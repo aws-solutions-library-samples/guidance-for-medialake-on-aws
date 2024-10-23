@@ -4,15 +4,29 @@ from aws_cdk import (
     aws_cloudfront as cf,
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
+    aws_events as events,
+    aws_athena as athena,
+    aws_events_targets as targets,
     aws_s3_deployment as s3deploy,
     aws_secretsmanager as secretsmanager,
     aws_cognito as cognito,
+    aws_kinesis as kinesis,
     aws_lambda as lambda_,
     aws_logs as logs,
     aws_cloudfront as cloudfront,
+    aws_cloudformation as cfn,
+    aws_dynamodb as ddb,
+    aws_ssm as ssm,
+    aws_quicksight as quicksight,
     aws_iam as iam,
+    aws_lambda as _lambda,
+    aws_sqs as sqs,
     aws_s3 as s3,
+    aws_stepfunctions as stepfunctions,
+    aws_stepfunctions_tasks as stepfunctions_tasks,
+    aws_stepfunctions_tasks as tasks,
     RemovalPolicy,
+    aws_kinesisfirehose as firehose,
     CfnOutput,
     Duration,
     ILocalBundling,
@@ -20,7 +34,7 @@ from aws_cdk import (
     DockerImage,
 )
 
-import os
+import aws_cdk.aws_glue_alpha as glue
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 
 
