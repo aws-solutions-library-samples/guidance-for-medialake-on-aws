@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -20,7 +20,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useCreateUser, useGetUsers } from './api/hooks/useUsers'
+import { useGetS3Buckets } from './api/hooks/useConnectors';
 
 interface Connector {
     type: string;
@@ -62,19 +62,22 @@ const SettingsComponent: React.FC = () => {
     const [editingItem, setEditingItem] = useState<number | null>(null);
     const [connectorPage, setConnectorPage] = useState<number>(1);
     const [integrationPage, setIntegrationPage] = useState<number>(1);
-    const { data: users, isLoading, error } = useGetUsers();
-    const createUserMutation = useCreateUser();
+    const [s3Buckets, setS3Buckets] = useState<string[]>([]);
 
-    if (isLoading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error.message}</div>;
+    const {
+        data: fetchedS3Buckets,
+        isLoading: isLoadingS3Buckets,
+        error: s3BucketsError
+    } = useGetS3Buckets();
 
-    const handleCreateUser = () => {
-        const newUser = {
-            name: 'John Doe',
-            email: 'john.doe@example.com',
-        };
-        createUserMutation.mutate(newUser);
-    };
+    useEffect(() => {
+        if (fetchedS3Buckets) {
+            setS3Buckets(fetchedS3Buckets.map(bucket => bucket[0]));
+        }
+        if (s3BucketsError) {
+            console.error('Error fetching S3 buckets:', s3BucketsError.message);
+        }
+    }, [fetchedS3Buckets, s3BucketsError]);
 
     const itemsPerPage = 6; // 2 rows of 3 cards
 
@@ -190,6 +193,76 @@ const SettingsComponent: React.FC = () => {
             </Grid>
         ));
     };
+
+    const renderConnectorModal = () => (
+        <Modal open={openConnectorModal} onClose={handleCloseConnectorModal}>
+            <Box sx={modalStyle}>
+                <IconButton
+                    aria-label="close"
+                    onClick={handleCloseConnectorModal}
+                    sx={{ position: 'absolute', right: 8, top: 8 }}
+                >
+                    <CloseIcon />
+                </IconButton>
+                <Typography variant="h6" component="h2" gutterBottom>
+                    {editingItem !== null ? 'Edit Connector' : 'Add New Connector'}
+                </Typography>
+                <TextField
+                    fullWidth
+                    label="Name"
+                    variant="outlined"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    sx={{ mt: 2 }}
+                />
+                <FormControl fullWidth sx={{ mt: 2 }}>
+                    <InputLabel>Type</InputLabel>
+                    <Select
+                        value={connectorType}
+                        label="Type"
+                        onChange={(e: SelectChangeEvent<string>) => setConnectorType(e.target.value)}
+                    >
+                        <MenuItem value="amazonS3">Amazon S3</MenuItem>
+                        <MenuItem value="googleCloudStorage">Google Cloud Storage</MenuItem>
+                    </Select>
+                </FormControl>
+                {connectorType === 'amazonS3' && (
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                        <InputLabel>Bucket</InputLabel>
+                        <Select
+                            value={bucket}
+                            label="Bucket"
+                            onChange={(e: SelectChangeEvent<string>) => setBucket(e.target.value)}
+                        >
+                            {isLoadingS3Buckets ? (
+                                <MenuItem value="">Loading buckets...</MenuItem>
+                            ) : s3Buckets.length > 0 ? (
+                                s3Buckets.map((bucketName) => (
+                                    <MenuItem key={bucketName} value={bucketName}>
+                                        {bucketName}
+                                    </MenuItem>
+                                ))
+                            ) : (
+                                <MenuItem value="">No buckets available</MenuItem>
+                            )}
+                        </Select>
+                    </FormControl>
+                )}
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button onClick={handleCloseConnectorModal} sx={{ mr: 2 }}>
+                        Cancel
+                    </Button>
+                    <Button variant="contained" onClick={handleConnectorSave}>
+                        Save
+                    </Button>
+                </Box>
+            </Box>
+        </Modal>
+    );
+
+    if (isLoadingS3Buckets) return <div>Loading S3 buckets...</div>;
+    if (s3BucketsError) return <div>Error loading S3 buckets: {s3BucketsError.message}</div>;
+
     return (
         <Box sx={{ flexGrow: 1, p: 3, mt: 8 }}>
             <Box sx={{ mb: 4 }}>
@@ -260,62 +333,7 @@ const SettingsComponent: React.FC = () => {
                 )}
             </Box>
 
-            {/* Connector Modal */}
-            <Modal open={openConnectorModal} onClose={handleCloseConnectorModal}>
-                <Box sx={modalStyle}>
-                    <IconButton
-                        aria-label="close"
-                        onClick={handleCloseConnectorModal}
-                        sx={{ position: 'absolute', right: 8, top: 8 }}
-                    >
-                        <CloseIcon />
-                    </IconButton>
-                    <Typography variant="h6" component="h2" gutterBottom>
-                        {editingItem !== null ? 'Edit Connector' : 'Add New Connector'}
-                    </Typography>
-                    <TextField
-                        fullWidth
-                        label="Name"
-                        variant="outlined"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        sx={{ mt: 2 }}
-                    />
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Type</InputLabel>
-                        <Select
-                            value={connectorType}
-                            label="Type"
-                            onChange={(e: SelectChangeEvent<string>) => setConnectorType(e.target.value)}
-                        >
-                            <MenuItem value="amazonS3">Amazon S3</MenuItem>
-                            <MenuItem value="googleCloudStorage">Google Cloud Storage</MenuItem>
-                        </Select>
-                    </FormControl>
-                    {connectorType === 'amazonS3' && (
-                        <FormControl fullWidth sx={{ mt: 2 }}>
-                            <InputLabel>Bucket</InputLabel>
-                            <Select
-                                value={bucket}
-                                label="Bucket"
-                                onChange={(e: SelectChangeEvent<string>) => setBucket(e.target.value)}
-                            >
-                                <MenuItem value="bucket1">Sample Bucket 1</MenuItem>
-                                <MenuItem value="bucket2">Sample Bucket 2</MenuItem>
-                                <MenuItem value="bucket3">Sample Bucket 3</MenuItem>
-                            </Select>
-                        </FormControl>
-                    )}
-                    <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button onClick={handleCloseConnectorModal} sx={{ mr: 2 }}>
-                            Cancel
-                        </Button>
-                        <Button variant="contained" onClick={handleConnectorSave}>
-                            Save
-                        </Button>
-                    </Box>
-                </Box>
-            </Modal>
+            {renderConnectorModal()}
 
             {/* Integration Modal */}
             <Modal open={openIntegrationModal} onClose={handleCloseIntegrationModal}>

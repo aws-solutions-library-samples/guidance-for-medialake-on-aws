@@ -170,7 +170,7 @@ class UIConstruct(Construct):
                     ),
                     behaviors=[
                         cloudfront.Behavior(
-                            path_pattern="/prod/api/*",
+                            path_pattern="/prod/*",
                             allowed_methods=cloudfront.CloudFrontAllowedMethods.ALL,
                             cached_methods=cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD,
                             compress=False,

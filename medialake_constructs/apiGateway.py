@@ -193,6 +193,43 @@ class ApiGatewayConstruct(Construct):
         # API resources
         api_resource = rest_api.root.add_resource("api")
 
+        # Add new connectors resource and s3list sub-resource
+        connectors_resource = api_resource.add_resource("connectors")
+        s3list_resource = connectors_resource.add_resource("s3list")
+
+        # Create S3 list Lambda function
+        s3list_handler = _lambda.Function(
+            self,
+            "S3ListHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset("lambdas/api/connectors/s3list"),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        # Add S3 list permissions to Lambda role
+        lambda_execution_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["s3:ListAllMyBuckets"],
+                resources=["*"],
+            )
+        )
+
+        # Add GET method to s3list resource
+        s3list_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(s3list_handler),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
         # Create specific route resources instead of using proxy
         reviews_resource = api_resource.add_resource("reviews")
         search_resource = api_resource.add_resource("search")

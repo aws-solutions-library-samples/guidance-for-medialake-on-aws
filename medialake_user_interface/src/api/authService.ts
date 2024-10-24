@@ -1,6 +1,8 @@
 // src/services/authService.ts
 import { CognitoUserPool, CognitoRefreshToken } from 'amazon-cognito-identity-js';
 import { StorageHelper } from '../common/helpers/storage-helper';
+import { Amplify } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 class AuthService {
     private userPool: CognitoUserPool | null = null;
@@ -63,6 +65,16 @@ class AuthService {
     clearTokens(): void {
         StorageHelper.clearToken();
         StorageHelper.clearRefreshToken();
+    }
+
+    async getCredentials() {
+        try {
+            const session = await fetchAuthSession();
+            return session.credentials;
+        } catch (error) {
+            console.error('Error getting credentials:', error);
+            return null;
+        }
     }
 }
 

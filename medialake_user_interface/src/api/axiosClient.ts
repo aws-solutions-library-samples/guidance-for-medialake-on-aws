@@ -1,10 +1,15 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { authService } from './authService';
+import { StorageHelper } from '../common/helpers/storage-helper';
 
-const baseURL = process.env.REACT_APP_API_BASE_URL;
+// Get the API endpoint from AWS configuration
+const getBaseURL = () => {
+    const awsConfig = StorageHelper.getAwsConfig();
+    return awsConfig?.API?.REST?.RestApi?.endpoint || '';
+};
 
 const axiosClient: AxiosInstance = axios.create({
-    baseURL,
+    baseURL: getBaseURL(),
     headers: {
         'Content-Type': 'application/json',
     },
@@ -18,10 +23,11 @@ axiosClient.interceptors.request.use(
             if (token) {
                 config.headers['Authorization'] = `Bearer ${token}`;
             }
+            return config;
         } catch (error) {
             console.error('Error setting auth token:', error);
+            return Promise.reject(error);
         }
-        return config;
     },
     (error) => Promise.reject(error)
 );
@@ -41,7 +47,7 @@ axiosClient.interceptors.response.use(
                 if (newToken) {
                     // Update the failed request with the new token
                     originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    return axios(originalRequest);
+                    return axiosClient(originalRequest);
                 }
             } catch (refreshError) {
                 // If refresh fails, clear tokens and redirect to login

@@ -1,7 +1,10 @@
 {
   "dependencies": {
+    "@aws-amplify/auth": "^6.5.3",
+    "@aws-amplify/core": "^6.4.6",
     "@aws-amplify/ui-react": "^6.5.5",
     "amazon-cognito-identity-js": "^6.3.12",
+    "aws-amplify": "^6.6.6",
     "axios": "^1.7.7"
   }
 }
