@@ -15,7 +15,7 @@ class ApiClient extends ApiClientBase {
 
     private getBaseURL() {
         const awsConfig = StorageHelper.getAwsConfig();
-        return awsConfig?.API?.REST?.RestApi?.endpoint || '';
+        return awsConfig?.API?.REST?.RestApi?.endpoint + '/api' || '';
     }
 
     private setupInterceptors() {

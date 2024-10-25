@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Typography,
@@ -15,6 +15,7 @@ import {
     IconButton,
     Pagination,
     SelectChangeEvent,
+    CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -48,7 +49,6 @@ const modalStyle = {
     borderRadius: 2,
 };
 
-
 const SettingsComponent: React.FC = () => {
     const [openConnectorModal, setOpenConnectorModal] = useState<boolean>(false);
     const [openIntegrationModal, setOpenIntegrationModal] = useState<boolean>(false);
@@ -63,36 +63,40 @@ const SettingsComponent: React.FC = () => {
     const [connectorPage, setConnectorPage] = useState<number>(1);
     const [integrationPage, setIntegrationPage] = useState<number>(1);
     const [s3Buckets, setS3Buckets] = useState<string[]>([]);
+    const [isLoadingS3Buckets, setIsLoadingS3Buckets] = useState(false);
 
-    const {
-        data: fetchedS3Buckets,
-        isLoading: isLoadingS3Buckets,
-        error: s3BucketsError
-    } = useGetS3Buckets();
+    const { refetch: fetchS3Buckets } = useGetS3Buckets();
 
-    useEffect(() => {
-        if (fetchedS3Buckets) {
-            setS3Buckets(fetchedS3Buckets.map(bucket => bucket[0]));
-        }
-        if (s3BucketsError) {
-            console.error('Error fetching S3 buckets:', s3BucketsError.message);
-        }
-    }, [fetchedS3Buckets, s3BucketsError]);
+    const itemsPerPage = 6;
 
-    const itemsPerPage = 6; // 2 rows of 3 cards
-
-    const handleOpenConnectorModal = () => {
+    const handleOpenConnectorModal = async () => {
         setOpenConnectorModal(true);
         setEditingItem(null);
+        if (s3Buckets.length === 0) {
+            setIsLoadingS3Buckets(true);
+            try {
+                const result = await fetchS3Buckets();
+                if (result.data && result.data.buckets) {
+                    setS3Buckets(result.data.buckets);
+                }
+            } catch (error) {
+                console.error('Error fetching S3 buckets:', error);
+            } finally {
+                setIsLoadingS3Buckets(false);
+            }
+        }
     };
+
     const handleCloseConnectorModal = () => {
         setOpenConnectorModal(false);
         resetForm();
     };
+
     const handleOpenIntegrationModal = () => {
         setOpenIntegrationModal(true);
         setEditingItem(null);
     };
+
     const handleCloseIntegrationModal = () => {
         setOpenIntegrationModal(false);
         resetForm();
@@ -235,7 +239,9 @@ const SettingsComponent: React.FC = () => {
                             onChange={(e: SelectChangeEvent<string>) => setBucket(e.target.value)}
                         >
                             {isLoadingS3Buckets ? (
-                                <MenuItem value="">Loading buckets...</MenuItem>
+                                <MenuItem value="">
+                                    <CircularProgress size={20} /> Loading buckets...
+                                </MenuItem>
                             ) : s3Buckets.length > 0 ? (
                                 s3Buckets.map((bucketName) => (
                                     <MenuItem key={bucketName} value={bucketName}>
@@ -259,9 +265,6 @@ const SettingsComponent: React.FC = () => {
             </Box>
         </Modal>
     );
-
-    if (isLoadingS3Buckets) return <div>Loading S3 buckets...</div>;
-    if (s3BucketsError) return <div>Error loading S3 buckets: {s3BucketsError.message}</div>;
 
     return (
         <Box sx={{ flexGrow: 1, p: 3, mt: 8 }}>
@@ -335,7 +338,6 @@ const SettingsComponent: React.FC = () => {
 
             {renderConnectorModal()}
 
-            {/* Integration Modal */}
             <Modal open={openIntegrationModal} onClose={handleCloseIntegrationModal}>
                 <Box sx={modalStyle}>
                     <IconButton

@@ -74,7 +74,6 @@ class ApiGatewayConstruct(Construct):
                 ),
             ),
         )
-
         # Cognito Authorizer
 
         cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
@@ -82,21 +81,6 @@ class ApiGatewayConstruct(Construct):
             "CognitoAuthorizer",
             identity_source="method.request.header.Authorization",
             cognito_user_pools=[user_pool],
-        )
-
-        # API handler
-        api_handler_role = iam.Role(
-            self,
-            "CreateJobExecutionRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-        )
-
-        api_handler_role.add_to_principal_policy(
-            iam.PolicyStatement(
-                actions=["states:StartExecution"],
-                resources=["*"],
-                effect=iam.Effect.ALLOW,
-            )
         )
 
         api_handler_log_group = logs.LogGroup(
@@ -196,6 +180,7 @@ class ApiGatewayConstruct(Construct):
         # Add new connectors resource and s3list sub-resource
         connectors_resource = api_resource.add_resource("connectors")
         s3list_resource = connectors_resource.add_resource("s3list")
+        s3connector_resource = connectors_resource.add_resource("s3connector")
 
         # Create S3 list Lambda function
         s3list_handler = _lambda.Function(
@@ -205,6 +190,21 @@ class ApiGatewayConstruct(Construct):
             handler="index.handler",
             architecture=lambda_architecture,
             code=_lambda.Code.from_asset("lambdas/api/connectors/s3list"),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        s3connector_handler = _lambda.Function(
+            self,
+            "S3ConnectorHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset("lambdas/api/connectors/s3connector"),
             log_group=api_handler_log_group,
             role=lambda_execution_role,
             timeout=Duration.seconds(30),
@@ -230,6 +230,14 @@ class ApiGatewayConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
+        # Add GET method to s3list resource
+        s3connector_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(s3connector_handler),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
         # Create specific route resources instead of using proxy
         reviews_resource = api_resource.add_resource("reviews")
         search_resource = api_resource.add_resource("search")
@@ -250,22 +258,6 @@ class ApiGatewayConstruct(Construct):
                 "REVIEW_TABLE_NAME": "asset-review",
             },
         )
-
-        search_handler = _lambda.Function(
-            self,
-            "SearchHandler",
-            runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="index.handler",
-            architecture=lambda_architecture,
-            code=_lambda.Code.from_asset("lambdas/search_handler"),
-            log_group=api_handler_log_group,
-            role=lambda_execution_role,
-            timeout=Duration.seconds(30),
-            environment={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-            },
-        )
-
         # Add methods to resources with specific Lambda integrations
         reviews_resource.add_method(
             "GET",
@@ -283,7 +275,7 @@ class ApiGatewayConstruct(Construct):
 
         search_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(search_handler),
+            apigateway.LambdaIntegration(s3connector_handler),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )

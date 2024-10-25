@@ -5,7 +5,9 @@ import { StorageHelper } from '../common/helpers/storage-helper';
 // Get the API endpoint from AWS configuration
 const getBaseURL = () => {
     const awsConfig = StorageHelper.getAwsConfig();
-    return awsConfig?.API?.REST?.RestApi?.endpoint || '';
+    const baseURL = awsConfig?.API?.REST?.RestApi?.endpoint + '/api' || '';
+    console.log('Base URL:', baseURL);
+    return baseURL;
 };
 
 const axiosClient: AxiosInstance = axios.create({

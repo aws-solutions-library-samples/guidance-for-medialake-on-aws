@@ -1,7 +1,6 @@
 // src/services/authService.ts
 import { CognitoUserPool, CognitoRefreshToken } from 'amazon-cognito-identity-js';
 import { StorageHelper } from '../common/helpers/storage-helper';
-import { Amplify } from 'aws-amplify';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 class AuthService {
