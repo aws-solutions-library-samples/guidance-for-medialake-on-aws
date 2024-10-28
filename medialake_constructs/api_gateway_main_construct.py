@@ -4,7 +4,6 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     Duration,
     RemovalPolicy,
-    SecretValue,
 )
 from dataclasses import dataclass
 from constructs import Construct
@@ -33,6 +32,14 @@ class ApiGatewayConstruct(Construct):
             self,
             "RestAPILogGroup",
             removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        # Create Cognito Authorizer first
+        cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self,
+            "CognitoAuthorizer",
+            identity_source="method.request.header.Authorization",
+            cognito_user_pools=[user_pool],
         )
 
         # Create the Rest API
@@ -66,14 +73,10 @@ class ApiGatewayConstruct(Construct):
                     rest_api_log_group
                 ),
             ),
-        )
-
-        # Cognito Authorizer
-        cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "CognitoAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[user_pool],
+            default_method_options=apigateway.MethodOptions(
+                authorization_type=apigateway.AuthorizationType.COGNITO,
+                authorizer=cognito_authorizer,
+            ),
         )
 
         x_origin_verify_secret = secretsmanager.Secret(

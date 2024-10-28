@@ -1,0 +1,1 @@
+{"region":"us-east-1","Auth":{"Cognito":{"userPoolClientId":"9oth52he4ggef6kcc4ves98f7","userPoolId":"us-east-1_bMxZCbjK4","identityPoolId":"us-east-1:837fdd16-b18d-4a8e-9c4e-24e77451be0e"}},"API":{"REST":{"RestApi":{"endpoint":"https://d169qga2r7f5ly.cloudfront.net/prod"}}}}

@@ -1,15 +1,19 @@
 from aws_cdk import (
     Stack,
-    RemovalPolicy,
     CfnOutput,
+    aws_iam as iam,
 )
 
 from constructs import Construct
 
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
-
-from medialake_constructs.apiGateway import ApiGatewayConstruct, ApiGatewayProps
-
+from medialake_constructs.api_gateway_main_construct import (
+    ApiGatewayConstruct,
+)
+from medialake_constructs.api_gateway_connectors import (
+    ConnectorsConstruct,
+)
+from medialake_constructs.api_gateway_pipelines import PipelinesConstruct
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
 
@@ -18,25 +22,63 @@ class DataLake(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # # User auth with Cognito
+        # User auth with Cognito
         self._cognito = CognitoConstruct(
             self,
             "Cognito",
-            props=CognitoProps(assets_bucket_arn="arn:aws:s3:::mne-mscdemo-testevent"),
+            props=CognitoProps(
+                assets_bucket_arn="arn:aws:s3:::mne-mscdemo-testevent"
+            ),
         )
 
-        # # APIGateway
-        self._rest_api = ApiGatewayConstruct(
+        # Create main API Gateway construct
+        api_gateway = ApiGatewayConstruct(
             self,
             "ApiGateway",
-            self._cognito.user_pool,
-            ApiGatewayProps(collection_endpoint="seendpoint"),
+            user_pool=self._cognito.user_pool,
         )
 
+        # Create Lambda execution role
+        lambda_execution_role = iam.Role(
+            self,
+            "LambdaExecutionRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+        )
+
+        # Add necessary permissions to Lambda role
+        lambda_execution_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["s3:ListAllMyBuckets"],
+                resources=["*"],
+            )
+        )
+
+        # Create connectors construct
+        _ = ConnectorsConstruct(
+            self,
+            "Connectors",
+            api_resource=api_gateway.api_resource,
+            cognito_authorizer=api_gateway.cognito_authorizer,
+            lambda_execution_role=lambda_execution_role,
+            x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+        )
+
+        # Create pipelines construct
+        _ = PipelinesConstruct(
+            self,
+            "Pipelines",
+            api_resource=api_gateway.api_resource,
+            cognito_authorizer=api_gateway.cognito_authorizer,
+            lambda_execution_role=lambda_execution_role,
+            x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+        )
+
+        # Create User Interface
         self._ui = UIConstruct(
             self,
             "UserInterface",
-            self._rest_api.rest_api_id,
+            api_gateway.rest_api.rest_api_id,
             self._cognito.user_pool,
             self._cognito.user_pool_client,
             self._cognito.identity_pool,

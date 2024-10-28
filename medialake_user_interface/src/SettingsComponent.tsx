@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -15,27 +15,14 @@ import {
     IconButton,
     Pagination,
     SelectChangeEvent,
-    CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useGetS3Buckets } from './api/hooks/useConnectors';
-
-interface Connector {
-    type: string;
-    bucket: string;
-    name: string;
-    createdDate: string;
-}
-
-interface Integration {
-    type: string;
-    apiKey: string;
-    name: string;
-    createdDate: string;
-}
+import { useCreateConnector, useUpdateConnector, useDeleteConnector, useGetConnectors } from './api/hooks/useConnectors';
+import { ConnectorResponse, CreateConnectorRequest, Integration } from './api/types/api.types';
+import { useAuth } from './common/hooks/auth-context';
+import ConnectorCard from './components/settings/ConnectorCard';
+import { ConnectorModal } from './components/settings/ConnectorModal';
 
 const modalStyle = {
     position: 'absolute' as const,
@@ -52,144 +39,139 @@ const modalStyle = {
 const SettingsComponent: React.FC = () => {
     const [openConnectorModal, setOpenConnectorModal] = useState<boolean>(false);
     const [openIntegrationModal, setOpenIntegrationModal] = useState<boolean>(false);
-    const [connectorType, setConnectorType] = useState<string>('');
-    const [bucket, setBucket] = useState<string>('');
     const [integrationType, setIntegrationType] = useState<string>('');
     const [apiKey, setApiKey] = useState<string>('');
-    const [connectors, setConnectors] = useState<Connector[]>([]);
+    const [connectors, setConnectors] = useState<ConnectorResponse[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [name, setName] = useState<string>('');
-    const [editingItem, setEditingItem] = useState<number | null>(null);
+    const [editingConnector, setEditingConnector] = useState<ConnectorResponse | null>(null);
     const [connectorPage, setConnectorPage] = useState<number>(1);
     const [integrationPage, setIntegrationPage] = useState<number>(1);
-    const [s3Buckets, setS3Buckets] = useState<string[]>([]);
-    const [isLoadingS3Buckets, setIsLoadingS3Buckets] = useState(false);
 
-    const { refetch: fetchS3Buckets } = useGetS3Buckets();
+    const { isAuthenticated } = useAuth();
+    const { data: connectorsData, refetch: refetchConnectors } = useGetConnectors();
+    const { mutateAsync: createConnector } = useCreateConnector();
+    const { mutateAsync: updateConnector } = useUpdateConnector();
+    const { mutateAsync: deleteConnector } = useDeleteConnector();
 
     const itemsPerPage = 6;
 
-    const handleOpenConnectorModal = async () => {
-        setOpenConnectorModal(true);
-        setEditingItem(null);
-        if (s3Buckets.length === 0) {
-            setIsLoadingS3Buckets(true);
-            try {
-                const result = await fetchS3Buckets();
-                if (result.data && result.data.buckets) {
-                    setS3Buckets(result.data.buckets);
-                }
-            } catch (error) {
-                console.error('Error fetching S3 buckets:', error);
-            } finally {
-                setIsLoadingS3Buckets(false);
-            }
+    useEffect(() => {
+        if (connectorsData?.data?.connectors) {
+            setConnectors(Array.isArray(connectorsData.data.connectors) 
+                ? connectorsData.data.connectors 
+                : []);
         }
+    }, [connectorsData]);
+
+    const handleOpenConnectorModal = () => {
+        setOpenConnectorModal(true);
+        setEditingConnector(null);
     };
 
     const handleCloseConnectorModal = () => {
         setOpenConnectorModal(false);
-        resetForm();
+        setEditingConnector(null);
+    };
+
+    const handleConnectorSave = async (connectorData: CreateConnectorRequest) => {
+        try {
+            if (editingConnector) {
+                await updateConnector({
+                    id: editingConnector.id,
+                    data: connectorData
+                });
+            } else {
+                await createConnector(connectorData);
+            }
+            await refetchConnectors();
+            handleCloseConnectorModal();
+        } catch (error) {
+            console.error('Error saving connector:', error);
+        }
+    };
+
+    const handleConnectorDelete = async (id: string) => {
+        try {
+            await deleteConnector(id);
+            await refetchConnectors();
+        } catch (error) {
+            console.error('Error deleting connector:', error);
+        }
+    };
+
+    const handleConnectorEdit = (connector: ConnectorResponse) => {
+        setEditingConnector(connector);
+        setOpenConnectorModal(true);
     };
 
     const handleOpenIntegrationModal = () => {
         setOpenIntegrationModal(true);
-        setEditingItem(null);
     };
 
     const handleCloseIntegrationModal = () => {
         setOpenIntegrationModal(false);
-        resetForm();
-    };
-
-    const resetForm = () => {
-        setConnectorType('');
-        setBucket('');
+        setName('');
         setIntegrationType('');
         setApiKey('');
-        setName('');
-        setEditingItem(null);
-    };
-
-    const handleConnectorSave = () => {
-        const newConnector: Connector = {
-            type: connectorType,
-            bucket,
-            name,
-            createdDate: new Date().toISOString()
-        };
-        if (editingItem !== null) {
-            const updatedConnectors = [...connectors];
-            updatedConnectors[editingItem] = newConnector;
-            setConnectors(updatedConnectors);
-        } else {
-            setConnectors([...connectors, newConnector]);
-        }
-        handleCloseConnectorModal();
     };
 
     const handleIntegrationSave = () => {
         const newIntegration: Integration = {
+            id: Date.now().toString(),
             type: integrationType,
             apiKey,
             name,
             createdDate: new Date().toISOString()
         };
-        if (editingItem !== null) {
-            const updatedIntegrations = [...integrations];
-            updatedIntegrations[editingItem] = newIntegration;
-            setIntegrations(updatedIntegrations);
-        } else {
-            setIntegrations([...integrations, newIntegration]);
-        }
+        setIntegrations([...integrations, newIntegration]);
         handleCloseIntegrationModal();
     };
 
-    const handleDelete = (index: number, isConnector: boolean) => {
-        if (isConnector) {
-            setConnectors(connectors.filter((_, i) => i !== index));
-        } else {
-            setIntegrations(integrations.filter((_, i) => i !== index));
-        }
+    const handleIntegrationDelete = (id: string) => {
+        setIntegrations(integrations.filter(i => i.id !== id));
     };
 
-    const handleEdit = (index: number, isConnector: boolean) => {
-        const item = isConnector ? connectors[index] : integrations[index];
-        setName(item.name);
-        if (isConnector) {
-            setConnectorType(item.type);
-            if ('bucket' in item) {
-                setBucket(item.bucket);
-            }
-            setOpenConnectorModal(true);
-        } else {
-            setIntegrationType(item.type);
-            if ('apiKey' in item) {
-                setApiKey(item.apiKey);
-            }
-            setOpenIntegrationModal(true);
+    const renderConnectors = () => {
+        if (!Array.isArray(connectors)) {
+            return null;
         }
-        setEditingItem(index);
-    };
-
-    const renderCards = (items: (Connector | Integration)[], isConnector: boolean) => {
-        const startIndex = ((isConnector ? connectorPage : integrationPage) - 1) * itemsPerPage;
+    
+        const startIndex = (connectorPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
-        const paginatedItems = items.slice(startIndex, endIndex);
+        const paginatedConnectors = connectors.slice(startIndex, endIndex);
+    
+        return paginatedConnectors.map((connector) => (
+            <Grid item xs={12} sm={6} md={4} key={connector.id}>
+                <ConnectorCard
+                    connector={connector}
+                    onEdit={handleConnectorEdit}
+                    onDelete={handleConnectorDelete}
+                />
+            </Grid>
+        ));
+    };
 
-        return paginatedItems.map((item, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
+    const renderIntegrations = () => {
+        const startIndex = (integrationPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedIntegrations = integrations.slice(startIndex, endIndex);
+
+        return paginatedIntegrations.map((integration) => (
+            <Grid item xs={12} sm={6} md={4} key={integration.id}>
                 <Card>
                     <CardContent>
-                        <Typography variant="h6">{item.name}</Typography>
-                        <Typography>Type: {item.type}</Typography>
-                        <Typography>Created: {new Date(item.createdDate).toLocaleDateString()}</Typography>
+                        <Typography variant="h6">{integration.name}</Typography>
+                        <Typography>Type: {integration.type}</Typography>
+                        <Typography>
+                            Created: {new Date(integration.createdDate).toLocaleDateString()}
+                        </Typography>
                         <Box sx={{ mt: 2 }}>
-                            <IconButton aria-label="edit" onClick={() => handleEdit(startIndex + index, isConnector)}>
-                                <EditIcon />
-                            </IconButton>
-                            <IconButton aria-label="delete" onClick={() => handleDelete(startIndex + index, isConnector)}>
-                                <DeleteIcon />
+                            <IconButton
+                                aria-label="delete"
+                                onClick={() => handleIntegrationDelete(integration.id)}
+                            >
+                                <CloseIcon />
                             </IconButton>
                         </Box>
                     </CardContent>
@@ -198,74 +180,6 @@ const SettingsComponent: React.FC = () => {
         ));
     };
 
-    const renderConnectorModal = () => (
-        <Modal open={openConnectorModal} onClose={handleCloseConnectorModal}>
-            <Box sx={modalStyle}>
-                <IconButton
-                    aria-label="close"
-                    onClick={handleCloseConnectorModal}
-                    sx={{ position: 'absolute', right: 8, top: 8 }}
-                >
-                    <CloseIcon />
-                </IconButton>
-                <Typography variant="h6" component="h2" gutterBottom>
-                    {editingItem !== null ? 'Edit Connector' : 'Add New Connector'}
-                </Typography>
-                <TextField
-                    fullWidth
-                    label="Name"
-                    variant="outlined"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    sx={{ mt: 2 }}
-                />
-                <FormControl fullWidth sx={{ mt: 2 }}>
-                    <InputLabel>Type</InputLabel>
-                    <Select
-                        value={connectorType}
-                        label="Type"
-                        onChange={(e: SelectChangeEvent<string>) => setConnectorType(e.target.value)}
-                    >
-                        <MenuItem value="amazonS3">Amazon S3</MenuItem>
-                        <MenuItem value="googleCloudStorage">Google Cloud Storage</MenuItem>
-                    </Select>
-                </FormControl>
-                {connectorType === 'amazonS3' && (
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Bucket</InputLabel>
-                        <Select
-                            value={bucket}
-                            label="Bucket"
-                            onChange={(e: SelectChangeEvent<string>) => setBucket(e.target.value)}
-                        >
-                            {isLoadingS3Buckets ? (
-                                <MenuItem value="">
-                                    <CircularProgress size={20} /> Loading buckets...
-                                </MenuItem>
-                            ) : s3Buckets.length > 0 ? (
-                                s3Buckets.map((bucketName) => (
-                                    <MenuItem key={bucketName} value={bucketName}>
-                                        {bucketName}
-                                    </MenuItem>
-                                ))
-                            ) : (
-                                <MenuItem value="">No buckets available</MenuItem>
-                            )}
-                        </Select>
-                    </FormControl>
-                )}
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button onClick={handleCloseConnectorModal} sx={{ mr: 2 }}>
-                        Cancel
-                    </Button>
-                    <Button variant="contained" onClick={handleConnectorSave}>
-                        Save
-                    </Button>
-                </Box>
-            </Box>
-        </Modal>
-    );
-
     return (
         <Box sx={{ flexGrow: 1, p: 3, mt: 8 }}>
             <Box sx={{ mb: 4 }}>
@@ -273,7 +187,7 @@ const SettingsComponent: React.FC = () => {
                     Connectors
                 </Typography>
                 <Grid container spacing={2}>
-                    {renderCards(connectors, true)}
+                    {renderConnectors()}
                     {connectors.length < itemsPerPage && (
                         <Grid item xs={12} sm={6} md={4}>
                             <Card sx={{ height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -307,7 +221,7 @@ const SettingsComponent: React.FC = () => {
                     Integrations
                 </Typography>
                 <Grid container spacing={2}>
-                    {renderCards(integrations, false)}
+                    {renderIntegrations()}
                     {integrations.length < itemsPerPage && (
                         <Grid item xs={12} sm={6} md={4}>
                             <Card sx={{ height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -336,7 +250,12 @@ const SettingsComponent: React.FC = () => {
                 )}
             </Box>
 
-            {renderConnectorModal()}
+            <ConnectorModal
+                open={openConnectorModal}
+                onClose={handleCloseConnectorModal}
+                onSave={handleConnectorSave}
+                editingConnector={editingConnector || undefined}
+            />
 
             <Modal open={openIntegrationModal} onClose={handleCloseIntegrationModal}>
                 <Box sx={modalStyle}>
@@ -348,7 +267,7 @@ const SettingsComponent: React.FC = () => {
                         <CloseIcon />
                     </IconButton>
                     <Typography variant="h6" component="h2" gutterBottom>
-                        {editingItem !== null ? 'Edit Integration' : 'Add New Integration'}
+                        Add New Integration
                     </Typography>
                     <TextField
                         fullWidth

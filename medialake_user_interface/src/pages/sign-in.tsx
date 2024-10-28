@@ -35,19 +35,15 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
         try {
             const result = await onSignIn(email, password);
             if (result.success) {
-                // Handle successful sign-in
                 console.log('Sign-in successful');
             } else if (result.user) {
-                // Handle the case where sign-in failed but we have a user object
                 console.log('Sign-in failed, but we have a user object:', result.user);
                 setCognitoUser(result.user);
                 console.log(result.type)
-                // Check if we need to show the change password modal
                 if (result.type === 'NEW_PASSWORD_REQUIRED') {
                     setShowChangePasswordModal(true);
                 }
             } else {
-                // Handle sign-in failure without a user object
                 console.error('Sign-in failed');
             }
         } catch (error) {
@@ -57,15 +53,12 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
         }
     };
 
-
     const handleChangePassword = async () => {
         if (onChangePassword && cognitoUser && newPassword) {
             try {
                 await onChangePassword(cognitoUser, newPassword, {});
                 setShowChangePasswordModal(false);
                 setChangePasswordError('');
-                // Optionally, you can sign in the user automatically after password change
-                // or redirect them to the login page
             } catch (error) {
                 setChangePasswordError('Failed to change password. Please try again.');
             }
@@ -104,10 +97,16 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
                                 fullWidth
                                 id="email"
                                 label="Email"
+                                name="email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 disabled={loading}
+                                autoComplete="username"
+                                autoFocus
+                                inputProps={{
+                                    'data-testid': 'email-input'
+                                }}
                             />
 
                             <TextField
@@ -116,10 +115,15 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
                                 fullWidth
                                 id="password"
                                 label="Password"
+                                name="password"
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 disabled={loading}
+                                autoComplete="current-password"
+                                inputProps={{
+                                    'data-testid': 'password-input'
+                                }}
                             />
 
                             <Button
@@ -128,6 +132,7 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
                                 variant="contained"
                                 sx={{ mt: 3, mb: 2 }}
                                 disabled={loading}
+                                data-testid="sign-in-button"
                             >
                                 {loading ? 'Signing in...' : 'Sign In'}
                             </Button>
@@ -155,6 +160,7 @@ const SignInPage: React.FC<SignInPageProps> = ({ onSignIn, onChangePassword, log
                         fullWidth
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
                     />
                 </DialogContent>
                 <DialogActions>
