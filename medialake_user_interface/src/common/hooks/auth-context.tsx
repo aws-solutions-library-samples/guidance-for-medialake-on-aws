@@ -10,16 +10,15 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { refreshSession: refreshAuthSession } = useAuthenticate();
   const { reinitializeUserPool } = useUserPool();
 
-  const checkAuthStatus = () => {
-
+  const checkAuthStatus = useCallback(() => {
     const token = StorageHelper.getToken();
     if (token) {
       setIsAuthenticated(true);
@@ -27,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
     }
     setIsLoading(false);
-  };
+  }, []);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -66,12 +65,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}

@@ -14,20 +14,15 @@ import {
     CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useGetS3Buckets } from './api/hooks/useConnectors';
-
-interface Connector {
-    type: string;
-    bucket: string;
-    name: string;
-    createdDate: string;
-}
+import { useGetS3Buckets } from '../../api/hooks/useConnectors';
+import { ConnectorResponse, CreateConnectorRequest } from '../../api/types/api.types';
+import { useCreateS3Connector, useCreateGCSConnector } from '../../api/hooks/useConnectors';
 
 interface ConnectorModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (connector: Connector) => void;
-    editingConnector?: Connector;
+    onSave: (connector: CreateConnectorRequest) => void;
+    editingConnector?: ConnectorResponse;
 }
 
 const modalStyle = {
@@ -51,16 +46,15 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [name, setName] = useState('');
     const [connectorType, setConnectorType] = useState('');
     const [bucket, setBucket] = useState('');
-    const [s3Buckets, setS3Buckets] = useState<string[]>([]);
-    const [isLoadingS3Buckets, setIsLoadingS3Buckets] = useState(false);
-
-    const { refetch: fetchS3Buckets } = useGetS3Buckets();
+    const { data: s3BucketsData, refetch: fetchS3Buckets, isLoading: isLoadingS3Buckets } = useGetS3Buckets();
+    const createS3Connector = useCreateS3Connector();
+    const createGCSConnector = useCreateGCSConnector();
 
     useEffect(() => {
         if (editingConnector) {
             setName(editingConnector.name);
             setConnectorType(editingConnector.type);
-            setBucket(editingConnector.bucket);
+            setBucket(editingConnector.configuration?.bucket || '');
         } else {
             setName('');
             setConnectorType('');
@@ -69,33 +63,36 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
     }, [editingConnector]);
 
     useEffect(() => {
-        if (open && connectorType === 'amazonS3' && s3Buckets.length === 0) {
-            loadS3Buckets();
+        if (open && connectorType === 'amazonS3') {
+            fetchS3Buckets();
         }
-    }, [open, connectorType]);
+    }, [open, connectorType, fetchS3Buckets]);
 
-    const loadS3Buckets = async () => {
-        setIsLoadingS3Buckets(true);
+    const handleSave = async () => {
+        const connectorData: CreateConnectorRequest = {
+            name,
+            type: connectorType,
+            configuration: {
+                bucket
+            }
+        };
+
         try {
-            const result = await fetchS3Buckets();
-            if (result.data && result.data.buckets) {
-                setS3Buckets(result.data.buckets);
+            let response;
+            if (connectorType === 'amazonS3') {
+                response = await createS3Connector.mutateAsync(connectorData);
+            } else if (connectorType === 'googleCloudStorage') {
+                response = await createGCSConnector.mutateAsync(connectorData);
+            }
+
+            if (response) {
+                onSave(connectorData);
+                onClose();
             }
         } catch (error) {
-            console.error('Error fetching S3 buckets:', error);
-        } finally {
-            setIsLoadingS3Buckets(false);
+            console.error('Error creating connector:', error);
+            // You might want to add error handling/display here
         }
-    };
-
-    const handleSave = () => {
-        const newConnector: Connector = {
-            type: connectorType,
-            bucket,
-            name,
-            createdDate: editingConnector?.createdDate || new Date().toISOString(),
-        };
-        onSave(newConnector);
     };
 
     return (
@@ -142,8 +139,8 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 <MenuItem value="">
                                     <CircularProgress size={20} /> Loading buckets...
                                 </MenuItem>
-                            ) : s3Buckets.length > 0 ? (
-                                s3Buckets.map((bucketName) => (
+                            ) : s3BucketsData?.buckets && s3BucketsData.buckets.length > 0 ? (
+                                s3BucketsData.buckets.map((bucketName) => (
                                     <MenuItem key={bucketName} value={bucketName}>
                                         {bucketName}
                                     </MenuItem>

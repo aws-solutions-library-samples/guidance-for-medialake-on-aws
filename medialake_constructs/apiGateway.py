@@ -11,9 +11,6 @@ from aws_cdk import (
 )
 from dataclasses import dataclass
 from constructs import Construct
-
-# from workflowConstructs.lambdaLayers import PowertoolsLayer
-# from workflowConstructs.customLambdaLayer import CustomLambdaLayerConstruct
 from typing import Optional
 
 
@@ -74,8 +71,8 @@ class ApiGatewayConstruct(Construct):
                 ),
             ),
         )
-        # Cognito Authorizer
 
+        # Cognito Authorizer
         cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
             self,
             "CognitoAuthorizer",
@@ -147,40 +144,13 @@ class ApiGatewayConstruct(Construct):
             )
         )
 
-        api_handler = _lambda.Function(
-            self,
-            "ApiHandler",
-            runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="index.handler",
-            architecture=lambda_architecture,
-            code=_lambda.Code.from_asset("lambdas/api_handler"),
-            log_group=api_handler_log_group,
-            role=lambda_execution_role,
-            timeout=Duration.seconds(30),
-            layers=[
-                # powertools_layer.layer,
-                # opensearchpy_layer.layer,
-                # requests_aws4auth_layer.layer,
-            ],
-            environment={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                # "OPENSEARCH_COLLECTION_ENDPOINT": self.props.collection_endpoint,
-                "REVIEW_TABLE_NAME": "asset-review",
-            },
-        )
-
-        # set ddb permissions
-        ddb.Table.from_table_name(
-            self, "AssetReviewTable", "asset-review"
-        ).grant_read_write_data(api_handler)
-
         # API resources
         api_resource = rest_api.root.add_resource("api")
 
-        # Add new connectors resource and s3list sub-resource
+        # Add connectors resource and s3list sub-resource
         connectors_resource = api_resource.add_resource("connectors")
         s3list_resource = connectors_resource.add_resource("s3list")
-        s3connector_resource = connectors_resource.add_resource("s3connector")
+        s3_resource = connectors_resource.add_resource("s3")
 
         # Create S3 list Lambda function
         s3list_handler = _lambda.Function(
@@ -198,13 +168,13 @@ class ApiGatewayConstruct(Construct):
             },
         )
 
-        s3connector_handler = _lambda.Function(
+        post_s3_handler = _lambda.Function(
             self,
-            "S3ConnectorHandler",
+            "PostS3Handler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="index.handler",
             architecture=lambda_architecture,
-            code=_lambda.Code.from_asset("lambdas/api/connectors/s3connector"),
+            code=_lambda.Code.from_asset("lambdas/api/connectors/s3/post_s3"),
             log_group=api_handler_log_group,
             role=lambda_execution_role,
             timeout=Duration.seconds(30),
@@ -230,52 +200,141 @@ class ApiGatewayConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
-        # Add GET method to s3list resource
-        s3connector_resource.add_method(
+        # Add POST method to post_s3 resource
+        s3_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(s3connector_handler),
+            apigateway.LambdaIntegration(post_s3_handler),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
 
-        # Create specific route resources instead of using proxy
-        reviews_resource = api_resource.add_resource("reviews")
-        search_resource = api_resource.add_resource("search")
+        # Add pipelines resources
+        # The `pipelines_resource` is creating a resource named "pipelines" under the main API
+        # resource "api". This resource represents a collection of pipelines and is used to define
+        # endpoints related to pipelines within the API Gateway. It allows for organizing and grouping
+        # API endpoints related to pipelines under a common path.
+        pipelines_resource = api_resource.add_resource("pipelines")
 
-        # Create separate Lambda functions for different routes
-        reviews_handler = _lambda.Function(
+        # GET /api/pipelines
+        get_pipelines_handler = _lambda.Function(
             self,
-            "ReviewsHandler",
+            "GetPipelinesHandler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="index.handler",
             architecture=lambda_architecture,
-            code=_lambda.Code.from_asset("lambdas/reviews_handler"),
+            code=_lambda.Code.from_asset("lambdas/api/pipelines/get_pipelines"),
             log_group=api_handler_log_group,
             role=lambda_execution_role,
             timeout=Duration.seconds(30),
             environment={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "REVIEW_TABLE_NAME": "asset-review",
             },
         )
-        # Add methods to resources with specific Lambda integrations
-        reviews_resource.add_method(
+
+        pipelines_resource.add_method(
             "GET",
-            apigateway.LambdaIntegration(reviews_handler),
+            apigateway.LambdaIntegration(get_pipelines_handler),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
 
-        reviews_resource.add_method(
+        # POST /api/pipelines
+        post_pipelines_handler = _lambda.Function(
+            self,
+            "PostPipelinesHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset("lambdas/api/pipelines/post_pipelines"),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        pipelines_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(reviews_handler),
+            apigateway.LambdaIntegration(post_pipelines_handler),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
 
-        search_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(s3connector_handler),
+        # Pipeline ID specific endpoints
+        pipeline_id_resource = pipelines_resource.add_resource("{pipelineId}")
+
+        # GET /api/pipelines/{pipelineId}
+        get_pipeline_id_handler = _lambda.Function(
+            self,
+            "GetPipelineIdHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset(
+                "lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"
+            ),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        pipeline_id_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(get_pipeline_id_handler),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # PUT /api/pipelines/{pipelineId}
+        put_pipeline_id_handler = _lambda.Function(
+            self,
+            "PutPipelineIdHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset(
+                "lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"
+            ),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        pipeline_id_resource.add_method(
+            "PUT",
+            apigateway.LambdaIntegration(put_pipeline_id_handler),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # DELETE /api/pipelines/{pipelineId}
+        del_pipeline_id_handler = _lambda.Function(
+            self,
+            "DeletePipelineIdHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            architecture=lambda_architecture,
+            code=_lambda.Code.from_asset(
+                "lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"
+            ),
+            log_group=api_handler_log_group,
+            role=lambda_execution_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+            },
+        )
+
+        pipeline_id_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(del_pipeline_id_handler),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )

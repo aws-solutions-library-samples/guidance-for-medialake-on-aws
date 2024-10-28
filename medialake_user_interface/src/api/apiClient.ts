@@ -15,7 +15,7 @@ class ApiClient extends ApiClientBase {
 
     private getBaseURL() {
         const awsConfig = StorageHelper.getAwsConfig();
-        return awsConfig?.API?.REST?.RestApi?.endpoint + '/api' || '';
+        return awsConfig?.API?.REST?.RestApi?.endpoint || '';
     }
 
     private setupInterceptors() {
@@ -38,7 +38,21 @@ class ApiClient extends ApiClientBase {
         return this.axiosInstance.get<T>(url, config);
     }
 
-    // Add other HTTP methods (post, put, delete) as needed
+    public post<T>(url: string, data?: any, config?: AxiosRequestConfig) {
+        return this.axiosInstance.post<T>(url, data, config);
+    }
+
+    public put<T>(url: string, data?: any, config?: AxiosRequestConfig) {
+        return this.axiosInstance.put<T>(url, data, config);
+    }
+
+    public delete<T>(url: string, config?: AxiosRequestConfig) {
+        return this.axiosInstance.delete<T>(url, config);
+    }
+
+    public patch<T>(url: string, data?: any, config?: AxiosRequestConfig) {
+        return this.axiosInstance.patch<T>(url, data, config);
+    }
 }
 
 export const apiClient = new ApiClient();

@@ -13,11 +13,12 @@ import {
     IconButton,
     Grid,
 } from '@mui/material';
-import { Search as SearchIcon, FilterList as FilterListIcon, Close as CloseIcon, Send as SendIcon } from '@mui/icons-material';
+import { Search as SearchIcon, FilterList as FilterListIcon, Close as CloseIcon, Send as SendIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useNavigate } from 'react-router-dom';
+import { signOut } from 'aws-amplify/auth';
 
 interface FilterOptions {
     creationDate: {
@@ -68,6 +69,15 @@ function TopBar() {
     const [chatVisible, setChatVisible] = useState(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            navigate('/sign-in');
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+    };
 
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(event.target.value);
@@ -241,9 +251,17 @@ function TopBar() {
                             variant="contained"
                             startIcon={<SearchIcon />}
                             onClick={handleSearchSubmit}
+                            sx={{ mr: 2 }}
                         >
                             Search
                         </Button>
+                        <IconButton
+                            color="inherit"
+                            onClick={handleLogout}
+                            sx={{ ml: 'auto' }}
+                        >
+                            <LogoutIcon />
+                        </IconButton>
                     </Box>
                 </Toolbar>
             </AppBar>
