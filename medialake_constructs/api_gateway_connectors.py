@@ -36,7 +36,7 @@ class ConnectorsConstruct(Construct):
         ingest_event_bus: events.EventBus,
     ) -> None:
         super().__init__(scope, id)
-
+        
         # Create IAC assets bucket with explicit name including region
         medialake_iac_assets_config = S3Config(
             bucket_name=f"medialake-iac-assets-{Stack.of(self).region}-{id}".lower()
