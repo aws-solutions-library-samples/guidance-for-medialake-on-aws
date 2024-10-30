@@ -31,7 +31,8 @@ class BaseInfrastructureStack(Stack):
         # Create EventBus with retention policy
         ingest_event_bus_config = EventBusConfig(
             bus_name=f"medialake-ingest-{region}",
-            description="event bus"
+            description="event bus",
+            log_all=True,
         )
         self._ingest_event_bus = EventBus(
             self,

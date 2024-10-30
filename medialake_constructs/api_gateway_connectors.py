@@ -226,6 +226,7 @@ class ConnectorsConstruct(Construct):
                     "iam:UpdateRole",
                     "iam:PutRolePolicy",
                     "iam:DeleteRolePolicy",
+                    "iam:CreateRole",
                 ],
                 resources=["*"],
             )
