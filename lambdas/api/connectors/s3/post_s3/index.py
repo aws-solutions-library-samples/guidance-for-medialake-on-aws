@@ -16,6 +16,7 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
 from pydantic import BaseModel
+from botocore.config import Config
 
 tracer = Tracer()
 logger = Logger()
@@ -28,7 +29,7 @@ s3_client = boto3.client("s3")
 dynamodb = boto3.resource('dynamodb')
 
 # Initialize Lambda client
-lambda_client = boto3.client('lambda')
+# lambda_client = boto3.client('lambda')
 iam_client = boto3.client('iam')
 
 
@@ -65,6 +66,8 @@ def handle_validation_error(ex: RequestValidationError):
 
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
+    # Track created resources for cleanup in case of failure
+    created_resources = []
     try:
         # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
         medialake_tag = 'medialake'
@@ -83,7 +86,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         current_time = datetime.utcnow().isoformat(timespec='seconds')
 
         # Validate request body
-        s3_bucket = createconnector.confi   guration.bucket
+        s3_bucket = createconnector.configuration.bucket
         connector_name = createconnector.name
 
         target_function_name = f"medialake_connector_{s3_bucket}"
@@ -110,10 +113,18 @@ def create_connector(createconnector: S3Connector) -> dict:
         s3 = boto3.client('s3', region_name=bucket_region)
         sqs = boto3.client('sqs', region_name=bucket_region)
 
+        # Configure Lambda client with proper S3 addressing
+        lambda_config = Config(
+            region_name=bucket_region,
+            s3={'addressing_style': 'virtual'}
+        )
+        lambda_client = boto3.client('lambda', config=lambda_config)
+
         # Create SQS queue in the same region as the bucket
         queue_name = f"{s3_bucket}-notifications"
         response = sqs.create_queue(QueueName=queue_name)
         queue_url = response["QueueUrl"]
+        created_resources.append(('sqs_queue', queue_url))
 
         # Get the SQS queue ARN
         response = sqs.get_queue_attributes(
@@ -125,74 +136,113 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Deploy lambda if environment variables are set
         try:
             # Get the INGEST_EVENT_BUS environment variable
-        ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
-        
-        # Create IAM role for Lambda
-        role_name = f"{target_function_name}-role"
-        assume_role_policy = {
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {"Service": "lambda.amazonaws.com"},
-                "Action": "sts:AssumeRole"
-            }]
-        }
-        
-        create_role_response = iam_client.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-            Tags=[{'Key': 'medialake', 'Value': medialake_tag}]
-        )
-        lambda_role_arn = create_role_response['Role']['Arn']
-        
-        # Attach policies to the role
-        iam_client.attach_role_policy(
-            RoleName=role_name,
-            PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-        )
-        
-        # Create custom policy for SQS permissions
-        sqs_policy = {
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Action": [
-                    "sqs:ReceiveMessage",
-                    "sqs:DeleteMessage",
-                    "sqs:GetQueueAttributes",
-                    "sqs:ChangeMessageVisibility"
-                ],
-                "Resource": queue_arn
-            }]
-        }
-        
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName=f"{role_name}-sqs-policy",
-            PolicyDocument=json.dumps(sqs_policy)
-        )
-        
-        # Create custom policy for EventBridge permissions
-        eventbridge_policy = {
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Action": [
-                    "events:PutEvents"
-                ],
-                "Resource": ingest_event_bus
-            }]
-        }
-        
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName=f"{role_name}-eventbridge-policy",
-            PolicyDocument=json.dumps(eventbridge_policy)
-        )
+            ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
+            
+            # Create IAM role for Lambda
+            role_name = f"{target_function_name}-role"
+            assume_role_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": {"Service": "lambda.amazonaws.com"},
+                    "Action": "sts:AssumeRole"
+                }]
+            }
+            
+            create_role_response = iam_client.create_role(
+                RoleName=role_name,
+                AssumeRolePolicyDocument=json.dumps(assume_role_policy),
+                Tags=[{'Key': 'medialake', 'Value': medialake_tag}]
+            )
+            lambda_role_arn = create_role_response['Role']['Arn']
+            created_resources.append(('iam_role', role_name))
+            
+            # Add delay to allow IAM role to propagate
+            time.sleep(10)
+            
+            # Attach policies to the role
+            iam_client.attach_role_policy(
+                RoleName=role_name,
+                PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+            )
+            created_resources.append(('role_policy', (role_name, 'AWSLambdaBasicExecutionRole')))
+            
+            # Create custom policy for SQS permissions
+            sqs_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ReceiveMessage",
+                        "sqs:DeleteMessage",
+                        "sqs:GetQueueAttributes",
+                        "sqs:ChangeMessageVisibility"
+                    ],
+                    "Resource": queue_arn
+                }]
+            }
+            
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName=f"{role_name}-sqs-policy",
+                PolicyDocument=json.dumps(sqs_policy)
+            )
+            created_resources.append(('inline_policy', (role_name, f"{role_name}-sqs-policy")))
+            
+            # Add delay to allow policy to propagate
+            time.sleep(10)
+            
+            # Attach policies to the role
+            iam_client.attach_role_policy(
+                RoleName=role_name,
+                PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+            )
+            created_resources.append(('role_policy', (role_name, 'AWSLambdaBasicExecutionRole')))
+            
+            # Create custom policy for SQS permissions
+            sqs_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ReceiveMessage",
+                        "sqs:DeleteMessage",
+                        "sqs:GetQueueAttributes",
+                        "sqs:ChangeMessageVisibility"
+                    ],
+                    "Resource": queue_arn
+                }]
+            }
+            
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName=f"{role_name}-sqs-policy",
+                PolicyDocument=json.dumps(sqs_policy)
+            )
+            created_resources.append(('inline_policy', (role_name, f"{role_name}-sqs-policy")))
+            
+            # Create custom policy for EventBridge permissions
+            eventbridge_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": [
+                        "events:PutEvents"
+                    ],
+                    "Resource": f"arn:aws:events:{bucket_region}:{boto3.client('sts').get_caller_identity()['Account']}:event-bus/{ingest_event_bus}"
+                }]
+            }
+            
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName=f"{role_name}-eventbridge-policy",
+                PolicyDocument=json.dumps(eventbridge_policy)
+            )
+            created_resources.append(('inline_policy', (role_name, f"{role_name}-eventbridge-policy")))
             
             ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
             
-            # Deploy the lambda
+            # Deploy the lambda with proper S3 configuration
             create_function_response = lambda_client.create_function(
                 FunctionName=target_function_name,
                 Runtime='python3.12',
@@ -212,18 +262,21 @@ def create_connector(createconnector: S3Connector) -> dict:
             )
             logger.info(f"Deployed new lambda function: {target_function_name}")
             lambda_arn = create_function_response['FunctionArn']
+            created_resources.append(('lambda_function', target_function_name))
             
             # Add SQS trigger to the deployed lambda
-            lambda_client.create_event_source_mapping(
+            event_source_mapping = lambda_client.create_event_source_mapping(
                 EventSourceArn=queue_arn,
                 FunctionName=target_function_name,
                 Enabled=True
             )
+            created_resources.append(('event_source_mapping', event_source_mapping['UUID']))
             logger.info(
                 f"Added SQS trigger to lambda: {target_function_name}"
             )
         except Exception as e:
             logger.error(f"Failed to deploy/configure lambda: {str(e)}")
+            raise
 
         # Set up SQS queue policy
         queue_policy = {
@@ -246,6 +299,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             QueueUrl=queue_url,
             Attributes={'Policy': json.dumps(queue_policy)}
         )
+        created_resources.append(('queue_policy', queue_url))
 
         # Subscribe SQS queue to S3 bucket notifications
         notification_config = {
@@ -257,6 +311,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             Bucket=s3_bucket,
             NotificationConfiguration=notification_config
         )
+        created_resources.append(('bucket_notification', s3_bucket))
 
         # Save the connector details in DynamoDB
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
@@ -288,6 +343,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             "iamRoleArn": lambda_role_arn
         }
         table.put_item(Item=connector_item)
+        created_resources.append(('dynamodb_item', (table_name, connector_id)))
 
         logger.info(
             f"Created connector '{connector_name}' for bucket '{s3_bucket}'"
@@ -301,6 +357,47 @@ def create_connector(createconnector: S3Connector) -> dict:
 
     except Exception as e:
         logger.exception(f"Unexpected error: {str(e)}")
+        # Clean up created resources in reverse order
+        for resource_type, resource_id in reversed(created_resources):
+            try:
+                if resource_type == 'dynamodb_item':
+                    table_name, item_id = resource_id
+                    table = dynamodb.Table(table_name)
+                    table.delete_item(Key={'id': item_id})
+                elif resource_type == 'bucket_notification':
+                    s3.put_bucket_notification_configuration(
+                        Bucket=resource_id,
+                        NotificationConfiguration={}
+                    )
+                elif resource_type == 'queue_policy':
+                    sqs.set_queue_attributes(
+                        QueueUrl=resource_id,
+                        Attributes={'Policy': ''}
+                    )
+                elif resource_type == 'event_source_mapping':
+                    lambda_client.delete_event_source_mapping(UUID=resource_id)
+                elif resource_type == 'lambda_function':
+                    lambda_client.delete_function(FunctionName=resource_id)
+                elif resource_type == 'inline_policy':
+                    role_name, policy_name = resource_id
+                    iam_client.delete_role_policy(
+                        RoleName=role_name,
+                        PolicyName=policy_name
+                    )
+                elif resource_type == 'role_policy':
+                    role_name, policy_name = resource_id
+                    iam_client.detach_role_policy(
+                        RoleName=role_name,
+                        PolicyArn=f'arn:aws:iam::aws:policy/service-role/{policy_name}'
+                    )
+                elif resource_type == 'iam_role':
+                    iam_client.delete_role(RoleName=resource_id)
+                elif resource_type == 'sqs_queue':
+                    sqs.delete_queue(QueueUrl=resource_id)
+                logger.info(f"Cleaned up {resource_type}: {resource_id}")
+            except Exception as cleanup_error:
+                logger.error(f"Error cleaning up {resource_type} {resource_id}: {str(cleanup_error)}")
+
         return {
             "statusCode": 500,
             "body": {

@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_iam as iam,
     RemovalPolicy,
     Duration,
+    aws_events_targets as targets,
 )
 from constructs import Construct
 from typing import Dict, Optional, List
@@ -19,6 +20,7 @@ class EventBusConfig:
     encryption: bool = False
     logging: bool = True
     log_retention: logs.RetentionDays = logs.RetentionDays.ONE_MONTH
+    log_all: bool = False
 
 class EventBus(Construct):
     def __init__(self, scope: Construct, construct_id: str, props: EventBusConfig, **kwargs) -> None:
@@ -65,6 +67,25 @@ class EventBus(Construct):
                     actions=["logs:CreateLogStream", "logs:PutLogEvents"],
                     resources=[log_group.log_group_arn],
                 )
+            )
+        # Add EventBridge rule to log all events if log_all is True
+        if props.log_all:
+            log_all_group = logs.LogGroup(
+                self,
+                "EventBusLogAllGroup",
+                log_group_name=f"eventbus_{props.bus_name}",
+                retention=logs.RetentionDays.ONE_WEEK,
+                removal_policy=RemovalPolicy.DESTROY,
+            )
+
+            events.Rule(
+                self,
+                "LogAllEventsRule",
+                event_bus=self._event_bus,
+                event_pattern=events.EventPattern(
+                    account=[Stack.of(self).account]
+                ),
+                targets=[targets.CloudWatchLogGroup(log_all_group)]
             )
 
         # Grant permissions to the event bus
