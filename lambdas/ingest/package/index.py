@@ -13,18 +13,30 @@ INGEST_EVENT_BUS = os.environ["INGEST_EVENT_BUS"]
 
 
 def handler(event, context):
-    print(event)
-
     for record in event["Records"]:
         body = json.loads(record["body"])
+        
+        if "Event" in body and body["Event"] == "s3:TestEvent":
+            # Handle test event
+            print("Received S3 test event")
+            continue
+        
+        if "Records" not in body:
+            print("Invalid event format: missing Records")
+            continue
+
         s3_events = body["Records"]
 
         for s3_event in s3_events:
             # Extract S3 event information
-            bucket = s3_event["s3"]["bucket"]["name"]
-            key = s3_event["s3"]["object"]["key"]
-            event_time = s3_event["eventTime"]
-            event_type = s3_event["eventName"]
+            try:
+                bucket = s3_event["s3"]["bucket"]["name"]
+                key = s3_event["s3"]["object"]["key"]
+                event_time = s3_event["eventTime"]
+                event_type = s3_event["eventName"]
+            except KeyError as e:
+                print(f"Invalid event format: missing key {str(e)}")
+                continue
 
             if not bucket or not key:
                 print("Invalid event format: missing bucket or key information")
@@ -50,7 +62,6 @@ def handler(event, context):
                     print(f"EventBridge event sent: {response}")
                 except Exception as e:
                     print(f"Error sending EventBridge event: {str(e)}")
-
 
 def process_asset(bucket, key, event_time, event_type):
     # Generate a unique ID for the asset
