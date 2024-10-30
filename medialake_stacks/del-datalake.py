@@ -15,12 +15,14 @@ from medialake_constructs.api_gateway_connectors import (
 )
 from medialake_constructs.api_gateway_pipelines import PipelinesConstruct
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
-
+from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 
 class DataLake(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, base_infrastructure: BaseInfrastructureStack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        
+        self.base_infrastructure = base_infrastructure
 
         # User auth with Cognito
         self._cognito = CognitoConstruct(
@@ -38,21 +40,22 @@ class DataLake(Stack):
             user_pool=self._cognito.user_pool,
         )
 
-        # Create Lambda execution role
-        lambda_execution_role = iam.Role(
-            self,
-            "LambdaExecutionRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-        )
+        # # Create Lambda execution role
+        # lambda_execution_role = iam.Role(
+        #     self,
+        #     "LambdaExecutionRole",
+        #     assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+        # )
 
-        # Add necessary permissions to Lambda role
-        lambda_execution_role.add_to_principal_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["s3:ListAllMyBuckets"],
-                resources=["*"],
-            )
-        )
+        # # Add necessary permissions to Lambda role
+        # lambda_execution_role.add_to_principal_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=["s3:ListAllMyBuckets"],
+        #         resources=["*"],
+        #     )
+        # )
+
 
         # Create connectors construct
         _ = ConnectorsConstruct(
@@ -60,8 +63,8 @@ class DataLake(Stack):
             "Connectors",
             api_resource=api_gateway.api_resource,
             cognito_authorizer=api_gateway.cognito_authorizer,
-            lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+            ingest_event_bus=self.base_infrastructure.ingest_event_bus
         )
 
         # Create pipelines construct
@@ -70,9 +73,9 @@ class DataLake(Stack):
             "Pipelines",
             api_resource=api_gateway.api_resource,
             cognito_authorizer=api_gateway.cognito_authorizer,
-            lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
         )
+
 
         # Create User Interface
         self._ui = UIConstruct(

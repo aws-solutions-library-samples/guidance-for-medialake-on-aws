@@ -17,7 +17,6 @@ class PipelinesConstruct(Construct):
         id: str,
         api_resource: apigateway.IResource,
         cognito_authorizer: apigateway.IAuthorizer,
-        lambda_execution_role: iam.Role,
         x_origin_verify_secret: secretsmanager.Secret,
     ) -> None:
         super().__init__(scope, id)
