@@ -188,13 +188,12 @@ class ConnectorsConstruct(Construct):
             },
         )
 
-
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
             config=connector_s3_post_lambda_config,
         )
-        
+                
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -223,12 +222,15 @@ class ConnectorsConstruct(Construct):
                     "s3:PutBucketNotification",
                     "s3:GetBucketNotification",
                     "s3:DeleteBucketNotification",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
                 ],
                 resources=["*"],
             )
         )
         
-                
         # Grant permissions correctly
         self.iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
 
@@ -241,7 +243,7 @@ class ConnectorsConstruct(Construct):
                     "dynamodb:UpdateItem",
                     "dynamodb:DeleteItem",
                 ],
-                resources=[dynamo_table.table_arn],  # Specific DynamoDB table
+                resources=[dynamo_table.table_arn],
             )
         )
 
@@ -251,9 +253,9 @@ class ConnectorsConstruct(Construct):
                 actions=[
                     "s3:ListBucket",
                     "s3:GetBucketLocation",
-                    "s3:PutBucketNotification",  # Allow subscribing S3 buckets to SQS/SNS
+                    "s3:PutBucketNotification",
                 ],
-                resources=["arn:aws:s3:::*"],  # Correct resource ARN for S3
+                resources=["arn:aws:s3:::*"],
             )
         )
 
