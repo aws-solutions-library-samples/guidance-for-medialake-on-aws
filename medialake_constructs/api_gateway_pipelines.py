@@ -66,6 +66,7 @@ class PipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
+                    "sqs:TagQueue",
                     "sqs:GetQueueAttributes",
                     "sqs:CreateQueue",
                     "sqs:DeleteQueue",
