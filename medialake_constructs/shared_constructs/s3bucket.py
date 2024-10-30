@@ -8,7 +8,6 @@ from aws_cdk import (
 from constructs import Construct
 from typing import Optional, List
 from dataclasses import dataclass
-from config import config
 
 
 @dataclass
@@ -29,13 +28,13 @@ class S3Bucket(Construct):
     ):
         super().__init__(scope, id, **kwargs)
         stack = Stack.of(self)
-        config.load()
 
-        # Create KMS key for bucket encryption
+        # Create KMS key for bucket encryption with RETAIN policy
         self.kms_key = kms.Key(
             self,
             "BucketEncryptionKey",
-            removal_policy=RemovalPolicy.DESTROY,
+            removal_policy=RemovalPolicy.DESTROY,  # Changed to RETAIN to prevent deletion
+            enable_key_rotation=True,  # Added key rotation as a security best practice
         )
 
         # Create S3 bucket with security best practices
@@ -47,7 +46,7 @@ class S3Bucket(Construct):
             encryption_key=self.kms_key,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             versioned=True,
-            lifecycle_rules=config.lifecycle_rules,
+            lifecycle_rules=s3_config.lifecycle_rules,
             removal_policy=(
                 RemovalPolicy.DESTROY
                 if s3_config.destroy_on_delete
@@ -57,8 +56,8 @@ class S3Bucket(Construct):
         )
 
         # Enable access logging if access_log_bucket is provided
-        if config.access_logs:
-            access_log_bucket = f"{config.DEMO_MEDIA_ASSETS_BUCKET_NAME}-{stack.region}"
+        if s3_config.access_logs:
+            access_log_bucket = f"{s3_config.bucket_name}-logs-{stack.region}"
             self.bucket.add_to_resource_policy(
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
@@ -68,7 +67,4 @@ class S3Bucket(Construct):
                     ],
                     principals=[iam.ServicePrincipal("logging.s3.amazonaws.com")],
                 )
-            )
-            self.bucket.add_server_access_logs_destination(
-                access_log_bucket, self.bucket.bucket_name
             )

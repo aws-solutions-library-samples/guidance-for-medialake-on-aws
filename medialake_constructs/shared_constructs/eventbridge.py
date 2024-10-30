@@ -8,21 +8,24 @@ from aws_cdk import (
     Duration,
 )
 from constructs import Construct
+from typing import Dict, Optional, List
+from dataclasses import dataclass
 
+@dataclass
+class EventBusConfig:
+    """Configuration for EventBus creation."""
+    bus_name: str
+    description: str = None
+    encryption: bool = False
+    logging: bool = True
+    log_retention: logs.RetentionDays = logs.RetentionDays.ONE_MONTH
 
-class EventBusConstruct(Construct):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        super().__init__(scope, construct_id)
-
-        # Extract optional parameters with default values
-        bus_name = kwargs.get("bus_name", "default-event-bus")
-        description = kwargs.get("description", "Secure EventBridge Event Bus")
-        enable_encryption = kwargs.get("enable_encryption", True)
-        enable_logging = kwargs.get("enable_logging", True)
-        log_retention = kwargs.get("log_retention", logs.RetentionDays.ONE_MONTH)
+class EventBus(Construct):
+    def __init__(self, scope: Construct, construct_id: str, props: EventBusConfig, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
 
         # Create KMS Key for encryption
-        if enable_encryption:
+        if props.encryption:
             encryption_key = kms.Key(
                 self,
                 "EventBusEncryptionKey",
@@ -34,21 +37,21 @@ class EventBusConstruct(Construct):
             encryption_key = None
 
         # Create EventBridge Event Bus
-        self.event_bus = events.EventBus(
+        self._event_bus = events.EventBus(
             self,
             "SecureEventBus",
-            event_bus_name=bus_name,
-            description=description,
-            kms_key=encryption_key,
+            event_bus_name=props.bus_name,
+            # description=props.description,
+            # encryption_key=encryption_key,
         )
 
         # Enable logging if specified
-        if enable_logging:
+        if props.logging:
             log_group = logs.LogGroup(
                 self,
                 "EventBusLogGroup",
-                log_group_name=f"/aws/events/{bus_name}",
-                retention=log_retention,
+                log_group_name=f"/aws/events/{props.bus_name}",
+                retention=props.log_retention,
                 removal_policy=RemovalPolicy.DESTROY,
             )
 
@@ -67,19 +70,32 @@ class EventBusConstruct(Construct):
             )
 
             # Add CloudWatch Logs as a target for all events
-            self.event_bus.archive(
-                "EventBusArchive",
-                archive_name=f"{bus_name}-archive",
-                description="Archive for all events",
-                event_pattern=events.EventPattern(account=[Stack.of(self).account]),
-                retention=Duration.days(90),
-            )
+            # self._event_bus.archive(
+            #     "EventBusArchive",
+            #     archive_name=f"{props.bus_name}-archive",
+            #     description="Archive for all events",
+            #     event_pattern=events.EventPattern(account=[Stack.of(self).account]),
+            #     retention=Duration.days(90),
+            # )
 
         # Grant permissions to the event bus
-        self.event_bus.grant_put_events_to(iam.AccountRootPrincipal())
+        self._event_bus.grant_put_events_to(iam.AccountRootPrincipal())
 
     def grant_put_events(self, grantee: iam.IGrantable):
         """
         Grants permissions to put events to the Event Bus
         """
-        return self.event_bus.grant_put_events_to(grantee)
+        return self._event_bus.grant_put_events_to(grantee)
+    
+    @property
+    def event_bus(self) -> events.EventBus:
+        """Get the EventBus instance."""
+        return self._event_bus
+    
+    @property
+    def event_bus_name(self) -> str:
+        """Get the name of the EventBus."""
+        return self._event_bus.event_bus_name
+    @property
+    def ingest_event_bus_name(self) -> str:
+        return self._event_bus.event_bus_name

@@ -5,6 +5,7 @@
     "@aws-amplify/ui-react": "^6.5.5",
     "amazon-cognito-identity-js": "^6.3.12",
     "aws-amplify": "^6.6.6",
-    "axios": "^1.7.7"
+    "axios": "^1.7.7",
+    "jwt-decode": "^4.0.0"
   }
 }

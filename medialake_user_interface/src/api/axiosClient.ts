@@ -25,7 +25,7 @@ const getBaseURL = () => {
 };
 
 const axiosClient: AxiosInstance = axios.create({
-    baseURL: getBaseURL(),
+    baseURL: getBaseURL() + '/prod',
     headers: {
         'Content-Type': 'application/json',
     },

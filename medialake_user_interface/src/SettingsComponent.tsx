@@ -91,9 +91,9 @@ const SettingsComponent: React.FC = () => {
         }
     };
 
-    const handleConnectorDelete = async (id: string) => {
+    const handleConnectorDelete = async (connector: ConnectorResponse) => {
         try {
-            await deleteConnector(id);
+            await deleteConnector(connector.id);
             await refetchConnectors();
         } catch (error) {
             console.error('Error deleting connector:', error);
@@ -122,7 +122,7 @@ const SettingsComponent: React.FC = () => {
             type: integrationType,
             apiKey,
             name,
-            createdDate: new Date().toISOString()
+            createdAt: new Date().toISOString()
         };
         setIntegrations([...integrations, newIntegration]);
         handleCloseIntegrationModal();
@@ -146,7 +146,7 @@ const SettingsComponent: React.FC = () => {
                 <ConnectorCard
                     connector={connector}
                     onEdit={handleConnectorEdit}
-                    onDelete={handleConnectorDelete}
+                    onDelete={() => handleConnectorDelete(connector)}
                 />
             </Grid>
         ));
@@ -164,7 +164,7 @@ const SettingsComponent: React.FC = () => {
                         <Typography variant="h6">{integration.name}</Typography>
                         <Typography>Type: {integration.type}</Typography>
                         <Typography>
-                            Created: {new Date(integration.createdDate).toLocaleDateString()}
+                            Created: {new Date(integration.createdAt).toLocaleDateString()}
                         </Typography>
                         <Box sx={{ mt: 2 }}>
                             <IconButton

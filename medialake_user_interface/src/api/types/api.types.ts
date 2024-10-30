@@ -7,8 +7,9 @@ export interface ApiError {
 }
 
 export interface ApiResponse<T> {
+  status: string;
+  message: string;
   data: T;
-  status: number;
 }
 
 export interface QueryConfig {
@@ -33,30 +34,32 @@ export interface ConnectorResponse {
   id: string;
   name: string;
   type: string;
-  description?: string;
-  configuration: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  createdDate?: string; // Add this for backward compatibility
+  createdAt: string;
+  updatedAt: string;
+  storageIdentifier: string;
+  sqsArn: string;
+  region: string;
+  configuration?: Record<string, any>;
 }
 
 export interface S3ListResponse {
   buckets: string[];
+  count: number;
 }
 
-// Update Connector interface to match ConnectorResponse
-export interface Connector {
-  id: string;
-  name: string;
-  type: string;
-  description?: string;
-  configuration: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  createdDate?: string;
+export interface S3BucketResponse {
+  status: string;
+  message: string;
+  data: {
+    buckets: string[];
+  }
 }
 
-export type ConnectorListResponse = {
+export interface Connector extends ConnectorResponse {}
+
+export interface ConnectorListResponse {
+  status: string;
+  message: string;
   data: {
     connectors: ConnectorResponse[];
   }
@@ -67,9 +70,5 @@ export interface Integration {
   type: string;
   apiKey: string;
   name: string;
-  createdDate: string;
-}
-
-export interface S3BucketResponse {
-  buckets: string[];
+  createdAt: string;
 }

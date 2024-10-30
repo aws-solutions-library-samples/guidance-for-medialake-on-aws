@@ -139,8 +139,8 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 <MenuItem value="">
                                     <CircularProgress size={20} /> Loading buckets...
                                 </MenuItem>
-                            ) : s3BucketsData?.buckets && s3BucketsData.buckets.length > 0 ? (
-                                s3BucketsData.buckets.map((bucketName) => (
+                            ) : s3BucketsData?.data?.buckets && s3BucketsData.data.buckets.length > 0 ? (
+                                s3BucketsData.data.buckets.map((bucketName) => (
                                     <MenuItem key={bucketName} value={bucketName}>
                                         {bucketName}
                                     </MenuItem>

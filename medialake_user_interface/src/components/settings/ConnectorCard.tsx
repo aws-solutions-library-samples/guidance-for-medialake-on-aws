@@ -1,48 +1,54 @@
 import React from 'react';
-import {
-    Box,
-    Typography,
-    Card,
-    CardContent,
-    IconButton,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Card, CardContent, Typography, Box, Button } from '@mui/material';
+import { format } from 'date-fns';
 import { ConnectorResponse } from '../../api/types/api.types';
 
 interface ConnectorCardProps {
-    connector: ConnectorResponse;
-    onEdit: (connector: ConnectorResponse) => void;
-    onDelete: (id: string) => void;
+  connector: ConnectorResponse;
+  onEdit: (connector: ConnectorResponse) => void;
+  onDelete: (id: string) => Promise<void>;
 }
 
-export const ConnectorCard: React.FC<ConnectorCardProps> = ({
-    connector,
-    onEdit,
-    onDelete,
-}) => {
-    return (
-        <Card>
-            <CardContent>
-                <Typography variant="h6">{connector.name}</Typography>
-                <Typography>Type: {connector.type}</Typography>
-                <Typography>
-                    Created: {new Date(connector.created_at).toLocaleDateString()}
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                    <IconButton aria-label="edit" onClick={() => onEdit(connector)}>
-                        <EditIcon />
-                    </IconButton>
-                    <IconButton
-                        aria-label="delete"
-                        onClick={() => onDelete(connector.id)}
-                    >
-                        <DeleteIcon />
-                    </IconButton>
-                </Box>
-            </CardContent>
-        </Card>
-    );
+const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDelete }) => {
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  return (
+    <Card sx={{ minWidth: 275, mb: 2 }}>
+      <CardContent>
+        <Typography variant="h6" component="div" gutterBottom>
+          {connector.name}
+        </Typography>
+        <Box sx={{ mt: 1 }}>
+          <Typography color="text.secondary" gutterBottom>
+            Bucket: {connector.storageIdentifier}
+          </Typography>
+          <Typography color="text.secondary" gutterBottom>
+            Type: {connector.type}
+          </Typography>
+          <Typography color="text.secondary" gutterBottom>
+            Created: {formatDate(connector.createdAt)}
+          </Typography>
+          <Typography color="text.secondary">
+            Updated: {formatDate(connector.updatedAt)}
+          </Typography>
+        </Box>
+        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+          <Button variant="outlined" onClick={() => onEdit(connector)}>
+            Edit
+          </Button>
+          <Button variant="outlined" color="error" onClick={() => onDelete(connector.id)}>
+            Delete
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
+  );
 };
 
 export default ConnectorCard;

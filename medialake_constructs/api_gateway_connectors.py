@@ -3,7 +3,13 @@ from aws_cdk import (
     aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
+    aws_s3_deployment as s3deploy,
+    Duration,
+    aws_s3 as s3,
+    aws_events as events,
 )
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
+from aws_cdk import Fn, Stack
 from constructs import Construct
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -13,6 +19,10 @@ from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB,
     DynamoDBConfig,
 )
+import os
+import shutil
+from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
+from config import config
 
 
 class ConnectorsConstruct(Construct):
@@ -22,13 +32,30 @@ class ConnectorsConstruct(Construct):
         id: str,
         api_resource: apigateway.IResource,
         cognito_authorizer: apigateway.IAuthorizer,
-        lambda_execution_role: iam.Role,
         x_origin_verify_secret: secretsmanager.Secret,
+        ingest_event_bus: events.EventBus,
     ) -> None:
         super().__init__(scope, id)
 
+        # Create IAC assets bucket with explicit name including region
+        medialake_iac_assets_config = S3Config(
+            bucket_name=f"medialake-iac-assets-{Stack.of(self).region}-{id}".lower()
+        )
+        self.iac_assets_bucket = S3Bucket(
+            self,
+            "IACAssets",
+            s3_config=medialake_iac_assets_config
+        )
+
+        # Use the new LambdaDeployment construct
+        self.lambda_deployment = LambdaDeployment(
+            self,
+            "IngestS3LambdaDeployment",
+            destination_bucket=self.iac_assets_bucket.bucket
+        )
+
         dynamo_config = DynamoDBConfig(
-            name="connectors",
+            name=f"medialake_connector_table_{id}",
             partition_key_name="id",
             partition_key_type=dynamodb.AttributeType.STRING,
         )
@@ -45,6 +72,7 @@ class ConnectorsConstruct(Construct):
             entry="lambdas/api/connectors/get_connectors",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn
             },
         )
         connectors_get_lambda = Lambda(
@@ -59,35 +87,64 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Add KMS decrypt permission for the DynamoDB table's KMS key
+        connectors_get_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt"],
+                resources=[dynamo_table.kms_key.key_arn]
+            )
+        )
+
         connectors_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connectors_get_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
-
-        # Create s3list resource and Lambda function
-        s3list_resource = connectors_resource.add_resource("s3list")
-        s3list_lambda_config = LambdaConfig(
-            name="s3list",
-            entry="lambdas/api/connectors/s3list",
+        
+        #Delete Connector
+        connectors_del_lambda_config = LambdaConfig(
+            name="connectors_del_lambda",
+            entry="lambdas/api/connectors/del_connectors",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn
             },
         )
-        s3list_handler = Lambda(
+        connectors_del_lambda = Lambda(
             self,
-            "S3ListHandler",
-            config=s3list_lambda_config,
+            "ConnectorsDelLambda",
+            config=connectors_del_lambda_config,
         )
 
-        s3list_handler.function.role.add_to_policy(
-            iam.PolicyStatement(actions=["s3:ListAllMyBuckets"], resources=["*"])
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:Scan"], resources=[dynamo_table.table_arn]
+            )
+        )
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"], resources=[dynamo_table.table_arn]
+            )
         )
 
-        s3list_resource.add_method(
-            "GET",
-            apigateway.LambdaIntegration(s3list_handler.function),
+        # Add KMS decrypt permission for the DynamoDB table's KMS key
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt"],
+                resources=[dynamo_table.kms_key.key_arn],
+            )
+        )
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=['dynamodb:DeleteItem'],
+                resources=[dynamo_table.table_arn]
+            )
+        )
+
+        connectors_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(connectors_del_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
@@ -124,15 +181,56 @@ class ConnectorsConstruct(Construct):
             entry="lambdas/api/connectors/s3/post_s3",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "DYNAMO_TABLE_ARN": dynamo_table.table_arn,
+                "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
+                "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+                "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
+                "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
             },
         )
+
 
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
             config=connector_s3_post_lambda_config,
         )
+        
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:GetQueueAttributes",
+                    "sqs:CreateQueue",
+                    "sqs:DeleteQueue",
+                    "sqs:SetQueueAttributes",
+                ],
+                resources=["*"],
+            )
+        )
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "lambda:CreateFunction",
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateFunctionConfiguration",
+                    "lambda:DeleteFunction",
+                ],
+                resources=["*"],
+            )
+        )
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:PutBucketNotification",
+                    "s3:GetBucketNotification",
+                    "s3:DeleteBucketNotification",
+                ],
+                resources=["*"],
+            )
+        )
+        
+                
+        # Grant permissions correctly
+        self.iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
 
         # Policy for DynamoDB actions on a specific table
         connector_s3_post_lambda.function.role.add_to_policy(
@@ -164,9 +262,9 @@ class ConnectorsConstruct(Construct):
             iam.PolicyStatement(
                 actions=[
                     "sqs:CreateQueue",
-                    "sns:CreateTopic",  # Allow creating SQS queues
+                    "sns:CreateTopic",
                 ],
-                resources=["*"],  # Allow on all resources
+                resources=["*"],
             )
         )
 

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { Box, CircularProgress, Typography, Grid } from '@mui/material';
 import { useGetConnectors, useDeleteConnector } from '../api/hooks/useConnectors';
-import { ConnectorCard } from './settings/ConnectorCard';
+import ConnectorCard from './settings/ConnectorCard';
 import { ConnectorResponse, ConnectorListResponse } from '../api/types/api.types';
 import { UseQueryResult } from '@tanstack/react-query';
 
