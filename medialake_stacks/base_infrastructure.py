@@ -9,6 +9,7 @@ from constructs import Construct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from config import config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
+from medialake_constructs.shared_constructs.opensearch_serverless import OpenSearchServerlessConstruct, OpenSearchServerlessProps
 
 class BaseInfrastructureStack(Stack):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -36,6 +37,19 @@ class BaseInfrastructureStack(Stack):
             self,
             "IngestEventBus",
             props=ingest_event_bus_config
+        )
+
+
+        self.opensearch_serverless = OpenSearchServerlessConstruct(
+            self,
+            "MediaLakeOSEmbeddings",
+            props=OpenSearchServerlessProps(
+                collection_name="medialake",
+                public_access=True,
+                collection_type="VECTORSEARCH",
+                collection_desc="Collection to be used for vector search using OpenSearch Serverless",
+                collection_indexes=["media"]
+            ),
         )
 
         # Export the EventBus name and ARN
