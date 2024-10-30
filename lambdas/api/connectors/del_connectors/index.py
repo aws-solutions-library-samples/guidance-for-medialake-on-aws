@@ -39,54 +39,70 @@ def lambda_handler(event, context):
                 'body': json.dumps({'message': 'Invalid connector configuration'})
             }
 
-        # Create S3 and SQS clients in the specified region
         # Create AWS clients in the specified region
         lambda_client = boto3.client('lambda', region_name=region)
         iam = boto3.client('iam', region_name=region)
         s3 = boto3.client('s3', region_name=region)
         sqs = boto3.client('sqs', region_name=region)
 
+        errors = []
+
+        # Delete Lambda
         try:
-            # Delete Lambda 
             lambda_client.delete_function(FunctionName=lambda_arn.split(':')[-1])
-            # Delete IAM role
-            role_name = iam_role_arn.split('/')[-1]
-            # Get queue ARN
-            queue_attributes = sqs.get_queue_attributes(
-                QueueUrl=queue_url,
-                AttributeNames=['QueueArn']
-            )
-            queue_arn = queue_attributes['Attributes']['QueueArn']
-            for policy in iam.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']:
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'ResourceNotFoundException':
+                errors.append(f"Error deleting Lambda: {str(e)}")
+
+        # Delete IAM role
+        role_name = iam_role_arn.split('/')[-1]
+        try:
+            # Detach all managed policies
+            attached_policies = iam.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
+            for policy in attached_policies:
                 iam.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+            
+            # Delete all inline policies
+            inline_policies = iam.list_role_policies(RoleName=role_name)['PolicyNames']
+            for policy_name in inline_policies:
+                iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+            
+            # Delete the role
             iam.delete_role(RoleName=role_name)
-            
-            # Delete SQS queue
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchEntity':
+                errors.append(f"Error deleting IAM role: {str(e)}")
+
+        # Delete SQS queue
+        try:
             sqs.delete_queue(QueueUrl=queue_url)
-            
-            # Remove S3 bucket notification
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'AWS.SimpleQueueService.NonExistentQueue':
+                errors.append(f"Error deleting SQS queue: {str(e)}")
+
+        # Remove S3 bucket notification
+        try:
             s3.put_bucket_notification_configuration(
                 Bucket=bucket_name,
                 NotificationConfiguration={}  # Empty config removes all notifications
             )
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchBucket':
+                errors.append(f"Error removing S3 bucket notification: {str(e)}")
 
-            # Delete SQS queue
-            # sqs.delete_queue(QueueUrl=queue_url)
-
-            # Delete connector from DynamoDB
+        # Delete connector from DynamoDB only if all other resources are cleaned up
+        if not errors:
             table.delete_item(Key={'id': connector_id})
-
             return {
                 'statusCode': 200,
                 'body': json.dumps({'message': 'Connector deleted successfully'})
             }
-
-        except ClientError as e:
+        else:
             return {
                 'statusCode': 500,
                 'body': json.dumps({
                     'message': 'Error deleting connector',
-                    'error': str(e)
+                    'errors': errors
                 })
             }
 
