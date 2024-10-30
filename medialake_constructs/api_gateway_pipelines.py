@@ -62,6 +62,18 @@ class PipelinesConstruct(Construct):
             "PostPipelinesHandler",
             config=post_pipelines_lambda_config,
         )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:GetQueueAttributes",
+                    "sqs:CreateQueue",
+                    "sqs:DeleteQueue",
+                    "sqs:SetQueueAttributes",
+                ],
+                resources=["*"],
+            )
+        )
 
         pipelines_resource.add_method(
             "POST",
