@@ -9,7 +9,7 @@ s3 = boto3.client("s3")
 eventbridge = boto3.client("events")
 
 # Environment variables
-EVENT_BUS_NAME = os.environ["NORMALIZED_EVENT_BUS"]
+INGEST_EVENT_BUS = os.environ["INGEST_EVENT_BUS"]
 
 
 def handler(event, context):
@@ -43,7 +43,7 @@ def handler(event, context):
                                 "Source": "MnEMSCAutomatedWorkflow",
                                 "DetailType": event_type,
                                 "Detail": json.dumps(event_detail),
-                                "EventBusName": EVENT_BUS_NAME,
+                                "EventBusName": INGEST_EVENT_BUS,
                             }
                         ]
                     )

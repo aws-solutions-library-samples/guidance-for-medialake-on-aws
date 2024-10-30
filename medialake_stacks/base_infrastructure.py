@@ -1,7 +1,9 @@
 from aws_cdk import (
     Stack,
     Environment,
-    aws_events as events
+    aws_events as events,
+    RemovalPolicy,
+    CfnOutput
 )
 from constructs import Construct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
@@ -17,7 +19,7 @@ class BaseInfrastructureStack(Stack):
 
         # Create media assets bucket with explicit name including region
         media_assets_bucket_config = S3Config(
-            bucket_name=f"medialake-media-assets-{region}-{config.small_uid}"
+            bucket_name=f"medialake-media-assets-{region}"
         )
         self.media_assets_bucket = S3Bucket(
             self,
@@ -25,14 +27,29 @@ class BaseInfrastructureStack(Stack):
             s3_config=media_assets_bucket_config
         )
         
+        # Create EventBus with retention policy
         ingest_event_bus_config = EventBusConfig(
-            bus_name=f"medialake-ingest-{region}-{config.small_uid}",
+            bus_name=f"medialake-ingest-{region}",
             description="event bus"
         )
         self._ingest_event_bus = EventBus(
             self,
             "IngestEventBus",
             props=ingest_event_bus_config
+        )
+
+        # Export the EventBus name and ARN
+        CfnOutput(
+            self,
+            "IngestEventBusName",
+            value=self._ingest_event_bus.event_bus_name,
+            export_name=f"{id}-ingest-event-bus-name"
+        )
+        CfnOutput(
+            self,
+            "IngestEventBusArn",
+            value=self._ingest_event_bus.event_bus.event_bus_arn,
+            export_name=f"{id}-ingest-event-bus-arn"
         )
     
     @property

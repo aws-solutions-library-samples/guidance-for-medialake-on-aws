@@ -83,9 +83,11 @@ def create_connector(createconnector: S3Connector) -> dict:
         current_time = datetime.utcnow().isoformat(timespec='seconds')
 
         # Validate request body
-        s3_bucket = createconnector.configuration.bucket
+        s3_bucket = createconnector.confi   guration.bucket
         connector_name = createconnector.name
 
+        target_function_name = f"medialake_connector_{s3_bucket}"
+        
         # Validate S3 bucket exists and get its region
         try:
             bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
@@ -122,53 +124,73 @@ def create_connector(createconnector: S3Connector) -> dict:
 
         # Deploy lambda if environment variables are set
         try:
-            # Create IAM role for Lambda
-            role_name = f"{target_function_name}-role"
-            assume_role_policy = {
-                "Version": "2012-10-17",
-                "Statement": [{
-                    "Effect": "Allow",
-                    "Principal": {"Service": "lambda.amazonaws.com"},
-                    "Action": "sts:AssumeRole"
-                }]
-            }
+            # Get the INGEST_EVENT_BUS environment variable
+        ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
+        
+        # Create IAM role for Lambda
+        role_name = f"{target_function_name}-role"
+        assume_role_policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "lambda.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+            }]
+        }
+        
+        create_role_response = iam_client.create_role(
+            RoleName=role_name,
+            AssumeRolePolicyDocument=json.dumps(assume_role_policy),
+            Tags=[{'Key': 'medialake', 'Value': medialake_tag}]
+        )
+        lambda_role_arn = create_role_response['Role']['Arn']
+        
+        # Attach policies to the role
+        iam_client.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        )
+        
+        # Create custom policy for SQS permissions
+        sqs_policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:ChangeMessageVisibility"
+                ],
+                "Resource": queue_arn
+            }]
+        }
+        
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-sqs-policy",
+            PolicyDocument=json.dumps(sqs_policy)
+        )
+        
+        # Create custom policy for EventBridge permissions
+        eventbridge_policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                    "events:PutEvents"
+                ],
+                "Resource": ingest_event_bus
+            }]
+        }
+        
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-eventbridge-policy",
+            PolicyDocument=json.dumps(eventbridge_policy)
+        )
             
-            create_role_response = iam_client.create_role(
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-                Tags=[{'Key': 'medialake', 'Value': medialake_tag}]
-            )
-            lambda_role_arn = create_role_response['Role']['Arn']
-            
-            # Attach policies to the role
-            iam_client.attach_role_policy(
-                RoleName=role_name,
-                PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-            )
-            
-            # Create custom policy for SQS permissions
-            sqs_policy = {
-                "Version": "2012-10-17",
-                "Statement": [{
-                    "Effect": "Allow",
-                    "Action": [
-                        "sqs:ReceiveMessage",
-                        "sqs:DeleteMessage",
-                        "sqs:GetQueueAttributes",
-                        "sqs:ChangeMessageVisibility"
-                    ],
-                    "Resource": queue_arn  # Make sure this variable is defined
-                }]
-            }
-            
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy",
-                PolicyDocument=json.dumps(sqs_policy)
-            )
-            
-            # Wait for the role to be ready
-            time.sleep(10)  # Wait for 10 seconds
+            ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
             
             # Deploy the lambda
             create_function_response = lambda_client.create_function(
@@ -181,8 +203,12 @@ def create_connector(createconnector: S3Connector) -> dict:
                     'S3Key': deployment_zip
                 },
                 Publish=True,
-                Tags={'medialake': medialake_tag}
-                
+                Tags={'medialake': medialake_tag},
+                Environment={
+                    'Variables': {
+                        'INGEST_EVENT_BUS': ingest_event_bus
+                    }
+                }
             )
             logger.info(f"Deployed new lambda function: {target_function_name}")
             lambda_arn = create_function_response['FunctionArn']

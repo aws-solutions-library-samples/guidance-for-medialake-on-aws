@@ -41,8 +41,6 @@ class EventBus(Construct):
             self,
             "SecureEventBus",
             event_bus_name=props.bus_name,
-            # description=props.description,
-            # encryption_key=encryption_key,
         )
 
         # Enable logging if specified
@@ -69,15 +67,6 @@ class EventBus(Construct):
                 )
             )
 
-            # Add CloudWatch Logs as a target for all events
-            # self._event_bus.archive(
-            #     "EventBusArchive",
-            #     archive_name=f"{props.bus_name}-archive",
-            #     description="Archive for all events",
-            #     event_pattern=events.EventPattern(account=[Stack.of(self).account]),
-            #     retention=Duration.days(90),
-            # )
-
         # Grant permissions to the event bus
         self._event_bus.grant_put_events_to(iam.AccountRootPrincipal())
 
@@ -96,6 +85,7 @@ class EventBus(Construct):
     def event_bus_name(self) -> str:
         """Get the name of the EventBus."""
         return self._event_bus.event_bus_name
+    
     @property
     def ingest_event_bus_name(self) -> str:
         return self._event_bus.event_bus_name
