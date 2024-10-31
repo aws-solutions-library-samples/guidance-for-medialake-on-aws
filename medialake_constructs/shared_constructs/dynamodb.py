@@ -14,6 +14,7 @@ class DynamoDBProps:
     partition_key_name: str
     partition_key_type: str
     stream: Optional[dynamodb.StreamViewType] = None
+    point_in_time_recovery: Optional[bool] = False
     
     
 
@@ -37,6 +38,7 @@ class DynamoDB(Construct):
             # encryption_key=self._kms_key,
             # point_in_time_recovery=config.get("point_in_time_recovery", False),
             removal_policy=cdk.RemovalPolicy.DESTROY,
+            dynamo_stream=props.stream,
         )
 
     @property
