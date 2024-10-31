@@ -186,6 +186,7 @@ class ConnectorsConstruct(Construct):
                 "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
             },
         )
 
