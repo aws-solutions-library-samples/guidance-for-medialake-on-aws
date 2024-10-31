@@ -22,11 +22,11 @@ class PipelinesConstruct(Construct):
     ) -> None:
         super().__init__(scope, id)
 
-        self.lambda_deployment = LambdaDeployment(
-            self,
-            "SfnPipelineTriggerLambdaDeployment",
-            destination_bucket=self.iac_assets_bucket.bucket
-        )
+        # self.lambda_deployment = LambdaDeployment(
+        #     self,
+        #     "SfnPipelineTriggerLambdaDeployment",
+        #     destination_bucket=self.iac_assets_bucket.bucket
+        # )
                 
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
@@ -63,7 +63,7 @@ class PipelinesConstruct(Construct):
                 # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 # "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
                 # "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
+                # "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
                 # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
             }
         )
