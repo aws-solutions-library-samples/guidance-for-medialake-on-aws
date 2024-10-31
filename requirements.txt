@@ -9,3 +9,4 @@ boto3
 python-dotenv
 # cdk-ec2-key-pair
 cdk_nag
+pydantic
