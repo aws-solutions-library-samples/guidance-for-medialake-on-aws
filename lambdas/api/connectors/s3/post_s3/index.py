@@ -75,11 +75,6 @@ def create_connector(createconnector: S3Connector) -> dict:
         deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
         deployment_zip = os.environ.get('S3_CONNECTOR_LAMBDA')
         # target_function_name = os.environ.get('TARGET_FUNCTION_NAME')
-
-        # deployment_bucket = "medialake-iac-assets-us-east-1"
-        # deployment_zip = "lambda/s3-connector.zip"
-        target_function_name = "test_connector"
-        # target_function_name = f{}
         
         # Generate unique ID and timestamps
         connector_id = str(uuid.uuid4())
@@ -137,6 +132,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         try:
             # Get the INGEST_EVENT_BUS environment variable
             ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
+            medialake_asset_table = os.environ.get('MEDIALAKE_ASSET_TABLE')
             
             # Create IAM role for Lambda
             role_name = f"{target_function_name}-role"
@@ -256,7 +252,8 @@ def create_connector(createconnector: S3Connector) -> dict:
                 Tags={'medialake': medialake_tag},
                 Environment={
                     'Variables': {
-                        'INGEST_EVENT_BUS': ingest_event_bus
+                        'INGEST_EVENT_BUS': ingest_event_bus,
+                        'MEDIALAKE_ASSET_TABLE': medialake_asset_table
                     }
                 }
             )
