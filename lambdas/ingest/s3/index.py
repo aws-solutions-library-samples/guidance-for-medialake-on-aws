@@ -7,9 +7,11 @@ from datetime import datetime
 # Initialize AWS clients
 s3 = boto3.client("s3")
 eventbridge = boto3.client("events")
+dynamodb = boto3.resource("dynamodb")
 
 # Environment variables
 INGEST_EVENT_BUS = os.environ["INGEST_EVENT_BUS"]
+MEDIALAKE_ASSET_TABLE = os.environ["MEDIALAKE_ASSET_TABLE"]
 
 
 def handler(event, context):
@@ -44,6 +46,30 @@ def handler(event, context):
 
             asset = process_asset(bucket, key, event_time, event_type)
             if asset:
+                try:
+                    s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            'TagSet': [
+                                {
+                                    'Key': 'medialakeUID',
+                                    'Value': asset['id']
+                                },
+                            ]
+                        }
+                    )
+                    print(f"S3 object tagged with MediaLake UID: {asset['id']}")
+                except Exception as e:
+                    print(f"Error tagging S3 object: {str(e)}")
+                
+                try:
+                    table = dynamodb.Table(MEDIALAKE_ASSET_TABLE)
+                    table.put_item(Item=asset)
+                    print(f"Asset information inserted into DynamoDB: {asset['id']}")
+                except Exception as e:
+                    print(f"Error inserting asset information into DynamoDB: {str(e)}")
+                    
                 # Create EventBridge event
                 event_type = "AssetDeleted" if event_type.startswith("ObjectRemoved") else "AssetIngested"
                 event_detail = {"eventType": event_type, "assets": [asset]}
