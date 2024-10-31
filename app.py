@@ -48,6 +48,7 @@ class MediaLakeStack(cdk.Stack):
             cognito_authorizer=api_gateway.cognito_authorizer,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
             ingest_event_bus=base_infrastructure.ingest_event_bus,
+            iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
             )   
@@ -60,6 +61,7 @@ class MediaLakeStack(cdk.Stack):
             api_resource=api_gateway.api_resource,
             cognito_authorizer=api_gateway.cognito_authorizer,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+            iac_assets_bucket=base_infrastructure.iac_assets_bucket,
         )
 
         # Create User Interface
