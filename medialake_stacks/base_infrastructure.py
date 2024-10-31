@@ -36,6 +36,16 @@ class BaseInfrastructureStack(Stack):
             s3_config=media_assets_bucket_config
         )
         
+        # Create IAC assets bucket with explicit name including region
+        medialake_iac_assets_config = S3Config(
+            bucket_name=f"medialake-iac-assets-{Stack.of(self).region}-{id}".lower()
+        )
+        self.iac_assets_bucket = S3Bucket(
+            self,
+            "IACAssets",
+            s3_config=medialake_iac_assets_config
+        )
+        
         # Create EventBus with retention policy
         ingest_event_bus_config = EventBusConfig(
             bus_name=f"medialake-ingest-{region}",

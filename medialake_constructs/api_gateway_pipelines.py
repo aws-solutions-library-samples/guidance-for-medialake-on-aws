@@ -1,6 +1,7 @@
 from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
+    aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
@@ -18,15 +19,16 @@ class PipelinesConstruct(Construct):
         id: str,
         api_resource: apigateway.IResource,
         cognito_authorizer: apigateway.IAuthorizer,
+        iac_assets_bucket: s3.Bucket,
         x_origin_verify_secret: secretsmanager.Secret,
     ) -> None:
         super().__init__(scope, id)
 
-        # self.lambda_deployment = LambdaDeployment(
-        #     self,
-        #     "SfnPipelineTriggerLambdaDeployment",
-        #     destination_bucket=self.iac_assets_bucket.bucket
-        # )
+        self.lambda_deployment = LambdaDeployment(
+            self,
+            "SfnPipelineTriggerLambdaDeployment",
+            destination_bucket=iac_assets_bucket.bucket
+        )
                 
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
