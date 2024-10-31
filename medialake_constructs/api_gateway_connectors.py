@@ -1,3 +1,4 @@
+from attr import dataclass
 from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
@@ -7,6 +8,7 @@ from aws_cdk import (
     Duration,
     aws_s3 as s3,
     aws_events as events,
+    RemovalPolicy
 )
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from aws_cdk import Fn, Stack
@@ -17,13 +19,18 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB,
-    DynamoDBConfig,
+    DynamoDBProps,
 )
+from dataclasses import dataclass
 import os
 import shutil
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from config import config
 
+@dataclass
+class ConnectorsProps:
+    """Configuration for Lambda function creation."""
+    asset_table: dynamodb.TableV2
 
 class ConnectorsConstruct(Construct):
     def __init__(
@@ -34,6 +41,7 @@ class ConnectorsConstruct(Construct):
         cognito_authorizer: apigateway.IAuthorizer,
         x_origin_verify_secret: secretsmanager.Secret,
         ingest_event_bus: events.EventBus,
+        props: ConnectorsProps,
     ) -> None:
         super().__init__(scope, id)
         
@@ -54,15 +62,15 @@ class ConnectorsConstruct(Construct):
             destination_bucket=self.iac_assets_bucket.bucket
         )
 
-        dynamo_config = DynamoDBConfig(
-            name=f"medialake_connector_table_{id}",
-            partition_key_name="id",
-            partition_key_type=dynamodb.AttributeType.STRING,
-        )
         dynamo_table = DynamoDB(
             self,
             "ConnectorsTable",
-            config=dynamo_config,
+            props=DynamoDBProps(
+                name=f"medialake_connector_table_{id}",
+                partition_key_name="id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                # removal_policy=RemovalPolicy.DESTROY
+            ),
         )
 
         # Create connectors resource
@@ -88,12 +96,12 @@ class ConnectorsConstruct(Construct):
         )
 
         # Add KMS decrypt permission for the DynamoDB table's KMS key
-        connectors_get_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["kms:Decrypt"],
-                resources=[dynamo_table.kms_key.key_arn]
-            )
-        )
+        # connectors_get_lambda.function.role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=["kms:Decrypt"],
+        #         resources=[dynamo_table.table.encryption_key],
+        #     )
+        # )
 
         connectors_resource.add_method(
             "GET",
@@ -129,12 +137,12 @@ class ConnectorsConstruct(Construct):
         )
 
         # Add KMS decrypt permission for the DynamoDB table's KMS key
-        connectors_del_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["kms:Decrypt"],
-                resources=[dynamo_table.kms_key.key_arn],
-            )
-        )
+        # connectors_del_lambda.function.role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=["kms:Decrypt"],
+        #         resources=[dynamo_table.kms_key.key_arn],
+        #     )
+        # )
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=['dynamodb:DeleteItem'],

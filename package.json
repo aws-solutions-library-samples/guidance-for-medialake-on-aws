@@ -6,6 +6,7 @@
     "amazon-cognito-identity-js": "^6.3.12",
     "aws-amplify": "^6.6.6",
     "axios": "^1.7.7",
+    "cdk": "^2.164.1",
     "jwt-decode": "^4.0.0"
   }
 }
