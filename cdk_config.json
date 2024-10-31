@@ -1,6 +1,7 @@
 {
     "enable_ha": false,
     "primary_region": "us-east-1",
+    "account_id": "881490120934",
     "secondary_region": null,
     "small_uid": "",
     "assets_bucket_name": "medialake-assets",

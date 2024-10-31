@@ -45,6 +45,7 @@ const CustomNode = ({ data, id }: { data: any, id: string }) => {
         setIsModalOpen(false);
     };
 
+
     return (
         <>
             <div style={{
@@ -264,6 +265,7 @@ const NewPipelinePage = () => {
     const [edgeLabel, setEdgeLabel] = useState('');
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
     const [pipelineName, setPipelineName] = useState('');
+    const [rfInstance, setRfInstance] = useState(null);
 
     useEffect(() => {
         // Fetch pipeline data based on the pipeline ID
@@ -286,6 +288,13 @@ const NewPipelinePage = () => {
 
         fetchPipelineData();
     }, [id, setNodes, setEdges]);
+
+    const onSave = useCallback(() => {
+        if (rfInstance) {
+            const flow = rfInstance.toObject();
+            console.log(flow);
+        }
+    }, [rfInstance]);
 
     const onConnect = useCallback(
         (connection: Connection) => {  // Change type from Edge to Connection
@@ -420,6 +429,15 @@ const NewPipelinePage = () => {
             left: '60px',
             top: '64px',
         }}>
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Button
+                    variant="contained"
+                    onClick={null}
+                    sx={{ mr: 2 }}
+                >
+                    Save
+                </Button>
+            </Box>
             {/* <Box sx={{ p: 2 }}>
                 <TextField
                     label="Pipeline Name"
@@ -440,6 +458,7 @@ const NewPipelinePage = () => {
                         onEdgeClick={onEdgeClick}
                         onDragOver={onDragOver}
                         onDrop={onDrop}
+                        onInit={setRfInstance}
                         fitView
                         style={{ width: '100%', height: '100%' }}
                         minZoom={0.1}
@@ -559,3 +578,4 @@ const WrappedNewPipelinePage = () => (
 );
 
 export default WrappedNewPipelinePage;
+
