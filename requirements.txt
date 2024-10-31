@@ -8,3 +8,4 @@ aws_cdk.aws_cognito_identitypool_alpha
 boto3
 python-dotenv
 # cdk-ec2-key-pair
+pydantic
