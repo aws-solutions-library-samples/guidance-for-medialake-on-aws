@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
+from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
@@ -21,9 +22,16 @@ class PipelinesConstruct(Construct):
     ) -> None:
         super().__init__(scope, id)
 
+        self.lambda_deployment = LambdaDeployment(
+            self,
+            "SfnPipelineTriggerLambdaDeployment",
+            destination_bucket=self.iac_assets_bucket.bucket
+        )
+                
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
 
+        
         # GET /api/pipelines
         get_pipelines_lambda_config = LambdaConfig(
             name="GetPipelinesHandler",
@@ -52,9 +60,11 @@ class PipelinesConstruct(Construct):
             name="PostPipelinesHandler",
             entry="lambdas/api/pipelines/post_pipelines",
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (
-                    x_origin_verify_secret.secret_arn
-                ),
+                # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                # "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
+                # "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+                "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
+                # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
             }
         )
         post_pipelines_handler = Lambda(
@@ -66,11 +76,9 @@ class PipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "sqs:TagQueue",
-                    "sqs:GetQueueAttributes",
                     "sqs:CreateQueue",
-                    "sqs:DeleteQueue",
-                    "sqs:SetQueueAttributes",
+                    "sqs:GetQueueAttributes",
+                    "sqs:TagQueue"
                 ],
                 resources=["*"],
             )
@@ -79,14 +87,9 @@ class PipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "s3:PutBucketNotification",
-                    "s3:GetBucketNotification",
-                    "s3:DeleteBucketNotification",
-                    "iam:DeleteRole",
-                    "iam:UpdateRole",
-                    "iam:PutRolePolicy",
-                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
                     "iam:CreateRole",
+                    "iam:AttachRolePolicy"
                 ],
                 resources=["*"],
             )
