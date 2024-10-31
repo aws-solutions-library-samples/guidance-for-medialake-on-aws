@@ -86,10 +86,12 @@ class BaseInfrastructureStack(Stack):
             ),
         )
         
+        self._asset_table.table.grant_stream(asset_lambda_stream.function)
         asset_lambda_stream.function.add_event_source(eventsources.DynamoEventSource(self._asset_table.table,
             starting_position=lambda_.StartingPosition.LATEST,
             filters=[lambda_.FilterCriteria.filter({"event_name": lambda_.FilterRule.is_equal("INSERT")})]
         ))
+
         # # Export the EventBus name and ARN
         # CfnOutput(
         #     self,
