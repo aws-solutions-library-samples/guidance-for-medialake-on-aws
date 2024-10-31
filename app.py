@@ -6,10 +6,12 @@ import aws_cdk as cdk
 from config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway_main_construct import ApiGatewayConstruct
-from medialake_constructs.api_gateway_connectors import ConnectorsConstruct
+from medialake_constructs.api_gateway_connectors import ConnectorsConstruct, ConnectorsProps
 from medialake_constructs.api_gateway_pipelines import PipelinesConstruct
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
+from cdk_nag import AwsSolutionsChecks, NagSuppressions
+
 
 class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: cdk.App, id: str, **kwargs) -> None:
@@ -45,7 +47,10 @@ class MediaLakeStack(cdk.Stack):
             api_resource=api_gateway.api_resource,
             cognito_authorizer=api_gateway.cognito_authorizer,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
-            ingest_event_bus=base_infrastructure.ingest_event_bus
+            ingest_event_bus=base_infrastructure.ingest_event_bus,
+            props=ConnectorsProps(
+                asset_table=base_infrastructure.asset_table,
+            )   
         )
 
         # Create pipelines construct
@@ -76,6 +81,13 @@ class MediaLakeStack(cdk.Stack):
             export_name=f"{id}-user-interface-url",
         )
 
+        # Add CDK-nag suppressions for the stack
+        NagSuppressions.add_stack_suppressions(self, [
+            {"id": "AwsSolutions-S1", "reason": "S3 bucket does not require server-side encryption for this use case"},
+            {"id": "AwsSolutions-IAM4", "reason": "IAM role uses AWSLambdaBasicExecutionRole which is required for Lambda function"},
+        ])
+
+
 app = cdk.App()
 
 primary_stack = MediaLakeStack(
@@ -96,5 +108,17 @@ if config.enable_ha and config.secondary_region:
             account=app.account
         )
     )
+
+# Add AWS Solutions checks to the entire app
+# cdk.Aspects.of(app).add(AwsSolutionsChecks())
+
+# Optionally, add HIPAA Security checks
+# cdk.Aspects.of(app).add(cdk_nag.HIPAASecurityChecks())
+
+# Optionally, add NIST 800-53 rev 5 checks
+# cdk.Aspects.of(app).add(cdk_nag.NIST80053R5Checks())
+
+# Optionally, add PCI DSS 3.2.1 checks
+# cdk.Aspects.of(app).add(cdk_nag.PCIDSS321Checks())
 
 app.synth()
