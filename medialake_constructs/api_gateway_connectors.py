@@ -229,6 +229,7 @@ class ConnectorsConstruct(Construct):
                     "iam:PutRolePolicy",
                     "iam:DeleteRolePolicy",
                     "iam:CreateRole",
+                    "iam:TagRole"
                 ],
                 resources=["*"],
             )

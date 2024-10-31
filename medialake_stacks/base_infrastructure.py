@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_events as events,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
+    Names,
     RemovalPolicy,
     CfnOutput
 )
@@ -26,6 +27,14 @@ class BaseInfrastructureStack(Stack):
         env = kwargs.get('env')
         region = env.region if isinstance(env, Environment) else config.primary_region
 
+        unique_name = Names.unique_resource_name(
+            self,
+            "medialake",
+            allowed_special_characters="-",
+            max_length=6,
+            separator="-"
+        )
+        
         # Create media assets bucket with explicit name including region
         media_assets_bucket_config = S3Config(
             bucket_name=f"medialake-media-assets-{region}"
@@ -61,7 +70,7 @@ class BaseInfrastructureStack(Stack):
 
         self.opensearch_serverless = OpenSearchServerlessConstruct(
             self,
-            "MediaLakeOSEmbeddings",
+            unique_name,
             props=OpenSearchServerlessProps(
                 collection_name="medialake",
                 public_access=True,
