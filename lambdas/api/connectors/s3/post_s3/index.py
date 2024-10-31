@@ -73,7 +73,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         medialake_tag = 'medialake'
         # Get deployment configuration from environment variables
         deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
-        deployment_zip = os.environ.get('S3_CONNECTOR_LAMBDA')
+        deployment_zip: str | None = os.environ.get('S3_CONNECTOR_LAMBDA')
         # target_function_name = os.environ.get('TARGET_FUNCTION_NAME')
         
         # Generate unique ID and timestamps
@@ -216,6 +216,31 @@ def create_connector(createconnector: S3Connector) -> dict:
                 PolicyDocument=json.dumps(sqs_policy)
             )
             created_resources.append(('inline_policy', (role_name, f"{role_name}-sqs-policy")))
+            # Create custom policy for S3 permissions
+            s3_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObjectTagging",
+                        "s3:GetObjectTagging",
+                        "s3:GetBucketLocation",
+                        "s3:GetObject",
+                        "s3:ListBucket"
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{s3_bucket}",
+                        f"arn:aws:s3:::{s3_bucket}/*"
+                    ]
+                }]
+            }
+
+            iam_client.put_role_policy(
+                RoleName=role_name,
+                PolicyName=f"{role_name}-s3-policy",
+                PolicyDocument=json.dumps(s3_policy)
+            )
+            created_resources.append(('inline_policy', (role_name, f"{role_name}-s3-policy")))
             
             # Create custom policy for EventBridge permissions
             eventbridge_policy = {
