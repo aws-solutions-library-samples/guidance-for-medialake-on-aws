@@ -138,10 +138,10 @@ def create_pipeline_role(role_name: str, tags: dict) -> str:
         )
         
         # Add Step Functions execution policy
-        iam_client.attach_role_policy(
-            RoleName=role_name,
-            PolicyArn='arn:aws:iam::aws:policy/service-role/AWSStepFunctionsFullAccess'
-        )
+        # iam_client.attach_role_policy(
+        #     RoleName=role_name,
+        #     PolicyArn='arn:aws:iam::aws:policy/service-role/AWSStepFunctionsFullAccess'
+        # )
         
         return response['Role']['Arn']
     except Exception as e:
@@ -155,6 +155,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         # Generate unique ID and timestamps
         pipeline_id = str(uuid.uuid4())
         current_time = datetime.utcnow().isoformat(timespec='seconds')
+        deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
+        deployment_zip = os.environ.get('S3_CONNECTOR_LAMBDA')
         
         # Common tags for all resources
         tags = {
@@ -182,8 +184,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             Role=role_arn,
             Handler='index.handler',
             Code={
-                'S3Bucket': os.environ['PIPELINE_LAMBDA_BUCKET'],
-                'S3Key': os.environ['PIPELINE_LAMBDA_KEY']
+                'S3Bucket': deployment_bucket,
+                'S3Key': deployment_zip
             },
             Tags=tags
         )
