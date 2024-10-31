@@ -10,7 +10,7 @@ from aws_cdk import (
     aws_events as events,
     RemovalPolicy
 )
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
+# from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from aws_cdk import Fn, Stack
 from constructs import Construct
 from medialake_constructs.shared_constructs.lambda_base import (
@@ -41,25 +41,18 @@ class ConnectorsConstruct(Construct):
         cognito_authorizer: apigateway.IAuthorizer,
         x_origin_verify_secret: secretsmanager.Secret,
         ingest_event_bus: events.EventBus,
+        iac_assets_bucket: s3.Bucket,
         props: ConnectorsProps,
     ) -> None:
         super().__init__(scope, id)
         
-        # Create IAC assets bucket with explicit name including region
-        medialake_iac_assets_config = S3Config(
-            bucket_name=f"medialake-iac-assets-{Stack.of(self).region}-{id}".lower()
-        )
-        self.iac_assets_bucket = S3Bucket(
-            self,
-            "IACAssets",
-            s3_config=medialake_iac_assets_config
-        )
+
 
         # Use the new LambdaDeployment construct
         self.lambda_deployment = LambdaDeployment(
             self,
             "IngestS3LambdaDeployment",
-            destination_bucket=self.iac_assets_bucket.bucket
+            destination_bucket=iac_assets_bucket.bucket
         )
 
         dynamo_table = DynamoDB(
@@ -191,7 +184,7 @@ class ConnectorsConstruct(Construct):
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
                 "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
+                "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
             },
         )
@@ -241,7 +234,7 @@ class ConnectorsConstruct(Construct):
         )
         
         # Grant permissions correctly
-        self.iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
+        iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
 
         # Policy for DynamoDB actions on a specific table
         connector_s3_post_lambda.function.role.add_to_policy(
