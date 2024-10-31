@@ -41,17 +41,17 @@ class BaseInfrastructureStack(Stack):
         )
 
 
-        # self.opensearch_serverless = OpenSearchServerlessConstruct(
-        #     self,
-        #     "MediaLakeOSEmbeddings",
-        #     props=OpenSearchServerlessProps(
-        #         collection_name="medialake",
-        #         public_access=True,
-        #         collection_type="VECTORSEARCH",
-        #         collection_desc="Collection to be used for vector search using OpenSearch Serverless",
-        #         collection_indexes=["media"]
-        #     ),
-        # )
+        self.opensearch_serverless = OpenSearchServerlessConstruct(
+            self,
+            "MediaLakeOSEmbeddings",
+            props=OpenSearchServerlessProps(
+                collection_name="medialake",
+                public_access=True,
+                collection_type="VECTORSEARCH",
+                collection_desc="Collection to be used for vector search using OpenSearch Serverless",
+                collection_indexes=["media"]
+            ),
+        )
 
         # Export the EventBus name and ARN
         CfnOutput(

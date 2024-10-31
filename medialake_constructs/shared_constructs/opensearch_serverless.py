@@ -112,7 +112,7 @@ class OpenSearchServerlessConstruct(Construct):
             self, "Index",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler='index.handler',
-            code=_lambda.Code.from_asset('lambdas/create_oss_index/'),
+            code=_lambda.Code.from_asset('lambdas/back_end/create_oss_index/'),
             timeout=Duration.seconds(60),
             environment={
                 "COLLECTION_ENDPOINT": self.cfn_collection.attr_collection_endpoint,
@@ -124,7 +124,7 @@ class OpenSearchServerlessConstruct(Construct):
         layer = PythonLayerVersion(
             self,
             "RequestsLayer",
-            entry="lambdas/create_oss_index",
+            entry="lambdas/back_end/create_oss_index",
             compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
         )
         
@@ -206,7 +206,7 @@ class OpenSearchServerlessConstruct(Construct):
         )
         
         lambda_code=""
-        file = open('lambdas/create_oss_index/index.py', 'r')
+        file = open('lambdas/back_end/create_oss_index/index.py', 'r')
         lambda_code= file.read()
         file.close()
             
