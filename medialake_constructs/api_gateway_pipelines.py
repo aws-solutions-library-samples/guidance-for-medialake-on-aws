@@ -75,6 +75,22 @@ class PipelinesConstruct(Construct):
                 resources=["*"],
             )
         )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:PutBucketNotification",
+                    "s3:GetBucketNotification",
+                    "s3:DeleteBucketNotification",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:CreateRole",
+                ],
+                resources=["*"],
+            )
+        )
 
         pipelines_resource.add_method(
             "POST",
