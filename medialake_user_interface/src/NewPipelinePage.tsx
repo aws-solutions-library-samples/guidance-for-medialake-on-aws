@@ -108,6 +108,7 @@ const CustomNode = ({ data, id }: { data: any, id: string }) => {
     };
 
 
+
     return (
         <>
             <div style={{
@@ -329,7 +330,7 @@ const NewPipelinePage = () => {
     const [selectedEdge, setSelectedEdge] = useState(null);
     const [edgeLabel, setEdgeLabel] = useState('');
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-    const [pipelineName, setPipelineName] = useState('untitled');
+    const [pipelineName, setPipelineName] = useState('');
     const [rfInstance, setRfInstance] = useState(null);
 
     useEffect(() => {
@@ -353,6 +354,13 @@ const NewPipelinePage = () => {
 
         fetchPipelineData();
     }, [id, setNodes, setEdges]);
+
+    const onSave = useCallback(() => {
+        if (rfInstance) {
+            const flow = rfInstance.toObject();
+            console.log(flow);
+        }
+    }, [rfInstance]);
 
     const onSave = useCallback(() => {
         if (rfInstance) {
@@ -494,11 +502,24 @@ const NewPipelinePage = () => {
             left: '60px',
             top: '64px',
         }}>
-
-            <PipelineNameInput
-                value={pipelineName}
-                onChange={setPipelineName}
-            />
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Button
+                    variant="contained"
+                    onClick={null}
+                    sx={{ mr: 2 }}
+                >
+                    Save
+                </Button>
+            </Box>
+            {/* <Box sx={{ p: 2 }}>
+                <TextField
+                    label="Pipeline Name"
+                    variant="outlined"
+                    value={pipelineName}
+                    onChange={(e) => setPipelineName(e.target.value)}
+                    sx={{ width: '300px' }}
+                />
+            </Box> */}
             <Box sx={{ display: 'flex', flex: 1 }}>
                 <div style={{ flex: 1, height: '100%' }} ref={reactFlowWrapper}>
                     <ReactFlow
@@ -511,7 +532,7 @@ const NewPipelinePage = () => {
                         onDragOver={onDragOver}
                         onDrop={onDrop}
                         onInit={setRfInstance}
-                        fitView={false} // prevents auto zoom on drop
+                        fitView
                         style={{ width: '100%', height: '100%' }}
                         minZoom={0.1}
                         maxZoom={4}
@@ -634,4 +655,5 @@ const WrappedNewPipelinePage = () => (
 );
 
 export default WrappedNewPipelinePage;
+
 
