@@ -330,7 +330,7 @@ const NewPipelinePage = () => {
     const [selectedEdge, setSelectedEdge] = useState(null);
     const [edgeLabel, setEdgeLabel] = useState('');
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-    const [pipelineName, setPipelineName] = useState('');
+    const [pipelineName, setPipelineName] = useState('untitled');
     const [rfInstance, setRfInstance] = useState(null);
 
     useEffect(() => {
@@ -502,24 +502,11 @@ const NewPipelinePage = () => {
             left: '60px',
             top: '64px',
         }}>
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Button
-                    variant="contained"
-                    onClick={null}
-                    sx={{ mr: 2 }}
-                >
-                    Save
-                </Button>
-            </Box>
-            {/* <Box sx={{ p: 2 }}>
-                <TextField
-                    label="Pipeline Name"
-                    variant="outlined"
-                    value={pipelineName}
-                    onChange={(e) => setPipelineName(e.target.value)}
-                    sx={{ width: '300px' }}
-                />
-            </Box> */}
+
+            <PipelineNameInput
+                value={pipelineName}
+                onChange={setPipelineName}
+            />
             <Box sx={{ display: 'flex', flex: 1 }}>
                 <div style={{ flex: 1, height: '100%' }} ref={reactFlowWrapper}>
                     <ReactFlow
@@ -532,7 +519,7 @@ const NewPipelinePage = () => {
                         onDragOver={onDragOver}
                         onDrop={onDrop}
                         onInit={setRfInstance}
-                        fitView
+                        fitView={false} // prevents auto zoom on drop
                         style={{ width: '100%', height: '100%' }}
                         minZoom={0.1}
                         maxZoom={4}
