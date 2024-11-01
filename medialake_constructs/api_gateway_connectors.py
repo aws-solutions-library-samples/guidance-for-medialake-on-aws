@@ -52,7 +52,8 @@ class ConnectorsConstruct(Construct):
         self.lambda_deployment = LambdaDeployment(
             self,
             "IngestS3LambdaDeployment",
-            destination_bucket=iac_assets_bucket.bucket
+            destination_bucket=iac_assets_bucket.bucket,
+            code_path=["lambdas", "ingest", "s3"]
         )
 
         dynamo_table = DynamoDB(

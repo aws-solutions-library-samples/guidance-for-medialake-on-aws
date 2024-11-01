@@ -1,0 +1,28 @@
+{
+    "id": {
+        "S": "03c23094-d405-4aa7-a243-5a7a8f71d4a5"
+    },
+    "type": {
+        "S": "imageasset"
+    },
+    "label": {
+        "S": "Image Asset"
+    },
+    "icon": {
+        "S": "<FaFileImage size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    }
+}

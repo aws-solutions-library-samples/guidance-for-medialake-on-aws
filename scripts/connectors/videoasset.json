@@ -1,0 +1,28 @@
+{
+    "id": {
+        "S": "60fb5fc1-372a-45e8-8767-f1690d5bc5bb"
+    },
+    "type": {
+        "S": "videoasset"
+    },
+    "label": {
+        "S": "Video Asset"
+    },
+    "icon": {
+        "S": "<FaFileVideo size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "video"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": [
+            {
+                "S": "video"
+            }
+        ]
+    }
+}

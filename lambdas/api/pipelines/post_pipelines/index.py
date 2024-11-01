@@ -3,6 +3,7 @@ import uuid
 import json
 import time
 import boto3
+from decimal import Decimal
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -29,15 +30,21 @@ iam_client = boto3.client('iam')
 sqs_client = boto3.client('sqs')
 sfn_client = boto3.client('stepfunctions')
 
-class S3PipelineConfig(BaseModel):
-    bucket: str
-
 
 class S3Pipeline(BaseModel):
-    configuration: S3PipelineConfig
+    definition: dict
     name: str
     type: str
 
+def float_to_decimal(obj):
+    """Convert float values to Decimal for DynamoDB compatibility"""
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: float_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [float_to_decimal(x) for x in obj]
+    return obj
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
@@ -108,7 +115,7 @@ def create_state_machine(
         raise
 
 
-def create_pipeline_role(role_name: str, tags: dict) -> str:
+def create_pipeline_role(role_name: str, queue_arn: str, tags: dict) -> str:
     """Create IAM role for pipeline execution"""
     try:
         assume_role_policy = {
@@ -137,11 +144,28 @@ def create_pipeline_role(role_name: str, tags: dict) -> str:
             PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
         )
         
-        # Add Step Functions execution policy
-        # iam_client.attach_role_policy(
-        #     RoleName=role_name,
-        #     PolicyArn='arn:aws:iam::aws:policy/service-role/AWSStepFunctionsFullAccess'
-        # )
+        # Create and attach SQS policy
+        sqs_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ReceiveMessage",
+                        "sqs:DeleteMessage",
+                        "sqs:GetQueueAttributes",
+                        "sqs:ChangeMessageVisibility"
+                    ],
+                    "Resource": queue_arn
+                }
+            ]
+        }
+        
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-sqs-policy",
+            PolicyDocument=json.dumps(sqs_policy)
+        )
         
         return response['Role']['Arn']
     except Exception as e:
@@ -156,7 +180,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         pipeline_id = str(uuid.uuid4())
         current_time = datetime.utcnow().isoformat(timespec='seconds')
         deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
-        deployment_zip = os.environ.get('S3_CONNECTOR_LAMBDA')
+        pipeline_trigger_deployment_zip = os.environ.get('PIPELINE_TRIGGER_LAMBDA')
+        image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
         
         # Common tags for all resources
         tags = {
@@ -171,21 +196,21 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         
         # 2. Create IAM Role for Lambda and Step Functions
         role_name = f"pipeline-{pipeline_id}-role"
-        role_arn = create_pipeline_role(role_name, tags)
+        role_arn = create_pipeline_role(role_name,queue_arn, tags)
         
         # Wait for IAM role propagation
         time.sleep(10)
         
         # 3. Create Lambda Function
         lambda_function_name = f"pipeline-{pipeline_id}-executor"
-        lambda_response = lambda_client.create_function(
+        pipeline_trigger_lambda_response = lambda_client.create_function(
             FunctionName=lambda_function_name,
-            Runtime='python3.9',
+            Runtime='python3.12',
             Role=role_arn,
             Handler='index.handler',
             Code={
                 'S3Bucket': deployment_bucket,
-                'S3Key': deployment_zip
+                'S3Key': pipeline_trigger_deployment_zip
             },
             Tags=tags
         )
@@ -207,7 +232,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                     "Type": "Task",
                     "Resource": "arn:aws:states:::lambda:invoke",
                     "Parameters": {
-                        "FunctionName": lambda_response['FunctionArn'],
+                        "FunctionName": pipeline_trigger_lambda_response['FunctionArn'],
                         "Payload": {
                             "pipeline_id.$": "$.pipeline_id",
                             "input.$": "$.input"
@@ -225,10 +250,31 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             tags
         )
         
+        lambda_function_name = f"pipeline-{pipeline_id}-image-proxy"
+        lambda_response = lambda_client.create_function(
+            FunctionName=lambda_function_name,
+            Runtime='python3.12',
+            Role=role_arn,
+            Handler='index.handler',
+            Code={
+                'S3Bucket': deployment_bucket,
+                'S3Key': image_proxy_deployment_zip
+            },
+            Environment={
+                'Variables': {
+                    'STEP_FUNCTION_ARN': state_machine_arn
+                }
+            },
+            Tags=tags
+        )
+        
         # Save pipeline details to DynamoDB
         table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
         if not table_name:
             raise ValueError("MEDIALAKE_PIPELINE_TABLE environment variable not set")
+        
+         # Convert the definition's float values to Decimal
+        definition = float_to_decimal(createpipeline.definition)
         
         table = dynamodb.Table(table_name)
         pipeline_item = {
@@ -237,9 +283,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             "type": createpipeline.type,
             "createdAt": current_time,
             "updatedAt": current_time,
-            "configuration": {
-                "bucket": createpipeline.configuration.bucket
-            },
+            "definition": definition,
             "queueUrl": queue_url,
             "queueArn": queue_arn,
             "lambdaArn": lambda_response['FunctionArn'],
