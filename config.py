@@ -3,12 +3,13 @@ import os
 import uuid
 from typing import List, Optional
 from pydantic import BaseModel
+import hashlib
 
 
 def generate_small_uid() -> str:
     return str(uuid.uuid4())[:16]
 
-
+GLOBAL_PREFIX = "medialake"
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
     enable_ha: bool = False
@@ -16,10 +17,7 @@ class CDKConfig(BaseModel):
     secondary_region: Optional[str] = None
     small_uid: str = ""
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.small_uid = os.environ.get("SMALL_UID", generate_small_uid())
-        
+
     @property
     def regions(self) -> List[str]:
         regions = [self.primary_region]
@@ -29,7 +27,7 @@ class CDKConfig(BaseModel):
 
     @property
     def access_logs_bucket(self) -> str:
-        return f"medialake-access-logs-{self.small_uid}"
+        return "medialake-access-logs"
 
     @classmethod
     def load_from_file(cls, filename="cdk_config.json"):
@@ -39,6 +37,12 @@ class CDKConfig(BaseModel):
             return cls(**config_data)
         except FileNotFoundError:
             return cls()
-
+        
+def generate_short_uid(construct, length=8):
+    # Generate a hash based on the construct's path
+    construct_path = construct.node.path
+    hash_object = hashlib.md5(construct_path.encode())
+    full_hash = hash_object.hexdigest()
+    return full_hash[:length]
 
 config = CDKConfig.load_from_file()
