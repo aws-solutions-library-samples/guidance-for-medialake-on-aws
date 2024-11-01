@@ -1,0 +1,28 @@
+{
+    "id": {
+        "S": "6773f9ef-2161-42c1-9485-11ef1c23f3b4"
+    },
+    "type": {
+        "S": "imagethumbnail"
+    },
+    "label": {
+        "S": "Image Thumbnail"
+    },
+    "icon": {
+        "S": "<FaFileImage size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    }
+}

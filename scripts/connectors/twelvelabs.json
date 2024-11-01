@@ -1,0 +1,28 @@
+{
+    "id": {
+        "S": "9408d6dc-021b-46c1-b22c-19e4721b7d44"
+    },
+    "type": {
+        "S": "twelvelabs"
+    },
+    "label": {
+        "S": "TwelveLabs"
+    },
+    "icon": {
+        "S": "<FaDatabase size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "video"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": [
+            {
+                "S": "metadata"
+            }
+        ]
+    }
+}

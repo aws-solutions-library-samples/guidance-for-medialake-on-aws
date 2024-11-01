@@ -1,0 +1,33 @@
+{
+    "id": {
+        "S": "14a670a0-967d-452c-9e0e-cf2f9e92d634"
+    },
+    "type": {
+        "S": "medialake"
+    },
+    "label": {
+        "S": "MediaLake"
+    },
+    "icon": {
+        "S": "<FaAmazon size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "video"
+            },
+            {
+                "S": "audio"
+            },
+            {
+                "S": "image"
+            },
+            {
+                "S": "metadata"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": []
+    }
+}

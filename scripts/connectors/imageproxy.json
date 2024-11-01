@@ -1,0 +1,28 @@
+{
+    "id": {
+        "S": "9361ac53-13e9-4358-adde-3e4cd023954f"
+    },
+    "type": {
+        "S": "imageproxy"
+    },
+    "label": {
+        "S": "Image Proxy"
+    },
+    "icon": {
+        "S": "<FaFileImage size={20} />"
+    },
+    "inputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    },
+    "outputTypes": {
+        "L": [
+            {
+                "S": "image"
+            }
+        ]
+    }
+}

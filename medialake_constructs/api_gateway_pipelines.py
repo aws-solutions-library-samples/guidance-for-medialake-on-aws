@@ -2,9 +2,14 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_dynamodb as dynamodb,
     aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
+from medialake_constructs.shared_constructs.dynamodb import (
+    DynamoDB,
+    DynamoDBProps,
+)
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -24,12 +29,31 @@ class PipelinesConstruct(Construct):
     ) -> None:
         super().__init__(scope, id)
 
-        self.lambda_deployment = LambdaDeployment(
+        self.image_proxy_lambda_deployment = LambdaDeployment(
             self,
-            "SfnPipelineTriggerLambdaDeployment",
-            destination_bucket=iac_assets_bucket.bucket
+            "ImageProxyLambdaDeployment",
+            destination_bucket=iac_assets_bucket.bucket,
+            code_path=["lambdas", "pipelines", "image_proxy"]            
         )
-                
+        
+        self.pipeline_trigger_lambda_deployment = LambdaDeployment(
+            self,
+            "PipelineTriggerLambdaDeployment",
+            destination_bucket=iac_assets_bucket.bucket,
+            code_path=["lambdas", "pipelines", "pipeline_trigger"]            
+        )
+        
+        dynamo_table = DynamoDB(
+            self,
+            "PipelinesTable",
+            props=DynamoDBProps(
+                name=f"medialake_pipeline_table_{id}",
+                partition_key_name="id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                # removal_policy=RemovalPolicy.DESTROY
+            ),
+        )
+
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
 
@@ -39,10 +63,9 @@ class PipelinesConstruct(Construct):
             name="GetPipelinesHandler",
             entry="lambdas/api/pipelines/get_pipelines",
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (
-                    x_origin_verify_secret.secret_arn
-                ),
-            }
+                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
+            },
         )
         get_pipelines_handler = Lambda(
             self,
@@ -63,9 +86,10 @@ class PipelinesConstruct(Construct):
             entry="lambdas/api/pipelines/post_pipelines",
             environment_variables={
                 # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                # "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
-                # "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                # "IAC_ASSETS_BUCKET": self.iac_assets_bucket.bucket.bucket_name,
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+                "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
+                "PIPELINE_TRIGGER_LAMBDA": self.pipeline_trigger_lambda_deployment.deployment_key,
+                "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
             }
         )
@@ -91,11 +115,51 @@ class PipelinesConstruct(Construct):
                 actions=[
                     "iam:TagRole",
                     "iam:CreateRole",
-                    "iam:AttachRolePolicy"
+                    "iam:AttachRolePolicy",
+                    "iam:PassRole",
+                    "iam:PutRolePolicy"
                 ],
                 resources=["*"],
             )
         )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "lambda:CreateFunction",
+                    "lambda:TagResource",
+                    "lambda:CreateEventSourceMapping"
+                ],
+                resources=["*"],
+            )
+        )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:CreateStateMachine",
+                    "states:TagResource"
+                ],
+                resources=["*"],
+            )
+        )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:PutItem"
+                ],
+                resources=["*"],
+            )
+        )
+        
+        
+        
+       
+        
+        iac_assets_bucket.bucket.grant_read_write(post_pipelines_handler.function)
+        
+        
 
         pipelines_resource.add_method(
             "POST",
@@ -114,9 +178,8 @@ class PipelinesConstruct(Construct):
                 "lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"
             ),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (
-                    x_origin_verify_secret.secret_arn
-                ),
+                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
             }
         )
         get_pipeline_id_handler = Lambda(
@@ -139,9 +202,8 @@ class PipelinesConstruct(Construct):
                 "lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"
             ),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (
-                    x_origin_verify_secret.secret_arn
-                ),
+                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
             }
         )
         put_pipeline_id_handler = Lambda(
@@ -164,9 +226,8 @@ class PipelinesConstruct(Construct):
                 "lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"
             ),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (
-                    x_origin_verify_secret.secret_arn
-                ),
+                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
             }
         )
         del_pipeline_id_handler = Lambda(
