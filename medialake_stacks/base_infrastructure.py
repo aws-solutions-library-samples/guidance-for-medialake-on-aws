@@ -8,6 +8,8 @@ from aws_cdk import (
     RemovalPolicy,
     CfnOutput
 )
+from config import GLOBAL_PREFIX, generate_short_uid
+import hashlib
 import aws_cdk.aws_lambda_event_sources as eventsources
 from constructs import Construct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
@@ -20,6 +22,18 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 
+
+def generate_short_uid(construct, length=8):
+    # Generate a hash based on the construct's path
+    construct_path = construct.node.path
+    hash_object = hashlib.md5(construct_path.encode())
+    full_hash = hash_object.hexdigest()
+    
+    # Return the first 'length' characters of the hash
+
+    return full_hash[:length]
+
+
 class BaseInfrastructureStack(Stack):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -27,17 +41,27 @@ class BaseInfrastructureStack(Stack):
         env = kwargs.get('env')
         region = env.region if isinstance(env, Environment) else config.primary_region
 
-        unique_name = Names.unique_resource_name(
-            self,
-            "medialake",
-            allowed_special_characters="-",
-            max_length=6,
-            separator="-"
-        )
+        # Generate a short unique identifier
+        short_uid = generate_short_uid(self, length=8)
+
+        # Define your fixed name prefix
+        fixed_name_prefix = "medialake-"
+
+        # Calculate the maximum length for the fixed name prefix
+        max_prefix_length = 4 - len(short_uid) - 1  # Subtract 1 for the separator
+
+        # Truncate the fixed name prefix if it exceeds the maximum length
+        truncated_prefix = fixed_name_prefix[:max_prefix_length]
+
+        # Combine the truncated prefix, separator, and unique identifier
+        lambda_function_name = f"{truncated_prefix}_{short_uid}"
+        # Use the generated name for your Lambda function
         
+        print(lambda_function_name)
+        # lambda_function_name = "asset_table_lambda"
         # Create media assets bucket with explicit name including region
         media_assets_bucket_config = S3Config(
-            bucket_name=f"medialake-media-assets-{region}"
+            bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{region}-{short_uid}"
         )
         self.media_assets_bucket = S3Bucket(
             self,
@@ -70,7 +94,7 @@ class BaseInfrastructureStack(Stack):
 
         self.opensearch_serverless = OpenSearchServerlessConstruct(
             self,
-            unique_name,
+            "OpenSearch",
             props=OpenSearchServerlessProps(
                 collection_name="medialake",
                 public_access=True,
@@ -98,7 +122,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "AssetTableLambdaStream",
             config=LambdaConfig(
-                name="connectors_get_lambda",
+                name=lambda_function_name,
                 entry="lambdas/back_end/asset_table_stream",
                 environment_variables={
                 },

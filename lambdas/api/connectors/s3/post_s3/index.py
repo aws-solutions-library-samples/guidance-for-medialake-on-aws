@@ -22,26 +22,16 @@ tracer = Tracer()
 logger = Logger()
 app = APIGatewayRestResolver(enable_validation=True)
 
-# Initialize S3 client - region will be determined per bucket
+# Initialize AWS Clients S3 client - region will be determined per bucket
 s3_client = boto3.client("s3")
-
-# Initialize DynamoDB in Lambda's region
 dynamodb = boto3.resource('dynamodb')
-
-# Initialize Lambda client
-# lambda_client = boto3.client('lambda')
 iam_client = boto3.client('iam')
-
-
 class S3ConnectorConfig(BaseModel):
     bucket: str
-
-
 class S3Connector(BaseModel):
     configuration: S3ConnectorConfig
     name: str
     type: str
-
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
@@ -50,7 +40,6 @@ def handle_validation_error(ex: RequestValidationError):
         path=app.current_event.path,
         errors=ex.errors()
     )
-
     return Response(
         status_code=422,
         content_type=content_types.APPLICATION_JSON,
@@ -63,7 +52,6 @@ def handle_validation_error(ex: RequestValidationError):
         },
     )
 
-
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
     # Track created resources for cleanup in case of failure
@@ -74,16 +62,16 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Get deployment configuration from environment variables
         deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
         deployment_zip: str | None = os.environ.get('S3_CONNECTOR_LAMBDA')
-        # target_function_name = os.environ.get('TARGET_FUNCTION_NAME')
         
         # Generate unique ID and timestamps
         connector_id = str(uuid.uuid4())
         current_time = datetime.utcnow().isoformat(timespec='seconds')
 
-        # Validate request body
+        # Get request variables from request body
         s3_bucket = createconnector.configuration.bucket
         connector_name = createconnector.name
-
+        # Create resource specific name prefix
+        resource_name_prefix = f"medialake_s3Connector_{s3_bucket}"
         target_function_name = f"medialake_connector_{s3_bucket}"
         
         # Validate S3 bucket exists and get its region
@@ -104,19 +92,16 @@ def create_connector(createconnector: S3Connector) -> dict:
                 }
             }
 
-        # Initialize S3 and SQS clients in the bucket's region
+        # Initialize S3, SQS, and Lambda clients in the bucket's region
         s3 = boto3.client('s3', region_name=bucket_region)
         sqs = boto3.client('sqs', region_name=bucket_region)
-
-        # Configure Lambda client with proper S3 addressing
-        lambda_config = Config(
+        lambda_client = boto3.client('lambda', config=Config(
             region_name=bucket_region,
             s3={'addressing_style': 'virtual'}
-        )
-        lambda_client = boto3.client('lambda', config=lambda_config)
+        ))
 
         # Create SQS queue in the same region as the bucket
-        queue_name = f"{s3_bucket}-notifications"
+        queue_name = f"{resource_name_prefix}-notifications"
         response = sqs.create_queue(QueueName=queue_name)
         queue_url = response["QueueUrl"]
         created_resources.append(('sqs_queue', queue_url))
@@ -130,12 +115,12 @@ def create_connector(createconnector: S3Connector) -> dict:
 
         # Deploy lambda if environment variables are set
         try:
-            # Get the INGEST_EVENT_BUS environment variable
+            # Get the Lambda environment variable
             ingest_event_bus = os.environ.get('INGEST_EVENT_BUS')
             medialake_asset_table = os.environ.get('MEDIALAKE_ASSET_TABLE')
-            
-            # Create IAM role for Lambda
-            role_name = f"{target_function_name}-role"
+    
+            # Create Lambda execution, IAM roles for Lambda
+            role_name = f"{resource_name_prefix}-role"
             assume_role_policy = {
                 "Version": "2012-10-17",
                 "Statement": [{
@@ -144,7 +129,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                     "Action": "sts:AssumeRole"
                 }]
             }
-            
             create_role_response = iam_client.create_role(
                 RoleName=role_name,
                 AssumeRolePolicyDocument=json.dumps(assume_role_policy),
@@ -154,7 +138,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             created_resources.append(('iam_role', role_name))
             
             # Add delay to allow IAM role to propagate
-            time.sleep(10)
+            time.sleep(5)
             
             # Attach policies to the role
             iam_client.attach_role_policy(
@@ -234,7 +218,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                     ]
                 }]
             }
-
             iam_client.put_role_policy(
                 RoleName=role_name,
                 PolicyName=f"{role_name}-s3-policy",

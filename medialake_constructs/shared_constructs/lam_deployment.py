@@ -49,8 +49,8 @@ class LambdaDeployment(Construct):
             # If no requirements.txt, zip the source directory directly
             shutil.make_archive(zip_path.replace('.zip', ''), 'zip', lambda_source_path)
             # Use the source directly for Lambda
-            lambda_code = lambda_.Code.from_asset(lambda_source_path)
-            deploy_source_path = zip_path
+            lambda_code: lambda_.AssetCode = lambda_.Code.from_asset(lambda_source_path)
+            deploy_source_path: str = zip_path
 
         # Deploy the Lambda zip to the destination bucket
         self.deployment = s3deploy.BucketDeployment(
@@ -66,21 +66,3 @@ class LambdaDeployment(Construct):
     @property
     def deployment_key(self) -> str:
         return f"lambda-code/{Fn.select(0, self.deployment.object_keys)}"
-
-
-
-# class BaseInfrastructureStack(Stack):
-#     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-#         super().__init__(scope, construct_id, **kwargs)
-
-#         # Create or import your S3 bucket
-#         self.lambda_code_bucket = s3.Bucket(self, "LambdaCodeBucket")
-#         # Or if you're using an existing bucket:
-#         # self.lambda_code_bucket = s3.Bucket.from_bucket_name(self, "LambdaCodeBucket", "your-existing-bucket-name")
-
-#         lambda_deployment = LambdaDeployment(
-#             self, 'LambdaDeployment',
-#             destination_bucket=self.lambda_code_bucket
-#         )
-
-    
