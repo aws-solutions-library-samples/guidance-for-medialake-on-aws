@@ -355,12 +355,7 @@ const NewPipelinePage = () => {
         fetchPipelineData();
     }, [id, setNodes, setEdges]);
 
-    const onSave = useCallback(() => {
-        if (rfInstance) {
-            const flow = rfInstance.toObject();
-            console.log(flow);
-        }
-    }, [rfInstance]);
+
 
     const onSave = useCallback(() => {
         if (rfInstance) {
