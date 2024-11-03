@@ -27,6 +27,68 @@ interface CustomEdgeData {
     text: string;
 }
 
+interface SavePipelineButtonProps {
+    onClick: () => void;
+}
+
+const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({ onClick }) => {
+    return (
+        <div
+            style={{
+                position: 'absolute',
+                right: 10,
+                top: 10,
+                zIndex: 4,
+                backgroundColor: '#0972d3',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+            }}
+            onClick={onClick}
+        >
+            Save
+        </div>
+    );
+};
+
+interface PipelineNameInputProps {
+    value: string;
+    onChange: (newValue: string) => void;
+}
+
+const PipelineNameInput: React.FC<PipelineNameInputProps> = ({ value, onChange }) => {
+    return (
+        <Box
+            style={{
+                position: 'absolute',
+                left: 10,
+                top: 10,
+                zIndex: 4,
+                backgroundColor: 'white',
+                color: 'black',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+            }}
+            sx={{ p: 2 }}
+        >
+            <TextField
+                label="Pipeline Name"
+                variant="outlined"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                sx={{ width: '300px' }}
+            />
+        </Box>
+    );
+};
+
 const CustomNode = ({ data, id }: { data: any, id: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOption, setSelectedOption] = useState('');
@@ -44,6 +106,8 @@ const CustomNode = ({ data, id }: { data: any, id: string }) => {
         // Handle saving changes (API call)
         setIsModalOpen(false);
     };
+
+
 
     return (
         <>
@@ -192,6 +256,7 @@ const getId = () => `dndnode_${id++}`;
 const Sidebar = ({ pipelineName, setPipelineName }: { pipelineName: string, setPipelineName: (name: string) => void }) => {
     const onDragStart = (event, nodeType) => {
         const nodeData = {
+            id: nodeType.id,
             type: nodeType.type,
             label: nodeType.label,
             icon: nodeType.icon.type.name,
@@ -214,20 +279,22 @@ const Sidebar = ({ pipelineName, setPipelineName }: { pipelineName: string, setP
             <Typography variant="subtitle1" sx={{ mb: 1 }}>Drag nodes to the pane</Typography>
             <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                 {[
-                    { type: 'videoasset', label: 'Video Asset', icon: <FaFileVideo size={20} />, inputTypes: ['video'], outputTypes: ['video'] },
-                    { type: 'audioasset', label: 'Audio Asset', icon: <FaFileAudio size={20} />, inputTypes: ['audio'], outputTypes: ['audio'] },
-                    { type: 'imageasset', label: 'Image Asset', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
-                    { type: 'mediaconvert', label: 'MediaConvert', icon: <FaVideo size={20} />, inputTypes: ['video', 'audio'], outputTypes: ['video', 'audio'] },
-                    { type: 'twelvelabs', label: 'TwelveLabs', icon: <FaDatabase size={20} />, inputTypes: ['video'], outputTypes: ['metadata'] },
-                    { type: 'medialake', label: 'MediaLake', icon: <FaAmazon size={20} />, inputTypes: ['video', 'audio', 'image', 'metadata'], outputTypes: [] },
-                    { type: 'imagemetadata', label: 'Image Metadata', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
+                    { id: '60fb5fc1-372a-45e8-8767-f1690d5bc5bb', type: 'videoasset', label: 'Video Asset', icon: <FaFileVideo size={20} />, inputTypes: ['video'], outputTypes: ['video'] },
+                    { id: '71366379-46c5-4583-8400-25002bf01b5c', type: 'audioasset', label: 'Audio Asset', icon: <FaFileAudio size={20} />, inputTypes: ['audio'], outputTypes: ['audio'] },
+                    { id: '03c23094-d405-4aa7-a243-5a7a8f71d4a5', type: 'imageasset', label: 'Image Asset', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
+                    { id: '9cd66662-884a-4010-b230-8a2c440e675e', type: 'mediaconvert', label: 'MediaConvert', icon: <FaVideo size={20} />, inputTypes: ['video', 'audio'], outputTypes: ['video', 'audio'] },
+                    { id: '9408d6dc-021b-46c1-b22c-19e4721b7d44', type: 'twelvelabs', label: 'TwelveLabs', icon: <FaDatabase size={20} />, inputTypes: ['video'], outputTypes: ['metadata'] },
+                    { id: '14a670a0-967d-452c-9e0e-cf2f9e92d634', type: 'medialake', label: 'MediaLake', icon: <FaAmazon size={20} />, inputTypes: ['video', 'audio', 'image', 'metadata'], outputTypes: [] },
+                    { id: '57207390-4b93-4c07-a1cc-e4733710b842', type: 'imagemetadata', label: 'Image Metadata', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
+                    { id: '9361ac53-13e9-4358-adde-3e4cd023954f', type: 'imageproxy', label: 'Image Proxy', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
+                    { id: '6773f9ef-2161-42c1-9485-11ef1c23f3b4', type: 'imagethumbnail', label: 'Image Thumbnail', icon: <FaFileImage size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
                     // { type: 'bedrockautomation', label: 'Bedrock Data Automation', icon: <FaRobot size={20} />, inputTypes: ['data'], outputTypes: ['data'] },
                     // { type: 'media2cloud', label: 'Media2Cloud', icon: <FaCloud size={20} />, inputTypes: ['video', 'audio', 'image'], outputTypes: ['metadata'] },
                     // { type: 'bedrockClaude', label: 'Bedrock Claude', icon: <FaBrain size={20} />, inputTypes: ['text'], outputTypes: ['text'] },
                     // { type: 'briaAI', label: 'Bria.AI', icon: <FaBrain size={20} />, inputTypes: ['image'], outputTypes: ['image'] },
                 ].map((item) => (
                     <div
-                        key={item.type}
+                        key={item.id}
                         style={{
                             width: '60px',
                             height: '70px',
@@ -263,7 +330,8 @@ const NewPipelinePage = () => {
     const [selectedEdge, setSelectedEdge] = useState(null);
     const [edgeLabel, setEdgeLabel] = useState('');
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-    const [pipelineName, setPipelineName] = useState('');
+    const [pipelineName, setPipelineName] = useState('untitled');
+    const [rfInstance, setRfInstance] = useState(null);
 
     useEffect(() => {
         // Fetch pipeline data based on the pipeline ID
@@ -286,6 +354,15 @@ const NewPipelinePage = () => {
 
         fetchPipelineData();
     }, [id, setNodes, setEdges]);
+
+
+
+    const onSave = useCallback(() => {
+        if (rfInstance) {
+            const flow = rfInstance.toObject();
+            console.log(flow);
+        }
+    }, [rfInstance]);
 
     const onConnect = useCallback(
         (connection: Connection) => {  // Change type from Edge to Connection
@@ -346,6 +423,7 @@ const NewPipelinePage = () => {
                 return;
             }
 
+
             const position = project({
                 x: event.clientX - reactFlowBounds.left,
                 y: event.clientY - reactFlowBounds.top,
@@ -374,7 +452,6 @@ const NewPipelinePage = () => {
                     icon: <IconComponent size={20} />
                 },
             };
-
             setNodes((nds) => nds.concat(newNode));
 
             // Check for proximity to other nodes
@@ -420,15 +497,11 @@ const NewPipelinePage = () => {
             left: '60px',
             top: '64px',
         }}>
-            {/* <Box sx={{ p: 2 }}>
-                <TextField
-                    label="Pipeline Name"
-                    variant="outlined"
-                    value={pipelineName}
-                    onChange={(e) => setPipelineName(e.target.value)}
-                    sx={{ width: '300px' }}
-                />
-            </Box> */}
+
+            <PipelineNameInput
+                value={pipelineName}
+                onChange={setPipelineName}
+            />
             <Box sx={{ display: 'flex', flex: 1 }}>
                 <div style={{ flex: 1, height: '100%' }} ref={reactFlowWrapper}>
                     <ReactFlow
@@ -440,10 +513,14 @@ const NewPipelinePage = () => {
                         onEdgeClick={onEdgeClick}
                         onDragOver={onDragOver}
                         onDrop={onDrop}
-                        fitView
+                        onInit={setRfInstance}
+                        fitView={false} // prevents auto zoom on drop
                         style={{ width: '100%', height: '100%' }}
                         minZoom={0.1}
                         maxZoom={4}
+                        // zoomOnScroll={false}
+                        // zoomOnPinch={false}
+                        // zoomOnDoubleClick={false}
                         proOptions={{ hideAttribution: true }}
                         nodeTypes={nodeTypes}
                         edgeTypes={edgeTypes}
@@ -456,6 +533,7 @@ const NewPipelinePage = () => {
                         />
                         <Controls />
                         <MiniMap position="bottom-right" />
+                        <SavePipelineButton onClick={onSave} />
                     </ReactFlow>
                 </div>
                 <Sidebar
@@ -559,3 +637,5 @@ const WrappedNewPipelinePage = () => (
 );
 
 export default WrappedNewPipelinePage;
+
+
