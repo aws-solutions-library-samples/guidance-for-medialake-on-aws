@@ -6,8 +6,12 @@ import aws_cdk as cdk
 from config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway_main_construct import ApiGatewayConstruct
-from medialake_constructs.api_gateway_connectors import ConnectorsConstruct, ConnectorsProps
+from medialake_constructs.api_gateway_connectors import (
+    ConnectorsConstruct,
+    ConnectorsProps,
+)
 from medialake_constructs.api_gateway_pipelines import PipelinesConstruct
+from medialake_constructs.api_gateway_search import SearchConstruct, SearchProps
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -19,18 +23,14 @@ class MediaLakeStack(cdk.Stack):
 
         # Create base infrastructure
         base_infrastructure = BaseInfrastructureStack(
-            self,
-            "BaseInfrastructure",
-            env=kwargs.get('env')
+            self, "BaseInfrastructure", env=kwargs.get("env")
         )
 
         # User auth with Cognito
         self._cognito = CognitoConstruct(
             self,
             "Cognito",
-            props=CognitoProps(
-                assets_bucket_arn="arn:aws:s3:::mne-mscdemo-testevent"
-            ),
+            props=CognitoProps(assets_bucket_arn="arn:aws:s3:::mne-mscdemo-testevent"),
         )
 
         # Create main API Gateway construct
@@ -51,7 +51,8 @@ class MediaLakeStack(cdk.Stack):
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
-            )   
+                iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+            ),
         )
 
         # Create pipelines construct
@@ -66,6 +67,20 @@ class MediaLakeStack(cdk.Stack):
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
             ) 
+        )
+
+        _ = SearchConstruct(
+            self,
+            "Search",
+            props=SearchProps(
+                asset_table=base_infrastructure.asset_table,
+                api_resource=api_gateway.api_resource,
+                cognito_authorizer=api_gateway.cognito_authorizer,
+                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+                open_search_endpoint=base_infrastructure.collection_endpoint,
+                open_search_arn=base_infrastructure.collection_arn,
+                open_search_index="media",
+            ),
         )
 
         # Create User Interface
@@ -88,31 +103,34 @@ class MediaLakeStack(cdk.Stack):
         )
 
         # Add CDK-nag suppressions for the stack
-        NagSuppressions.add_stack_suppressions(self, [
-            {"id": "AwsSolutions-S1", "reason": "S3 bucket does not require server-side encryption for this use case"},
-            {"id": "AwsSolutions-IAM4", "reason": "IAM role uses AWSLambdaBasicExecutionRole which is required for Lambda function"},
-        ])
+        NagSuppressions.add_stack_suppressions(
+            self,
+            [
+                {
+                    "id": "AwsSolutions-S1",
+                    "reason": "S3 bucket does not require server-side encryption for this use case",
+                },
+                {
+                    "id": "AwsSolutions-IAM4",
+                    "reason": "IAM role uses AWSLambdaBasicExecutionRole which is required for Lambda function",
+                },
+            ],
+        )
 
 
 app = cdk.App()
 
 primary_stack = MediaLakeStack(
-    app, 
-    "MediaLake", 
-    env=cdk.Environment(
-        region=config.primary_region,
-        account=app.account
-    )
+    app,
+    "MediaLake",
+    env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
 if config.enable_ha and config.secondary_region:
     secondary_stack = MediaLakeStack(
-        app, 
-        "MediaLakeSecondary", 
-        env=cdk.Environment(
-            region=config.secondary_region,
-            account=app.account
-        )
+        app,
+        "MediaLakeSecondary",
+        env=cdk.Environment(region=config.secondary_region, account=app.account),
     )
 
 # Add AWS Solutions checks to the entire app

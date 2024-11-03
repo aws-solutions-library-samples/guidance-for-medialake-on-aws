@@ -1,7 +1,4 @@
 export const QUERY_KEYS = {
-    USERS: 'users',
-    POSTS: 'posts',
-    COMMENTS: 'comments',
     CONNECTORS: {
         all: ['connectors'] as const,
         lists: () => [...QUERY_KEYS.CONNECTORS.all, 'list'] as const,
@@ -13,5 +10,7 @@ export const QUERY_KEYS = {
             buckets: () => [...QUERY_KEYS.CONNECTORS.s3.all, 'buckets'] as const,
         },
     },
-    S3_LIST: 's3list'
+    SEARCH: {
+        all: ['search'] as const,
+    },
 } as const;
