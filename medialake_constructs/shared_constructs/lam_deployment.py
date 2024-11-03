@@ -34,7 +34,11 @@ class LambdaDeployment(Construct):
 
         # Install dependencies and create zip if requirements.txt exists
         if os.path.exists(requirements_path):
-            pip_cmd = f'pip install -r {requirements_path} -t {lambda_package_path}'
+            # Using manylinux2014_x86_64 platform tag ensures compatibility with AWS Lambda's execution environment
+            # --platform: Specifies the target platform for wheel installation
+            # --only-binary=:all: Forces pip to use pre-built wheels instead of building from source
+            # This helps avoid compatibility issues that can occur when packages are built on different platforms
+            pip_cmd = f'pip install -r {requirements_path} -t {lambda_package_path} --platform manylinux2014_x86_64 --only-binary=:all:'
             os.system(pip_cmd)
             
             # Copy Lambda source files to package directory

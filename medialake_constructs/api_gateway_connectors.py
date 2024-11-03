@@ -215,6 +215,8 @@ class ConnectorsConstruct(Construct):
                     "lambda:UpdateFunctionCode",
                     "lambda:UpdateFunctionConfiguration",
                     "lambda:DeleteFunction",
+                    "lambda:TagResource",
+                    "lambda:CreateEventSourceMapping"
                 ],
                 resources=["*"],
             )
@@ -225,16 +227,30 @@ class ConnectorsConstruct(Construct):
                     "s3:PutBucketNotification",
                     "s3:GetBucketNotification",
                     "s3:DeleteBucketNotification",
-                    "iam:DeleteRole",
-                    "iam:UpdateRole",
-                    "iam:PutRolePolicy",
-                    "iam:DeleteRolePolicy",
-                    "iam:CreateRole",
-                    "iam:TagRole"
                 ],
                 resources=["*"],
             )
         )
+        
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:PassRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:CreateRole",
+                    "iam:TagRole",
+                    "iam:DetachRolePolicy"
+                ],
+                resources=["*"],
+            )
+        )
+        
+
+        
         
         # Grant permissions correctly
         iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
