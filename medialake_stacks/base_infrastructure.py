@@ -57,7 +57,6 @@ class BaseInfrastructureStack(Stack):
         lambda_function_name = f"{truncated_prefix}_{short_uid}"
         # Use the generated name for your Lambda function
         
-        print(lambda_function_name)
         # lambda_function_name = "asset_table_lambda"
         # Create media assets bucket with explicit name including region
         media_assets_bucket_config = S3Config(

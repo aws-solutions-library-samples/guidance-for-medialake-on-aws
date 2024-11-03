@@ -69,4 +69,5 @@ class ApiGatewayStack(Stack):
             lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
             iac_assets_bucket = self.iac_assets_bucket
+            media_assets_bucket = self.media_assets_bucket
         )
