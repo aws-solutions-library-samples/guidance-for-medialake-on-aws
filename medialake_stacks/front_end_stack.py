@@ -4,29 +4,15 @@ from aws_cdk import (
     aws_cloudfront as cf,
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_athena as athena,
-    aws_events_targets as targets,
     aws_s3_deployment as s3deploy,
     aws_secretsmanager as secretsmanager,
     aws_cognito as cognito,
-    aws_kinesis as kinesis,
     aws_lambda as lambda_,
     aws_logs as logs,
     aws_cloudfront as cloudfront,
-    aws_cloudformation as cfn,
-    aws_dynamodb as ddb,
-    aws_ssm as ssm,
-    aws_quicksight as quicksight,
     aws_iam as iam,
-    aws_lambda as _lambda,
-    aws_sqs as sqs,
     aws_s3 as s3,
-    aws_stepfunctions as stepfunctions,
-    aws_stepfunctions_tasks as stepfunctions_tasks,
-    aws_stepfunctions_tasks as tasks,
     RemovalPolicy,
-    aws_kinesisfirehose as firehose,
     CfnOutput,
     Duration,
     ILocalBundling,
@@ -34,7 +20,6 @@ from aws_cdk import (
     DockerImage,
 )
 
-import aws_cdk.aws_glue_alpha as glue
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 
 
@@ -45,6 +30,8 @@ from aws_cdk.aws_cognito_identitypool_alpha import (
     UserPoolAuthenticationProvider,
     IdentityPoolAuthenticationProviders,
 )
+
+from aws_cdk import aws_cloudfront_origins as origins
 
 
 @jsii.implements(ILocalBundling)
@@ -287,61 +274,41 @@ class FrontEndStack(Stack):
             any_method=False,
         )
 
-        distribution = cloudfront.CloudFrontWebDistribution(
+        distribution = cloudfront.Distribution(
             self,
-            "Distribution",
-            origin_configs=[
-                cloudfront.SourceConfiguration(
-                    s3_origin_source=cloudfront.S3OriginConfig(
-                        s3_bucket_source=user_interface_bucket,
-                        origin_access_identity=origin_access_identity,
-                    ),
-                    behaviors=[cloudfront.Behavior(is_default_behavior=True)],
-                ),
-                cloudfront.SourceConfiguration(
-                    custom_origin_source=cloudfront.CustomOriginConfig(
-                        domain_name=f"{rest_api.rest_api_id}.execute-api.{self.region}.amazonaws.com",
+            "WebDistribution",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=origins.S3Origin(user_interface_bucket),
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+            ),
+            additional_behaviors={
+                "/api/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{rest_api.rest_api_id}.execute-api.{self.region}.amazonaws.com",
                         origin_protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
-                        origin_headers={
+                        custom_headers={
                             "X-Origin-Verify": x_origin_verify_secret.secret_value_from_json(
                                 "headerValue"
                             ).unsafe_unwrap()
                         },
                     ),
-                    behaviors=[
-                        cloudfront.Behavior(
-                            path_pattern="/api/*",
-                            allowed_methods=cloudfront.CloudFrontAllowedMethods.ALL,
-                            cached_methods=cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD,
-                            compress=False,
-                            forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                                query_string=True,
-                                headers=[
-                                    "x-api-key",
-                                    "Referer",
-                                    "Origin",
-                                    "Authorization",
-                                    "Content-Type",
-                                    "x-forwarded-user",
-                                    "Access-Control-Request-Headers",
-                                    "Access-Control-Request-Method",
-                                ],
-                            ),
-                            default_ttl=Duration.seconds(0),
-                            is_default_behavior=False,
-                            max_ttl=Duration.minutes(30),
-                            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
-                        ),
-                    ],
-                ),
-            ],
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+                )
+            },
             price_class=cloudfront.PriceClass.PRICE_CLASS_ALL,
-            error_configurations=[
-                cloudfront.CfnDistribution.CustomErrorResponseProperty(
-                    error_code=404,
-                    error_caching_min_ttl=0,
-                    response_code=200,
+            error_responses=[
+                cloudfront.ErrorResponse(
+                    http_status=404,
+                    response_http_status=200,
                     response_page_path="/index.html",
+                    ttl=Duration.seconds(0),
                 )
             ],
             default_root_object="index.html",
