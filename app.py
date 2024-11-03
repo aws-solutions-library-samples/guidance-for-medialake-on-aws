@@ -63,6 +63,7 @@ class MediaLakeStack(cdk.Stack):
             ingest_event_bus=base_infrastructure.ingest_event_bus,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+            media_assets_bucket=base_infrastructure.media_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
             ) 
