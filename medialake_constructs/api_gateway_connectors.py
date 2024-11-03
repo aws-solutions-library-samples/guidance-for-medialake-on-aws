@@ -67,6 +67,7 @@ class ConnectorsConstruct(Construct):
             self,
             "IngestS3LambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
+            code_path=["lambdas", "ingest", "s3"],
         )
 
         dynamo_table = DynamoDB(
@@ -374,6 +375,8 @@ class ConnectorsConstruct(Construct):
                     "iam:DeleteRole",
                     "iam:UpdateRole",
                     "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:PassRole",
                     "iam:DeleteRolePolicy",
                     "iam:CreateRole",
                     "iam:TagRole",
@@ -384,6 +387,9 @@ class ConnectorsConstruct(Construct):
                 resources=[f"arn:aws:iam::{account_id}:role/*"],
             )
         )
+
+        # Grant permissions correctly
+        iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
 
         # Policy for DynamoDB actions on a specific table
         connector_s3_post_lambda.function.role.add_to_policy(
