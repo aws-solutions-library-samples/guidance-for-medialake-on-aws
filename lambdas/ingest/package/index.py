@@ -80,7 +80,7 @@ def handler(event, context):
                     else "AssetIngested"
                 )
                 event_detail = {"eventType": event_type, "assets": [asset]}
-
+                print(asset)
                 try:
                     response = eventbridge.put_events(
                         Entries=[
@@ -186,21 +186,6 @@ def process_asset(bucket, key, event_time, event_type):
         },
         "status": "Deleted" if event_type.startswith("ObjectRemoved") else "Ingested",
         "tags": parse_tags(metadata.get("tags", "")),
-        "workflow": {
-            "currentStage": (
-                "Deleted" if event_type.startswith("ObjectRemoved") else "QC"
-            ),
-            "history": [
-                {
-                    "stage": (
-                        "Deleted"
-                        if event_type.startswith("ObjectRemoved")
-                        else "Ingest"
-                    ),
-                    "timestamp": event_time,
-                }
-            ],
-        },
     }
 
     # Include hash if it exists
@@ -213,7 +198,18 @@ def process_asset(bucket, key, event_time, event_type):
 def get_asset_type(file_extension):
     video_extensions = [".mp4", ".mov", ".avi", ".mkv"]
     audio_extensions = [".mp3", ".wav", ".aac", ".flac"]
-    image_extensions = [".jpg", ".jpeg", ".png", ".tiff"]
+    image_extensions = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".tiff",
+        ".webp",
+        ".heic",
+        ".heif",
+        ".svg",
+        ".gif",
+        ".bmp",
+    ]
 
     if file_extension in video_extensions:
         return "Video"
@@ -239,6 +235,12 @@ def get_container_format(file_extension):
         ".jpeg": "JPEG",
         ".png": "PNG",
         ".tiff": "TIFF",
+        ".webp": "WebP",
+        ".heic": "High-Efficiency Image Format",
+        ".heif": "High-Efficiency Image Format",
+        ".gif": "GIF",
+        ".bmp": "Bitmap",
+        ".svg": "Scalable Vector Graphics",
     }
     return format_map.get(file_extension.lower(), "Unknown")
 

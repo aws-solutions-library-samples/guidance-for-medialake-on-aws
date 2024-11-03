@@ -58,7 +58,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             s3_config=S3Config(
-                bucket_name=f"medialake-iac-assets-343424234234-{short_uid}"
+                bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}"
             ),
         )
 
