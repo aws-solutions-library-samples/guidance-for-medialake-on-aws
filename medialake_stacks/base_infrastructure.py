@@ -4,18 +4,18 @@ from aws_cdk import (
     aws_events as events,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
-    Names,
-    RemovalPolicy,
-    CfnOutput
 )
-from config import GLOBAL_PREFIX, generate_short_uid
-import hashlib
-import aws_cdk.aws_lambda_event_sources as eventsources
+from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
+
+# Local imports
+from config import GLOBAL_PREFIX, generate_short_uid, config
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
-from config import config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.shared_constructs.opensearch_serverless import OpenSearchServerlessConstruct, OpenSearchServerlessProps
+from medialake_constructs.shared_constructs.opensearch_serverless import (
+    OpenSearchServerlessConstruct,
+    OpenSearchServerlessProps,
+)
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -23,62 +23,45 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 
 
-def generate_short_uid(construct, length=8):
-    # Generate a hash based on the construct's path
-    construct_path = construct.node.path
-    hash_object = hashlib.md5(construct_path.encode())
-    full_hash = hash_object.hexdigest()
-    
-    # Return the first 'length' characters of the hash
-
-    return full_hash[:length]
-
-
 class BaseInfrastructureStack(Stack):
-    def __init__(self, scope: Construct, id: str, **kwargs):
-        super().__init__(scope, id, **kwargs)
+    def __init__(self, scope: Construct, construct_id: str, **kwargs):
+        super().__init__(scope, construct_id, **kwargs)
 
-        env = kwargs.get('env')
+        env = kwargs.get("env")
         region = env.region if isinstance(env, Environment) else config.primary_region
 
         # Generate a short unique identifier
         short_uid = generate_short_uid(self, length=8)
 
-        # Define your fixed name prefix
-        fixed_name_prefix = "medialake-"
-
         # Calculate the maximum length for the fixed name prefix
         max_prefix_length = 4 - len(short_uid) - 1  # Subtract 1 for the separator
 
         # Truncate the fixed name prefix if it exceeds the maximum length
-        truncated_prefix = fixed_name_prefix[:max_prefix_length]
+        truncated_prefix = GLOBAL_PREFIX[:max_prefix_length]
 
         # Combine the truncated prefix, separator, and unique identifier
         lambda_function_name = f"{truncated_prefix}_{short_uid}"
         # Use the generated name for your Lambda function
-        
-        # lambda_function_name = "asset_table_lambda"
-        # Create media assets bucket with explicit name including region
-        media_assets_bucket_config = S3Config(
-            bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{region}-{short_uid}"
-        )
         self.media_assets_bucket = S3Bucket(
             self,
             "MediaAssets",
-            s3_config=media_assets_bucket_config
+            s3_config=S3Config(
+                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-343424234234-{region}-{short_uid}"
+            ),
         )
-        
+
         # Create IAC assets bucket with explicit name including region
         medialake_iac_assets_config = S3Config(
             bucket_name=f"medialake-iac-assets-{config.account_id}-{Stack.of(self).region}-{id}".lower()
-     
         )
         self.iac_assets_bucket = S3Bucket(
             self,
             "IACAssets",
-            s3_config=medialake_iac_assets_config
+            s3_config=S3Config(
+                bucket_name=f"medialake-iac-assets-343424234234-{short_uid}"
+            ),
         )
-        
+
         # Create EventBus with retention policy
         ingest_event_bus_config = EventBusConfig(
             bus_name=f"medialake-ingest-{region}",
@@ -86,11 +69,8 @@ class BaseInfrastructureStack(Stack):
             log_all=True,
         )
         self._ingest_event_bus = EventBus(
-            self,
-            "IngestEventBus",
-            props=ingest_event_bus_config
+            self, "IngestEventBus", props=ingest_event_bus_config
         )
-
 
         self.opensearch_serverless = OpenSearchServerlessConstruct(
             self,
@@ -100,7 +80,7 @@ class BaseInfrastructureStack(Stack):
                 public_access=True,
                 collection_type="VECTORSEARCH",
                 collection_desc="Collection to be used for vector search using OpenSearch Serverless",
-                collection_indexes=["media"]
+                collection_indexes=["media"],
             ),
         )
 
@@ -116,52 +96,54 @@ class BaseInfrastructureStack(Stack):
                 # removal_policy=RemovalPolicy.DESTROY,
             ),
         )
-        
-        
+
         asset_lambda_stream = Lambda(
             self,
             "AssetTableLambdaStream",
             config=LambdaConfig(
-                name=lambda_function_name,
+                name=f"{GLOBAL_PREFIX}-asset-table-stream",
                 entry="lambdas/back_end/asset_table_stream",
-                environment_variables={
-                },
+                environment_variables={},
             ),
         )
-        
-        self._asset_table.table.grant_stream(asset_lambda_stream.function)
-        asset_lambda_stream.function.add_event_source(eventsources.DynamoEventSource(self._asset_table.table,
-            starting_position=lambda_.StartingPosition.LATEST,
-            filters=[lambda_.FilterCriteria.filter({"event_name": lambda_.FilterRule.is_equal("INSERT")})]
-        ))
 
-        # # Export the EventBus name and ARN
-        # CfnOutput(
-        #     self,
-        #     "IngestEventBusName",
-        #     value=self._ingest_event_bus.event_bus_name,
-        #     export_name=f"{id}-ingest-event-bus-name"
-        # )
-        # CfnOutput(
-        #     self,
-        #     "IngestEventBusArn",
-        #     value=self._ingest_event_bus.event_bus.event_bus_arn,
-        #     export_name=f"{id}-ingest-event-bus-arn"
-        # )
-    
+        self._asset_table.table.grant_stream(asset_lambda_stream.function)
+        asset_lambda_stream.function.add_event_source(
+            eventsources.DynamoEventSource(
+                self._asset_table.table,
+                starting_position=lambda_.StartingPosition.LATEST,
+                filters=[
+                    lambda_.FilterCriteria.filter(
+                        {"event_name": lambda_.FilterRule.is_equal("INSERT")}
+                    )
+                ],
+            )
+        )
+
     @property
     def ingest_event_bus(self) -> events.EventBus:
         return self._ingest_event_bus.event_bus
-    
+
     @property
     def ingest_event_bus_name(self) -> str:
         return self._ingest_event_bus.event_bus_name
-    
-    
+
     @property
     def asset_table(self) -> dynamodb.TableV2:
         return self._asset_table
-    
+
     @property
     def asset_table_name(self) -> str:
         return self._asset_table.table.table_name
+
+    @property
+    def collection_dashboards_url(self) -> str:
+        return self.opensearch_serverless.collection_dashboards_url
+
+    @property
+    def collection_endpoint(self) -> str:
+        return self.opensearch_serverless.collection_endpoint
+
+    @property
+    def collection_arn(self) -> str:
+        return self.opensearch_serverless.collection_arn

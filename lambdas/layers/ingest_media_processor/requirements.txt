@@ -1,0 +1,3 @@
+iptcinfo3
+Pillow
+pymediainfo-lambda

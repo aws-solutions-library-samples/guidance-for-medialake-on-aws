@@ -179,10 +179,7 @@ export const useUpdateConnector = () => {
             } else {
                 showError(`Failed to update connector: ${error.message}`);
             }
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
-        },
+        }
     });
 };
 
@@ -233,10 +230,7 @@ export const useDeleteConnector = () => {
             } else {
                 showError(`Failed to delete connector: ${error.message}`);
             }
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
-        },
+        }
     });
 };
 

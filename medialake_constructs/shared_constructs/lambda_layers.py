@@ -124,16 +124,30 @@ class GoogleCloudStorageLayer(Construct):
 
 
 class IngestMediaProcessorLayer(Construct):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs):
+        super().__init__(scope, construct_id, **kwargs)
+
+        # Define the Lambda layer
+        self.layer = PythonLayerVersion(
+            self,
+            "IngestMediaProcessorLayer",
+            entry="lambdas/layers/ingest_media_processor",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            description="A Lambda layer for analyzing media container media info",
+        )
+
+
+class SearchLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
         self.layer = PythonLayerVersion(
             self,
-            "IngestMediaProcessorLayer",
-            entry="lambdas/layers/ingestMediaProcessor",
+            "SearchLayer",
+            entry="lambdas/layers/search",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            description="A Lambda layer for analyzing media container media info",
+            description="A Lambda layer for search",
         )
 
     @property
