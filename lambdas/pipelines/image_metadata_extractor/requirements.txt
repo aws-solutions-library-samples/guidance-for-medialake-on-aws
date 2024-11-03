@@ -2,3 +2,4 @@ pillow==11.0.0
 pymediainfo-lambda==0.0.13
 IPTCInfo3==2.1.4
 aws-lambda-powertools==3.2.0
+PyExifTool==0.5.6

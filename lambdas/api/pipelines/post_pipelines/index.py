@@ -16,6 +16,7 @@ from aws_lambda_powertools.event_handler import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
+
 from pydantic import BaseModel
 
 from image_pipeline_definitions import (
@@ -276,10 +277,12 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                 {
                     "Effect": "Allow",
                     "Action": [
-                        "dynamodb:UpdateItem"
+                        "dynamodb:UpdateItem",
+                        "dynamodb:GetItem",  
+                        "dynamodb:PutItem"   
                     ],
                     "Resource": [
-                        f"arn:aws:dynamodb:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:table/{os.environ['MEDIALAKE_ASSET_TABLE']}"
+                        f"{os.environ['MEDIALAKE_ASSET_TABLE']}"
                     ]
                 }
             ]
@@ -310,6 +313,28 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
             RoleName=role_name,
             PolicyName=f"{role_name}-lambda-policy",
             PolicyDocument=json.dumps(lambda_policy)
+        )
+        
+        # Create and attach S3 policy
+        s3_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::*/*"
+                    ]
+                }
+            ]
+        }
+
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-s3-policy",
+            PolicyDocument=json.dumps(s3_policy)
         )
         
         return response['Role']['Arn']
@@ -428,6 +453,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         image_metadata_extractor_deployment_zip = os.environ.get('IMAGE_METADATA_EXTRACTOR_LAMBDA')
         image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
         ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
+        exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
+        
         
         # Common tags for all resources
         tags = {
@@ -497,6 +524,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             role_arn,
             deployment_bucket,
             image_metadata_extractor_deployment_zip,
+            exiftool_layer_arn,
             tags
         )
 
