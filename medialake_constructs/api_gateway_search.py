@@ -1,61 +1,80 @@
+from dataclasses import dataclass
 from aws_cdk import (
     aws_apigateway as apigateway,
-    aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
-    aws_s3_deployment as s3deploy,
     Duration,
-    aws_s3 as s3,
-    aws_events as events,
+    aws_iam as iam,
 )
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from aws_cdk import Fn, Stack
 from constructs import Construct
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBConfig,
-)
-import os
-import shutil
-from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from config import config
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 
 
-class ApiSearchConstruct(Construct):
+@dataclass
+class SearchProps:
+    asset_table: dynamodb.TableV2
+    api_resource: apigateway.IResource
+    cognito_authorizer: apigateway.IAuthorizer
+    x_origin_verify_secret: secretsmanager.Secret
+    open_search_endpoint: str
+    open_search_arn: str
+    open_search_index: str
+
+
+class SearchConstruct(Construct):
     def __init__(
         self,
         scope: Construct,
-        id: str,
-        api_resource: apigateway.IResource,
-        cognito_authorizer: apigateway.IAuthorizer,
-        x_origin_verify_secret: secretsmanager.Secret,
+        construct_id: str,
+        props: SearchProps,
     ) -> None:
-        super().__init__(scope, id)
+        super().__init__(scope, construct_id)
 
-
+        search_layer = SearchLayer(self, "SearchLayer")
 
         # Create connectors resource
-        search_resource = api_resource.root.add_resource("search")
-        search_get_lambda_config = LambdaConfig(
-            name="connectors_get_lambda",
-            entry="lambdas/api/search/get_search",
-            environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-            },
-        )
+        search_resource = props.api_resource.root.add_resource("search")
         search_get_lambda = Lambda(
             self,
-            "ConnectorsGetLambda",
-            config=search_get_lambda_config,
+            "SearchGetLambda",
+            config=LambdaConfig(
+                name="search_get_lambda",
+                entry="lambdas/api/search/get_search",
+                layers=[search_layer.layer],
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": (
+                        props.x_origin_verify_secret.secret_arn
+                    ),
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_INDEX": props.open_search_index,
+                },
+            ),
+        )
+
+        # Add OpenSearch read permissions to the Lambda
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "aoss:ReadDocument",
+                    "aoss:SearchDocument",
+                    "aoss:BatchGetDocument",
+                    "aoss:APIAccessAll",
+                    "aoss:DescribeIndex",
+                    "aoss:ListIndices",
+                ],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
         )
 
         search_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_get_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
