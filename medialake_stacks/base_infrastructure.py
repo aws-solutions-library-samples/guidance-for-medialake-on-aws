@@ -46,7 +46,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaAssets",
             s3_config=S3Config(
-                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-343424234234-{region}-{short_uid}"
+                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{config.account_id}-{region}-{short_uid}"
             ),
         )
 
