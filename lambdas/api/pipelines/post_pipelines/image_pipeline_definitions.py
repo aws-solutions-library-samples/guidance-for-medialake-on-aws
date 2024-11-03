@@ -41,6 +41,7 @@ def get_state_machine_definition(
                         ":metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
                     }
                 },
+                "ResultPath": null
                 "Next": "CreateProxy"
             },
             # Rest of the states remain the same
