@@ -49,7 +49,7 @@ const SettingsComponent: React.FC = () => {
     const [integrationPage, setIntegrationPage] = useState<number>(1);
 
     const { isAuthenticated } = useAuth();
-    const { data: connectorsData, refetch: refetchConnectors } = useGetConnectors();
+    const { data: connectorsData } = useGetConnectors();
     const { mutateAsync: createConnector } = useCreateConnector();
     const { mutateAsync: updateConnector } = useUpdateConnector();
     const { mutateAsync: deleteConnector } = useDeleteConnector();
@@ -58,8 +58,8 @@ const SettingsComponent: React.FC = () => {
 
     useEffect(() => {
         if (connectorsData?.data?.connectors) {
-            setConnectors(Array.isArray(connectorsData.data.connectors) 
-                ? connectorsData.data.connectors 
+            setConnectors(Array.isArray(connectorsData.data.connectors)
+                ? connectorsData.data.connectors
                 : []);
         }
     }, [connectorsData]);
@@ -84,7 +84,6 @@ const SettingsComponent: React.FC = () => {
             } else {
                 await createConnector(connectorData);
             }
-            await refetchConnectors();
             handleCloseConnectorModal();
         } catch (error) {
             console.error('Error saving connector:', error);
@@ -94,7 +93,6 @@ const SettingsComponent: React.FC = () => {
     const handleConnectorDelete = async (connector: ConnectorResponse) => {
         try {
             await deleteConnector(connector.id);
-            await refetchConnectors();
         } catch (error) {
             console.error('Error deleting connector:', error);
         }
@@ -136,11 +134,11 @@ const SettingsComponent: React.FC = () => {
         if (!Array.isArray(connectors)) {
             return null;
         }
-    
+
         const startIndex = (connectorPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedConnectors = connectors.slice(startIndex, endIndex);
-    
+
         return paginatedConnectors.map((connector) => (
             <Grid item xs={12} sm={6} md={4} key={connector.id}>
                 <ConnectorCard

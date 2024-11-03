@@ -7,15 +7,20 @@ from aws_cdk import (
     Duration,
 )
 from constructs import Construct
-from aws_cdk.aws_lambda_python_alpha import PythonFunction, BundlingOptions
+from aws_cdk.aws_lambda_python_alpha import (
+    PythonFunction,
+    BundlingOptions,
+    PythonLayerVersion,
+)
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
     PowertoolsLayerConfig,
 )
+
 from typing import Dict, Optional, List
 from dataclasses import dataclass
-import constants
 import re
+from config import WORKFLOW_PAYLOAD_TEMP_BUCKET
 
 # Constants
 DEFAULT_MEMORY_SIZE = 128
@@ -28,9 +33,9 @@ MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
 
 
-def validate_lambda_resources_names(base_name: str, id: str) -> str:
+def validate_lambda_resources_names(base_name: str, construct_id: str) -> str:
     # Combine base_name and id
-    lambda_full_name = f"{base_name}-{id}"
+    lambda_full_name = f"{base_name}-{construct_id}"
 
     # Check if the base_name is empty
     if not base_name:
@@ -72,6 +77,7 @@ def validate_lambda_resources_names(base_name: str, id: str) -> str:
 @dataclass
 class LambdaConfig:
     """Configuration for Lambda function creation."""
+
     name: str
     entry: Optional[str] = None
     memory_size: int = DEFAULT_MEMORY_SIZE
@@ -79,7 +85,7 @@ class LambdaConfig:
     environment_variables: Optional[Dict[str, str]] = None
     runtime: lambda_.Runtime = DEFAULT_RUNTIME
     architecture: lambda_.Architecture = DEFAULT_ARCHITECTURE
-    layers: Optional[List[str]] = None
+    layers: Optional[List[PythonLayerVersion]] = None
     iam_role_name: Optional[str] = None
 
 
@@ -90,11 +96,7 @@ class Lambda(Construct):
     """
 
     def __init__(
-        self,
-        scope: Construct,
-        id: str,
-        config: LambdaConfig,
-        **kwargs
+        self, scope: Construct, construct_id: str, config: LambdaConfig, **kwargs
     ):
         """
         Initialize the LambdaBase construct.
@@ -104,7 +106,7 @@ class Lambda(Construct):
         :param config: Configuration for the Lambda function.
         :param kwargs: Additional keyword arguments.
         """
-        super().__init__(scope, id, **kwargs)
+        super().__init__(scope, construct_id, **kwargs)
 
         if config.memory_size < 128 or config.memory_size > 10240:
             raise ValueError("Memory size must be between 128 MB and 10,240 MB")
@@ -113,7 +115,7 @@ class Lambda(Construct):
         stack = Stack.of(self)
 
         lambda_function_name = validate_lambda_resources_names(
-            config.name, id
+            config.name, construct_id
         )
         lambda_runtime = config.runtime
 
@@ -123,6 +125,10 @@ class Lambda(Construct):
             self, "PowertoolsLayer", config=power_tools_layer_config
         )
         layer_objects = [powertools_layer.layer]
+
+        # Add layers from config if provided
+        if config.layers:
+            layer_objects.extend(config.layers)
 
         # Create Log Group
         log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
@@ -155,7 +161,7 @@ class Lambda(Construct):
                 role_id,
                 assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
                 managed_policies=[basic_execution_policy],
-                role_name=f"{lambda_function_name}ExecutionRole"
+                role_name=f"{lambda_function_name}ExecutionRole",
             )
 
         # Apply removal policy to the role
@@ -189,7 +195,7 @@ class Lambda(Construct):
         if config.environment_variables:
             lambda_environment_variables = config.environment_variables
             lambda_environment_variables["external_payload_s3_bucket"] = (
-                f"{constants.WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
+                f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
             )
             lambda_props["environment"] = config.environment_variables
 
