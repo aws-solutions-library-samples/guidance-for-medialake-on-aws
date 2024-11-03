@@ -78,17 +78,18 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
         };
 
         try {
-            let response;
-            if (connectorType === 'amazonS3') {
-                response = await createS3Connector.mutateAsync(connectorData);
-            } else if (connectorType === 'googleCloudStorage') {
-                response = await createGCSConnector.mutateAsync(connectorData);
-            }
-
-            if (response) {
+            if (editingConnector) {
+                // For editing, use the general onSave callback
                 onSave(connectorData);
-                onClose();
+            } else {
+                // For creating new connectors, use the specific connector mutations
+                if (connectorType === 'amazonS3') {
+                    await createS3Connector.mutateAsync(connectorData);
+                } else if (connectorType === 'googleCloudStorage') {
+                    await createGCSConnector.mutateAsync(connectorData);
+                }
             }
+            onClose();
         } catch (error) {
             console.error('Error creating connector:', error);
             // You might want to add error handling/display here

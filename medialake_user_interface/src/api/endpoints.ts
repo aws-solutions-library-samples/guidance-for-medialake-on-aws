@@ -2,6 +2,6 @@
 
 export const API_ENDPOINTS = {
     CONNECTORS: '/connectors',
-    PIPELINES: '/pipelines',
-
+    PIPELINES: "/pipelines",
+    SEARCH: "/search",
 };

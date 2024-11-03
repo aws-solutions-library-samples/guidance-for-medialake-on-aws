@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Typography, Tabs, Tab, Box, Paper, Grid, Card, CardContent, Divider } from '@mui/material';
+import { Typography, Tabs, Tab, Box, Paper, Grid, Card, CardContent, Divider, Button } from '@mui/material';
 import { Assessment, CompareArrows, HighQuality, CheckCircle, Timer } from '@mui/icons-material';
 import DeduplicationComponent from './deduplicationReview';
 import QualityCheckComponent from './videoReview';
+import VideoReviewInterface from './components/VideoReviewInterface';
 
 interface DashboardData {
     totalPendingReviews: number;
@@ -16,6 +17,7 @@ interface DashboardCardProps {
     title: string;
     value: number | string;
     icon: React.ReactNode;
+    onClick?: () => void;
 }
 
 interface TabPanelProps {
@@ -26,6 +28,7 @@ interface TabPanelProps {
 
 const ReviewQueue: React.FC = () => {
     const [value, setValue] = useState(0);
+    const [showVideoReview, setShowVideoReview] = useState(false);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -40,8 +43,18 @@ const ReviewQueue: React.FC = () => {
         averageReviewTime: '5 minutes',
     };
 
-    const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon }) => (
-        <Card elevation={3} sx={{ height: '100%' }}>
+    const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon, onClick }) => (
+        <Card
+            elevation={3}
+            sx={{
+                height: '100%',
+                cursor: onClick ? 'pointer' : 'default',
+                '&:hover': onClick ? {
+                    backgroundColor: 'action.hover',
+                } : {}
+            }}
+            onClick={onClick}
+        >
             <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                 {icon}
                 <Typography variant="h6" component="div" sx={{ mt: 2, mb: 1 }}>
@@ -50,9 +63,22 @@ const ReviewQueue: React.FC = () => {
                 <Typography variant="h4" color="primary">
                     {value}
                 </Typography>
+                {onClick && (
+                    <Button
+                        variant="text"
+                        color="primary"
+                        sx={{ mt: 1 }}
+                    >
+                        View Queue
+                    </Button>
+                )}
             </CardContent>
         </Card>
     );
+
+    if (showVideoReview) {
+        return <VideoReviewInterface onClose={() => setShowVideoReview(false)} />;
+    }
 
     return (
         <Box sx={{ pt: 8, px: 4 }}>
@@ -81,6 +107,7 @@ const ReviewQueue: React.FC = () => {
                         title="Quality Check Reviews"
                         value={dashboardData.qualityCheckReviews}
                         icon={<HighQuality fontSize="large" color="primary" />}
+                        onClick={() => setShowVideoReview(true)}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4} lg={2.4}>
