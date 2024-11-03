@@ -100,6 +100,7 @@ coverage/
 
 # zip fikes
 *.zip
+!medialake_constructs/shared_constructs/exiftool_x86_64.zip
 
 
 # lambda temp files

@@ -16,6 +16,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from medialake_constructs.shared_constructs.lambda_layers import ExiftoolLayer
 
 
 from dataclasses import dataclass
@@ -38,6 +39,8 @@ class PipelinesConstruct(Construct):
         props: PipelinesProps,
     ) -> None:
         super().__init__(scope, id)
+        
+        exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
@@ -110,7 +113,8 @@ class PipelinesConstruct(Construct):
                 "PIPELINE_TRIGGER_LAMBDA": self.pipeline_trigger_lambda_deployment.deployment_key,
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
-                "AWS_ACCOUNT_ID": scope.account
+                "AWS_ACCOUNT_ID": scope.account,
+                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn
             }
         )
         post_pipelines_handler = Lambda(
@@ -150,6 +154,7 @@ class PipelinesConstruct(Construct):
                 actions=[
                     "lambda:CreateFunction",
                     "lambda:TagResource",
+                    "lambda:GetLayerVersion",
                     "lambda:GetFunction",
                     "lambda:CreateEventSourceMapping"
                 ],

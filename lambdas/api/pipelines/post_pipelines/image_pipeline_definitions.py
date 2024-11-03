@@ -12,6 +12,131 @@ def get_state_machine_definition(
         "StartAt": "ExtractMetadata",
         "States": {
             "ExtractMetadata": {
+                # This state remains the same
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                    "FunctionName": image_metadata_extractor_arn,
+                    "Payload": {
+                        "pipeline_id.$": "$.pipeline_id",
+                        "input.$": "$.input",
+                        "parameters": {
+                            "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)"
+                        }
+                    }
+                },
+                "ResultPath": "$.metadataResult",
+                "Next": "StoreMetadata"
+            },
+            "StoreMetadata": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::dynamodb:updateItem",
+                "Parameters": {
+                    "TableName": asset_table_name,
+                    "Key": {
+                        "id": {"S.$": "$.input.id"}
+                    },
+                    "UpdateExpression": "SET metadata = :metadata",
+                    "ExpressionAttributeValues": {
+                        ":metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
+                    }
+                },
+                "Next": "CreateProxy"
+            },
+            # Rest of the states remain the same
+            "CreateProxy": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                    "FunctionName": image_proxy_lambda_arn,
+                    "Payload": {
+                        "pipeline_id.$": "$.pipeline_id",
+                        "input.$": "$.input",
+                        "metadata.$": "$.metadataResult.Payload.body.metadata",  # Updated path
+                        "parameters": {
+                            "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)",
+                            "mode": "proxy",
+                            "output_bucket": "YOUR_OUTPUT_BUCKET"
+                        }
+                    }
+                },
+                "ResultPath": "$.proxyResult",
+                "Next": "StoreProxy"
+            },
+            "StoreProxy": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::dynamodb:updateItem",
+                "Parameters": {
+                    "TableName": asset_table_name,
+                    "Key": {
+                        "id": {"S.$": "$.input.id"}
+                    },
+                    "UpdateExpression": "SET proxyLocation = :proxyLocation",
+                    "ExpressionAttributeValues": {
+                        ":proxyLocation": {
+                            "M": {
+                                "bucket": {"S.$": "$.proxyResult.Payload.body.bucket"},
+                                "key": {"S.$": "$.proxyResult.Payload.body.key"},
+                                "type": {"S": "S3"}
+                            }
+                        }
+                    }
+                },
+                "Next": "CreateThumbnail"
+            },
+            "CreateThumbnail": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                    "FunctionName": image_proxy_lambda_arn,
+                    "Payload": {
+                        "pipeline_id.$": "$.pipeline_id",
+                        "input.$": "$.input",
+                        "metadata.$": "$.metadataResult.Payload.body.metadata",  # Updated path
+                        "parameters": {
+                            "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)",
+                            "mode": "thumbnail",
+                            "output_bucket": "YOUR_OUTPUT_BUCKET",
+                            "thumbnail": {
+                                "width": 345,
+                                "height": 194
+                            }
+                        }
+                    }
+                },
+                "ResultPath": "$.thumbnailResult",
+                "Next": "StoreThumbnail"
+            },
+            "StoreThumbnail": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::dynamodb:updateItem",
+                "Parameters": {
+                    "TableName": asset_table_name,
+                    "Key": {
+                        "id": {"S.$": "$.input.id"}
+                    },
+                    "UpdateExpression": "SET thumbnailLocation = :thumbnailLocation",
+                    "ExpressionAttributeValues": {
+                        ":thumbnailLocation": {
+                            "M": {
+                                "bucket": {"S.$": "$.thumbnailResult.Payload.body.bucket"},
+                                "key": {"S.$": "$.thumbnailResult.Payload.body.key"},
+                                "type": {"S": "S3"}
+                            }
+                        }
+                    }
+                },
+                "End": True
+            }
+        }
+    }
+
+    """Returns the state machine definition with the provided ARNs"""
+    return {
+        "Comment": f"Pipeline {pipeline_name}",
+        "StartAt": "ExtractMetadata",
+        "States": {
+            "ExtractMetadata": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
                 "Parameters": {
@@ -40,6 +165,7 @@ def get_state_machine_definition(
                         ":metadata": {"M.$": "$.metadataResult.body"}
                     }
                 },
+                "ResultPath": null
                 "Next": "CreateProxy"
             },
             "CreateProxy": {
@@ -135,6 +261,7 @@ def create_metadata_extractor_lambda(
     role_arn: str,
     deployment_bucket: str,
     deployment_zip: str,
+    exiftool_layer_arn: str, 
     tags: dict
 ) -> dict:
     """Creates the metadata extractor lambda function"""
@@ -148,6 +275,7 @@ def create_metadata_extractor_lambda(
             'S3Bucket': deployment_bucket,
             'S3Key': deployment_zip
         },
+        Layers=[exiftool_layer_arn],
         Tags=tags
     )
 
