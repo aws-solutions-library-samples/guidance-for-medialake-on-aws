@@ -21,11 +21,15 @@ from medialake_constructs.shared_constructs.lambda_layers import ExiftoolLayer
 
 from dataclasses import dataclass
 
+
 @dataclass
 class PipelinesProps:
     """Configuration for Lambda function creation."""
+
     asset_table: dynamodb.TableV2
-    
+    iac_assets_bucket: s3.Bucket
+
+
 class PipelinesConstruct(Construct):
     def __init__(
         self,
@@ -40,30 +44,30 @@ class PipelinesConstruct(Construct):
         props: PipelinesProps,
     ) -> None:
         super().__init__(scope, id)
-        
+
         exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "ImageMetadataExtractorLambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "image_metadata_extractor"]            
+            code_path=["lambdas", "pipelines", "image_metadata_extractor"],
         )
-        
+
         self.image_proxy_lambda_deployment = LambdaDeployment(
             self,
             "ImageProxyLambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "image_proxy"]            
+            code_path=["lambdas", "pipelines", "image_proxy"],
         )
-        
+
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "pipeline_trigger"]            
+            code_path=["lambdas", "pipelines", "pipeline_trigger"],
         )
-        
+
         dynamo_table = DynamoDB(
             self,
             "PipelinesTable",
@@ -78,14 +82,13 @@ class PipelinesConstruct(Construct):
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
 
-        
         # GET /api/pipelines
         get_pipelines_lambda_config = LambdaConfig(
             name="GetPipelinesHandler",
             entry="lambdas/api/pipelines/get_pipelines",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
             },
         )
         get_pipelines_handler = Lambda(
@@ -117,27 +120,27 @@ class PipelinesConstruct(Construct):
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "AWS_ACCOUNT_ID": scope.account,
-                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn
-            }
+                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn,
+            },
         )
         post_pipelines_handler = Lambda(
             self,
             "PostPipelinesHandler",
             config=post_pipelines_lambda_config,
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "sqs:CreateQueue",
                     "sqs:GetQueueAttributes",
                     "sqs:TagQueue",
-                    "sqs:setqueueattributes"
+                    "sqs:setqueueattributes",
                 ],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -146,12 +149,12 @@ class PipelinesConstruct(Construct):
                     "iam:AttachRolePolicy",
                     "iam:PassRole",
                     "iam:PutRolePolicy",
-                    "iam:GetRole"
+                    "iam:GetRole",
                 ],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -159,61 +162,50 @@ class PipelinesConstruct(Construct):
                     "lambda:TagResource",
                     "lambda:GetLayerVersion",
                     "lambda:GetFunction",
-                    "lambda:CreateEventSourceMapping"
+                    "lambda:CreateEventSourceMapping",
                 ],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "states:CreateStateMachine",
                     "states:TagResource",
-                    "states:DescribeStateMachine"
+                    "states:DescribeStateMachine",
                 ],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "dynamodb:PutItem",
-                    "dynamodb:Scan"
-                ],
+                actions=["dynamodb:PutItem", "dynamodb:Scan"],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "events:TagResource",
                     "events:PutRule",
                     "events:PutTargets",
-                    "events:DescribeRule"
+                    "events:DescribeRule",
                 ],
                 resources=["*"],
             )
         )
-        
+
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "s3:PutBucketPolicy"
-                ],
+                actions=["s3:PutBucketPolicy"],
                 resources=["*"],
             )
         )
-        
-        
-        
-        
-        
+
         iac_assets_bucket.bucket.grant_read_write(post_pipelines_handler.function)
-        
-        
 
         pipelines_resource.add_method(
             "POST",
@@ -228,13 +220,11 @@ class PipelinesConstruct(Construct):
         # GET /api/pipelines/{pipelineId}
         get_pipeline_id_lambda_config = LambdaConfig(
             name="GetPipelineIdHandler",
-            entry=(
-                "lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"
-            ),
+            entry=("lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
-            }
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+            },
         )
         get_pipeline_id_handler = Lambda(
             self,
@@ -252,13 +242,11 @@ class PipelinesConstruct(Construct):
         # PUT /api/pipelines/{pipelineId}
         put_pipeline_id_lambda_config = LambdaConfig(
             name="PutPipelineIdHandler",
-            entry=(
-                "lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"
-            ),
+            entry=("lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
-            }
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+            },
         )
         put_pipeline_id_handler = Lambda(
             self,
@@ -276,27 +264,25 @@ class PipelinesConstruct(Construct):
         # DELETE /api/pipelines/{pipelineId}
         del_pipeline_id_lambda_config = LambdaConfig(
             name="DeletePipelineIdHandler",
-            entry=(
-                "lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"
-            ),
+            entry=("lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn
-            }
+                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+            },
         )
         del_pipeline_id_handler = Lambda(
             self,
             "DeletePipelineIdHandler",
             config=del_pipeline_id_lambda_config,
         )
-        
-         # Add Lambda function deletion permissions
+
+        # Add Lambda function deletion permissions
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:DeleteFunction",
                     "lambda:ListEventSourceMappings",
-                    "lambda:DeleteEventSourceMapping"
+                    "lambda:DeleteEventSourceMapping",
                 ],
                 resources=["*"],
             )
@@ -305,9 +291,7 @@ class PipelinesConstruct(Construct):
         # Add Step Functions deletion permissions
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "states:DeleteStateMachine"
-                ],
+                actions=["states:DeleteStateMachine"],
                 resources=["*"],
             )
         )
@@ -315,10 +299,7 @@ class PipelinesConstruct(Construct):
         # Add SQS deletion permissions
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "sqs:DeleteQueue",
-                    "sqs:setqueueattributes"
-                ],
+                actions=["sqs:DeleteQueue", "sqs:setqueueattributes"],
                 resources=["*"],
             )
         )
@@ -330,7 +311,7 @@ class PipelinesConstruct(Construct):
                     "events:RemoveTargets",
                     "events:DeleteRule",
                     "events:DescribeRule",
-                    "events:ListTargetsByRule"
+                    "events:ListTargetsByRule",
                 ],
                 resources=["*"],
             )
@@ -345,7 +326,7 @@ class PipelinesConstruct(Construct):
                     "iam:DetachRolePolicy",
                     "iam:ListAttachedRolePolicies",
                     "iam:ListRolePolicies",
-                    "iam:GetRole"
+                    "iam:GetRole",
                 ],
                 resources=["*"],
             )
@@ -354,10 +335,7 @@ class PipelinesConstruct(Construct):
         # Add DynamoDB delete permission
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "dynamodb:DeleteItem",
-                    "dynamodb:GetItem"
-                ],
+                actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
                 resources=[dynamo_table.table.table_arn],
             )
         )
