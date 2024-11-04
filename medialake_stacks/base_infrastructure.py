@@ -112,11 +112,6 @@ class BaseInfrastructureStack(Stack):
             eventsources.DynamoEventSource(
                 self._asset_table.table,
                 starting_position=lambda_.StartingPosition.LATEST,
-                filters=[
-                    lambda_.FilterCriteria.filter(
-                        {"event_name": lambda_.FilterRule.is_equal("INSERT")}
-                    )
-                ],
             )
         )
 
