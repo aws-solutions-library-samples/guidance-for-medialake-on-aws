@@ -10,7 +10,7 @@ from medialake_constructs.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
 )
-from medialake_constructs.api_gateway_pipelines import PipelinesConstruct
+from medialake_constructs.api_gateway_pipelines import PipelinesConstruct ,PipelinesProps
 from medialake_constructs.api_gateway_search import SearchConstruct, SearchProps
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
@@ -64,7 +64,8 @@ class MediaLakeStack(cdk.Stack):
             ingest_event_bus=base_infrastructure.ingest_event_bus,
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
-            props=ConnectorsProps(
+            media_assets_bucket=base_infrastructure.media_assets_bucket,
+            props=PipelinesProps(
                 asset_table=base_infrastructure.asset_table,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             ),

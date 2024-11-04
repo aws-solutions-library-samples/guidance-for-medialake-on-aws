@@ -322,7 +322,7 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                 {
                     "Effect": "Allow",
                     "Action": [
-                        "s3:GetObject"
+                        "s3:GetObject",
                     ],
                     "Resource": [
                         "arn:aws:s3:::*/*"
@@ -333,9 +333,56 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
 
         iam_client.put_role_policy(
             RoleName=role_name,
-            PolicyName=f"{role_name}-s3-policy",
+            PolicyName=f"{role_name}-read-s3-policy",
             PolicyDocument=json.dumps(s3_policy)
         )
+        
+        s3_write_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:PutObjectAcl"
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}/*",
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
+                    ]
+                }
+            ]
+        }
+
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-write-s3-policy",
+            PolicyDocument=json.dumps(s3_write_policy)
+        )
+        
+        
+        kms_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "kms:GenerateDataKey"
+                    ],
+                    "Resource": [
+                        os.environ['MEDIA_ASSETS_BUCKET_NAME_KMS_KEY']
+                    ]
+                }
+            ]
+        }
+
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-kms-policy",
+            PolicyDocument=json.dumps(kms_policy)
+        )
+
+        
         
         return response['Role']['Arn']
     except Exception as e:
@@ -537,7 +584,38 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             image_proxy_deployment_zip,
             tags
         )
-  
+        
+        # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
+
+        bucket_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "AllowLambdaWriteAccess",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"  # Use service principal
+                    },
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:PutObjectAcl"
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
+                    ],
+                    "Condition": {
+                        "ArnLike": {
+                            "aws:SourceArn": image_proxy_lambda_response['FunctionArn']
+                        }
+                    }
+                }
+            ]
+        }
+        s3_client.put_bucket_policy(
+            Bucket=os.environ.get('MEDIA_ASSETS_BUCKET_NAME'),
+            Policy=json.dumps(bucket_policy)
+        )
         
         # Create Step Function
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
@@ -614,7 +692,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             image_metadata_extractor_lambda_response['FunctionArn'],
             image_proxy_lambda_response['FunctionArn'],
             createpipeline.name,
-            os.environ.get('MEDIALAKE_ASSET_TABLE')
+            os.environ.get('MEDIALAKE_ASSET_TABLE'),
+            os.environ.get('MEDIA_ASSETS_BUCKET_NAME')
         )
         
         state_machine_arn = create_state_machine(

@@ -32,32 +32,35 @@ def create_proxy(img):
 
 def lambda_handler(event, context):
     # Get the s3_uri and mode from query parameters
-    s3_uri = event.get('parameters', {}).get('s3_uri')
-    mode = event.get('parameters', {}).get('mode', 'thumbnail')  # default to thumbnail mode
+
+    input_data = event.get('input', {})
+    source_location = input_data.get('sourceLocation', {})
     
-    if not s3_uri:
+    bucket = source_location.get('bucket')
+    key = source_location.get('path')
+    
+    # Get the output bucket from event
+    output_bucket = event.get('output_bucket')
+    
+    mode = event.get('mode',  'proxy')  # default to proxy mode
+    
+    if not key:
         return {
             'statusCode': 400,
-            'body': 'Missing s3_uri parameter'
+            'body': 'Missing key parameter'
         }
-
-    # Get the output bucket from event
-    output_bucket = event.get('parameters', {}).get('output_bucket')
+    if not bucket:
+        return {
+            'statusCode': 400,
+            'body': 'Missing bucket parameter'
+        }
+    
     if not output_bucket:
         return {
             'statusCode': 400,
             'body': 'Missing output_bucket parameter'
         }
 
-    # Parse S3 URI
-    if not s3_uri.startswith('s3://'):
-        return {'statusCode': 400, 'body': 'Invalid s3_uri parameter'}
-    s3_uri = s3_uri[5:]
-    bucket_end = s3_uri.find('/')
-    if bucket_end == -1:
-        return {'statusCode': 400, 'body': 'Invalid s3_uri parameter, missing key'}
-    bucket = s3_uri[:bucket_end]
-    key = s3_uri[bucket_end+1:]
 
     # Initialize S3 client
     s3 = boto3.client('s3')
@@ -70,21 +73,21 @@ def lambda_handler(event, context):
 
         if mode == 'thumbnail':
             # Get thumbnail parameters
-            params = event.get('parameters', {}).get('thumbnail', {})
-            width = params.get('width', 100)
-            height = params.get('height', 100)
+            params = event.get('thumbnail')
+            width = event.get('width', 100)
+            height = event.get('height', 100)
             
             # Process image
             processed_img = create_thumbnail(img, width, height)
             # Generate output key
-            output_key = f"thumbnails/{key.rsplit('.', 1)[0]}_{width}x{height}.webp"
+            output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnails_{width}x{height}.webp"
             
         elif mode == 'proxy':
             # Process image
             processed_img = create_proxy(img)
             width, height = img.size
             # Generate output key
-            output_key = f"proxies/{key.rsplit('.', 1)[0]}.webp"
+            output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_proxy.webp"
             
         else:
             return {'statusCode': 400, 'body': 'Invalid mode parameter'}
@@ -112,8 +115,10 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'body': {
-                'bucket': output_bucket,
-                'key': output_key,
+                'location':{
+                    'bucket': output_bucket,
+                    'key': output_key,
+                },
                 'width': width,
                 'height': height,
                 'mode': mode,
