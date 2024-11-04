@@ -45,7 +45,7 @@ class ApiGatewayConstruct(Construct):
         # Create the Rest API
         rest_api = apigateway.RestApi(
             self,
-            "RestApi",
+            "MediaLakeApi",
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             cloud_watch_role=True,
             default_cors_preflight_options=apigateway.CorsOptions(
