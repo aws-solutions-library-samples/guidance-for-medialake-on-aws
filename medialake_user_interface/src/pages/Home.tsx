@@ -1,7 +1,21 @@
-import React from 'react';
-import { Box, Container, Stack, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
+import React, { Suspense } from 'react';
+import { Box, Container, Stack, Typography, Paper, useTheme, useMediaQuery, CircularProgress } from '@mui/material';
 import { SmartFolders } from '../components/home/SmartFolders';
 import { ConnectedStorage } from '../components/home/ConnectedStorage';
+import { ErrorBoundary } from 'react-error-boundary';
+
+const LoadingFallback = () => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+        <CircularProgress />
+    </Box>
+);
+
+const ErrorFallback = ({ error }: { error: Error }) => (
+    <Box sx={{ p: 3, color: 'error.main' }}>
+        <Typography variant="h6">Something went wrong:</Typography>
+        <Typography variant="body1">{error.message}</Typography>
+    </Box>
+);
 
 const Home: React.FC = () => {
     const theme = useTheme();
@@ -68,7 +82,11 @@ const Home: React.FC = () => {
                             }
                         }}
                     >
-                        <SmartFolders />
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <Suspense fallback={<LoadingFallback />}>
+                                <SmartFolders />
+                            </Suspense>
+                        </ErrorBoundary>
                     </Paper>
 
                     <Paper
@@ -87,7 +105,11 @@ const Home: React.FC = () => {
                             }
                         }}
                     >
-                        <ConnectedStorage />
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <Suspense fallback={<LoadingFallback />}>
+                                <ConnectedStorage />
+                            </Suspense>
+                        </ErrorBoundary>
                     </Paper>
                 </Stack>
             </Container>
