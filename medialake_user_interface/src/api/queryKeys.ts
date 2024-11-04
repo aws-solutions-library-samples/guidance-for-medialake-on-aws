@@ -8,6 +8,8 @@ export const QUERY_KEYS = {
         s3: {
             all: ['connectors', 's3'] as const,
             buckets: () => [...QUERY_KEYS.CONNECTORS.s3.all, 'buckets'] as const,
+            explorer: (connectorId: string, prefix: string, continuationToken: string | null) =>
+                [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, prefix, continuationToken] as const,
         },
     },
     SEARCH: {

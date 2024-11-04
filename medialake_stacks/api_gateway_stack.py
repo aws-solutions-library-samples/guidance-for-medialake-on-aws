@@ -15,14 +15,9 @@ from medialake_constructs.api_gateway_pipelines import (
 )
 
 
-
 class ApiGatewayStack(Stack):
     def __init__(
-        self, 
-        scope: Construct, 
-        id: str, 
-        user_pool: cognito.UserPool,
-        **kwargs
+        self, scope: Construct, id: str, user_pool: cognito.UserPool, **kwargs
     ):
         super().__init__(scope, id, **kwargs)
 
@@ -57,7 +52,7 @@ class ApiGatewayStack(Stack):
             cognito_authorizer=self.api_gateway.cognito_authorizer,
             lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
-            iac_assets_bucket = self.iac_assets_bucket
+            iac_assets_bucket=self.iac_assets_bucket,
         )
 
         # Create pipelines construct
@@ -68,5 +63,5 @@ class ApiGatewayStack(Stack):
             cognito_authorizer=self.api_gateway.cognito_authorizer,
             lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
-            iac_assets_bucket = self.iac_assets_bucket
+            iac_assets_bucket=self.iac_assets_bucket,
         )

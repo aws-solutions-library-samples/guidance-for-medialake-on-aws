@@ -66,7 +66,8 @@ class MediaLakeStack(cdk.Stack):
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
-            ) 
+                iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+            ),
         )
 
         _ = SearchConstruct(
