@@ -35,6 +35,7 @@ class PipelinesConstruct(Construct):
         cognito_authorizer: apigateway.IAuthorizer,
         ingest_event_bus: events.EventBus,
         iac_assets_bucket: s3.Bucket,
+        media_assets_bucket: s3.Bucket,
         x_origin_verify_secret: secretsmanager.Secret,
         props: PipelinesProps,
     ) -> None:
@@ -106,6 +107,8 @@ class PipelinesConstruct(Construct):
             entry="lambdas/api/pipelines/post_pipelines",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
                 "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
@@ -194,6 +197,17 @@ class PipelinesConstruct(Construct):
                 resources=["*"],
             )
         )
+        
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:PutBucketPolicy"
+                ],
+                resources=["*"],
+            )
+        )
+        
+        
         
         
         

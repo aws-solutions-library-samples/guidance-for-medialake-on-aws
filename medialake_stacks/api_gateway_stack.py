@@ -63,5 +63,6 @@ class ApiGatewayStack(Stack):
             cognito_authorizer=self.api_gateway.cognito_authorizer,
             lambda_execution_role=lambda_execution_role,
             x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
-            iac_assets_bucket=self.iac_assets_bucket,
+            iac_assets_bucket = self.iac_assets_bucket
+            media_assets_bucket = self.media_assets_bucket
         )

@@ -42,12 +42,11 @@ class BaseInfrastructureStack(Stack):
         # Combine the truncated prefix, separator, and unique identifier
         lambda_function_name = f"{truncated_prefix}_{short_uid}"
         # Use the generated name for your Lambda function
-
         self.media_assets_bucket = S3Bucket(
             self,
             "MediaAssets",
             s3_config=S3Config(
-                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-343424234234-{region}-{short_uid}"
+                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{config.account_id}-{region}-{short_uid}"
             ),
         )
 
@@ -59,7 +58,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             s3_config=S3Config(
-                bucket_name=f"medialake-iac-assets-343424234234-{short_uid}"
+                bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}"
             ),
         )
 
