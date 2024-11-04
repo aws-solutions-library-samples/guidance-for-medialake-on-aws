@@ -1,86 +1,51 @@
 // src/services/authService.ts
-import { CognitoUserPool, CognitoRefreshToken, CognitoUser } from 'amazon-cognito-identity-js';
+import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { StorageHelper } from '../common/helpers/storage-helper';
-import { fetchAuthSession } from 'aws-amplify/auth';
 
 class AuthService {
-    private userPool: CognitoUserPool | null = null;
-
-    private initializeUserPool() {
-        console.log('Initializing user pool...');
-        const config = StorageHelper.getAwsConfig();
-        if (config?.Auth?.Cognito?.userPoolId && config?.Auth?.Cognito?.userPoolClientId) {
-            this.userPool = new CognitoUserPool({
-                UserPoolId: config.Auth.Cognito.userPoolId,
-                ClientId: config.Auth.Cognito.userPoolClientId,
-            });
-            console.log('User pool initialized successfully');
-        } else {
-            console.error('Missing Cognito configuration');
-        }
-    }
-
-    private getCurrentUser(): CognitoUser | null {
-        if (!this.userPool) {
-            this.initializeUserPool();
-        }
-        const user = this.userPool?.getCurrentUser();
-        console.log('Current user:', user ? 'Found' : 'Not found');
-        return user;
-    }
-
     async refreshToken(): Promise<string | null> {
         console.log('Starting token refresh process...');
-        
-        const user = this.getCurrentUser();
-        if (!user) {
-            console.error('No current user found during token refresh');
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            if (token) {
+                console.log('Session refresh successful');
+                StorageHelper.setToken(token);
+                return token;
+            }
+
+            console.error('No token in refreshed session');
+            return null;
+        } catch (error) {
+            console.error('Failed to refresh token:', error);
+            this.clearTokens();
             return null;
         }
-
-        const refreshToken = StorageHelper.getRefreshToken();
-        if (!refreshToken) {
-            console.error('No refresh token available during token refresh');
-            return null;
-        }
-
-        console.log('Found refresh token, attempting to refresh session...');
-
-        return new Promise((resolve, reject) => {
-            const cognitoRefreshToken = new CognitoRefreshToken({ RefreshToken: refreshToken });
-
-            user.refreshSession(cognitoRefreshToken, (err, session) => {
-                if (err) {
-                    console.error('Failed to refresh token:', err);
-                    this.clearTokens();
-                    reject(err);
-                    return;
-                }
-
-                try {
-                    console.log('Session refresh successful');
-                    const newIdToken = session.getIdToken().getJwtToken();
-                    const newRefreshToken = session.getRefreshToken().getToken();
-
-                    // Update stored tokens
-                    StorageHelper.setToken(newIdToken);
-                    StorageHelper.setRefreshToken(newRefreshToken);
-
-                    console.log('New tokens stored successfully');
-                    resolve(newIdToken);
-                } catch (error) {
-                    console.error('Error processing refresh session:', error);
-                    this.clearTokens();
-                    reject(error);
-                }
-            });
-        });
     }
 
-    getToken(): string | null {
-        const token = StorageHelper.getToken();
-        console.log('Retrieved token:', token ? 'Present' : 'Not found');
-        return token;
+    async getToken(): Promise<string | null> {
+        try {
+            // First try to get from storage for performance
+            const storedToken = StorageHelper.getToken();
+            if (storedToken) {
+                return storedToken;
+            }
+
+            // If no stored token, get from current session
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            if (token) {
+                StorageHelper.setToken(token);
+                return token;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Error getting token:', error);
+            return null;
+        }
     }
 
     clearTokens(): void {
@@ -97,6 +62,15 @@ class AuthService {
         } catch (error) {
             console.error('Error getting credentials:', error);
             return null;
+        }
+    }
+
+    async isAuthenticated(): Promise<boolean> {
+        try {
+            const user = await getCurrentUser();
+            return !!user;
+        } catch {
+            return false;
         }
     }
 }

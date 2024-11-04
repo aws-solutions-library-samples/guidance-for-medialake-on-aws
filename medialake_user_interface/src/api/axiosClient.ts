@@ -35,13 +35,14 @@ const axiosClient: AxiosInstance = axios.create({
 axiosClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
-            let token = authService.getToken();
+            let token = await authService.getToken();
             if (token && isTokenExpiringSoon(token)) {
                 console.log('Token is expiring soon, refreshing...');
-                token = await authService.refreshToken();
-                if (!token) {
+                const newToken = await authService.refreshToken();
+                if (!newToken) {
                     throw new Error('Failed to refresh token');
                 }
+                token = newToken;
             }
             if (token) {
                 config.headers['Authorization'] = `Bearer ${token}`;

@@ -8,7 +8,7 @@ import PipelinesPage from './PipelinesPage';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import ExecutionStatusPage from './ExecutionStatusPage';
-import Home from './components/Home';
+import Home from './pages/Home';
 import SearchResults from './components/SearchResults';
 import TagsPage from './TagsPage';
 import ReviewQueue from './reviewQueue'; // New import for ReviewQueue component

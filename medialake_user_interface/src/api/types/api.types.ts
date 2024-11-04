@@ -55,7 +55,25 @@ export interface S3BucketResponse {
   }
 }
 
-export interface Connector extends ConnectorResponse {}
+export interface S3Object {
+  Key: string;
+  LastModified: string;
+  ETag: string;
+  Size: number;
+  StorageClass: string;
+  IsFolder?: boolean;
+}
+
+export interface S3ListObjectsResponse {
+  objects: S3Object[];
+  prefix: string;
+  delimiter: string;
+  commonPrefixes: string[];
+  isTruncated: boolean;
+  nextContinuationToken?: string;
+}
+
+export interface Connector extends ConnectorResponse { }
 
 export interface ConnectorListResponse {
   status: string;
