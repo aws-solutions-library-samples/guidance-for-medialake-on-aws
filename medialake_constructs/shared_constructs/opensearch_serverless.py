@@ -224,12 +224,6 @@ class OpenSearchServerlessConstruct(Construct):
             log_retention=logs.RetentionDays.ONE_WEEK,  # Add log retention for debugging
         )
 
-        # lambda_code = ""
-        # with open(
-        #     "lambdas/back_end/create_oss_index/index.py", "r", encoding="utf-8"
-        # ) as file:
-        # lambda_code = file.read()
-
         lambda_code = Path("lambdas/back_end/create_oss_index/index.py").read_text(
             encoding="utf-8"
         )
