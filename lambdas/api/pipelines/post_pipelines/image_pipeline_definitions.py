@@ -91,10 +91,9 @@ def get_state_machine_definition(
                         "metadata.$": "$.metadataResult.Payload.body.metadata",
                         "output_bucket": output_bucket_name,
                         "mode": "thumbnail",
-                        "thumbnail": {
-                            "width": 345,
-                            "height": 194
-                        }
+                        "width": 345,
+                        "height": 194
+                        
                     }  # This closing brace was missing
                 },
                 "ResultPath": "$.thumbnailResult",
