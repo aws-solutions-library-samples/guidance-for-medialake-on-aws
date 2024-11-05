@@ -1,85 +1,265 @@
 import React, { useState } from 'react';
-import { Drawer, List, ListItem, ListItemIcon, ListItemText, IconButton, Box, ListItemButton } from '@mui/material';
-import { Menu as MenuIcon, AccountCircle as AccountCircleIcon, Settings as SettingsIcon } from '@mui/icons-material';
-import { Link } from 'react-router-dom';
-import QueuePlayNextIcon from '@mui/icons-material/QueuePlayNext';
-import SearchIcon from '@mui/icons-material/Search';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import LabelIcon from '@mui/icons-material/Label';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import HistoryIcon from '@mui/icons-material/History';
-import { useQueryClient } from '@tanstack/react-query';  // Fix the import path
+import {
+    Drawer,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    ListItemButton,
+    Box,
+    useTheme,
+    Collapse,
+    Typography,
+    IconButton,
+    Tooltip,
+} from '@mui/material';
+import {
+    AccountTree as PipelineIcon,
+    Reviews as ReviewIcon,
+    Settings as SettingsIcon,
+    ExpandLess,
+    ExpandMore,
+    Storage as StorageIcon,
+    Api as ApiIcon,
+    AdminPanelSettings as AdminIcon,
+    Search as SearchIcon,
+    Folder as AssetsIcon,
+    LocalOffer as TagsIcon,
+    PlaylistPlay as ExecutionsIcon,
+    ChevronLeft as ChevronLeftIcon,
+    Menu as MenuIcon,
+} from '@mui/icons-material';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-interface MenuItem {
-    text: string;
-    icon: JSX.Element;
-    path: string;
-}
-
-const menuItems: MenuItem[] = [
-    { text: 'Search', icon: <SearchIcon />, path: '/search' },
-    { text: 'Home', icon: <DashboardIcon />, path: '/' },
-    { text: 'Tags', icon: <LabelIcon />, path: '/tags' },
-    { text: 'Pipelines', icon: <TimelineIcon />, path: '/pipelines' },
-    { text: 'Execution Status', icon: <HistoryIcon />, path: '/execution-status' },
-    { text: 'Review Queue', icon: <QueuePlayNextIcon />, path: '/review-queue' },
-];
+const drawerWidth = 260;
+const collapsedDrawerWidth = 72;
 
 function Sidebar() {
-    const [open, setOpen] = useState(false);
-    const queryClient = useQueryClient();
+    const theme = useTheme();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
+
+    const isActive = (path: string) => location.pathname === path;
+    const isSettingsActive = (path: string) => location.pathname.includes(path);
+
+    const mainMenuItems = [
+        {
+            text: 'Assets',
+            icon: <AssetsIcon />,
+            path: '/'
+        },
+        {
+            text: 'Search',
+            icon: <SearchIcon />,
+            path: '/search'
+        },
+        {
+            text: 'Pipelines',
+            icon: <PipelineIcon />,
+            path: '/pipelines'
+        },
+        {
+            text: 'Pipeline Executions',
+            icon: <ExecutionsIcon />,
+            path: '/executions'
+        },
+        {
+            text: 'Review Queue',
+            icon: <ReviewIcon />,
+            path: '/review-queue'
+        },
+        {
+            text: 'Tags',
+            icon: <TagsIcon />,
+            path: '/tags'
+        },
+        {
+            text: 'Settings',
+            icon: <SettingsIcon />,
+            onClick: () => setSettingsOpen(!settingsOpen),
+            isExpandable: true,
+            isExpanded: settingsOpen,
+            subItems: [
+                { text: 'Integrations', icon: <ApiIcon />, path: '/settings/integrations' },
+                { text: 'Connectors', icon: <StorageIcon />, path: '/settings/connectors' },
+                { text: 'System', icon: <AdminIcon />, path: '/settings/system' },
+            ]
+        }
+    ];
+
+    const handleNavigation = (path: string) => {
+        navigate(path);
+    };
 
     const toggleDrawer = () => {
-        setOpen(!open);
+        setIsCollapsed(!isCollapsed);
     };
 
     return (
         <Drawer
             variant="permanent"
             sx={{
-                width: open ? 240 : 60,
+                width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                 flexShrink: 0,
+                transition: theme.transitions.create('width', {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 '& .MuiDrawer-paper': {
-                    width: open ? 240 : 60,
+                    width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
-                    transition: 'width 0.3s',
-                    top: 64,
-                    height: 'calc(100% - 64px)',
-                    display: 'flex',
-                    flexDirection: 'column',
+                    borderRight: '1px solid rgba(0,0,0,0.08)',
+                    backgroundColor: theme.palette.background.paper,
+                    mt: '64px', // Height of TopBar
+                    transition: theme.transitions.create('width', {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
+                    overflowX: 'hidden',
                 },
             }}
         >
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <IconButton onClick={toggleDrawer} sx={{ alignSelf: 'flex-end', m: 1 }}>
-                    <MenuIcon />
-                </IconButton>
-                <List sx={{ flexGrow: 1 }}>
-                    {menuItems.map((item) => (
-                        <ListItem
-                            key={item.text}
-                            component={Link}
-                            to={item.path}
-                            onClick={() => {
-                                if (item.path !== '/tags') {
-                                    queryClient.invalidateQueries({ queryKey: ['tags'] });
-                                }
-                            }}
-                        >
-                            <ListItemIcon>{item.icon}</ListItemIcon>
-                            {open && <ListItemText primary={item.text} />}
-                        </ListItem>
-                    ))}
-                </List>
+            <Box sx={{ overflow: 'auto', py: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, mb: 1 }}>
+                    <IconButton onClick={toggleDrawer}>
+                        {isCollapsed ? <MenuIcon /> : <ChevronLeftIcon />}
+                    </IconButton>
+                </Box>
                 <List>
-                    <ListItemButton component={Link} to="/settings">
-                        <ListItemIcon><SettingsIcon /></ListItemIcon>
-                        {open && <ListItemText primary="Settings" />}
-                    </ListItemButton>
-                    <ListItemButton component={Link} to="/profile">
-                        <ListItemIcon><AccountCircleIcon /></ListItemIcon>
-                        {open && <ListItemText primary="User Profile" />}
-                    </ListItemButton>
+                    {mainMenuItems.map((item) => (
+                        <React.Fragment key={item.text}>
+                            <ListItem disablePadding>
+                                {isCollapsed ? (
+                                    <Tooltip title={item.text} placement="right">
+                                        <ListItemButton
+                                            onClick={item.isExpandable ? item.onClick : () => handleNavigation(item.path || '/')}
+                                            sx={{
+                                                minHeight: 48,
+                                                justifyContent: 'center',
+                                                px: 2.5,
+                                                backgroundColor: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                    ? `${theme.palette.primary.main}08`
+                                                    : 'transparent',
+                                                '&:hover': {
+                                                    backgroundColor: `${theme.palette.primary.main}15`,
+                                                },
+                                            }}
+                                        >
+                                            <ListItemIcon
+                                                sx={{
+                                                    minWidth: 0,
+                                                    mr: 'auto',
+                                                    justifyContent: 'center',
+                                                    color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                        ? theme.palette.primary.main
+                                                        : theme.palette.text.secondary,
+                                                }}
+                                            >
+                                                {item.icon}
+                                            </ListItemIcon>
+                                        </ListItemButton>
+                                    </Tooltip>
+                                ) : (
+                                    <ListItemButton
+                                        onClick={item.isExpandable ? item.onClick : () => handleNavigation(item.path || '/')}
+                                        sx={{
+                                            backgroundColor: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                ? `${theme.palette.primary.main}08`
+                                                : 'transparent',
+                                            '&:hover': {
+                                                backgroundColor: `${theme.palette.primary.main}15`,
+                                            },
+                                            borderRight: isActive(item.path || '')
+                                                ? `3px solid ${theme.palette.primary.main}`
+                                                : 'none',
+                                            mx: 1,
+                                            borderRadius: '8px',
+                                        }}
+                                    >
+                                        <ListItemIcon sx={{
+                                            color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                ? theme.palette.primary.main
+                                                : theme.palette.text.secondary,
+                                            minWidth: '40px'
+                                        }}>
+                                            {item.icon}
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontWeight: isActive(item.path || '') || (item.isExpandable && item.isExpanded) ? 600 : 400,
+                                                        color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                            ? theme.palette.primary.main
+                                                            : theme.palette.text.primary
+                                                    }}
+                                                >
+                                                    {item.text}
+                                                </Typography>
+                                            }
+                                        />
+                                        {item.isExpandable && (
+                                            item.isExpanded ? <ExpandLess /> : <ExpandMore />
+                                        )}
+                                    </ListItemButton>
+                                )}
+                            </ListItem>
+                            {!isCollapsed && item.isExpandable && item.subItems && (
+                                <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
+                                    <List component="div" disablePadding>
+                                        {item.subItems.map((subItem) => (
+                                            <ListItem key={subItem.text} disablePadding>
+                                                <ListItemButton
+                                                    onClick={() => handleNavigation(subItem.path)}
+                                                    sx={{
+                                                        pl: 6,
+                                                        backgroundColor: isSettingsActive(subItem.text.toLowerCase())
+                                                            ? `${theme.palette.primary.main}08`
+                                                            : 'transparent',
+                                                        '&:hover': {
+                                                            backgroundColor: `${theme.palette.primary.main}15`,
+                                                        },
+                                                        borderRight: isSettingsActive(subItem.text.toLowerCase())
+                                                            ? `3px solid ${theme.palette.primary.main}`
+                                                            : 'none',
+                                                        mx: 1,
+                                                        borderRadius: '8px',
+                                                    }}
+                                                >
+                                                    <ListItemIcon sx={{
+                                                        color: isSettingsActive(subItem.text.toLowerCase())
+                                                            ? theme.palette.primary.main
+                                                            : theme.palette.text.secondary,
+                                                        minWidth: '40px'
+                                                    }}>
+                                                        {subItem.icon}
+                                                    </ListItemIcon>
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontWeight: isSettingsActive(subItem.text.toLowerCase()) ? 600 : 400,
+                                                                    color: isSettingsActive(subItem.text.toLowerCase())
+                                                                        ? theme.palette.primary.main
+                                                                        : theme.palette.text.primary
+                                                                }}
+                                                            >
+                                                                {subItem.text}
+                                                            </Typography>
+                                                        }
+                                                    />
+                                                </ListItemButton>
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Collapse>
+                            )}
+                        </React.Fragment>
+                    ))}
                 </List>
             </Box>
         </Drawer>

@@ -1,127 +1,190 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-    Box,
+    Card,
+    CardContent,
     Typography,
-    Button,
-    Modal,
-    TextField,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel,
+    Box,
     IconButton,
-    SelectChangeEvent,
+    Chip,
+    useTheme,
+    Tooltip,
+    Button,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
+import {
+    Edit as EditIcon,
+    Delete as DeleteIcon,
+    Api as ApiIcon,
+    YouTube as YouTubeIcon,
+    Cloud as CloudIcon,
+    PhotoLibrary as PhotoIcon,
+    Settings as SettingsIcon,
+    Check as CheckIcon,
+    Warning as WarningIcon,
+} from '@mui/icons-material';
+import { Integration } from '../../api/types/api.types';
 
-interface Integration {
-    type: string;
-    apiKey: string;
-    name: string;
-    createdDate: string;
+interface IntegrationCardProps {
+    integration: Integration;
+    onEdit: (integration: Integration) => void;
+    onDelete: (id: string) => void;
+    onConfigure: (integration: Integration) => void;
 }
 
-interface IntegrationModalProps {
-    open: boolean;
-    onClose: () => void;
-    onSave: (integration: Integration) => void;
-    editingIntegration?: Integration;
-}
-
-const modalStyle = {
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 400,
-    bgcolor: 'background.paper',
-    boxShadow: 24,
-    p: 4,
-    borderRadius: 2,
-};
-
-export const IntegrationModal: React.FC<IntegrationModalProps> = ({
-    open,
-    onClose,
-    onSave,
-    editingIntegration,
+const IntegrationCard: React.FC<IntegrationCardProps> = ({
+    integration,
+    onEdit,
+    onDelete,
+    onConfigure,
 }) => {
-    const [name, setName] = useState('');
-    const [integrationType, setIntegrationType] = useState('');
-    const [apiKey, setApiKey] = useState('');
+    const theme = useTheme();
 
-    useEffect(() => {
-        if (editingIntegration) {
-            setName(editingIntegration.name);
-            setIntegrationType(editingIntegration.type);
-            setApiKey(editingIntegration.apiKey);
-        } else {
-            setName('');
-            setIntegrationType('');
-            setApiKey('');
+    const getIntegrationIcon = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'youtube':
+                return <YouTubeIcon />;
+            case 'cloudinary':
+                return <CloudIcon />;
+            case 'shutterstock':
+                return <PhotoIcon />;
+            default:
+                return <ApiIcon />;
         }
-    }, [editingIntegration]);
+    };
 
-    const handleSave = () => {
-        const newIntegration: Integration = {
-            type: integrationType,
-            apiKey,
-            name,
-            createdDate: editingIntegration?.createdDate || new Date().toISOString(),
-        };
-        onSave(newIntegration);
+    const getIntegrationColor = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'youtube':
+                return '#FF0000';
+            case 'cloudinary':
+                return '#3448C5';
+            case 'shutterstock':
+                return '#EE2B24';
+            default:
+                return theme.palette.primary.main;
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case 'active':
+                return theme.palette.success.main;
+            case 'warning':
+                return theme.palette.warning.main;
+            case 'error':
+                return theme.palette.error.main;
+            default:
+                return theme.palette.grey[500];
+        }
     };
 
     return (
-        <Modal open={open} onClose={onClose}>
-            <Box sx={modalStyle}>
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{ position: 'absolute', right: 8, top: 8 }}
-                >
-                    <CloseIcon />
-                </IconButton>
-                <Typography variant="h6" component="h2" gutterBottom>
-                    {editingIntegration ? 'Edit Integration' : 'Add New Integration'}
-                </Typography>
-                <TextField
-                    fullWidth
-                    label="Name"
-                    variant="outlined"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    sx={{ mt: 2 }}
-                />
-                <FormControl fullWidth sx={{ mt: 2 }}>
-                    <InputLabel>Type</InputLabel>
-                    <Select
-                        value={integrationType}
-                        label="Type"
-                        onChange={(e: SelectChangeEvent<string>) => setIntegrationType(e.target.value)}
-                    >
-                        <MenuItem value="twelveLabs">Twelve Labs Embeddings API</MenuItem>
-                    </Select>
-                </FormControl>
-                {integrationType === 'twelveLabs' && (
-                    <TextField
-                        fullWidth
-                        label="API Key"
-                        variant="outlined"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        sx={{ mt: 2 }}
-                    />
-                )}
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button onClick={onClose} sx={{ mr: 2 }}>
-                        Cancel
-                    </Button>
-                    <Button variant="contained" onClick={handleSave}>
-                        Save
-                    </Button>
+        <Card
+            sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: theme.shadows[4],
+                },
+            }}
+        >
+            <CardContent sx={{ flex: 1, pb: 2 }}>
+                {/* Header */}
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                            sx={{
+                                backgroundColor: `${getIntegrationColor(integration.type)}15`,
+                                borderRadius: '8px',
+                                p: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: getIntegrationColor(integration.type),
+                            }}
+                        >
+                            {getIntegrationIcon(integration.type)}
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                {integration.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                {integration.type} Integration
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Tooltip title="Edit integration">
+                            <IconButton
+                                size="small"
+                                onClick={() => onEdit(integration)}
+                                sx={{ color: theme.palette.text.secondary }}
+                            >
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete integration">
+                            <IconButton
+                                size="small"
+                                onClick={() => onDelete(integration.id)}
+                                sx={{ color: theme.palette.error.main }}
+                            >
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                 </Box>
-            </Box>
-        </Modal>
+
+                {/* Status and Info */}
+                <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <Chip
+                            icon={<CheckIcon fontSize="small" />}
+                            label="Connected"
+                            size="small"
+                            sx={{
+                                backgroundColor: `${theme.palette.success.main}15`,
+                                color: theme.palette.success.main,
+                                fontWeight: 500,
+                            }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                            Last synced: {new Date(integration.createdAt).toLocaleDateString()}
+                        </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        API Key: •••••••••{integration.apiKey.slice(-4)}
+                    </Typography>
+                </Box>
+
+                {/* Actions */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<SettingsIcon />}
+                        onClick={() => onConfigure(integration)}
+                        sx={{
+                            borderColor: getIntegrationColor(integration.type),
+                            color: getIntegrationColor(integration.type),
+                            '&:hover': {
+                                borderColor: getIntegrationColor(integration.type),
+                                backgroundColor: `${getIntegrationColor(integration.type)}10`,
+                            },
+                        }}
+                    >
+                        Configure
+                    </Button>
+                    <Typography variant="caption" color="text.secondary">
+                        Created {new Date(integration.createdAt).toLocaleDateString()}
+                    </Typography>
+                </Box>
+            </CardContent>
+        </Card>
     );
 };
+
+export default IntegrationCard;

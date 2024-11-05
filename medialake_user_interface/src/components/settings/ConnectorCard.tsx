@@ -1,6 +1,23 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box, Button } from '@mui/material';
-import { format } from 'date-fns';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  IconButton,
+  Chip,
+  useTheme,
+  Tooltip,
+  LinearProgress,
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Storage as StorageIcon,
+  CloudQueue as CloudIcon,
+  Check as CheckIcon,
+  Warning as WarningIcon,
+} from '@mui/icons-material';
 import { ConnectorResponse } from '../../api/types/api.types';
 
 interface ConnectorCardProps {
@@ -10,41 +27,155 @@ interface ConnectorCardProps {
 }
 
 const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDelete }) => {
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
-    } catch (error) {
-      return dateString;
+  const theme = useTheme();
+
+  const getConnectorTypeIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'amazons3':
+        return <StorageIcon />;
+      case 'googlecloudstorage':
+        return <CloudIcon />;
+      default:
+        return <StorageIcon />;
+    }
+  };
+
+  const getConnectorTypeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'amazons3':
+        return theme.palette.primary.main;
+      case 'googlecloudstorage':
+        return theme.palette.success.main;
+      default:
+        return theme.palette.info.main;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return theme.palette.success.main;
+      case 'warning':
+        return theme.palette.warning.main;
+      case 'error':
+        return theme.palette.error.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return <CheckIcon fontSize="small" />;
+      case 'warning':
+        return <WarningIcon fontSize="small" />;
+      default:
+        return null;
     }
   };
 
   return (
-    <Card sx={{ minWidth: 275, mb: 2 }}>
-      <CardContent>
-        <Typography variant="h6" component="div" gutterBottom>
-          {connector.name}
-        </Typography>
-        <Box sx={{ mt: 1 }}>
-          <Typography color="text.secondary" gutterBottom>
-            Bucket: {connector.storageIdentifier}
-          </Typography>
-          <Typography color="text.secondary" gutterBottom>
-            Type: {connector.type}
-          </Typography>
-          <Typography color="text.secondary" gutterBottom>
-            Created: {formatDate(connector.createdAt)}
-          </Typography>
-          <Typography color="text.secondary">
-            Updated: {formatDate(connector.updatedAt)}
-          </Typography>
+    <Card
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: theme.shadows[4],
+        },
+      }}
+    >
+      <CardContent sx={{ flex: 1, pb: 2 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                backgroundColor: `${getConnectorTypeColor(connector.type)}15`,
+                borderRadius: '8px',
+                p: 1,
+                display: 'flex',
+                alignItems: 'center',
+                color: getConnectorTypeColor(connector.type),
+              }}
+            >
+              {getConnectorTypeIcon(connector.type)}
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                {connector.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {connector.type === 'amazonS3' ? 'Amazon S3' : 'Google Cloud Storage'}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Edit connector">
+              <IconButton
+                size="small"
+                onClick={() => onEdit(connector)}
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete connector">
+              <IconButton
+                size="small"
+                onClick={() => onDelete(connector.id)}
+                sx={{ color: theme.palette.error.main }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
-        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-          <Button variant="outlined" onClick={() => onEdit(connector)}>
-            Edit
-          </Button>
-          <Button variant="outlined" color="error" onClick={() => onDelete(connector.id)}>
-            Delete
-          </Button>
+
+        {/* Stats */}
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Storage Usage
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {connector.usage?.used || '0'} / {connector.usage?.total || '0'} GB
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={((connector.usage?.used || 0) / (connector.usage?.total || 1)) * 100}
+            sx={{
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: theme.palette.grey[200],
+              '& .MuiLinearProgress-bar': {
+                borderRadius: 3,
+                backgroundColor: getConnectorTypeColor(connector.type),
+              },
+            }}
+          />
+        </Box>
+
+        {/* Footer */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Chip
+            icon={getStatusIcon(connector.status || 'active')}
+            label={connector.status || 'Active'}
+            size="small"
+            sx={{
+              backgroundColor: `${getStatusColor(connector.status || 'active')}15`,
+              color: getStatusColor(connector.status || 'active'),
+              fontWeight: 500,
+            }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Last synced: {new Date(connector.lastSync || Date.now()).toLocaleDateString()}
+          </Typography>
         </Box>
       </CardContent>
     </Card>

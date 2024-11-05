@@ -30,6 +30,11 @@ export interface UpdateConnectorRequest {
   configuration?: Record<string, any>;
 }
 
+export interface ConnectorUsage {
+  used: number;
+  total: number;
+}
+
 export interface ConnectorResponse {
   id: string;
   name: string;
@@ -40,6 +45,9 @@ export interface ConnectorResponse {
   sqsArn: string;
   region: string;
   configuration?: Record<string, any>;
+  usage?: ConnectorUsage;
+  status?: 'active' | 'warning' | 'error' | 'inactive';
+  lastSync?: string;
 }
 
 export interface S3ListResponse {
