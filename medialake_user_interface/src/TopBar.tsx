@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     AppBar,
     Toolbar,
@@ -12,6 +12,7 @@ import {
     Avatar,
     useTheme,
     Divider,
+    InputBase,
 } from '@mui/material';
 import {
     Notifications as NotificationsIcon,
@@ -21,6 +22,8 @@ import {
     Info as InfoIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useSearch } from './api/hooks/useSearch';
+import debounce from 'lodash/debounce';
 
 interface Notification {
     id: string;
@@ -59,6 +62,8 @@ function TopBar() {
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const { refetch } = useSearch(searchQuery);
 
     const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -86,6 +91,29 @@ function TopBar() {
 
     const getNotificationCount = (type: string) => {
         return mockNotifications.filter(n => n.type === type).length;
+    };
+
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((query: string) => {
+            if (query.trim()) {
+                refetch();
+                navigate('/search', { state: { query } });
+            }
+        }, 500),
+        [navigate, refetch]
+    );
+
+    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const query = event.target.value;
+        setSearchQuery(query);
+        debouncedSearch(query);
+    };
+
+    const handleSearchKeyPress = (event: React.KeyboardEvent) => {
+        if (event.key === 'Enter' && searchQuery.trim()) {
+            navigate('/search', { state: { query: searchQuery } });
+        }
     };
 
     return (
@@ -118,15 +146,18 @@ function TopBar() {
                     width: '400px',
                 }}>
                     <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                    <input
+                    <InputBase
                         placeholder="Search assets, pipelines, or tags..."
-                        style={{
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            width: '100%',
-                            outline: 'none',
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        onKeyPress={handleSearchKeyPress}
+                        fullWidth
+                        sx={{
                             fontSize: '14px',
                             color: theme.palette.text.primary,
+                            '& input': {
+                                padding: '4px 0',
+                            },
                         }}
                     />
                 </Box>
