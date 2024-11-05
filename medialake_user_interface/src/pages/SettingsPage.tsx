@@ -21,7 +21,7 @@ import {
 import IntegrationsView from '../components/settings/IntegrationsView';
 import { ConnectorsList } from '../components/ConnectorsList';
 import IntegrationModal from '../components/settings/IntegrationModal';
-import { ConnectorModal } from '../components/settings/ConnectorModal';
+import ConnectorModal from '../components/settings/ConnectorModal';
 import { Integration, ConnectorResponse, CreateConnectorRequest } from '../api/types/api.types';
 import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '../api/hooks/useConnectors';
 import UserProfile from '../components/settings/UserProfile';
@@ -70,11 +70,13 @@ const SettingsPage = () => {
     };
 
     const handleAddIntegration = () => {
+        console.log('Opening integration modal'); // Debug log
         setEditingIntegration(undefined);
         setOpenIntegrationModal(true);
     };
 
     const handleAddConnector = () => {
+        console.log('Opening connector modal'); // Debug log
         setEditingConnector(undefined);
         setOpenConnectorModal(true);
     };
@@ -234,6 +236,7 @@ const SettingsPage = () => {
             <IntegrationModal
                 open={openIntegrationModal}
                 onClose={() => {
+                    console.log('Closing integration modal'); // Debug log
                     setOpenIntegrationModal(false);
                     setEditingIntegration(undefined);
                 }}
@@ -244,6 +247,7 @@ const SettingsPage = () => {
             <ConnectorModal
                 open={openConnectorModal}
                 onClose={() => {
+                    console.log('Closing connector modal'); // Debug log
                     setOpenConnectorModal(false);
                     setEditingConnector(undefined);
                 }}

@@ -1,22 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
     Box,
     Typography,
-    Button,
-    Modal,
-    TextField,
-    Select,
     MenuItem,
+    Select,
     FormControl,
     InputLabel,
+    Alert,
+    Stepper,
+    Step,
+    StepLabel,
     IconButton,
-    SelectChangeEvent,
-    CircularProgress,
+    useTheme,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import { useGetS3Buckets } from '../../api/hooks/useConnectors';
+import {
+    Close as CloseIcon,
+    Storage as StorageIcon,
+    CloudUpload as CloudUploadIcon,
+    Folder as FolderIcon,
+    Cloud as CloudIcon,
+} from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '../../api/types/api.types';
-import { useCreateS3Connector, useCreateGCSConnector } from '../../api/hooks/useConnectors';
 
 interface ConnectorModalProps {
     open: boolean;
@@ -25,142 +35,331 @@ interface ConnectorModalProps {
     editingConnector?: ConnectorResponse;
 }
 
-const modalStyle = {
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 400,
-    bgcolor: 'background.paper',
-    boxShadow: 24,
-    p: 4,
-    borderRadius: 2,
-};
+const CONNECTOR_TYPES = [
+    { value: 's3', label: 'Amazon S3', icon: CloudIcon, color: '#FF9900' },
+    { value: 'local', label: 'Local Storage', icon: FolderIcon, color: '#4CAF50' },
+    { value: 'cloud', label: 'Cloud Storage', icon: CloudUploadIcon, color: '#2196F3' },
+    { value: 'nas', label: 'Network Storage', icon: StorageIcon, color: '#9C27B0' },
+];
 
-export const ConnectorModal: React.FC<ConnectorModalProps> = ({
+const ConnectorModal: React.FC<ConnectorModalProps> = ({
     open,
     onClose,
     onSave,
     editingConnector,
 }) => {
+    const theme = useTheme();
+    const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
-    const [connectorType, setConnectorType] = useState('');
-    const [bucket, setBucket] = useState('');
-    const { data: s3BucketsData, refetch: fetchS3Buckets, isLoading: isLoadingS3Buckets } = useGetS3Buckets();
-    const createS3Connector = useCreateS3Connector();
-    const createGCSConnector = useCreateGCSConnector();
+    const [type, setType] = useState('');
+    const [configuration, setConfiguration] = useState<Record<string, string>>({});
+    const [error, setError] = useState('');
 
     useEffect(() => {
         if (editingConnector) {
             setName(editingConnector.name);
-            setConnectorType(editingConnector.type);
-            setBucket(editingConnector.configuration?.bucket || '');
+            setType(editingConnector.type);
+            setConfiguration(editingConnector.configuration || {});
+            setActiveStep(2); // Skip type selection for editing
         } else {
             setName('');
-            setConnectorType('');
-            setBucket('');
+            setType('');
+            setConfiguration({});
+            setActiveStep(0);
         }
-    }, [editingConnector]);
+    }, [editingConnector, open]);
 
-    useEffect(() => {
-        if (open && connectorType === 'amazonS3') {
-            fetchS3Buckets();
+    const handleNext = () => {
+        setActiveStep((prev) => prev + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prev) => prev - 1);
+    };
+
+    const handleSave = () => {
+        if (!name || !type) {
+            setError('Please fill in all required fields');
+            return;
         }
-    }, [open, connectorType, fetchS3Buckets]);
 
-    const handleSave = async () => {
-        const connectorData: CreateConnectorRequest = {
+        const connector: CreateConnectorRequest = {
             name,
-            type: connectorType,
-            configuration: {
-                bucket
-            }
+            type,
+            configuration,
         };
 
-        try {
-            if (editingConnector) {
-                // For editing, use the general onSave callback
-                onSave(connectorData);
-            } else {
-                // For creating new connectors, use the specific connector mutations
-                if (connectorType === 'amazonS3') {
-                    await createS3Connector.mutateAsync(connectorData);
-                } else if (connectorType === 'googleCloudStorage') {
-                    await createGCSConnector.mutateAsync(connectorData);
-                }
-            }
-            onClose();
-        } catch (error) {
-            console.error('Error creating connector:', error);
-            // You might want to add error handling/display here
+        onSave(connector);
+    };
+
+    const renderConfigurationFields = () => {
+        switch (type) {
+            case 's3':
+                return (
+                    <>
+                        <TextField
+                            label="Bucket Name"
+                            value={configuration.bucketName || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, bucketName: e.target.value })}
+                            fullWidth
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Region"
+                            value={configuration.region || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, region: e.target.value })}
+                            fullWidth
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Access Key ID"
+                            value={configuration.accessKeyId || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, accessKeyId: e.target.value })}
+                            fullWidth
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Secret Access Key"
+                            value={configuration.secretAccessKey || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, secretAccessKey: e.target.value })}
+                            fullWidth
+                            required
+                            type="password"
+                        />
+                    </>
+                );
+            case 'local':
+                return (
+                    <TextField
+                        label="Path"
+                        value={configuration.path || ''}
+                        onChange={(e) => setConfiguration({ ...configuration, path: e.target.value })}
+                        fullWidth
+                        required
+                        placeholder="/path/to/storage"
+                    />
+                );
+            case 'cloud':
+                return (
+                    <>
+                        <TextField
+                            label="Provider"
+                            value={configuration.provider || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, provider: e.target.value })}
+                            fullWidth
+                            required
+                            select
+                            sx={{ mb: 2 }}
+                        >
+                            <MenuItem value="google">Google Cloud Storage</MenuItem>
+                            <MenuItem value="azure">Azure Blob Storage</MenuItem>
+                        </TextField>
+                        <TextField
+                            label="Credentials"
+                            value={configuration.credentials || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, credentials: e.target.value })}
+                            fullWidth
+                            required
+                            multiline
+                            rows={4}
+                        />
+                    </>
+                );
+            case 'nas':
+                return (
+                    <>
+                        <TextField
+                            label="Host"
+                            value={configuration.host || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, host: e.target.value })}
+                            fullWidth
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Share Path"
+                            value={configuration.sharePath || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, sharePath: e.target.value })}
+                            fullWidth
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Username"
+                            value={configuration.username || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, username: e.target.value })}
+                            fullWidth
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            label="Password"
+                            value={configuration.password || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, password: e.target.value })}
+                            fullWidth
+                            type="password"
+                        />
+                    </>
+                );
+            default:
+                return null;
+        }
+    };
+
+    const steps = ['Select Type', 'Basic Info', 'Configuration'];
+
+    const renderStepContent = (step: number) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+                        {CONNECTOR_TYPES.map((connectorType) => {
+                            const Icon = connectorType.icon;
+                            return (
+                                <Box
+                                    key={connectorType.value}
+                                    onClick={() => {
+                                        setType(connectorType.value);
+                                        handleNext();
+                                    }}
+                                    sx={{
+                                        p: 2,
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 2,
+                                        transition: 'all 0.2s',
+                                        '&:hover': {
+                                            borderColor: connectorType.color,
+                                            backgroundColor: `${connectorType.color}08`,
+                                        },
+                                    }}
+                                >
+                                    <Icon sx={{ color: connectorType.color, fontSize: 32 }} />
+                                    <Box>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                            {connectorType.label}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Connect to {connectorType.label}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                );
+            case 1:
+                return (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            label="Connector Name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            fullWidth
+                            required
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                            Give your connector a meaningful name to easily identify it later.
+                        </Typography>
+                    </Box>
+                );
+            case 2:
+                return (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {renderConfigurationFields()}
+                    </Box>
+                );
+            default:
+                return null;
         }
     };
 
     return (
-        <Modal open={open} onClose={onClose}>
-            <Box sx={modalStyle}>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: '12px',
+                }
+            }}
+        >
+            <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="h6">
+                    {editingConnector ? 'Edit Connector' : 'Add New Connector'}
+                </Typography>
                 <IconButton
                     aria-label="close"
                     onClick={onClose}
-                    sx={{ position: 'absolute', right: 8, top: 8 }}
+                    sx={{
+                        color: theme.palette.grey[500],
+                    }}
                 >
                     <CloseIcon />
                 </IconButton>
-                <Typography variant="h6" component="h2" gutterBottom>
-                    {editingConnector ? 'Edit Connector' : 'Add New Connector'}
-                </Typography>
-                <TextField
-                    fullWidth
-                    label="Name"
-                    variant="outlined"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    sx={{ mt: 2 }}
-                />
-                <FormControl fullWidth sx={{ mt: 2 }}>
-                    <InputLabel>Type</InputLabel>
-                    <Select
-                        value={connectorType}
-                        label="Type"
-                        onChange={(e: SelectChangeEvent<string>) => setConnectorType(e.target.value)}
-                    >
-                        <MenuItem value="amazonS3">Amazon S3</MenuItem>
-                        <MenuItem value="googleCloudStorage">Google Cloud Storage</MenuItem>
-                    </Select>
-                </FormControl>
-                {connectorType === 'amazonS3' && (
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Bucket</InputLabel>
-                        <Select
-                            value={bucket}
-                            label="Bucket"
-                            onChange={(e: SelectChangeEvent<string>) => setBucket(e.target.value)}
-                        >
-                            {isLoadingS3Buckets ? (
-                                <MenuItem value="">
-                                    <CircularProgress size={20} /> Loading buckets...
-                                </MenuItem>
-                            ) : s3BucketsData?.data?.buckets && s3BucketsData.data.buckets.length > 0 ? (
-                                s3BucketsData.data.buckets.map((bucketName) => (
-                                    <MenuItem key={bucketName} value={bucketName}>
-                                        {bucketName}
-                                    </MenuItem>
-                                ))
-                            ) : (
-                                <MenuItem value="">No buckets available</MenuItem>
-                            )}
-                        </Select>
-                    </FormControl>
+            </DialogTitle>
+
+            <DialogContent dividers>
+                {!editingConnector && (
+                    <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
                 )}
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button onClick={onClose} sx={{ mr: 2 }}>
-                        Cancel
+
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
+
+                {renderStepContent(activeStep)}
+            </DialogContent>
+
+            <DialogActions sx={{ p: 2, gap: 1 }}>
+                {!editingConnector && activeStep > 0 && (
+                    <Button onClick={handleBack}>
+                        Back
                     </Button>
-                    <Button variant="contained" onClick={handleSave}>
-                        Save
+                )}
+                <Button onClick={onClose} color="inherit">
+                    Cancel
+                </Button>
+                {(activeStep === steps.length - 1 || editingConnector) ? (
+                    <Button
+                        variant="contained"
+                        onClick={handleSave}
+                        sx={{
+                            backgroundColor: theme.palette.primary.main,
+                            '&:hover': {
+                                backgroundColor: theme.palette.primary.dark,
+                            },
+                        }}
+                    >
+                        {editingConnector ? 'Save Changes' : 'Add Connector'}
                     </Button>
-                </Box>
-            </Box>
-        </Modal>
+                ) : (
+                    <Button
+                        variant="contained"
+                        onClick={handleNext}
+                        disabled={!type || (activeStep === 1 && !name)}
+                    >
+                        Next
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
     );
 };
+
+export default ConnectorModal;

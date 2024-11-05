@@ -64,22 +64,21 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({
             }
         });
 
+    const handleAddClick = () => {
+        console.log('Add Integration button clicked'); // Debug log
+        onAddIntegration();
+    };
+
     return (
         <Box>
             {/* Header */}
             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-                        Integrations
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Manage your third-party service integrations and API connections
-                    </Typography>
                 </Box>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={onAddIntegration}
+                    onClick={handleAddClick}
                     sx={{
                         backgroundColor: theme.palette.primary.main,
                         '&:hover': {
@@ -192,13 +191,6 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                             ? 'Try adjusting your search or filters'
                             : 'Get started by adding your first integration'}
                     </Typography>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={onAddIntegration}
-                    >
-                        Add Integration
-                    </Button>
                 </Box>
             )}
         </Box>

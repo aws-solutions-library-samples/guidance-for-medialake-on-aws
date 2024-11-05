@@ -1,12 +1,12 @@
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.openapi.params import Query
+from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint
 import os
 import boto3
-from aws_lambda_powertools.event_handler.openapi.params import Query
-from aws_lambda_powertools.logging import correlation_paths
 from opensearchpy import (
     RequestsHttpConnection,
     RequestsAWSV4SignerAuth,
@@ -32,7 +32,6 @@ class SearchParams(BaseModel):
     q: str = Field(..., min_length=1)
     size: conint(gt=0, le=100) = Field(default=10)  # type: ignore
     from_: conint(ge=0) = Field(default=0, alias="from")  # type: ignore
-    fuzzy_max_expansions: conint(ge=1, le=50) = Field(default=10)  # type: ignore
     min_score: float = Field(default=0.1)
 
 
@@ -40,8 +39,9 @@ class SearchResult(BaseModel):
     """Pydantic model for search results"""
 
     id: str
-    title: str
-    content: str
+    name: str
+    date_created: str
+    source_location: Dict
     score: float
 
 
@@ -58,9 +58,7 @@ def get_opensearch_client() -> OpenSearch:
     host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
     region = os.environ["AWS_REGION"]
 
-    auth = RequestsAWSV4SignerAuth(
-        boto3.Session().get_credentials(), "us-east-1", "aoss"
-    )
+    auth = RequestsAWSV4SignerAuth(boto3.Session().get_credentials(), region, "aoss")
 
     return OpenSearch(
         hosts=[{"host": host, "port": 443}],
@@ -68,15 +66,13 @@ def get_opensearch_client() -> OpenSearch:
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
-        region="us-east-1",
+        region=region,
     )
 
 
 @tracer.capture_method
 def perform_search(params: SearchParams) -> SearchResponse:
-    """
-    Perform search operation in OpenSearch with proper error handling.
-    """
+    """Perform search operation in OpenSearch with proper error handling."""
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
 
@@ -84,33 +80,11 @@ def perform_search(params: SearchParams) -> SearchResponse:
         "query": {
             "bool": {
                 "should": [
-                    {
-                        "multi_match": {
-                            "query": params.q,
-                            "fields": [
-                                "title^3",
-                                "content^2",
-                                "description",
-                                "tags^1.5",
-                                "metadata.*",
-                            ],
-                            "fuzziness": "AUTO",
-                            "prefix_length": 2,
-                            "max_expansions": params.fuzzy_max_expansions,
-                            "type": "best_fields",
-                            "tie_breaker": 0.3,
-                            "minimum_should_match": "75%",
-                        }
-                    },
-                    {
-                        "multi_match": {
-                            "query": params.q,
-                            "fields": ["title^2", "content"],
-                            "type": "phrase_prefix",
-                            "boost": 1.2,
-                        }
-                    },
-                ]
+                    {"wildcard": {"name": f"*{params.q}*"}},
+                    {"prefix": {"name": params.q}},
+                    {"match_phrase_prefix": {"name": params.q}},
+                ],
+                "minimum_should_match": 1,
             }
         },
         "min_score": params.min_score,
@@ -124,8 +98,9 @@ def perform_search(params: SearchParams) -> SearchResponse:
         hits = [
             SearchResult(
                 id=hit["_id"],
-                title=hit["_source"].get("title", ""),
-                content=hit["_source"].get("content", ""),
+                name=hit["_source"].get("name", ""),
+                date_created=hit["_source"].get("dateCreated", ""),
+                source_location=hit["_source"].get("sourceLocation", {}),
                 score=hit["_score"],
             )
             for hit in response["hits"]["hits"]
@@ -178,4 +153,5 @@ def handle_search():
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
+    """Lambda handler function"""
     return app.resolve(event, context)

@@ -1,28 +1,23 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
-import SettingsComponent from './SettingsComponent';
-import PipelinesPage from './PipelinesPage';
+import SettingsPage from './pages/SettingsPage';
+import PipelinesPage from './pages/PipelinesPage';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import ExecutionStatusPage from './ExecutionStatusPage';
+import ExecutionsPage from './pages/ExecutionsPage';
 import Home from './pages/Home';
-import SearchResults from './components/SearchResults';
-import TagsPage from './TagsPage';
-import ReviewQueue from './reviewQueue'; // New import for ReviewQueue component
+import SearchPage from './pages/SearchPage';
+import TagsPage from './pages/TagsPage';
+import ReviewQueuePage from './pages/ReviewQueuePage';
 import NewPipelinePage from './NewPipelinePage';
-import ImageDetailPage from './ImageDetailPage'; // New import for ImageDetailPage
+import ImageDetailPage from './pages/ImageDetailPage';
 import { useAuth } from "./common/hooks/auth-context";
 
 function App() {
-  const [selectedImage, setSelectedImage] = useState(null);
   const { refreshSession } = useAuth();
-
-  const handleImageSelect = (image) => {
-    setSelectedImage(image);
-  };
 
   return (
     <Router>
@@ -31,17 +26,19 @@ function App() {
           <TopBar />
         </LocalizationProvider>
         <Sidebar />
-        <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/search" element={<SearchResults onImageSelect={handleImageSelect} />} />
-            <Route path="/settings" element={<SettingsComponent />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/settings/*" element={<SettingsPage />} />
             <Route path="/pipelines" element={<PipelinesPage />} />
             <Route path="/pipelines/new" element={<NewPipelinePage />} />
-            <Route path="/pipelines/edit/:id" element={<NewPipelinePage />} />            <Route path="/execution-status" element={<ExecutionStatusPage />} />
+            <Route path="/pipelines/edit/:id" element={<NewPipelinePage />} />
+            <Route path="/executions" element={<ExecutionsPage />} />
             <Route path="/tags" element={<TagsPage />} />
-            <Route path="/review-queue" element={<ReviewQueue />} /> {/* New route for ReviewQueue */}
-            <Route path="/image-detail" element={<ImageDetailPage image={selectedImage} />} />
+            <Route path="/review-queue" element={<ReviewQueuePage />} />
+            <Route path="/images/:id" element={<ImageDetailPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Box>
       </Box>

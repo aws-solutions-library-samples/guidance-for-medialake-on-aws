@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '../common/hooks/auth-context';
 import { Box, CircularProgress } from '@mui/material';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
+import SearchPage from '../pages/SearchPage';
 import { S3Explorer } from './home/S3Explorer';
 import { ConnectedStorage } from './home/ConnectedStorage';
 import SettingsComponent from '../SettingsComponent';
@@ -296,13 +297,13 @@ const AppLayout = () => {
     );
 };
 
-const SearchResultsWrapper = () => {
-    const handleImageSelect = (image: any) => {
-        console.log('Selected image:', image);
-    };
+// const SearchResultsWrapper = () => {
+//     const handleImageSelect = (image: any) => {
+//         console.log('Selected image:', image);
+//     };
 
-    return <SearchResults onImageSelect={handleImageSelect} />;
-};
+//     return <SearchResults onImageSelect={handleImageSelect} />;
+// };
 
 const router = createBrowserRouter([
     {
@@ -330,7 +331,7 @@ const router = createBrowserRouter([
                 element: <SettingsComponent />
             },
             {
-                path: 'execution-status',
+                path: 'executions',
                 element: <ExecutionStatusPage />
             },
             {
@@ -355,7 +356,7 @@ const router = createBrowserRouter([
             },
             {
                 path: 'search',
-                element: <SearchResultsWrapper />
+                element: <SearchPage />
             }
         ]
     }
