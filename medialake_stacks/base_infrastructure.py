@@ -113,6 +113,9 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
+        # Grant the Lambda function permissions to access OpenSearch Serverless
+        # self.opensearch_serverless.grant_write_access(asset_lambda_stream.function)
+
         self._asset_table.table.grant_stream(asset_lambda_stream.function)
         asset_lambda_stream.function.add_event_source(
             eventsources.DynamoEventSource(
