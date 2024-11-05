@@ -1,0 +1,318 @@
+import React, { useState } from 'react';
+import {
+    Box,
+    Paper,
+    Typography,
+    TextField,
+    Button,
+    Avatar,
+    Grid,
+    Divider,
+    Switch,
+    FormControlLabel,
+    IconButton,
+    useTheme,
+    Alert,
+} from '@mui/material';
+import {
+    Edit as EditIcon,
+    Save as SaveIcon,
+    Cancel as CancelIcon,
+    PhotoCamera as PhotoCameraIcon,
+    Notifications as NotificationsIcon,
+    Security as SecurityIcon,
+    Language as LanguageIcon,
+    Palette as PaletteIcon,
+} from '@mui/icons-material';
+
+interface UserProfileData {
+    firstName: string;
+    lastName: string;
+    email: string;
+    jobTitle: string;
+    organization: string;
+    language: string;
+    theme: 'light' | 'dark';
+    notifications: {
+        email: boolean;
+        push: boolean;
+        updates: boolean;
+    };
+}
+
+const UserProfile: React.FC = () => {
+    const theme = useTheme();
+    const [editing, setEditing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [profileData, setProfileData] = useState<UserProfileData>({
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john.doe@example.com',
+        jobTitle: 'Media Manager',
+        organization: 'MediaLake Inc.',
+        language: 'English',
+        theme: 'light',
+        notifications: {
+            email: true,
+            push: true,
+            updates: false,
+        },
+    });
+
+    const handleSave = () => {
+        try {
+            // TODO: Implement save functionality
+            setEditing(false);
+            setError(null);
+        } catch (err) {
+            setError('Failed to save profile changes. Please try again.');
+        }
+    };
+
+    const handleCancel = () => {
+        setEditing(false);
+        setError(null);
+    };
+
+    return (
+        <Box>
+            {error && (
+                <Alert
+                    severity="error"
+                    sx={{ mb: 3 }}
+                    onClose={() => setError(null)}
+                >
+                    {error}
+                </Alert>
+            )}
+
+            <Grid container spacing={3}>
+                {/* Profile Information */}
+                <Grid item xs={12} md={8}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            borderRadius: '12px',
+                            border: `1px solid ${theme.palette.divider}`,
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                            <Typography variant="h6">Profile Information</Typography>
+                            {!editing ? (
+                                <Button
+                                    startIcon={<EditIcon />}
+                                    onClick={() => setEditing(true)}
+                                >
+                                    Edit Profile
+                                </Button>
+                            ) : (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button
+                                        startIcon={<CancelIcon />}
+                                        onClick={handleCancel}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<SaveIcon />}
+                                        onClick={handleSave}
+                                    >
+                                        Save Changes
+                                    </Button>
+                                </Box>
+                            )}
+                        </Box>
+
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Avatar
+                                        sx={{
+                                            width: 80,
+                                            height: 80,
+                                            bgcolor: theme.palette.primary.main,
+                                        }}
+                                    >
+                                        {profileData.firstName[0]}{profileData.lastName[0]}
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h6">
+                                            {profileData.firstName} {profileData.lastName}
+                                        </Typography>
+                                        <Typography color="text.secondary">
+                                            {profileData.jobTitle}
+                                        </Typography>
+                                        {editing && (
+                                            <Button
+                                                size="small"
+                                                startIcon={<PhotoCameraIcon />}
+                                                sx={{ mt: 1 }}
+                                            >
+                                                Change Photo
+                                            </Button>
+                                        )}
+                                    </Box>
+                                </Box>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="First Name"
+                                    value={profileData.firstName}
+                                    disabled={!editing}
+                                    onChange={(e) => setProfileData({
+                                        ...profileData,
+                                        firstName: e.target.value
+                                    })}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Last Name"
+                                    value={profileData.lastName}
+                                    disabled={!editing}
+                                    onChange={(e) => setProfileData({
+                                        ...profileData,
+                                        lastName: e.target.value
+                                    })}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Email"
+                                    value={profileData.email}
+                                    disabled={!editing}
+                                    type="email"
+                                    onChange={(e) => setProfileData({
+                                        ...profileData,
+                                        email: e.target.value
+                                    })}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Job Title"
+                                    value={profileData.jobTitle}
+                                    disabled={!editing}
+                                    onChange={(e) => setProfileData({
+                                        ...profileData,
+                                        jobTitle: e.target.value
+                                    })}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Organization"
+                                    value={profileData.organization}
+                                    disabled={!editing}
+                                    onChange={(e) => setProfileData({
+                                        ...profileData,
+                                        organization: e.target.value
+                                    })}
+                                />
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Grid>
+
+                {/* Preferences */}
+                <Grid item xs={12} md={4}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            borderRadius: '12px',
+                            border: `1px solid ${theme.palette.divider}`,
+                        }}
+                    >
+                        <Typography variant="h6" sx={{ mb: 3 }}>
+                            Preferences
+                        </Typography>
+
+                        <Box sx={{ mb: 3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <NotificationsIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="subtitle1">Notifications</Typography>
+                            </Box>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={profileData.notifications.email}
+                                        onChange={(e) => setProfileData({
+                                            ...profileData,
+                                            notifications: {
+                                                ...profileData.notifications,
+                                                email: e.target.checked
+                                            }
+                                        })}
+                                    />
+                                }
+                                label="Email Notifications"
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={profileData.notifications.push}
+                                        onChange={(e) => setProfileData({
+                                            ...profileData,
+                                            notifications: {
+                                                ...profileData.notifications,
+                                                push: e.target.checked
+                                            }
+                                        })}
+                                    />
+                                }
+                                label="Push Notifications"
+                            />
+                        </Box>
+
+                        <Divider sx={{ my: 2 }} />
+
+                        <Box sx={{ mb: 3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <SecurityIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="subtitle1">Security</Typography>
+                            </Box>
+                            <Button variant="outlined" fullWidth sx={{ mb: 1 }}>
+                                Change Password
+                            </Button>
+                            <Button variant="outlined" fullWidth>
+                                Two-Factor Authentication
+                            </Button>
+                        </Box>
+
+                        <Divider sx={{ my: 2 }} />
+
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <PaletteIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="subtitle1">Appearance</Typography>
+                            </Box>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={profileData.theme === 'dark'}
+                                        onChange={(e) => setProfileData({
+                                            ...profileData,
+                                            theme: e.target.checked ? 'dark' : 'light'
+                                        })}
+                                    />
+                                }
+                                label="Dark Mode"
+                            />
+                        </Box>
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Box>
+    );
+};
+
+export default UserProfile;

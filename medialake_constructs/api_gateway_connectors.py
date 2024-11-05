@@ -523,11 +523,7 @@ class ConnectorsConstruct(Construct):
         )
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
-                actions=["dynamodb:Scan"], resources=[dynamo_table.table_arn]
-            )
-        )
-        s3_explorer_get_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"], resources=[dynamo_table.table_arn]
+                actions=["dynamodb:Scan", "dynamodb:Query", "dynamodb:GetItem"],
+                resources=[dynamo_table.table_arn],
             )
         )

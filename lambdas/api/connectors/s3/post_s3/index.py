@@ -2,6 +2,8 @@ import os
 import uuid
 import json
 import time
+import string
+import random
 import boto3
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
@@ -17,8 +19,6 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 )
 from pydantic import BaseModel
 from botocore.config import Config
-import random
-import string
 
 tracer = Tracer()
 logger = Logger()
@@ -38,11 +38,6 @@ class S3Connector(BaseModel):
     configuration: S3ConnectorConfig
     name: str
     type: str
-
-
-def generate_suffix():
-    """Generate a 6-digit alphanumeric suffix"""
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
 
 
 @app.exception_handler(RequestValidationError)
@@ -78,19 +73,26 @@ def create_connector(createconnector: S3Connector) -> dict:
         connector_id = str(uuid.uuid4())
         current_time = datetime.utcnow().isoformat(timespec="seconds")
 
+        def generate_suffix():
+            """Generate a 6-digit alphanumeric suffix"""
+            return "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+
         # Get request variables from request body
         s3_bucket = createconnector.configuration.bucket
         connector_name = createconnector.name
-        # Generate unique suffix for this deployment
-        resource_suffix = generate_suffix()
-        # Create resource specific name prefix with suffix
-        resource_name_prefix = f"medialake_s3Connector_{s3_bucket}_{resource_suffix}"
-        target_function_name = f"medialake_connector_{s3_bucket}_{resource_suffix}"
+
+        suffix = generate_suffix()
+
+        # Create resource specific name prefix
+        resource_name_prefix = f"medialake_connector_{s3_bucket}"
+        target_function_name = f"medialake_connector_{s3_bucket}_{suffix}"
 
         # Validate S3 bucket exists and get its region
         try:
+
             bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
             bucket_region = bucket_location["LocationConstraint"]
+            bucket_region = bucket_region or "us-east-1"
         except s3_client.exceptions.ClientError:
             return {
                 "statusCode": 400,
@@ -115,7 +117,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         )
 
         # Create SQS queue in the same region as the bucket
-        queue_name = f"{resource_name_prefix}-notifications-{resource_suffix}"
+        queue_name = f"{resource_name_prefix}-notifications"
         response = sqs.create_queue(
             QueueName=queue_name,
             Attributes={"VisibilityTimeout": "360"},  # 1.2x Lambda timeout (300s)
@@ -187,14 +189,11 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy-{resource_suffix}",
+                PolicyName=f"{role_name}-sqs-policy",
                 PolicyDocument=json.dumps(sqs_policy),
             )
             created_resources.append(
-                (
-                    "inline_policy",
-                    (role_name, f"{role_name}-sqs-policy-{resource_suffix}"),
-                )
+                ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
             )
 
             # Add delay to allow policy to propagate
@@ -228,14 +227,11 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy-{resource_suffix}",
+                PolicyName=f"{role_name}-sqs-policy",
                 PolicyDocument=json.dumps(sqs_policy),
             )
             created_resources.append(
-                (
-                    "inline_policy",
-                    (role_name, f"{role_name}-sqs-policy-{resource_suffix}"),
-                )
+                ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
             )
             # Create custom policy for S3 permissions
             s3_policy = {
@@ -259,14 +255,11 @@ def create_connector(createconnector: S3Connector) -> dict:
             }
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-s3-policy-{resource_suffix}",
+                PolicyName=f"{role_name}-s3-policy",
                 PolicyDocument=json.dumps(s3_policy),
             )
             created_resources.append(
-                (
-                    "inline_policy",
-                    (role_name, f"{role_name}-s3-policy-{resource_suffix}"),
-                )
+                ("inline_policy", (role_name, f"{role_name}-s3-policy"))
             )
 
             # Create custom policy for EventBridge permissions
@@ -283,14 +276,11 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-eventbridge-policy-{resource_suffix}",
+                PolicyName=f"{role_name}-eventbridge-policy",
                 PolicyDocument=json.dumps(eventbridge_policy),
             )
             created_resources.append(
-                (
-                    "inline_policy",
-                    (role_name, f"{role_name}-eventbridge-policy-{resource_suffix}"),
-                )
+                ("inline_policy", (role_name, f"{role_name}-eventbridge-policy"))
             )
 
             # Create custom policy for DynamoDB permissions
@@ -314,14 +304,11 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-dynamodb-policy-{resource_suffix}",
+                PolicyName=f"{role_name}-dynamodb-policy",
                 PolicyDocument=json.dumps(dynamodb_policy),
             )
             created_resources.append(
-                (
-                    "inline_policy",
-                    (role_name, f"{role_name}-dynamodb-policy-{resource_suffix}"),
-                )
+                ("inline_policy", (role_name, f"{role_name}-dynamodb-policy"))
             )
 
             ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")

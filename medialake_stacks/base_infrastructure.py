@@ -16,6 +16,7 @@ from medialake_constructs.shared_constructs.opensearch_serverless import (
     OpenSearchServerlessConstruct,
     OpenSearchServerlessProps,
 )
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -96,6 +97,7 @@ class BaseInfrastructureStack(Stack):
                 # removal_policy=RemovalPolicy.DESTROY,
             ),
         )
+        opensearch_layer = SearchLayer(self, "OpenSearchLayer")
 
         asset_lambda_stream = Lambda(
             self,
@@ -103,7 +105,11 @@ class BaseInfrastructureStack(Stack):
             config=LambdaConfig(
                 name=f"{GLOBAL_PREFIX}-asset-table-stream",
                 entry="lambdas/back_end/asset_table_stream",
-                environment_variables={},
+                environment_variables={
+                    "OPENSEARCH_ENDPOINT": self.opensearch_serverless.collection_endpoint,
+                    "OPENSEARCH_INDEX": "media",
+                },
+                layers=[opensearch_layer.layer],
             ),
         )
 
