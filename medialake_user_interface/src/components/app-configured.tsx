@@ -271,7 +271,6 @@ const AuthPage = () => {
     );
 };
 
-// Rest of the code remains unchanged...
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
@@ -297,7 +296,6 @@ const AppLayout = () => {
     );
 };
 
-// Rest of the components remain unchanged...
 const SearchResultsWrapper = () => {
     const handleImageSelect = (image: any) => {
         console.log('Selected image:', image);
@@ -328,7 +326,7 @@ const router = createBrowserRouter([
                 element: <S3Explorer />
             },
             {
-                path: 'settings',
+                path: 'settings/*',
                 element: <SettingsComponent />
             },
             {

@@ -1,13 +1,18 @@
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import OpenSearch, RequestsHttpConnection, OpenSearchException
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint
 import os
 import boto3
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.logging import correlation_paths
+from opensearchpy import (
+    RequestsHttpConnection,
+    RequestsAWSV4SignerAuth,
+    OpenSearch,
+    OpenSearchException,
+)
 
 logger = Logger()
 tracer = Tracer()
@@ -27,6 +32,8 @@ class SearchParams(BaseModel):
     q: str = Field(..., min_length=1)
     size: conint(gt=0, le=100) = Field(default=10)  # type: ignore
     from_: conint(ge=0) = Field(default=0, alias="from")  # type: ignore
+    fuzzy_max_expansions: conint(ge=1, le=50) = Field(default=10)  # type: ignore
+    min_score: float = Field(default=0.1)
 
 
 class SearchResult(BaseModel):
@@ -51,19 +58,17 @@ def get_opensearch_client() -> OpenSearch:
     host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
     region = os.environ["AWS_REGION"]
 
-    credentials = boto3.Session().get_credentials()
-    auth = (
-        credentials.access_key,
-        credentials.secret_key,
-    )  # Create tuple of credentials
+    auth = RequestsAWSV4SignerAuth(
+        boto3.Session().get_credentials(), "us-east-1", "aoss"
+    )
 
     return OpenSearch(
         hosts=[{"host": host, "port": 443}],
-        http_auth=auth,  # Pass credentials tuple
+        http_auth=auth,
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
-        region=region,
+        region="us-east-1",
     )
 
 
@@ -77,12 +82,38 @@ def perform_search(params: SearchParams) -> SearchResponse:
 
     search_body = {
         "query": {
-            "multi_match": {
-                "query": params.q,
-                "fields": ["title^2", "content"],
-                "fuzziness": "AUTO",
+            "bool": {
+                "should": [
+                    {
+                        "multi_match": {
+                            "query": params.q,
+                            "fields": [
+                                "title^3",
+                                "content^2",
+                                "description",
+                                "tags^1.5",
+                                "metadata.*",
+                            ],
+                            "fuzziness": "AUTO",
+                            "prefix_length": 2,
+                            "max_expansions": params.fuzzy_max_expansions,
+                            "type": "best_fields",
+                            "tie_breaker": 0.3,
+                            "minimum_should_match": "75%",
+                        }
+                    },
+                    {
+                        "multi_match": {
+                            "query": params.q,
+                            "fields": ["title^2", "content"],
+                            "type": "phrase_prefix",
+                            "boost": 1.2,
+                        }
+                    },
+                ]
             }
-        }
+        },
+        "min_score": params.min_score,
     }
 
     try:

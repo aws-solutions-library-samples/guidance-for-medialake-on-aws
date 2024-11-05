@@ -24,6 +24,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useSearch } from './api/hooks/useSearch';
 import debounce from 'lodash/debounce';
+import { signOut } from 'aws-amplify/auth';
+import { useAuth } from './common/hooks/auth-context';
 
 interface Notification {
     id: string;
@@ -60,6 +62,7 @@ const mockNotifications: Notification[] = [
 function TopBar() {
     const theme = useTheme();
     const navigate = useNavigate();
+    const { setIsAuthenticated } = useAuth();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +79,17 @@ function TopBar() {
     const handleClose = () => {
         setAnchorEl(null);
         setNotificationsAnchor(null);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            setIsAuthenticated(false);
+            navigate('/auth');
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+        handleClose();
     };
 
     const getNotificationIcon = (type: string) => {
@@ -261,7 +275,7 @@ function TopBar() {
                     }}>
                         Profile
                     </MenuItem>
-                    <MenuItem onClick={handleClose} sx={{ color: 'error.main' }}>
+                    <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
                         Logout
                     </MenuItem>
                 </Menu>
