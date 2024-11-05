@@ -1,42 +1,58 @@
-import React from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { Box } from '@mui/material';
 import IntegrationsView from '../../components/settings/IntegrationsView';
+import IntegrationModal from '../../components/settings/IntegrationModal';
+import { Integration } from '../../api/types/api.types';
 
 const IntegrationsPage: React.FC = () => {
-    const [integrations, setIntegrations] = React.useState([]);
+    const [openIntegrationModal, setOpenIntegrationModal] = useState(false);
+    const [editingIntegration, setEditingIntegration] = useState<Integration | undefined>();
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
 
     const handleAddIntegration = () => {
-        // Implementation
+        console.log('Opening integration modal from IntegrationsPage'); // Debug log
+        setEditingIntegration(undefined);
+        setOpenIntegrationModal(true);
     };
 
-    const handleEditIntegration = () => {
-        // Implementation
+    const handleSaveIntegration = (integration: Integration) => {
+        if (editingIntegration) {
+            setIntegrations(integrations.map(i =>
+                i.id === integration.id ? integration : i
+            ));
+        } else {
+            setIntegrations([...integrations, integration]);
+        }
+        setOpenIntegrationModal(false);
+        setEditingIntegration(undefined);
     };
 
-    const handleDeleteIntegration = () => {
-        // Implementation
-    };
-
-    const handleConfigureIntegration = () => {
-        // Implementation
+    const handleDeleteIntegration = (id: string) => {
+        setIntegrations(integrations.filter(i => i.id !== id));
     };
 
     return (
         <Box>
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-                    Integrations
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                    Manage your third-party integrations and API connections
-                </Typography>
-            </Box>
             <IntegrationsView
                 integrations={integrations}
                 onAddIntegration={handleAddIntegration}
-                onEditIntegration={handleEditIntegration}
+                onEditIntegration={(integration) => {
+                    setEditingIntegration(integration);
+                    setOpenIntegrationModal(true);
+                }}
                 onDeleteIntegration={handleDeleteIntegration}
-                onConfigureIntegration={handleConfigureIntegration}
+                onConfigureIntegration={() => { }}
+            />
+
+            <IntegrationModal
+                open={openIntegrationModal}
+                onClose={() => {
+                    console.log('Closing integration modal'); // Debug log
+                    setOpenIntegrationModal(false);
+                    setEditingIntegration(undefined);
+                }}
+                onSave={handleSaveIntegration}
+                editingIntegration={editingIntegration}
             />
         </Box>
     );

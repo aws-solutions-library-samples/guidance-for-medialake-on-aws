@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Box, Typography, Card, CardContent, CardMedia, Button, Grid, Pagination, Menu, MenuItem, IconButton, TextField, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate } from 'react-router-dom';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VideoDetailPage from '../VideoDetailPage';
 import ImageDetailPage from '../ImageDetailPage';
+
+type MediaType = 'video' | 'image' | 'audio';
 
 interface MediaItem {
     src: string;
@@ -13,18 +15,55 @@ interface MediaItem {
     fileName: string;
     creationDate: string;
     description: string;
+    mediaType: MediaType;
+    type?: string;
+    resolution?: string;
+    colorSpace?: string;
+    fileSize?: string;
+    iptc?: {
+        creator: string;
+        copyright: string;
+        caption: string;
+        keywords: string[];
+    };
+    exif?: {
+        make: string;
+        model: string;
+        exposureTime: string;
+        fNumber: string;
+        iso: string;
+        focalLength: string;
+        dateTaken: string;
+    };
+    xmp?: {
+        title: string;
+        creator: string;
+        subject: string[];
+        description: string;
+        rating: number;
+        license: string;
+    };
+    contentAnalysis?: {
+        summary: string;
+        detectedObjects: string[];
+        people: string[];
+        landmarks: string[];
+        tags: string[];
+        aiGenerated: boolean;
+    };
 }
 
-interface MediaCardProps extends MediaItem {
-    type: 'video' | 'image' | 'audio';
+interface MediaCardProps extends Omit<MediaItem, 'mediaType'> {
+    type: MediaType;
     onImageSelect?: (image: MediaItem) => void;
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creationDate, description, onImageSelect }) => {
+const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creationDate, description, onImageSelect, ...rest }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isRenaming, setIsRenaming] = useState(false);
     const [newFileName, setNewFileName] = useState(fileName);
     const open = Boolean(anchorEl);
+    const navigate = useNavigate();
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
@@ -48,6 +87,55 @@ const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creation
         console.log('Renaming to:', newFileName);
         // Implement rename logic here
         setIsRenaming(false);
+    };
+
+    const handleImageClick = () => {
+        if (type === 'image') {
+            const imageData: MediaItem = {
+                src,
+                id,
+                fileName,
+                creationDate,
+                description,
+                mediaType: 'image',
+                type: 'image/jpeg',
+                resolution: '1920x1080',
+                colorSpace: 'sRGB',
+                fileSize: '2.5 MB',
+                iptc: {
+                    creator: 'John Doe',
+                    copyright: '© 2023 MediaLake',
+                    caption: description,
+                    keywords: ['nature', 'landscape', 'photography']
+                },
+                exif: {
+                    make: 'Canon',
+                    model: 'EOS R5',
+                    exposureTime: '1/250',
+                    fNumber: 'f/2.8',
+                    iso: '100',
+                    focalLength: '50mm',
+                    dateTaken: creationDate
+                },
+                xmp: {
+                    title: fileName,
+                    creator: 'John Doe',
+                    subject: ['nature', 'landscape'],
+                    description: description,
+                    rating: 5,
+                    license: 'All Rights Reserved'
+                },
+                contentAnalysis: {
+                    summary: 'A high-quality landscape photograph capturing natural scenery.',
+                    detectedObjects: ['trees', 'mountains', 'sky', 'clouds'],
+                    people: [],
+                    landmarks: ['Mountain Range'],
+                    tags: ['outdoor', 'scenic', 'nature', 'landscape'],
+                    aiGenerated: false
+                }
+            };
+            navigate(`/images/${id}`, { state: { image: imageData } });
+        }
     };
 
     const getActions = () => {
@@ -82,13 +170,13 @@ const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creation
 
     return (
         <Card sx={{ width: '100%', m: 1 }}>
-            <Link to={`/${type}/${id}`}>
+            <Box onClick={handleImageClick} sx={{ cursor: 'pointer' }}>
                 {type === 'video' && (
                     <CardMedia
                         component="video"
                         height="140"
                         src={src}
-                        title={fileName}  // Changed from alt to title
+                        title={fileName}
                         controls
                         sx={{ objectFit: 'cover' }}
                     />
@@ -99,7 +187,6 @@ const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creation
                         height="140"
                         image={src}
                         alt={fileName}
-                        onClick={() => onImageSelect && onImageSelect({ src, id, fileName, creationDate, description })}
                         sx={{ objectFit: 'cover' }}
                     />
                 )}
@@ -107,17 +194,17 @@ const MediaCard: React.FC<MediaCardProps> = ({ type, src, id, fileName, creation
                     <CardMedia
                         component="audio"
                         src={src}
-                        title={fileName}  // Changed from alt to title
+                        title={fileName}
                         controls
                         sx={{
-                            height: 50,  // Moved height to sx
+                            height: 50,
                             '& audio': {
                                 width: '100%'
                             }
                         }}
                     />
                 )}
-            </Link>
+            </Box>
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="subtitle1" sx={{ flexGrow: 1, mr: 1 }}>
@@ -192,7 +279,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ onImageSelect }) => {
     const [imageView, setImageView] = useState('card');
     const [audioView, setAudioView] = useState('card');
 
-    const toggleView = (section: 'video' | 'image' | 'audio') => {
+    const toggleView = (section: MediaType) => {
         if (section === 'video') {
             setVideoView(videoView === 'card' ? 'grid' : 'card');
         } else if (section === 'image') {
@@ -203,36 +290,36 @@ const SearchResults: React.FC<SearchResultsProps> = ({ onImageSelect }) => {
     };
 
     const videos: MediaItem[] = [
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'Third Blender Open Movie from 2010' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', id: 4, fileName: 'Tears of Steel', creationDate: '2023-05-04T16:20:00Z', description: 'Tears of Steel short film' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', id: 5, fileName: 'For Bigger Blazes', creationDate: '2023-05-05T09:30:00Z', description: 'HBO GO now works with Chromecast' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', id: 6, fileName: 'For Bigger Escapes', creationDate: '2023-05-06T11:45:00Z', description: 'Introducing Chromecast. The easiest way to enjoy online video and music on your TV' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit', mediaType: 'video' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006', mediaType: 'video' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'Third Blender Open Movie from 2010', mediaType: 'video' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', id: 4, fileName: 'Tears of Steel', creationDate: '2023-05-04T16:20:00Z', description: 'Tears of Steel short film', mediaType: 'video' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', id: 5, fileName: 'For Bigger Blazes', creationDate: '2023-05-05T09:30:00Z', description: 'HBO GO now works with Chromecast', mediaType: 'video' },
+        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', id: 6, fileName: 'For Bigger Escapes', creationDate: '2023-05-06T11:45:00Z', description: 'Introducing Chromecast. The easiest way to enjoy online video and music on your TV', mediaType: 'video' },
     ];
 
     const images: MediaItem[] = [
-        { src: 'https://picsum.photos/id/1018/345/194', id: 1, fileName: 'Mountain Lake', creationDate: '2023-05-10T09:15:00Z', description: 'A serene mountain lake view' },
-        { src: 'https://picsum.photos/id/1015/345/194', id: 2, fileName: 'River Valley', creationDate: '2023-05-11T16:45:00Z', description: 'A beautiful river flowing through a valley' },
-        { src: 'https://picsum.photos/id/1016/345/194', id: 3, fileName: 'Misty Forest', creationDate: '2023-05-12T11:30:00Z', description: 'A mysterious misty forest landscape' },
-        { src: 'https://picsum.photos/id/1020/345/194', id: 4, fileName: 'Bear Creek', creationDate: '2023-05-13T14:20:00Z', description: 'A peaceful creek in bear country' },
-        { src: 'https://picsum.photos/id/1021/345/194', id: 5, fileName: 'Rocky Mountains', creationDate: '2023-05-14T10:10:00Z', description: 'Majestic view of the Rocky Mountains' },
-        { src: 'https://picsum.photos/id/1022/345/194', id: 6, fileName: 'Northern Lights', creationDate: '2023-05-15T22:05:00Z', description: 'Spectacular display of Northern Lights' },
-        { src: 'https://picsum.photos/id/1023/345/194', id: 7, fileName: 'Autumn Forest', creationDate: '2023-05-16T15:40:00Z', description: 'Colorful autumn forest scene' },
-        { src: 'https://picsum.photos/id/1024/345/194', id: 8, fileName: 'Dragonfly', creationDate: '2023-05-17T13:25:00Z', description: 'Close-up of a dragonfly on a leaf' },
-        { src: 'https://picsum.photos/id/1025/345/194', id: 9, fileName: 'Pug Dog', creationDate: '2023-05-18T12:50:00Z', description: 'Adorable pug dog looking at the camera' },
-        { src: 'https://picsum.photos/id/1026/345/194', id: 10, fileName: 'Car Show', creationDate: '2023-05-19T11:15:00Z', description: 'Vintage cars at a car show' },
-        { src: 'https://picsum.photos/id/1027/345/194', id: 11, fileName: 'Jellyfish', creationDate: '2023-05-20T09:30:00Z', description: 'Colorful jellyfish in deep blue water' },
-        { src: 'https://picsum.photos/id/1028/345/194', id: 12, fileName: 'Lighthouse', creationDate: '2023-05-21T17:00:00Z', description: 'A lighthouse on a rocky coast' },
-        { src: 'https://picsum.photos/id/1029/345/194', id: 13, fileName: 'Winter Forest', creationDate: '2023-05-22T08:45:00Z', description: 'Snow-covered trees in a winter forest' },
-        { src: 'https://picsum.photos/id/1030/345/194', id: 14, fileName: 'Desert Landscape', creationDate: '2023-05-23T14:55:00Z', description: 'Vast desert landscape with sand dunes' },
-        { src: 'https://picsum.photos/id/1031/345/194', id: 15, fileName: 'Tropical Beach', creationDate: '2023-05-24T10:20:00Z', description: 'Idyllic tropical beach with palm trees' },
+        { src: 'https://picsum.photos/id/1018/345/194', id: 1, fileName: 'Mountain Lake', creationDate: '2023-05-10T09:15:00Z', description: 'A serene mountain lake view', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1015/345/194', id: 2, fileName: 'River Valley', creationDate: '2023-05-11T16:45:00Z', description: 'A beautiful river flowing through a valley', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1016/345/194', id: 3, fileName: 'Misty Forest', creationDate: '2023-05-12T11:30:00Z', description: 'A mysterious misty forest landscape', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1020/345/194', id: 4, fileName: 'Bear Creek', creationDate: '2023-05-13T14:20:00Z', description: 'A peaceful creek in bear country', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1021/345/194', id: 5, fileName: 'Rocky Mountains', creationDate: '2023-05-14T10:10:00Z', description: 'Majestic view of the Rocky Mountains', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1022/345/194', id: 6, fileName: 'Northern Lights', creationDate: '2023-05-15T22:05:00Z', description: 'Spectacular display of Northern Lights', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1023/345/194', id: 7, fileName: 'Autumn Forest', creationDate: '2023-05-16T15:40:00Z', description: 'Colorful autumn forest scene', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1024/345/194', id: 8, fileName: 'Dragonfly', creationDate: '2023-05-17T13:25:00Z', description: 'Close-up of a dragonfly on a leaf', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1025/345/194', id: 9, fileName: 'Pug Dog', creationDate: '2023-05-18T12:50:00Z', description: 'Adorable pug dog looking at the camera', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1026/345/194', id: 10, fileName: 'Car Show', creationDate: '2023-05-19T11:15:00Z', description: 'Vintage cars at a car show', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1027/345/194', id: 11, fileName: 'Jellyfish', creationDate: '2023-05-20T09:30:00Z', description: 'Colorful jellyfish in deep blue water', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1028/345/194', id: 12, fileName: 'Lighthouse', creationDate: '2023-05-21T17:00:00Z', description: 'A lighthouse on a rocky coast', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1029/345/194', id: 13, fileName: 'Winter Forest', creationDate: '2023-05-22T08:45:00Z', description: 'Snow-covered trees in a winter forest', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1030/345/194', id: 14, fileName: 'Desert Landscape', creationDate: '2023-05-23T14:55:00Z', description: 'Vast desert landscape with sand dunes', mediaType: 'image' },
+        { src: 'https://picsum.photos/id/1031/345/194', id: 15, fileName: 'Tropical Beach', creationDate: '2023-05-24T10:20:00Z', description: 'Idyllic tropical beach with palm trees', mediaType: 'image' },
     ];
 
     const audios: MediaItem[] = [
-        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_700KB.mp3', id: 1, fileName: 'Sample Audio 1', creationDate: '2023-05-25T11:20:00Z', description: 'A sample audio file for testing' },
-        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_1MG.mp3', id: 2, fileName: 'Sample Audio 2', creationDate: '2023-05-26T13:10:00Z', description: 'Another sample audio file for testing' },
-        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_2MG.mp3', id: 3, fileName: 'Sample Audio 3', creationDate: '2023-05-27T15:40:00Z', description: 'A third sample audio file for testing' },
+        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_700KB.mp3', id: 1, fileName: 'Sample Audio 1', creationDate: '2023-05-25T11:20:00Z', description: 'A sample audio file for testing', mediaType: 'audio' },
+        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_1MG.mp3', id: 2, fileName: 'Sample Audio 2', creationDate: '2023-05-26T13:10:00Z', description: 'Another sample audio file for testing', mediaType: 'audio' },
+        { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_2MG.mp3', id: 3, fileName: 'Sample Audio 3', creationDate: '2023-05-27T15:40:00Z', description: 'A third sample audio file for testing', mediaType: 'audio' },
     ];
 
     return (
@@ -246,7 +333,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ onImageSelect }) => {
                         <Grid container spacing={2}>
                             {videos.map((video) => (
                                 <Grid item xs={12} sm={6} md={3} key={`video-${video.id}`}>
-                                    <MediaCard type="video" {...video} />
+                                    <MediaCard {...video} type={video.mediaType as MediaType} />
                                 </Grid>
                             ))}
                         </Grid>
@@ -260,7 +347,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ onImageSelect }) => {
                         <Grid container spacing={2}>
                             {images.map((image) => (
                                 <Grid item xs={12} sm={6} md={3} key={`image-${image.id}`}>
-                                    <MediaCard type="image" {...image} onImageSelect={onImageSelect} />
+                                    <MediaCard {...image} type={image.mediaType as MediaType} onImageSelect={onImageSelect} />
                                 </Grid>
                             ))}
                         </Grid>
@@ -274,15 +361,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({ onImageSelect }) => {
                         <Grid container spacing={2}>
                             {audios.map((audio) => (
                                 <Grid item xs={12} sm={6} md={3} key={`audio-${audio.id}`}>
-                                    <MediaCard type="audio" {...audio} />
+                                    <MediaCard {...audio} type={audio.mediaType as MediaType} />
                                 </Grid>
                             ))}
                         </Grid>
                     </>
                 } />
                 <Route path="/video/:id" element={<VideoDetailPage />} />
-                <Route path="/image/:id" element={<ImageDetailPage image={undefined} />} />
-                {/* <Route path="/audio/:id" element={<AudioDetail />} /> */}
+                <Route path="/image/:id" element={<ImageDetailPage />} />
             </Routes>
         </Box>
     );
