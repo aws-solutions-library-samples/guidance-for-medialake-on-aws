@@ -3,7 +3,7 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field, conint
+from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
 from opensearchpy import (
@@ -13,11 +13,14 @@ from opensearchpy import (
     OpenSearchException,
 )
 from datetime import datetime
+import json
 
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
-app = APIGatewayRestResolver()
+app = APIGatewayRestResolver(
+    serializer=lambda x: json.dumps(x, default=str), strip_prefixes=["/api"]
+)
 
 
 class SearchException(Exception):
@@ -26,7 +29,13 @@ class SearchException(Exception):
     pass
 
 
-class SearchParams(BaseModel):
+class BaseModelWithConfig(BaseModel):
+    """Base model with JSON configuration"""
+
+    model_config = ConfigDict(json_encoders={datetime: str})
+
+
+class SearchParams(BaseModelWithConfig):
     """Pydantic model for search parameters"""
 
     q: str = Field(..., min_length=1)
@@ -37,41 +46,61 @@ class SearchParams(BaseModel):
     search_fields: Optional[List[str]] = None
 
 
-class AssetLocation(BaseModel):
-    storage_type: str
+class AssetStorage(BaseModelWithConfig):
+    """Model for asset storage information"""
+
+    storageType: str
     bucket: str
-    object_key: Dict[str, str]
+    path: str
     status: str
-    file_info: Dict[str, Any]
+    fileSize: Optional[int]
+    hashValue: Optional[str]
 
 
-class AssetRepresentation(BaseModel):
+class ImageSpec(BaseModelWithConfig):
+    """Model for image specifications"""
+
+    colorSpace: Optional[str]
+    width: Optional[int]
+    height: Optional[int]
+    dpi: Optional[int]
+
+
+class AssetRepresentation(BaseModelWithConfig):
+    """Model for asset representation"""
+
     id: str
     type: str
     format: str
     purpose: str
-    storage_info: Dict[str, AssetLocation]
-    image_spec: Optional[Dict[str, Any]]
+    storage: AssetStorage
+    imageSpec: ImageSpec
 
 
-class AssetMetadata(BaseModel):
+class AssetMetadata(BaseModelWithConfig):
+    """Model for asset metadata"""
+
     embedded: Optional[Dict[str, Any]]
     generated: Optional[Dict[str, Any]]
     consolidated: Optional[Dict[str, Any]]
 
 
-class AssetSearchResult(BaseModel):
-    inventory_id: str
-    asset_id: str
-    type: str
-    create_date: datetime
-    main_representation: AssetRepresentation
-    derived_representations: Optional[List[AssetRepresentation]]
-    metadata: AssetMetadata
+class AssetSearchResult(BaseModelWithConfig):
+    """Model for search result"""
+
+    inventoryId: str
+    assetId: str
+    assetType: str
+    createDate: datetime
+    mainRepresentation: AssetRepresentation
+    derivedRepresentations: List[AssetRepresentation] = []
+    metadata: Optional[AssetMetadata] = None
     score: float
 
 
-class SearchMetadata(BaseModel):
+class SearchMetadata(BaseModelWithConfig):
+    """Model for search metadata"""
+
     totalResults: int
     page: int
     pageSize: int
@@ -80,7 +109,9 @@ class SearchMetadata(BaseModel):
     suggestions: Optional[Dict[str, Any]] = None
 
 
-class SearchResponse(BaseModel):
+class SearchResponse(BaseModelWithConfig):
+    """Model for search response"""
+
     status: str
     message: str
     data: Dict[str, Any]
@@ -108,7 +139,8 @@ def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     should_queries = []
     search_fields = params.search_fields or [
-        "name",
+        "mainRepresentation.storage.path",
+        "assetType",
         "metadata.consolidated.description",
         "metadata.consolidated.keywords",
     ]
@@ -122,6 +154,11 @@ def build_search_query(params: SearchParams) -> Dict:
                 }
             }
         )
+
+    # Add wildcard search for path
+    should_queries.append(
+        {"wildcard": {"mainRepresentation.storage.path": f"*{params.q}*"}}
+    )
 
     # Build filters
     filters = []
@@ -146,17 +183,22 @@ def build_search_query(params: SearchParams) -> Dict:
         "size": params.size,
         "from": params.from_,
         "aggs": {
-            "file_types": {"terms": {"field": "main_representation.format.keyword"}},
-            "asset_types": {"terms": {"field": "type.keyword"}},
+            "file_types": {"terms": {"field": "mainRepresentation.format.keyword"}},
+            "asset_types": {"terms": {"field": "assetType.keyword"}},
         },
         "suggest": {
             "text": params.q,
             "simple_phrase": {
                 "phrase": {
-                    "field": "name",
+                    "field": "mainRepresentation.storage.path",
                     "size": 1,
                     "gram_size": 3,
-                    "direct_generator": [{"field": "name", "suggest_mode": "always"}],
+                    "direct_generator": [
+                        {
+                            "field": "mainRepresentation.storage.path",
+                            "suggest_mode": "always",
+                        }
+                    ],
                     "highlight": {"pre_tag": "<em>", "post_tag": "</em>"},
                 }
             },
@@ -165,7 +207,7 @@ def build_search_query(params: SearchParams) -> Dict:
 
 
 @tracer.capture_method
-def perform_search(params: SearchParams) -> SearchResponse:
+def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
@@ -174,19 +216,24 @@ def perform_search(params: SearchParams) -> SearchResponse:
         search_body = build_search_query(params)
         response = client.search(body=search_body, index=index_name)
 
-        hits = [
-            AssetSearchResult(
-                inventory_id=hit["_source"].get("inventoryId"),
-                asset_id=hit["_source"].get("assetId"),
-                type=hit["_source"].get("type"),
-                create_date=hit["_source"].get("createDate"),
-                main_representation=hit["_source"].get("mainRepresentation"),
-                derived_representations=hit["_source"].get("derivedRepresentations"),
-                metadata=hit["_source"].get("metadata", {}),
-                score=hit["_score"],
-            )
-            for hit in response["hits"]["hits"]
-        ]
+        hits = []
+        for hit in response["hits"]["hits"]:
+            try:
+                source = hit["_source"]
+                result = AssetSearchResult(
+                    inventoryId=source.get("inventoryId"),
+                    assetId=source.get("assetId"),
+                    assetType=source.get("assetType"),
+                    createDate=source.get("createDate"),
+                    mainRepresentation=source.get("mainRepresentation"),
+                    derivedRepresentations=source.get("derivedRepresentations", []),
+                    metadata=source.get("metadata"),
+                    score=hit["_score"],
+                )
+                hits.append(result)
+            except Exception as e:
+                logger.warning(f"Error processing hit: {str(e)}")
+                continue
 
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],
@@ -197,14 +244,14 @@ def perform_search(params: SearchParams) -> SearchResponse:
             suggestions=response.get("suggest"),
         )
 
-        return SearchResponse(
-            status="200",
-            message="ok",
-            data={
-                "searchMetadata": search_metadata.model_dump(),
-                "results": [hit.model_dump() for hit in hits],
+        return {
+            "status": "200",
+            "message": "ok",
+            "data": {
+                "searchMetadata": search_metadata.model_dump(by_alias=True),
+                "results": [hit.model_dump(by_alias=True) for hit in hits],
             },
-        )
+        }
 
     except OpenSearchException as e:
         logger.error(f"OpenSearch error: {str(e)}")
@@ -220,30 +267,13 @@ def handle_search():
     """Handle search requests with validated parameters."""
     try:
         params = SearchParams(**app.current_event.get("queryStringParameters", {}))
-        results = perform_search(params)
-
-        return {
-            "statusCode": 200,
-            "body": results.model_dump(),
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-        }
+        return perform_search(params)
     except ValueError as e:
         logger.warning(f"Invalid input parameters: {str(e)}")
-        return {
-            "statusCode": 400,
-            "body": {"status": "400", "message": str(e), "data": None},
-            "headers": {"Content-Type": "application/json"},
-        }
+        return {"status": "400", "message": str(e), "data": None}
     except SearchException as e:
         logger.error(f"Search error: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": {"status": "500", "message": str(e), "data": None},
-            "headers": {"Content-Type": "application/json"},
-        }
+        return {"status": "500", "message": str(e), "data": None}
 
 
 @metrics.log_metrics
