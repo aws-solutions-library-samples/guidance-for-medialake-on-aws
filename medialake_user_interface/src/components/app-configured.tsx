@@ -20,7 +20,6 @@ import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react
 import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { StorageHelper } from '../common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
-import SearchResults from './SearchResults';
 
 // Custom theme for Authenticator
 const theme: Theme = {
@@ -296,14 +295,6 @@ const AppLayout = () => {
         </Box>
     );
 };
-
-// const SearchResultsWrapper = () => {
-//     const handleImageSelect = (image: any) => {
-//         console.log('Selected image:', image);
-//     };
-
-//     return <SearchResults onImageSelect={handleImageSelect} />;
-// };
 
 const router = createBrowserRouter([
     {

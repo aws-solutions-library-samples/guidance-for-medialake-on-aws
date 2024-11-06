@@ -49,7 +49,12 @@ class ApiGatewayConstruct(Construct):
             endpoint_types=[apigateway.EndpointType.REGIONAL],
             cloud_watch_role=True,
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_origins=[
+                    "http://localhost:5173",
+                    "http://localhost:3000",
+                    "https://localhost:5173",
+                    "https://localhost:3000",
+                ],
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=[
                     "x-api-key",

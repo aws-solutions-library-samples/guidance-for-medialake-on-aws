@@ -10,13 +10,15 @@ from typing import Dict, Optional, List
 @dataclass
 class DynamoDBProps:
     """Configuration for DynamoDB creation."""
+
     name: str
     partition_key_name: str
     partition_key_type: str
+    sort_key_name: Optional[str] = None
+    sort_key_type: Optional[dynamodb.AttributeType] = None
     stream: Optional[dynamodb.StreamViewType] = None
     point_in_time_recovery: Optional[bool] = False
-    
-    
+
 
 class DynamoDB(Construct):
     def __init__(self, scope: Construct, id: str, props: DynamoDBProps, **kwargs):

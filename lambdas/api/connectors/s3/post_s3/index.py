@@ -326,6 +326,10 @@ def create_connector(createconnector: S3Connector) -> dict:
                     "Variables": {
                         "INGEST_EVENT_BUS": ingest_event_bus,
                         "MEDIALAKE_ASSET_TABLE": medialake_asset_table,
+                        "POWERTOOLS_SERVICE_NAME": "asset-processor",
+                        "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
+                        "ASSETS_TABLE": medialake_asset_table,
+                        "EVENT_BUS_NAME": ingest_event_bus,
                     }
                 },
                 Layers=[layer_arn] if layer_arn else [],

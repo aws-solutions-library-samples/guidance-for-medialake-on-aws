@@ -13,6 +13,8 @@ import {
     useTheme,
     Divider,
     InputBase,
+    Chip,
+    Button,
 } from '@mui/material';
 import {
     Notifications as NotificationsIcon,
@@ -33,6 +35,11 @@ interface Notification {
     title: string;
     message: string;
     timestamp: string;
+}
+
+interface SearchTag {
+    key: string;
+    value: string;
 }
 
 const mockNotifications: Notification[] = [
@@ -65,8 +72,25 @@ function TopBar() {
     const { setIsAuthenticated } = useAuth();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const { refetch } = useSearch(searchQuery);
+    const [searchInput, setSearchInput] = useState('');
+    const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
+
+    const getSearchQuery = useCallback(() => {
+        const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
+        return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
+    }, [searchTags, searchInput]);
+
+    const { refetch } = useSearch(getSearchQuery());
+
+    const debouncedSearch = useCallback(
+        debounce((query: string) => {
+            if (query.trim()) {
+                refetch();
+                navigate('/search', { state: { query: getSearchQuery() } });
+            }
+        }, 500),
+        [navigate, refetch, getSearchQuery]
+    );
 
     const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -92,6 +116,73 @@ function TopBar() {
         handleClose();
     };
 
+    const createTagFromInput = (input: string): boolean => {
+        if (input.includes(':')) {
+            const [key, ...valueParts] = input.split(':');
+            const value = valueParts.join(':').trim();
+
+            if (key && value) {
+                const newTag: SearchTag = {
+                    key: key.trim(),
+                    value: value
+                };
+
+                setSearchTags(prev => [...prev, newTag]);
+                setSearchInput('');
+
+                const searchQuery = getSearchQuery();
+                navigate('/search', { state: { query: searchQuery } });
+                refetch();
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const value = event.target.value;
+
+        if (value.endsWith(' ') && value.includes(':')) {
+            const potentialTag = value.trim();
+            if (createTagFromInput(potentialTag)) {
+                return;
+            }
+        }
+
+        setSearchInput(value);
+
+        if (!value.includes(':')) {
+            debouncedSearch(value);
+        }
+    };
+
+    const handleSearchKeyPress = (event: React.KeyboardEvent) => {
+        if (event.key === 'Enter' && searchInput.includes(':')) {
+            createTagFromInput(searchInput);
+        }
+    };
+
+    const handleSearchClick = () => {
+        if (searchInput.includes(':')) {
+            createTagFromInput(searchInput);
+        } else if (searchInput.trim()) {
+            navigate('/search', { state: { query: getSearchQuery() } });
+            refetch();
+        }
+    };
+
+    const handleDeleteTag = (tagToDelete: SearchTag) => {
+        setSearchTags(prev => {
+            const newTags = prev.filter(tag =>
+                !(tag.key === tagToDelete.key && tag.value === tagToDelete.value)
+            );
+            const searchQuery = newTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
+            navigate('/search', { state: { query: searchQuery } });
+            refetch();
+            return newTags;
+        });
+    };
+
     const getNotificationIcon = (type: string) => {
         switch (type) {
             case 'alert':
@@ -105,29 +196,6 @@ function TopBar() {
 
     const getNotificationCount = (type: string) => {
         return mockNotifications.filter(n => n.type === type).length;
-    };
-
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((query: string) => {
-            if (query.trim()) {
-                refetch();
-                navigate('/search', { state: { query } });
-            }
-        }, 500),
-        [navigate, refetch]
-    );
-
-    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const query = event.target.value;
-        setSearchQuery(query);
-        debouncedSearch(query);
-    };
-
-    const handleSearchKeyPress = (event: React.KeyboardEvent) => {
-        if (event.key === 'Enter' && searchQuery.trim()) {
-            navigate('/search', { state: { query: searchQuery } });
-        }
     };
 
     return (
@@ -146,34 +214,87 @@ function TopBar() {
                     <img
                         src="/logo.png"
                         alt="MediaLake"
-                        style={{ height: '32px', marginRight: theme.spacing(2) }}
+                        style={{ height: '32px', marginRight: theme.spacing(1) }}
                     />
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            fontWeight: 600,
+                            color: theme.palette.primary.main,
+                            marginRight: theme.spacing(2)
+                        }}
+                    >
+                        MediaLake
+                    </Typography>
                 </Box>
 
                 {/* Center section - Search */}
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: 'rgba(0,0,0,0.04)',
-                    borderRadius: '8px',
-                    padding: '4px 12px',
-                    width: '400px',
+                    gap: 1,
+                    flex: 1,
+                    maxWidth: '800px',
                 }}>
-                    <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                    <InputBase
-                        placeholder="Search assets, pipelines, or tags..."
-                        value={searchQuery}
-                        onChange={handleSearchChange}
-                        onKeyPress={handleSearchKeyPress}
-                        fullWidth
+                    {/* Tags */}
+                    {searchTags.map((tag, index) => (
+                        <Chip
+                            key={index}
+                            label={`${tag.key}: ${tag.value}`}
+                            onDelete={() => handleDeleteTag(tag)}
+                            size="small"
+                            sx={{
+                                backgroundColor: theme.palette.primary.light,
+                                color: theme.palette.primary.contrastText,
+                                '& .MuiChip-deleteIcon': {
+                                    color: theme.palette.primary.contrastText,
+                                },
+                            }}
+                        />
+                    ))}
+
+                    {/* Search Input */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.04)',
+                        borderRadius: '8px',
+                        padding: '4px 12px',
+                        flex: 1,
+                    }}>
+                        <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                        <InputBase
+                            placeholder="Search or use key:value..."
+                            value={searchInput}
+                            onChange={handleSearchInputChange}
+                            onKeyPress={handleSearchKeyPress}
+                            fullWidth
+                            sx={{
+                                fontSize: '14px',
+                                color: theme.palette.text.primary,
+                                '& input': {
+                                    padding: '4px 0',
+                                },
+                            }}
+                        />
+                    </Box>
+
+                    {/* Search Button */}
+                    <Button
+                        variant="contained"
+                        onClick={handleSearchClick}
                         sx={{
-                            fontSize: '14px',
-                            color: theme.palette.text.primary,
-                            '& input': {
-                                padding: '4px 0',
+                            minWidth: 'unset',
+                            px: 3,
+                            py: 1,
+                            backgroundColor: theme.palette.primary.main,
+                            '&:hover': {
+                                backgroundColor: theme.palette.primary.dark,
                             },
                         }}
-                    />
+                    >
+                        Search
+                    </Button>
                 </Box>
 
                 {/* Right section */}

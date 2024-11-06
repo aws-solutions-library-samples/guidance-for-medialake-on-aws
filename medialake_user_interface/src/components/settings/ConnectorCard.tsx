@@ -32,11 +32,11 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
   const getConnectorTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'amazons3':
-        return <StorageIcon />;
+        return <StorageIcon aria-hidden="true" />;
       case 'googlecloudstorage':
-        return <CloudIcon />;
+        return <CloudIcon aria-hidden="true" />;
       default:
-        return <StorageIcon />;
+        return <StorageIcon aria-hidden="true" />;
     }
   };
 
@@ -67,16 +67,23 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active':
-        return <CheckIcon fontSize="small" />;
+        return <CheckIcon fontSize="small" aria-hidden="true" />;
       case 'warning':
-        return <WarningIcon fontSize="small" />;
+        return <WarningIcon fontSize="small" aria-hidden="true" />;
       default:
         return null;
     }
   };
 
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this connector?')) {
+      await onDelete(connector.id);
+    }
+  };
+
   return (
     <Card
+      component="article"
       sx={{
         height: '100%',
         display: 'flex',
@@ -91,7 +98,15 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
     >
       <CardContent sx={{ flex: 1, pb: 2 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+        <Box
+          component="header"
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            mb: 2
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box
               sx={{
@@ -102,11 +117,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
                 alignItems: 'center',
                 color: getConnectorTypeColor(connector.type),
               }}
+              aria-hidden="true"
             >
               {getConnectorTypeIcon(connector.type)}
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
                 {connector.name}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -120,6 +136,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
                 size="small"
                 onClick={() => onEdit(connector)}
                 sx={{ color: theme.palette.text.secondary }}
+                aria-label={`Edit ${connector.name}`}
               >
                 <EditIcon fontSize="small" />
               </IconButton>
@@ -127,8 +144,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
             <Tooltip title="Delete connector">
               <IconButton
                 size="small"
-                onClick={() => onDelete(connector.id)}
+                onClick={handleDelete}
                 sx={{ color: theme.palette.error.main }}
+                aria-label={`Delete ${connector.name}`}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>
@@ -137,12 +155,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
         </Box>
 
         {/* Stats */}
-        <Box sx={{ mb: 2 }}>
+        <Box component="section" sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" component="span">
               Storage Usage
             </Typography>
-            <Typography variant="body2" fontWeight={500}>
+            <Typography variant="body2" fontWeight={500} component="span">
               {connector.usage?.used || '0'} / {connector.usage?.total || '0'} GB
             </Typography>
           </Box>
@@ -158,11 +176,19 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
                 backgroundColor: getConnectorTypeColor(connector.type),
               },
             }}
+            aria-label={`Storage usage: ${connector.usage?.used || '0'} of ${connector.usage?.total || '0'} GB`}
           />
         </Box>
 
         {/* Footer */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          component="footer"
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
           <Chip
             icon={getStatusIcon(connector.status || 'active')}
             label={connector.status || 'Active'}
@@ -172,6 +198,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector, onEdit, onDele
               color: getStatusColor(connector.status || 'active'),
               fontWeight: 500,
             }}
+            role="status"
           />
           <Typography variant="caption" color="text.secondary">
             Last synced: {new Date(connector.lastSync || Date.now()).toLocaleDateString()}
