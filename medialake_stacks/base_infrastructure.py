@@ -4,6 +4,8 @@ from aws_cdk import (
     aws_events as events,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
+    aws_iam as iam,
+    aws_s3_notifications as s3n,
 )
 from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
@@ -16,7 +18,10 @@ from medialake_constructs.shared_constructs.opensearch_serverless import (
     OpenSearchServerlessConstruct,
     OpenSearchServerlessProps,
 )
-from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+from medialake_constructs.shared_constructs.lambda_layers import (
+    SearchLayer,
+    PynamoDbLambdaLayer,
+)
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -73,6 +78,41 @@ class BaseInfrastructureStack(Stack):
             self, "IngestEventBus", props=ingest_event_bus_config
         )
 
+        # Create Pipeline Executions EventBus
+        self._pipeline_event_bus = EventBus(
+            self,
+            "PipelineEventBus",
+            props=EventBusConfig(
+                bus_name=f"medialake-pipeline-executions-{region}",
+                log_all=True,
+            ),
+        )
+
+        # Configure S3 bucket to send notifications to EventBridge
+        # self.media_assets_bucket.bucket.enable_event_bridge_notification()
+
+        # Create EventBridge rule to route S3 events to pipeline event bus
+        # events.Rule(
+        #     self,
+        #     "S3ToPipelineEventBusRule",
+        #     event_pattern=events.EventPattern(
+        #         source=["aws.s3"],
+        #         detail_type=["AWS API Call via CloudTrail"],
+        #         detail={
+        #             "eventSource": ["s3.amazonaws.com"],
+        #             "eventName": [
+        #                 "StartExecution",
+        #                 "StopExecution",
+        #                 "ExecutionSucceeded",
+        #                 "ExecutionFailed",
+        #                 "ExecutionTimedOut",
+        #                 "ExecutionAborted",
+        #             ],
+        #         },
+        #     ),
+        #     targets=[self._pipeline_event_bus.event_bus],
+        # )
+
         self.opensearch_serverless = OpenSearchServerlessConstruct(
             self,
             "OpenSearch",
@@ -90,14 +130,32 @@ class BaseInfrastructureStack(Stack):
             "MediaLakeAssetTable",
             props=DynamoDBProps(
                 name="medialake-asset-table",
-                partition_key_name="id",
+                partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="ID",
+                sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
-                # # sort_key="createdAt",
-                # removal_policy=RemovalPolicy.DESTROY,
+                point_in_time_recovery=True,
             ),
         )
+        self._asset_table.table.add_global_secondary_index(
+            index_name="AssetIDIndex",
+            partition_key=dynamodb.Attribute(
+                name="ID", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        self._asset_table.table.add_global_secondary_index(
+            index_name="FileHashIndex",
+            partition_key=dynamodb.Attribute(
+                name="FileHash", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
         opensearch_layer = SearchLayer(self, "OpenSearchLayer")
+        pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
 
         asset_lambda_stream = Lambda(
             self,
@@ -109,12 +167,17 @@ class BaseInfrastructureStack(Stack):
                     "OPENSEARCH_ENDPOINT": self.opensearch_serverless.collection_endpoint,
                     "OPENSEARCH_INDEX": "media",
                 },
-                layers=[opensearch_layer.layer],
+                layers=[opensearch_layer.layer, pynamodb_layer.layer],
             ),
         )
 
-        # Grant the Lambda function permissions to access OpenSearch Serverless
-        # self.opensearch_serverless.grant_write_access(asset_lambda_stream.function)
+        # Add OpenSearch policy to Lambda function
+        asset_lambda_stream.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["aoss:APIAccessAll"],
+                resources=[self.opensearch_serverless.collection_arn],
+            )
+        )
 
         self._asset_table.table.grant_stream(asset_lambda_stream.function)
         asset_lambda_stream.function.add_event_source(
@@ -151,3 +214,11 @@ class BaseInfrastructureStack(Stack):
     @property
     def collection_arn(self) -> str:
         return self.opensearch_serverless.collection_arn
+
+    @property
+    def pipeline_event_bus(self) -> events.EventBus:
+        return self._pipeline_event_bus.event_bus
+
+    @property
+    def pipeline_event_bus_name(self) -> str:
+        return self._pipeline_event_bus.event_bus_name

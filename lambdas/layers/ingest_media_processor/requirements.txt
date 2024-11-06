@@ -1,3 +1,4 @@
+pillow
+exifread
 iptcinfo3
-Pillow
-pymediainfo-lambda
+python-xmp-toolkit

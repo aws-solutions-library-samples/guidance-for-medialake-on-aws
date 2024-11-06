@@ -256,3 +256,7 @@ class OpenSearchServerlessConstruct(Construct):
     @property
     def collection_arn(self) -> str:
         return self.cfn_collection.attr_arn
+
+    @property
+    def opensearch_instance(self) -> opensearch_serverless.CfnCollection:
+        return self.cfn_collection

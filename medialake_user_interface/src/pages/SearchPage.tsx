@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, InputAdornment, IconButton, Typography, Paper, Tabs, Tab } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
+import { Box, Typography, List, ListItem, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse } from '@mui/material';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VideoResults from '../components/search/VideoResults';
 import ImageResults from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
 
-// Mock data (replace with actual API calls)
+// Mock data remains exactly the same
 const mockVideos = [
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit' },
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006' },
@@ -25,119 +27,210 @@ const mockAudios = [
 ];
 
 const SearchPage: React.FC = () => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState(0);
+    const [filters, setFilters] = useState({
+        mediaTypes: {
+            videos: true,
+            images: true,
+            audio: true,
+        },
+        time: {
+            recent: false,
+            lastWeek: false,
+            lastMonth: false,
+            lastYear: false,
+        },
+        status: {
+            favorites: false,
+            archived: false,
+            shared: false,
+        }
+    });
 
-    const handleSearch = (event: React.FormEvent) => {
-        event.preventDefault();
-        // Implement search logic here
-        console.log('Searching for:', searchQuery);
+    const [expandedSections, setExpandedSections] = useState({
+        mediaTypes: true,
+        time: true,
+        status: true,
+    });
+
+    const [filterBarExpanded, setFilterBarExpanded] = useState(true);
+
+    const handleFilterChange = (section: string, filter: string) => {
+        setFilters(prev => ({
+            ...prev,
+            [section]: {
+                ...prev[section as keyof typeof prev],
+                [filter]: !prev[section as keyof typeof prev][filter as keyof typeof prev[keyof typeof prev]]
+            }
+        }));
     };
 
-    const handleClearSearch = () => {
-        setSearchQuery('');
+    const handleSectionToggle = (section: string) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section as keyof typeof prev]
+        }));
     };
 
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-        setActiveTab(newValue);
-    };
+    const renderFilterSection = (title: string, section: string, items: Record<string, boolean>) => (
+        <>
+            <ListItemButton
+                onClick={() => handleSectionToggle(section)}
+                sx={{
+                    py: 1.5,
+                    minHeight: 48,
+                    px: filterBarExpanded ? 2.5 : 1,
+                    justifyContent: filterBarExpanded ? 'initial' : 'center',
+                    '&:hover': {
+                        bgcolor: 'action.hover'
+                    }
+                }}
+            >
+                {filterBarExpanded && (
+                    <ListItemText
+                        primary={title}
+                        primaryTypographyProps={{
+                            fontWeight: 600,
+                            fontSize: '0.95rem'
+                        }}
+                    />
+                )}
+                {filterBarExpanded && (expandedSections[section as keyof typeof expandedSections] ? <ExpandLess /> : <ExpandMore />)}
+            </ListItemButton>
+            {filterBarExpanded && (
+                <Collapse in={expandedSections[section as keyof typeof expandedSections]} timeout="auto">
+                    <List component="div" disablePadding>
+                        {Object.entries(items).map(([key, value]) => (
+                            <ListItemButton
+                                key={key}
+                                onClick={() => handleFilterChange(section, key)}
+                                sx={{
+                                    pl: 4.5,
+                                    py: 1,
+                                    '&:hover': {
+                                        bgcolor: 'action.hover'
+                                    }
+                                }}
+                            >
+                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                    <Checkbox
+                                        edge="start"
+                                        checked={value}
+                                        tabIndex={-1}
+                                        disableRipple
+                                        size="small"
+                                        sx={{
+                                            color: 'primary.main',
+                                            '&.Mui-checked': {
+                                                color: 'primary.main'
+                                            }
+                                        }}
+                                    />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={key.charAt(0).toUpperCase() + key.slice(1)}
+                                    primaryTypographyProps={{
+                                        variant: 'body2',
+                                        sx: { fontWeight: value ? 500 : 400 }
+                                    }}
+                                />
+                            </ListItemButton>
+                        ))}
+                    </List>
+                </Collapse>
+            )}
+            <Divider />
+        </>
+    );
 
     return (
         <Box sx={{
-            flexGrow: 1,
+            display: 'flex',
             minHeight: '100vh',
-            bgcolor: 'grey.50'
+            bgcolor: 'background.paper'
         }}>
-            <Container maxWidth="xl" sx={{ pt: 4, pb: 8 }}>
+            {/* Filter Sidebar */}
+            <Box sx={{
+                width: filterBarExpanded ? 280 : 73,
+                flexShrink: 0,
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                transition: theme => theme.transitions.create(['width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+                overflowX: 'hidden',
+                bgcolor: 'background.default',
+                position: 'sticky',
+                top: 0,
+                height: '100vh',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: filterBarExpanded ? 'space-between' : 'center',
+                    py: 2,
+                    px: filterBarExpanded ? 3 : 2,
+                    minHeight: 64,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider'
+                }}>
+                    {filterBarExpanded && (
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            Filters
+                        </Typography>
+                    )}
+                    <IconButton
+                        onClick={() => setFilterBarExpanded(!filterBarExpanded)}
+                        sx={{
+                            p: 1,
+                            bgcolor: 'background.paper',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            '&:hover': {
+                                bgcolor: 'action.hover'
+                            }
+                        }}
+                    >
+                        {filterBarExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+                    </IconButton>
+                </Box>
+
+                <List component="nav" sx={{ width: '100%', mt: 1 }}>
+                    {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
+                    {renderFilterSection('Time Period', 'time', filters.time)}
+                    {renderFilterSection('Status', 'status', filters.status)}
+                </List>
+            </Box>
+
+            {/* Main Content */}
+            <Box sx={{
+                flexGrow: 1,
+                px: 4,
+                py: 4,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6
+            }}>
                 <Typography
                     variant="h4"
                     component="h1"
                     sx={{
                         fontWeight: 600,
-                        mb: 4,
-                        color: 'primary.main'
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        mb: 2
                     }}
                 >
-                    Media Search
+                    Media Library
                 </Typography>
 
-                <Paper
-                    component="form"
-                    onSubmit={handleSearch}
-                    elevation={2}
-                    sx={{
-                        p: 2,
-                        mb: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        borderRadius: 2
-                    }}
-                >
-                    <TextField
-                        fullWidth
-                        variant="outlined"
-                        placeholder="Search for videos, images, or audio files..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon color="action" />
-                                </InputAdornment>
-                            ),
-                            endAdornment: searchQuery && (
-                                <InputAdornment position="end">
-                                    <IconButton onClick={handleClearSearch} edge="end">
-                                        <ClearIcon />
-                                    </IconButton>
-                                </InputAdornment>
-                            )
-                        }}
-                        sx={{
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: 2
-                            }
-                        }}
-                    />
-                </Paper>
-
-                <Paper
-                    elevation={2}
-                    sx={{
-                        borderRadius: 2,
-                        overflow: 'hidden'
-                    }}
-                >
-                    <Tabs
-                        value={activeTab}
-                        onChange={handleTabChange}
-                        sx={{
-                            borderBottom: 1,
-                            borderColor: 'divider',
-                            bgcolor: 'background.paper',
-                            px: 2
-                        }}
-                    >
-                        <Tab label="All Results" />
-                        <Tab label="Videos" />
-                        <Tab label="Images" />
-                        <Tab label="Audio" />
-                    </Tabs>
-
-                    <Box sx={{ p: 3, bgcolor: 'background.paper' }}>
-                        {activeTab === 0 && (
-                            <>
-                                <VideoResults videos={mockVideos} />
-                                <ImageResults images={mockImages} />
-                                <AudioResults audios={mockAudios} />
-                            </>
-                        )}
-                        {activeTab === 1 && <VideoResults videos={mockVideos} />}
-                        {activeTab === 2 && <ImageResults images={mockImages} />}
-                        {activeTab === 3 && <AudioResults audios={mockAudios} />}
-                    </Box>
-                </Paper>
-            </Container>
+                {filters.mediaTypes.videos && <VideoResults videos={mockVideos} />}
+                {filters.mediaTypes.images && <ImageResults images={mockImages} />}
+                {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />}
+            </Box>
         </Box>
     );
 };

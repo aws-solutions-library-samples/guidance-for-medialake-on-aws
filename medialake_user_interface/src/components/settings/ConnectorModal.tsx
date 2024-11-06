@@ -18,15 +18,16 @@ import {
     StepLabel,
     IconButton,
     useTheme,
+    Popover,
+    CircularProgress,
 } from '@mui/material';
 import {
     Close as CloseIcon,
-    Storage as StorageIcon,
     CloudUpload as CloudUploadIcon,
-    Folder as FolderIcon,
-    Cloud as CloudIcon,
+    Info as InfoIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '../../api/types/api.types';
+import { useGetS3Buckets, useCreateS3Connector } from '../../api/hooks/useConnectors';
 
 interface ConnectorModalProps {
     open: boolean;
@@ -36,10 +37,13 @@ interface ConnectorModalProps {
 }
 
 const CONNECTOR_TYPES = [
-    { value: 's3', label: 'Amazon S3', icon: CloudIcon, color: '#FF9900' },
-    { value: 'local', label: 'Local Storage', icon: FolderIcon, color: '#4CAF50' },
-    { value: 'cloud', label: 'Cloud Storage', icon: CloudUploadIcon, color: '#2196F3' },
-    { value: 'nas', label: 'Network Storage', icon: StorageIcon, color: '#9C27B0' },
+    { value: 's3', label: 'Amazon S3', icon: CloudUploadIcon, colorHex: '#FF9900' },
+    { value: 'fsx', label: 'Amazon FSx', icon: CloudUploadIcon, colorHex: '#FF9900' },
+    { value: 'empty', label: '', icon: CloudUploadIcon, colorHex: '#FF9900' },
+];
+
+const S3_CONNECTOR_TYPES = [
+    { value: 'non-managed', label: 'MediaLake Non-Managed' },
 ];
 
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
@@ -51,16 +55,23 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const theme = useTheme();
     const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
     const [type, setType] = useState('');
+    const [s3ConnectorType, setS3ConnectorType] = useState('');
     const [configuration, setConfiguration] = useState<Record<string, string>>({});
     const [error, setError] = useState('');
+    const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
+
+    const { data: s3BucketsResponse, isLoading: isLoadingBuckets } = useGetS3Buckets();
+    const { mutateAsync: createS3Connector, isPending: isCreating } = useCreateS3Connector();
+    const buckets = s3BucketsResponse?.data?.buckets || [];
 
     useEffect(() => {
         if (editingConnector) {
             setName(editingConnector.name);
             setType(editingConnector.type);
             setConfiguration(editingConnector.configuration || {});
-            setActiveStep(2); // Skip type selection for editing
+            setActiveStep(2);
         } else {
             setName('');
             setType('');
@@ -77,147 +88,116 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         setActiveStep((prev) => prev - 1);
     };
 
-    const handleSave = () => {
-        if (!name || !type) {
+    const handleSave = async () => {
+        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket))) {
             setError('Please fill in all required fields');
             return;
         }
 
-        const connector: CreateConnectorRequest = {
+        const connectorData: CreateConnectorRequest = {
             name,
             type,
-            configuration,
+            description,
+            configuration: {
+                ...configuration,
+                connectorType: s3ConnectorType,
+            },
         };
 
-        onSave(connector);
-    };
-
-    const renderConfigurationFields = () => {
-        switch (type) {
-            case 's3':
-                return (
-                    <>
-                        <TextField
-                            label="Bucket Name"
-                            value={configuration.bucketName || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, bucketName: e.target.value })}
-                            fullWidth
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Region"
-                            value={configuration.region || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, region: e.target.value })}
-                            fullWidth
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Access Key ID"
-                            value={configuration.accessKeyId || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, accessKeyId: e.target.value })}
-                            fullWidth
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Secret Access Key"
-                            value={configuration.secretAccessKey || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, secretAccessKey: e.target.value })}
-                            fullWidth
-                            required
-                            type="password"
-                        />
-                    </>
-                );
-            case 'local':
-                return (
-                    <TextField
-                        label="Path"
-                        value={configuration.path || ''}
-                        onChange={(e) => setConfiguration({ ...configuration, path: e.target.value })}
-                        fullWidth
-                        required
-                        placeholder="/path/to/storage"
-                    />
-                );
-            case 'cloud':
-                return (
-                    <>
-                        <TextField
-                            label="Provider"
-                            value={configuration.provider || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, provider: e.target.value })}
-                            fullWidth
-                            required
-                            select
-                            sx={{ mb: 2 }}
-                        >
-                            <MenuItem value="google">Google Cloud Storage</MenuItem>
-                            <MenuItem value="azure">Azure Blob Storage</MenuItem>
-                        </TextField>
-                        <TextField
-                            label="Credentials"
-                            value={configuration.credentials || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, credentials: e.target.value })}
-                            fullWidth
-                            required
-                            multiline
-                            rows={4}
-                        />
-                    </>
-                );
-            case 'nas':
-                return (
-                    <>
-                        <TextField
-                            label="Host"
-                            value={configuration.host || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, host: e.target.value })}
-                            fullWidth
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Share Path"
-                            value={configuration.sharePath || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, sharePath: e.target.value })}
-                            fullWidth
-                            required
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Username"
-                            value={configuration.username || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, username: e.target.value })}
-                            fullWidth
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            label="Password"
-                            value={configuration.password || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, password: e.target.value })}
-                            fullWidth
-                            type="password"
-                        />
-                    </>
-                );
-            default:
-                return null;
+        try {
+            if (type === 's3') {
+                await createS3Connector(connectorData);
+            }
+            onSave(connectorData);
+            onClose();
+        } catch (err) {
+            // Error handling is managed by the mutation hook
         }
     };
 
-    const steps = ['Select Type', 'Basic Info', 'Configuration'];
+    const handleInfoClick = (event: React.MouseEvent<HTMLElement>) => {
+        setInfoAnchorEl(event.currentTarget);
+    };
+
+    const handleInfoClose = () => {
+        setInfoAnchorEl(null);
+    };
+
+    const renderS3Configuration = () => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+                label="Connector Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                fullWidth
+                required
+            />
+            <TextField
+                label="Description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                fullWidth
+                multiline
+                rows={2}
+            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <FormControl fullWidth required>
+                    <InputLabel>S3 Connector Type</InputLabel>
+                    <Select
+                        value={s3ConnectorType}
+                        label="S3 Connector Type"
+                        onChange={(e) => setS3ConnectorType(e.target.value)}
+                    >
+                        {S3_CONNECTOR_TYPES.map((type) => (
+                            <MenuItem key={type.value} value={type.value}>
+                                {type.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <IconButton onClick={handleInfoClick}>
+                    <InfoIcon />
+                </IconButton>
+            </Box>
+            <FormControl fullWidth required>
+                <InputLabel>S3 Bucket</InputLabel>
+                <Select
+                    value={configuration.bucket || ''}
+                    label="S3 Bucket"
+                    onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                    disabled={isLoadingBuckets}
+                    startAdornment={
+                        isLoadingBuckets ? (
+                            <CircularProgress size={20} sx={{ ml: 1 }} />
+                        ) : null
+                    }
+                >
+                    {buckets.map((bucket) => (
+                        <MenuItem key={bucket} value={bucket}>
+                            {bucket}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+        </Box>
+    );
+
+    const steps = ['Select Type', 'Configuration'];
 
     const renderStepContent = (step: number) => {
         switch (step) {
             case 0:
                 return (
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: 2
+                    }}>
                         {CONNECTOR_TYPES.map((connectorType) => {
                             const Icon = connectorType.icon;
-                            return (
+                            return connectorType.value === 'empty' ? (
+                                <Box key="empty" sx={{ visibility: 'hidden' }} />
+                            ) : (
                                 <Box
                                     key={connectorType.value}
                                     onClick={() => {
@@ -225,55 +205,32 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                         handleNext();
                                     }}
                                     sx={{
-                                        p: 2,
+                                        height: '120px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
                                         border: `1px solid ${theme.palette.divider}`,
                                         borderRadius: '8px',
                                         cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 2,
                                         transition: 'all 0.2s',
                                         '&:hover': {
-                                            borderColor: connectorType.color,
-                                            backgroundColor: `${connectorType.color}08`,
+                                            borderColor: connectorType.colorHex,
+                                            backgroundColor: `${connectorType.colorHex}08`,
                                         },
                                     }}
                                 >
-                                    <Icon sx={{ color: connectorType.color, fontSize: 32 }} />
-                                    <Box>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                            {connectorType.label}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Connect to {connectorType.label}
-                                        </Typography>
-                                    </Box>
+                                    <Icon sx={{ color: connectorType.colorHex, fontSize: 40, mb: 1 }} />
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                        {connectorType.label}
+                                    </Typography>
                                 </Box>
                             );
                         })}
                     </Box>
                 );
             case 1:
-                return (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
-                            label="Connector Name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            fullWidth
-                            required
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                            Give your connector a meaningful name to easily identify it later.
-                        </Typography>
-                    </Box>
-                );
-            case 2:
-                return (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {renderConfigurationFields()}
-                    </Box>
-                );
+                return type === 's3' ? renderS3Configuration() : null;
             default:
                 return null;
         }
@@ -328,17 +285,19 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
             <DialogActions sx={{ p: 2, gap: 1 }}>
                 {!editingConnector && activeStep > 0 && (
-                    <Button onClick={handleBack}>
+                    <Button onClick={handleBack} disabled={isCreating}>
                         Back
                     </Button>
                 )}
-                <Button onClick={onClose} color="inherit">
+                <Button onClick={onClose} color="inherit" disabled={isCreating}>
                     Cancel
                 </Button>
                 {(activeStep === steps.length - 1 || editingConnector) ? (
                     <Button
                         variant="contained"
                         onClick={handleSave}
+                        disabled={isCreating}
+                        startIcon={isCreating ? <CircularProgress size={20} /> : null}
                         sx={{
                             backgroundColor: theme.palette.primary.main,
                             '&:hover': {
@@ -352,12 +311,38 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     <Button
                         variant="contained"
                         onClick={handleNext}
-                        disabled={!type || (activeStep === 1 && !name)}
+                        disabled={!type || isCreating}
                     >
                         Next
                     </Button>
                 )}
             </DialogActions>
+
+            <Popover
+                open={Boolean(infoAnchorEl)}
+                anchorEl={infoAnchorEl}
+                onClose={handleInfoClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'center',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'center',
+                }}
+            >
+                <Box sx={{ p: 2, maxWidth: 400 }}>
+                    <Typography variant="body2" paragraph>
+                        • MediaLake Non-Managed (If/when other remote storage systems are introduced this would be that category)
+                    </Typography>
+                    <Typography variant="body2" paragraph>
+                        • Original files are kept on bucket, folder structure is not modified
+                    </Typography>
+                    <Typography variant="body2">
+                        • Representations of files created, such as proxies, will be put in a MediaLake managed bucket with a shadow folder structure
+                    </Typography>
+                </Box>
+            </Popover>
         </Dialog>
     );
 };
