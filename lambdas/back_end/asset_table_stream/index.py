@@ -9,12 +9,10 @@ import json
 import boto3
 import os
 from requests_aws4auth import AWS4Auth
-from opensearchpy import RequestsHttpConnection, RequestsAWSV4SignerAuth, OpenSearch
+from opensearchpy import RequestsHttpConnection, OpenSearch, AWSV4SignerAuth
 
-# Initialize AWS Lambda Powertools
 logger = Logger()
 
-# OpenSearch configuration
 HOST = os.environ["OPENSEARCH_ENDPOINT"]
 INDEX_NAME = os.environ["OPENSEARCH_INDEX"]
 
@@ -24,11 +22,10 @@ class OpenSearchClient:
         self.client = self._initialize_client()
 
     def _initialize_client(self) -> OpenSearch:
-        auth = RequestsAWSV4SignerAuth(
-            boto3.Session().get_credentials(), "us-east-1", "aoss"
-        )
+        credentials = boto3.Session().get_credentials()
+        auth = AWSV4SignerAuth(credentials, "us-east-1", "aoss")
         return OpenSearch(
-            hosts=[{"host": HOST, "port": 443}],
+            hosts=[HOST],
             http_auth=auth,
             use_ssl=True,
             verify_certs=True,
@@ -36,23 +33,29 @@ class OpenSearchClient:
         )
 
     def search_by_inventory_id(self, inventory_id: str) -> Dict:
-        search_query = {"query": {"term": {"InventoryID.keyword": inventory_id}}}
+        search_query = {"query": {"term": {"inventoryId.keyword": inventory_id}}}
         return self.client.search(index=INDEX_NAME, body=search_query)
 
-    def update_document(self, doc_id: str, data: Dict) -> Dict:
-        return self.client.update(
-            index=INDEX_NAME, id=doc_id, body={"doc": data}, refresh=True
-        )
+    def update_document(self, data: Dict) -> Dict:
+        body = {
+            "script": {
+                "source": "ctx._source = params.data",
+                "lang": "painless",
+                "params": {"data": data},
+            },
+            "query": {"term": {"inventoryId.keyword": data["inventoryId"]}},
+        }
+        return self.client.update_by_query(index=INDEX_NAME, body=body)
 
-    def index_document(self, doc_id: str, data: Dict) -> Dict:
-        return self.client.index(index=INDEX_NAME, body=data, id=doc_id, refresh=True)
+    def index_document(self, data: Dict) -> Dict:
+        return self.client.index(index=INDEX_NAME, body=data)
 
-    def delete_document(self, doc_id: str) -> Dict:
-        return self.client.delete(index=INDEX_NAME, id=doc_id, refresh=True)
+    def delete_documents(self, inventory_id: str) -> Dict:
+        body = {"query": {"term": {"inventoryId.keyword": inventory_id}}}
+        return self.client.delete_by_query(index=INDEX_NAME, body=body)
 
 
 def normalize_storage_info(storage_info: Dict) -> Dict:
-    """Normalize storage information for OpenSearch indexing"""
     primary_location = storage_info.get("PrimaryLocation", {})
     return {
         "storageType": primary_location.get("StorageType"),
@@ -65,7 +68,6 @@ def normalize_storage_info(storage_info: Dict) -> Dict:
 
 
 def normalize_image_spec(image_spec: Dict) -> Dict:
-    """Normalize image specifications for OpenSearch indexing"""
     return {
         "colorSpace": image_spec.get("ColorSpace"),
         "width": image_spec.get("Resolution", {}).get("Width"),
@@ -75,7 +77,6 @@ def normalize_image_spec(image_spec: Dict) -> Dict:
 
 
 def normalize_representation(representation: Dict) -> Dict:
-    """Normalize representation data for OpenSearch indexing"""
     return {
         "id": representation.get("ID"),
         "type": representation.get("Type"),
@@ -87,7 +88,6 @@ def normalize_representation(representation: Dict) -> Dict:
 
 
 def normalize_asset_data(inventory_data: Dict) -> Dict:
-    """Normalize the asset data for OpenSearch indexing"""
     digital_asset = inventory_data.get("DigitalSourceAsset", {})
 
     normalized_data = {
@@ -107,7 +107,6 @@ def normalize_asset_data(inventory_data: Dict) -> Dict:
 def process_dynamodb_record(
     record: DynamoDBRecord, opensearch_client: OpenSearchClient
 ) -> None:
-    """Process a single DynamoDB Stream record"""
     event_name = record.event_name
 
     # Handle DELETE events
@@ -115,13 +114,10 @@ def process_dynamodb_record(
         inventory_id = record.dynamodb.old_image.get("Inventory", {}).get("InventoryID")
         if inventory_id:
             try:
-                search_result = opensearch_client.search_by_inventory_id(inventory_id)
-                if search_result["hits"]["total"]["value"] > 0:
-                    doc_id = search_result["hits"]["hits"][0]["_id"]
-                    opensearch_client.delete_document(doc_id)
-                    logger.info(f"Deleted document {doc_id} from OpenSearch")
+                opensearch_client.delete_documents(inventory_id)
+                logger.info(f"Deleted documents for inventory ID {inventory_id}")
             except Exception as e:
-                logger.error(f"Error deleting document: {str(e)}")
+                logger.error(f"Error deleting documents: {str(e)}")
                 raise
         return
 
@@ -130,46 +126,27 @@ def process_dynamodb_record(
         logger.info("No new image in record, skipping")
         return
 
-    # Get the new data
     new_data = record.dynamodb.new_image
-
-    # Normalize the data for OpenSearch
     normalized_data = normalize_asset_data(new_data)
-    print(normalized_data)
+
     if not normalized_data:
         logger.warning("No valid asset data found in record")
         return
 
-    inventory_id = normalized_data["inventoryId"]
-
     try:
-        # Search for existing document
-        search_result = opensearch_client.search_by_inventory_id(inventory_id)
-
-        if search_result["hits"]["total"]["value"] > 0:
-            # Update existing document
-            existing_doc_id = search_result["hits"]["hits"][0]["_id"]
-            response = opensearch_client.update_document(
-                existing_doc_id, normalized_data
-            )
-            logger.info(
-                f"Updated document {existing_doc_id} with result: {response.get('result', 'unknown')}"
-            )
-        else:
-            # Index new document
-            response = opensearch_client.index_document(inventory_id, normalized_data)
-            logger.info(
-                f"Indexed new document {inventory_id} with result: {response.get('result', 'unknown')}"
-            )
+        if event_name == "MODIFY":
+            response = opensearch_client.update_document(normalized_data)
+            logger.info(f"Updated document with result: {response}")
+        else:  # INSERT
+            response = opensearch_client.index_document(normalized_data)
+            logger.info(f"Indexed new document with result: {response}")
     except Exception as e:
-        logger.error(f"Error processing document {inventory_id}: {str(e)}")
+        logger.error(f"Error processing document: {str(e)}")
         raise
 
 
+@logger.inject_lambda_context
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler for processing DynamoDB Stream events and syncing to OpenSearch
-    """
     try:
         stream_event = DynamoDBStreamEvent(event)
         opensearch_client = OpenSearchClient()
@@ -180,7 +157,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     f"Skipping non-DynamoDB event source: {record.event_source}"
                 )
                 continue
-            print(record)
             process_dynamodb_record(record, opensearch_client)
 
         return {

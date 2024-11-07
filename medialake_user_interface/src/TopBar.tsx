@@ -198,6 +198,42 @@ function TopBar() {
         return mockNotifications.filter(n => n.type === type).length;
     };
 
+    const renderNotificationContent = (notification: Notification) => (
+        <Box sx={{ display: 'flex', width: '100%', gap: 1 }}>
+            <Box sx={{ pt: 0.5 }}>
+                {getNotificationIcon(notification.type)}
+            </Box>
+            <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    {notification.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    {notification.message}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                    {notification.timestamp}
+                </Typography>
+            </Box>
+        </Box>
+    );
+
+    const renderNotificationItems = () => {
+        const items: JSX.Element[] = [];
+        mockNotifications.forEach((notification, index) => {
+            items.push(
+                <MenuItem key={`item-${notification.id}`}>
+                    {renderNotificationContent(notification)}
+                </MenuItem>
+            );
+            if (index < mockNotifications.length - 1) {
+                items.push(
+                    <Divider key={`divider-${notification.id}`} />
+                );
+            }
+        });
+        return items;
+    };
+
     return (
         <AppBar
             position="fixed"
@@ -352,29 +388,7 @@ function TopBar() {
                         }
                     }}
                 >
-                    {mockNotifications.map((notification, index) => (
-                        <React.Fragment key={notification.id}>
-                            <MenuItem>
-                                <Box sx={{ display: 'flex', width: '100%', gap: 1 }}>
-                                    <Box sx={{ pt: 0.5 }}>
-                                        {getNotificationIcon(notification.type)}
-                                    </Box>
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                            {notification.title}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {notification.message}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {notification.timestamp}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </MenuItem>
-                            {index < mockNotifications.length - 1 && <Divider />}
-                        </React.Fragment>
-                    ))}
+                    {renderNotificationItems()}
                 </Menu>
 
                 {/* Profile Menu */}

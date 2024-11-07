@@ -8,11 +8,33 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import { useNavigate } from 'react-router-dom';
 
 interface ImageItem {
-    src: string;
-    id: number;
-    fileName: string;
-    creationDate: string;
-    description: string;
+    inventoryId: string;
+    assetId: string;
+    assetType: string;
+    createDate: string;
+    mainRepresentation: {
+        id: string;
+        type: string;
+        format: string;
+        purpose: string;
+        storage: {
+            storageType: string;
+            bucket: string;
+            path: string;
+            status: string;
+            fileSize: number;
+            hashValue: string;
+        };
+        imageSpec?: {
+            colorSpace: string | null;
+            width: number | null;
+            height: number | null;
+            dpi: number | null;
+        };
+    };
+    derivedRepresentations: any[];
+    metadata: any;
+    score: number;
 }
 
 interface ImageResultsProps {
@@ -20,7 +42,7 @@ interface ImageResultsProps {
 }
 
 type Order = 'asc' | 'desc';
-type OrderBy = 'fileName' | 'creationDate';
+type OrderBy = 'path' | 'createDate';
 
 const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const navigate = useNavigate();
@@ -28,9 +50,20 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [order, setOrder] = useState<Order>('asc');
-    const [orderBy, setOrderBy] = useState<OrderBy>('fileName');
+    const [orderBy, setOrderBy] = useState<OrderBy>('path');
 
-    const handleImageClick = (imageId: number) => {
+    const getImageUrl = (image: ImageItem) => {
+        // Construct the S3 URL based on the bucket and path
+        if (image.mainRepresentation.storage.storageType === 's3') {
+            const { bucket, path } = image.mainRepresentation.storage;
+            // Use the S3 URL format for the region your bucket is in
+            return `https://${bucket}.s3.amazonaws.com/${path}`;
+        }
+        // Fallback to placeholder if no valid storage info
+        return 'https://via.placeholder.com/400x300';
+    };
+
+    const handleImageClick = (imageId: string) => {
         navigate(`/images/${imageId}`);
     };
 
@@ -50,16 +83,17 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
         switch (action) {
             case 'edit':
-                console.log('Edit:', selectedImage.fileName);
+                console.log('Edit:', selectedImage.mainRepresentation.storage.path);
                 break;
             case 'delete':
-                console.log('Delete:', selectedImage.fileName);
+                console.log('Delete:', selectedImage.mainRepresentation.storage.path);
                 break;
             case 'share':
-                console.log('Share:', selectedImage.fileName);
+                console.log('Share:', selectedImage.mainRepresentation.storage.path);
                 break;
             case 'download':
-                console.log('Download:', selectedImage.fileName);
+                // Implement download using the S3 URL
+                window.open(getImageUrl(selectedImage), '_blank');
                 break;
         }
         handleMenuClose();
@@ -79,14 +113,14 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
     const sortedImages = React.useMemo(() => {
         const comparator = (a: ImageItem, b: ImageItem) => {
-            if (orderBy === 'fileName') {
+            if (orderBy === 'path') {
                 return order === 'asc'
-                    ? a.fileName.localeCompare(b.fileName)
-                    : b.fileName.localeCompare(a.fileName);
+                    ? a.mainRepresentation.storage.path.localeCompare(b.mainRepresentation.storage.path)
+                    : b.mainRepresentation.storage.path.localeCompare(a.mainRepresentation.storage.path);
             } else {
                 return order === 'asc'
-                    ? new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()
-                    : new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime();
+                    ? new Date(a.createDate).getTime() - new Date(b.createDate).getTime()
+                    : new Date(b.createDate).getTime() - new Date(a.createDate).getTime();
             }
         };
         return [...images].sort(comparator);
@@ -95,7 +129,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const renderCardView = () => (
         <Grid container spacing={3}>
             {sortedImages.map((image) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={image.id}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={image.inventoryId}>
                     <Box
                         sx={{
                             position: 'relative',
@@ -106,7 +140,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                         }}
                     >
                         <Box
-                            onClick={() => handleImageClick(image.id)}
+                            onClick={() => handleImageClick(image.inventoryId)}
                             sx={{
                                 cursor: 'pointer',
                                 borderRadius: 2,
@@ -124,8 +158,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                             <Box
                                 component="img"
                                 height="180"
-                                src={image.src}
-                                alt={image.fileName}
+                                src={getImageUrl(image)}
+                                alt={image.mainRepresentation.storage.path}
                                 sx={{
                                     width: '100%',
                                     objectFit: 'cover'
@@ -167,6 +201,13 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                 }}>
                                     <Box sx={{ flex: 1, mr: 1 }}>
                                         <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                            sx={{ mb: 0.5 }}
+                                        >
+                                            Object Name:
+                                        </Typography>
+                                        <Typography
                                             variant="subtitle1"
                                             sx={{
                                                 fontWeight: 500,
@@ -179,14 +220,21 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                                 mb: 0.5
                                             }}
                                         >
-                                            {image.fileName}
+                                            {image.mainRepresentation.storage.path}
                                         </Typography>
                                         <Typography
                                             variant="body2"
                                             color="text.secondary"
                                             sx={{ mb: 0.5 }}
                                         >
-                                            {new Date(image.creationDate).toLocaleDateString()}
+                                            Format: {image.mainRepresentation.format}
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ mb: 0.5 }}
+                                        >
+                                            Created: {new Date(image.createDate).toLocaleDateString()}
                                         </Typography>
                                     </Box>
                                     <Box sx={{
@@ -241,21 +289,6 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                         </IconButton>
                                     </Box>
                                 </Box>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        mt: 1,
-                                        lineHeight: 1.3
-                                    }}
-                                >
-                                    {image.description}
-                                </Typography>
                             </Box>
                         </Box>
                     </Box>
@@ -272,39 +305,39 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                         <TableCell>Preview</TableCell>
                         <TableCell>
                             <TableSortLabel
-                                active={orderBy === 'fileName'}
-                                direction={orderBy === 'fileName' ? order : 'asc'}
-                                onClick={() => handleRequestSort('fileName')}
+                                active={orderBy === 'path'}
+                                direction={orderBy === 'path' ? order : 'asc'}
+                                onClick={() => handleRequestSort('path')}
                             >
-                                Name
+                                Object Name
                             </TableSortLabel>
                         </TableCell>
+                        <TableCell>Format</TableCell>
                         <TableCell>
                             <TableSortLabel
-                                active={orderBy === 'creationDate'}
-                                direction={orderBy === 'creationDate' ? order : 'asc'}
-                                onClick={() => handleRequestSort('creationDate')}
+                                active={orderBy === 'createDate'}
+                                direction={orderBy === 'createDate' ? order : 'asc'}
+                                onClick={() => handleRequestSort('createDate')}
                             >
                                 Created
                             </TableSortLabel>
                         </TableCell>
-                        <TableCell>Description</TableCell>
                         <TableCell align="right">Actions</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {sortedImages.map((image) => (
                         <TableRow
-                            key={image.id}
+                            key={image.inventoryId}
                             hover
-                            onClick={() => handleImageClick(image.id)}
+                            onClick={() => handleImageClick(image.inventoryId)}
                             sx={{ cursor: 'pointer' }}
                         >
                             <TableCell sx={{ width: 100 }}>
                                 <Box
                                     component="img"
-                                    src={image.src}
-                                    alt={image.fileName}
+                                    src={getImageUrl(image)}
+                                    alt={image.mainRepresentation.storage.path}
                                     sx={{
                                         width: 60,
                                         height: 60,
@@ -313,9 +346,9 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                     }}
                                 />
                             </TableCell>
-                            <TableCell>{image.fileName}</TableCell>
-                            <TableCell>{new Date(image.creationDate).toLocaleDateString()}</TableCell>
-                            <TableCell>{image.description}</TableCell>
+                            <TableCell>{image.mainRepresentation.storage.path}</TableCell>
+                            <TableCell>{image.mainRepresentation.format}</TableCell>
+                            <TableCell>{new Date(image.createDate).toLocaleDateString()}</TableCell>
                             <TableCell align="right">
                                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                     <IconButton

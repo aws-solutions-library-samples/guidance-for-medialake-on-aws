@@ -2,6 +2,7 @@ from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
@@ -18,8 +19,20 @@ import json
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=[
+        "Content-Type",
+        "X-Amz-Date",
+        "Authorization",
+        "X-Api-Key",
+        "X-Amz-Security-Token",
+    ],
+)
 app = APIGatewayRestResolver(
-    serializer=lambda x: json.dumps(x, default=str), strip_prefixes=["/api"]
+    serializer=lambda x: json.dumps(x, default=str),
+    strip_prefixes=["/api"],
+    cors=cors_config,
 )
 
 
