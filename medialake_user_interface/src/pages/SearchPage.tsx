@@ -7,18 +7,14 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VideoResults from '../components/search/VideoResults';
 import ImageResults from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
+import { useLocation } from 'react-router-dom';
+import { useSearch } from '../api/hooks/useSearch';
 
-// Mock data remains exactly the same
+// Mock data for video and audio remains the same
 const mockVideos = [
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit' },
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006' },
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'Third Blender Open Movie from 2010' },
-];
-
-const mockImages = [
-    { src: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470', id: 1, fileName: 'Mountain Lake', creationDate: '2023-05-10T09:15:00Z', description: 'A serene mountain lake view' },
-    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05', id: 2, fileName: 'River Valley', creationDate: '2023-05-11T16:45:00Z', description: 'A beautiful river flowing through a valley' },
-    { src: 'https://images.unsplash.com/photo-1511497584788-876760111969', id: 3, fileName: 'Misty Forest', creationDate: '2023-05-12T11:30:00Z', description: 'A mysterious misty forest landscape' },
 ];
 
 const mockAudios = [
@@ -26,7 +22,16 @@ const mockAudios = [
     { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_1MG.mp3', id: 2, fileName: 'Sample Audio 2', creationDate: '2023-05-26T13:10:00Z', description: 'Another sample audio file for testing' },
 ];
 
+interface LocationState {
+    query?: string;
+}
+
 const SearchPage: React.FC = () => {
+    const location = useLocation();
+    const { query } = (location.state as LocationState) || {};
+    const { data: searchResults } = useSearch(query || '');
+    const imageResults = searchResults?.data?.results?.filter(item => item.assetType === 'Image') || [];
+
     const [filters, setFilters] = useState({
         mediaTypes: {
             videos: true,
@@ -228,7 +233,9 @@ const SearchPage: React.FC = () => {
                 </Typography>
 
                 {filters.mediaTypes.videos && <VideoResults videos={mockVideos} />}
-                {filters.mediaTypes.images && <ImageResults images={mockImages} />}
+                {filters.mediaTypes.images && imageResults.length > 0 && (
+                    <ImageResults images={imageResults} />
+                )}
                 {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />}
             </Box>
         </Box>

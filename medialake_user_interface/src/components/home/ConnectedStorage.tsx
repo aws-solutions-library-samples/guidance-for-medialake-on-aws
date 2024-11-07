@@ -51,6 +51,30 @@ export const ConnectedStorage: React.FC = () => {
         );
     }
 
+    // Add error handling for missing or malformed data
+    if (!data?.data) {
+        return (
+            <Alert
+                severity="error"
+                sx={{
+                    borderRadius: 2,
+                    '& .MuiAlert-icon': {
+                        fontSize: 28
+                    }
+                }}
+            >
+                <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                    Invalid data format
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    Unable to load connectors due to invalid data format
+                </Typography>
+            </Alert>
+        );
+    }
+
+    const connectors = data.data.connectors || [];
+
     return (
         <Box>
             <Typography
@@ -70,7 +94,7 @@ export const ConnectedStorage: React.FC = () => {
                 Connected Storage
             </Typography>
 
-            {data?.data.connectors.length === 0 ? (
+            {connectors.length === 0 ? (
                 <Alert
                     severity="info"
                     sx={{
@@ -95,7 +119,7 @@ export const ConnectedStorage: React.FC = () => {
                         }
                     }}
                 >
-                    {data?.data.connectors.map((connector) => (
+                    {connectors.map((connector) => (
                         <Grid
                             item
                             xs={12}

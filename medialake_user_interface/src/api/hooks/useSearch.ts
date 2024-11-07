@@ -21,10 +21,80 @@ export interface SearchFilters {
     };
 }
 
+export interface SearchResult {
+    inventoryId: string;
+    assetId: string;
+    assetType: string;
+    createDate: string;
+    mainRepresentation: {
+        id: string;
+        type: string;
+        format: string;
+        purpose: string;
+        storage: {
+            storageType: string;
+            bucket: string;
+            path: string;
+            status: string;
+            fileSize: number;
+            hashValue: string;
+        };
+        imageSpec?: {
+            colorSpace: string | null;
+            width: number | null;
+            height: number | null;
+            dpi: number | null;
+        };
+    };
+    derivedRepresentations: any[];
+    metadata: any;
+    score: number;
+}
+
+export interface SearchResponse {
+    status: string;
+    message: string;
+    data: {
+        searchMetadata: {
+            totalResults: number;
+            page: number;
+            pageSize: number;
+            searchTerm: string;
+            facets: {
+                file_types: {
+                    doc_count_error_upper_bound: number;
+                    sum_other_doc_count: number;
+                    buckets: Array<{
+                        key: string;
+                        doc_count: number;
+                    }>;
+                };
+                asset_types: {
+                    doc_count_error_upper_bound: number;
+                    sum_other_doc_count: number;
+                    buckets: Array<{
+                        key: string;
+                        doc_count: number;
+                    }>;
+                };
+            };
+            suggestions: {
+                simple_phrase: Array<{
+                    text: string;
+                    offset: number;
+                    length: number;
+                    options: any[];
+                }>;
+            };
+        };
+        results: SearchResult[];
+    };
+}
+
 export const useSearch = (query: string, filters?: SearchFilters) => {
     const { showError } = useErrorModal();
 
-    return useQuery({
+    return useQuery<SearchResponse>({
         queryKey: [...QUERY_KEYS.SEARCH.all, query, filters],
         queryFn: async ({ signal }) => {
             try {
@@ -54,7 +124,7 @@ export const useSearch = (query: string, filters?: SearchFilters) => {
                     });
                 }
 
-                const response = await apiClient.get(`${API_ENDPOINTS.SEARCH}?${params.toString()}`, { signal });
+                const response = await apiClient.get<SearchResponse>(`${API_ENDPOINTS.SEARCH}?${params.toString()}`, { signal });
                 return response.data;
             } catch (error) {
                 logger.error('Search error:', error);
