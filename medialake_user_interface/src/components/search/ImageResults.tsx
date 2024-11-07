@@ -44,6 +44,8 @@ interface ImageResultsProps {
 type Order = 'asc' | 'desc';
 type OrderBy = 'path' | 'createDate';
 
+const ITEMS_PER_PAGE = 12;
+
 const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const navigate = useNavigate();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -51,15 +53,13 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [order, setOrder] = useState<Order>('asc');
     const [orderBy, setOrderBy] = useState<OrderBy>('path');
+    const [page, setPage] = useState(1);
 
     const getImageUrl = (image: ImageItem) => {
-        // Construct the S3 URL based on the bucket and path
         if (image.mainRepresentation.storage.storageType === 's3') {
             const { bucket, path } = image.mainRepresentation.storage;
-            // Use the S3 URL format for the region your bucket is in
             return `https://${bucket}.s3.amazonaws.com/${path}`;
         }
-        // Fallback to placeholder if no valid storage info
         return 'https://via.placeholder.com/400x300';
     };
 
@@ -92,7 +92,6 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                 console.log('Share:', selectedImage.mainRepresentation.storage.path);
                 break;
             case 'download':
-                // Implement download using the S3 URL
                 window.open(getImageUrl(selectedImage), '_blank');
                 break;
         }
@@ -102,6 +101,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const handleViewModeChange = (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
         if (newMode !== null) {
             setViewMode(newMode);
+            setPage(1); // Reset to first page when changing view mode
         }
     };
 
@@ -109,6 +109,11 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
         setOrderBy(property);
+        setPage(1); // Reset to first page when sorting
+    };
+
+    const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+        setPage(value);
     };
 
     const sortedImages = React.useMemo(() => {
@@ -126,9 +131,14 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
         return [...images].sort(comparator);
     }, [images, order, orderBy]);
 
+    // Calculate pagination
+    const totalPages = Math.ceil(sortedImages.length / ITEMS_PER_PAGE);
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const paginatedImages = sortedImages.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
     const renderCardView = () => (
         <Grid container spacing={3}>
-            {sortedImages.map((image) => (
+            {paginatedImages.map((image) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={image.inventoryId}>
                     <Box
                         sx={{
@@ -326,7 +336,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {sortedImages.map((image) => (
+                    {paginatedImages.map((image) => (
                         <TableRow
                             key={image.inventoryId}
                             hover
@@ -421,20 +431,33 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
             {viewMode === 'card' ? renderCardView() : renderTableView()}
 
-            {images.length > 0 && (
+            {images.length > ITEMS_PER_PAGE && (
                 <Box sx={{
                     display: 'flex',
                     justifyContent: 'flex-end',
-                    mt: 4
+                    mt: 4,
+                    mb: 2
                 }}>
                     <Pagination
-                        count={Math.ceil(images.length / 12)}
+                        count={totalPages}
+                        page={page}
+                        onChange={handlePageChange}
                         color="primary"
                         size="medium"
-                        shape="rounded"
+                        shape="circular"
                         sx={{
                             '& .MuiPaginationItem-root': {
-                                borderRadius: 1
+                                borderRadius: '50%',
+                                minWidth: 40,
+                                height: 40,
+                                '&.Mui-selected': {
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'primary.main',
+                                    color: 'white',
+                                    '&:hover': {
+                                        backgroundColor: 'primary.dark',
+                                    }
+                                }
                             }
                         }}
                     />
