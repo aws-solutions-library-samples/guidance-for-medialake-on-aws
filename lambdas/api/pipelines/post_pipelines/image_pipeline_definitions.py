@@ -1,5 +1,6 @@
 import os
 
+
 def get_state_machine_definition(
     image_metadata_extractor_arn: str,
     image_proxy_lambda_arn: str,
@@ -18,29 +19,24 @@ def get_state_machine_definition(
                 "Resource": "arn:aws:states:::lambda:invoke",
                 "Parameters": {
                     "FunctionName": image_metadata_extractor_arn,
-                    "Payload": {
-                        "pipeline_id.$": "$.pipeline_id",
-                        "input.$": "$.input"
-                    }
+                    "Payload": {"pipeline_id.$": "$.pipeline_id", "input.$": "$.input"},
                 },
                 "ResultPath": "$.metadataResult",
-                "Next": "StoreMetadata"
+                "Next": "StoreMetadata",
             },
             "StoreMetadata": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::dynamodb:updateItem",
                 "Parameters": {
                     "TableName": asset_table_name,
-                    "Key": {
-                        "id": {"S.$": "$.input.id"}
-                    },
+                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
                     "UpdateExpression": "SET metadata = :metadata",
                     "ExpressionAttributeValues": {
                         ":metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
-                    }
+                    },
                 },
                 "ResultPath": None,
-                "Next": "CreateProxy"
+                "Next": "CreateProxy",
             },
             # Rest of the states remain the same
             "CreateProxy": {
@@ -53,32 +49,34 @@ def get_state_machine_definition(
                         "input.$": "$.input",
                         "output_bucket": output_bucket_name,
                         "mode": "proxy",
-                    }
+                    },
                 },
                 "ResultPath": "$.proxyResult",
-                "Next": "StoreProxy"
+                "Next": "StoreProxy",
             },
             "StoreProxy": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::dynamodb:updateItem",
                 "Parameters": {
                     "TableName": asset_table_name,
-                    "Key": {
-                        "id": {"S.$": "$.input.id"}
-                    },
+                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
                     "UpdateExpression": "SET proxyLocation = :proxyLocation",
                     "ExpressionAttributeValues": {
                         ":proxyLocation": {
                             "M": {
-                                "bucket": {"S.$": "$.proxyResult.Payload.body.location.bucket"},
-                                "key": {"S.$": "$.proxyResult.Payload.body.location.key"},
-                                "type": {"S": "S3"}
+                                "bucket": {
+                                    "S.$": "$.proxyResult.Payload.body.location.bucket"
+                                },
+                                "key": {
+                                    "S.$": "$.proxyResult.Payload.body.location.key"
+                                },
+                                "type": {"S": "S3"},
                             }
                         }
-                    }
+                    },
                 },
                 "ResultPath": None,
-                "Next": "CreateThumbnail"
+                "Next": "CreateThumbnail",
             },
             "CreateThumbnail": {
                 "Type": "Task",
@@ -92,39 +90,39 @@ def get_state_machine_definition(
                         "output_bucket": output_bucket_name,
                         "mode": "thumbnail",
                         "width": 345,
-                        "height": 194
-                        
-                    }  # This closing brace was missing
+                        "height": 194,
+                    },  # This closing brace was missing
                 },
                 "ResultPath": "$.thumbnailResult",
-                "Next": "StoreThumbnail"
+                "Next": "StoreThumbnail",
             },
             "StoreThumbnail": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::dynamodb:updateItem",
                 "Parameters": {
                     "TableName": asset_table_name,
-                    "Key": {
-                        "id": {"S.$": "$.input.id"}
-                    },
+                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
                     "UpdateExpression": "SET thumbnailLocation = :thumbnailLocation",
                     "ExpressionAttributeValues": {
                         ":thumbnailLocation": {
                             "M": {
-                                "bucket": {"S.$": "$.thumbnailResult.Payload.body.location.bucket"},
-                                "key": {"S.$": "$.thumbnailResult.Payload.body.location.key"},
-                                "type": {"S": "S3"}
+                                "bucket": {
+                                    "S.$": "$.thumbnailResult.Payload.body.location.bucket"
+                                },
+                                "key": {
+                                    "S.$": "$.thumbnailResult.Payload.body.location.key"
+                                },
+                                "type": {"S": "S3"},
                             }
                         }
-                    }
+                    },
                 },
                 "ResultPath": None,
-                "End": True
-            }
-        }
+                "End": True,
+            },
+        },
     }
 
-   
 
 def create_metadata_extractor_lambda(
     lambda_client,
@@ -132,23 +130,21 @@ def create_metadata_extractor_lambda(
     role_arn: str,
     deployment_bucket: str,
     deployment_zip: str,
-    exiftool_layer_arn: str, 
-    tags: dict
+    exiftool_layer_arn: str,
+    tags: dict,
 ) -> dict:
     """Creates the metadata extractor lambda function"""
     return lambda_client.create_function(
         FunctionName=function_name,
-        Runtime='python3.12',
+        Runtime="python3.12",
         Role=role_arn,
         Timeout=900,
-        Handler='index.lambda_handler',
-        Code={
-            'S3Bucket': deployment_bucket,
-            'S3Key': deployment_zip
-        },
+        Handler="index.lambda_handler",
+        Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
         Layers=[exiftool_layer_arn],
-        Tags=tags
+        Tags=tags,
     )
+
 
 def create_image_proxy_lambda(
     lambda_client,
@@ -156,19 +152,16 @@ def create_image_proxy_lambda(
     role_arn: str,
     deployment_bucket: str,
     deployment_zip: str,
-    tags: dict
+    tags: dict,
 ) -> dict:
     """Creates the image proxy lambda function"""
     return lambda_client.create_function(
         FunctionName=function_name,
-        Runtime='python3.12',
+        Runtime="python3.12",
         Role=role_arn,
         Timeout=900,
         MemorySize=10240,
-        Handler='index.lambda_handler',
-        Code={
-            'S3Bucket': deployment_bucket,
-            'S3Key': deployment_zip
-        },
-        Tags=tags
+        Handler="index.lambda_handler",
+        Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+        Tags=tags,
     )
