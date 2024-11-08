@@ -34,7 +34,9 @@ class AssetProcessor:
             metadata = self._create_asset_metadata(response, bucket, key)
             dynamo_entry = self.create_dynamo_entry(metadata)
             self.publish_event(
-                dynamo_entry["InventoryID"], dynamo_entry["DigitalSourceAsset"]["ID"]
+                dynamo_entry["InventoryID"],
+                dynamo_entry["DigitalSourceAsset"]["ID"],
+                metadata,
             )
 
             return dynamo_entry
@@ -108,7 +110,7 @@ class AssetProcessor:
         return item
 
     @tracer.capture_method
-    def publish_event(self, inventory_id: str, asset_id: str):
+    def publish_event(self, inventory_id: str, asset_id: str, metadata: Dict):
         """Publish event to EventBridge"""
         try:
             self.eventbridge.put_events(
@@ -118,10 +120,23 @@ class AssetProcessor:
                         "DetailType": "AssetCreated",
                         "Detail": json.dumps(
                             {
-                                "inventoryId": inventory_id,
-                                "assetId": asset_id,
-                                "status": "initial_processing_complete",
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "InventoryID": f"asset:uuid:{inventory_id}",
+                                "DigitalSourceAsset": {
+                                    "ID": f"asset:img:{asset_id}",
+                                    "Type": "Image",
+                                    "CreateDate": datetime.utcnow().isoformat(),
+                                    "MainRepresentation": {
+                                        "ID": f"asset:rep:{asset_id}:master",
+                                        "Type": "Image",
+                                        "Format": metadata["StorageInfo"][
+                                            "PrimaryLocation"
+                                        ]["ObjectKey"]["Name"]
+                                        .split(".")[-1]
+                                        .upper(),
+                                        "Purpose": "master",
+                                        "StorageInfo": metadata["StorageInfo"],
+                                    },
+                                },
                             }
                         ),
                         "EventBusName": os.environ["EVENT_BUS_NAME"],
