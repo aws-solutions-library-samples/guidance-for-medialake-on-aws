@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
+from botocore.config import Config
 from opensearchpy import (
     RequestsHttpConnection,
     RequestsAWSV4SignerAuth,
@@ -16,9 +17,12 @@ from opensearchpy import (
 from datetime import datetime
 import json
 
+# Initialize AWS clients and utilities
 logger = Logger()
-tracer = Tracer()
 metrics = Metrics()
+s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
+
+# Configure CORS
 cors_config = CORSConfig(
     allow_origin="*",
     allow_headers=[
@@ -29,6 +33,8 @@ cors_config = CORSConfig(
         "X-Amz-Security-Token",
     ],
 )
+
+# Initialize API Gateway resolver
 app = APIGatewayRestResolver(
     serializer=lambda x: json.dumps(x, default=str),
     strip_prefixes=["/api"],
@@ -99,7 +105,7 @@ class AssetMetadata(BaseModelWithConfig):
 
 
 class AssetSearchResult(BaseModelWithConfig):
-    """Model for search result"""
+    """Model for search result with presigned URL"""
 
     inventoryId: str
     assetId: str
@@ -109,6 +115,7 @@ class AssetSearchResult(BaseModelWithConfig):
     derivedRepresentations: List[AssetRepresentation] = []
     metadata: Optional[AssetMetadata] = None
     score: float
+    thumbnailUrl: Optional[str] = None
 
 
 class SearchMetadata(BaseModelWithConfig):
@@ -147,7 +154,26 @@ def get_opensearch_client() -> OpenSearch:
     )
 
 
-@tracer.capture_method
+def generate_presigned_url(
+    bucket: str, key: str, expiration: int = 3600
+) -> Optional[str]:
+    """Generate a presigned URL for an S3 object"""
+    try:
+        url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket,
+                "Key": key,
+                "ResponseContentDisposition": "inline",
+            },
+            ExpiresIn=expiration,
+        )
+        return url
+    except Exception as e:
+        logger.error(f"Error generating presigned URL: {str(e)}")
+        return None
+
+
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     should_queries = []
@@ -219,7 +245,34 @@ def build_search_query(params: SearchParams) -> Dict:
     }
 
 
-@tracer.capture_method
+def process_search_hit(hit: Dict) -> AssetSearchResult:
+    """Process a single search hit and add presigned URL if thumbnail representation exists"""
+    source = hit["_source"]
+
+    # Find proxy representation if it exists
+    thumbnail_url = None
+    for rep in source.get("derivedRepresentations", []):
+        if rep.get("purpose") == "thumbnail":
+            storage = rep.get("storage", {})
+            if storage.get("storageType") == "s3":
+                thumbnail_url = generate_presigned_url(
+                    bucket=storage["bucket"], key=storage["path"]
+                )
+                break
+
+    return AssetSearchResult(
+        inventoryId=source.get("inventoryId"),
+        assetId=source.get("assetId"),
+        assetType=source.get("assetType"),
+        createDate=source.get("createDate"),
+        mainRepresentation=source.get("mainRepresentation"),
+        derivedRepresentations=source.get("derivedRepresentations", []),
+        metadata=source.get("metadata"),
+        score=hit["_score"],
+        thumbnailUrl=thumbnail_url,
+    )
+
+
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
     client = get_opensearch_client()
@@ -232,17 +285,7 @@ def perform_search(params: SearchParams) -> Dict:
         hits = []
         for hit in response["hits"]["hits"]:
             try:
-                source = hit["_source"]
-                result = AssetSearchResult(
-                    inventoryId=source.get("inventoryId"),
-                    assetId=source.get("assetId"),
-                    assetType=source.get("assetType"),
-                    createDate=source.get("createDate"),
-                    mainRepresentation=source.get("mainRepresentation"),
-                    derivedRepresentations=source.get("derivedRepresentations", []),
-                    metadata=source.get("metadata"),
-                    score=hit["_score"],
-                )
+                result = process_search_hit(hit)
                 hits.append(result)
             except Exception as e:
                 logger.warning(f"Error processing hit: {str(e)}")
@@ -275,7 +318,6 @@ def perform_search(params: SearchParams) -> Dict:
 
 
 @app.get("/search")
-@tracer.capture_method
 def handle_search():
     """Handle search requests with validated parameters."""
     try:
@@ -291,7 +333,6 @@ def handle_search():
 
 @metrics.log_metrics
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
-@tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """Lambda handler function"""
     return app.resolve(event, context)

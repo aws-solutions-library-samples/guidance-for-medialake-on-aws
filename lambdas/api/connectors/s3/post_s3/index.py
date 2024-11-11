@@ -313,6 +313,15 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
 
+            # Get current AWS account ID
+            account_id = boto3.client("sts").get_caller_identity()["Account"]
+            # Construct AWS SDK Python layer ARN using current account
+            aws_sdk_layer_arn = f"arn:aws:lambda:{bucket_region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:2"
+            # Get any existing layers
+            layers = [layer_arn] if layer_arn else []
+            # Add AWS SDK layer
+            layers.append(aws_sdk_layer_arn)
+
             # Deploy the lambda with proper S3 configuration
             create_function_response = lambda_client.create_function(
                 FunctionName=target_function_name,
@@ -332,7 +341,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "EVENT_BUS_NAME": ingest_event_bus,
                     }
                 },
-                Layers=[layer_arn] if layer_arn else [],
+                Layers=layers,  # Updated to include both custom and AWS SDK layers
                 Timeout=300,  # 5 minutes
             )
             logger.info(f"Deployed new lambda function: {target_function_name}")

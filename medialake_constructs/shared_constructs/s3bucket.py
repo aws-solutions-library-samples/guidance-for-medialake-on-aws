@@ -16,6 +16,7 @@ class S3Config:
     access_logs: bool = False
     lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
     destroy_on_delete: bool = True
+    cors: Optional[List[s3.CorsRule]] = None
 
 
 class S3Bucket(Construct):
@@ -47,6 +48,7 @@ class S3Bucket(Construct):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             versioned=True,
             lifecycle_rules=s3_config.lifecycle_rules,
+            cors=s3_config.cors,
             removal_policy=(
                 RemovalPolicy.DESTROY
                 if s3_config.destroy_on_delete

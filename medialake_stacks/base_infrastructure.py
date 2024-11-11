@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_iam as iam,
     aws_s3_notifications as s3n,
+    aws_s3 as s3,
 )
 from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
@@ -52,7 +53,25 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaAssets",
             s3_config=S3Config(
-                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{config.account_id}-{region}-{short_uid}"
+                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{config.account_id}-{region}-{short_uid}",
+                cors=[
+                    s3.CorsRule(
+                        allowed_methods=[
+                            s3.HttpMethods.GET,
+                            s3.HttpMethods.PUT,
+                            s3.HttpMethods.POST,
+                            s3.HttpMethods.DELETE,
+                            s3.HttpMethods.HEAD,
+                        ],
+                        allowed_origins=[
+                            "http://localhost:5173",
+                            "https://*.cloudfront.net",
+                        ],
+                        allowed_headers=["*"],
+                        exposed_headers=["ETag"],
+                        max_age=3000,
+                    )
+                ],
             ),
         )
 
@@ -64,7 +83,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             s3_config=S3Config(
-                bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}"
+                bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}",
             ),
         )
 

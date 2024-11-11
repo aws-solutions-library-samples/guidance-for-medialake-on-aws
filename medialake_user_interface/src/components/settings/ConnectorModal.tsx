@@ -107,9 +107,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         try {
             if (type === 's3') {
                 await createS3Connector(connectorData);
+                onClose();
             }
-            onSave(connectorData);
-            onClose();
         } catch (err) {
             // Error handling is managed by the mutation hook
         }

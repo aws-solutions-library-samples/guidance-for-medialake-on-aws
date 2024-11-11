@@ -8,7 +8,7 @@ class ApiClient extends ApiClientBase {
     constructor() {
         super();
         this.axiosInstance = axios.create({
-            baseURL: this.getBaseURL(),
+            baseURL: this.getBaseURL() + '/prod',
         });
         this.setupInterceptors();
     }

@@ -7,6 +7,9 @@ from aws_lambda_powertools import Logger
 from iptcinfo3 import IPTCInfo
 from io import BytesIO
 from boto3.dynamodb.types import TypeSerializer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.data_classes import event_source
+from boto3.dynamodb.types import TypeDeserializer
 
 
 # Initialize the logger
@@ -121,43 +124,47 @@ def process_image_file(bucket, key):
 
 def lambda_handler(event, context):
     logger.info("Received event: %s", event)
-    print(event)
     input = event.get("input", {})
-    print(input)
     input_data = input.get("DigitalSourceAsset", {})
-    print(input_data)
-    main_representation = input_data.get("MainRepresentation", {})
-    print(main_representation)
-    storage_info = main_representation.get("StorageInfo", {})
-    PrimaryLocation = storage_info.get("PrimaryLocation", {})
-    object_info = PrimaryLocation.get("ObjectKey", {})
-    print(PrimaryLocation)
-    bucket = PrimaryLocation.get("Bucket")
-    key = object_info.get("FullPath")
-    metadata = input_data.get("metadata", {})
-    pipeline_id = event.get("pipeline_id")
+    inventory_id = input_data.get("InventoryID")
 
-    if not bucket or not key:
-        logger.error("Invalid event format: missing bucket or key information")
-        return {"statusCode": 400, "body": "Missing bucket or key information"}
+    if not inventory_id:
+        logger.error("Invalid event format: missing InventoryID")
+        return {"statusCode": 400, "body": "Missing InventoryID"}
 
     try:
         extracted_metadata = process_image_file(bucket, key)
         if extracted_metadata is None:
             return {"statusCode": 500, "body": "Failed to extract metadata"}
 
-        # Create the metadata object
         complete_metadata = {
             "contentType": input_data.get("contentType", "image/tiff"),
             "customMetadata": extracted_metadata,
         }
-        # Convert any float values to Decimal before marshalling
         converted_metadata = convert_floats_to_decimals(complete_metadata)
-
-        # Marshall the metadata for DynamoDB
         marshalled_metadata = marshall_json_item(converted_metadata)
 
-        return {"statusCode": 200, "body": {"metadata": marshalled_metadata}}
+        # Initialize DynamoDB client
+        dynamodb = boto3.client("dynamodb")
+
+        # Update DynamoDB
+        try:
+            response = dynamodb.update_item(
+                TableName=os.environ["ASSET_TABLE"],
+                Key={"InventoryID": {"S": inventory_id}},
+                UpdateExpression="SET metadata = :metadata",
+                ExpressionAttributeValues={":metadata": marshalled_metadata},
+                ReturnValues="UPDATED_NEW",
+            )
+            logger.info(f"Successfully updated DynamoDB item: {response}")
+        except Exception as db_error:
+            logger.error(f"Failed to update DynamoDB: {str(db_error)}")
+            raise
+
+        return {
+            "statusCode": 200,
+            "body": {"metadata": marshalled_metadata, "inventoryId": inventory_id},
+        }
 
     except Exception as e:
         logger.error(f"Lambda handler error: {str(e)}")

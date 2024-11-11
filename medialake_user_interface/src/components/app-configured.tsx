@@ -260,13 +260,6 @@ const AuthPage = () => {
                     }}
                 />
             </ThemeProvider>
-            <Box sx={{
-                textAlign: 'center',
-                color: '#8c8c8c',
-                fontSize: '0.75rem',
-            }}>
-                © {new Date().getFullYear()} MediaLake. All rights reserved.
-            </Box>
         </Box>
     );
 };

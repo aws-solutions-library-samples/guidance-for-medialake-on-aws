@@ -17,7 +17,7 @@ from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 
 
 @dataclass
-class SearchProps:
+class AssetsProps:
     asset_table: dynamodb.TableV2
     api_resource: apigateway.IResource
     cognito_authorizer: apigateway.IAuthorizer
@@ -27,19 +27,19 @@ class SearchProps:
     open_search_index: str
 
 
-class SearchConstruct(Construct):
+class AssetsConstruct(Construct):
     def __init__(
         self,
         scope: Construct,
         construct_id: str,
-        props: SearchProps,
+        props: AssetsProps,
     ) -> None:
         super().__init__(scope, construct_id)
 
         search_layer = SearchLayer(self, "SearchLayer")
 
         # Create connectors resource
-        search_resource = props.api_resource.root.add_resource("search")
+        search_resource = props.api_resource.root.add_resource("assets")
         search_get_lambda = Lambda(
             self,
             "SearchGetLambda",

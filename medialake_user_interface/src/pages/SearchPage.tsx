@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Typography, List, ListItem, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse } from '@mui/material';
+import { Box, Typography, List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VideoResults from '../components/search/VideoResults';
-import ImageResults from '../components/search/ImageResults';
+import ImageResults, { ImageItem } from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
 import { useLocation } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
@@ -14,7 +14,7 @@ import { useSearch } from '../api/hooks/useSearch';
 const mockVideos = [
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit' },
     { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006' },
-    { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'Third Blender Open Movie from 2010' },
+    { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'A short animated film about a big rabbit' },
 ];
 
 const mockAudios = [
@@ -26,10 +26,19 @@ interface LocationState {
     query?: string;
 }
 
+interface SearchResponse {
+    status: string;
+    message: string;
+    data: {
+        searchMetadata: any;
+        results: ImageItem[];
+    };
+}
+
 const SearchPage: React.FC = () => {
     const location = useLocation();
     const { query } = (location.state as LocationState) || {};
-    const { data: searchResults } = useSearch(query || '');
+    const { data: searchResults } = useSearch(query || '') as { data: SearchResponse | undefined };
     const imageResults = searchResults?.data?.results?.filter(item => item.assetType === 'Image') || [];
 
     const [filters, setFilters] = useState({
@@ -175,9 +184,9 @@ const SearchPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: filterBarExpanded ? 'space-between' : 'center',
-                    py: 2,
-                    px: filterBarExpanded ? 3 : 2,
-                    minHeight: 64,
+                    py: 1.5,
+                    px: filterBarExpanded ? 2 : 1,
+                    minHeight: 56,
                     borderBottom: '1px solid',
                     borderColor: 'divider'
                 }}>
@@ -189,12 +198,18 @@ const SearchPage: React.FC = () => {
                     <IconButton
                         onClick={() => setFilterBarExpanded(!filterBarExpanded)}
                         sx={{
-                            p: 1,
+                            width: 40,
+                            height: 40,
+                            p: 0,
                             bgcolor: 'background.paper',
                             border: '1px solid',
                             borderColor: 'divider',
+                            borderRadius: '8px',
                             '&:hover': {
                                 bgcolor: 'action.hover'
+                            },
+                            '& .MuiSvgIcon-root': {
+                                fontSize: 20
                             }
                         }}
                     >

@@ -7,7 +7,7 @@ import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import { useNavigate } from 'react-router-dom';
 
-interface ImageItem {
+export interface ImageItem {
     inventoryId: string;
     assetId: string;
     assetType: string;
@@ -32,9 +32,29 @@ interface ImageItem {
             dpi: number | null;
         };
     };
-    derivedRepresentations: any[];
+    derivedRepresentations: Array<{
+        id: string;
+        type: string;
+        format: string;
+        purpose: string;
+        storage: {
+            storageType: string;
+            bucket: string;
+            path: string;
+            status: string;
+            fileSize: number;
+            hashValue: string | null;
+        };
+        imageSpec?: {
+            colorSpace: string | null;
+            width: number | null;
+            height: number | null;
+            dpi: number | null;
+        };
+    }>;
     metadata: any;
     score: number;
+    thumbnailUrl: string | null;
 }
 
 interface ImageResultsProps {
@@ -47,6 +67,7 @@ type OrderBy = 'path' | 'createDate';
 const ITEMS_PER_PAGE = 12;
 
 const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
+    // Rest of the component implementation remains the same
     const navigate = useNavigate();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
@@ -56,11 +77,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [page, setPage] = useState(1);
 
     const getImageUrl = (image: ImageItem) => {
-        if (image.mainRepresentation.storage.storageType === 's3') {
-            const { bucket, path } = image.mainRepresentation.storage;
-            return `https://${bucket}.s3.amazonaws.com/${path}`;
-        }
-        return 'https://via.placeholder.com/400x300';
+        return image.thumbnailUrl || 'https://via.placeholder.com/400x300';
     };
 
     const handleImageClick = (imageId: string) => {
