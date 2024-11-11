@@ -54,35 +54,55 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const buckets = s3BucketsResponse?.data?.buckets || [];
 
     const handleSave = async () => {
-        if (!name || !s3ConnectorType || !configuration.bucket) {
-            setError('Please fill in all required fields');
-            return;
-        }
-
-        const connectorData: CreateConnectorRequest = {
-            name,
-            type: 's3',
-            description,
-            configuration: {
-                ...configuration,
-                connectorType: s3ConnectorType,
-            },
-        };
-
         try {
+            if (!name || !s3ConnectorType || !configuration.bucket) {
+                setError('Please fill in all required fields');
+                return;
+            }
+
+            const connectorData: CreateConnectorRequest = {
+                name,
+                type: 's3',
+                description,
+                configuration: {
+                    ...configuration,
+                    connectorType: s3ConnectorType,
+                },
+            };
+
             const result = await createS3Connector(connectorData);
+
             if (!result) {
                 throw new Error('Failed to create connector');
             }
+
+            // Only call onSave if we have a successful result
             onSave(connectorData);
+
+            // Clear any existing errors
+            setError('');
+
+            // Close the modal
             onClose();
-        } catch (err) {
-            showError('Error Creating S3 Connector');
+        } catch (err: any) {
+            const errorMessage = err?.message || 'Error Creating S3 Connector';
+            showError(errorMessage);
+            setError(errorMessage);
         }
     };
 
+    const handleClose = () => {
+        // Clear form state
+        setName('');
+        setDescription('');
+        setS3ConnectorType('');
+        setConfiguration({});
+        setError('');
+        onClose();
+    };
+
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
             <DialogTitle>
                 {connector ? 'Edit Connector' : 'New S3 Connector'}
             </DialogTitle>
@@ -94,6 +114,8 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         onChange={(e) => setName(e.target.value)}
                         fullWidth
                         required
+                        error={!name && error !== ''}
+                        helperText={!name && error !== '' ? 'Name is required' : ''}
                     />
                     <TextField
                         label="Description"
@@ -104,7 +126,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         rows={2}
                     />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FormControl fullWidth required>
+                        <FormControl fullWidth required error={!s3ConnectorType && error !== ''}>
                             <InputLabel>S3 Connector Type</InputLabel>
                             <Select
                                 value={s3ConnectorType}
@@ -117,12 +139,17 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                     </MenuItem>
                                 ))}
                             </Select>
+                            {!s3ConnectorType && error !== '' && (
+                                <Typography variant="caption" color="error">
+                                    Connector type is required
+                                </Typography>
+                            )}
                         </FormControl>
                         <IconButton>
                             <InfoIcon />
                         </IconButton>
                     </Box>
-                    <FormControl fullWidth required>
+                    <FormControl fullWidth required error={!configuration.bucket && error !== ''}>
                         <InputLabel>S3 Bucket</InputLabel>
                         <Select
                             value={configuration.bucket || ''}
@@ -141,6 +168,11 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 </MenuItem>
                             ))}
                         </Select>
+                        {!configuration.bucket && error !== '' && (
+                            <Typography variant="caption" color="error">
+                                Bucket selection is required
+                            </Typography>
+                        )}
                     </FormControl>
                     {error && (
                         <Alert severity="error" onClose={() => setError('')}>
@@ -150,7 +182,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 </Box>
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose} disabled={isCreating}>
+                <Button onClick={handleClose} disabled={isCreating}>
                     Cancel
                 </Button>
                 <Button

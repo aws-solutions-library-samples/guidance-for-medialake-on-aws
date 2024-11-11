@@ -113,38 +113,48 @@ class AssetProcessor:
     def publish_event(self, inventory_id: str, asset_id: str, metadata: Dict):
         """Publish event to EventBridge"""
         try:
-            self.eventbridge.put_events(
+            # Log the event bus name
+            logger.info(f"Publishing to event bus: {os.environ.get('EVENT_BUS_NAME')}")
+
+            event_detail = {
+                "InventoryID": inventory_id,
+                "DigitalSourceAsset": {
+                    "ID": asset_id,
+                    "Type": "Image",
+                    "CreateDate": datetime.utcnow().isoformat(),
+                    "MainRepresentation": {
+                        "ID": f"{asset_id}:master",
+                        "Type": "Image",
+                        "Format": metadata["StorageInfo"]["PrimaryLocation"][
+                            "ObjectKey"
+                        ]["Name"]
+                        .split(".")[-1]
+                        .upper(),
+                        "Purpose": "master",
+                        "StorageInfo": metadata["StorageInfo"],
+                    },
+                },
+            }
+
+            # Log the event detail
+            logger.info(f"Publishing event with detail: {json.dumps(event_detail)}")
+
+            response = self.eventbridge.put_events(
                 Entries=[
                     {
                         "Source": "custom.asset.processor",
                         "DetailType": "AssetCreated",
-                        "Detail": json.dumps(
-                            {
-                                "InventoryID": f"asset:uuid:{inventory_id}",
-                                "DigitalSourceAsset": {
-                                    "ID": f"asset:img:{asset_id}",
-                                    "Type": "Image",
-                                    "CreateDate": datetime.utcnow().isoformat(),
-                                    "MainRepresentation": {
-                                        "ID": f"asset:rep:{asset_id}:master",
-                                        "Type": "Image",
-                                        "Format": metadata["StorageInfo"][
-                                            "PrimaryLocation"
-                                        ]["ObjectKey"]["Name"]
-                                        .split(".")[-1]
-                                        .upper(),
-                                        "Purpose": "master",
-                                        "StorageInfo": metadata["StorageInfo"],
-                                    },
-                                },
-                            }
-                        ),
+                        "Detail": json.dumps(event_detail),
                         "EventBusName": os.environ["EVENT_BUS_NAME"],
                     }
                 ]
             )
+
+            # Log the response
+            logger.info(f"EventBridge response: {json.dumps(response)}")
+
         except Exception as e:
-            logger.exception("Error publishing event")
+            logger.exception(f"Error publishing event: {str(e)}")
             raise
 
 

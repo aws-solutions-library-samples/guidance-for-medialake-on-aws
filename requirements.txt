@@ -6,8 +6,6 @@ boto3
 cdk_nag
 python-dotenv
 pydantic
-aioboto3
-asyncio
 # aws_cdk.aws_neptune_alpha
 # aws-cdk.aws-glue-alpha
 # pyyaml

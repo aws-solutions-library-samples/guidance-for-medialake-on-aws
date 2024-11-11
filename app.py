@@ -3,14 +3,17 @@
 This module serves as the entry point for the MediaLake CDK application.
 """
 import aws_cdk as cdk
-from config import config
+from medialake_config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway_main_construct import ApiGatewayConstruct
 from medialake_constructs.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
 )
-from medialake_constructs.api_gateway_pipelines import PipelinesConstruct ,PipelinesProps
+from medialake_constructs.api_gateway_pipelines import (
+    PipelinesConstruct,
+    PipelinesProps,
+)
 from medialake_constructs.api_gateway_search import SearchConstruct, SearchProps
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack

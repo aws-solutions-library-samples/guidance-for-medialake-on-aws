@@ -2,6 +2,14 @@ import boto3
 import base64
 from PIL import Image
 import io
+import os
+from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from boto3.dynamodb.conditions import Key
+
+# Initialize Powertools
+logger = Logger()
+tracer = Tracer()
 
 
 def create_thumbnail(img, width, height):
@@ -33,11 +41,43 @@ def create_proxy(img):
     return img
 
 
-def lambda_handler(event, context):
+def strip_after_last_colon(input_string: str) -> str:
+    """
+    Strips everything after the last colon in a string.
+    """
+    return input_string.rsplit(":", 1)[0]
+
+
+def clean_asset_id(input_string: str) -> str:
+    """
+    Ensures the asset ID has the correct format without duplicates.
+    Extracts just the UUID part and adds the proper prefix.
+    """
+    # Extract the UUID part (assuming it's the last part after any prefixes)
+    parts = input_string.split(":")
+    uuid = parts[-1]
+    # If the last part is 'master', take the part before it
+    if uuid == "master":
+        uuid = parts[-2]
+    return f"asset:uuid:{uuid}"
+
+
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event, context: LambdaContext):
+    # Get DynamoDB table name from environment variable
+    table_name = os.environ["ASSET_TABLE"]
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(table_name)
+
     # Get the s3_uri and mode from query parameters
     input = event.get("input", {})
     input_data = input.get("DigitalSourceAsset", {})
+    inventory_id = input.get("InventoryID")
+    clean_inventory_id = clean_asset_id(inventory_id)
     main_representation = input_data.get("MainRepresentation", {})
+    master_asset_id = input_data.get("ID")
+    asset_id = clean_asset_id(master_asset_id)
     storage_info = main_representation.get("StorageInfo", {})
     PrimaryLocation = storage_info.get("PrimaryLocation", {})
     object_info = PrimaryLocation.get("ObjectKey", {})
@@ -66,6 +106,7 @@ def lambda_handler(event, context):
         image_data = s3_response["Body"].read()
         img = Image.open(io.BytesIO(image_data))
 
+        print(mode)
         if mode == "thumbnail":
             # Get thumbnail parameters
             params = event.get("thumbnail")
@@ -95,10 +136,55 @@ def lambda_handler(event, context):
         # Save as WebP with appropriate quality
         if mode == "thumbnail":
             processed_img.save(output_buffer, format="WEBP", quality=85)
+            asset_id = f"{asset_id}:thumbnail"
+            output_data = output_buffer.getvalue()
+            new_representation = {
+                "ID": asset_id,
+                "Type": "Image",
+                "Format": "WEBP",
+                "Purpose": mode,
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "StorageType": "s3",
+                        "Provider": "aws",
+                        "Bucket": output_bucket,
+                        "ObjectKey": {
+                            "FullPath": output_key,
+                        },
+                        "Status": "active",
+                        "FileInfo": {
+                            "Size": len(output_data),
+                        },
+                    }
+                },
+                "ImageSpec": {
+                    "Resolution": {"Width": width, "Height": height},
+                },
+            }
         else:  # proxy mode
             processed_img.save(output_buffer, format="WEBP", quality=90)
-
-        output_data = output_buffer.getvalue()
+            output_data = output_buffer.getvalue()
+            asset_id = f"{asset_id}:proxy"
+            new_representation = {
+                "ID": asset_id,
+                "Type": "Image",
+                "Format": "WEBP",
+                "Purpose": mode,
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "StorageType": "s3",
+                        "Provider": "aws",
+                        "Bucket": output_bucket,
+                        "ObjectKey": {
+                            "FullPath": output_key,
+                        },
+                        "Status": "active",
+                        "FileInfo": {
+                            "Size": len(output_data),
+                        },
+                    }
+                },
+            }
 
         # Upload to output bucket
         s3.put_object(
@@ -108,18 +194,70 @@ def lambda_handler(event, context):
             ContentType="image/webp",
         )
 
+        try:
+            # Add logging before the update
+            logger.info(
+                "Attempting DynamoDB update",
+                extra={
+                    "inventory_id": clean_inventory_id,
+                    "new_representation": new_representation,
+                },
+            )
+
+            # Update DynamoDB
+            response = table.update_item(
+                Key={"InventoryID": clean_inventory_id},
+                UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
+                ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
+                ExpressionAttributeValues={
+                    ":new_rep": [new_representation],
+                    ":empty_list": [],
+                },
+                ReturnValues="UPDATED_NEW",
+            )
+
+            # Add more detailed success logging
+            logger.info(
+                "DynamoDB update response",
+                extra={"response": response, "inventory_id": clean_inventory_id},
+            )
+
+        except Exception as e:
+            # Enhance error logging
+            logger.exception(
+                "Error updating DynamoDB",
+                extra={
+                    "inventory_id": clean_inventory_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            raise  # Re-raise to ensure we catch all errors
+
         # Return the processed image information
         return {
             "statusCode": 200,
             "body": {
+                "ID": asset_id,
+                "type": "image",
+                "format": "WEBP",
+                "Purpose": mode,
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "StorageType": "s3",
+                        "Bucket": output_bucket,
+                        "path": output_key,
+                        "status": "active",
+                        "ObjectKey": {
+                            "FullPath": output_key,
+                        },
+                    }
+                },
                 "location": {
                     "bucket": output_bucket,
                     "key": output_key,
                 },
-                "width": width,
-                "height": height,
                 "mode": mode,
-                "format": "webp",
             },
         }
 
