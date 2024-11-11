@@ -15,6 +15,10 @@ from medialake_constructs.api_gateway_pipelines import (
     PipelinesProps,
 )
 from medialake_constructs.api_gateway_search import SearchConstruct, SearchProps
+from medialake_constructs.api_gateway.api_gateway_assets import (
+    AssetsConstruct,
+    AssetsProps,
+)
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -88,6 +92,16 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
+        _ = AssetsConstruct(
+            self,
+            "ApiGatewayAssets",
+            props=AssetsProps(
+                asset_table=base_infrastructure.asset_table,
+                api_resource=api_gateway.api_resource,
+                cognito_authorizer=api_gateway.cognito_authorizer,
+                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+            ),
+        )
         # Create User Interface
         self._ui = UIConstruct(
             self,

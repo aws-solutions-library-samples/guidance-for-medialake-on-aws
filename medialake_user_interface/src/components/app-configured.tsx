@@ -12,7 +12,7 @@ import SearchPage from '../pages/SearchPage';
 import { S3Explorer } from './home/S3Explorer';
 import { ConnectedStorage } from './home/ConnectedStorage';
 import SettingsComponent from '../SettingsComponent';
-import ExecutionStatusPage from '../ExecutionStatusPage';
+import ExecutionStatusPage from '../pages/ExecutionStatusPage';
 import PipelinesPage from '../PipelinesPage';
 import ReviewQueue from '../reviewQueue';
 import TagsPage from '../TagsPage';
@@ -20,6 +20,7 @@ import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react
 import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { StorageHelper } from '../common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
+import ImageDetailPage from '../pages/ImageDetailPage';
 
 // Custom theme for Authenticator
 const theme: Theme = {
@@ -341,6 +342,10 @@ const router = createBrowserRouter([
             {
                 path: 'search',
                 element: <SearchPage />
+            },
+            {
+                path: 'images/:id',
+                element: <ImageDetailPage />
             }
         ]
     }

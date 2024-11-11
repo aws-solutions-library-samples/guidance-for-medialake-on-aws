@@ -9,6 +9,7 @@ import ImageResults, { ImageItem } from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
 import { useLocation } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
+import MenuIcon from '@mui/icons-material/Menu';
 
 // Mock data for video and audio remains the same
 const mockVideos = [
@@ -66,7 +67,7 @@ const SearchPage: React.FC = () => {
         status: true,
     });
 
-    const [filterBarExpanded, setFilterBarExpanded] = useState(true);
+    const [filterBarExpanded, setFilterBarExpanded] = useState(false);
 
     const handleFilterChange = (section: string, filter: string) => {
         setFilters(prev => ({
@@ -90,9 +91,9 @@ const SearchPage: React.FC = () => {
             <ListItemButton
                 onClick={() => handleSectionToggle(section)}
                 sx={{
-                    py: 1.5,
-                    minHeight: 48,
-                    px: filterBarExpanded ? 2.5 : 1,
+                    py: 1,
+                    minHeight: 40,
+                    px: filterBarExpanded ? 2 : 1,
                     justifyContent: filterBarExpanded ? 'initial' : 'center',
                     '&:hover': {
                         bgcolor: 'action.hover'
@@ -104,7 +105,7 @@ const SearchPage: React.FC = () => {
                         primary={title}
                         primaryTypographyProps={{
                             fontWeight: 600,
-                            fontSize: '0.95rem'
+                            fontSize: '0.875rem'
                         }}
                     />
                 )}
@@ -118,14 +119,14 @@ const SearchPage: React.FC = () => {
                                 key={key}
                                 onClick={() => handleFilterChange(section, key)}
                                 sx={{
-                                    pl: 4.5,
-                                    py: 1,
+                                    pl: 3,
+                                    py: 0.75,
                                     '&:hover': {
                                         bgcolor: 'action.hover'
                                     }
                                 }}
                             >
-                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                <ListItemIcon sx={{ minWidth: 32 }}>
                                     <Checkbox
                                         edge="start"
                                         checked={value}
@@ -144,7 +145,10 @@ const SearchPage: React.FC = () => {
                                     primary={key.charAt(0).toUpperCase() + key.slice(1)}
                                     primaryTypographyProps={{
                                         variant: 'body2',
-                                        sx: { fontWeight: value ? 500 : 400 }
+                                        sx: {
+                                            fontWeight: value ? 500 : 400,
+                                            fontSize: '0.8125rem'
+                                        }
                                     }}
                                 />
                             </ListItemButton>
@@ -162,68 +166,6 @@ const SearchPage: React.FC = () => {
             minHeight: '100vh',
             bgcolor: 'background.paper'
         }}>
-            {/* Filter Sidebar */}
-            <Box sx={{
-                width: filterBarExpanded ? 280 : 73,
-                flexShrink: 0,
-                borderRight: '1px solid',
-                borderColor: 'divider',
-                transition: theme => theme.transitions.create(['width'], {
-                    easing: theme.transitions.easing.sharp,
-                    duration: theme.transitions.duration.enteringScreen,
-                }),
-                overflowX: 'hidden',
-                bgcolor: 'background.default',
-                position: 'sticky',
-                top: 0,
-                height: '100vh',
-                display: 'flex',
-                flexDirection: 'column'
-            }}>
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: filterBarExpanded ? 'space-between' : 'center',
-                    py: 1.5,
-                    px: filterBarExpanded ? 2 : 1,
-                    minHeight: 56,
-                    borderBottom: '1px solid',
-                    borderColor: 'divider'
-                }}>
-                    {filterBarExpanded && (
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                            Filters
-                        </Typography>
-                    )}
-                    <IconButton
-                        onClick={() => setFilterBarExpanded(!filterBarExpanded)}
-                        sx={{
-                            width: 40,
-                            height: 40,
-                            p: 0,
-                            bgcolor: 'background.paper',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: '8px',
-                            '&:hover': {
-                                bgcolor: 'action.hover'
-                            },
-                            '& .MuiSvgIcon-root': {
-                                fontSize: 20
-                            }
-                        }}
-                    >
-                        {filterBarExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-                    </IconButton>
-                </Box>
-
-                <List component="nav" sx={{ width: '100%', mt: 1 }}>
-                    {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
-                    {renderFilterSection('Time Period', 'time', filters.time)}
-                    {renderFilterSection('Status', 'status', filters.status)}
-                </List>
-            </Box>
-
             {/* Main Content */}
             <Box sx={{
                 flexGrow: 1,
@@ -253,6 +195,62 @@ const SearchPage: React.FC = () => {
                 )}
                 {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />}
             </Box>
+
+            {/* Filter Sidebar - Now properly aligned with TopBar */}
+            <Box sx={{
+                width: filterBarExpanded ? 240 : 48,
+                flexShrink: 0,
+                borderLeft: '1px solid',
+                borderColor: 'divider',
+                transition: theme => theme.transitions.create(['width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+                overflowX: 'hidden',
+                bgcolor: 'background.default',
+                position: 'fixed',
+                top: 64,
+                right: 0,
+                height: 'calc(100vh - 64px)',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 1000
+            }}>
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: filterBarExpanded ? 'flex-start' : 'center',
+                    px: 1,
+                    py: 2
+                }}>
+                    <IconButton
+                        onClick={() => setFilterBarExpanded(!filterBarExpanded)}
+                        sx={{
+                            transform: filterBarExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
+                            transition: theme => theme.transitions.create('transform', {
+                                duration: theme.transitions.duration.shortest,
+                            }),
+                        }}
+                    >
+                        <ChevronRightIcon />
+                    </IconButton>
+                </Box>
+
+                {/* Only show list when expanded */}
+                {filterBarExpanded ? (
+                    <List component="nav" sx={{ width: '100%' }}>
+                        {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
+                        {renderFilterSection('Time Period', 'time', filters.time)}
+                        {renderFilterSection('Status', 'status', filters.status)}
+                    </List>
+                ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                        {/* Icons for collapsed state */}
+                    </Box>
+                )}
+            </Box>
+
+            {/* Spacer to prevent content from going under the fixed sidebar */}
+            <Box sx={{ width: filterBarExpanded ? 240 : 48, flexShrink: 0 }} />
         </Box>
     );
 };

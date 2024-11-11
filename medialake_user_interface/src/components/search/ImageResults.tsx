@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Box, Grid, Typography, Pagination, IconButton, Menu, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TableSortLabel, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { Box, Grid, Typography, Pagination, IconButton, Menu, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TableSortLabel, ToggleButtonGroup, ToggleButton, TextField } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmationModal } from '../common/ConfirmationModal';
 
 export interface ImageItem {
     inventoryId: string;
@@ -75,6 +76,15 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [order, setOrder] = useState<Order>('asc');
     const [orderBy, setOrderBy] = useState<OrderBy>('path');
     const [page, setPage] = useState(1);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null);
+    const [editingImageId, setEditingImageId] = useState<string | null>(null);
+    const [editedName, setEditedName] = useState<string>('');
+    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+    const [imageToRename, setImageToRename] = useState<{
+        image: ImageItem;
+        newName: string;
+    } | null>(null);
 
     const getImageUrl = (image: ImageItem) => {
         return image.thumbnailUrl || 'https://via.placeholder.com/400x300';
@@ -153,6 +163,52 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const startIndex = (page - 1) * ITEMS_PER_PAGE;
     const paginatedImages = sortedImages.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
+    const handleDeleteClick = (event: React.MouseEvent<HTMLElement>, image: ImageItem) => {
+        event.stopPropagation();
+        setImageToDelete(image);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        // TODO: Implement actual delete logic
+        console.log('Deleting image:', imageToDelete?.inventoryId);
+        setIsDeleteModalOpen(false);
+        setImageToDelete(null);
+    };
+
+    const handleStartEditing = (image: ImageItem) => {
+        setEditingImageId(image.inventoryId);
+        setEditedName(image.mainRepresentation.storage.path);
+    };
+
+    const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setEditedName(event.target.value);
+    };
+
+    const handleNameEditComplete = (image: ImageItem) => {
+        if (editedName !== image.mainRepresentation.storage.path) {
+            setImageToRename({ image, newName: editedName });
+            setIsRenameModalOpen(true);
+        }
+        setEditingImageId(null);
+    };
+
+    const handleRenameConfirm = async () => {
+        if (imageToRename) {
+            // TODO: Implement actual rename logic
+            console.log('Renaming image:', imageToRename.image.inventoryId, 'to:', imageToRename.newName);
+        }
+        setIsRenameModalOpen(false);
+        setImageToRename(null);
+        setEditedName('');
+    };
+
+    const handleRenameCancel = () => {
+        setIsRenameModalOpen(false);
+        setImageToRename(null);
+        setEditedName('');
+    };
+
     const renderCardView = () => (
         <Grid container spacing={3}>
             {paginatedImages.map((image) => (
@@ -184,136 +240,72 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                         >
                             <Box
                                 component="img"
-                                height="180"
                                 src={getImageUrl(image)}
                                 alt={image.mainRepresentation.storage.path}
                                 sx={{
                                     width: '100%',
-                                    objectFit: 'cover'
+                                    height: 300,
+                                    objectFit: 'cover',
+                                    backgroundColor: 'rgba(0,0,0,0.03)'
                                 }}
                             />
-                            <Box
-                                className="image-overlay"
-                                sx={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    bgcolor: 'rgba(0, 0, 0, 0.4)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    opacity: 0,
-                                    transition: 'opacity 0.2s ease-in-out'
-                                }}
-                            >
-                                <Typography
-                                    variant="body1"
-                                    sx={{
-                                        color: 'white',
-                                        textAlign: 'center',
-                                        p: 2,
-                                        fontWeight: 500
-                                    }}
-                                >
-                                    Click to view details
-                                </Typography>
-                            </Box>
                             <Box sx={{ p: 2 }}>
-                                <Box sx={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'flex-start',
-                                }}>
-                                    <Box sx={{ flex: 1, mr: 1 }}>
-                                        <Typography
-                                            variant="subtitle2"
-                                            color="text.secondary"
-                                            sx={{ mb: 0.5 }}
-                                        >
-                                            Object Name:
-                                        </Typography>
-                                        <Typography
-                                            variant="subtitle1"
-                                            sx={{
-                                                fontWeight: 500,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                display: '-webkit-box',
-                                                WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical',
-                                                lineHeight: 1.2,
-                                                mb: 0.5
-                                            }}
-                                        >
-                                            {image.mainRepresentation.storage.path}
-                                        </Typography>
+                                <Box sx={{ mb: 2 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                        <Box sx={{ wordBreak: 'break-word' }}>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                                sx={{ mb: 0.5 }}
+                                            >
+                                                Name:
+                                            </Typography>
+                                            <Typography
+                                                variant="subtitle1"
+                                                sx={{
+                                                    fontWeight: 500,
+                                                    wordBreak: 'break-word',
+                                                    lineHeight: 1.2,
+                                                }}
+                                            >
+                                                {image.mainRepresentation.storage.path}
+                                            </Typography>
+                                        </Box>
                                         <Typography
                                             variant="body2"
                                             color="text.secondary"
-                                            sx={{ mb: 0.5 }}
                                         >
                                             Format: {image.mainRepresentation.format}
                                         </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                            sx={{ mb: 0.5 }}
-                                        >
-                                            Created: {new Date(image.createDate).toLocaleDateString()}
-                                        </Typography>
-                                    </Box>
-                                    <Box sx={{
-                                        display: 'flex',
-                                        gap: 0.5,
-                                        opacity: 0.7,
-                                        '&:hover': {
-                                            opacity: 1
-                                        }
-                                    }}>
-                                        <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAction('edit');
-                                            }}
-                                            sx={{
-                                                bgcolor: 'background.paper',
-                                                '&:hover': {
-                                                    bgcolor: 'action.hover'
-                                                }
-                                            }}
-                                        >
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAction('delete');
-                                            }}
-                                            sx={{
-                                                bgcolor: 'background.paper',
-                                                '&:hover': {
-                                                    bgcolor: 'action.hover'
-                                                }
-                                            }}
-                                        >
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            onClick={(e) => handleMenuOpen(e, image)}
-                                            sx={{
-                                                bgcolor: 'background.paper',
-                                                '&:hover': {
-                                                    bgcolor: 'action.hover'
-                                                }
-                                            }}
-                                        >
-                                            <MoreVertIcon fontSize="small" />
-                                        </IconButton>
+                                        <Box sx={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Created: {new Date(image.createDate).toLocaleDateString()}
+                                            </Typography>
+                                            <Box sx={{
+                                                display: 'flex',
+                                                gap: 1
+                                            }}>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => handleDeleteClick(e, image)}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => handleMenuOpen(e, image)}
+                                                >
+                                                    <MoreVertIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>
@@ -336,7 +328,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                 direction={orderBy === 'path' ? order : 'asc'}
                                 onClick={() => handleRequestSort('path')}
                             >
-                                Object Name
+                                Name
                             </TableSortLabel>
                         </TableCell>
                         <TableCell>Format</TableCell>
@@ -349,7 +341,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                 Created
                             </TableSortLabel>
                         </TableCell>
-                        <TableCell align="right">Actions</TableCell>
+                        <TableCell /> {/* Empty header cell for actions */}
                     </TableRow>
                 </TableHead>
                 <TableBody>
@@ -373,35 +365,61 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                     }}
                                 />
                             </TableCell>
-                            <TableCell>{image.mainRepresentation.storage.path}</TableCell>
+                            <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {editingImageId === image.inventoryId ? (
+                                        <TextField
+                                            value={editedName}
+                                            onChange={handleNameChange}
+                                            onBlur={() => handleNameEditComplete(image)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleNameEditComplete(image);
+                                                }
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            autoFocus
+                                            fullWidth
+                                            size="small"
+                                        />
+                                    ) : (
+                                        <>
+                                            <Typography>{image.mainRepresentation.storage.path}</Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStartEditing(image);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </>
+                                    )}
+                                </Box>
+                            </TableCell>
                             <TableCell>{image.mainRepresentation.format}</TableCell>
-                            <TableCell>{new Date(image.createDate).toLocaleDateString()}</TableCell>
-                            <TableCell align="right">
-                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleAction('edit');
-                                        }}
-                                    >
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleAction('delete');
-                                        }}
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => handleMenuOpen(e, image)}
-                                    >
-                                        <MoreVertIcon fontSize="small" />
-                                    </IconButton>
+                            <TableCell>
+                                <Box sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    {new Date(image.createDate).toLocaleDateString()}
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <IconButton
+                                            size="small"
+                                            onClick={(e) => handleDeleteClick(e, image)}
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                        <IconButton
+                                            size="small"
+                                            onClick={(e) => handleMenuOpen(e, image)}
+                                        >
+                                            <MoreVertIcon fontSize="small" />
+                                        </IconButton>
+                                    </Box>
                                 </Box>
                             </TableCell>
                         </TableRow>
@@ -495,9 +513,39 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                     }
                 }}
             >
+                <MenuItem onClick={() => {
+                    handleMenuClose();
+                    if (selectedImage) {
+                        handleStartEditing(selectedImage);
+                    }
+                }}>
+                    Rename
+                </MenuItem>
                 <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
                 <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
             </Menu>
+
+            <ConfirmationModal
+                open={isDeleteModalOpen}
+                title="Delete Image"
+                message={`Are you sure you want to delete "${imageToDelete?.mainRepresentation.storage.path}"? This action cannot be undone.`}
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => {
+                    setIsDeleteModalOpen(false);
+                    setImageToDelete(null);
+                }}
+                confirmText="Delete Image"
+            />
+
+            <ConfirmationModal
+                open={isRenameModalOpen}
+                title="Rename Image"
+                message={`Are you sure you want to rename "${imageToRename?.image.mainRepresentation.storage.path}" to "${imageToRename?.newName}"?`}
+                onConfirm={handleRenameConfirm}
+                onCancel={handleRenameCancel}
+                confirmText="Rename"
+                cancelText="Cancel"
+            />
         </Box>
     );
 };

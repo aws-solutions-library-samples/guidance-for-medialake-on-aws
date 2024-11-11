@@ -15,4 +15,11 @@ export const QUERY_KEYS = {
     SEARCH: {
         all: ['search'] as const,
     },
+    ASSETS: {
+        all: ['assets'] as const,
+        lists: () => [...QUERY_KEYS.ASSETS.all, 'list'] as const,
+        list: (filters: string) => [...QUERY_KEYS.ASSETS.lists(), { filters }] as const,
+        details: () => [...QUERY_KEYS.ASSETS.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.ASSETS.details(), id] as const,
+    },
 } as const;
