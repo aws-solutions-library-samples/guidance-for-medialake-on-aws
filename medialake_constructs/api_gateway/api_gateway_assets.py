@@ -21,6 +21,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 
 
 @dataclass
@@ -55,6 +56,8 @@ class AssetsConstruct(Construct):
         assets_resource = props.api_resource.root.add_resource("assets")
         asset_resource = assets_resource.add_resource("{id}")
 
+        search_layer = SearchLayer(self, "SearchLayer")
+
         # GET /assets/{id} Lambda
         get_asset_lambda = Lambda(
             self,
@@ -62,6 +65,7 @@ class AssetsConstruct(Construct):
             config=LambdaConfig(
                 name="get_asset_lambda",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
+                layers=[search_layer.layer],
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -76,6 +80,7 @@ class AssetsConstruct(Construct):
             config=LambdaConfig(
                 name="delete_asset_lambda",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
+                layers=[search_layer.layer],
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -131,6 +136,75 @@ class AssetsConstruct(Construct):
             "DELETE",
             apigateway.LambdaIntegration(
                 delete_asset_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
+
+        # Add POST /assets/{id}/rename endpoint
+        rename_resource = asset_resource.add_resource("rename")
+        rename_asset_lambda = Lambda(
+            self,
+            "RenameAssetLambda",
+            config=LambdaConfig(
+                name="rename_asset_lambda",
+                layers=[search_layer.layer],
+                entry="lambdas/api/assets/rp_assets_id/rename/post_rename",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        # Add DynamoDB and S3 permissions for rename Lambda
+        rename_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                ],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        rename_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:CopyObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::medialake-asset-bucket-*/*",
+                    "arn:aws:s3:::medialake-asset-bucket-*",
+                ],
+            )
+        )
+
+        # Add POST method to /assets/{id}/rename
+        rename_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(
+                rename_asset_lambda.function,
                 proxy=True,
                 integration_responses=[
                     apigateway.IntegrationResponse(

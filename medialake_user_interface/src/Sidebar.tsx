@@ -46,15 +46,15 @@ function Sidebar() {
 
     const mainMenuItems = [
         {
-            text: 'Assets',
+            text: 'Home',
             icon: <AssetsIcon />,
             path: '/'
         },
-        {
-            text: 'Search',
-            icon: <SearchIcon />,
-            path: '/search'
-        },
+        // {
+        //     text: 'Search',
+        //     icon: <SearchIcon />,
+        //     path: '/search'
+        // },
         {
             text: 'Pipelines',
             icon: <PipelineIcon />,
