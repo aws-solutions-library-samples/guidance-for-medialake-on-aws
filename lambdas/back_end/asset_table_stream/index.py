@@ -67,7 +67,6 @@ class OpenSearchClient:
                 index=INDEX_NAME,
                 id=doc_id,
                 body=body,
-                # refresh=True,  # Force refresh after update
             )
             logger.info(f"Update result: {json.dumps(result, default=str)}")
             return result

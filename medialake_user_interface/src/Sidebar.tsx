@@ -29,7 +29,7 @@ import {
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
 } from '@mui/icons-material';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 72;

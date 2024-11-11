@@ -157,16 +157,18 @@ function TopBar() {
     };
 
     const handleSearchKeyPress = (event: React.KeyboardEvent) => {
-        if (event.key === 'Enter' && searchInput.includes(':')) {
-            createTagFromInput(searchInput);
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            handleSearchSubmit();
         }
     };
 
-    const handleSearchClick = () => {
+    const handleSearchSubmit = () => {
         if (searchInput.includes(':')) {
             createTagFromInput(searchInput);
-        } else if (searchInput.trim()) {
-            navigate('/search', { state: { query: getSearchQuery() } });
+        } else if (searchInput.trim() || searchTags.length > 0) {
+            const searchQuery = getSearchQuery();
+            navigate('/search', { state: { query: searchQuery } });
             refetch();
         }
     };
@@ -318,7 +320,7 @@ function TopBar() {
                     {/* Search Button */}
                     <Button
                         variant="contained"
-                        onClick={handleSearchClick}
+                        onClick={handleSearchSubmit}
                         sx={{
                             minWidth: 'unset',
                             px: 3,
