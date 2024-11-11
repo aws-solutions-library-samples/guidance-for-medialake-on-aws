@@ -68,6 +68,11 @@ interface DeleteAssetResponse {
     };
 }
 
+interface RenameAssetRequest {
+    oldName: string;
+    newName: string;
+}
+
 // Hook to get a single asset by ID
 export const useAsset = (assetId: string) => {
     return useQuery({
@@ -101,25 +106,36 @@ export const useDeleteAsset = () => {
     });
 };
 
-// Hook to rename an asset (if you add this functionality to the API)
+// Hook to rename an asset
 export const useRenameAsset = () => {
     const queryClient = useQueryClient();
+    const { showError } = useErrorModal();
 
     return useMutation({
-        mutationFn: async ({ assetId, newName }: { assetId: string; newName: string }) => {
-            const response = await apiClient.patch<AssetResponse>(`/assets/${assetId}`, {
-                name: newName,
-            });
-            return response.data;
+        mutationFn: async ({ assetId, oldName, newName }: { assetId: string; oldName: string; newName: string }) => {
+            try {
+                const response = await apiClient.post<AssetResponse>(
+                    `${API_ENDPOINTS.ASSETS}/${assetId}/rename`,
+                    { oldName, newName }
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Error renaming asset:', error);
+                showError('Failed to rename asset');
+                throw error;
+            }
         },
         onSuccess: (_, variables) => {
-            // Invalidate relevant queries
             queryClient.invalidateQueries({
                 queryKey: QUERY_KEYS.ASSETS.detail(variables.assetId),
             });
             queryClient.invalidateQueries({
-                queryKey: QUERY_KEYS.ASSETS.lists(),
+                queryKey: QUERY_KEYS.SEARCH.all,
             });
+        },
+        onError: (error) => {
+            logger.error('Error in rename mutation:', error);
+            showError('Failed to rename asset');
         },
     });
 };

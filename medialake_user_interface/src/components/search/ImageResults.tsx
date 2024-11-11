@@ -7,6 +7,7 @@ import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
+import { useRenameAsset } from '../../api/hooks/useAssets';
 
 export interface ImageItem {
     inventoryId: string;
@@ -85,6 +86,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
         image: ImageItem;
         newName: string;
     } | null>(null);
+    const renameAsset = useRenameAsset();
 
     const getImageUrl = (image: ImageItem) => {
         return image.thumbnailUrl || 'https://via.placeholder.com/400x300';
@@ -171,7 +173,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
     const handleDeleteConfirm = async () => {
         // TODO: Implement actual delete logic
-        console.log('Deleting image:', imageToDelete?.inventoryId);
+        console.log('Deleting image:', imageToDelete?.mainRepresentation.storage.path);
         setIsDeleteModalOpen(false);
         setImageToDelete(null);
     };
@@ -195,12 +197,22 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
     const handleRenameConfirm = async () => {
         if (imageToRename) {
-            // TODO: Implement actual rename logic
-            console.log('Renaming image:', imageToRename.image.inventoryId, 'to:', imageToRename.newName);
+            try {
+                await renameAsset.mutateAsync({
+                    assetId: imageToRename.image.inventoryId,
+                    oldName: imageToRename.image.mainRepresentation.storage.path,
+                    newName: imageToRename.newName
+                });
+                setIsRenameModalOpen(false);
+                setImageToRename(null);
+                setEditedName('');
+            } catch (error) {
+                // Error handling is done in the mutation
+                setIsRenameModalOpen(false);
+                setImageToRename(null);
+                setEditedName('');
+            }
         }
-        setIsRenameModalOpen(false);
-        setImageToRename(null);
-        setEditedName('');
     };
 
     const handleRenameCancel = () => {
@@ -545,6 +557,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                 onCancel={handleRenameCancel}
                 confirmText="Rename"
                 cancelText="Cancel"
+                isLoading={renameAsset.isPending}
             />
         </Box>
     );
