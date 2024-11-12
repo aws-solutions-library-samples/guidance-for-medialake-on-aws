@@ -4,5 +4,9 @@ export const API_ENDPOINTS = {
     CONNECTORS: '/connectors',
     PIPELINES: "/pipelines",
     SEARCH: "/search",
-    ASSETS: "/assets",
+    ASSETS: {
+        GET: (id: string) => `/assets/${id}`,
+        DELETE: (id: string) => `/assets/${id}`,
+        RENAME: (id: string) => `/assets/${id}/rename`,
+    },
 };

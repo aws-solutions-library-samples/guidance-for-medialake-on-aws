@@ -33,6 +33,22 @@ class AssetProcessor:
 
             metadata = self._create_asset_metadata(response, bucket, key)
             dynamo_entry = self.create_dynamo_entry(metadata)
+
+            # Add tags to S3 object
+            self.s3.put_object_tagging(
+                Bucket=bucket,
+                Key=key,
+                Tagging={
+                    "TagSet": [
+                        {"Key": "InventoryID", "Value": dynamo_entry["InventoryID"]},
+                        {
+                            "Key": "AssetID",
+                            "Value": dynamo_entry["DigitalSourceAsset"]["ID"],
+                        },
+                    ]
+                },
+            )
+
             self.publish_event(
                 dynamo_entry["InventoryID"],
                 dynamo_entry["DigitalSourceAsset"]["ID"],

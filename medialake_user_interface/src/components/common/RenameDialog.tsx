@@ -1,40 +1,50 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
-    Typography,
+    TextField,
     IconButton,
+    Box,
+    Typography,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { ActionButton } from './button/ActionButton';
 
-interface ConfirmationModalProps {
+interface RenameDialogProps {
     open: boolean;
     title: string;
-    message: string;
-    onConfirm: () => void;
+    currentName: string;
+    onConfirm: (newName: string) => void;
     onCancel: () => void;
-    confirmText?: string;
-    cancelText?: string;
     isLoading?: boolean;
 }
 
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+export const RenameDialog: React.FC<RenameDialogProps> = ({
     open,
     title,
-    message,
+    currentName,
     onConfirm,
     onCancel,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
     isLoading = false,
 }) => {
+    const [newName, setNewName] = useState(currentName);
+
+    const handleConfirm = () => {
+        onConfirm(newName);
+        setNewName(currentName);
+    };
+
+    const handleCancel = () => {
+        setNewName(currentName);
+        onCancel();
+    };
+
     return (
         <Dialog
             open={open}
-            onClose={onCancel}
+            onClose={handleCancel}
             maxWidth="sm"
             fullWidth
             PaperProps={{
@@ -51,28 +61,41 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 p: 2
             }}>
                 <Typography variant="h6">{title}</Typography>
-                <IconButton onClick={onCancel} size="small">
+                <IconButton onClick={handleCancel} size="small">
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ p: 2 }}>
-                <Typography>{message}</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField
+                        label="Current Name"
+                        value={currentName}
+                        disabled
+                        fullWidth
+                    />
+                    <TextField
+                        label="New Name"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        fullWidth
+                        autoFocus
+                    />
+                </Box>
             </DialogContent>
             <DialogActions sx={{ p: 2, pt: 0 }}>
                 <ActionButton
                     variant="outlined"
-                    onClick={onCancel}
+                    onClick={handleCancel}
                     disabled={isLoading}
                 >
-                    {cancelText}
+                    Cancel
                 </ActionButton>
                 <ActionButton
                     variant="contained"
-                    color="error"
-                    onClick={onConfirm}
+                    onClick={handleConfirm}
                     loading={isLoading}
                 >
-                    {confirmText}
+                    Rename
                 </ActionButton>
             </DialogActions>
         </Dialog>

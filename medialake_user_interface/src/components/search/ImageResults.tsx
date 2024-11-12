@@ -7,7 +7,8 @@ import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { useRenameAsset } from '../../api/hooks/useAssets';
+import { useRenameAsset, useDeleteAsset } from '../../api/hooks/useAssets';
+import { RenameDialog } from '../common/RenameDialog';
 
 export interface ImageItem {
     inventoryId: string;
@@ -68,7 +69,24 @@ type OrderBy = 'path' | 'createDate';
 
 const ITEMS_PER_PAGE = 12;
 
+interface ImageToRename {
+    image: ImageItem;
+    newName: string;
+}
+
 const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
+    // Deduplicate results based on inventoryId
+    const uniqueResults = images.reduce((acc, current) => {
+        // Take the most complete version of each asset (one with thumbnail)
+        const existing = acc.get(current.inventoryId);
+        if (!existing || (!existing.thumbnailUrl && current.thumbnailUrl)) {
+            acc.set(current.inventoryId, current);
+        }
+        return acc;
+    }, new Map());
+
+    const deduplicatedResults = Array.from(uniqueResults.values());
+
     // Rest of the component implementation remains the same
     const navigate = useNavigate();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -81,12 +99,10 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null);
     const [editingImageId, setEditingImageId] = useState<string | null>(null);
     const [editedName, setEditedName] = useState<string>('');
-    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
-    const [imageToRename, setImageToRename] = useState<{
-        image: ImageItem;
-        newName: string;
-    } | null>(null);
+    const [imageToRename, setImageToRename] = useState<ImageToRename | null>(null);
+    const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
     const renameAsset = useRenameAsset();
+    const deleteAsset = useDeleteAsset();
 
     const getImageUrl = (image: ImageItem) => {
         return image.thumbnailUrl || 'https://via.placeholder.com/400x300';
@@ -157,8 +173,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                     : new Date(b.createDate).getTime() - new Date(a.createDate).getTime();
             }
         };
-        return [...images].sort(comparator);
-    }, [images, order, orderBy]);
+        return [...deduplicatedResults].sort(comparator);
+    }, [deduplicatedResults, order, orderBy]);
 
     // Calculate pagination
     const totalPages = Math.ceil(sortedImages.length / ITEMS_PER_PAGE);
@@ -172,10 +188,17 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     };
 
     const handleDeleteConfirm = async () => {
-        // TODO: Implement actual delete logic
-        console.log('Deleting image:', imageToDelete?.mainRepresentation.storage.path);
-        setIsDeleteModalOpen(false);
-        setImageToDelete(null);
+        if (imageToDelete) {
+            try {
+                await deleteAsset.mutateAsync(imageToDelete.inventoryId);
+                setIsDeleteModalOpen(false);
+                setImageToDelete(null);
+            } catch (error) {
+                // Error handling is done in the mutation
+                setIsDeleteModalOpen(false);
+                setImageToDelete(null);
+            }
+        }
     };
 
     const handleStartEditing = (image: ImageItem) => {
@@ -190,35 +213,37 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const handleNameEditComplete = (image: ImageItem) => {
         if (editedName !== image.mainRepresentation.storage.path) {
             setImageToRename({ image, newName: editedName });
-            setIsRenameModalOpen(true);
+            setIsRenameDialogOpen(true);
         }
         setEditingImageId(null);
     };
 
-    const handleRenameConfirm = async () => {
+    const handleRenameConfirm = async (newName: string) => {
+        const imageToRename = selectedImage;
         if (imageToRename) {
             try {
                 await renameAsset.mutateAsync({
-                    assetId: imageToRename.image.inventoryId,
-                    oldName: imageToRename.image.mainRepresentation.storage.path,
-                    newName: imageToRename.newName
+                    inventoryId: imageToRename.inventoryId,
+                    newName
                 });
-                setIsRenameModalOpen(false);
-                setImageToRename(null);
+                setIsRenameDialogOpen(false);
+                setSelectedImage(null);
                 setEditedName('');
             } catch (error) {
                 // Error handling is done in the mutation
-                setIsRenameModalOpen(false);
-                setImageToRename(null);
-                setEditedName('');
             }
         }
     };
 
     const handleRenameCancel = () => {
-        setIsRenameModalOpen(false);
+        setIsRenameDialogOpen(false);
         setImageToRename(null);
         setEditedName('');
+    };
+
+    const handleRenameClick = (image: ImageItem) => {
+        setSelectedImage(image);
+        setIsRenameDialogOpen(true);
     };
 
     const renderCardView = () => (
@@ -382,11 +407,11 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                     {editingImageId === image.inventoryId ? (
                                         <TextField
                                             value={editedName}
-                                            onChange={handleNameChange}
-                                            onBlur={() => handleNameEditComplete(image)}
+                                            onChange={(e) => setEditedName(e.target.value)}
+                                            onBlur={() => handleTableNameEditComplete(image)}
                                             onKeyPress={(e) => {
                                                 if (e.key === 'Enter') {
-                                                    handleNameEditComplete(image);
+                                                    handleTableNameEditComplete(image);
                                                 }
                                             }}
                                             onClick={(e) => e.stopPropagation()}
@@ -401,7 +426,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                                                 size="small"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleStartEditing(image);
+                                                    setEditingImageId(image.inventoryId);
+                                                    setEditedName(image.mainRepresentation.storage.path);
                                                 }}
                                             >
                                                 <EditIcon fontSize="small" />
@@ -439,6 +465,48 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                 </TableBody>
             </Table>
         </TableContainer>
+    );
+
+    const handleTableNameEditComplete = async (image: ImageItem) => {
+        if (editedName !== image.mainRepresentation.storage.path) {
+            try {
+                await renameAsset.mutateAsync({
+                    inventoryId: image.inventoryId,
+                    newName: editedName
+                });
+            } catch (error) {
+                // Error handling is done in the mutation
+            }
+        }
+        setEditingImageId(null);
+        setEditedName('');
+    };
+
+    const handleCardRenameClick = (image: ImageItem) => {
+        setSelectedImage(image);
+        setIsRenameDialogOpen(true);
+    };
+
+    const renderMenu = () => (
+        <Menu
+            anchorEl={menuAnchorEl}
+            open={Boolean(menuAnchorEl)}
+            onClose={handleMenuClose}
+            onClick={(e) => e.stopPropagation()}
+        >
+            {viewMode === 'card' && (
+                <MenuItem onClick={() => {
+                    handleMenuClose();
+                    if (selectedImage) {
+                        handleCardRenameClick(selectedImage);
+                    }
+                }}>
+                    Rename
+                </MenuItem>
+            )}
+            <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
+            <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
+        </Menu>
     );
 
     return (
@@ -511,31 +579,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                 </Box>
             )}
 
-            <Menu
-                anchorEl={menuAnchorEl}
-                open={Boolean(menuAnchorEl)}
-                onClose={handleMenuClose}
-                onClick={(e) => e.stopPropagation()}
-                PaperProps={{
-                    elevation: 3,
-                    sx: {
-                        minWidth: 150,
-                        borderRadius: 2,
-                        mt: 1
-                    }
-                }}
-            >
-                <MenuItem onClick={() => {
-                    handleMenuClose();
-                    if (selectedImage) {
-                        handleStartEditing(selectedImage);
-                    }
-                }}>
-                    Rename
-                </MenuItem>
-                <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
-                <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
-            </Menu>
+            {renderMenu()}
 
             <ConfirmationModal
                 open={isDeleteModalOpen}
@@ -547,18 +591,22 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                     setImageToDelete(null);
                 }}
                 confirmText="Delete Image"
+                isLoading={deleteAsset.isPending}
             />
 
-            <ConfirmationModal
-                open={isRenameModalOpen}
-                title="Rename Image"
-                message={`Are you sure you want to rename "${imageToRename?.image.mainRepresentation.storage.path}" to "${imageToRename?.newName}"?`}
-                onConfirm={handleRenameConfirm}
-                onCancel={handleRenameCancel}
-                confirmText="Rename"
-                cancelText="Cancel"
-                isLoading={renameAsset.isPending}
-            />
+            {viewMode === 'card' && (
+                <RenameDialog
+                    open={isRenameDialogOpen}
+                    title="Rename Asset"
+                    currentName={selectedImage?.mainRepresentation.storage.path || ''}
+                    onConfirm={handleRenameConfirm}
+                    onCancel={() => {
+                        setIsRenameDialogOpen(false);
+                        setSelectedImage(null);
+                    }}
+                    isLoading={renameAsset.isPending}
+                />
+            )}
         </Box>
     );
 };

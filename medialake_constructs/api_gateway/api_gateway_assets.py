@@ -88,6 +88,21 @@ class AssetsConstruct(Construct):
             ),
         )
 
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:CopyObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
         # Add DynamoDB permissions for GET Lambda
         get_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -185,6 +200,7 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Update the policy to allow access to all S3 buckets
         rename_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -194,8 +210,8 @@ class AssetsConstruct(Construct):
                     "s3:CopyObject",
                 ],
                 resources=[
-                    "arn:aws:s3:::medialake-asset-bucket-*/*",
-                    "arn:aws:s3:::medialake-asset-bucket-*",
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
                 ],
             )
         )
