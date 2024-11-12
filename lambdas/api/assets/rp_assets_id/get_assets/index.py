@@ -150,26 +150,23 @@ def create_response(
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler for retrieving asset details.
-
-    Args:
-        event: API Gateway event
-        context: Lambda context
-
-    Returns:
-        API Gateway response
-    """
+    """Lambda handler for getting asset details."""
     try:
-        # Extract and validate asset ID from path parameters
+        # Extract and validate asset ID
         asset_id = event.get("pathParameters", {}).get("id")
-        validate_asset_id(asset_id)
+        if not asset_id:
+            raise AssetDetailsError("Missing asset ID", HTTPStatus.BAD_REQUEST)
 
         # Get asset details
         asset_data = get_asset_details(asset_id)
 
+        # Add any additional metadata or computed fields
+        enriched_asset = enrich_asset_data(asset_data)
+
         return create_response(
-            HTTPStatus.OK, "Asset details retrieved successfully", asset_data
+            HTTPStatus.OK,
+            "Asset details retrieved successfully",
+            {"asset": enriched_asset},
         )
 
     except AssetDetailsError as e:
@@ -188,3 +185,22 @@ def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, An
         return create_response(
             HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error"
         )
+
+
+def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrich asset data with additional computed fields."""
+    try:
+        # Add any computed fields or additional metadata
+        asset["computedFields"] = {
+            "totalSize": sum(
+                rep["storage"].get("fileSize", 0)
+                for rep in asset.get("derivedRepresentations", [])
+            )
+            + asset["mainRepresentation"]["storage"].get("fileSize", 0),
+            "lastModified": asset.get("updateDate", asset["createDate"]),
+            # Add other computed fields as needed
+        }
+        return asset
+    except Exception as e:
+        logger.error(f"Error enriching asset data: {str(e)}")
+        return asset

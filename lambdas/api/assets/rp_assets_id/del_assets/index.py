@@ -10,17 +10,19 @@ It implements best practices for AWS Lambda including:
 - Security best practices
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.validation import validate_request_parameters
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 import boto3
 import os
 import json
+from http import HTTPStatus
+from decimal import Decimal
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-deletion-service")
@@ -29,134 +31,167 @@ metrics = Metrics(namespace="AssetDeletionService", service="asset-deletion-serv
 
 # Initialize AWS clients with X-Ray tracing
 dynamodb = boto3.resource("dynamodb")
+s3 = boto3.client("s3")
 table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder for Decimal types."""
+
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return super(DecimalEncoder, self).default(obj)
 
 
 class AssetDeletionError(Exception):
     """Custom exception for asset deletion errors"""
 
-    def __init__(self, message: str, status_code: int = 500):
+    def __init__(
+        self, message: str, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR
+    ):
         super().__init__(message)
         self.status_code = status_code
 
 
-@tracer.capture_method
-def validate_asset_id(asset_id: str) -> None:
-    """
-    Validates the asset ID format.
+class DeleteRequest(BaseModel):
+    """Request model for delete operation"""
 
-    Args:
-        asset_id: The asset ID to validate
-
-    Raises:
-        AssetDeletionError: If the asset ID is invalid
-    """
-    if not asset_id or not isinstance(asset_id, str):
-        raise AssetDeletionError("Invalid asset ID format", 400)
+    inventoryId: str = Field(..., description="Inventory ID of the asset to delete")
 
 
 @tracer.capture_method
-def delete_asset(inventory_id: str) -> None:
+def get_asset(inventory_id: str) -> Dict[str, Any]:
     """
-    Deletes an asset from DynamoDB.
-
-    Args:
-        inventory_id: The inventory ID of the asset to delete
-
-    Raises:
-        AssetDeletionError: If the deletion fails
+    Retrieves asset details for deletion.
     """
     try:
-        response = table.delete_item(
-            Key={"id": inventory_id},
-            ReturnValues="ALL_OLD",  # Get the deleted item's attributes
-        )
+        response = table.get_item(Key={"InventoryID": inventory_id})
 
-        # Check if the item existed before deletion
-        if "Attributes" not in response:
-            raise AssetDeletionError(f"Asset with ID {inventory_id} not found", 404)
+        if "Item" not in response:
+            raise AssetDeletionError(
+                f"Asset with ID {inventory_id} not found", HTTPStatus.NOT_FOUND
+            )
 
-        # Log the deleted asset details (excluding sensitive data)
+        # Convert Decimal objects for JSON serialization
+        return json.loads(json.dumps(response["Item"], cls=DecimalEncoder))
+
+    except ClientError as e:
+        logger.error(f"DynamoDB error: {str(e)}")
+        raise AssetDeletionError(f"Failed to retrieve asset: {str(e)}")
+
+
+@tracer.capture_method
+def delete_s3_objects(asset: Dict[str, Any]) -> None:
+    """
+    Deletes all S3 objects associated with the asset.
+    """
+    try:
+        # Delete main representation
+        main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
+        main_storage = main_rep["StorageInfo"]["PrimaryLocation"]
+        main_bucket = main_storage["Bucket"]
+        main_key = main_storage["ObjectKey"]["FullPath"]
+
         logger.info(
-            "Asset deleted successfully",
+            "Deleting main representation",
             extra={
-                "inventory_id": inventory_id,
-                "deletion_timestamp": tracer.get_current_event(),
+                "bucket": main_bucket,
+                "key": main_key,
+                "operation": "delete_main_representation",
             },
         )
 
-        # Record metric for successful deletion
-        metrics.add_metric(name="AssetDeletions", unit=MetricUnit.Count, value=1)
+        s3.delete_object(Bucket=main_bucket, Key=main_key)
+
+        # Delete derived representations
+        for derived in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
+            if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
+                continue
+
+            storage = derived["StorageInfo"]["PrimaryLocation"]
+            derived_bucket = storage["Bucket"]
+            derived_key = storage["ObjectKey"]["FullPath"]
+
+            logger.info(
+                "Deleting derived representation",
+                extra={
+                    "bucket": derived_bucket,
+                    "key": derived_key,
+                    "operation": "delete_derived_representation",
+                },
+            )
+
+            s3.delete_object(Bucket=derived_bucket, Key=derived_key)
 
     except ClientError as e:
-        logger.error(f"Failed to delete asset: {str(e)}")
-        metrics.add_metric(name="AssetDeletionErrors", unit=MetricUnit.Count, value=1)
-        raise AssetDeletionError(f"Failed to delete asset: {str(e)}")
+        logger.error(f"S3 deletion error: {str(e)}")
+        raise AssetDeletionError(f"Failed to delete S3 objects: {str(e)}")
 
 
-def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Creates a standardized API response.
+def create_response(
+    status_code: int, message: str, data: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """Creates a standardized API response."""
+    body = {
+        "status": "success" if status_code < 400 else "error",
+        "message": message,
+        "data": data or {},
+    }
 
-    Args:
-        status_code: HTTP status code
-        body: Response body
-
-    Returns:
-        Dict containing the API Gateway response
-    """
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",  # Configure as needed
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Credentials": True,
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=DecimalEncoder),
     }
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler for asset deletion.
-
-    Args:
-        event: API Gateway event
-        context: Lambda context
-
-    Returns:
-        API Gateway response
-    """
+def lambda_handler(
+    event: APIGatewayProxyEvent, context: LambdaContext
+) -> Dict[str, Any]:
+    """Lambda handler for asset deletion."""
     try:
-        # Extract and validate asset ID from path parameters
-        asset_id = event.get("pathParameters", {}).get("id")
-        validate_asset_id(asset_id)
+        # Extract and validate inventory ID from path parameters
+        inventory_id = event.get("pathParameters", {}).get("id")
+        if not inventory_id:
+            raise AssetDeletionError("Missing inventory ID", HTTPStatus.BAD_REQUEST)
 
-        # Delete the asset
-        delete_asset(asset_id)
+        # Get asset details
+        asset = get_asset(inventory_id)
+
+        # Delete S3 objects
+        delete_s3_objects(asset)
+
+        # Delete DynamoDB record
+        table.delete_item(Key={"InventoryID": inventory_id})
+
+        # Record successful deletion metric
+        metrics.add_metric(name="AssetDeletions", unit=MetricUnit.Count, value=1)
 
         return create_response(
-            200, {"message": "Asset deleted successfully", "assetId": asset_id}
+            HTTPStatus.OK, "Asset deleted successfully", {"inventoryId": inventory_id}
         )
 
     except AssetDeletionError as e:
         logger.warning(
             f"Asset deletion failed: {str(e)}",
-            extra={"asset_id": asset_id, "error_code": e.status_code},
+            extra={"inventory_id": inventory_id, "error_code": e.status_code},
         )
-        return create_response(
-            e.status_code, {"message": str(e), "error_code": e.status_code}
-        )
+        return create_response(e.status_code, str(e))
 
     except Exception as e:
         logger.error(
             f"Unexpected error during asset deletion: {str(e)}",
-            extra={"asset_id": asset_id},
+            extra={"inventory_id": inventory_id},
         )
         metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
         return create_response(
-            500, {"message": "Internal server error", "error_code": 500}
+            HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error"
         )

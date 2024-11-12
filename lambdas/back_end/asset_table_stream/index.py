@@ -10,11 +10,15 @@ import boto3
 import os
 from requests_aws4auth import AWS4Auth
 from opensearchpy import RequestsHttpConnection, OpenSearch, AWSV4SignerAuth
+import time  # Add this import at the top with other imports
 
 logger = Logger()
 
 HOST = os.environ["OPENSEARCH_ENDPOINT"]
 INDEX_NAME = os.environ["OPENSEARCH_INDEX"]
+
+# Add s3 client initialization near the top with other clients
+s3 = boto3.client("s3")
 
 
 class OpenSearchClient:
@@ -34,18 +38,15 @@ class OpenSearchClient:
 
     def search_by_inventory_id(self, inventory_id: str) -> Dict:
         # Use term query with .keyword field for exact matching
-        search_query = {"query": {"match": {"inventoryId": inventory_id}}}
+        search_query = {"query": {"term": {"inventoryId.keyword": inventory_id}}}
         logger.info(f"Searching for inventoryId: {inventory_id}")
         logger.info(f"Search query: {json.dumps(search_query, default=str)}")
 
         try:
-            # Force refresh before searching
-            # self.client.media.refresh(index=INDEX_NAME)
-
             result = self.client.search(
                 index=INDEX_NAME,
                 body=search_query,
-                size=100,  # Increase size to ensure we get all matches
+                size=100,
             )
             total_hits = result["hits"]["total"]["value"]
             logger.info(f"Search found {total_hits} documents")
@@ -84,6 +85,10 @@ class OpenSearchClient:
             raise ValueError("Document must have an inventoryId")
 
         try:
+            # Add sleep before searching
+            logger.info("Sleeping for 5 seconds before searching...")
+            time.sleep(20)
+
             # First search for existing document
             search_result = self.search_by_inventory_id(inventory_id)
 
@@ -109,11 +114,47 @@ class OpenSearchClient:
             raise
 
     def delete_documents(self, inventory_id: str) -> Dict:
-        """Delete documents with matching inventoryId"""
-        body = {"query": {"term": {"inventoryId.keyword": inventory_id}}}
-        return self.client.delete_by_query(
-            # index=INDEX_NAME, body=body, refresh=True  # Force refresh after deletion
-        )
+        """Delete all documents with matching inventoryId"""
+        try:
+            # First search for all documents with this inventory ID
+            search_result = self.search_by_inventory_id(inventory_id)
+            total_hits = search_result["hits"]["total"]["value"]
+
+            if total_hits > 0:
+                logger.info(
+                    f"Found {total_hits} documents to delete for inventoryId: {inventory_id}"
+                )
+                deletion_results = []
+
+                # Delete each document found
+                for hit in search_result["hits"]["hits"]:
+                    doc_id = hit["_id"]
+                    logger.info(f"Deleting document with ID: {doc_id}")
+
+                    # Delete the document using the DELETE /{index}/_doc/{id} endpoint
+                    result = self.client.delete(
+                        index=INDEX_NAME,
+                        id=doc_id,
+                        # refresh=True  # Force refresh after deletion
+                    )
+                    deletion_results.append(result)
+                    logger.info(
+                        f"Delete result for doc {doc_id}: {json.dumps(result, default=str)}"
+                    )
+
+                return {
+                    "deleted_count": len(deletion_results),
+                    "results": deletion_results,
+                }
+            else:
+                logger.warning(
+                    f"No documents found to delete for inventoryId: {inventory_id}"
+                )
+                return {"result": "not_found", "deleted_count": 0}
+
+        except Exception as e:
+            logger.error(f"Error deleting documents: {str(e)}")
+            raise
 
 
 def normalize_storage_info(storage_info: Dict) -> Dict:
@@ -172,6 +213,52 @@ def normalize_asset_data(inventory_data: Dict) -> Dict:
     return normalized_data
 
 
+def delete_s3_objects(asset_data: Dict) -> None:
+    """Deletes all S3 objects associated with the asset"""
+    try:
+        # Delete main representation
+        main_rep = asset_data.get("DigitalSourceAsset", {}).get(
+            "MainRepresentation", {}
+        )
+        if main_rep:
+            main_storage = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            if main_storage:
+                main_bucket = main_storage.get("Bucket")
+                main_key = main_storage.get("ObjectKey", {}).get("FullPath")
+                if main_bucket and main_key:
+                    logger.info(
+                        "Deleting main representation",
+                        extra={
+                            "bucket": main_bucket,
+                            "key": main_key,
+                        },
+                    )
+                    s3.delete_object(Bucket=main_bucket, Key=main_key)
+
+        # Delete derived representations
+        derived_reps = asset_data.get("DerivedRepresentations", [])
+        for derived in derived_reps:
+            if not derived:
+                continue
+            storage = derived.get("StorageInfo", {}).get("PrimaryLocation", {})
+            if storage:
+                derived_bucket = storage.get("Bucket")
+                derived_key = storage.get("ObjectKey", {}).get("FullPath")
+                if derived_bucket and derived_key:
+                    logger.info(
+                        "Deleting derived representation",
+                        extra={
+                            "bucket": derived_bucket,
+                            "key": derived_key,
+                        },
+                    )
+                    s3.delete_object(Bucket=derived_bucket, Key=derived_key)
+
+    except Exception as e:
+        logger.error(f"Error deleting S3 objects: {str(e)}")
+        raise
+
+
 def process_dynamodb_record(
     record: DynamoDBRecord, opensearch_client: OpenSearchClient
 ) -> None:
@@ -180,14 +267,25 @@ def process_dynamodb_record(
 
     # Handle DELETE events
     if event_name == "REMOVE":
-        inventory_id = record.dynamodb.old_image.get("Inventory", {}).get("InventoryID")
+        # Get the old image (data before deletion)
+        old_data = record.dynamodb.old_image
+        inventory_id = old_data.get("InventoryID")
         logger.info(f"Processing DELETE event for inventoryId: {inventory_id}")
+
         if inventory_id:
             try:
+                # First delete all S3 objects
+                delete_s3_objects(old_data)
+                logger.info("Successfully deleted S3 objects")
+
+                # Then delete from OpenSearch
                 delete_result = opensearch_client.delete_documents(inventory_id)
-                logger.info(f"Delete result: {json.dumps(delete_result, default=str)}")
+                logger.info(
+                    f"Delete result from OpenSearch: {json.dumps(delete_result, default=str)}"
+                )
+
             except Exception as e:
-                logger.error(f"Error deleting documents: {str(e)}")
+                logger.error(f"Error in deletion process: {str(e)}")
                 raise
         return
 

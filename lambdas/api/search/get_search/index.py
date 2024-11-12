@@ -176,45 +176,43 @@ def generate_presigned_url(
 
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
-    should_queries = []
     search_fields = params.search_fields or [
-        "mainRepresentation.storage.path",
+        "mainRepresentation.storage.path^2",  # Boosted field
         "assetType",
         "metadata.consolidated.description",
         "metadata.consolidated.keywords",
+        "*",  # This will search all indexed fields
     ]
 
-    # Add search fields
-    for field in search_fields:
-        should_queries.append(
-            {
-                "match_phrase_prefix": {
-                    field: {"query": params.q, "slop": 2, "max_expansions": 50}
-                }
-            }
-        )
+    # Build base query with multi_match
+    query = {
+        "bool": {
+            "should": [
+                {
+                    "multi_match": {
+                        "query": params.q,
+                        "fields": search_fields,
+                        "type": "best_fields",
+                        "fuzziness": "AUTO",
+                        "prefix_length": 2,
+                    }
+                },
+                # Keep wildcard search for exact path matches
+                {"wildcard": {"mainRepresentation.storage.path": f"*{params.q}*"}},
+            ],
+            "minimum_should_match": 1,
+        }
+    }
 
-    # Add wildcard search for path
-    should_queries.append(
-        {"wildcard": {"mainRepresentation.storage.path": f"*{params.q}*"}}
-    )
-
-    # Build filters
-    filters = []
+    # Add filters if they exist
     if params.filters:
+        filters = []
         for filter_item in params.filters:
             if filter_item.get("operator") == "term":
                 filters.append({"term": {filter_item["field"]: filter_item["value"]}})
             elif filter_item.get("operator") == "range":
                 filters.append({"range": {filter_item["field"]: filter_item["value"]}})
-
-    query = {
-        "bool": {
-            "should": should_queries,
-            "minimum_should_match": 1,
-            "filter": filters if filters else [],
-        }
-    }
+        query["bool"]["filter"] = filters
 
     return {
         "query": query,
@@ -280,7 +278,14 @@ def perform_search(params: SearchParams) -> Dict:
 
     try:
         search_body = build_search_query(params)
+        # Log the search query being sent to OpenSearch
+        logger.info("OpenSearch query body:", extra={"query": search_body})
+
         response = client.search(body=search_body, index=index_name)
+
+        # Log total hits and response from OpenSearch
+        logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
+        logger.info("OpenSearch response:", extra={"response": response})
 
         hits = []
         for hit in response["hits"]["hits"]:
@@ -288,8 +293,12 @@ def perform_search(params: SearchParams) -> Dict:
                 result = process_search_hit(hit)
                 hits.append(result)
             except Exception as e:
-                logger.warning(f"Error processing hit: {str(e)}")
+                # Enhanced error logging
+                logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                 continue
+
+        # Log processed hits count
+        logger.info(f"Successfully processed hits: {len(hits)}")
 
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],

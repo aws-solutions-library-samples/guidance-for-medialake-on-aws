@@ -17,13 +17,15 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.parser import parse_json_body, ValidationError
+from aws_lambda_powertools.utilities.parser import event_parser
+from pydantic import BaseModel, Field
 from botocore.exceptions import ClientError
 import boto3
 import os
 import json
 from http import HTTPStatus
 import re
+from decimal import Decimal
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-rename-service")
@@ -34,6 +36,12 @@ metrics = Metrics(namespace="AssetRenameService", service="asset-rename-service"
 dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+
+class RenameRequest(BaseModel):
+    """Request model for rename operation"""
+
+    newName: str = Field(..., description="New name for the asset")
 
 
 class AssetRenameError(Exception):
@@ -68,23 +76,22 @@ def validate_name(name: str) -> None:
         )
 
 
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder for Decimal types."""
+
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+
 @tracer.capture_method
-def get_asset(inventory_id: str, old_name: str) -> Dict[str, Any]:
+def get_asset(inventory_id: str) -> Dict[str, Any]:
     """
-    Retrieves asset details and validates old name.
-
-    Args:
-        inventory_id: The inventory ID of the asset
-        old_name: The current name to verify
-
-    Returns:
-        Dict containing the asset details
-
-    Raises:
-        AssetRenameError: If retrieval fails or name doesn't match
+    Retrieves asset details with proper path information.
     """
     try:
-        response = table.get_item(Key={"id": inventory_id})
+        response = table.get_item(Key={"InventoryID": inventory_id})
 
         if "Item" not in response:
             raise AssetRenameError(
@@ -92,10 +99,25 @@ def get_asset(inventory_id: str, old_name: str) -> Dict[str, Any]:
             )
 
         asset = response["Item"]
-        if asset["mainRepresentation"]["storage"]["path"] != old_name:
-            raise AssetRenameError(
-                "Current name does not match asset record", HTTPStatus.CONFLICT
-            )
+
+        # Convert any Decimal values to float/str for JSON serialization
+        asset = json.loads(json.dumps(asset, cls=DecimalEncoder))
+
+        # Validate required paths exist
+        if not all(
+            [
+                asset.get("DigitalSourceAsset"),
+                asset["DigitalSourceAsset"].get("MainRepresentation"),
+                asset["DigitalSourceAsset"]["MainRepresentation"].get("StorageInfo"),
+                asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"].get(
+                    "PrimaryLocation"
+                ),
+                asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+                    "PrimaryLocation"
+                ].get("ObjectKey"),
+            ]
+        ):
+            raise AssetRenameError("Invalid asset structure", HTTPStatus.BAD_REQUEST)
 
         return asset
 
@@ -104,56 +126,339 @@ def get_asset(inventory_id: str, old_name: str) -> Dict[str, Any]:
         raise AssetRenameError(f"Failed to retrieve asset: {str(e)}")
 
 
+def get_object_name_from_path(full_path: str) -> str:
+    """Extracts the object name from the full path."""
+    return full_path.split("/")[-1]
+
+
 @tracer.capture_method
-def rename_s3_object(bucket: str, old_key: str, new_key: str) -> None:
+def copy_s3_object_with_tags(
+    source_bucket: str,
+    source_key: str,
+    dest_bucket: str,
+    dest_key: str,
+    inventory_id: str,
+    master_id: str = None,
+    is_master: bool = False,
+) -> None:
     """
-    Renames (copies and deletes) an S3 object.
+    Copies an S3 object with its tags and adds inventory ID tag.
 
     Args:
-        bucket: The S3 bucket name
-        old_key: The current object key
-        new_key: The new object key
-
-    Raises:
-        AssetRenameError: If the rename operation fails
+        source_bucket: Source bucket name
+        source_key: Source object key
+        dest_bucket: Destination bucket name
+        dest_key: Destination object key
+        inventory_id: The inventory ID to tag the object with
+        master_id: Optional master ID for tagging master representation
+        is_master: Flag indicating if this is the master representation
     """
     try:
-        # Copy object to new key
-        s3.copy_object(Bucket=bucket, CopySource=f"{bucket}/{old_key}", Key=new_key)
+        # Get source object tags
+        try:
+            tags_response = s3.get_object_tagging(Bucket=source_bucket, Key=source_key)
+            existing_tags = tags_response.get("TagSet", [])
 
-        # Delete old object
-        s3.delete_object(Bucket=bucket, Key=old_key)
+            # Remove any existing AssetID and MasterID tags if present
+            tags = [
+                tag
+                for tag in existing_tags
+                if tag["Key"] not in ["AssetID", "MasterID"]
+            ]
+
+            # Add the inventory ID tag
+            tags.append({"Key": "AssetID", "Value": inventory_id})
+
+            # Add master ID tag only for master representation
+            if is_master and master_id:
+                tags.append({"Key": "MasterID", "Value": master_id})
+
+            logger.info(
+                "Retrieved existing tags and added required tags",
+                extra={
+                    "source_bucket": source_bucket,
+                    "source_key": source_key,
+                    "tag_count": len(tags),
+                    "inventory_id": inventory_id,
+                    "master_id": master_id if is_master else None,
+                    "is_master": is_master,
+                },
+            )
+
+        except ClientError as e:
+            logger.warning(f"Could not get tags for {source_key}: {str(e)}")
+            # If we can't get existing tags, set required tags
+            tags = [{"Key": "AssetID", "Value": inventory_id}]
+            if is_master and master_id:
+                tags.append({"Key": "MasterID", "Value": master_id})
+
+        # Copy object with tags
+        s3.copy_object(
+            Bucket=dest_bucket,
+            CopySource={"Bucket": source_bucket, "Key": source_key},
+            Key=dest_key,
+            TaggingDirective="REPLACE",
+            Tagging=format_tags_for_copy(tags),
+        )
+
+        logger.info(
+            "Successfully copied object with tags",
+            extra={
+                "source_bucket": source_bucket,
+                "source_key": source_key,
+                "dest_bucket": dest_bucket,
+                "dest_key": dest_key,
+                "tags_count": len(tags),
+                "inventory_id": inventory_id,
+                "master_id": master_id if is_master else None,
+                "is_master": is_master,
+            },
+        )
 
     except ClientError as e:
-        logger.error(f"S3 error: {str(e)}")
-        raise AssetRenameError(f"Failed to rename S3 object: {str(e)}")
+        logger.error(
+            "Failed to copy object with tags",
+            extra={
+                "error": str(e),
+                "source_bucket": source_bucket,
+                "source_key": source_key,
+                "inventory_id": inventory_id,
+                "master_id": master_id if is_master else None,
+                "is_master": is_master,
+            },
+        )
+        raise
+
+
+def format_tags_for_copy(tags: List[Dict[str, str]]) -> str:
+    """Formats tags for S3 copy operation."""
+    return "&".join([f"{tag['Key']}={tag['Value']}" for tag in tags])
 
 
 @tracer.capture_method
-def update_asset_record(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
+def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]]:
     """
-    Updates the asset record in DynamoDB with the new name.
-
-    Args:
-        asset: The asset record to update
-        new_name: The new name to set
-
-    Returns:
-        Dict containing the updated asset
-
-    Raises:
-        AssetRenameError: If the update fails
+    Copies all S3 objects with new names.
+    Returns list of successful copies for cleanup if needed.
     """
+    successful_copies = []
     try:
-        # Update main representation path
-        asset["mainRepresentation"]["storage"]["path"] = new_name
+        # Get inventory ID and master ID from asset
+        inventory_id = asset.get("InventoryID")
+        master_id = asset["DigitalSourceAsset"]["MainRepresentation"].get("ID")
 
-        # Update derived representations paths
-        for rep in asset.get("derivedRepresentations", []):
-            old_path = rep["storage"]["path"]
-            rep["storage"]["path"] = old_path.replace(
-                asset["mainRepresentation"]["storage"]["path"], new_name
+        if not inventory_id:
+            raise AssetRenameError("Missing inventory ID in asset data")
+
+        # Copy main representation
+        main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
+        main_storage = main_rep["StorageInfo"]["PrimaryLocation"]
+        source_bucket = main_storage["Bucket"]
+        source_path = main_storage["ObjectKey"]["FullPath"]
+
+        # Update object name in DynamoDB
+        main_rep["Name"] = get_object_name_from_path(new_name)
+        new_path = f"{new_name}"
+
+        logger.info(
+            "Starting main representation copy",
+            extra={
+                "source_bucket": source_bucket,
+                "source_path": source_path,
+                "destination_path": new_path,
+                "object_name": main_rep["Name"],
+                "inventory_id": inventory_id,
+                "master_id": master_id,
+                "operation": "copy_main_representation",
+            },
+        )
+
+        # Copy main representation with both inventory ID and master ID tags
+        copy_s3_object_with_tags(
+            source_bucket,
+            source_path,
+            source_bucket,
+            new_path,
+            inventory_id,
+            master_id,
+            is_master=True,  # This is the master representation
+        )
+
+        successful_copies.append({"bucket": source_bucket, "key": new_path})
+
+        # Copy derived representations (only with inventory ID)
+        for idx, derived in enumerate(
+            asset["DigitalSourceAsset"].get("DerivedRepresentations", [])
+        ):
+            if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
+                continue
+
+            storage = derived["StorageInfo"]["PrimaryLocation"]
+            derived_bucket = storage["Bucket"]
+            derived_path = storage["ObjectKey"]["FullPath"]
+            new_derived_path = derived_path.replace(source_path, new_path)
+
+            # Update object name in DynamoDB
+            derived["Name"] = get_object_name_from_path(new_derived_path)
+
+            logger.info(
+                f"Copying derived representation {idx + 1}",
+                extra={
+                    "derived_index": idx,
+                    "source_bucket": derived_bucket,
+                    "source_path": derived_path,
+                    "destination_path": new_derived_path,
+                    "object_name": derived["Name"],
+                    "inventory_id": inventory_id,
+                    "operation": "copy_derived_representation",
+                },
             )
+
+            # Copy derived representation with only inventory ID tag
+            copy_s3_object_with_tags(
+                derived_bucket,
+                derived_path,
+                derived_bucket,
+                new_derived_path,
+                inventory_id,
+                is_master=False,  # This is not the master representation
+            )
+
+            successful_copies.append(
+                {"bucket": derived_bucket, "key": new_derived_path}
+            )
+
+        return successful_copies
+
+    except ClientError as e:
+        logger.error(
+            "S3 copy operation failed",
+            extra={
+                "error_code": e.response["Error"]["Code"],
+                "error_message": e.response["Error"]["Message"],
+                "successful_copies": successful_copies,
+                "operation": "copy_error",
+                "inventory_id": inventory_id if "inventory_id" in locals() else None,
+                "master_id": master_id if "master_id" in locals() else None,
+            },
+        )
+        # If any copy fails, clean up successful copies
+        cleanup_copied_objects(successful_copies)
+        raise AssetRenameError(f"Failed to copy S3 objects: {str(e)}")
+
+
+@tracer.capture_method
+def cleanup_copied_objects(copies: List[Dict[str, Any]]) -> None:
+    """Deletes any successfully copied objects during rollback."""
+    for copy in copies:
+        try:
+            s3.delete_object(Bucket=copy["bucket"], Key=copy["key"])
+        except ClientError as e:
+            logger.error(f"Failed to cleanup copied object: {str(e)}")
+
+
+@tracer.capture_method
+def delete_original_objects(asset: Dict[str, Any]) -> None:
+    """Deletes original objects after successful copy."""
+    try:
+        # Delete main representation
+        main_storage = asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+            "PrimaryLocation"
+        ]
+        main_bucket = main_storage["Bucket"]
+        main_key = main_storage["ObjectKey"]["FullPath"]
+
+        logger.info(
+            "Deleting main representation",
+            extra={
+                "bucket": main_bucket,
+                "key": main_key,
+                "operation": "delete_main_representation",
+            },
+        )
+
+        s3.delete_object(Bucket=main_bucket, Key=main_key)
+
+        logger.info(
+            "Successfully deleted main representation",
+            extra={
+                "bucket": main_bucket,
+                "key": main_key,
+                "operation": "delete_main_representation_success",
+            },
+        )
+
+        # Delete derived representations
+        for idx, derived in enumerate(
+            asset["DigitalSourceAsset"].get("DerivedRepresentations", [])
+        ):
+            if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
+                logger.warning(
+                    "Skipping derived representation deletion - missing storage info",
+                    extra={"derived_index": idx, "operation": "delete_derived_skip"},
+                )
+                continue
+
+            storage = derived["StorageInfo"]["PrimaryLocation"]
+            derived_bucket = storage["Bucket"]
+            derived_key = storage["ObjectKey"]["FullPath"]
+
+            logger.info(
+                f"Deleting derived representation {idx + 1}",
+                extra={
+                    "derived_index": idx,
+                    "bucket": derived_bucket,
+                    "key": derived_key,
+                    "operation": "delete_derived_representation",
+                },
+            )
+
+            s3.delete_object(Bucket=derived_bucket, Key=derived_key)
+
+            logger.info(
+                f"Successfully deleted derived representation {idx + 1}",
+                extra={
+                    "derived_index": idx,
+                    "bucket": derived_bucket,
+                    "key": derived_key,
+                    "operation": "delete_derived_representation_success",
+                },
+            )
+
+    except ClientError as e:
+        logger.error(
+            "Failed to delete original objects",
+            extra={
+                "error_code": e.response["Error"]["Code"],
+                "error_message": e.response["Error"]["Message"],
+                "operation": "delete_error",
+            },
+        )
+        raise AssetRenameError("Failed to delete original objects after copy")
+
+
+@tracer.capture_method
+def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
+    """Updates all paths in the asset record."""
+    try:
+        main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
+        old_path = main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+
+        # Update main representation path
+        main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"] = new_name
+
+        # Update derived representation paths
+        for derived in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
+            if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
+                continue
+
+            derived_path = derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
+                "FullPath"
+            ]
+            new_derived_path = derived_path.replace(old_path, new_name)
+            derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
+                "FullPath"
+            ] = new_derived_path
 
         # Update DynamoDB record
         table.put_item(Item=asset)
@@ -181,7 +486,7 @@ def create_response(
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Credentials": True,
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=DecimalEncoder),  # Use custom encoder
     }
 
 
@@ -189,54 +494,36 @@ def create_response(
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler for asset renaming.
-
-    Args:
-        event: API Gateway event
-        context: Lambda context
-
-    Returns:
-        API Gateway response
-    """
+    """Lambda handler for asset renaming."""
     try:
-        # Extract and validate path parameter
+        # Extract and validate parameters
         inventory_id = event.get("pathParameters", {}).get("id")
         if not inventory_id:
             raise AssetRenameError("Missing inventory ID", HTTPStatus.BAD_REQUEST)
 
-        # Parse and validate request body
+        # Parse request body
         try:
-            body = parse_json_body(event)
-            old_name = body.get("oldName")
-            new_name = body.get("newName")
+            body = json.loads(event.get("body", "{}"))
+            rename_request = RenameRequest(newName=body.get("newName"))
+        except (json.JSONDecodeError, ValueError) as e:
+            raise AssetRenameError(
+                f"Invalid request body: {str(e)}", HTTPStatus.BAD_REQUEST
+            )
 
-            if not old_name or not new_name:
-                raise AssetRenameError(
-                    "Missing oldName or newName in request body", HTTPStatus.BAD_REQUEST
-                )
+        # Validate new name
+        validate_name(rename_request.newName)
 
-            validate_name(new_name)
+        # Get asset
+        asset = get_asset(inventory_id)
 
-        except ValidationError as e:
-            raise AssetRenameError(str(e), HTTPStatus.BAD_REQUEST)
+        # Copy all objects with new names
+        successful_copies = copy_s3_objects(asset, rename_request.newName)
 
-        # Get and validate asset
-        asset = get_asset(inventory_id, old_name)
+        # Delete original objects
+        delete_original_objects(asset)
 
-        # Rename main representation in S3
-        rename_s3_object(
-            asset["mainRepresentation"]["storage"]["bucket"], old_name, new_name
-        )
-
-        # Rename derived representations in S3
-        for rep in asset.get("derivedRepresentations", []):
-            old_path = rep["storage"]["path"]
-            new_path = old_path.replace(old_name, new_name)
-            rename_s3_object(rep["storage"]["bucket"], old_path, new_path)
-
-        # Update asset record
-        updated_asset = update_asset_record(asset, new_name)
+        # Update asset record with new paths
+        updated_asset = update_asset_paths(asset, rename_request.newName)
 
         # Record successful rename metric
         metrics.add_metric(name="AssetRenames", unit=MetricUnit.Count, value=1)
