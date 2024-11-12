@@ -175,7 +175,7 @@ const SearchPage: React.FC = () => {
                 flexDirection: 'column',
                 gap: 6
             }}>
-                <Typography
+                {/* <Typography
                     variant="h4"
                     component="h1"
                     sx={{
@@ -187,13 +187,13 @@ const SearchPage: React.FC = () => {
                     }}
                 >
                     Media Library
-                </Typography>
+                </Typography> */}
 
-                {filters.mediaTypes.videos && <VideoResults videos={mockVideos} />}
+                {/* {filters.mediaTypes.videos && <VideoResults videos={mockVideos} />} */}
                 {filters.mediaTypes.images && imageResults.length > 0 && (
                     <ImageResults images={imageResults} />
                 )}
-                {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />}
+                {/* {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />} */}
             </Box>
 
             {/* Filter Sidebar - Now properly aligned with TopBar */}
