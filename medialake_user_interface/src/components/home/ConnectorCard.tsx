@@ -34,14 +34,15 @@ export const ConnectorCard: React.FC<ConnectorCardProps> = ({ connector }) => {
     });
 
     const handleClick = () => {
-        if (connector.type === 'amazonS3' && !isLoading) {
+
+        if (connector.type === 's3' && !isLoading) {
             navigate(`/s3/explorer/${connector.id}`);
         }
     };
 
     const getConnectorTypeColor = (type: string) => {
         switch (type.toLowerCase()) {
-            case 'amazons3':
+            case 's3':
                 return theme.palette.primary.main;
             default:
                 return theme.palette.secondary.main;
