@@ -195,8 +195,10 @@ class ConnectorsConstruct(Construct):
                     "lambda:DeleteFunction",
                     "lambda:TagResource",
                     "lambda:CreateEventSourceMapping",
+                    "lambda:GetLayerVersion"
                 ],
                 resources=[
+                    f"arn:aws:lambda:*:*:layer:*:*", # Powertools layer was in a different account
                     f"arn:aws:lambda:*:{account_id}:function:*",
                     f"arn:aws:lambda:*:{account_id}:event-source-mapping:*",  # Added resource
                 ],
