@@ -12,7 +12,14 @@ from requests_aws4auth import AWS4Auth
 from opensearchpy import RequestsHttpConnection, OpenSearch, AWSV4SignerAuth
 import time  # Add this import at the top with other imports
 
-logger = Logger()
+# Initialize logger with default level WARNING, but check environment variable
+log_level = os.environ.get("LOG_LEVEL", "DEBUG").upper()
+logger = Logger(
+    service="asset-table-stream",
+    level=log_level,
+    json_default=str,  # Handles datetime and other complex types
+    use_rfc3339=True,  # Standardized timestamp format
+)
 
 HOST = os.environ["OPENSEARCH_ENDPOINT"]
 INDEX_NAME = os.environ["OPENSEARCH_INDEX"]
@@ -226,36 +233,79 @@ def delete_s3_objects(asset_data: Dict) -> None:
                 main_bucket = main_storage.get("Bucket")
                 main_key = main_storage.get("ObjectKey", {}).get("FullPath")
                 if main_bucket and main_key:
+                    logger.debug(
+                        "Attempting to delete main representation",
+                        extra={
+                            "bucket": main_bucket,
+                            "key": main_key,
+                            "operation": "delete_main_representation",
+                        },
+                    )
+                    s3.delete_object(Bucket=main_bucket, Key=main_key)
                     logger.info(
-                        "Deleting main representation",
+                        "Successfully deleted main representation",
                         extra={
                             "bucket": main_bucket,
                             "key": main_key,
                         },
                     )
-                    s3.delete_object(Bucket=main_bucket, Key=main_key)
+                else:
+                    logger.warning(
+                        "Missing bucket or key for main representation",
+                        extra={
+                            "bucket": main_bucket,
+                            "key": main_key,
+                            "asset_data": asset_data,
+                        },
+                    )
 
         # Delete derived representations
         derived_reps = asset_data.get("DerivedRepresentations", [])
         for derived in derived_reps:
             if not derived:
+                logger.debug("Empty derived representation found, skipping")
                 continue
+
             storage = derived.get("StorageInfo", {}).get("PrimaryLocation", {})
             if storage:
                 derived_bucket = storage.get("Bucket")
                 derived_key = storage.get("ObjectKey", {}).get("FullPath")
                 if derived_bucket and derived_key:
+                    logger.debug(
+                        "Attempting to delete derived representation",
+                        extra={
+                            "bucket": derived_bucket,
+                            "key": derived_key,
+                            "operation": "delete_derived_representation",
+                        },
+                    )
+                    s3.delete_object(Bucket=derived_bucket, Key=derived_key)
                     logger.info(
-                        "Deleting derived representation",
+                        "Successfully deleted derived representation",
                         extra={
                             "bucket": derived_bucket,
                             "key": derived_key,
                         },
                     )
-                    s3.delete_object(Bucket=derived_bucket, Key=derived_key)
+                else:
+                    logger.warning(
+                        "Missing bucket or key for derived representation",
+                        extra={
+                            "bucket": derived_bucket,
+                            "key": derived_key,
+                            "derived_data": derived,
+                        },
+                    )
 
     except Exception as e:
-        logger.error(f"Error deleting S3 objects: {str(e)}")
+        logger.error(
+            "Failed to delete S3 objects",
+            extra={
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "asset_data": asset_data,
+            },
+        )
         raise
 
 
@@ -263,30 +313,74 @@ def process_dynamodb_record(
     record: DynamoDBRecord, opensearch_client: OpenSearchClient
 ) -> None:
     event_name = record.event_name
-    logger.info(f"Processing DynamoDB record with event type: {event_name}")
+    logger.debug(
+        "Starting DynamoDB record processing",
+        extra={
+            "event_name": event_name,
+            "record_id": record.event_id,
+        },
+    )
 
-    # Handle DELETE events
-    if event_name == "REMOVE":
-        # Get the old image (data before deletion)
+    # Handle DELETE events - Fix the event name comparison
+    if (
+        event_name == "DynamoDBRecordEventName.REMOVE"
+    ):  # This is the actual event name from the logs
         old_data = record.dynamodb.old_image
-        inventory_id = old_data.get("InventoryID")
-        logger.info(f"Processing DELETE event for inventoryId: {inventory_id}")
+        logger.debug(
+            "Processing REMOVE event",
+            extra={
+                "old_data": old_data,
+            },
+        )
+
+        # Get the InventoryID from the correct path in old_image
+        inventory_id = old_data.get("InventoryID")  # Changed from nested get
+        logger.info(
+            "Processing DELETE event",
+            extra={
+                "inventory_id": inventory_id,
+                "operation": "delete_asset",
+                "old_data": old_data,
+            },
+        )
 
         if inventory_id:
             try:
-                # First delete all S3 objects
-                delete_s3_objects(old_data)
-                logger.info("Successfully deleted S3 objects")
-
-                # Then delete from OpenSearch
+                logger.debug(
+                    "Starting OpenSearch documents deletion",
+                    extra={"inventory_id": inventory_id},
+                )
                 delete_result = opensearch_client.delete_documents(inventory_id)
                 logger.info(
-                    f"Delete result from OpenSearch: {json.dumps(delete_result, default=str)}"
+                    "Successfully deleted OpenSearch documents",
+                    extra={"delete_result": delete_result},
                 )
 
+                logger.debug(
+                    "Starting S3 objects deletion", extra={"inventory_id": inventory_id}
+                )
+                delete_s3_objects(old_data)  # Pass the entire old_data
+                logger.info("Successfully deleted S3 objects")
+
             except Exception as e:
-                logger.error(f"Error in deletion process: {str(e)}")
+                logger.error(
+                    "Failed to process DELETE event",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "inventory_id": inventory_id,
+                        "old_data": old_data,
+                    },
+                )
                 raise
+        else:
+            logger.warning(
+                "DELETE event missing inventory_id",
+                extra={
+                    "old_data": old_data,
+                    "event_name": event_name,
+                },
+            )
         return
 
     # Handle INSERT and MODIFY events
