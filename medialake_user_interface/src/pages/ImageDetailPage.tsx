@@ -1,88 +1,13 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAsset } from '../api/hooks/useAssets';
+import { useAsset, Asset } from '../api/hooks/useAssets';
 import { Box, Typography, Grid, Paper, CircularProgress, useTheme, Chip, Button, Divider, Card, CardMedia, CardContent, IconButton, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import DownloadIcon from '@mui/icons-material/Download';
 import InfoIcon from '@mui/icons-material/Info';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
-interface Asset {
-    id: string;
-    assetId: string;
-    assetType: string;
-    createDate: string;
-    metadata: {
-        description?: string;
-        resolution?: string;
-        fileSize?: string;
-        colorSpace?: string;
-        iptc?: {
-            creator: string;
-            copyright: string;
-            caption: string;
-            keywords: string[];
-        };
-        exif?: {
-            make: string;
-            model: string;
-            exposureTime: string;
-            fNumber: string;
-            iso: string;
-            focalLength: string;
-            dateTaken: string;
-        };
-        contentAnalysis?: {
-            summary: string;
-            detectedObjects: string[];
-            people: string[];
-            landmarks: string[];
-            tags: string[];
-            aiGenerated: boolean;
-        };
-    };
-    mainRepresentation: {
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    };
-    derivedRepresentations: Array<{
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string | null;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    }>;
-}
+import { ImageViewer } from '../components/common/ImageViewer'
 
 interface Pipeline {
     id: string;
@@ -97,29 +22,39 @@ const ImageDetailPage: React.FC = () => {
     const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
 
-    const [relatedVersions] = useState(assetData?.data ? [
-        {
-            id: '1',
-            src: assetData.data.mainRepresentation.storage.path,
-            type: 'Thumbnail',
-            description: 'Compressed thumbnail version',
-            createdAt: new Date().toISOString()
-        },
-        {
-            id: '2',
-            src: assetData.data.mainRepresentation.storage.path,
-            type: 'High Resolution',
-            description: 'Original high resolution version',
-            createdAt: new Date().toISOString()
-        },
-        {
-            id: '3',
-            src: assetData.data.mainRepresentation.storage.path,
-            type: 'Web Optimized',
-            description: 'Optimized for web display',
-            createdAt: new Date().toISOString()
-        }
-    ] : []);
+
+    const [derivedRepresentations] = useState(() => {
+        if (!assetData?.data) return [];
+
+        const representations = [
+            // Include the original (master) representation
+            {
+                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+                src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: 'Original',
+                description: 'Original high resolution version',
+                createdAt: assetData.data.asset.DigitalSourceAsset.CreateDate,
+                format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+                size: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
+            },
+            // Dynamically add all DerivedRepresentations
+            ...assetData.data.asset.DerivedRepresentations.map(rep => ({
+                id: rep.ID,
+                src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1), // Capitalize the purpose
+                description: `${rep.Purpose} version`,
+                createdAt: new Date().toISOString(), // Note: Actual creation date not provided in the data
+                format: rep.Format,
+                size: rep.StorageInfo.PrimaryLocation.FileInfo.Size,
+                resolution: rep.ImageSpec?.Resolution
+                    ? `${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}`
+                    : undefined
+            }))
+        ];
+
+        return representations;
+    });
+
 
     const [availablePipelines] = useState([
         {
@@ -164,7 +99,19 @@ const ImageDetailPage: React.FC = () => {
         );
     }
 
-    const asset = assetData.data;
+    const getProxyUrl = () => {
+        if (assetData?.data?.asset?.DerivedRepresentations) {
+            const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
+            if (proxyRep) {
+                return proxyRep.URL;
+            }
+        }
+        return assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Path;
+    };
+
+    const proxyUrl = getProxyUrl();
+
+    console.log(proxyUrl)
 
     return (
         <Box sx={{ flexGrow: 1, p: 3, maxWidth: '1600px', margin: '0 auto' }}>
@@ -176,83 +123,87 @@ const ImageDetailPage: React.FC = () => {
                 {/* Main Image Display */}
                 <Grid item xs={12} md={8}>
                     <Paper elevation={3} sx={{ p: 2, position: 'relative' }}>
-                        <img
-                            src={asset.mainRepresentation.storage.path}
-                            alt={asset.mainRepresentation.storage.path}
+                        {/* <img
+                            src={proxyUrl}
+                            alt={assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Path}
                             style={{
                                 width: '100%',
                                 height: 'auto',
                                 maxHeight: '70vh',
                                 objectFit: 'contain'
                             }}
+                        /> */}
+                        <ImageViewer
+                            imageSrc={proxyUrl}
+                            maxHeight={600}
                         />
-                        <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
+                        {/* <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
                             <Tooltip title="Download Original">
                                 <IconButton color="primary">
                                     <DownloadIcon />
                                 </IconButton>
                             </Tooltip>
-                        </Box>
+                        </Box> */}
                     </Paper>
                 </Grid>
 
                 {/* Quick Info and Actions */}
                 <Grid item xs={12} md={4}>
                     <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                        <Typography variant="h6" gutterBottom>{asset.mainRepresentation.storage.path}</Typography>
-                        <Typography variant="body2" color="text.secondary" paragraph>
-                            {asset.metadata.description}
-                        </Typography>
+                        <Typography variant="h6" gutterBottom>{assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Path}</Typography>
+                        {/* <Typography variant="body2" color="text.secondary" paragraph>
+                            {asset.Metadata.Description}
+                        </Typography> */}
                         <Divider sx={{ my: 2 }} />
                         <Grid container spacing={2}>
                             <Grid item xs={6}>
                                 <Typography variant="subtitle2">Resolution</Typography>
-                                <Typography variant="body2">{asset.metadata.resolution}</Typography>
+                                {/* <Typography variant="body2">{asset.Metadata.resolution}</Typography> */}
                             </Grid>
                             <Grid item xs={6}>
                                 <Typography variant="subtitle2">File Size</Typography>
-                                <Typography variant="body2">{asset.metadata.fileSize}</Typography>
+                                {/* <Typography variant="body2">{asset.Metadata.fileSize}</Typography> */}
                             </Grid>
                             <Grid item xs={6}>
                                 <Typography variant="subtitle2">Color Space</Typography>
-                                <Typography variant="body2">{asset.metadata.colorSpace}</Typography>
+                                {/* <Typography variant="body2">{asset.Metadata.colorSpace}</Typography> */}
                             </Grid>
                             <Grid item xs={6}>
                                 <Typography variant="subtitle2">Created</Typography>
                                 <Typography variant="body2">
-                                    {new Date(asset.createDate).toLocaleDateString()}
+                                    {new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()}
                                 </Typography>
                             </Grid>
                         </Grid>
                     </Paper>
 
                     {/* Content Analysis */}
-                    {asset.metadata.contentAnalysis && (
+                    {/* {asset.Metadata.contentAnalysis && (
                         <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
                             <Typography variant="h6" gutterBottom>Content Analysis</Typography>
                             <Typography variant="body2" paragraph>
-                                {asset.metadata.contentAnalysis.summary}
+                                {asset.Metadata.contentAnalysis.summary}
                             </Typography>
                             <Box sx={{ mb: 1 }}>
                                 <Typography variant="subtitle2" gutterBottom>Detected Objects:</Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {asset.metadata.contentAnalysis.detectedObjects.map((obj, index) => (
+                                    {asset.Metadata.contentAnalysis.detectedObjects.map((obj, index) => (
                                         <Chip key={index} label={obj} size="small" />
                                     ))}
                                 </Box>
                             </Box>
-                            {asset.metadata.contentAnalysis.people.length > 0 && (
+                            {asset.Metadata.contentAnalysis.people.length > 0 && (
                                 <Box sx={{ mb: 1 }}>
                                     <Typography variant="subtitle2" gutterBottom>People:</Typography>
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                        {asset.metadata.contentAnalysis.people.map((person, index) => (
+                                        {asset.Metadata.contentAnalysis.people.map((person, index) => (
                                             <Chip key={index} label={person} size="small" />
                                         ))}
                                     </Box>
                                 </Box>
                             )}
                         </Paper>
-                    )}
+                    )} */}
                 </Grid>
 
                 {/* Related Versions */}
@@ -260,7 +211,7 @@ const ImageDetailPage: React.FC = () => {
                     <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
                         <Typography variant="h6" gutterBottom>Related Versions</Typography>
                         <Grid container spacing={2}>
-                            {relatedVersions.map((version) => (
+                            {derivedRepresentations.map((version) => (
                                 <Grid item xs={12} sm={6} md={4} key={version.id}>
                                     <Card>
                                         <CardMedia
@@ -289,27 +240,27 @@ const ImageDetailPage: React.FC = () => {
                 <Grid item xs={12} md={6}>
                     <Paper elevation={3} sx={{ p: 2 }}>
                         <Typography variant="h6" gutterBottom>IPTC Metadata</Typography>
-                        {asset.metadata.iptc && (
+                        {assetData.data.asset.Metadata.CustomMetadata.IPTC && (
                             <Grid container spacing={2}>
                                 <Grid item xs={12}>
                                     <Typography variant="subtitle2">Creator</Typography>
-                                    <Typography variant="body2">{asset.metadata.iptc.creator}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.creator}</Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Typography variant="subtitle2">Copyright</Typography>
-                                    <Typography variant="body2">{asset.metadata.iptc.copyright}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.copyright}</Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Typography variant="subtitle2">Caption</Typography>
-                                    <Typography variant="body2">{asset.metadata.iptc.caption}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.caption}</Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Typography variant="subtitle2">Keywords</Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                        {asset.metadata.iptc.keywords.map((keyword, index) => (
+                                    {/* <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                        {assetData.data.asset.Metadata.CustomMetadata.IPTC?.keywords.map((keyword, index) => (
                                             <Chip key={index} label={keyword} size="small" />
                                         ))}
-                                    </Box>
+                                    </Box> */}
                                 </Grid>
                             </Grid>
                         )}
@@ -319,31 +270,31 @@ const ImageDetailPage: React.FC = () => {
                 <Grid item xs={12} md={6}>
                     <Paper elevation={3} sx={{ p: 2 }}>
                         <Typography variant="h6" gutterBottom>EXIF Data</Typography>
-                        {asset.metadata.exif && (
+                        {assetData.data.asset.Metadata.CustomMetadata.EXIF && (
                             <Grid container spacing={2}>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">Camera Make</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.make}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.make}</Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">Model</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.model}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.model}</Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">Exposure Time</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.exposureTime}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.exposureTime}</Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">F-Number</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.fNumber}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.fNumber}</Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">ISO</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.iso}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.iso}</Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2">Focal Length</Typography>
-                                    <Typography variant="body2">{asset.metadata.exif.focalLength}</Typography>
+                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.focalLength}</Typography>
                                 </Grid>
                             </Grid>
                         )}

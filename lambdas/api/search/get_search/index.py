@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
-from botocore.config import Config
+
 from opensearchpy import (
     RequestsHttpConnection,
     RequestsAWSV4SignerAuth,
@@ -16,11 +16,12 @@ from opensearchpy import (
 )
 from datetime import datetime
 import json
+from utils import generate_presigned_url
 
 # Initialize AWS clients and utilities
 logger = Logger()
 metrics = Metrics()
-s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
+
 
 # Configure CORS
 cors_config = CORSConfig(
@@ -154,24 +155,6 @@ def get_opensearch_client() -> OpenSearch:
     )
 
 
-def generate_presigned_url(
-    bucket: str, key: str, expiration: int = 3600
-) -> Optional[str]:
-    """Generate a presigned URL for an S3 object"""
-    try:
-        url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": bucket,
-                "Key": key,
-                "ResponseContentDisposition": "inline",
-            },
-            ExpiresIn=expiration,
-        )
-        return url
-    except Exception as e:
-        logger.error(f"Error generating presigned URL: {str(e)}")
-        return None
 
 
 def build_search_query(params: SearchParams) -> Dict:
@@ -249,6 +232,7 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
 
     # Find proxy representation if it exists
     thumbnail_url = None
+    
     for rep in source.get("derivedRepresentations", []):
         if rep.get("purpose") == "thumbnail":
             storage = rep.get("storage", {})

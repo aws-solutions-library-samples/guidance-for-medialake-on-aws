@@ -2,9 +2,11 @@ import json
 import uuid
 import decimal
 from typing import Dict, Any, Optional
+from aws_lambda_powertools import Logger
 import boto3
 from botocore.config import Config
 
+logger = Logger(service="asset-details-service-utils")
 s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 def replace_decimals(obj):

@@ -66,7 +66,7 @@ def clean_asset_id(input_string: str) -> str:
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
     # Get DynamoDB table name from environment variable
-    table_name = os.environ["ASSET_TABLE"]
+    table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(table_name)
 

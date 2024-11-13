@@ -1,7 +1,7 @@
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
-from typing import Dict, Optional
+from typing import Dict, Optional, TypedDict, List
 import boto3
 import json
 import uuid
@@ -11,6 +11,72 @@ from datetime import datetime
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
+
+
+class FileHash(TypedDict):
+    Algorithm: str
+    Value: str
+
+
+class FileInfo(TypedDict):
+    Size: int
+    Hash: FileHash
+    CreateDate: str
+
+
+class ObjectKey(TypedDict):
+    Name: str
+    Path: str
+    FullPath: str
+
+
+class PrimaryLocation(TypedDict):
+    StorageType: str
+    Bucket: str
+    ObjectKey: ObjectKey
+    Status: str
+    FileInfo: FileInfo
+
+
+class StorageInfo(TypedDict):
+    PrimaryLocation: PrimaryLocation
+
+
+class S3Metadata(TypedDict):
+    Metadata: Dict
+    ContentType: str
+    LastModified: str
+
+
+class EmbeddedMetadata(TypedDict):
+    ExtractedDate: str
+    S3: S3Metadata
+
+
+class AssetMetadata(TypedDict):
+    Embedded: EmbeddedMetadata
+
+
+class AssetRepresentation(TypedDict):
+    ID: str
+    Type: str
+    Format: str
+    Purpose: str
+    StorageInfo: StorageInfo
+
+
+class DigitalSourceAsset(TypedDict):
+    ID: str
+    Type: str
+    CreateDate: str
+    MainRepresentation: AssetRepresentation
+
+
+class AssetRecord(TypedDict):
+    InventoryID: str
+    DigitalSourceAsset: DigitalSourceAsset
+    DerivedRepresentations: Optional[List[AssetRepresentation]]
+    Metadata: Optional[AssetMetadata]
 
 
 class AssetProcessor:
@@ -61,7 +127,9 @@ class AssetProcessor:
             logger.exception(f"Error processing asset: {key}")
             raise
 
-    def _create_asset_metadata(self, s3_response: Dict, bucket: str, key: str) -> Dict:
+    def _create_asset_metadata(
+        self, s3_response: Dict, bucket: str, key: str
+    ) -> StorageInfo:
         """Create asset metadata structure"""
         return {
             "StorageInfo": {
@@ -97,12 +165,12 @@ class AssetProcessor:
         }
 
     @tracer.capture_method
-    def create_dynamo_entry(self, metadata: Dict) -> Dict:
+    def create_dynamo_entry(self, metadata: StorageInfo) -> AssetRecord:
         """Create DynamoDB entry for the asset"""
         inventory_id = str(uuid.uuid4())
         asset_id = str(uuid.uuid4())
 
-        item = {
+        item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
             "DigitalSourceAsset": {
                 "ID": f"asset:img:{asset_id}",
@@ -120,19 +188,18 @@ class AssetProcessor:
                     "StorageInfo": metadata["StorageInfo"],
                 },
             },
+            "DerivedRepresentations": [],
+            "Metadata": metadata.get("Metadata"),
         }
 
         self.dynamodb.put_item(Item=item)
         return item
 
     @tracer.capture_method
-    def publish_event(self, inventory_id: str, asset_id: str, metadata: Dict):
-        """Publish event to EventBridge"""
+    def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
+        """Publish event to EventBridge using the same structure"""
         try:
-            # Log the event bus name
-            logger.info(f"Publishing to event bus: {os.environ.get('EVENT_BUS_NAME')}")
-
-            event_detail = {
+            event_detail: AssetRecord = {
                 "InventoryID": inventory_id,
                 "DigitalSourceAsset": {
                     "ID": asset_id,
@@ -150,9 +217,10 @@ class AssetProcessor:
                         "StorageInfo": metadata["StorageInfo"],
                     },
                 },
+                "DerivedRepresentations": [],
+                "Metadata": metadata.get("Metadata"),
             }
 
-            # Log the event detail
             logger.info(f"Publishing event with detail: {json.dumps(event_detail)}")
 
             response = self.eventbridge.put_events(
@@ -166,7 +234,6 @@ class AssetProcessor:
                 ]
             )
 
-            # Log the response
             logger.info(f"EventBridge response: {json.dumps(response)}")
 
         except Exception as e:

@@ -22,6 +22,8 @@ import boto3
 import os
 import json
 from http import HTTPStatus
+from utils import generate_presigned_url
+
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-details-service")
@@ -74,9 +76,10 @@ def get_asset_details(inventory_id: str) -> Dict[str, Any]:
     """
     try:
         response = table.get_item(
-            Key={"id": inventory_id},
+            Key={"InventoryID": inventory_id},
             ConsistentRead=True,  # Ensure we get the latest data
         )
+        print(response)
 
         if "Item" not in response:
             raise AssetDetailsError(
@@ -91,7 +94,7 @@ def get_asset_details(inventory_id: str) -> Dict[str, Any]:
             extra={
                 "inventory_id": inventory_id,
                 "asset_type": asset_data.get("assetType"),
-                "retrieval_timestamp": tracer.get_timestamp(),
+                # "retrieval_timestamp": tracer.get_timestamp(),
             },
         )
 
@@ -142,14 +145,14 @@ def create_response(
             "Access-Control-Allow-Credentials": True,
             "Cache-Control": "no-cache, no-store, must-revalidate",
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, default=str),
     }
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
     """Lambda handler for getting asset details."""
     try:
         # Extract and validate asset ID
@@ -186,18 +189,39 @@ def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, An
             HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error"
         )
 
+def get_url_for_purpose(asset, purpose):
+    for rep in asset.get("DerivedRepresentations", []):
+        if rep.get("Purpose") == purpose:
+            storage = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            if storage.get("StorageType") == "s3":
+                return generate_presigned_url(
+                    bucket=storage["Bucket"],
+                    key=storage["ObjectKey"]["FullPath"]
+                )
+    return None
 
+@tracer.capture_method
 def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
     """Enrich asset data with additional computed fields."""
     try:
-        # Add any computed fields or additional metadata
-        asset["computedFields"] = {
-            "totalSize": sum(
-                rep["storage"].get("fileSize", 0)
-                for rep in asset.get("derivedRepresentations", [])
+        thumbnail_url = get_url_for_purpose(asset, "thumbnail")
+        proxy_url = get_url_for_purpose(asset, "proxy")
+
+        # Add URLs to their respective DerivedRepresentations
+        for rep in asset.get("DerivedRepresentations", []):
+            if rep.get("Purpose") == "thumbnail" and thumbnail_url:
+                rep["URL"] = thumbnail_url
+            elif rep.get("Purpose") == "proxy" and proxy_url:
+                rep["URL"] = proxy_url
+
+        # Add computed fields
+        asset["DigitalSourceAsset"]["ComputedFields"] = {
+            "TotalSize": sum(
+                rep["StorageInfo"]["PrimaryLocation"]["FileInfo"].get("Size", 0)
+                for rep in asset.get("DerivedRepresentations", [])
             )
-            + asset["mainRepresentation"]["storage"].get("fileSize", 0),
-            "lastModified": asset.get("updateDate", asset["createDate"]),
+            + asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]["FileInfo"].get("Size", 0),
+            "LastModified": asset["DigitalSourceAsset"].get("UpdateDate", asset["DigitalSourceAsset"]["CreateDate"]),
             # Add other computed fields as needed
         }
         return asset

@@ -5,51 +5,74 @@ import { logger } from '../../common/helpers/logger';
 import { useErrorModal } from '../../hooks/useErrorModal';
 
 interface Asset {
-    id: string;
-    inventoryId: string;
-    assetType: string;
-    createDate: string;
-    mainRepresentation: {
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string;
+    asset: {
+        InventoryID: string;
+        DerivedRepresentations: Array<{
+            Format: string;
+            ID: string;
+            Purpose: string;
+            URL: string;
+            StorageInfo: {
+                PrimaryLocation: {
+                    Bucket: string;
+                    FileInfo: {
+                        Size: number;
+                    };
+                    ObjectKey: {
+                        FullPath: string;
+                    };
+                    Provider: string;
+                    Status: string;
+                    StorageType: string;
+                };
+
+            };
+            Type: string;
+            ImageSpec?: {
+                Resolution: {
+                    Height: number;
+                    Width: number;
+                };
+            };
+        }>;
+        DigitalSourceAsset: {
+            CreateDate: string;
+            ID: string;
+            MainRepresentation: {
+                Format: string;
+                ID: string;
+                Purpose: string;
+                StorageInfo: {
+                    PrimaryLocation: {
+                        Bucket: string;
+                        FileInfo: {
+                            CreateDate: string;
+                            Hash: {
+                                Algorithm: string;
+                                Value: string;
+                            };
+                            Size: number;
+                        };
+                        ObjectKey: {
+                            FullPath: string;
+                            Name: string;
+                            Path: string;
+                        };
+                        Status: string;
+                        StorageType: string;
+                    };
+                };
+            };
+            Type: string;
         };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    };
-    derivedRepresentations: Array<{
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string | null;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    }>;
-    metadata: any;
+        Type: string;
+        Metadata: {
+            CustomMetadata: {
+                EXIF: any;
+                IPTC: any;
+            };
+        }
+    },
 }
 
 interface AssetResponse {
@@ -62,9 +85,72 @@ interface DeleteAssetResponse {
     status: string;
     message: string;
     data: {
-        inventoryId: string;
+        InventoryID: string;
     };
 }
+
+
+// interface Asset {
+//     id: string;
+//     inventoryId: string;
+//     assetType: string;
+//     createDate: string;
+//     mainRepresentation: {
+//         id: string;
+//         type: string;
+//         format: string;
+//         purpose: string;
+//         storage: {
+//             storageType: string;
+//             bucket: string;
+//             path: string;
+//             status: string;
+//             fileSize: number;
+//             hashValue: string;
+//         };
+//         imageSpec?: {
+//             colorSpace: string | null;
+//             width: number | null;
+//             height: number | null;
+//             dpi: number | null;
+//         };
+//     };
+//     derivedRepresentations: Array<{
+//         id: string;
+//         type: string;
+//         format: string;
+//         purpose: string;
+//         storage: {
+//             storageType: string;
+//             bucket: string;
+//             path: string;
+//             status: string;
+//             fileSize: number;
+//             hashValue: string | null;
+//         };
+//         imageSpec?: {
+//             colorSpace: string | null;
+//             width: number | null;
+//             height: number | null;
+//             dpi: number | null;
+//         };
+//     }>;
+//     metadata: any;
+// }
+
+// interface AssetResponse {
+//     status: string;
+//     message: string;
+//     data: Asset;
+// }
+
+// interface DeleteAssetResponse {
+//     status: string;
+//     message: string;
+//     data: {
+//         inventoryId: string;
+//     };
+// }
 
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
