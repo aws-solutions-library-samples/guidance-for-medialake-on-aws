@@ -125,9 +125,11 @@ def process_image_file(bucket, key):
 def lambda_handler(event, context):
     logger.info("Received event: %s", event)
     input = event.get("input", {})
-    input_data = input.get("DigitalSourceAsset", {})
-    inventory_id = input_data.get("InventoryID")
-
+    inventory_id = input.get("InventoryID", None)
+    digital_source_asset = input.get("DigitalSourceAsset", None)
+    bucket = digital_source_asset['MainRepresentation']['StorageInfo']['PrimaryLocation']['Bucket']
+    key = digital_source_asset['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['FullPath']
+  
     if not inventory_id:
         logger.error("Invalid event format: missing InventoryID")
         return {"statusCode": 400, "body": "Missing InventoryID"}
@@ -138,11 +140,11 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": "Failed to extract metadata"}
 
         complete_metadata = {
-            "contentType": input_data.get("contentType", "image/tiff"),
-            "customMetadata": extracted_metadata,
+          
+            "CustomMetadata": extracted_metadata,
         }
         converted_metadata = convert_floats_to_decimals(complete_metadata)
-        marshalled_metadata = marshall_json_item(converted_metadata)
+        marshalled_metadata = {"M": marshall_json_item(converted_metadata)}
 
         # Initialize DynamoDB client
         dynamodb = boto3.client("dynamodb")
@@ -150,10 +152,10 @@ def lambda_handler(event, context):
         # Update DynamoDB
         try:
             response = dynamodb.update_item(
-                TableName=os.environ["ASSET_TABLE"],
+                TableName=os.environ["MEDIALAKE_ASSET_TABLE"],
                 Key={"InventoryID": {"S": inventory_id}},
-                UpdateExpression="SET metadata = :metadata",
-                ExpressionAttributeValues={":metadata": marshalled_metadata},
+                UpdateExpression="SET Metadata = :Metadata",
+                ExpressionAttributeValues={":Metadata": marshalled_metadata},
                 ReturnValues="UPDATED_NEW",
             )
             logger.info(f"Successfully updated DynamoDB item: {response}")

@@ -22,22 +22,22 @@ def get_state_machine_definition(
                     "Payload": {"pipeline_id.$": "$.pipeline_id", "input.$": "$.input"},
                 },
                 "ResultPath": "$.metadataResult",
-                "Next": "StoreMetadata",
-            },
-            "StoreMetadata": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::dynamodb:updateItem",
-                "Parameters": {
-                    "TableName": asset_table_name,
-                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
-                    "UpdateExpression": "SET metadata = :metadata",
-                    "ExpressionAttributeValues": {
-                        ":metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
-                    },
-                },
-                "ResultPath": None,
                 "Next": "CreateProxy",
             },
+            # "StoreMetadata": {
+            #     "Type": "Task",
+            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
+            #     "Parameters": {
+            #         "TableName": asset_table_name,
+            #         "Key": {"id": {"S.$": "$.InventoryID"}},
+            #         "UpdateExpression": "SET Metadata = :Metadata",
+            #         "ExpressionAttributeValues": {
+            #             ":Metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
+            #         },
+            #     },
+            #     "ResultPath": None,
+            #     "Next": "CreateProxy",
+            # },
             # Rest of the states remain the same
             "CreateProxy": {
                 "Type": "Task",
@@ -52,32 +52,32 @@ def get_state_machine_definition(
                     },
                 },
                 "ResultPath": "$.proxyResult",
-                "Next": "StoreProxy",
-            },
-            "StoreProxy": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::dynamodb:updateItem",
-                "Parameters": {
-                    "TableName": asset_table_name,
-                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
-                    "UpdateExpression": "SET proxyLocation = :proxyLocation",
-                    "ExpressionAttributeValues": {
-                        ":proxyLocation": {
-                            "M": {
-                                "bucket": {
-                                    "S.$": "$.proxyResult.Payload.body.location.bucket"
-                                },
-                                "key": {
-                                    "S.$": "$.proxyResult.Payload.body.location.key"
-                                },
-                                "type": {"S": "S3"},
-                            }
-                        }
-                    },
-                },
-                "ResultPath": None,
                 "Next": "CreateThumbnail",
             },
+            # "StoreProxy": {
+            #     "Type": "Task",
+            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
+            #     "Parameters": {
+            #         "TableName": asset_table_name,
+            #         "Key": {"id": {"S.$": "$.InventoryID"}},
+            #         "UpdateExpression": "SET DerivedRepresentations = :DerivedRepresentations",
+            #         "ExpressionAttributeValues": {
+            #             ":DerivedRepresentations": {
+            #                 "M": {
+            #                     "bucket": {
+            #                         "S.$": "$.proxyResult.Payload.body.location.bucket"
+            #                     },
+            #                     "key": {
+            #                         "S.$": "$.proxyResult.Payload.body.location.key"
+            #                     },
+            #                     "type": {"S": "S3"},
+            #                 }
+            #             }
+            #         },
+            #     },
+            #     "ResultPath": None,
+            #     "Next": "CreateThumbnail",
+            # },
             "CreateThumbnail": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -86,40 +86,40 @@ def get_state_machine_definition(
                     "Payload": {
                         "pipeline_id.$": "$.pipeline_id",
                         "input.$": "$.input",
-                        "metadata.$": "$.metadataResult.Payload.body.metadata",
+                        # "metadata.$": "$.metadataResult.Payload.body.metadata",
                         "output_bucket": output_bucket_name,
                         "mode": "thumbnail",
                         "width": 345,
                         "height": 194,
                     },  # This closing brace was missing
                 },
-                "ResultPath": "$.thumbnailResult",
-                "Next": "StoreThumbnail",
-            },
-            "StoreThumbnail": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::dynamodb:updateItem",
-                "Parameters": {
-                    "TableName": asset_table_name,
-                    "Key": {"id": {"S.$": "$.input.InventoryID"}},
-                    "UpdateExpression": "SET thumbnailLocation = :thumbnailLocation",
-                    "ExpressionAttributeValues": {
-                        ":thumbnailLocation": {
-                            "M": {
-                                "bucket": {
-                                    "S.$": "$.thumbnailResult.Payload.body.location.bucket"
-                                },
-                                "key": {
-                                    "S.$": "$.thumbnailResult.Payload.body.location.key"
-                                },
-                                "type": {"S": "S3"},
-                            }
-                        }
-                    },
-                },
                 "ResultPath": None,
                 "End": True,
             },
+            # "StoreThumbnail": {
+            #     "Type": "Task",
+            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
+            #     "Parameters": {
+            #         "TableName": asset_table_name,
+            #         "Key": {"id": {"S.$": "$.InventoryID"}},
+            #         "UpdateExpression": "SET thumbnailLocation = :thumbnailLocation",
+            #         "ExpressionAttributeValues": {
+            #             ":thumbnailLocation": {
+            #                 "M": {
+            #                     "bucket": {
+            #                         "S.$": "$.thumbnailResult.Payload.body.location.bucket"
+            #                     },
+            #                     "key": {
+            #                         "S.$": "$.thumbnailResult.Payload.body.location.key"
+            #                     },
+            #                     "type": {"S": "S3"},
+            #                 }
+            #             }
+            #         },
+            #     },
+            #     "ResultPath": None,
+            #     "End": True,
+            # },
         },
     }
 
@@ -131,7 +131,8 @@ def create_metadata_extractor_lambda(
     deployment_bucket: str,
     deployment_zip: str,
     exiftool_layer_arn: str,
-    tags: dict,
+    environment_variables: dict,
+    tags: dict,   
 ) -> dict:
     """Creates the metadata extractor lambda function"""
     return lambda_client.create_function(
@@ -142,6 +143,9 @@ def create_metadata_extractor_lambda(
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
         Layers=[exiftool_layer_arn],
+        Environment={
+            'Variables': environment_variables
+        },
         Tags=tags,
     )
 
@@ -152,6 +156,7 @@ def create_image_proxy_lambda(
     role_arn: str,
     deployment_bucket: str,
     deployment_zip: str,
+    environment_variables: dict,
     tags: dict,
 ) -> dict:
     """Creates the image proxy lambda function"""
@@ -163,5 +168,9 @@ def create_image_proxy_lambda(
         MemorySize=10240,
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+        Layers=["arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:56"],
+        Environment={
+            'Variables': environment_variables
+        },
         Tags=tags,
     )
