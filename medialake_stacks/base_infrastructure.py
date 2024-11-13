@@ -15,6 +15,11 @@ from constructs import Construct
 from config import GLOBAL_PREFIX, generate_short_uid, config
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
+from medialake_constructs.vpc import CustomVpc, CustomVpcProps
+from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
+    OpenSearchCluster,
+    OpenSearchClusterProps,
+)
 from medialake_constructs.shared_constructs.opensearch_serverless import (
     OpenSearchServerlessConstruct,
     OpenSearchServerlessProps,
@@ -49,6 +54,21 @@ class BaseInfrastructureStack(Stack):
         # Combine the truncated prefix, separator, and unique identifier
         lambda_function_name = f"{truncated_prefix}_{short_uid}"
         # Use the generated name for your Lambda function
+        self.vpc = CustomVpc(
+            self,
+            "MediaLakeVPC",
+            props=CustomVpcProps(vpc_name=f"{GLOBAL_PREFIX}-vpc-{region}"),
+        )
+
+        self.opensearch_cluster = OpenSearchCluster(
+            self,
+            "MediaLakeOpenSearch",
+            props=OpenSearchClusterProps(
+                domain_name=f"{GLOBAL_PREFIX}-opensearch",
+                vpc=self.vpc.vpc,
+            ),
+        )
+
         self.media_assets_bucket = S3Bucket(
             self,
             "MediaAssets",
