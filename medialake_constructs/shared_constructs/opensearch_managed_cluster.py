@@ -7,6 +7,23 @@ from aws_cdk import (
 )
 from constructs import Construct
 from typing import Optional, List, Dict
+from dataclasses import dataclass
+
+
+@dataclass
+class OpenSearchClusterProps:
+    domain_name: str
+    engine_version: str = "OpenSearch_1.3"
+    instance_type: str = "r6g.large.search"
+    instance_count: int = 3
+    volume_size: int = 20
+    availability_zone_count: int = 3
+    vpc: Optional[ec2.IVpc] = None
+    enforce_https: bool = True
+    node_to_node_encryption: bool = True
+    encryption_at_rest: bool = True
+    master_node_instance_type: str = "r6g.large.search"
+    master_node_count: int = 2
 
 
 class OpenSearchCluster(Construct):
@@ -15,16 +32,7 @@ class OpenSearchCluster(Construct):
         scope: Construct,
         id: str,
         *,
-        domain_name: str,
-        engine_version: str = "OpenSearch_1.3",
-        instance_type: str = "r6g.large.search",
-        instance_count: int = 3,
-        volume_size: int = 20,
-        availability_zone_count: int = 3,
-        vpc: Optional[ec2.IVpc] = None,
-        enforce_https: bool = True,
-        node_to_node_encryption: bool = True,
-        encryption_at_rest: bool = True
+        props: OpenSearchClusterProps,
     ) -> None:
         super().__init__(scope, id)
 
@@ -32,24 +40,27 @@ class OpenSearchCluster(Construct):
         self.domain = opensearch.Domain(
             self,
             "OpenSearchDomain",
-            domain_name=domain_name,
-            version=opensearch.EngineVersion.of(engine_version),
+            domain_name=props.domain_name,
+            version=opensearch.EngineVersion.OPENSEARCH_2_11,
             # Capacity configuration
             capacity={
-                "data_nodes": instance_count,
-                "data_node_instance_type": instance_type,
+                "data_nodes": props.instance_count,
+                "data_node_instance_type": props.instance_type,
+                # "master_nodes": props.master_node_count,
+                # "master_node_instance_type": props.master_node_instance_type,
+                "multi_az_with_standby_enabled": False,
             },
             # EBS configuration
             ebs={
-                "volume_size": volume_size,
+                "volume_size": props.volume_size,
                 "volume_type": ec2.EbsDeviceVolumeType.GP3,
             },
             # Zone awareness configuration
-            zone_awareness={"availability_zone_count": availability_zone_count},
+            # zone_awareness={"availability_zone_count": props.availability_zone_count},
             # Security configuration
-            enforce_https=enforce_https,
-            node_to_node_encryption=node_to_node_encryption,
-            encryption_at_rest={"enabled": encryption_at_rest},
+            enforce_https=props.enforce_https,
+            # node_to_node_encryption=props.node_to_node_encryption,
+            # encryption_at_rest={"enabled": props.encryption_at_rest},
             # Logging configuration
             logging={
                 "slow_search_log_enabled": True,
@@ -57,12 +68,19 @@ class OpenSearchCluster(Construct):
                 "slow_index_log_enabled": True,
             },
             # VPC configuration
-            vpc=vpc,
-            vpc_subnets=(
-                vpc.select_subnets(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
-                if vpc
-                else None
-            ),
+            # vpc=props.vpc,
+            # vpc_subnets=(
+            #     [
+            #         ec2.SubnetSelection(
+            #             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            #             availability_zones=props.vpc.availability_zones[
+            #                 : props.availability_zone_count
+            #             ],
+            #         )
+            #     ]
+            #     if props.vpc
+            #     else None
+            # ),
             # Advanced options
             advanced_options={
                 "rest.action.multi.allow_explicit_index": "true",
