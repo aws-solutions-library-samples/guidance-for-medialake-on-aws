@@ -163,9 +163,7 @@ def create_eventbridge_rule(
             Name=rule_name,
             EventBusName=event_bus_name,
             EventPattern=json.dumps({
-                "detail": {
-                    "eventType": ["AssetIngested"]
-                }
+                "detail-type": ["AssetCreated"]
             }),
             State='ENABLED',
             Tags=[{'Key': k, 'Value': v} for k, v in tags.items()]
@@ -501,6 +499,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
         ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
         exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
+        powertools_layer_arn = os.environ.get('POWERTOOLS__LAYER_ARN')
         
         
         # Common tags for all resources
@@ -572,6 +571,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             deployment_bucket,
             image_metadata_extractor_deployment_zip,
             exiftool_layer_arn,
+            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
             tags
         )
 
@@ -582,6 +582,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             role_arn,
             deployment_bucket,
             image_proxy_deployment_zip,
+            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
             tags
         )
         
