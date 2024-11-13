@@ -72,6 +72,21 @@ class AssetsConstruct(Construct):
                 },
             ),
         )
+        
+        
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "kms:Decrypt",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                    "arn:aws:kms:*:*:key/*",
+                ],
+            )
+        )
 
         # DELETE /assets/{id} Lambda
         delete_asset_lambda = Lambda(
