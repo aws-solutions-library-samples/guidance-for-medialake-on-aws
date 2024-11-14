@@ -106,6 +106,40 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         },
         [MIN_ZOOM, MAX_ZOOM, isCanvasLocked]
     );
+    const handleCanvasDownload = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // Create a new canvas
+        const newCanvas = document.createElement('canvas');
+        newCanvas.width = canvas.width;
+        newCanvas.height = canvas.height;
+
+        // Get the context of the new canvas
+        const context = newCanvas.getContext('2d');
+        if (!context) return;
+
+        // Draw the original canvas onto the new canvas
+        context.drawImage(canvas, 0, 0);
+
+        try {
+            // Convert the new canvas to a data URL
+            const dataUrl = newCanvas.toDataURL('image/png');
+
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${filename || 'image'}_modified.png`;
+
+            // Append to the body, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            // You might want to show an error message to the user here
+        }
+    };
 
 
     // Add and remove the wheel event listener
@@ -128,47 +162,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
             y: prevOffset.y - deltaY,
         }));
         touch.current = { x: clientX, y: clientY };
-    };
-    const handleDownload = () => {
-        // Create a new Image object
-        const img = new Image();
-        img.crossOrigin = "anonymous";  // This may help with CORS issues
-        img.src = imageSrc;
-
-        img.onload = () => {
-            // Create a canvas element
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-
-            // Draw the image onto the canvas
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0);
-
-            // Convert the canvas to a blob
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    // Create a URL for the blob
-                    const url = URL.createObjectURL(blob);
-
-                    // Create a link element and trigger the download
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = filename || 'image_download.png';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-
-                    // Release the blob URL
-                    URL.revokeObjectURL(url);
-                }
-            }, 'image/png');
-        };
-
-        img.onerror = () => {
-            console.error('Error loading image for download');
-            // You might want to show an error message to the user here
-        };
     };
 
 
@@ -230,9 +223,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         //     onClick: centerImage,
         // },
         {
-            tip: 'Download',
+            tip: 'Download Canvas',
             icon: <GetAppIcon />,
-            onClick: handleDownload,
+            onClick: handleCanvasDownload,
         },
         {
             tip: 'Reset',
@@ -259,37 +252,49 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
     ];
     // Render the component
     return (
-        <div
+        <Box
             ref={divRef}
-            className="full-size flex-center flex-align-center"
-            style={{ height: maxHeight, maxHeight }}
+            sx={{
+                height: maxHeight,
+                maxHeight,
+                width: '100%',
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gridTemplateRows: '1fr',
+                position: 'relative',
+                overflow: 'hidden',
+            }}
         >
-            <Box position="relative" width="100%" height="100%">
-                <canvas
-                    ref={canvasRef}
-                    onMouseDown={handleMouseDown}
-                    onMouseUp={handleMouseUp}
-                    onMouseOut={handleMouseUp}
-                    onMouseMove={handleMouseMove}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        cursor: isCanvasLocked ? 'default' : (dragging ? 'grabbing' : 'grab'),
-                    }}
-                />
+            <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                onMouseOut={handleMouseUp}
+                onMouseMove={handleMouseMove}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    cursor: isCanvasLocked ? 'default' : (dragging ? 'grabbing' : 'grab'),
+                    gridColumn: '1 / -1',
+                    gridRow: '1 / -1',
+                }}
+            />
+            <Box
+                sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '8px',
+                    zIndex: 1,
+                }}
+            >
                 {toolButtons.map((item, i) => (
                     <Tooltip key={`image-tool-${i}`} title={item.tip}>
                         <IconButton
-                            sx={{
-                                position: 'absolute',
-                                top: 8,
-                                right: 8 + i * 40,
-                                backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                },
-                                ...item.style,
-                            }}
+                            color="primary"
+
                             onClick={item.onClick}
                         >
                             {item.icon}
@@ -297,7 +302,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
                     </Tooltip>
                 ))}
             </Box>
-        </div>
+        </Box>
     );
 };
 export default ImageViewer;
