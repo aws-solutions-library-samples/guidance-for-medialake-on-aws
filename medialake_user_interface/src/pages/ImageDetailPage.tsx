@@ -1,13 +1,47 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useAsset, Asset } from '../api/hooks/useAssets';
-import { Box, Typography, Grid, Paper, CircularProgress, useTheme, Chip, Button, Divider, Card, CardMedia, CardContent, IconButton, Tooltip } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+
+// MUI Components
+import {
+    Box,
+    Typography,
+    Grid,
+    Drawer,
+    Paper,
+    CircularProgress,
+    Button,
+    Divider,
+    IconButton,
+    Stack,
+    TextField,
+    Menu,
+    MenuItem,
+} from '@mui/material';
+import { styled, alpha } from '@mui/material/styles';
+import type { MenuProps } from '@mui/material/Menu';
+import Chip from '@mui/joy/Chip';
+
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+// MUI Icons
+import ArrowForwardIosSharpIcon from '@mui/icons-material/ArrowForwardIosSharp';
+import MuiAccordion, { AccordionProps } from '@mui/material/Accordion';
+import MuiAccordionSummary, {
+    AccordionSummaryProps,
+} from '@mui/material/AccordionSummary';
+import MuiAccordionDetails from '@mui/material/AccordionDetails';
+import EditIcon from '@mui/icons-material/Edit';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import FileCopyIcon from '@mui/icons-material/FileCopy';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import DownloadIcon from '@mui/icons-material/Download';
-import InfoIcon from '@mui/icons-material/Info';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { ImageViewer } from '../components/common/ImageViewer'
+
+// Custom components and hooks
+import { ImageViewer } from '../components/common/ImageViewer';
+import { useAsset } from '../api/hooks/useAssets';
+
+
 
 interface Pipeline {
     id: string;
@@ -17,65 +51,130 @@ interface Pipeline {
     estimatedTime: string;
 }
 
+const Accordion = styled((props: AccordionProps) => (
+    <MuiAccordion disableGutters elevation={0} square {...props} />
+))(({ theme }) => ({
+    border: `1px solid ${theme.palette.divider}`,
+    '&:not(:last-child)': {
+        borderBottom: 0,
+    },
+    '&::before': {
+        display: 'none',
+    },
+}));
+
+const AccordionSummary = styled((props: AccordionSummaryProps) => (
+    <MuiAccordionSummary
+        expandIcon={<ArrowForwardIosSharpIcon sx={{ fontSize: '0.9rem' }} />}
+        {...props}
+    />
+))(({ theme }) => ({
+    backgroundColor: 'rgba(0, 0, 0, .03)',
+    flexDirection: 'row-reverse',
+    '& .MuiAccordionSummary-expandIconWrapper.Mui-expanded': {
+        transform: 'rotate(90deg)',
+    },
+    '& .MuiAccordionSummary-content': {
+        marginLeft: theme.spacing(1),
+    },
+    ...theme.applyStyles('dark', {
+        backgroundColor: 'rgba(255, 255, 255, .05)',
+    }),
+}));
+
+const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
+    padding: theme.spacing(2),
+    borderTop: '1px solid rgba(0, 0, 0, .125)',
+}));
+
+const StyledMenu = styled((props: MenuProps) => (
+    <Menu
+        elevation={0}
+        anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+        }}
+        transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+        }}
+        {...props}
+    />
+))(({ theme }) => ({
+    '& .MuiPaper-root': {
+        borderRadius: 6,
+        marginTop: theme.spacing(1),
+        minWidth: 180,
+        color: 'rgb(55, 65, 81)',
+        boxShadow:
+            'rgb(255, 255, 255) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.05) 0px 4px 6px -2px',
+        '& .MuiMenu-list': {
+            padding: '4px 0',
+        },
+        '& .MuiMenuItem-root': {
+            '& .MuiSvgIcon-root': {
+                fontSize: 18,
+                color: theme.palette.text.secondary,
+                marginRight: theme.spacing(1.5),
+            },
+            '&:active': {
+                backgroundColor: alpha(
+                    theme.palette.primary.main,
+                    theme.palette.action.selectedOpacity,
+                ),
+            },
+        },
+        ...theme.applyStyles('dark', {
+            color: theme.palette.grey[300],
+        }),
+    },
+}));
+
 const ImageDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
 
+    const [expanded, setExpanded] = React.useState<string | false>('panel1');
+
+    const handleChange =
+        (panel: string) => (event: React.SyntheticEvent, newExpanded: boolean) => {
+            setExpanded(newExpanded ? panel : false);
+        };
+
 
     const [derivedRepresentations] = useState(() => {
         if (!assetData?.data) return [];
-
-        const representations = [
-            // Include the original (master) representation
+        return [
             {
                 id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
                 src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
                 type: 'Original',
                 description: 'Original high resolution version',
-                createdAt: assetData.data.asset.DigitalSourceAsset.CreateDate,
-                format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
-                size: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
             },
-            // Dynamically add all DerivedRepresentations
             ...assetData.data.asset.DerivedRepresentations.map(rep => ({
                 id: rep.ID,
                 src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
-                type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1), // Capitalize the purpose
+                type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1),
                 description: `${rep.Purpose} version`,
-                createdAt: new Date().toISOString(), // Note: Actual creation date not provided in the data
-                format: rep.Format,
-                size: rep.StorageInfo.PrimaryLocation.FileInfo.Size,
-                resolution: rep.ImageSpec?.Resolution
-                    ? `${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}`
-                    : undefined
             }))
         ];
-
-        return representations;
     });
-
-
     const [availablePipelines] = useState([
-        {
-            id: 'p1',
-            name: 'Image Enhancement',
-            description: 'Enhance image quality and colors',
-            icon: '🎨',
-            estimatedTime: '2-3 minutes'
-        },
-        {
-            id: 'p2',
-            name: 'Object Detection',
-            description: 'Detect and label objects in the image',
-            icon: '🔍',
-            estimatedTime: '1-2 minutes'
-        }
+        { id: 'p1', name: 'Image Enhancement', description: 'Enhance image quality and colors', icon: ':art:', estimatedTime: '2-3 minutes' },
+        { id: 'p2', name: 'Object Detection', description: 'Detect and label objects in the image', icon: ':mag:', estimatedTime: '1-2 minutes' }
     ]);
-
     const handlePipelineExecution = (pipelineId: string) => {
         console.log(`Executing pipeline: ${pipelineId}`);
-        // Implementation for pipeline execution
+    };
+
+    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
+    const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+    const handleClose = () => {
+        setAnchorEl(null);
     };
 
     if (isLoading) {
@@ -85,7 +184,6 @@ const ImageDetailPage: React.FC = () => {
             </Box>
         );
     }
-
     if (error || !assetData) {
         return (
             <Box sx={{ p: 3 }}>
@@ -98,7 +196,6 @@ const ImageDetailPage: React.FC = () => {
             </Box>
         );
     }
-
     const getProxyUrl = () => {
         if (assetData?.data?.asset?.DerivedRepresentations) {
             const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
@@ -110,234 +207,176 @@ const ImageDetailPage: React.FC = () => {
     };
 
     const proxyUrl = getProxyUrl();
-
-    console.log(proxyUrl)
-
     return (
         <Box sx={{ flexGrow: 1, p: 3, maxWidth: '1600px', margin: '0 auto' }}>
             <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>
                 Back to Search Results
             </Button>
+            <Grid container spacing={3} sx={{ flexGrow: 1 }}>
+                {/* Left Panel - Inventory/Manifestation */}
+                <Grid item xs={2} sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Paper elevation={3} sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <Typography variant="h6">Representations</Typography>
+                        <Box sx={{ flexGrow: 1, overflowY: 'auto', mt: 2 }}>
+                            {derivedRepresentations.map((rep) => (
+                                <Button
+                                    key={rep.id}
+                                    variant="outlined"
+                                    fullWidth
+                                    sx={{ mb: 1 }}
+                                >
+                                    {rep.type}
+                                </Button>
+                            ))}
+                        </Box>
+                    </Paper>
+                </Grid>
+                {/* Main Image Section with Status above */}
+                <Grid item xs={8}>
+                    {/* Status Section */}
+                    <Paper elevation={3} sx={{ p: 2 }}>
+                        <Stack direction="row"
 
-            <Grid container spacing={3}>
-                {/* Main Image Display */}
-                <Grid item xs={12} md={8}>
-                    <Paper elevation={3} sx={{ p: 2, position: 'relative' }}>
-                        {/* <img
-                            src={proxyUrl}
-                            alt={assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Path}
-                            style={{
-                                width: '100%',
-                                height: 'auto',
-                                maxHeight: '70vh',
-                                objectFit: 'contain'
+                            sx={{
+                                justifyContent: "space-between",
+                                alignItems: "baseline",
                             }}
-                        /> */}
-                        <ImageViewer
-                            imageSrc={proxyUrl}
-                            maxHeight={600}
-                        />
-                        {/* <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
-                            <Tooltip title="Download Original">
-                                <IconButton color="primary">
-                                    <DownloadIcon />
-                                </IconButton>
-                            </Tooltip>
+                        >
+
+                            <Typography variant="h6">Status: Active</Typography>
+                            {/* Add a status display or control here */}
+                            <div>
+                                <Button
+                                    id="demo-customized-button"
+                                    aria-controls={open ? 'demo-customized-menu' : undefined}
+                                    aria-haspopup="true"
+                                    aria-expanded={open ? 'true' : undefined}
+                                    variant="outlined"
+                                    disableElevation
+                                    onClick={handleClick}
+                                    endIcon={<KeyboardArrowDownIcon />}
+                                >
+                                    Pipelines
+                                </Button>
+                                <StyledMenu
+                                    id="demo-customized-menu"
+                                    MenuListProps={{
+                                        'aria-labelledby': 'demo-customized-button',
+                                    }}
+                                    anchorEl={anchorEl}
+                                    open={open}
+                                    onClose={handleClose}
+                                >
+                                    {availablePipelines.map(pipeline => (
+
+
+                                        <MenuItem key={pipeline.id} sx={{
+                                            justifyContent: "space-between",
+                                            alignItems: "baseline",
+                                        }} disableRipple>
+                                            {/* <EditIcon /> */}
+                                            {pipeline.name}<Button onClick={() => handlePipelineExecution(pipeline.id)}>Run</Button>
+                                        </MenuItem>
+                                    ))}
+
+
+                                </StyledMenu>
+                            </div>
+
+                        </Stack>
+                    </Paper>
+                    {/* Image Viewer */}
+                    <Paper elevation={3} sx={{ p: 2, mt: 2, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
+                        {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', position: 'absolute', top: '50%' }}>
+                            <IconButton><ArrowBackIcon /></IconButton>
+                            <IconButton><PlayArrowIcon /></IconButton>
                         </Box> */}
                     </Paper>
                 </Grid>
+                {/* Right Panel - Pipelines and Comments */}
+                <Grid item xs={2} sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Paper elevation={3} sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>Comments</Typography>
+                        <Stack
+                            sx={{
+                                flexGrow: 1,
+                                height: '100%',
+                            }}
+                            spacing={2}
+                        >
+                            <Box sx={{ overflowY: 'auto', flexGrow: 1 }}>
+                                <Stack spacing={2}>
+                                    <Chip
+                                        color="primary"
+                                        onClick={function () { }}
+                                        size="sm"
+                                        variant="soft"
+                                    >9:46 AM: Crop to center</Chip>
+                                    <Chip
+                                        color="success"
+                                        onClick={function () { }}
 
-                {/* Quick Info and Actions */}
-                <Grid item xs={12} md={4}>
-                    <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                        <Typography variant="h6" gutterBottom>{assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Path}</Typography>
-                        {/* <Typography variant="body2" color="text.secondary" paragraph>
-                            {asset.Metadata.Description}
-                        </Typography> */}
-                        <Divider sx={{ my: 2 }} />
-                        <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                                <Typography variant="subtitle2">Resolution</Typography>
-                                {/* <Typography variant="body2">{asset.Metadata.resolution}</Typography> */}
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Typography variant="subtitle2">File Size</Typography>
-                                {/* <Typography variant="body2">{asset.Metadata.fileSize}</Typography> */}
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Typography variant="subtitle2">Color Space</Typography>
-                                {/* <Typography variant="body2">{asset.Metadata.colorSpace}</Typography> */}
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Typography variant="subtitle2">Created</Typography>
-                                <Typography variant="body2">
-                                    {new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()}
-                                </Typography>
-                            </Grid>
-                        </Grid>
-                    </Paper>
+                                        size="sm"
+                                        variant="soft"
+                                    >10:46 AM: Remove bg</Chip>
+                                    <Chip
+                                        color="primary"
+                                        onClick={function () { }}
+                                        size="sm"
+                                        variant="soft"
+                                    >11:46 AM: Send to publisher</Chip>
 
-                    {/* Content Analysis */}
-                    {/* {asset.Metadata.contentAnalysis && (
-                        <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="h6" gutterBottom>Content Analysis</Typography>
-                            <Typography variant="body2" paragraph>
-                                {asset.Metadata.contentAnalysis.summary}
-                            </Typography>
-                            <Box sx={{ mb: 1 }}>
-                                <Typography variant="subtitle2" gutterBottom>Detected Objects:</Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {asset.Metadata.contentAnalysis.detectedObjects.map((obj, index) => (
-                                        <Chip key={index} label={obj} size="small" />
-                                    ))}
-                                </Box>
+                                </Stack>
                             </Box>
-                            {asset.Metadata.contentAnalysis.people.length > 0 && (
-                                <Box sx={{ mb: 1 }}>
-                                    <Typography variant="subtitle2" gutterBottom>People:</Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                        {asset.Metadata.contentAnalysis.people.map((person, index) => (
-                                            <Chip key={index} label={person} size="small" />
-                                        ))}
-                                    </Box>
-                                </Box>
-                            )}
-                        </Paper>
-                    )} */}
-                </Grid>
 
-                {/* Related Versions */}
-                <Grid item xs={12}>
-                    <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                        <Typography variant="h6" gutterBottom>Related Versions</Typography>
-                        <Grid container spacing={2}>
-                            {derivedRepresentations.map((version) => (
-                                <Grid item xs={12} sm={6} md={4} key={version.id}>
-                                    <Card>
-                                        <CardMedia
-                                            component="img"
-                                            height="140"
-                                            image={version.src}
-                                            alt={version.type}
-                                        />
-                                        <CardContent>
-                                            <Typography variant="h6">{version.type}</Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {version.description}
-                                            </Typography>
-                                            <Typography variant="caption" display="block">
-                                                Created: {new Date(version.createdAt).toLocaleDateString()}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
+                            <TextField
+                                multiline
+                                fullWidth
+                                rows={4}
+                                maxRows={4}
+                                placeholder="Add comments"
+                                sx={{
+                                    '& .MuiInputBase-root': {
+                                        maxHeight: 'calc(8em + 32px)', // Approximation for 4 rows
+                                        overflowY: 'auto'
+                                    }
+                                }}
+                            />
+                        </Stack>
                     </Paper>
                 </Grid>
-
-                {/* Metadata Sections */}
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={3} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>IPTC Metadata</Typography>
-                        {assetData.data.asset.Metadata.CustomMetadata.IPTC && (
-                            <Grid container spacing={2}>
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2">Creator</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.creator}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2">Copyright</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.copyright}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2">Caption</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.IPTC?.caption}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2">Keywords</Typography>
-                                    {/* <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                        {assetData.data.asset.Metadata.CustomMetadata.IPTC?.keywords.map((keyword, index) => (
-                                            <Chip key={index} label={keyword} size="small" />
-                                        ))}
-                                    </Box> */}
-                                </Grid>
-                            </Grid>
-                        )}
-                    </Paper>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={3} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>EXIF Data</Typography>
-                        {assetData.data.asset.Metadata.CustomMetadata.EXIF && (
-                            <Grid container spacing={2}>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">Camera Make</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.make}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">Model</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.model}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">Exposure Time</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.exposureTime}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">F-Number</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.fNumber}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">ISO</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.iso}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="subtitle2">Focal Length</Typography>
-                                    <Typography variant="body2">{assetData.data.asset.Metadata.CustomMetadata.EXIF.focalLength}</Typography>
-                                </Grid>
-                            </Grid>
-                        )}
-                    </Paper>
-                </Grid>
-
-                {/* Available Pipelines */}
+                {/* Metadata and Activity Log */}
                 <Grid item xs={12}>
                     <Paper elevation={3} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>Available Pipelines</Typography>
-                        <Grid container spacing={2}>
-                            {availablePipelines.map((pipeline) => (
-                                <Grid item xs={12} sm={6} md={3} key={pipeline.id}>
-                                    <Card>
-                                        <CardContent>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography variant="h3" sx={{ mr: 1 }}>{pipeline.icon}</Typography>
-                                                <Typography variant="h6">{pipeline.name}</Typography>
-                                            </Box>
-                                            <Typography variant="body2" color="text.secondary" paragraph>
-                                                {pipeline.description}
-                                            </Typography>
-                                            <Typography variant="caption" display="block" sx={{ mb: 1 }}>
-                                                Estimated time: {pipeline.estimatedTime}
-                                            </Typography>
-                                            <Button
-                                                variant="contained"
-                                                startIcon={<PlayArrowIcon />}
-                                                onClick={() => handlePipelineExecution(pipeline.id)}
-                                                fullWidth
-                                            >
-                                                Execute
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
+                        <Typography variant="h6">Metadata</Typography>
+                        <Divider sx={{ my: 1 }} />
+
+                        <Accordion expanded={expanded === 'panel1'} onChange={handleChange('panel1')}>
+                            <AccordionSummary aria-controls="panel1d-content" id="panel1d-header">
+                                <Typography>EXIF</Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                                <Typography>
+                                    <Stack direction="row">
+                                        <Typography variant="body2">Color Space: XXXX</Typography>
+                                    </Stack>
+                                </Typography>
+                            </AccordionDetails>
+                        </Accordion>
+
+                    </Paper>
+                </Grid>
+                <Grid item xs={12}>
+                    <Paper elevation={3} sx={{ p: 2 }}>
+                        <Typography variant="h6">Activity Log</Typography>
+                        <Divider sx={{ my: 1 }} />
+                        <Typography variant="body2">User A did this</Typography>
+                        <Typography variant="body2">Pipeline C did this...</Typography>
                     </Paper>
                 </Grid>
             </Grid>
         </Box>
     );
 };
-
 export default ImageDetailPage;
