@@ -24,6 +24,7 @@ const getBaseURL = () => {
     return awsConfig?.API?.REST?.RestApi?.endpoint || '';
 };
 
+
 const axiosClient: AxiosInstance = axios.create({
     baseURL: getBaseURL() + '/prod',
     headers: {

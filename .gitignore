@@ -106,3 +106,6 @@ coverage/
 
 # lambda temp files
 **/package/
+
+## aws-exports.json
+medialake_user_interface/public/aws-exports.json
