@@ -155,8 +155,6 @@ def get_opensearch_client() -> OpenSearch:
     )
 
 
-
-
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     search_fields = params.search_fields or [
@@ -232,7 +230,7 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
 
     # Find proxy representation if it exists
     thumbnail_url = None
-    
+
     for rep in source.get("derivedRepresentations", []):
         if rep.get("purpose") == "thumbnail":
             storage = rep.get("storage", {})

@@ -13,17 +13,17 @@ from dataclasses import dataclass
 @dataclass
 class OpenSearchClusterProps:
     domain_name: str
-    engine_version: str = "OpenSearch_1.3"
-    instance_type: str = "r6g.large.search"
-    instance_count: int = 3
+    engine_version: str = "OpenSearch_2.11"
+    instance_type: str = "t2.medium.search"
+    instance_count: int = 1
     volume_size: int = 20
-    availability_zone_count: int = 3
+    availability_zone_count: int = 1
     vpc: Optional[ec2.IVpc] = None
     enforce_https: bool = True
     node_to_node_encryption: bool = True
     encryption_at_rest: bool = True
-    master_node_instance_type: str = "r6g.large.search"
-    master_node_count: int = 2
+    master_node_instance_type: str = "t2.medium.search"
+    master_node_count: int = 1
 
 
 class OpenSearchCluster(Construct):
@@ -41,7 +41,7 @@ class OpenSearchCluster(Construct):
             self,
             "OpenSearchDomain",
             domain_name=props.domain_name,
-            version=opensearch.EngineVersion.OPENSEARCH_2_11,
+            version=opensearch.EngineVersion.OPENSEARCH_2_15,
             # Capacity configuration
             capacity={
                 "data_nodes": props.instance_count,
@@ -53,7 +53,7 @@ class OpenSearchCluster(Construct):
             # EBS configuration
             ebs={
                 "volume_size": props.volume_size,
-                "volume_type": ec2.EbsDeviceVolumeType.GP3,
+                "volume_type": ec2.EbsDeviceVolumeType.GP2,
             },
             # Zone awareness configuration
             # zone_awareness={"availability_zone_count": props.availability_zone_count},

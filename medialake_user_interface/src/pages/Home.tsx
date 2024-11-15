@@ -1,7 +1,11 @@
 import React, { Suspense } from 'react';
-import { Box, Container, Stack, Typography, Paper, useTheme, useMediaQuery, CircularProgress } from '@mui/material';
+import { Box, Stack, Typography, Paper, useTheme, useMediaQuery, CircularProgress, Grid } from '@mui/material';
+import { Statistics } from '../components/home/Statistics';
+import { Collections } from '../components/home/Collections';
 import { SmartFolders } from '../components/home/SmartFolders';
 import { ConnectedStorage } from '../components/home/ConnectedStorage';
+import { SharedCollections } from '../components/home/SharedCollections';
+import { Favorites } from '../components/home/Favorites';
 import { ErrorBoundary } from 'react-error-boundary';
 
 const LoadingFallback = () => (
@@ -23,23 +27,20 @@ const Home: React.FC = () => {
 
     return (
         <Box
+            component="main"
             sx={{
-                flexGrow: 1,
-                minHeight: '100vh',
-                background: 'linear-gradient(145deg, #f6f8fc 0%, #ffffff 100%)',
-                p: { xs: 2, sm: 3 },
-                mt: 8
+                position: 'fixed',
+                top: 64, // Header height
+                left: 240, // Sidebar width
+                right: 0,
+                bottom: 0,
+                bgcolor: '#f6f8fc',
+                overflowY: 'auto',
+                overflowX: 'hidden',
             }}
         >
-            <Container
-                maxWidth="lg"
-                sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4
-                }}
-            >
-                <Box sx={{ mb: 2 }}>
+            <Box sx={{ p: { xs: 2, sm: 3 } }}>
+                <Box sx={{ mb: 4 }}>
                     <Typography
                         variant="h4"
                         component="h1"
@@ -54,37 +55,32 @@ const Home: React.FC = () => {
                     <Typography
                         variant="subtitle1"
                         color="text.secondary"
-                        sx={{ maxWidth: '800px' }}
                     >
                         Manage and organize your media files efficiently
                     </Typography>
                 </Box>
 
-                <Stack
-                    spacing={4}
-                    sx={{
-                        width: '100%'
-                    }}
-                >
+                <Stack spacing={3}>
+                    <ErrorBoundary FallbackComponent={ErrorFallback}>
+                        <Suspense fallback={<LoadingFallback />}>
+                            <Statistics />
+                        </Suspense>
+                    </ErrorBoundary>
+
                     <Paper
                         elevation={0}
                         sx={{
-                            p: { xs: 2, sm: 3 },
+                            p: 3,
                             borderRadius: 2,
                             backgroundColor: 'rgba(255, 255, 255, 0.8)',
                             backdropFilter: 'blur(10px)',
                             border: '1px solid',
-                            borderColor: 'divider',
-                            transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                            '&:hover': {
-                                transform: 'translateY(-2px)',
-                                boxShadow: theme.shadows[4]
-                            }
+                            borderColor: 'divider'
                         }}
                     >
                         <ErrorBoundary FallbackComponent={ErrorFallback}>
                             <Suspense fallback={<LoadingFallback />}>
-                                <SmartFolders />
+                                <Collections />
                             </Suspense>
                         </ErrorBoundary>
                     </Paper>
@@ -92,27 +88,83 @@ const Home: React.FC = () => {
                     <Paper
                         elevation={0}
                         sx={{
-                            p: { xs: 2, sm: 3 },
+                            p: 3,
                             borderRadius: 2,
                             backgroundColor: 'rgba(255, 255, 255, 0.8)',
                             backdropFilter: 'blur(10px)',
                             border: '1px solid',
-                            borderColor: 'divider',
-                            transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                            '&:hover': {
-                                transform: 'translateY(-2px)',
-                                boxShadow: theme.shadows[4]
-                            }
+                            borderColor: 'divider'
                         }}
                     >
                         <ErrorBoundary FallbackComponent={ErrorFallback}>
                             <Suspense fallback={<LoadingFallback />}>
-                                <ConnectedStorage />
+                                <SharedCollections />
                             </Suspense>
                         </ErrorBoundary>
                     </Paper>
+
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            borderRadius: 2,
+                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid',
+                            borderColor: 'divider'
+                        }}
+                    >
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <Suspense fallback={<LoadingFallback />}>
+                                <Favorites />
+                            </Suspense>
+                        </ErrorBoundary>
+                    </Paper>
+
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 3,
+                                    height: '100%',
+                                    borderRadius: 2,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                    backdropFilter: 'blur(10px)',
+                                    border: '1px solid',
+                                    borderColor: 'divider'
+                                }}
+                            >
+                                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                                    <Suspense fallback={<LoadingFallback />}>
+                                        <SmartFolders />
+                                    </Suspense>
+                                </ErrorBoundary>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 3,
+                                    height: '100%',
+                                    borderRadius: 2,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                    backdropFilter: 'blur(10px)',
+                                    border: '1px solid',
+                                    borderColor: 'divider'
+                                }}
+                            >
+                                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                                    <Suspense fallback={<LoadingFallback />}>
+                                        <ConnectedStorage />
+                                    </Suspense>
+                                </ErrorBoundary>
+                            </Paper>
+                        </Grid>
+                    </Grid>
                 </Stack>
-            </Container>
+            </Box>
         </Box>
     );
 };
