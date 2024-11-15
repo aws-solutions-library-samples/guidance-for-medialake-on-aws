@@ -5,22 +5,23 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '../queryClient';
 import { AwsConfigProvider } from '../common/hooks/aws-config-context';
 import { AuthProvider, useAuth } from '../common/hooks/auth-context';
+import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react';
+import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
 import SearchPage from '../pages/SearchPage';
 import { S3Explorer } from './home/S3Explorer';
-import { ConnectedStorage } from './home/ConnectedStorage';
+import Home from '../pages/Home';
 import SettingsComponent from '../SettingsComponent';
 import ExecutionStatusPage from '../pages/ExecutionStatusPage';
-import PipelinesPage from '../PipelinesPage';
+import PipelinesPage from '../pages/PipelinesPage';
 import ReviewQueue from '../reviewQueue';
 import TagsPage from '../TagsPage';
-import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react';
-import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { StorageHelper } from '../common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
 import ImageDetailPage from '../pages/ImageDetailPage';
+import PipelineEditorPage from '../pages/PipelineEditorPage';
 
 // Custom theme for Authenticator
 const theme: Theme = {
@@ -305,7 +306,7 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: <ConnectedStorage />
+                element: <Home />
             },
             {
                 path: 's3/explorer/:connectorId',
@@ -325,7 +326,7 @@ const router = createBrowserRouter([
             },
             {
                 path: 'pipelines/:pipelineId',
-                element: <PipelinesPage />
+                element: <PipelineEditorPage />
             },
             {
                 path: 'review-queue',
