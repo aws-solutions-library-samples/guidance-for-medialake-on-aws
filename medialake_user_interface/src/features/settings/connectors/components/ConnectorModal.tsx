@@ -26,8 +26,8 @@ import {
     CloudUpload as CloudUploadIcon,
     Info as InfoIcon,
 } from '@mui/icons-material';
-import { ConnectorResponse, CreateConnectorRequest } from '../../api/types/api.types';
-import { useGetS3Buckets, useCreateS3Connector } from '../../api/hooks/useConnectors';
+import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
+import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
 
 interface ConnectorModalProps {
     open: boolean;
@@ -45,6 +45,11 @@ const CONNECTOR_TYPES = [
 const S3_CONNECTOR_TYPES = [
     { value: 'non-managed', label: 'MediaLake Non-Managed' },
 ];
+
+const S3_INTEGRATION_METHODS = [
+    { value: 'eventbridge' as const, label: 'S3 EventBridge Notifications' },
+    { value: 's3-event-notifications' as const, label: 'S3 Event Notifications' },
+] as const;
 
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
     open,
@@ -89,7 +94,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     };
 
     const handleSave = async () => {
-        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket))) {
+        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket || !configuration.integrationMethod))) {
             setError('Please fill in all required fields');
             return;
         }
@@ -101,6 +106,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             configuration: {
                 ...configuration,
                 connectorType: s3ConnectorType,
+                s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3-event-notifications',
             },
         };
 
@@ -124,13 +130,32 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
     const renderS3Configuration = () => (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-                label="Connector Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                fullWidth
-                required
-            />
+            {editingConnector ? (
+                <>
+                    <TextField
+                        label="Connector Name"
+                        value={name}
+                        disabled
+                        fullWidth
+                        InputProps={{
+                            sx: { bgcolor: 'action.disabledBackground' }
+                        }}
+                        helperText="Connector name cannot be modified after creation"
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+                        Amazon S3
+                    </Typography>
+                </>
+            ) : (
+                <TextField
+                    label="Connector Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    fullWidth
+                    required
+                />
+            )}
+
             <TextField
                 label="Description"
                 value={description}
@@ -139,25 +164,90 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 multiline
                 rows={2}
             />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FormControl fullWidth required>
-                    <InputLabel>S3 Connector Type</InputLabel>
-                    <Select
-                        value={s3ConnectorType}
-                        label="S3 Connector Type"
-                        onChange={(e) => setS3ConnectorType(e.target.value)}
-                    >
-                        {S3_CONNECTOR_TYPES.map((type) => (
-                            <MenuItem key={type.value} value={type.value}>
-                                {type.label}
+
+            {editingConnector ? (
+                <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FormControl fullWidth disabled>
+                            <InputLabel>S3 Connector Type</InputLabel>
+                            <Select
+                                value={s3ConnectorType}
+                                label="S3 Connector Type"
+                                sx={{ bgcolor: 'action.disabledBackground' }}
+                            >
+                                {S3_CONNECTOR_TYPES.map((type) => (
+                                    <MenuItem key={type.value} value={type.value}>
+                                        {type.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <IconButton onClick={handleInfoClick}>
+                            <InfoIcon />
+                        </IconButton>
+                    </Box>
+                    <FormControl fullWidth disabled>
+                        <InputLabel>S3 Integration Method</InputLabel>
+                        <Select
+                            value={configuration.integrationMethod || ''}
+                            label="S3 Integration Method"
+                            sx={{ bgcolor: 'action.disabledBackground' }}
+                        >
+                            {S3_INTEGRATION_METHODS.map((method) => (
+                                <MenuItem key={method.value} value={method.value}>
+                                    {method.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <FormControl fullWidth disabled>
+                        <InputLabel>S3 Bucket</InputLabel>
+                        <Select
+                            value={configuration.bucket || ''}
+                            label="S3 Bucket"
+                            sx={{ bgcolor: 'action.disabledBackground' }}
+                        >
+                            <MenuItem value={configuration.bucket}>
+                                {configuration.bucket}
                             </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <IconButton onClick={handleInfoClick}>
-                    <InfoIcon />
-                </IconButton>
-            </Box>
+                        </Select>
+                    </FormControl>
+                </>
+            ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FormControl fullWidth required>
+                        <InputLabel>S3 Connector Type</InputLabel>
+                        <Select
+                            value={s3ConnectorType}
+                            label="S3 Connector Type"
+                            onChange={(e) => setS3ConnectorType(e.target.value)}
+                        >
+                            {S3_CONNECTOR_TYPES.map((type) => (
+                                <MenuItem key={type.value} value={type.value}>
+                                    {type.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <IconButton onClick={handleInfoClick}>
+                        <InfoIcon />
+                    </IconButton>
+                </Box>
+            )}
+            <FormControl fullWidth required>
+                <InputLabel>S3 Integration Method</InputLabel>
+                <Select
+                    value={configuration.integrationMethod || ''}
+                    label="S3 Integration Method"
+                    onChange={(e) => setConfiguration({ ...configuration, integrationMethod: e.target.value })}
+                >
+                    {S3_INTEGRATION_METHODS.map((method) => (
+                        <MenuItem key={method.value} value={method.value}>
+                            {method.label}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
             <FormControl fullWidth required>
                 <InputLabel>S3 Bucket</InputLabel>
                 <Select

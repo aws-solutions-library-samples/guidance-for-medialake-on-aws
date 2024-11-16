@@ -21,7 +21,7 @@ import {
     Check as CheckIcon,
     Warning as WarningIcon,
 } from '@mui/icons-material';
-import { Integration } from '../../api/types/api.types';
+import { Integration } from '@/api/types/api.types';
 
 interface IntegrationCardProps {
     integration: Integration;

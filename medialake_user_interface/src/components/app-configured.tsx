@@ -13,7 +13,7 @@ import Sidebar from '../Sidebar';
 import SearchPage from '../pages/SearchPage';
 import { S3Explorer } from './home/S3Explorer';
 import Home from '../pages/Home';
-import SettingsComponent from '../SettingsComponent';
+import SettingsComponent from '@/features/settings/SettingsLayout';
 import ExecutionStatusPage from '../pages/ExecutionStatusPage';
 import PipelinesPage from '../pages/PipelinesPage';
 import ReviewQueue from '../reviewQueue';

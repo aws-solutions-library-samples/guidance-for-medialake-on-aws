@@ -1,0 +1,272 @@
+"""
+API Gateway reviews module for MediaLake.
+
+This module defines the reviewsConstruct class which sets up API Gateway endpoints
+for managing reviews, including:
+- GET /reviews/{id} - Get asset details
+- DELETE /reviews/{id} - Delete an asset
+"""
+
+from dataclasses import dataclass
+from aws_cdk import (
+    aws_apigateway as apigateway,
+    aws_secretsmanager as secretsmanager,
+    aws_dynamodb as dynamodb,
+    Duration,
+    aws_iam as iam,
+)
+from aws_cdk import Fn, Stack
+from constructs import Construct
+from medialake_constructs.shared_constructs.lambda_base import (
+    Lambda,
+    LambdaConfig,
+)
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+
+
+@dataclass
+class reviewsProps:
+    """Configuration for reviews API endpoints."""
+
+    asset_table: dynamodb.TableV2
+    api_resource: apigateway.IResource
+    cognito_authorizer: apigateway.IAuthorizer
+    x_origin_verify_secret: secretsmanager.Secret
+
+
+class reviewsConstruct(Construct):
+    """
+    AWS CDK Construct for managing MediaLake reviews API endpoints.
+
+    This construct creates and configures:
+    - API Gateway endpoints for asset operations
+    - Lambda functions for handling asset requests
+    - IAM roles and permissions for secure access
+    """
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        props: reviewsProps,
+    ) -> None:
+        super().__init__(scope, construct_id)
+
+        # Create reviews resource and add {id} parameter
+        reviews_resource = props.api_resource.root.add_resource("reviews")
+        asset_resource = reviews_resource.add_resource("{id}")
+
+        search_layer = SearchLayer(self, "SearchLayer")
+
+        # GET /reviews/{id} Lambda
+        get_asset_lambda = Lambda(
+            self,
+            "GetAssetLambda",
+            config=LambdaConfig(
+                name="get_asset_lambda",
+                entry="lambdas/api/reviews/rp_reviews_id/get_reviews",
+                layers=[search_layer.layer],
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "kms:Decrypt",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                    "arn:aws:kms:*:*:key/*",
+                ],
+            )
+        )
+
+        # DELETE /reviews/{id} Lambda
+        delete_asset_lambda = Lambda(
+            self,
+            "DeleteAssetLambda",
+            config=LambdaConfig(
+                name="delete_asset_lambda",
+                entry="lambdas/api/reviews/rp_reviews_id/del_reviews",
+                layers=[search_layer.layer],
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:CopyObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
+        # Add DynamoDB permissions for GET Lambda
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        # Add DynamoDB permissions for DELETE Lambda
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        # Add GET method to /reviews/{id}
+        asset_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(
+                get_asset_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
+
+        # Add DELETE method to /reviews/{id}
+        asset_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(
+                delete_asset_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
+
+        # Add POST /reviews/{id}/rename endpoint
+        rename_resource = asset_resource.add_resource("rename")
+        rename_asset_lambda = Lambda(
+            self,
+            "RenameAssetLambda",
+            config=LambdaConfig(
+                name="rename_asset_lambda",
+                layers=[search_layer.layer],
+                entry="lambdas/api/reviews/rp_reviews_id/rename/post_rename",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        # Add DynamoDB and S3 permissions for rename Lambda
+        rename_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                ],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        # Update the policy to allow access to all S3 buckets
+        rename_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:CopyObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
+        # Add POST method to /reviews/{id}/rename
+        rename_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(
+                rename_asset_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
+
+        # Add OPTIONS method for CORS
+        # asset_resource.add_cors_preflight(
+        #     allow_origins=["*"],
+        #     allow_methods=["GET", "DELETE"],
+        #     allow_headers=[
+        #         "Content-Type",
+        #         "X-Amz-Date",
+        #         "Authorization",
+        #         "X-Api-Key",
+        #         "X-Origin-Verify",
+        #     ],
+        #     max_age=Duration.days(1),
+        # )

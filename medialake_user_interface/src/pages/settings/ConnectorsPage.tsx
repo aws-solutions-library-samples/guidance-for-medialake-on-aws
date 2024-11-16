@@ -1,62 +1,75 @@
 import React, { useState } from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import { Grid, Typography, Button, Box } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
-import { ConnectorsList } from '../../components/ConnectorsList';
-import ConnectorModal from '../../components/settings/ConnectorModal';
-import { ConnectorResponse, CreateConnectorRequest } from '../../api/types/api.types';
-import { useCreateConnector } from '../../api/hooks/useConnectors';
+import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
+import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
+import { useGetConnectors, useDeleteConnector } from '@/api/hooks/useConnectors';
+import { ConnectorResponse } from '@/api/types/api.types';
 
 const ConnectorsPage: React.FC = () => {
-    const [openConnectorModal, setOpenConnectorModal] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
-    const createConnector = useCreateConnector();
 
-    const handleAddConnector = () => {
-        console.log('Opening connector modal'); // Debug log
+    const { data: connectorsResponse, isLoading } = useGetConnectors();
+    const { mutateAsync: deleteConnector } = useDeleteConnector();
+
+    const handleAddClick = () => {
         setEditingConnector(undefined);
-        setOpenConnectorModal(true);
+        setIsModalOpen(true);
     };
 
-    const handleSaveConnector = async (connectorData: CreateConnectorRequest) => {
-        try {
-            await createConnector.mutateAsync(connectorData);
-            setOpenConnectorModal(false);
-            setEditingConnector(undefined);
-        } catch (err) {
-            console.error('Failed to save connector:', err);
-        }
+    const handleEditClick = (connector: ConnectorResponse) => {
+        setEditingConnector(connector);
+        setIsModalOpen(true);
     };
+
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+        setEditingConnector(undefined);
+    };
+
+    const handleDelete = async (id: string) => {
+        await deleteConnector(id);
+    };
+
+    if (isLoading) {
+        return <div>Loading...</div>;
+    }
+
+    const connectors = connectorsResponse?.data?.connectors || [];
 
     return (
-        <Box>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-                        Storage Connectors
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Manage your storage connections and data sources
-                    </Typography>
-                </Box>
+        <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="h5">Connectors</Typography>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={handleAddConnector}
+                    onClick={handleAddClick}
                 >
                     Add Connector
                 </Button>
             </Box>
 
-            <ConnectorsList />
+            <Grid container spacing={3}>
+                {connectors.map((connector) => (
+                    <Grid item xs={12} sm={6} md={4} key={connector.id}>
+                        <ConnectorCard
+                            connector={connector}
+                            onEdit={handleEditClick}
+                            onDelete={handleDelete}
+                        />
+                    </Grid>
+                ))}
+            </Grid>
 
             <ConnectorModal
-                open={openConnectorModal}
-                onClose={() => {
-                    console.log('Closing connector modal'); // Debug log
-                    setOpenConnectorModal(false);
-                    setEditingConnector(undefined);
+                open={isModalOpen}
+                onClose={handleModalClose}
+                onSave={() => {
+                    // Handle save
+                    handleModalClose();
                 }}
-                onSave={handleSaveConnector}
                 editingConnector={editingConnector}
             />
         </Box>

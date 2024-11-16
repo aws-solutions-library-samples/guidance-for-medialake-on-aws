@@ -20,7 +20,7 @@ import {
     FilterList as FilterIcon,
 } from '@mui/icons-material';
 import IntegrationCard from './IntegrationCard';
-import { Integration } from '../../api/types/api.types';
+import { Integration } from '@/api/types/api.types';
 
 interface IntegrationsViewProps {
     integrations: Integration[];
