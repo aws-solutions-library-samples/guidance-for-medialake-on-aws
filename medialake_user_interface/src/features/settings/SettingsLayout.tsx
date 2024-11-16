@@ -1,10 +1,10 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import IntegrationsPage from './pages/settings/IntegrationsPage';
-import ConnectorsPage from './pages/settings/ConnectorsPage';
-import SystemPage from './pages/settings/SystemPage';
-import ProfilePage from './pages/settings/ProfilePage';
+import IntegrationsPage from '@/pages/settings/IntegrationsPage';
+import ConnectorsPage from '@/pages/settings/ConnectorsPage';
+import SystemPage from '@/pages/settings/SystemPage';
+import ProfilePage from '@/pages/settings/ProfilePage';
 
 const SettingsComponent: React.FC = () => {
     return (

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Box } from '@mui/material';
-import IntegrationsView from '../../components/settings/IntegrationsView';
-import IntegrationModal from '../../components/settings/IntegrationModal';
-import { Integration } from '../../api/types/api.types';
+import IntegrationsView from '@/features/settings/integrations/components/IntegrationsView';
+import IntegrationModal from '@/features/settings/integrations/components/IntegrationModal';
+import { Integration } from '@/api/types/api.types';
 
 const IntegrationsPage: React.FC = () => {
     const [openIntegrationModal, setOpenIntegrationModal] = useState(false);
@@ -10,7 +9,6 @@ const IntegrationsPage: React.FC = () => {
     const [integrations, setIntegrations] = useState<Integration[]>([]);
 
     const handleAddIntegration = () => {
-        console.log('Opening integration modal from IntegrationsPage'); // Debug log
         setEditingIntegration(undefined);
         setOpenIntegrationModal(true);
     };
@@ -27,12 +25,8 @@ const IntegrationsPage: React.FC = () => {
         setEditingIntegration(undefined);
     };
 
-    const handleDeleteIntegration = (id: string) => {
-        setIntegrations(integrations.filter(i => i.id !== id));
-    };
-
     return (
-        <Box>
+        <>
             <IntegrationsView
                 integrations={integrations}
                 onAddIntegration={handleAddIntegration}
@@ -40,21 +34,21 @@ const IntegrationsPage: React.FC = () => {
                     setEditingIntegration(integration);
                     setOpenIntegrationModal(true);
                 }}
-                onDeleteIntegration={handleDeleteIntegration}
+                onDeleteIntegration={(id) => {
+                    setIntegrations(integrations.filter(i => i.id !== id));
+                }}
                 onConfigureIntegration={() => { }}
             />
-
             <IntegrationModal
                 open={openIntegrationModal}
                 onClose={() => {
-                    console.log('Closing integration modal'); // Debug log
                     setOpenIntegrationModal(false);
                     setEditingIntegration(undefined);
                 }}
                 onSave={handleSaveIntegration}
                 editingIntegration={editingIntegration}
             />
-        </Box>
+        </>
     );
 };
 

@@ -26,7 +26,7 @@ import {
     PhotoLibrary as PhotoIcon,
     Api as ApiIcon,
 } from '@mui/icons-material';
-import { Integration } from '../../api/types/api.types';
+import { Integration } from '@/api/types/api.types';
 
 interface IntegrationModalProps {
     open: boolean;

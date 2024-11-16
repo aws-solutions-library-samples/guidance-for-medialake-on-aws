@@ -18,12 +18,12 @@ import {
     Person as PersonIcon,
     AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material';
-import IntegrationsView from '../components/settings/IntegrationsView';
-import { ConnectorsList } from '../components/ConnectorsList';
-import IntegrationModal from '../components/settings/IntegrationModal';
-import ConnectorModal from '../components/settings/ConnectorModal';
-import { Integration, ConnectorResponse, CreateConnectorRequest } from '../api/types/api.types';
-import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '../api/hooks/useConnectors';
+import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '@/api/hooks/useConnectors';
+import { Integration, ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
+import IntegrationsView from '@/features/settings/integrations/components/IntegrationsView';
+import { ConnectorsList } from '@/features/settings/connectors/components/ConnectorsList';
+import IntegrationModal from '@/features/settings/integrations/components/IntegrationModal';
+import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
 import UserProfile from '../components/settings/UserProfile';
 import AdminSettings from '../components/settings/AdminSettings';
 
@@ -70,13 +70,13 @@ const SettingsPage = () => {
     };
 
     const handleAddIntegration = () => {
-        console.log('Opening integration modal'); // Debug log
+        console.log('Opening integration modal');
         setEditingIntegration(undefined);
         setOpenIntegrationModal(true);
     };
 
     const handleAddConnector = () => {
-        console.log('Opening connector modal'); // Debug log
+        console.log('Opening connector modal');
         setEditingConnector(undefined);
         setOpenConnectorModal(true);
     };
@@ -200,7 +200,7 @@ const SettingsPage = () => {
                                 Add Connector
                             </Button>
                         </Box>
-                        <ConnectorsList />
+                        <ConnectorsList onAddConnector={handleAddConnector} />
                     </Box>
                 </TabPanel>
 
