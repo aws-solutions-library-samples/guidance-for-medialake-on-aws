@@ -63,7 +63,67 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'; // Im
 import { ImageViewer } from '../components/common/ImageViewer';
 import { useAsset } from '../api/hooks/useAssets';
 
+const NestedMetadata: React.FC<{ data: any, isTopLevel?: boolean }> = ({ data, isTopLevel = false }) => {
+    if (Array.isArray(data)) {
+        return (
+            <List dense disablePadding>
+                {data.map((item, index) => (
+                    <ListItem key={index} sx={{ pl: isTopLevel ? 0 : 2 }}>
+                        <NestedMetadata data={item} />
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else if (typeof data === 'object' && data !== null) {
+        return (
+            <List dense disablePadding>
+                {Object.entries(data).map(([key, value]) => (
+                    <ListItem key={key} sx={{ pl: isTopLevel ? 0 : 2, flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {formatCamelCase(key)}:
+                        </Typography>
+                        <Box sx={{ pl: 2, width: '100%' }}>
+                            <NestedMetadata data={value} />
+                        </Box>
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else {
+        return <Typography variant="body2">{String(data)}</Typography>;
+    }
+};
 
+const MetadataContent: React.FC<{ data: any, depth?: number }> = ({ data, depth = 0 }) => {
+    if (Array.isArray(data)) {
+        return (
+            <List dense disablePadding>
+                {data.map((item, index) => (
+                    <ListItem key={index} sx={{ pl: depth * 2 }}>
+                        <MetadataContent data={item} depth={depth + 1} />
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else if (typeof data === 'object' && data !== null) {
+        return (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+                {Object.entries(data).map(([key, value]) => (
+                    <Box key={key}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {formatCamelCase(key)}:
+                        </Typography>
+                        <Box sx={{ pl: 2 }}>
+                            <MetadataContent data={value} depth={depth + 1} />
+                        </Box>
+                    </Box>
+                ))}
+            </Box>
+        );
+    } else {
+        return <TruncatedTextWithTooltip text={String(data)} />;
+    }
+};
 
 interface Pipeline {
     id: string;
@@ -305,19 +365,33 @@ const ImageDetailPage: React.FC = () => {
             setNewComment('');
         }
     };
+    // const transformMetadata = (metadata: any) => {
+    //     if (!metadata) return [];
+
+    //     return Object.entries(metadata).map(([parentCategory, parentData]) => ({
+    //         category: parentCategory,
+    //         subCategories: Object.entries(parentData as Record<string, any>).map(([category, data]) => ({
+    //             category,
+    //             data: Object.entries(data as Record<string, string>).map(([key, value]) => ({ key, value })),
+    //             count: Object.keys(data as Record<string, string>).length
+    //         })),
+    //         count: Object.keys(parentData as Record<string, any>).length
+    //     }));
+    // };
     const transformMetadata = (metadata: any) => {
         if (!metadata) return [];
 
         return Object.entries(metadata).map(([parentCategory, parentData]) => ({
             category: parentCategory,
-            subCategories: Object.entries(parentData as Record<string, any>).map(([category, data]) => ({
-                category,
-                data: Object.entries(data as Record<string, string>).map(([key, value]) => ({ key, value })),
-                count: Object.keys(data as Record<string, string>).length
+            subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
+                category: subCategory,
+                data: data,
+                count: typeof data === 'object' ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 1
             })),
-            count: Object.keys(parentData as Record<string, any>).length
+            count: Object.keys(parentData as object).length
         }));
     };
+
     const metadataAccordions = useMemo(() => {
         if (!assetData?.data?.asset?.Metadata) return [];
         return transformMetadata(assetData.data.asset.Metadata);
@@ -682,43 +756,36 @@ const ImageDetailPage: React.FC = () => {
                         {metadataAccordions.map((parentAccordion, parentIndex) => (
                             <Accordion
                                 key={parentAccordion.category}
-                                expanded={expandedAccordions[`parent${parentIndex}`] || false}
-                                onChange={handleAccordionChange(`parent${parentIndex}`)}
+                                expanded={expandedAccordions[`parent-${parentIndex}`] || false}
+                                onChange={handleAccordionChange(`parent-${parentIndex}`)}
                             >
                                 <AccordionSummary
-                                    // expandIcon={<ExpandMoreIcon />}
-                                    aria-controls={`parent${parentIndex}d-content`}
-                                    id={`parent${parentIndex}d-header`}
+                                    expandIcon={<ExpandMoreIcon />}
+                                    aria-controls={`parent-${parentIndex}-content`}
+                                    id={`parent-${parentIndex}-header`}
                                 >
-                                    <Typography>{parentAccordion.category} ({parentAccordion.count})</Typography>
+                                    <Typography sx={{ fontWeight: 'bold' }}>
+                                        {parentAccordion.category} ({parentAccordion.count})
+                                    </Typography>
                                 </AccordionSummary>
                                 <AccordionDetails>
-                                    {parentAccordion.subCategories.map((accordion, index) => (
+                                    {parentAccordion.subCategories.map((subAccordion, subIndex) => (
                                         <Accordion
-                                            key={accordion.category}
-                                            expanded={expandedAccordions[`${parentAccordion.category}-${index}`] || false}
-                                            onChange={handleAccordionChange(`${parentAccordion.category}-${index}`)}
+                                            key={subAccordion.category}
+                                            expanded={expandedAccordions[`sub-${parentIndex}-${subIndex}`] || false}
+                                            onChange={handleAccordionChange(`sub-${parentIndex}-${subIndex}`)}
                                         >
                                             <AccordionSummary
-                                                // expandIcon={<ExpandMoreIcon />}
-                                                aria-controls={`${parentAccordion.category}-${index}d-content`}
-                                                id={`${parentAccordion.category}-${index}d-header`}
+                                                expandIcon={<ExpandMoreIcon />}
+                                                aria-controls={`sub-${parentIndex}-${subIndex}-content`}
+                                                id={`sub-${parentIndex}-${subIndex}-header`}
                                             >
-                                                <Typography>{accordion.category} ({accordion.count})</Typography>
+                                                <Typography sx={{ fontWeight: 'bold' }}>
+                                                    {subAccordion.category} ({subAccordion.count})
+                                                </Typography>
                                             </AccordionSummary>
                                             <AccordionDetails>
-                                                <Box sx={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                                    gap: 2,
-                                                    justifyItems: 'start'
-                                                }}>
-                                                    {accordion.data.map(({ key, value }) => (
-                                                        <Box key={key} sx={{ width: '100%' }}>
-                                                            <strong>{formatCamelCase(key)}:</strong> <TruncatedTextWithTooltip text={`${value}`} />
-                                                        </Box>
-                                                    ))}
-                                                </Box>
+                                                <MetadataContent data={subAccordion.data} />
                                             </AccordionDetails>
                                         </Accordion>
                                     ))}
