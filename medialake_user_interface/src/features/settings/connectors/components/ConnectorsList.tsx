@@ -1,14 +1,18 @@
 import { Suspense } from 'react';
-import { Box, CircularProgress, Typography, Grid } from '@mui/material';
+import { Box, CircularProgress, Typography, Grid, Button } from '@mui/material';
 import { useGetConnectors, useDeleteConnector } from '@/api/hooks/useConnectors';
-import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
 import { ConnectorResponse, ConnectorListResponse } from '@/api/types/api.types';
+import ConnectorCard from './ConnectorCard';
 import { UseQueryResult } from '@tanstack/react-query';
 
-export const ConnectorsList = () => {
+interface ConnectorsListProps {
+    onAddConnector: () => void;
+}
+
+export const ConnectorsList: React.FC<ConnectorsListProps> = ({ onAddConnector }) => {
     return (
         <Suspense fallback={<LoadingSpinner />}>
-            <ConnectorsListContent />
+            <ConnectorsListContent onAddConnector={onAddConnector} />
         </Suspense>
     );
 };
@@ -19,7 +23,11 @@ const LoadingSpinner = () => (
     </Box>
 );
 
-const ConnectorsListContent = () => {
+interface ConnectorsListContentProps {
+    onAddConnector: () => void;
+}
+
+const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConnector }) => {
     const {
         data: connectorsData,
         isLoading,
@@ -57,27 +65,28 @@ const ConnectorsListContent = () => {
 
     const connectors = connectorsData?.data?.connectors || [];
 
-    if (connectors.length === 0) {
-        return (
-            <Box p={3}>
-                <Typography>No connectors found.</Typography>
-            </Box>
-        );
-    }
-
     return (
         <Box p={3}>
-            <Grid container spacing={3}>
-                {connectors.map(connector => (
-                    <Grid item xs={12} sm={6} md={4} key={connector.id}>
-                        <ConnectorCard
-                            connector={connector}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                        />
-                    </Grid>
-                ))}
-            </Grid>
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+                <Button variant="contained" color="primary" onClick={onAddConnector}>
+                    Add Connector
+                </Button>
+            </Box>
+            {connectors.length === 0 ? (
+                <Typography>No connectors found.</Typography>
+            ) : (
+                <Grid container spacing={3}>
+                    {connectors.map(connector => (
+                        <Grid item xs={12} sm={6} md={4} key={connector.id}>
+                            <ConnectorCard
+                                connector={connector}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                            />
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
         </Box>
     );
 };

@@ -20,7 +20,12 @@ export interface CreateConnectorRequest {
   name: string;
   type: string;
   description?: string;
-  configuration: Record<string, any>;
+  configuration: {
+    connectorType?: string;
+    bucket?: string;
+    s3IntegrationMethod?: 's3-event-notifications' | 'eventbridge';
+    [key: string]: string | undefined;
+  };
 }
 
 export interface UpdateConnectorRequest {
@@ -39,16 +44,41 @@ export interface ConnectorResponse {
   id: string;
   name: string;
   type: string;
+  description?: string;
   createdAt: string;
   updatedAt: string;
   storageIdentifier: string;
   sqsArn: string;
   region: string;
   configuration?: Record<string, any>;
-  usage?: ConnectorUsage;
-  status?: 'active' | 'warning' | 'error' | 'inactive';
-  lastSync?: string;
+  usage?: {
+    total: number;
+  };
+  settings?: {
+    bucket: string;
+    region?: string;
+    path?: string;
+  };
+  status?: string;
 }
+
+// interface ConnectorResponse {
+//   id: string;
+//   name: string;
+//   type: string;
+//   usage?: {
+//     total: number;
+//   };
+//   updatedAt: string;
+//   status?: string;
+//   bucket?: string;
+//   description: string;
+//   settings?: {
+//     bucket: string;
+//     region?: string;
+//     path?: string;
+//   };
+// }
 
 export interface S3ListResponse {
   buckets: string[];

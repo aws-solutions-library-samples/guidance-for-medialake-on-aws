@@ -19,6 +19,7 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 )
 from pydantic import BaseModel
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 tracer = Tracer()
 logger = Logger()
@@ -32,6 +33,7 @@ iam_client = boto3.client("iam")
 
 class S3ConnectorConfig(BaseModel):
     bucket: str
+    s3IntegrationMethod: str
 
 
 class S3Connector(BaseModel):
@@ -58,9 +60,157 @@ def handle_validation_error(ex: RequestValidationError):
     )
 
 
+def setup_eventbridge_notifications(
+    s3_bucket: str, bucket_region: str, created_resources: list
+) -> tuple[str, str]:
+    """Set up EventBridge notifications and return queue URL and ARN"""
+
+    eventbridge = boto3.client("events", region_name=bucket_region)
+    sqs = boto3.client("sqs", region_name=bucket_region)
+    s3 = boto3.client("s3", region_name=bucket_region)
+
+    # Enable EventBridge notifications on the S3 bucket
+    try:
+        response = s3.put_bucket_notification_configuration(
+            Bucket=s3_bucket,
+            NotificationConfiguration={"EventBridgeConfiguration": {}},
+        )
+        logger.info(
+            f"Enabled EventBridge notifications for bucket {s3_bucket} with response {response}"
+        )
+        created_resources.append(("eventbridge_config", s3_bucket))
+    except ClientError as e:
+        logger.error(f"Failed to enable EventBridge notifications: {str(e)}")
+        raise
+
+    # Create FIFO SQS queue
+    queue_name = (
+        f"medialake-connector-{s3_bucket}-eventbridge.fifo"  # Note the .fifo suffix
+    )
+    response = sqs.create_queue(
+        QueueName=queue_name,
+        Attributes={
+            "VisibilityTimeout": "360",
+            "FifoQueue": "true",  # Enable FIFO
+            "ContentBasedDeduplication": "true",  # Enable content-based deduplication
+            "DeduplicationScope": "messageGroup",  # Deduplicate within message groups
+            "FifoThroughputLimit": "perMessageGroupId",  # Throughput limit per message group
+        },
+    )
+    queue_url = response["QueueUrl"]
+    created_resources.append(("sqs_queue", queue_url))
+
+    # Get queue ARN
+    response = sqs.get_queue_attributes(QueueUrl=queue_url, AttributeNames=["QueueArn"])
+    queue_arn = response["Attributes"]["QueueArn"]
+
+    # Get account ID
+    account_id = boto3.client("sts").get_caller_identity()["Account"]
+
+    # Create EventBridge rule with more specific event pattern
+    rule_name = f"medialake-{s3_bucket}-s3-events"
+    event_pattern = {
+        "source": ["aws.s3"],
+        "detail-type": ["Object Created"],
+        "detail": {
+            "bucket": {"name": [s3_bucket]},
+            "object": {"key": [{"anything-but": ""}]},
+        },
+    }
+
+    eventbridge.put_rule(
+        Name=rule_name,
+        EventPattern=json.dumps(event_pattern),
+        State="ENABLED",
+        Description=f"Rule for S3 bucket {s3_bucket} object creation events",
+    )
+    created_resources.append(("eventbridge_rule", rule_name))
+
+    # Set up SQS queue policy to allow EventBridge
+    queue_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowEventBridgeSendMessage",
+                "Effect": "Allow",
+                "Principal": {"Service": "events.amazonaws.com"},
+                "Action": "sqs:SendMessage",
+                "Resource": queue_arn,
+                "Condition": {
+                    "ArnLike": {
+                        "aws:SourceArn": f"arn:aws:events:{bucket_region}:{account_id}:rule/{rule_name}"
+                    }
+                },
+            }
+        ],
+    }
+    sqs.set_queue_attributes(
+        QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+    )
+    created_resources.append(("queue_policy", queue_url))
+
+    # Add SQS as target for the EventBridge rule
+    target_id = f"SQSTarget-{s3_bucket}"
+    eventbridge.put_targets(
+        Rule=rule_name,
+        Targets=[
+            {
+                "Id": target_id,
+                "Arn": queue_arn,
+                "SqsParameters": {
+                    "MessageGroupId": "s3events"  # Required for FIFO queues
+                },
+            }
+        ],
+    )
+    created_resources.append(("eventbridge_target", (rule_name, target_id)))
+
+    return queue_url, queue_arn
+
+
+def create_eventbridge_role(
+    bucket_region: str, queue_arn: str, rule_name: str, created_resources: list
+) -> str:
+    """Create IAM role for EventBridge to send events to SQS"""
+
+    iam = boto3.client("iam")
+    role_name = f"medialake-eb-{rule_name}"
+
+    assume_role_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"Service": "events.amazonaws.com"},
+                "Action": "sts:AssumeRole",
+            }
+        ],
+    }
+
+    role = iam.create_role(
+        RoleName=role_name, AssumeRolePolicyDocument=json.dumps(assume_role_policy)
+    )
+    created_resources.append(("iam_role", role_name))
+
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {"Effect": "Allow", "Action": "sqs:SendMessage", "Resource": queue_arn}
+        ],
+    }
+
+    iam.put_role_policy(
+        RoleName=role_name,
+        PolicyName=f"{role_name}-policy",
+        PolicyDocument=json.dumps(policy),
+    )
+    created_resources.append(("inline_policy", (role_name, f"{role_name}-policy")))
+
+    return role["Role"]["Arn"]
+
+
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
-    # Track created resources for cleanup in case of failure
     created_resources = []
     try:
         # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
@@ -80,6 +230,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Get request variables from request body
         s3_bucket = createconnector.configuration.bucket
         connector_name = createconnector.name
+        integration_method = createconnector.configuration.s3IntegrationMethod
 
         suffix = generate_suffix()
 
@@ -116,20 +267,56 @@ def create_connector(createconnector: S3Connector) -> dict:
             ),
         )
 
-        # Create SQS queue in the same region as the bucket
-        queue_name = f"{resource_name_prefix}-notifications"
-        response = sqs.create_queue(
-            QueueName=queue_name,
-            Attributes={"VisibilityTimeout": "360"},  # 1.2x Lambda timeout (300s)
-        )
-        queue_url = response["QueueUrl"]
-        created_resources.append(("sqs_queue", queue_url))
+        # Set up notifications based on integration method
+        if integration_method == "eventbridge":
+            queue_url, queue_arn = setup_eventbridge_notifications(
+                s3_bucket, bucket_region, created_resources
+            )
+        else:  # s3-event-notifications
+            # Create SQS queue in the same region as the bucket
+            queue_name = f"medialake-connector-{s3_bucket}-notifications"
+            response = sqs.create_queue(
+                QueueName=queue_name, Attributes={"VisibilityTimeout": "360"}
+            )
+            queue_url = response["QueueUrl"]
+            created_resources.append(("sqs_queue", queue_url))
 
-        # Get the SQS queue ARN
-        response = sqs.get_queue_attributes(
-            QueueUrl=queue_url, AttributeNames=["QueueArn"]
-        )
-        queue_arn = response["Attributes"]["QueueArn"]
+            # Get queue ARN
+            response = sqs.get_queue_attributes(
+                QueueUrl=queue_url, AttributeNames=["QueueArn"]
+            )
+            queue_arn = response["Attributes"]["QueueArn"]
+
+            # Set up SQS queue policy
+            queue_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "s3.amazonaws.com"},
+                        "Action": "sqs:SendMessage",
+                        "Resource": queue_arn,
+                        "Condition": {
+                            "ArnLike": {"aws:SourceArn": f"arn:aws:s3:::{s3_bucket}"}
+                        },
+                    }
+                ],
+            }
+            sqs.set_queue_attributes(
+                QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+            )
+            created_resources.append(("queue_policy", queue_url))
+
+            # Configure S3 bucket notifications
+            notification_config = {
+                "QueueConfigurations": [
+                    {"QueueArn": queue_arn, "Events": ["s3:ObjectCreated:*"]}
+                ]
+            }
+            s3.put_bucket_notification_configuration(
+                Bucket=s3_bucket, NotificationConfiguration=notification_config
+            )
+            created_resources.append(("bucket_notification", s3_bucket))
 
         # Deploy lambda if environment variables are set
         try:
@@ -362,37 +549,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             logger.error(f"Failed to deploy/configure lambda: {str(e)}")
             raise
 
-        # Set up SQS queue policy
-        queue_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"Service": "s3.amazonaws.com"},
-                    "Action": "sqs:SendMessage",
-                    "Resource": queue_arn,
-                    "Condition": {
-                        "ArnLike": {"aws:SourceArn": f"arn:aws:s3:::{s3_bucket}"}
-                    },
-                }
-            ],
-        }
-        sqs.set_queue_attributes(
-            QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
-        )
-        created_resources.append(("queue_policy", queue_url))
-
-        # Subscribe SQS queue to S3 bucket notifications
-        notification_config = {
-            "QueueConfigurations": [
-                {"QueueArn": queue_arn, "Events": ["s3:ObjectCreated:*"]}
-            ]
-        }
-        s3.put_bucket_notification_configuration(
-            Bucket=s3_bucket, NotificationConfiguration=notification_config
-        )
-        created_resources.append(("bucket_notification", s3_bucket))
-
         # Save the connector details in DynamoDB
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
         if not table_name:
@@ -433,7 +589,17 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
             try:
-                if resource_type == "dynamodb_item":
+                if resource_type == "eventbridge_target":
+                    rule_name, target_id = resource_id
+                    eventbridge.remove_targets(Rule=rule_name, Ids=[target_id])
+                elif resource_type == "eventbridge_rule":
+                    eventbridge.delete_rule(Name=resource_id)
+                elif resource_type == "eventbridge_config":
+                    # Remove EventBridge configuration from bucket
+                    s3.put_bucket_notification_configuration(
+                        Bucket=resource_id, NotificationConfiguration={}
+                    )
+                elif resource_type == "dynamodb_item":
                     table_name, item_id = resource_id
                     table = dynamodb.Table(table_name)
                     table.delete_item(Key={"id": item_id})
