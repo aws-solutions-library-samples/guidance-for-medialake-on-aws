@@ -132,6 +132,7 @@ class OpenSearchServerlessConstruct(Construct):
                 "COLLECTION_ENDPOINT": self.cfn_collection.attr_collection_endpoint,
                 "INDEX_NAMES": ",".join(self.props.collection_indexes),
                 "REGION": self.region,
+                "SCOPE": "aoss",
             },
         )
 

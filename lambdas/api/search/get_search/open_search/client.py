@@ -11,7 +11,7 @@ class OpenSearchClient:
     def __init__(self):
         self.collection_endpoint = os.environ.get("OPENSEARCH_COLLECTION_ENDPOINT")
         self.region_name = os.environ.get("AWS_REGION")
-        self.service = "aoss"
+        self.service = "es"
         self.client = self._create_client()
 
     @staticmethod

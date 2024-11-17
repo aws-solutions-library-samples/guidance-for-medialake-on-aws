@@ -66,6 +66,7 @@ class BaseInfrastructureStack(Stack):
             props=OpenSearchClusterProps(
                 domain_name=f"{GLOBAL_PREFIX}-opensearch",
                 vpc=self.vpc.vpc,
+                collection_indexes=["media"],
             ),
         )
 
@@ -152,17 +153,17 @@ class BaseInfrastructureStack(Stack):
         #     targets=[self._pipeline_event_bus.event_bus],
         # )
 
-        self.opensearch_serverless = OpenSearchServerlessConstruct(
-            self,
-            "OpenSearch",
-            props=OpenSearchServerlessProps(
-                collection_name="medialake",
-                public_access=True,
-                collection_type="VECTORSEARCH",
-                collection_desc="Collection to be used for vector search using OpenSearch Serverless",
-                collection_indexes=["media"],
-            ),
-        )
+        # self.opensearch_serverless = OpenSearchServerlessConstruct(
+        #     self,
+        #     "OpenSearch",
+        #     props=OpenSearchServerlessProps(
+        #         collection_name="medialake",
+        #         public_access=True,
+        #         collection_type="VECTORSEARCH",
+        #         collection_desc="Collection to be used for vector search using OpenSearch Serverless",
+        #         collection_indexes=["media"],
+        #     ),
+        # )
 
         self._asset_table = DynamoDB(
             self,
@@ -196,27 +197,63 @@ class BaseInfrastructureStack(Stack):
         opensearch_layer = SearchLayer(self, "OpenSearchLayer")
         pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
 
+        # asset_lambda_stream = Lambda(
+        #     self,
+        #     "AssetTableLambdaStream",
+        #     config=LambdaConfig(
+        #         name=f"{GLOBAL_PREFIX}-asset-table-stream",
+        #         entry="lambdas/back_end/asset_table_stream",
+        #         environment_variables={
+        #             "OPENSEARCH_ENDPOINT": self.opensearch_serverless.collection_endpoint,
+        #             "OPENSEARCH_INDEX": "media",
+        #         },
+        #         layers=[opensearch_layer.layer, pynamodb_layer.layer],
+        #     ),
+        # )
+        
         asset_lambda_stream = Lambda(
             self,
             "AssetTableLambdaStream",
             config=LambdaConfig(
                 name=f"{GLOBAL_PREFIX}-asset-table-stream",
+                vpc=self.vpc.vpc,
                 entry="lambdas/back_end/asset_table_stream",
                 environment_variables={
-                    "OPENSEARCH_ENDPOINT": self.opensearch_serverless.collection_endpoint,
+                    "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
                     "OPENSEARCH_INDEX": "media",
+                    "SCOPE": "es"
                 },
                 layers=[opensearch_layer.layer, pynamodb_layer.layer],
             ),
         )
 
         # Add OpenSearch policy to Lambda function
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["aoss:APIAccessAll"],
+        #         resources=[self.opensearch_serverless.collection_arn],
+        #     )
+        # )
+        
+        ## to allow attaching the vpc
         asset_lambda_stream.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["aoss:APIAccessAll"],
-                resources=[self.opensearch_serverless.collection_arn],
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface"
+                ],
+                resources=["*"],
             )
         )
+         
+        asset_lambda_stream.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["es:ESHttpPost"],
+                resources=["*"],
+            )
+        )
+        
 
         self._asset_table.table.grant_stream(asset_lambda_stream.function)
         asset_lambda_stream.function.add_event_source(
@@ -246,13 +283,21 @@ class BaseInfrastructureStack(Stack):
     def collection_dashboards_url(self) -> str:
         return self.opensearch_serverless.collection_dashboards_url
 
-    @property
-    def collection_endpoint(self) -> str:
-        return self.opensearch_serverless.collection_endpoint
+    # @property
+    # def collection_endpoint(self) -> str:
+    #     return self.opensearch_serverless.collection_endpoint
 
     @property
+    def collection_endpoint(self) -> str:
+        return self.opensearch_cluster.domain_endpoint
+
+    # @property
+    # def collection_arn(self) -> str:
+    #     return self.opensearch_serverless.collection_arn
+    
+    @property
     def collection_arn(self) -> str:
-        return self.opensearch_serverless.collection_arn
+        return self.opensearch_cluster.domain_arn
 
     @property
     def pipeline_event_bus(self) -> events.EventBus:

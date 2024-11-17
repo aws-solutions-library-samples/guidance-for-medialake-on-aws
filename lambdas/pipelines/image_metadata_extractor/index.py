@@ -5,6 +5,7 @@ import subprocess
 from decimal import Decimal
 from aws_lambda_powertools import Logger
 from iptcinfo3 import IPTCInfo
+import tempfile
 from io import BytesIO
 from boto3.dynamodb.types import TypeSerializer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -40,16 +41,30 @@ def extract_iptc_data(image_content):
     iptc_data = {}
     try:
         logger.info("Starting IPTC extraction")
-        iptc_info = IPTCInfo(BytesIO(image_content))
-        if hasattr(iptc_info, "data"):
-            iptc_data = {
-                key: str(value) for key, value in iptc_info.data.items() if value
-            }
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file.write(image_content)
+            temp_file_path = temp_file.name
+
+        # Use the temporary file path to create IPTCInfo object
+        with open(temp_file_path, 'rb') as file:
+            iptc_info = IPTCInfo(file)
+
+            if bool(iptc_info):
+                iptc_data = {
+                    key: str(value) for key, value in {IPTCData._key_as_str(k): v for k, v in iptc_info._data.items()} if value
+                }
+        
+        # Remove the temporary file
+        os.unlink(temp_file_path)
+        
         logger.info(f"Extracted IPTC data: {iptc_data}")
     except Exception as iptc_error:
         logger.error(f"IPTC extraction error: {str(iptc_error)}")
         logger.error(f"IPTC error type: {type(iptc_error)}")
     return iptc_data
+
 
 
 def extract_exif_data(temp_file_path):
@@ -149,13 +164,33 @@ def lambda_handler(event, context):
         # Initialize DynamoDB client
         dynamodb = boto3.client("dynamodb")
 
+        # Get the existing item from DynamoDB
+        try:
+            response = dynamodb.get_item(
+                TableName=os.environ["MEDIALAKE_ASSET_TABLE"],
+                Key={"InventoryID": {"S": inventory_id}}
+            )
+            existing_item = response.get('Item', {})
+            existing_metadata = existing_item.get('Metadata', {'M': {}})['M']
+        except Exception as db_error:
+            logger.error(f"Failed to get item from DynamoDB: {str(db_error)}")
+            raise
+
+        # Prepare the new CustomMetadata
+        new_custom_metadata = {"CustomMetadata": extracted_metadata}
+        converted_new_metadata = convert_floats_to_decimals(new_custom_metadata)
+        marshalled_new_metadata = marshall_json_item(converted_new_metadata)
+
+        # Combine existing metadata with new CustomMetadata
+        existing_metadata.update(marshalled_new_metadata)
+
         # Update DynamoDB
         try:
             response = dynamodb.update_item(
                 TableName=os.environ["MEDIALAKE_ASSET_TABLE"],
                 Key={"InventoryID": {"S": inventory_id}},
                 UpdateExpression="SET Metadata = :Metadata",
-                ExpressionAttributeValues={":Metadata": marshalled_metadata},
+                ExpressionAttributeValues={":Metadata": existing_metadata},
                 ReturnValues="UPDATED_NEW",
             )
             logger.info(f"Successfully updated DynamoDB item: {response}")
