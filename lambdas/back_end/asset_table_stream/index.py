@@ -34,7 +34,7 @@ class OpenSearchClient:
 
     def _initialize_client(self) -> OpenSearch:
         credentials = boto3.Session().get_credentials()
-        auth = AWSV4SignerAuth(credentials, "us-east-1", "aoss")
+        auth = AWSV4SignerAuth(credentials, "us-east-1", os.environ["SCOPE"])
         return OpenSearch(
             hosts=[HOST],
             http_auth=auth,

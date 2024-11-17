@@ -3,6 +3,7 @@ from aws_cdk import (
     Stack,
     aws_logs as logs,
     aws_iam as iam,
+    aws_ec2 as ec2,
     RemovalPolicy,
     Duration,
 )
@@ -87,6 +88,7 @@ class LambdaConfig:
     architecture: lambda_.Architecture = DEFAULT_ARCHITECTURE
     layers: Optional[List[PythonLayerVersion]] = None
     iam_role_name: Optional[str] = None
+    vpc: Optional[ec2.IVpc] = None
 
 
 class Lambda(Construct):
@@ -198,6 +200,11 @@ class Lambda(Construct):
                 f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
             )
             lambda_props["environment"] = config.environment_variables
+            
+        if config.vpc:
+            lambda_vpc = config.vpc
+            lambda_props["vpc"] = lambda_vpc
+
 
         # Create the Lambda function
         self._function = PythonFunction(self, "StandardLambda", **lambda_props)

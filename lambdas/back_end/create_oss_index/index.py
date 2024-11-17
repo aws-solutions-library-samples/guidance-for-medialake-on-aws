@@ -32,7 +32,7 @@ def handler(event, context):
         
         # 2. Obtaining AWS credentials and signing the AWS API request 
         region = os.environ["REGION"]
-        service = 'aoss'
+        service = os.environ["SCOPE"]
         credentials = boto3.Session().get_credentials()
         
         params = None
@@ -46,7 +46,7 @@ def handler(event, context):
                     url = host + "/" + index_name
                     print(f"URL: " + url)
                     req = AWSRequest(method='PUT', url=url, data=payload_json, params=params, headers=headers)
-                    req.headers['X-Amz-Content-SHA256'] = signer.payload(req) # Add the payload hash to the headers as aoss requires it !
+                    req.headers['X-Amz-Content-SHA256'] = signer.payload(req) # Add the payload hash to the headers as aoss/es requires it !
                     SigV4Auth(credentials, service, region).add_auth(req)
                     req = req.prepare()
 
@@ -58,10 +58,10 @@ def handler(event, context):
                     )
 
                     if response.status_code != 200:
-                        raise Exception(f"Failed to create AOSS index - status: {response.status_code}")
+                        raise Exception(f"Failed to create AOSS index - status: {response.status_code} {response.text}")
                 
                 except Exception as e:
-                    print('Retrying to create aoss index...')
+                    print('Retrying to create aoss/es index...')
                     sleep(5)
                     continue
             
