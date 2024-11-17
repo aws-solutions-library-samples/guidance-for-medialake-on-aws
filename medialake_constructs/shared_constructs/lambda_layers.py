@@ -53,6 +53,30 @@ class ExiftoolLayer(Construct):
     def layer_version(self) -> lambda_.LayerVersion:
         return self.layer
     
+class ExempitoolLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        # Define the Lambda layer from the zip file
+        self.layer = lambda_.LayerVersion(
+            self,
+            "ExiftoolLayer",
+            code=lambda_.Code.from_asset(
+                os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    "medialake_constructs",
+                    "shared_constructs",
+                    "exempi_x86_64.zip"
+                )
+            ),
+            description="Exempi binary and dependencies",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12]
+        )
+
+    @property
+    def layer_version(self) -> lambda_.LayerVersion:
+        return self.layer
+    
 class JinjaLambdaLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)

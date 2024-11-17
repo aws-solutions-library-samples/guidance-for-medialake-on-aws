@@ -4,7 +4,7 @@ import json
 import subprocess
 from decimal import Decimal
 from aws_lambda_powertools import Logger
-from iptcinfo3 import IPTCInfo
+from iptcinfo3 import IPTCInfo, IPTCData
 import tempfile
 from io import BytesIO
 from boto3.dynamodb.types import TypeSerializer
@@ -52,9 +52,7 @@ def extract_iptc_data(image_content):
             iptc_info = IPTCInfo(file)
 
             if bool(iptc_info):
-                iptc_data = {
-                    key: str(value) for key, value in {IPTCData._key_as_str(k): v for k, v in iptc_info._data.items()} if value
-                }
+                iptc_data =  {IPTCData._key_as_str(k): v for k, v in iptc_info._data.items()}
         
         # Remove the temporary file
         os.unlink(temp_file_path)
@@ -154,12 +152,12 @@ def lambda_handler(event, context):
         if extracted_metadata is None:
             return {"statusCode": 500, "body": "Failed to extract metadata"}
 
-        complete_metadata = {
+        # complete_metadata = {
           
-            "CustomMetadata": extracted_metadata,
-        }
-        converted_metadata = convert_floats_to_decimals(complete_metadata)
-        marshalled_metadata = {"M": marshall_json_item(converted_metadata)}
+        #     "CustomMetadata": extracted_metadata,
+        # }
+        # converted_metadata = convert_floats_to_decimals(complete_metadata)
+        # marshalled_custom_metadata = {"M": marshall_json_item(converted_metadata)}
 
         # Initialize DynamoDB client
         dynamodb = boto3.client("dynamodb")
@@ -176,10 +174,12 @@ def lambda_handler(event, context):
             logger.error(f"Failed to get item from DynamoDB: {str(db_error)}")
             raise
 
+
         # Prepare the new CustomMetadata
         new_custom_metadata = {"CustomMetadata": extracted_metadata}
         converted_new_metadata = convert_floats_to_decimals(new_custom_metadata)
         marshalled_new_metadata = marshall_json_item(converted_new_metadata)
+       
 
         # Combine existing metadata with new CustomMetadata
         existing_metadata.update(marshalled_new_metadata)
@@ -190,7 +190,7 @@ def lambda_handler(event, context):
                 TableName=os.environ["MEDIALAKE_ASSET_TABLE"],
                 Key={"InventoryID": {"S": inventory_id}},
                 UpdateExpression="SET Metadata = :Metadata",
-                ExpressionAttributeValues={":Metadata": existing_metadata},
+                ExpressionAttributeValues={":Metadata": {"M": existing_metadata}},
                 ReturnValues="UPDATED_NEW",
             )
             logger.info(f"Successfully updated DynamoDB item: {response}")
@@ -200,7 +200,7 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": {"metadata": marshalled_metadata, "inventoryId": inventory_id},
+            "body": { "inventoryId": inventory_id},
         }
 
     except Exception as e:
