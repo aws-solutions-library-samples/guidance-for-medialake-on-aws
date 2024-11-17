@@ -1,1 +1,17 @@
-{"region":"us-east-1","Auth":{"Cognito":{"userPoolClientId":"2c7dqgtq1v9t21o9b5hqmqcmsh","userPoolId":"us-east-1_eADS1wzWC","identityPoolId":"us-east-1:7bfe668b-0704-4e0b-be84-9d8af7ebabc5"}},"API":{"REST":{"RestApi":{"endpoint":"https://d1luz4vassubhv.cloudfront.net/prod"}}}}
+{
+    "region": "us-east-1",
+    "Auth": {
+        "Cognito": {
+            "userPoolClientId": "2t87bh80ob0ie5h1h3pnof741j",
+            "userPoolId": "us-east-1_xWeVjzqJX",
+            "identityPoolId": "us-east-1:1bad207c-68ba-49ea-bd1e-bf49dfdfd9b9"
+        }
+    },
+    "API": {
+        "REST": {
+            "RestApi": {
+                "endpoint": "https://dqjxpqegio7kn.cloudfront.net/prod"
+            }
+        }
+    }
+}
