@@ -1,0 +1,19 @@
+{
+    "account_id": "987654321098",
+    "region": "us-east-1",
+    "enable_ha": true,
+    "secondary_region": "us-west-2",
+    "opensearch": {
+        "instance_type": "r6g.large.search",
+        "instance_count": 3,
+        "volume_size": 100,
+        "availability_zones": 3,
+        "dedicated_master_enabled": true,
+        "dedicated_master_type": "c6g.large.search",
+        "dedicated_master_count": 3,
+        "warm_enabled": true,
+        "warm_count": 2,
+        "warm_type": "ultrawarm1.medium.search"
+    },
+    "retention_days": 90
+} 

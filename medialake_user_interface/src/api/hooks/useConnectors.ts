@@ -10,7 +10,8 @@ import type {
     ConnectorResponse,
     CreateConnectorRequest,
     UpdateConnectorRequest,
-    ConnectorListResponse
+    ConnectorListResponse,
+    ApiResponse
 } from '../types/api.types';
 
 // Query configuration defaults
@@ -187,50 +188,22 @@ export const useDeleteConnector = () => {
     const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
-    return useMutation<void, Error, string>({
-        mutationFn: async (id) => {
-            await apiClient.delete(API_ENDPOINTS.CONNECTORS, {
-                data: { id }
-            });
-        },
-        onMutate: async (id) => {
-            await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
-
-            const previousConnectors = queryClient.getQueryData<ConnectorListResponse>(
-                [QUERY_KEYS.CONNECTORS]
-            );
-
-            queryClient.setQueryData<ConnectorListResponse>(
-                [QUERY_KEYS.CONNECTORS],
-                (old) => {
-                    if (!old) return previousConnectors;
-                    return {
-                        status: old.status,
-                        message: old.message,
-                        data: {
-                            ...old.data,
-                            connectors: old.data.connectors.filter(connector => connector.id !== id)
-                        }
-                    };
-                }
-            );
-
-            return { previousConnectors };
-        },
-        onError: (error, variables, context: { previousConnectors?: ConnectorListResponse }) => {
-            if (context?.previousConnectors) {
-                queryClient.setQueryData(
-                    [QUERY_KEYS.CONNECTORS],
-                    context.previousConnectors
+    return useMutation({
+        mutationFn: async (id: string) => {
+            try {
+                const response = await apiClient.delete<ApiResponse<void>>(
+                    `${API_ENDPOINTS.CONNECTORS}/${id}`
                 );
+                return response.data;
+            } catch (error) {
+                logger.error('Delete connector error:', error);
+                showError('Failed to delete connector');
+                throw error;
             }
-            logger.error('Delete connector error:', error);
-            if (error.message === 'Network Error') {
-                showError('Unable to delete connector - API is not available');
-            } else {
-                showError(`Failed to delete connector: ${error.message}`);
-            }
-        }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
+        },
     });
 };
 
