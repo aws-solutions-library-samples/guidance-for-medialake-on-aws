@@ -499,6 +499,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
         ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
         exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
+        exempitool_layer_arn = os.environ.get('EXEMPITOOL_LAYER_ARN')
+        
         powertools_layer_arn = os.environ.get('POWERTOOLS__LAYER_ARN')
         
         
@@ -571,6 +573,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             deployment_bucket,
             image_metadata_extractor_deployment_zip,
             exiftool_layer_arn,
+            exempitool_layer_arn,
             {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
             tags
         )

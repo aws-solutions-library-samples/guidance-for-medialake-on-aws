@@ -18,6 +18,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 from medialake_constructs.shared_constructs.lambda_layers import (
     ExiftoolLayer, 
+    ExempitoolLayer,
     PowertoolsLayer,
     PowertoolsLayerConfig
 )
@@ -50,6 +51,8 @@ class PipelinesConstruct(Construct):
         super().__init__(scope, id)
 
         exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
+        exempitool_layer = ExempitoolLayer(self, "ExempitoolLayer")
+        
        
 
 
@@ -126,7 +129,9 @@ class PipelinesConstruct(Construct):
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "AWS_ACCOUNT_ID": scope.account,
-                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn
+                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn,
+                "EXEMPITOOL_LAYER_ARN": exempitool_layer.layer_version.layer_version_arn
+                
             },
         )
         post_pipelines_handler = Lambda(

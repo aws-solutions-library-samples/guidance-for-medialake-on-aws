@@ -131,6 +131,7 @@ def create_metadata_extractor_lambda(
     deployment_bucket: str,
     deployment_zip: str,
     exiftool_layer_arn: str,
+    exempitool_layer_arn: str,
     environment_variables: dict,
     tags: dict,   
 ) -> dict:
@@ -142,7 +143,7 @@ def create_metadata_extractor_lambda(
         Timeout=900,
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Layers=[exiftool_layer_arn],
+        Layers=[exiftool_layer_arn,exempitool_layer_arn],
         Environment={
             'Variables': environment_variables
         },
