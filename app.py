@@ -3,7 +3,9 @@
 This module serves as the entry point for the MediaLake CDK application.
 """
 import aws_cdk as cdk
-from medialake_config import config
+
+# from medialake_config import config
+from config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway_main_construct import ApiGatewayConstruct
 from medialake_constructs.api_gateway_connectors import (
@@ -32,7 +34,6 @@ class MediaLakeStack(cdk.Stack):
         base_infrastructure = BaseInfrastructureStack(
             self, "BaseInfrastructure", env=kwargs.get("env")
         )
-        
 
         # User auth with Cognito
         self._cognito = CognitoConstruct(
@@ -90,7 +91,7 @@ class MediaLakeStack(cdk.Stack):
                 open_search_endpoint=base_infrastructure.collection_endpoint,
                 open_search_arn=base_infrastructure.collection_arn,
                 open_search_index="media",
-                vpc=base_infrastructure.vpc.vpc
+                vpc=base_infrastructure.vpc.vpc,
             ),
         )
 
@@ -140,7 +141,6 @@ class MediaLakeStack(cdk.Stack):
 
 
 app = cdk.App()
-
 
 
 primary_stack = MediaLakeStack(
