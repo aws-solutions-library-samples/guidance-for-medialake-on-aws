@@ -288,14 +288,16 @@ class BaseInfrastructureStack(Stack):
     # def collection_endpoint(self) -> str:
     #     return self.opensearch_serverless.collection_endpoint
 
-    @property
-    def collection_endpoint(self) -> str:
-        return self.opensearch_cluster.domain_endpoint
-
     # @property
     # def collection_arn(self) -> str:
     #     return self.opensearch_serverless.collection_arn
     
+    
+    @property
+    def collection_endpoint(self) -> str:
+        return self.opensearch_cluster.domain_endpoint
+
+
     @property
     def collection_arn(self) -> str:
         return self.opensearch_cluster.domain_arn

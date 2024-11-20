@@ -1,105 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
 import { QUERY_KEYS } from '../queryKeys';
 import { logger } from '../../common/helpers/logger';
 import { useErrorModal } from '../../hooks/useErrorModal';
+import { SearchResponse, SearchOptions } from '@/types/search'
 
-export interface SearchFilters {
-    creationDate?: {
-        before?: string;
-        after?: string;
-    };
-    media?: {
-        video?: string[];
-        images?: string[];
-        audio?: string[];
-    };
-    metadata?: {
-        title?: string[];
-        rights?: string[];
-    };
-}
-
-export interface SearchResult {
-    inventoryId: string;
-    assetId: string;
-    assetType: string;
-    createDate: string;
-    mainRepresentation: {
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    };
-    derivedRepresentations: any[];
-    metadata: any;
-    score: number;
-}
-
-export interface SearchResponse {
-    status: string;
-    message: string;
-    data: {
-        searchMetadata: {
-            totalResults: number;
-            page: number;
-            pageSize: number;
-            searchTerm: string;
-            facets: {
-                file_types: {
-                    doc_count_error_upper_bound: number;
-                    sum_other_doc_count: number;
-                    buckets: Array<{
-                        key: string;
-                        doc_count: number;
-                    }>;
-                };
-                asset_types: {
-                    doc_count_error_upper_bound: number;
-                    sum_other_doc_count: number;
-                    buckets: Array<{
-                        key: string;
-                        doc_count: number;
-                    }>;
-                };
-            };
-            suggestions: {
-                simple_phrase: Array<{
-                    text: string;
-                    offset: number;
-                    length: number;
-                    options: any[];
-                }>;
-            };
-        };
-        results: SearchResult[];
-    };
-}
-
-export const useSearch = (query: string, filters?: SearchFilters) => {
+export const useSearch = (query: string, options: SearchOptions = {}) => {
     const { showError } = useErrorModal();
+    const { page = 1, pageSize = 20, filters } = options;
 
-    return useQuery<SearchResponse>({
-        queryKey: [...QUERY_KEYS.SEARCH.all, query, filters],
+    return useQuery({
+        queryKey: [...QUERY_KEYS.SEARCH.all, query, page, pageSize, filters],
         queryFn: async ({ signal }) => {
             try {
                 const params = new URLSearchParams();
                 params.append('q', query);
+                params.append('page', page.toString());
+                params.append('pageSize', pageSize.toString());
 
                 if (filters) {
                     if (filters.creationDate) {
@@ -132,6 +50,13 @@ export const useSearch = (query: string, filters?: SearchFilters) => {
                 throw error;
             }
         },
-        enabled: !!query,
+        staleTime: 2 * 60 * 1000,      // Results stay fresh for 2 minutes
+        gcTime: 10 * 60 * 1000,        // Keep inactive results for 10 minutes
+        retry: 1,                       // Only retry once for search queries
+        retryDelay: 1000,
+        placeholderData: keepPreviousData,  // Keep previous results while fetching new ones
+        refetchOnWindowFocus: false,    // Don't refetch on window focus
+        refetchOnMount: true,           // Refetch when component mounts
+        enabled: !!query               // Only run if there's a query
     });
 };

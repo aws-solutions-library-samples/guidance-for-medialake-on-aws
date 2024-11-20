@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { QUERY_KEYS } from '../queryKeys';
+import { useMutation, useQuery, } from '@tanstack/react-query';
+import queryClient from '@/api/queryClient'
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
+import { QUERY_KEYS } from '@/api/queryKeys';
 import { logger } from '../../common/helpers/logger';
 import { useErrorModal } from '../../hooks/useErrorModal';
 import type {
@@ -12,15 +13,7 @@ import type {
     UpdateConnectorRequest,
     ConnectorListResponse,
     ApiResponse
-} from '../types/api.types';
-
-// Query configuration defaults
-const defaultQueryConfig = {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    retry: 3,
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
-};
+} from '@/api/types/api.types';
 
 const validateConnectorRequest = (data: any) => {
     if (!data) {
@@ -52,7 +45,6 @@ export const useGetS3Buckets = () => {
                 throw error;
             }
         },
-        ...defaultQueryConfig,
     });
 };
 
@@ -74,12 +66,10 @@ export const useGetConnectors = () => {
                 throw error;
             }
         },
-        ...defaultQueryConfig,
     });
 };
 
 export const useCreateConnector = () => {
-    const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
     return useMutation<ConnectorResponse, Error, CreateConnectorRequest>({
@@ -123,7 +113,6 @@ export const useCreateConnector = () => {
 };
 
 export const useUpdateConnector = () => {
-    const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
     return useMutation<
@@ -185,7 +174,6 @@ export const useUpdateConnector = () => {
 };
 
 export const useDeleteConnector = () => {
-    const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
     return useMutation({
@@ -208,7 +196,6 @@ export const useDeleteConnector = () => {
 };
 
 export const useCreateS3Connector = () => {
-    const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
     useEffect(() => {
