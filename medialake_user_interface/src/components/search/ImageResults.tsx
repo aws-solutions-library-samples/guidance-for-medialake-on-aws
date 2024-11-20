@@ -16,85 +16,9 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import SortIcon from '@mui/icons-material/Sort';
 import SettingsIcon from '@mui/icons-material/Settings';
-
-export interface ImageItem {
-    inventoryId: string;
-    assetId: string;
-    assetType: string;
-    createDate: string;
-    mainRepresentation: {
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    };
-    derivedRepresentations: Array<{
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string | null;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    }>;
-    metadata: any;
-    score: number;
-    thumbnailUrl: string | null;
-}
-
-interface ImageResultsProps {
-    images: ImageItem[];
-}
-
-type Order = 'asc' | 'desc';
-type OrderBy = 'path' | 'format' | 'createDate' | 'fileSize' | 'dimensions';
+import { ImageItem, ImageResultsProps, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy  } from '@/types/search/searchResults'
 
 const ITEMS_PER_PAGE = 12;
-
-interface ImageToRename {
-    image: ImageItem;
-    newName: string;
-}
-
-interface ColumnConfig {
-    id: string;
-    label: string;
-    visible: boolean;
-    minWidth?: number;
-    align?: 'right' | 'left' | 'center';
-    format?: (value: any) => string;
-}
-
-interface CardFieldConfig {
-    id: string;
-    label: string;
-    visible: boolean;
-}
 
 // Move formatFileSize outside of the component to make it available everywhere
 const formatFileSize = (bytes: number): string => {

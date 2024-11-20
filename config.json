@@ -1,0 +1,10 @@
+{
+    "enable_ha": false,
+    "primary_region": "us-east-1",
+    "account_id": "559050236048",
+    "secondary_region": null,
+    "small_uid": "1111",
+    "assets_bucket_name": "medialake-asset2s",
+    "lambda_runtime_version": "3.11",
+    "bedrock_region": "us-east-1"
+}

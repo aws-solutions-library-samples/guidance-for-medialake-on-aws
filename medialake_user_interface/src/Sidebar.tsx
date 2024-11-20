@@ -50,11 +50,16 @@ function Sidebar() {
             icon: <AssetsIcon />,
             path: '/'
         },
-        // {
-        //     text: 'Search',
-        //     icon: <SearchIcon />,
-        //     path: '/search'
-        // },
+        {
+            text: 'Assets',
+            icon: <SearchIcon />,
+            path: '/assets'
+        },
+        {
+            text: 'Metadata',
+            icon: <SearchIcon />,
+            path: '/metadata'
+        },
         {
             text: 'Pipelines',
             icon: <PipelineIcon />,

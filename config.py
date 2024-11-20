@@ -18,7 +18,7 @@ class CDKConfig(BaseModel):
 
     enable_ha: bool = False
     primary_region: str = "us-east-1"
-    account_id: Optional[str] = None
+    account_id: Optional[str] = "559050236048"
     secondary_region: Optional[str] = None
     small_uid: str = ""
 

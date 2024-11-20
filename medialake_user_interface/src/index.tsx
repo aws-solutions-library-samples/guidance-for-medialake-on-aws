@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import queryClient from './queryClient';
+import queryClient from '@/api/queryClient';
 import App from './App';
 
 ReactDOM.render(

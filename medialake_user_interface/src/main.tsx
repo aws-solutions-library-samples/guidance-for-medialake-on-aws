@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import AppConfigured from "./components/app-configured";
+import AppConfigured from "@/components/app-configured";
 import { Amplify } from 'aws-amplify';
 
 // Initialize Amplify with the configuration from aws-exports.json
