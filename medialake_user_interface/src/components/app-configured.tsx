@@ -2,7 +2,7 @@ import React, { Suspense, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import queryClient from '../queryClient';
+import queryClient from '@/queryClient';
 import { AwsConfigProvider } from '../common/hooks/aws-config-context';
 import { AuthProvider, useAuth } from '../common/hooks/auth-context';
 import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react';

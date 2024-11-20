@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { QUERY_KEYS } from '../queryKeys';
-import { apiClient } from '../apiClient';
+import { QUERY_KEYS } from '@/api/queryKeys';
+import { apiClient } from '@/api/apiClient';
 import { logger } from '../../common/helpers/logger';
 import { useErrorModal } from '../../hooks/useErrorModal';
 

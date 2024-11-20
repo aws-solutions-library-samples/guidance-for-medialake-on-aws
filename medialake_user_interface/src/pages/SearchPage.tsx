@@ -5,42 +5,30 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VideoResults from '../components/search/VideoResults';
-import ImageResults, { ImageItem } from '../components/search/ImageResults';
+import ImageResults from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
 import { useLocation } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
 import MenuIcon from '@mui/icons-material/Menu';
 
-// Mock data for video and audio remains the same
-const mockVideos = [
-    { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, fileName: 'Big Buck Bunny', creationDate: '2023-05-01T12:00:00Z', description: 'A short animated film about a big rabbit' },
-    { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, fileName: 'Elephants Dream', creationDate: '2023-05-02T14:30:00Z', description: 'The first Blender Open Movie from 2006' },
-    { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, fileName: 'Sintel', creationDate: '2023-05-03T10:15:00Z', description: 'A short animated film about a big rabbit' },
-];
-
-const mockAudios = [
-    { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_700KB.mp3', id: 1, fileName: 'Sample Audio 1', creationDate: '2023-05-25T11:20:00Z', description: 'A sample audio file for testing' },
-    { src: 'https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_1MG.mp3', id: 2, fileName: 'Sample Audio 2', creationDate: '2023-05-26T13:10:00Z', description: 'Another sample audio file for testing' },
-];
-
 interface LocationState {
     query?: string;
 }
 
-interface SearchResponse {
-    status: string;
-    message: string;
-    data: {
-        searchMetadata: any;
-        results: ImageItem[];
-    };
-}
+const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
     const { query } = (location.state as LocationState) || {};
-    const { data: searchResults } = useSearch(query || '') as { data: SearchResponse | undefined };
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const { data: searchResults, isLoading } = useSearch(query || '', {
+        page: currentPage,
+        pageSize: PAGE_SIZE
+    });
+
     const imageResults = searchResults?.data?.results?.filter(item => item.assetType === 'Image') || [];
+    const totalResults = searchResults?.data?.searchMetadata?.totalResults || 0;
 
     const [filters, setFilters] = useState({
         mediaTypes: {
@@ -175,28 +163,12 @@ const SearchPage: React.FC = () => {
                 flexDirection: 'column',
                 gap: 6
             }}>
-                {/* <Typography
-                    variant="h4"
-                    component="h1"
-                    sx={{
-                        fontWeight: 600,
-                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        mb: 2
-                    }}
-                >
-                    Media Library
-                </Typography> */}
-
-                {/* {filters.mediaTypes.videos && <VideoResults videos={mockVideos} />} */}
                 {filters.mediaTypes.images && imageResults.length > 0 && (
                     <ImageResults images={imageResults} />
                 )}
-                {/* {filters.mediaTypes.audio && <AudioResults audios={mockAudios} />} */}
             </Box>
 
-            {/* Filter Sidebar - Now properly aligned with TopBar */}
+            {/* Filter Sidebar */}
             <Box sx={{
                 width: filterBarExpanded ? 240 : 48,
                 flexShrink: 0,
@@ -235,18 +207,11 @@ const SearchPage: React.FC = () => {
                     </IconButton>
                 </Box>
 
-                {/* Only show list when expanded */}
-                {filterBarExpanded ? (
-                    <List component="nav" sx={{ width: '100%' }}>
-                        {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
-                        {renderFilterSection('Time Period', 'time', filters.time)}
-                        {renderFilterSection('Status', 'status', filters.status)}
-                    </List>
-                ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                        {/* Icons for collapsed state */}
-                    </Box>
-                )}
+                <List component="nav" sx={{ width: '100%' }}>
+                    {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
+                    {renderFilterSection('Time Period', 'time', filters.time)}
+                    {renderFilterSection('Status', 'status', filters.status)}
+                </List>
             </Box>
 
             {/* Spacer to prevent content from going under the fixed sidebar */}
