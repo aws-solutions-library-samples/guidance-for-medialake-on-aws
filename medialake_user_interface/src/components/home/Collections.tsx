@@ -1,6 +1,6 @@
 import React from 'react';
 import { Grid, Typography, Box, Button } from '@mui/material';
-import { CollectionCard } from '../common/CollectionCard';
+import { CollectionCard } from '@/components/home/CollectionCard';
 import { Add } from '@mui/icons-material';
 import type { Collection } from '../../types/collection';
 
