@@ -216,6 +216,7 @@ class BaseInfrastructureStack(Stack):
             "AssetTableLambdaStream",
             config=LambdaConfig(
                 name=f"{GLOBAL_PREFIX}-asset-table-stream",
+                timeout_minutes=15,
                 vpc=self.vpc.vpc,
                 entry="lambdas/back_end/asset_table_stream",
                 environment_variables={
