@@ -84,7 +84,7 @@ export interface SearchResponse {
                 };
             };
         };
-        results: ImageItem[];
+        results: SearchResult[];
     };
 }
 
