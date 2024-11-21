@@ -93,8 +93,8 @@ class OpenSearchClient:
 
         try:
             # Add sleep before searching
-            logger.info("Sleeping for 5 seconds before searching...")
-            time.sleep(20)
+            # logger.info("Sleeping for 5 seconds before searching...")
+            # time.sleep(20)
 
             # First search for existing document
             search_result = self.search_by_inventory_id(inventory_id)
@@ -112,7 +112,7 @@ class OpenSearchClient:
                 result = self.client.index(
                     index=INDEX_NAME,
                     body=data,
-                    # refresh=True,  # Force refresh after indexing
+                    refresh=True,  # Force refresh after indexing
                 )
                 logger.info(f"Index result: {json.dumps(result, default=str)}")
                 return result
