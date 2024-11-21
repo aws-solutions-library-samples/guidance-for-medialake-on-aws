@@ -55,6 +55,8 @@ export interface SearchResults {
 
 export interface ImageResultsProps {
     images: ImageItem[];
+    searchMetadata: SearchMetadata;
+    onPageChange: (page: number) => void;
 }
 
 export interface ImageToRename {
@@ -79,3 +81,20 @@ export interface CardFieldConfig {
 
 export type Order = 'asc' | 'desc';
 export type OrderBy = 'path' | 'format' | 'createDate' | 'fileSize' | 'dimensions';
+
+export interface SearchMetadata {
+    totalResults: number;
+    page: number;
+    pageSize: number;
+    searchTerm: string;
+    facets: {
+        file_types: {
+            doc_count_error_upper_bound: number;
+            sum_other_doc_count: number;
+            buckets: Array<{
+                key: string;
+                doc_count: number;
+            }>;
+        };
+    };
+}

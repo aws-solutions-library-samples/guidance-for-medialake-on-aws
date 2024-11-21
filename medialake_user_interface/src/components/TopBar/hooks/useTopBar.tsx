@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'aws-amplify/auth';
-import { useSearch } from '../../../api/hooks/useSearch';
+import { useSearch } from '@/api/hooks/useSearch';
 import type { SearchFilters } from '@/types/search';
 import { INITIAL_FILTER_OPTIONS } from '../constants';
 import type { FilterOptions } from '../types';
