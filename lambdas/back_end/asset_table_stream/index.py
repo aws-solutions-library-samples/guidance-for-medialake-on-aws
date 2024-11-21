@@ -75,6 +75,7 @@ class OpenSearchClient:
                 index=INDEX_NAME,
                 id=doc_id,
                 body=body,
+                refresh=True
             )
             logger.info(f"Update result: {json.dumps(result, default=str)}")
             return result
@@ -406,20 +407,28 @@ def process_dynamodb_record(
         logger.error(f"Error processing document: {str(e)}")
         raise
 
-
+import uuid
 @logger.inject_lambda_context
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
+    batch_id = uuid.uuid4()
     try:
         stream_event = DynamoDBStreamEvent(event)
         opensearch_client = OpenSearchClient()
 
+       
         for record in stream_event.records:
+            print(f"STREAM22 {record.event_name}",batch_id,"-LIST-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
+          
+        for record in stream_event.records:
+            print(f"STREAM22 {record.event_name}",batch_id,"-PROCESS-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
             if record.event_source != "aws:dynamodb":
                 logger.warning(
                     f"Skipping non-DynamoDB event source: {record.event_source}"
                 )
                 continue
+            
             process_dynamodb_record(record, opensearch_client)
+            print(f"STREAM22 {record.event_name}",batch_id,"-COMPLETED-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
 
         return {
             "statusCode": 200,
