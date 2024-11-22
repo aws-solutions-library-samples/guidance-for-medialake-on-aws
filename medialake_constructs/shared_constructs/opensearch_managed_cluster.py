@@ -198,17 +198,15 @@ class OpenSearchCluster(Construct):
             resource_type="Custom::OpenSearchCreateIndex",
         )
 
-        # Ensure the custom resource is created after the domain
+        
         create_index_resource.node.add_dependency(self.domain)
 
-        # access_policies = iam.PolicyStatement(
-        #     effect=iam.Effect.ALLOW,
-        #     actions=["es:*"],
-        #     principals=[iam.AnyPrincipal()],
-        #     resources=[f"{self.domain.domain_arn}/*"],
-        # )
-
-        # self.domain.add_access_policies(access_policies)
+        # Create OpenSearch Ingestion Pipeline Role
+        self.pipeline_role = iam.Role(
+            self,
+            "IngestionRole",
+            assumed_by=iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
+        )
 
     @property
     def domain_endpoint(self) -> str:
@@ -221,3 +219,5 @@ class OpenSearchCluster(Construct):
     @property
     def opensearch_instance(self) -> opensearch.Domain:
         return self.domain
+    
+  
