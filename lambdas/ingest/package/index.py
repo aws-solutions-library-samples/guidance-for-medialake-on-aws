@@ -6,6 +6,7 @@ import boto3
 import json
 import uuid
 import os
+import urllib.parse
 from datetime import datetime
 import hashlib
 from botocore.exceptions import ClientError
@@ -87,6 +88,16 @@ class AssetProcessor:
         self.dynamodb = boto3.resource("dynamodb").Table(os.environ["ASSETS_TABLE"])
         self.eventbridge = boto3.client("events")
 
+
+    def _decode_s3_event_key(encoded_key):
+        # First decode any URL encoding (handles %20, %2B etc.)
+        decoded_key = urllib.parse.unquote(encoded_key)
+        
+        # Then handle plus signs that represent spaces
+        decoded_key = decoded_key.replace("+", " ")
+        
+        return decoded_key
+
     def _calculate_md5(self, bucket: str, key: str) -> str:
         """Calculate MD5 hash of S3 object"""
         try:
@@ -120,6 +131,8 @@ class AssetProcessor:
     @tracer.capture_method
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3"""
+        key = self._decode_s3_event_key(key)
+        
         try:
             response = self.s3.head_object(Bucket=bucket, Key=key)
             existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)

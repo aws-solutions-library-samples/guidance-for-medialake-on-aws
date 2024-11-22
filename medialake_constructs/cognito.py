@@ -104,6 +104,41 @@ class CognitoConstruct(Construct):
         self.identity_pool = identity_pool
         self.user_pool = user_pool
 
+
+        create_user_handler = cr.AwsCustomResource(
+            self, "CreateUserHandler",
+            on_create=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="adminCreateUser",
+                parameters={
+                    "UserPoolId": user_pool.user_pool_id,
+                    "Username": "mne-mscdemo+medialake@amazon.com",
+                    "TemporaryPassword": "ChangeMe123!",
+                    "UserAttributes": [
+                        {
+                            "Name": "email",
+                            "Value": "mne-mscdemo+medialake@amazon.com"
+                        },
+                        {
+                            "Name": "email_verified",
+                            "Value": "true"
+                        }
+                    ]
+                },
+                physical_resource_id=cr.PhysicalResourceId.of("CreateUserHandler")
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements([
+                iam.PolicyStatement(
+                    actions=["cognito-idp:AdminCreateUser"],
+                    resources=[user_pool.user_pool_arn]
+                )
+            ])
+        )
+
+        # Ensure the user is created after the user pool
+        create_user_handler.node.add_dependency(user_pool)
+        
+        
         # first_cognito_user = Lambda(
         #     self,
         #     "FirstCognitoUser",
