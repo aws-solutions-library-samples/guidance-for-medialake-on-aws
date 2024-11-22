@@ -59,11 +59,21 @@ class SearchParams(BaseModelWithConfig):
     """Pydantic model for search parameters"""
 
     q: str = Field(..., min_length=1)
-    size: conint(gt=0, le=100) = Field(default=20)  # type: ignore
-    from_: conint(ge=0) = Field(default=0, alias="from")  # type: ignore
+    page: conint(gt=0) = Field(default=1)  # type: ignore
+    pageSize: conint(gt=0, le=100) = Field(default=20)  # type: ignore
     min_score: float = Field(default=0.1)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
+
+    @property
+    def from_(self) -> int:
+        """Calculate the from_ value based on page and pageSize"""
+        return (self.page - 1) * self.pageSize
+
+    @property
+    def size(self) -> int:
+        """Return the pageSize as size"""
+        return self.pageSize
 
 
 class AssetStorage(BaseModelWithConfig):
@@ -285,8 +295,8 @@ def perform_search(params: SearchParams) -> Dict:
 
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],
-            page=(params.from_ // params.size) + 1,
-            pageSize=params.size,
+            page=params.page,
+            pageSize=params.pageSize,
             searchTerm=params.q,
             facets=response.get("aggregations"),
             suggestions=response.get("suggest"),
