@@ -12,28 +12,33 @@ logger = Logger()
 tracer = Tracer()
 
 
-def create_thumbnail(img, width, height):
-    """Create a center-cropped thumbnail"""
-    # Calculate aspect ratios
-    target_ratio = width / height
-    img_ratio = img.width / img.height
+def create_thumbnail(img, width, height, crop=False):
+    """Create a thumbnail, optionally center-cropped"""
+    if crop:
+        # Existing center-crop logic
+        target_ratio = width / height
+        img_ratio = img.width / img.height
 
-    if img_ratio > target_ratio:
-        # Image is wider than needed
-        new_width = int(height * img_ratio)
-        new_height = height
-        img = img.resize((new_width, new_height))
-        left = (new_width - width) // 2
-        img = img.crop((left, 0, left + width, height))
+        if img_ratio > target_ratio:
+            # Image is wider than needed
+            new_width = int(height * img_ratio)
+            new_height = height
+            img = img.resize((new_width, new_height))
+            left = (new_width - width) // 2
+            img = img.crop((left, 0, left + width, height))
+        else:
+            # Image is taller than needed
+            new_width = width
+            new_height = int(width / img_ratio)
+            img = img.resize((new_width, new_height))
+            top = (new_height - height) // 2
+            img = img.crop((0, top, width, top + height))
     else:
-        # Image is taller than needed
-        new_width = width
-        new_height = int(width / img_ratio)
-        img = img.resize((new_width, new_height))
-        top = (new_height - height) // 2
-        img = img.crop((0, top, width, top + height))
+        # Resize without cropping
+        img.thumbnail((width, height))
 
     return img
+
 
 
 def create_proxy(img):
@@ -106,15 +111,31 @@ def lambda_handler(event, context: LambdaContext):
         image_data = s3_response["Body"].read()
         img = Image.open(io.BytesIO(image_data))
 
-        print(mode)
+    
         if mode == "thumbnail":
             # Get thumbnail parameters
             params = event.get("thumbnail")
-            width = event.get("width", 100)
-            height = event.get("height", 100)
+            width = event.get("width")
+            height = event.get("height")
+            crop = event.get("crop", False) 
 
+            # Check if both width and height are None
+            if width is None and height is None:
+                return {"statusCode": 400, "body": "Both width and height cannot be None for thumbnail creation"}
+
+            # If one dimension is None, calculate it based on the aspect ratio
+            if width is None:
+                width = int(height * (img.width / img.height))
+            elif height is None:
+                height = int(width * (img.height / img.width))
+
+            # Ensure width and height are integers
+            width = int(width)
+            height = int(height)
+            
             # Process image
-            processed_img = create_thumbnail(img, width, height)
+            processed_img = create_thumbnail(img, width, height, crop)
+
             # Generate output key
             output_key = (
                 f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnails_{width}x{height}.webp"
