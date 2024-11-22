@@ -24,21 +24,7 @@ def get_state_machine_definition(
                 "ResultPath": "$.metadataResult",
                 "Next": "CreateProxy",
             },
-            # "StoreMetadata": {
-            #     "Type": "Task",
-            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
-            #     "Parameters": {
-            #         "TableName": asset_table_name,
-            #         "Key": {"id": {"S.$": "$.InventoryID"}},
-            #         "UpdateExpression": "SET Metadata = :Metadata",
-            #         "ExpressionAttributeValues": {
-            #             ":Metadata": {"M.$": "$.metadataResult.Payload.body.metadata"}
-            #         },
-            #     },
-            #     "ResultPath": None,
-            #     "Next": "CreateProxy",
-            # },
-            # Rest of the states remain the same
+       
             "CreateProxy": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -54,30 +40,7 @@ def get_state_machine_definition(
                 "ResultPath": "$.proxyResult",
                 "Next": "CreateThumbnail",
             },
-            # "StoreProxy": {
-            #     "Type": "Task",
-            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
-            #     "Parameters": {
-            #         "TableName": asset_table_name,
-            #         "Key": {"id": {"S.$": "$.InventoryID"}},
-            #         "UpdateExpression": "SET DerivedRepresentations = :DerivedRepresentations",
-            #         "ExpressionAttributeValues": {
-            #             ":DerivedRepresentations": {
-            #                 "M": {
-            #                     "bucket": {
-            #                         "S.$": "$.proxyResult.Payload.body.location.bucket"
-            #                     },
-            #                     "key": {
-            #                         "S.$": "$.proxyResult.Payload.body.location.key"
-            #                     },
-            #                     "type": {"S": "S3"},
-            #                 }
-            #             }
-            #         },
-            #     },
-            #     "ResultPath": None,
-            #     "Next": "CreateThumbnail",
-            # },
+           
             "CreateThumbnail": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -90,36 +53,12 @@ def get_state_machine_definition(
                         "output_bucket": output_bucket_name,
                         "mode": "thumbnail",
                         "width": 345,
-                        "height": 194,
                     },  # This closing brace was missing
                 },
                 "ResultPath": None,
                 "End": True,
             },
-            # "StoreThumbnail": {
-            #     "Type": "Task",
-            #     "Resource": "arn:aws:states:::dynamodb:updateItem",
-            #     "Parameters": {
-            #         "TableName": asset_table_name,
-            #         "Key": {"id": {"S.$": "$.InventoryID"}},
-            #         "UpdateExpression": "SET thumbnailLocation = :thumbnailLocation",
-            #         "ExpressionAttributeValues": {
-            #             ":thumbnailLocation": {
-            #                 "M": {
-            #                     "bucket": {
-            #                         "S.$": "$.thumbnailResult.Payload.body.location.bucket"
-            #                     },
-            #                     "key": {
-            #                         "S.$": "$.thumbnailResult.Payload.body.location.key"
-            #                     },
-            #                     "type": {"S": "S3"},
-            #                 }
-            #             }
-            #         },
-            #     },
-            #     "ResultPath": None,
-            #     "End": True,
-            # },
+          
         },
     }
 
