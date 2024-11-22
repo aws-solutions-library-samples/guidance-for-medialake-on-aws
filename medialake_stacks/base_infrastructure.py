@@ -5,8 +5,10 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_iam as iam,
+    aws_logs as logs,
     aws_s3_notifications as s3n,
     aws_s3 as s3,
+    RemovalPolicy
 )
 from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
@@ -59,6 +61,14 @@ class BaseInfrastructureStack(Stack):
             "MediaLakeVPC",
             props=CustomVpcProps(vpc_name=f"{GLOBAL_PREFIX}-vpc-{region}"),
         )
+        
+        # Create CloudWatch logs for Ingestion Pipeline
+        ingestion_log_group = logs.LogGroup(
+            self,
+            "IngestionPipelineLogGroup",
+            removal_policy=RemovalPolicy.DESTROY,
+            retention=logs.RetentionDays.ONE_DAY,
+        )
 
         self.opensearch_cluster = OpenSearchCluster(
             self,
@@ -97,14 +107,20 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Create IAC assets bucket with explicit name including region
-        medialake_iac_assets_config = S3Config(
-            bucket_name=f"medialake-iac-assets-{config.account_id}-{Stack.of(self).region}-{id}".lower()
-        )
         self.iac_assets_bucket = S3Bucket(
             self,
             "IACAssets",
             s3_config=S3Config(
                 bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}",
+            ),
+        )
+        
+        # Create S3 Bucket for DynamoDB Exports
+        self.ddb_export_bucket = S3Bucket(
+            self,
+            "DynamodbExportBucket",
+            s3_config=S3Config(
+                bucket_name=f"medialake-ddb-export-{config.account_id}-{short_uid}",
             ),
         )
 
@@ -163,7 +179,6 @@ class BaseInfrastructureStack(Stack):
         #         collection_desc="Collection to be used for vector search using OpenSearch Serverless",
         #         collection_indexes=["media"],
         #     ),
-        # )
 
         self._asset_table = DynamoDB(
             self,
@@ -172,6 +187,9 @@ class BaseInfrastructureStack(Stack):
                 name="medialake-asset-table",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                pipeline_name="medialake-dynamodb-etl-pipeline",
+                pipeline_role=self.opensearch_cluster.pipeline_role,
+                ddb_export_bucket=self.ddb_export_bucket,
                 sort_key_name="ID",
                 sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
