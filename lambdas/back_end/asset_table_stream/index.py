@@ -113,7 +113,7 @@ class OpenSearchClient:
                 result = self.client.index(
                     index=INDEX_NAME,
                     body=data,
-                    # refresh=True,  # Force refresh after indexing
+                    refresh=True,  
                 )
                 logger.info(f"Index result: {json.dumps(result, default=str)}")
                 return result
