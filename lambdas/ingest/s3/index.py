@@ -7,6 +7,8 @@ import json
 import uuid
 import os
 from datetime import datetime
+import hashlib
+from botocore.exceptions import ClientError
 
 logger = Logger()
 tracer = Tracer()
@@ -85,6 +87,36 @@ class AssetProcessor:
         self.dynamodb = boto3.resource("dynamodb").Table(os.environ["ASSETS_TABLE"])
         self.eventbridge = boto3.client("events")
 
+    def _calculate_md5(self, bucket: str, key: str) -> str:
+        """Calculate MD5 hash of S3 object"""
+        try:
+            response = self.s3.get_object(Bucket=bucket, Key=key)
+            md5_hash = hashlib.md5()
+            for chunk in response['Body'].iter_chunks(4096):
+                md5_hash.update(chunk)
+            return md5_hash.hexdigest()
+        except Exception as e:
+            logger.exception(f"Error calculating MD5 hash for {bucket}/{key}")
+            raise
+
+    def _check_existing_file(self, md5_hash: str) -> Optional[Dict]:
+        """Check if file with same MD5 hash exists"""
+        try:
+            response = self.dynamodb.query(
+                IndexName='FileHashIndex',
+                KeyConditionExpression='FileHash = :hash',
+                ExpressionAttributeValues={
+                    ':hash': md5_hash
+                }
+            )
+            
+            if response['Items']:
+                return response['Items'][0]
+            return None
+        except ClientError as e:
+            logger.exception(f"Error querying DynamoDB for hash {md5_hash}")
+            raise
+
     @tracer.capture_method
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3"""
@@ -97,7 +129,26 @@ class AssetProcessor:
                 logger.info(f"Asset already processed: {tags['AssetID']}")
                 return None
 
-            metadata = self._create_asset_metadata(response, bucket, key)
+            # Calculate MD5 hash and check for duplicates
+            md5_hash = self._calculate_md5(bucket, key)
+            existing_file = self._check_existing_file(md5_hash)
+            
+            if existing_file:
+                logger.info(f"Duplicate file found with hash {md5_hash}")
+                # Tag the duplicate file with reference to original
+                self.s3.put_object_tagging(
+                    Bucket=bucket,
+                    Key=key,
+                    Tagging={
+                        "TagSet": [
+                            {"Key": "DuplicateOf", "Value": existing_file["InventoryID"]},
+                            {"Key": "FileHash", "Value": md5_hash}
+                        ]
+                    }
+                )
+                return None
+
+            metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
             dynamo_entry = self.create_dynamo_entry(metadata)
 
             # Add tags to S3 object
@@ -107,10 +158,8 @@ class AssetProcessor:
                 Tagging={
                     "TagSet": [
                         {"Key": "InventoryID", "Value": dynamo_entry["InventoryID"]},
-                        {
-                            "Key": "AssetID",
-                            "Value": dynamo_entry["DigitalSourceAsset"]["ID"],
-                        },
+                        {"Key": "AssetID", "Value": dynamo_entry["DigitalSourceAsset"]["ID"]},
+                        {"Key": "FileHash", "Value": md5_hash}
                     ]
                 },
             )
@@ -128,7 +177,7 @@ class AssetProcessor:
             raise
 
     def _create_asset_metadata(
-        self, s3_response: Dict, bucket: str, key: str
+        self, s3_response: Dict, bucket: str, key: str, md5_hash: str
     ) -> StorageInfo:
         """Create asset metadata structure"""
         return {
@@ -148,6 +197,7 @@ class AssetProcessor:
                             "Algorithm": "SHA256",
                             "Value": s3_response["ETag"].strip('"'),
                         },
+                        "MD5Hash": md5_hash,  # Add MD5 hash to metadata
                         "CreateDate": s3_response["LastModified"].isoformat(),
                     },
                 }
@@ -172,6 +222,7 @@ class AssetProcessor:
 
         item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
+            "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["MD5Hash"],  # Add FileHash as top-level attribute
             "DigitalSourceAsset": {
                 "ID": f"asset:img:{asset_id}",
                 "Type": "Image",

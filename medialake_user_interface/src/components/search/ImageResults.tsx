@@ -16,7 +16,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import SortIcon from '@mui/icons-material/Sort';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { ImageItem, ImageResultsProps, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy  } from '@/types/search/searchResults'
+import { ImageItem, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy } from '@/types/search/searchResults'
 
 const ITEMS_PER_PAGE = 12;
 
@@ -52,7 +52,18 @@ const renderCardField = (fieldId: string, image: ImageItem): string => {
     }
 };
 
-const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
+// Update the ImageResultsProps interface to include searchMetadata
+interface ImageResultsProps {
+    images: ImageItem[];
+    searchMetadata: {
+        totalResults: number;
+        page: number;
+        pageSize: number;
+    };
+    onPageChange: (page: number) => void;
+}
+
+const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange }) => {
     // Deduplicate results based on inventoryId
     const uniqueResults = images.reduce((acc, current) => {
         // Take the most complete version of each asset (one with thumbnail)
@@ -72,7 +83,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [order, setOrder] = useState<Order>('asc');
     const [orderBy, setOrderBy] = useState<OrderBy>('path');
-    const [page, setPage] = useState(1);
+    const [page, setPage] = useState(searchMetadata.page);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null);
     const [editingImageId, setEditingImageId] = useState<string | null>(null);
@@ -209,6 +220,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
 
     const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
+        onPageChange(value);
     };
 
     const sortedImages = React.useMemo(() => {
@@ -245,10 +257,11 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
         return [...deduplicatedResults].sort(comparator);
     }, [deduplicatedResults, order, orderBy]);
 
-    // Calculate pagination
-    const totalPages = Math.ceil(sortedImages.length / ITEMS_PER_PAGE);
-    const startIndex = (page - 1) * ITEMS_PER_PAGE;
-    const paginatedImages = sortedImages.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    // Update pagination calculations to use searchMetadata
+    const totalPages = Math.ceil(searchMetadata.totalResults / searchMetadata.pageSize);
+
+    // Remove the local pagination slicing since it's handled by the API
+    const paginatedImages = deduplicatedResults;
 
     const handleDeleteClick = (event: React.MouseEvent<HTMLElement>, image: ImageItem) => {
         event.stopPropagation();
@@ -949,13 +962,17 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                 renderTableView()
             )}
 
-            {images.length > ITEMS_PER_PAGE && (
+            {searchMetadata.totalResults > searchMetadata.pageSize && (
                 <Box sx={{
                     display: 'flex',
-                    justifyContent: 'flex-end',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     mt: 4,
                     mb: 2
                 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        Showing {((page - 1) * searchMetadata.pageSize) + 1} - {Math.min(page * searchMetadata.pageSize, searchMetadata.totalResults)} of {searchMetadata.totalResults} results
+                    </Typography>
                     <Pagination
                         count={totalPages}
                         page={page}
@@ -963,6 +980,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images }) => {
                         color="primary"
                         size="medium"
                         shape="circular"
+                        showFirstButton
+                        showLastButton
                         sx={{
                             '& .MuiPaginationItem-root': {
                                 borderRadius: '50%',

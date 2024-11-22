@@ -80,16 +80,15 @@ function TopBar() {
         return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
     }, [searchTags, searchInput]);
 
-    const { refetch } = useSearch(getSearchQuery());
+    const { data: searchResults } = useSearch(getSearchQuery() || '');
 
     const debouncedSearch = useCallback(
         debounce((query: string) => {
             if (query.trim()) {
-                refetch();
                 navigate('/search', { state: { query: getSearchQuery() } });
             }
         }, 500),
-        [navigate, refetch, getSearchQuery]
+        [navigate, getSearchQuery]
     );
 
     const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -132,7 +131,6 @@ function TopBar() {
 
                 const searchQuery = getSearchQuery();
                 navigate('/search', { state: { query: searchQuery } });
-                refetch();
                 return true;
             }
         }
@@ -169,7 +167,6 @@ function TopBar() {
         } else if (searchInput.trim() || searchTags.length > 0) {
             const searchQuery = getSearchQuery();
             navigate('/search', { state: { query: searchQuery } });
-            refetch();
         }
     };
 
@@ -180,7 +177,6 @@ function TopBar() {
             );
             const searchQuery = newTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
             navigate('/search', { state: { query: searchQuery } });
-            refetch();
             return newTags;
         });
     };

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Typography, List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse, LinearProgress } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -7,7 +7,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VideoResults from '../components/search/VideoResults';
 import ImageResults from '../components/search/ImageResults';
 import AudioResults from '../components/search/AudioResults';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
 import MenuIcon from '@mui/icons-material/Menu';
 
@@ -19,16 +19,22 @@ const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { query } = (location.state as LocationState) || {};
-    const [currentPage, setCurrentPage] = useState(1);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    const currentQuery = searchParams.get('q') || query || '';
 
-    const { data: searchResults, isLoading } = useSearch(query || '', {
+    const {
+        data: searchResults,
+        isLoading,
+        isFetching
+    } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: PAGE_SIZE
     });
 
     const imageResults = searchResults?.data?.results?.filter(item => item.assetType === 'Image') || [];
-    const totalResults = searchResults?.data?.searchMetadata?.totalResults || 0;
 
     const [filters, setFilters] = useState({
         mediaTypes: {
@@ -57,6 +63,19 @@ const SearchPage: React.FC = () => {
 
     const [filterBarExpanded, setFilterBarExpanded] = useState(false);
 
+    useEffect(() => {
+        if (query && !searchParams.has('q')) {
+            setSearchParams(prev => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('q', query);
+                if (!prev.has('page')) {
+                    newParams.set('page', '1');
+                }
+                return newParams;
+            });
+        }
+    }, [query, searchParams, setSearchParams]);
+
     const handleFilterChange = (section: string, filter: string) => {
         setFilters(prev => ({
             ...prev,
@@ -72,6 +91,17 @@ const SearchPage: React.FC = () => {
             ...prev,
             [section]: !prev[section as keyof typeof prev]
         }));
+    };
+
+    const handleSearch = (params: { page: number }) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('page', params.page.toString());
+            if (currentQuery) {
+                newParams.set('q', currentQuery);
+            }
+            return newParams;
+        });
     };
 
     const renderFilterSection = (title: string, section: string, items: Record<string, boolean>) => (
@@ -154,6 +184,18 @@ const SearchPage: React.FC = () => {
             minHeight: '100vh',
             bgcolor: 'background.paper'
         }}>
+            {isFetching && (
+                <LinearProgress
+                    sx={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 9999
+                    }}
+                />
+            )}
+
             {/* Main Content */}
             <Box sx={{
                 flexGrow: 1,
@@ -163,8 +205,12 @@ const SearchPage: React.FC = () => {
                 flexDirection: 'column',
                 gap: 6
             }}>
-                {filters.mediaTypes.images && imageResults.length > 0 && (
-                    <ImageResults images={imageResults} />
+                {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
+                    <ImageResults
+                        images={imageResults}
+                        searchMetadata={searchResults.data.searchMetadata}
+                        onPageChange={(newPage) => handleSearch({ page: newPage })}
+                    />
                 )}
             </Box>
 

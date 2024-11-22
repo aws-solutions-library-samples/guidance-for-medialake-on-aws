@@ -82,22 +82,6 @@ export interface SearchResponse {
                         doc_count: number;
                     }>;
                 };
-                asset_types: {
-                    doc_count_error_upper_bound: number;
-                    sum_other_doc_count: number;
-                    buckets: Array<{
-                        key: string;
-                        doc_count: number;
-                    }>;
-                };
-            };
-            suggestions: {
-                simple_phrase: Array<{
-                    text: string;
-                    offset: number;
-                    length: number;
-                    options: any[];
-                }>;
             };
         };
         results: SearchResult[];

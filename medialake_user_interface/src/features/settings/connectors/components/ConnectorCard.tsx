@@ -12,8 +12,6 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    Menu,
-    MenuItem,
     Popover,
     FormGroup,
     FormControlLabel,
@@ -44,24 +42,6 @@ interface ConnectorCardProps {
     onDelete: (id: string) => Promise<void>;
 }
 
-// interface ConnectorResponse {
-//     id: string;
-//     name: string;
-//     type: string;
-//     usage?: {
-//         total: number;
-//     };
-//     updatedAt: string;
-//     status?: string;
-//     bucket?: string;
-//     description: string;
-//     settings?: {
-//         bucket: string;
-//         region?: string;
-//         path?: string;
-//     };
-// }
-
 interface CardFieldConfig {
     id: string;
     label: string;
@@ -77,8 +57,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     const [isDeleting, setIsDeleting] = useState(false);
     const [cardFieldsAnchor, setCardFieldsAnchor] = useState<null | HTMLElement>(null);
     const [cardSortAnchor, setCardSortAnchor] = useState<null | HTMLElement>(null);
-    const [cardSortBy, setCardSortBy] = useState<string>('name');
-    const [cardSortOrder, setCardSortOrder] = useState<'asc' | 'desc'>('asc');
     const [isViewDetailsOpen, setIsViewDetailsOpen] = useState(false);
     const [editedDescription, setEditedDescription] = useState(connector.description);
     const [cardFields, setCardFields] = useState<CardFieldConfig[]>([
@@ -138,14 +116,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         ));
     };
 
-    const handleCardSortChange = (field: string) => {
-        if (cardSortBy === field) {
-            setCardSortOrder(cardSortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setCardSortBy(field);
-            setCardSortOrder('asc');
-        }
-    };
 
     const handleViewDetails = () => {
         setIsViewDetailsOpen(true);
@@ -193,46 +163,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         </Popover>
     );
 
-    const CardSortMenu = () => (
-        <Popover
-            open={Boolean(cardSortAnchor)}
-            anchorEl={cardSortAnchor}
-            onClose={() => setCardSortAnchor(null)}
-            anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-            }}
-            transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-            }}
-        >
-            <Box sx={{ p: 2, minWidth: 200 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Sort By
-                </Typography>
-                {cardFields.map((field) => (
-                    <MenuItem
-                        key={field.id}
-                        onClick={() => {
-                            handleCardSortChange(field.id);
-                            setCardSortAnchor(null);
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                            {field.label}
-                            {cardSortBy === field.id && (
-                                <Typography variant="caption">
-                                    {cardSortOrder === 'asc' ? '↑' : '↓'}
-                                </Typography>
-                            )}
-                        </Box>
-                    </MenuItem>
-                ))}
-            </Box>
-        </Popover>
-    );
-
     const ViewDetailsDialog = () => (
         <Dialog
             open={isViewDetailsOpen}
@@ -251,14 +181,14 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                     />
                     <TextField
                         label="Bucket"
-                        value={connector.settings?.bucket || ''}
+                        value={connector.storageIdentifier || ''}
                         fullWidth
                         disabled
                     />
                     {connector.settings?.region && (
                         <TextField
                             label="Region"
-                            value={connector.settings.region}
+                            value={connector.region}
                             fullWidth
                             disabled
                         />
@@ -311,18 +241,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             </Box>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton
-                                size="small"
-                                onClick={(e) => setCardSortAnchor(e.currentTarget)}
-                            >
-                                <SortIcon />
-                            </IconButton>
-                            <IconButton
-                                size="small"
-                                onClick={(e) => setCardFieldsAnchor(e.currentTarget)}
-                            >
-                                <ViewColumnIcon />
-                            </IconButton>
                             <Tooltip title="Edit">
                                 <IconButton onClick={handleViewDetails} size="small">
                                     <EditIcon />
@@ -335,13 +253,11 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             </Tooltip>
                         </Box>
                     </Box>
-
                     {cardFields.find(f => f.id === 'bucket')?.visible && connector.settings?.bucket && (
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Bucket: {connector.settings.bucket}
+                            Bucket: {connector.storageIdentifier}
                         </Typography>
                     )}
-
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                         {connector.description || 'No description provided'}
                     </Typography>
@@ -370,12 +286,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                     </Box>
                 </CardContent>
             </Card>
-
             <CardFieldsMenu />
-            <CardSortMenu />
             <ViewDetailsDialog />
 
-            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
