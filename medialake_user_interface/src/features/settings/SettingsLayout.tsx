@@ -5,6 +5,7 @@ import IntegrationsPage from '@/pages/settings/IntegrationsPage';
 import ConnectorsPage from '@/pages/settings/ConnectorsPage';
 import SystemPage from '@/pages/settings/SystemPage';
 import ProfilePage from '@/pages/settings/ProfilePage';
+import UserManagement from '@/pages/settings/UserManagement';
 
 const SettingsComponent: React.FC = () => {
     return (
@@ -14,6 +15,7 @@ const SettingsComponent: React.FC = () => {
                 <Route path="integrations" element={<IntegrationsPage />} />
                 <Route path="connectors" element={<ConnectorsPage />} />
                 <Route path="system" element={<SystemPage />} />
+                <Route path="users" element={<UserManagement />} />
                 <Route path="/" element={<Navigate to="profile" replace />} />
                 <Route path="*" element={<Navigate to="profile" replace />} />
             </Routes>
