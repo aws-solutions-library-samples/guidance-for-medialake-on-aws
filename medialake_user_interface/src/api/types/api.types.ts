@@ -1,4 +1,37 @@
-import { AxiosResponse } from 'axios';
+export interface User {
+  username: string;
+  enabled: boolean;
+  status: string;
+  created: string;
+  modified: string;
+  email: string;
+  email_verified: string;
+  given_name: string | null;
+  family_name: string | null;
+  groups: string[];
+  roles: string[];
+}
+
+export interface CreateUserRequest {
+  username: string;
+  email: string;
+  enabled?: boolean;
+  groups?: string[];
+  roles?: string[];
+}
+
+export interface UpdateUserRequest {
+  username: string;
+  email?: string;
+  enabled?: boolean;
+  groups?: string[];
+  roles?: string[];  // Added roles field
+}
+
+export interface ToggleUserStatusRequest {
+  username: string;
+  enabled: boolean;
+}
 
 export interface ApiError {
   message: string;
@@ -61,25 +94,6 @@ export interface ConnectorResponse {
   };
   status?: string;
 }
-
-// interface ConnectorResponse {
-//   id: string;
-//   name: string;
-//   type: string;
-//   usage?: {
-//     total: number;
-//   };
-//   updatedAt: string;
-//   status?: string;
-//   bucket?: string;
-//   description: string;
-//   settings?: {
-//     bucket: string;
-//     region?: string;
-//     path?: string;
-//   };
-// }
-
 export interface S3ListResponse {
   buckets: string[];
   count: number;
@@ -127,4 +141,20 @@ export interface Integration {
   apiKey: string;
   name: string;
   createdAt: string;
+}
+
+export interface UserListResponse {
+  status: string;
+  message: string;
+  data: {
+    users: User[];
+  }
+}
+
+export interface UserResponse {
+  status: string;
+  message: string;
+  data: {
+    user: User;
+  }
 }

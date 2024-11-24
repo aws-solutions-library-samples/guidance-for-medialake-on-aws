@@ -16,21 +16,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import { User as ApiUser } from '../../../../api/types/api.types';
 
-export interface User {
-    id: string;
-    username: string;
-    email: string;
-    roles: string[];
-    status: 'active' | 'inactive';
-    lastLogin?: string;
-}
+export type User = ApiUser;
 
 interface UserListProps {
     users: User[];
     onEditUser: (user: User) => void;
-    onDeleteUser: (userId: string) => void;
-    onToggleUserStatus: (userId: string, newStatus: 'active' | 'inactive') => void;
+    onDeleteUser: (username: string) => void;
+    onToggleUserStatus: (username: string, newStatus: boolean) => void;
 }
 
 const UserList: React.FC<UserListProps> = ({
@@ -39,6 +33,10 @@ const UserList: React.FC<UserListProps> = ({
     onDeleteUser,
     onToggleUserStatus,
 }) => {
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleString();
+    };
+
     return (
         <TableContainer component={Paper}>
             <Table>
@@ -46,38 +44,44 @@ const UserList: React.FC<UserListProps> = ({
                     <TableRow>
                         <TableCell>Username</TableCell>
                         <TableCell>Email</TableCell>
-                        <TableCell>Roles</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Last Login</TableCell>
+                        <TableCell>Groups</TableCell>
+                        <TableCell>Created</TableCell>
+                        <TableCell>Modified</TableCell>
                         <TableCell align="right">Actions</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {users.map((user) => (
-                        <TableRow key={user.id}>
+                        <TableRow key={user.username}>
                             <TableCell>{user.username}</TableCell>
                             <TableCell>{user.email}</TableCell>
                             <TableCell>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    {user.roles.map((role) => (
-                                        <Chip
-                                            key={role}
-                                            label={role}
-                                            size="small"
-                                            color="primary"
-                                            variant="outlined"
-                                        />
-                                    ))}
-                                </Box>
-                            </TableCell>
-                            <TableCell>
                                 <Chip
-                                    label={user.status}
-                                    color={user.status === 'active' ? 'success' : 'default'}
+                                    label={user.enabled ? 'Active' : 'Inactive'}
+                                    color={user.enabled ? 'success' : 'default'}
                                     size="small"
                                 />
                             </TableCell>
-                            <TableCell>{user.lastLogin || 'Never'}</TableCell>
+                            <TableCell>
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                    {user.groups.length > 0 ? (
+                                        user.groups.map((group) => (
+                                            <Chip
+                                                key={group}
+                                                label={group}
+                                                size="small"
+                                                color="primary"
+                                                variant="outlined"
+                                            />
+                                        ))
+                                    ) : (
+                                        <span>No groups</span>
+                                    )}
+                                </Box>
+                            </TableCell>
+                            <TableCell>{formatDate(user.created)}</TableCell>
+                            <TableCell>{formatDate(user.modified)}</TableCell>
                             <TableCell align="right">
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                                     <Tooltip title="Edit User">
@@ -89,19 +93,19 @@ const UserList: React.FC<UserListProps> = ({
                                             <EditIcon />
                                         </IconButton>
                                     </Tooltip>
-                                    <Tooltip title={user.status === 'active' ? 'Deactivate User' : 'Activate User'}>
+                                    <Tooltip title={user.enabled ? 'Deactivate User' : 'Activate User'}>
                                         <IconButton
                                             size="small"
-                                            onClick={() => onToggleUserStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
-                                            color={user.status === 'active' ? 'success' : 'default'}
+                                            onClick={() => onToggleUserStatus(user.username, !user.enabled)}
+                                            color={user.enabled ? 'success' : 'default'}
                                         >
-                                            {user.status === 'active' ? <LockOpenIcon /> : <LockIcon />}
+                                            {user.enabled ? <LockOpenIcon /> : <LockIcon />}
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Delete User">
                                         <IconButton
                                             size="small"
-                                            onClick={() => onDeleteUser(user.id)}
+                                            onClick={() => onDeleteUser(user.username)}
                                             color="error"
                                         >
                                             <DeleteIcon />

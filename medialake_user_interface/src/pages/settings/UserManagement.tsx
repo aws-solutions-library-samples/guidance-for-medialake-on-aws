@@ -8,11 +8,14 @@ import {
     Snackbar,
     Tab,
     Tabs,
+    CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import UserList, { User } from '../../features/settings/usermanagement/components/UserList';
+import UserList from '../../features/settings/usermanagement/components/UserList';
 import UserForm from '../../features/settings/usermanagement/components/UserForm';
 import RoleManagement, { Role } from '../../features/settings/usermanagement/components/RoleManagement';
+import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../../api/hooks/useUsers';
+import { User, CreateUserRequest, UpdateUserRequest } from '../../api/types/api.types';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -34,26 +37,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
     );
 };
 
-// Mock data
-const mockUsers: User[] = [
-    {
-        id: '1',
-        username: 'admin',
-        email: 'admin@example.com',
-        roles: ['Admin'],
-        status: 'active',
-        lastLogin: '2024-01-20 10:30:00',
-    },
-    {
-        id: '2',
-        username: 'user1',
-        email: 'user1@example.com',
-        roles: ['Editor'],
-        status: 'active',
-        lastLogin: '2024-01-19 15:45:00',
-    },
-];
-
 const mockRoles: Role[] = [
     {
         id: '1',
@@ -72,16 +55,17 @@ const mockRoles: Role[] = [
 const availableRoles = ['Admin', 'Editor', 'Viewer'];
 
 const UserManagement: React.FC = () => {
-    const [users, setUsers] = useState<User[]>(mockUsers);
-    const [roles, setRoles] = useState<Role[]>(mockRoles);
+    const [roles] = useState<Role[]>(mockRoles);
     const [openUserForm, setOpenUserForm] = useState(false);
     const [editingUser, setEditingUser] = useState<User | undefined>();
-    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-        open: false,
-        message: '',
-        severity: 'success',
-    });
     const [tabValue, setTabValue] = useState(0);
+    const [error, setError] = useState<string | null>(null);
+
+    // API Hooks
+    const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
+    const createUserMutation = useCreateUser();
+    const updateUserMutation = useUpdateUser();
+    const deleteUserMutation = useDeleteUser();
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -97,86 +81,83 @@ const UserManagement: React.FC = () => {
         setOpenUserForm(true);
     };
 
-    const handleSaveUser = (userData: Partial<User>) => {
+    const handleSaveUser = async (userData: Partial<User>) => {
         try {
             if (editingUser) {
-                setUsers(users.map(user =>
-                    user.id === editingUser.id ? { ...user, ...userData } : user
-                ));
-                showSnackbar('User updated successfully', 'success');
-            } else {
-                const newUser: User = {
-                    id: String(Date.now()),
+                // For updating existing user
+                const updateData: UpdateUserRequest = {
                     username: userData.username!,
-                    email: userData.email!,
-                    roles: userData.roles || [],
-                    status: userData.status || 'active',
-                    lastLogin: '-',
+                    email: userData.email,
+                    enabled: userData.enabled,
+                    groups: userData.groups,
+                    roles: userData.roles
                 };
-                setUsers([...users, newUser]);
-                showSnackbar('User added successfully', 'success');
+                await updateUserMutation.mutateAsync({
+                    username: editingUser.username,
+                    updates: updateData
+                });
+            } else {
+                // For creating new user
+                if (!userData.username || !userData.email) {
+                    throw new Error('Missing required fields');
+                }
+                const createData: CreateUserRequest = {
+                    username: userData.username,
+                    email: userData.email,
+                    enabled: userData.enabled,
+                    groups: userData.groups,
+                    roles: userData.roles
+                };
+                await createUserMutation.mutateAsync(createData);
             }
             setOpenUserForm(false);
+            setError(null);
         } catch (error) {
-            showSnackbar('Error saving user', 'error');
+            setError(error instanceof Error ? error.message : 'An error occurred while saving the user');
+            console.error('Error saving user:', error);
         }
     };
 
-    const handleDeleteUser = (userId: string) => {
+    const handleDeleteUser = async (username: string) => {
         try {
-            setUsers(users.filter(user => user.id !== userId));
-            showSnackbar('User deleted successfully', 'success');
+            await deleteUserMutation.mutateAsync(username);
+            setError(null);
         } catch (error) {
-            showSnackbar('Error deleting user', 'error');
+            setError(error instanceof Error ? error.message : 'An error occurred while deleting the user');
+            console.error('Error deleting user:', error);
         }
     };
 
-    const handleToggleUserStatus = (userId: string, newStatus: 'active' | 'inactive') => {
+    const handleToggleUserStatus = async (username: string, newEnabled: boolean) => {
         try {
-            setUsers(users.map(user =>
-                user.id === userId ? { ...user, status: newStatus } : user
-            ));
-            showSnackbar(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`, 'success');
+            const updateData: UpdateUserRequest = {
+                username,
+                enabled: newEnabled
+            };
+            await updateUserMutation.mutateAsync({
+                username,
+                updates: updateData
+            });
+            setError(null);
         } catch (error) {
-            showSnackbar('Error updating user status', 'error');
+            setError(error instanceof Error ? error.message : 'An error occurred while updating user status');
+            console.error('Error toggling user status:', error);
         }
     };
 
     const handleAddRole = (roleData: Omit<Role, 'id'>) => {
-        try {
-            const newRole: Role = {
-                id: String(Date.now()),
-                ...roleData,
-            };
-            setRoles([...roles, newRole]);
-            showSnackbar('Role added successfully', 'success');
-        } catch (error) {
-            showSnackbar('Error adding role', 'error');
-        }
+        // TODO: Implement role management API
+        console.log('Add role:', roleData);
     };
 
     const handleEditRole = (updatedRole: Role) => {
-        try {
-            setRoles(roles.map(role =>
-                role.id === updatedRole.id ? updatedRole : role
-            ));
-            showSnackbar('Role updated successfully', 'success');
-        } catch (error) {
-            showSnackbar('Error updating role', 'error');
-        }
+        // TODO: Implement role management API
+        console.log('Edit role:', updatedRole);
     };
 
     const handleDeleteRole = (roleId: string) => {
-        try {
-            setRoles(roles.filter(role => role.id !== roleId));
-            showSnackbar('Role deleted successfully', 'success');
-        } catch (error) {
-            showSnackbar('Error deleting role', 'error');
-        }
-    };
-
-    const showSnackbar = (message: string, severity: 'success' | 'error') => {
-        setSnackbar({ open: true, message, severity });
+        // TODO: Implement role management API
+        console.log('Delete role:', roleId);
     };
 
     return (
@@ -213,12 +194,22 @@ const UserManagement: React.FC = () => {
                                 Add User
                             </Button>
                         </Box>
-                        <UserList
-                            users={users}
-                            onEditUser={handleEditUser}
-                            onDeleteUser={handleDeleteUser}
-                            onToggleUserStatus={handleToggleUserStatus}
-                        />
+                        {isLoadingUsers ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : usersError ? (
+                            <Alert severity="error" sx={{ mb: 2 }}>
+                                Failed to load users: {usersError instanceof Error ? usersError.message : 'Unknown error'}
+                            </Alert>
+                        ) : (
+                            <UserList
+                                users={users || []}
+                                onEditUser={handleEditUser}
+                                onDeleteUser={handleDeleteUser}
+                                onToggleUserStatus={handleToggleUserStatus}
+                            />
+                        )}
                     </Box>
                 </TabPanel>
 
@@ -243,16 +234,16 @@ const UserManagement: React.FC = () => {
             />
 
             <Snackbar
-                open={snackbar.open}
+                open={!!error}
                 autoHideDuration={6000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                onClose={() => setError(null)}
             >
                 <Alert
-                    onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    severity={snackbar.severity}
+                    severity="error"
+                    onClose={() => setError(null)}
                     sx={{ width: '100%' }}
                 >
-                    {snackbar.message}
+                    {error}
                 </Alert>
             </Snackbar>
         </Box>

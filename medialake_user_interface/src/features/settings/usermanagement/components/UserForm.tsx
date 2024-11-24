@@ -14,8 +14,10 @@ import {
     Chip,
     OutlinedInput,
     SelectChangeEvent,
+    Switch,
+    FormControlLabel,
 } from '@mui/material';
-import { User } from './UserList';
+import { User } from '../../../../api/types/api.types';
 
 interface UserFormProps {
     open: boolean;
@@ -47,7 +49,8 @@ const UserForm: React.FC<UserFormProps> = ({
         username: '',
         email: '',
         roles: [],
-        status: 'active',
+        enabled: true,
+        groups: []
     });
 
     useEffect(() => {
@@ -60,7 +63,8 @@ const UserForm: React.FC<UserFormProps> = ({
                 username: '',
                 email: '',
                 roles: [],
-                status: 'active',
+                enabled: true,
+                groups: []
             });
         }
     }, [user]);
@@ -79,6 +83,23 @@ const UserForm: React.FC<UserFormProps> = ({
         setFormData({
             ...formData,
             roles: typeof value === 'string' ? value.split(',') : value,
+        });
+    };
+
+    const handleGroupChange = (event: SelectChangeEvent<string[]>) => {
+        const {
+            target: { value },
+        } = event;
+        setFormData({
+            ...formData,
+            groups: typeof value === 'string' ? value.split(',') : value,
+        });
+    };
+
+    const handleEnabledChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({
+            ...formData,
+            enabled: event.target.checked,
         });
     };
 
@@ -135,21 +156,36 @@ const UserForm: React.FC<UserFormProps> = ({
                             </Select>
                         </FormControl>
                         <FormControl fullWidth>
-                            <InputLabel id="status-label">Status</InputLabel>
+                            <InputLabel id="groups-label">Groups</InputLabel>
                             <Select
-                                labelId="status-label"
-                                name="status"
-                                value={formData.status}
-                                label="Status"
-                                onChange={(e) => setFormData({
-                                    ...formData,
-                                    status: e.target.value as 'active' | 'inactive',
-                                })}
+                                labelId="groups-label"
+                                multiple
+                                value={formData.groups || []}
+                                onChange={handleGroupChange}
+                                input={<OutlinedInput label="Groups" />}
+                                renderValue={(selected) => (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {selected.map((value) => (
+                                            <Chip key={value} label={value} />
+                                        ))}
+                                    </Box>
+                                )}
+                                MenuProps={MenuProps}
                             >
-                                <MenuItem value="active">Active</MenuItem>
-                                <MenuItem value="inactive">Inactive</MenuItem>
+                                {/* TODO: Replace with actual groups from API */}
+                                <MenuItem value="default">Default</MenuItem>
                             </Select>
                         </FormControl>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={formData.enabled}
+                                    onChange={handleEnabledChange}
+                                    name="enabled"
+                                />
+                            }
+                            label="User Enabled"
+                        />
                     </Box>
                 </DialogContent>
                 <DialogActions>
