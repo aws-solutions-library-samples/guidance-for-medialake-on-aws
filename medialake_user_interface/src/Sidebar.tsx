@@ -28,6 +28,7 @@ import {
     PlaylistPlay as ExecutionsIcon,
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
+    Group as GroupIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 
@@ -89,6 +90,7 @@ function Sidebar() {
             subItems: [
                 { text: 'Integrations', icon: <ApiIcon />, path: '/settings/integrations' },
                 { text: 'Connectors', icon: <StorageIcon />, path: '/settings/connectors' },
+                { text: 'User Management', icon: <GroupIcon />, path: '/settings/users' },
                 { text: 'System', icon: <AdminIcon />, path: '/settings/system' },
             ]
         }

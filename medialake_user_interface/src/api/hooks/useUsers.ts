@@ -1,74 +1,74 @@
-// // src/api/hooks/useUsers.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../apiClient';
+import { API_ENDPOINTS } from '../endpoints';
+import { QUERY_KEYS } from '../queryKeys';
+import { User, CreateUserRequest, UpdateUserRequest } from '../types/api.types';
 
-// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import axiosClient from '../axiosClient';
-// import { API_ENDPOINTS } from '../endpoints';
-// import { QUERY_KEYS } from '../queryKeys';
+interface UsersResponse {
+    status: string;
+    message: string;
+    data: {
+        users: User[];
+        searchMetadata: {
+            totalResults: number;
+            page: number;
+            pageSize: number;
+        };
+    };
+}
 
-// interface User {
-//     id: string;
-//     name: string;
-//     email: string;
-// }
+export const useGetUsers = () => {
+    return useQuery<User[], Error>({
+        queryKey: [QUERY_KEYS.USERS],
+        queryFn: async () => {
+            const { data } = await apiClient.get<{ statusCode: number; body: string }>(API_ENDPOINTS.USERS);
+            const parsedBody = JSON.parse(data.body) as UsersResponse;
+            // Map API response to include roles if not present
+            return parsedBody.data.users.map(user => ({
+                ...user,
+                roles: user.roles || [] // Ensure roles is always present
+            }));
+        },
+    });
+};
 
-// export const useGetUsers = () => {
-//     return useQuery<User[], Error>({
-//         queryKey: [QUERY_KEYS.USERS],
-//         queryFn: async () => {
-//             const { data } = await axiosClient.get<User[]>(API_ENDPOINTS.USERS);
-//             return data;
-//         },
-//     });
-// };
+export const useCreateUser = () => {
+    const queryClient = useQueryClient();
 
-// export const useGetUser = (userId: string) => {
-//     return useQuery<User, Error>({
-//         queryKey: [QUERY_KEYS.USERS, userId],
-//         queryFn: async () => {
-//             const { data } = await axiosClient.get<User>(`${API_ENDPOINTS.USERS}/${userId}`);
-//             return data;
-//         },
-//     });
-// };
+    return useMutation<User, Error, CreateUserRequest>({
+        mutationFn: async (newUser) => {
+            const { data } = await apiClient.post<User>(API_ENDPOINTS.USERS, newUser);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
+        },
+    });
+};
 
-// export const useCreateUser = () => {
-//     const queryClient = useQueryClient();
+export const useUpdateUser = () => {
+    const queryClient = useQueryClient();
 
-//     return useMutation<User, Error, Omit<User, 'id'>>({
-//         mutationFn: async (newUser) => {
-//             const { data } = await axiosClient.post<User>(API_ENDPOINTS.USERS, newUser);
-//             return data;
-//         },
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
-//         },
-//     });
-// };
+    return useMutation<User, Error, { username: string; updates: UpdateUserRequest }>({
+        mutationFn: async ({ username, updates }) => {
+            const { data } = await apiClient.put<User>(`${API_ENDPOINTS.USERS}/${username}`, updates);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
+        },
+    });
+};
 
-// export const useUpdateUser = () => {
-//     const queryClient = useQueryClient();
+export const useDeleteUser = () => {
+    const queryClient = useQueryClient();
 
-//     return useMutation<User, Error, User>({
-//         mutationFn: async (updatedUser) => {
-//             const { data } = await axiosClient.put<User>(`${API_ENDPOINTS.USERS}/${updatedUser.id}`, updatedUser);
-//             return data;
-//         },
-//         onSuccess: (data) => {
-//             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS, data.id] });
-//             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
-//         },
-//     });
-// };
-
-// export const useDeleteUser = () => {
-//     const queryClient = useQueryClient();
-
-//     return useMutation<void, Error, string>({
-//         mutationFn: async (userId) => {
-//             await axiosClient.delete(`${API_ENDPOINTS.USERS}/${userId}`);
-//         },
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
-//         },
-//     });
-// };
+    return useMutation<void, Error, string>({
+        mutationFn: async (username) => {
+            await apiClient.delete(`${API_ENDPOINTS.USERS}/${username}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
+        },
+    });
+};

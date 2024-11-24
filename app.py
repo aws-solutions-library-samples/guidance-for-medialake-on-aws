@@ -3,6 +3,10 @@
 This module serves as the entry point for the MediaLake CDK application.
 """
 import aws_cdk as cdk
+from aws_cdk import (
+    aws_iam as iam,
+    custom_resources as cr,
+)
 
 # from medialake_config import config
 from config import config
@@ -21,6 +25,12 @@ from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
 )
+from medialake_constructs.api_gateway.api_gateway_settings import (
+    SettingsConstruct,
+    SettingsConstructProps,
+)
+from medialake_constructs.update_construct import UpdateConstruct, UpdateConstructProps
+
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -39,7 +49,7 @@ class MediaLakeStack(cdk.Stack):
         self._cognito = CognitoConstruct(
             self,
             "Cognito",
-            props=CognitoProps(assets_bucket_arn="arn:aws:s3:::mne-mscdemo-testevent"),
+            props=CognitoProps(),
         )
 
         # Create main API Gateway construct
@@ -47,6 +57,17 @@ class MediaLakeStack(cdk.Stack):
             self,
             "ApiGateway",
             user_pool=self._cognito.user_pool,
+        )
+
+        # Create User Interface
+        self._ui = UIConstruct(
+            self,
+            "UserInterface",
+            api_gateway.rest_api.rest_api_id,
+            self._cognito.user_pool,
+            self._cognito.user_pool_client,
+            self._cognito.identity_pool,
+            props=UIConstructProps(),
         )
 
         # Create connectors construct
@@ -105,15 +126,26 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=api_gateway.x_origin_verify_secret,
             ),
         )
-        # Create User Interface
-        self._ui = UIConstruct(
+
+        _ = SettingsConstruct(
             self,
-            "UserInterface",
-            api_gateway.rest_api.rest_api_id,
-            self._cognito.user_pool,
-            self._cognito.user_pool_client,
-            self._cognito.identity_pool,
-            props=UIConstructProps(),
+            "ApiSettingsConstruct",
+            props=SettingsConstructProps(
+                api_resource=api_gateway.api_resource,
+                cognito_authorizer=api_gateway.cognito_authorizer,
+                cognito_user_pool=self._cognito.user_pool,
+                cognito_app_client=self._cognito.user_pool_client,
+                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+            ),
+        )
+
+        _ = UpdateConstruct(
+            self,
+            "UpdateConfiguration",
+            props=UpdateConstructProps(
+                user_pool=self._cognito.user_pool,
+                distribution_url=self._ui.distribution_url,
+            ),
         )
 
         # Export the User Interface CloudFront URL
