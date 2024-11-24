@@ -6,59 +6,19 @@ import {
     Paper,
     Alert,
     Snackbar,
-    Tab,
-    Tabs,
     CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UserList from '../../features/settings/usermanagement/components/UserList';
 import UserForm from '../../features/settings/usermanagement/components/UserForm';
-import RoleManagement, { Role } from '../../features/settings/usermanagement/components/RoleManagement';
 import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../../api/hooks/useUsers';
 import { User, CreateUserRequest, UpdateUserRequest } from '../../api/types/api.types';
-
-interface TabPanelProps {
-    children?: React.ReactNode;
-    index: number;
-    value: number;
-}
-
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
-    return (
-        <Box
-            role="tabpanel"
-            hidden={value !== index}
-            id={`user-management-tabpanel-${index}`}
-            aria-labelledby={`user-management-tab-${index}`}
-            sx={{ mt: 3 }}
-        >
-            {value === index && children}
-        </Box>
-    );
-};
-
-const mockRoles: Role[] = [
-    {
-        id: '1',
-        name: 'Admin',
-        description: 'Full system access',
-        permissions: ['create_user', 'edit_user', 'delete_user', 'manage_roles'],
-    },
-    {
-        id: '2',
-        name: 'Editor',
-        description: 'Can edit content',
-        permissions: ['edit_content', 'view_content'],
-    },
-];
 
 const availableRoles = ['Admin', 'Editor', 'Viewer'];
 
 const UserManagement: React.FC = () => {
-    const [roles] = useState<Role[]>(mockRoles);
     const [openUserForm, setOpenUserForm] = useState(false);
     const [editingUser, setEditingUser] = useState<User | undefined>();
-    const [tabValue, setTabValue] = useState(0);
     const [error, setError] = useState<string | null>(null);
 
     // API Hooks
@@ -66,10 +26,6 @@ const UserManagement: React.FC = () => {
     const createUserMutation = useCreateUser();
     const updateUserMutation = useUpdateUser();
     const deleteUserMutation = useDeleteUser();
-
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-        setTabValue(newValue);
-    };
 
     const handleAddUser = () => {
         setEditingUser(undefined);
@@ -81,40 +37,37 @@ const UserManagement: React.FC = () => {
         setOpenUserForm(true);
     };
 
-    const handleSaveUser = async (userData: Partial<User>) => {
+    const handleSaveUser = async (userData: CreateUserRequest) => {
         try {
             if (editingUser) {
                 // For updating existing user
                 const updateData: UpdateUserRequest = {
-                    username: userData.username!,
-                    email: userData.email,
-                    enabled: userData.enabled,
-                    groups: userData.groups,
-                    roles: userData.roles
-                };
-                await updateUserMutation.mutateAsync({
-                    username: editingUser.username,
-                    updates: updateData
-                });
-            } else {
-                // For creating new user
-                if (!userData.username || !userData.email) {
-                    throw new Error('Missing required fields');
-                }
-                const createData: CreateUserRequest = {
                     username: userData.username,
                     email: userData.email,
                     enabled: userData.enabled,
                     groups: userData.groups,
                     roles: userData.roles
                 };
-                await createUserMutation.mutateAsync(createData);
+                const result = await updateUserMutation.mutateAsync({
+                    username: editingUser.username,
+                    updates: updateData
+                });
+                setOpenUserForm(false);
+                setError(null);
+                return result;
+            } else {
+                // For creating new user
+                const result = await createUserMutation.mutateAsync(userData);
+                if (result.status === 201) {
+                    setOpenUserForm(false);
+                    setError(null);
+                }
+                return result;
             }
-            setOpenUserForm(false);
-            setError(null);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'An error occurred while saving the user');
             console.error('Error saving user:', error);
+            throw error;
         }
     };
 
@@ -145,21 +98,6 @@ const UserManagement: React.FC = () => {
         }
     };
 
-    const handleAddRole = (roleData: Omit<Role, 'id'>) => {
-        // TODO: Implement role management API
-        console.log('Add role:', roleData);
-    };
-
-    const handleEditRole = (updatedRole: Role) => {
-        // TODO: Implement role management API
-        console.log('Edit role:', updatedRole);
-    };
-
-    const handleDeleteRole = (roleId: string) => {
-        // TODO: Implement role management API
-        console.log('Delete role:', roleId);
-    };
-
     return (
         <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
             <Box sx={{ mb: 4 }}>
@@ -167,62 +105,39 @@ const UserManagement: React.FC = () => {
                     User Management
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                    Manage users and roles in the system
+                    Manage system users and their access
                 </Typography>
             </Box>
 
             <Paper sx={{ width: '100%', mb: 2 }}>
-                <Tabs
-                    value={tabValue}
-                    onChange={handleTabChange}
-                    aria-label="user management tabs"
-                    sx={{ borderBottom: 1, borderColor: 'divider' }}
-                >
-                    <Tab label="Users" id="user-management-tab-0" />
-                    <Tab label="Roles" id="user-management-tab-1" />
-                </Tabs>
-
-                <TabPanel value={tabValue} index={0}>
-                    <Box sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={handleAddUser}
-                            >
-                                Add User
-                            </Button>
+                <Box sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            startIcon={<AddIcon />}
+                            onClick={handleAddUser}
+                        >
+                            Add User
+                        </Button>
+                    </Box>
+                    {isLoadingUsers ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                            <CircularProgress />
                         </Box>
-                        {isLoadingUsers ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : usersError ? (
-                            <Alert severity="error" sx={{ mb: 2 }}>
-                                Failed to load users: {usersError instanceof Error ? usersError.message : 'Unknown error'}
-                            </Alert>
-                        ) : (
-                            <UserList
-                                users={users || []}
-                                onEditUser={handleEditUser}
-                                onDeleteUser={handleDeleteUser}
-                                onToggleUserStatus={handleToggleUserStatus}
-                            />
-                        )}
-                    </Box>
-                </TabPanel>
-
-                <TabPanel value={tabValue} index={1}>
-                    <Box sx={{ p: 3 }}>
-                        <RoleManagement
-                            roles={roles}
-                            onAddRole={handleAddRole}
-                            onEditRole={handleEditRole}
-                            onDeleteRole={handleDeleteRole}
+                    ) : usersError ? (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            Failed to load users: {usersError instanceof Error ? usersError.message : 'Unknown error'}
+                        </Alert>
+                    ) : (
+                        <UserList
+                            users={users || []}
+                            onEditUser={handleEditUser}
+                            onDeleteUser={handleDeleteUser}
+                            onToggleUserStatus={handleToggleUserStatus}
                         />
-                    </Box>
-                </TabPanel>
+                    )}
+                </Box>
             </Paper>
 
             <UserForm

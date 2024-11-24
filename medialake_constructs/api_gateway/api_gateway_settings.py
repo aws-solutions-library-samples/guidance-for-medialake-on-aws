@@ -81,9 +81,12 @@ class SettingsConstruct(Construct):
 
         # Create settings resource
         settings_resource = props.api_resource.root.add_resource("settings")
-        settings_user_resource = settings_resource.add_resource("users")
-        settings_user_userid_resource = settings_user_resource.add_resource("{id}")
-        settings_user_user_resource = settings_user_resource.add_resource("user")
+        settings_users_resource = settings_resource.add_resource("users")
+        settings_users_userid_resource = settings_users_resource.add_resource("{id}")
+        settings_users_user_resource = settings_users_resource.add_resource("user")
+
+        settings_roles_resource = settings_resource.add_resource("roles")
+        settings_roles_role_resource = settings_roles_resource.add_resource("role")
 
         settings_users_get_lambda = Lambda(
             self,
@@ -108,9 +111,44 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_user_resource.add_method(
+        settings_users_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(settings_users_get_lambda.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        settings_roles_get_lambda = Lambda(
+            self,
+            "SettingsRolesGetLambda",
+            config=LambdaConfig(
+                name="settings_roles_get_lambda",
+                entry="lambdas/api/settings/roles/get_roles",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": (
+                        props.x_origin_verify_secret.secret_arn
+                    ),
+                    "USER_POOL_ID": (props.cognito_user_pool.user_pool_id),
+                },
+            ),
+        )
+
+        settings_roles_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:ListUsers",
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:ListGroups",
+                    "cognito-idp:GetGroup",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
+
+        settings_roles_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(settings_roles_get_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
@@ -141,7 +179,7 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_user_userid_resource.add_method(
+        settings_users_userid_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(settings_user_del_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
@@ -178,7 +216,7 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_user_userid_resource.add_method(
+        settings_users_userid_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(settings_user_put_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
@@ -219,7 +257,7 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_user_user_resource.add_method(
+        settings_users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(settings_users_user_post_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,

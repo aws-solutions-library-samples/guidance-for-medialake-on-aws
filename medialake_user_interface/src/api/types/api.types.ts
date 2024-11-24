@@ -1,15 +1,15 @@
 export interface User {
   username: string;
+  email: string;
   enabled: boolean;
   status: string;
   created: string;
   modified: string;
-  email: string;
   email_verified: string;
   given_name: string | null;
   family_name: string | null;
   groups: string[];
-  roles: string[];
+  roles?: string[];
 }
 
 export interface CreateUserRequest {
@@ -20,17 +20,63 @@ export interface CreateUserRequest {
   roles?: string[];
 }
 
+export interface CreateUserResponse {
+  status: number;
+  message: string;
+  data: {
+    username: string;
+    userStatus: string;
+  };
+}
+
 export interface UpdateUserRequest {
   username: string;
   email?: string;
   enabled?: boolean;
   groups?: string[];
-  roles?: string[];  // Added roles field
+  roles?: string[];
 }
 
 export interface ToggleUserStatusRequest {
   username: string;
   enabled: boolean;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateRoleRequest {
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface UpdateRoleRequest {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+export interface RoleListResponse {
+  status: string;
+  message: string;
+  data: {
+    roles: Role[];
+  }
+}
+
+export interface RoleResponse {
+  status: string;
+  message: string;
+  data: {
+    role: Role;
+  }
 }
 
 export interface ApiError {

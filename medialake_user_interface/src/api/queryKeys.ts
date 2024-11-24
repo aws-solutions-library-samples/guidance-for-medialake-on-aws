@@ -29,4 +29,11 @@ export const QUERY_KEYS = {
         details: () => [...QUERY_KEYS.USERS.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.USERS.details(), id] as const,
     },
+    ROLES: {
+        all: ['roles'] as const,
+        lists: () => [...QUERY_KEYS.ROLES.all, 'list'] as const,
+        list: (filters: string) => [...QUERY_KEYS.ROLES.lists(), { filters }] as const,
+        details: () => [...QUERY_KEYS.ROLES.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.ROLES.details(), id] as const,
+    },
 } as const;

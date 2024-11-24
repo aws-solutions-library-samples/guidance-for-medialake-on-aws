@@ -29,6 +29,7 @@ import {
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
     Group as GroupIcon,
+    Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 
@@ -91,6 +92,7 @@ function Sidebar() {
                 { text: 'Integrations', icon: <ApiIcon />, path: '/settings/integrations' },
                 { text: 'Connectors', icon: <StorageIcon />, path: '/settings/connectors' },
                 { text: 'User Management', icon: <GroupIcon />, path: '/settings/users' },
+                { text: 'Roles', icon: <SecurityIcon />, path: '/settings/roles' },
                 { text: 'System', icon: <AdminIcon />, path: '/settings/system' },
             ]
         }

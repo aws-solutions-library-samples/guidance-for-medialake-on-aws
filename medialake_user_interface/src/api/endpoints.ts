@@ -9,5 +9,7 @@ export const API_ENDPOINTS = {
         DELETE: (id: string) => `/assets/${id}`,
         RENAME: (id: string) => `/assets/${id}/rename`,
     },
-    USERS: '/settings/users'
+    USERS: '/settings/users',
+    USER: '/settings/users/user',
+    ROLES: '/settings/roles'
 };

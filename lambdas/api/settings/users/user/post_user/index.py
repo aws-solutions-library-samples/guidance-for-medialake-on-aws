@@ -14,7 +14,24 @@ from botocore.exceptions import ClientError
 logger = Logger(service="user-creation", level="DEBUG")
 tracer = Tracer(service="user-creation")
 metrics = Metrics(namespace="UserManagement", service="user-creation")
-app = APIGatewayRestResolver()
+# Configure CORS
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=[
+        "Content-Type",
+        "X-Amz-Date",
+        "Authorization",
+        "X-Api-Key",
+        "X-Amz-Security-Token",
+    ],
+)
+
+# Initialize API Gateway resolver
+app = APIGatewayRestResolver(
+    serializer=lambda x: json.dumps(x, default=str),
+    strip_prefixes=["/api"],
+    cors=cors_config,
+)
 
 # Initialize Cognito client
 cognito = boto3.client("cognito-idp")
@@ -81,10 +98,12 @@ def create_user():
             "statusCode": 201,
             "body": json.dumps(
                 {
+                    "status": 201,
                     "message": "User created successfully",
-                    "username": request_data["email"],
-                    "userStatus": response["User"]["UserStatus"],
-                    "temporary_password": temp_password,
+                    "data": {
+                        "username": request_data["email"],
+                        "userStatus": response["User"]["UserStatus"],
+                    },
                 }
             ),
         }
