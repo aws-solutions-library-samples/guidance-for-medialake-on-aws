@@ -17,6 +17,7 @@ import {
     Settings as SettingsIcon,
     Person as PersonIcon,
     AdminPanelSettings as AdminIcon,
+    Group as GroupIcon,
 } from '@mui/icons-material';
 import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '@/api/hooks/useConnectors';
 import { Integration, ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
@@ -26,6 +27,7 @@ import IntegrationModal from '@/features/settings/integrations/components/Integr
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
 import UserProfile from '../components/settings/UserProfile';
 import AdminSettings from '../components/settings/AdminSettings';
+import UserManagement from './settings/UserManagement';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -70,13 +72,11 @@ const SettingsPage = () => {
     };
 
     const handleAddIntegration = () => {
-        console.log('Opening integration modal');
         setEditingIntegration(undefined);
         setOpenIntegrationModal(true);
     };
 
     const handleAddConnector = () => {
-        console.log('Opening connector modal');
         setEditingConnector(undefined);
         setOpenConnectorModal(true);
     };
@@ -182,6 +182,11 @@ const SettingsPage = () => {
                             iconPosition="start"
                         />
                         <Tab
+                            icon={<GroupIcon sx={{ mr: 1 }} />}
+                            label="User Management"
+                            iconPosition="start"
+                        />
+                        <Tab
                             icon={<AdminIcon sx={{ mr: 1 }} />}
                             label="Admin"
                             iconPosition="start"
@@ -227,6 +232,12 @@ const SettingsPage = () => {
 
                 <TabPanel value={activeTab} index={3}>
                     <Box sx={{ px: 2 }}>
+                        <UserManagement />
+                    </Box>
+                </TabPanel>
+
+                <TabPanel value={activeTab} index={4}>
+                    <Box sx={{ px: 2 }}>
                         <AdminSettings />
                     </Box>
                 </TabPanel>
@@ -236,7 +247,6 @@ const SettingsPage = () => {
             <IntegrationModal
                 open={openIntegrationModal}
                 onClose={() => {
-                    console.log('Closing integration modal'); // Debug log
                     setOpenIntegrationModal(false);
                     setEditingIntegration(undefined);
                 }}
@@ -247,7 +257,6 @@ const SettingsPage = () => {
             <ConnectorModal
                 open={openConnectorModal}
                 onClose={() => {
-                    console.log('Closing connector modal'); // Debug log
                     setOpenConnectorModal(false);
                     setEditingConnector(undefined);
                 }}

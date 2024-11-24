@@ -154,7 +154,9 @@ def get_opensearch_client() -> OpenSearch:
     region = os.environ["AWS_REGION"]
     service_scope = os.environ["SCOPE"]
 
-    auth = RequestsAWSV4SignerAuth(boto3.Session().get_credentials(), region, service_scope)
+    auth = RequestsAWSV4SignerAuth(
+        boto3.Session().get_credentials(), region, service_scope
+    )
 
     return OpenSearch(
         hosts=[{"host": host, "port": 443}],
