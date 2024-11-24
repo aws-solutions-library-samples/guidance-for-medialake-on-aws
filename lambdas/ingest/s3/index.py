@@ -19,6 +19,7 @@ metrics = Metrics()
 class FileHash(TypedDict):
     Algorithm: str
     Value: str
+    MD5Hash: str
 
 
 class FileInfo(TypedDict):
@@ -80,6 +81,7 @@ class AssetRecord(TypedDict):
     DigitalSourceAsset: DigitalSourceAsset
     DerivedRepresentations: Optional[List[AssetRepresentation]]
     Metadata: Optional[AssetMetadata]
+    FileHash: str
 
 
 class AssetProcessor:
@@ -88,14 +90,14 @@ class AssetProcessor:
         self.dynamodb = boto3.resource("dynamodb").Table(os.environ["ASSETS_TABLE"])
         self.eventbridge = boto3.client("events")
 
-
-    def _decode_s3_event_key(encoded_key):
+    def _decode_s3_event_key(self, encoded_key: str) -> str:
+        """Decode S3 event key by handling URL encoding and plus signs"""
         # First decode any URL encoding (handles %20, %2B etc.)
         decoded_key = urllib.parse.unquote(encoded_key)
-        
+
         # Then handle plus signs that represent spaces
         decoded_key = decoded_key.replace("+", " ")
-        
+
         return decoded_key
 
     def _calculate_md5(self, bucket: str, key: str) -> str:
@@ -103,7 +105,7 @@ class AssetProcessor:
         try:
             response = self.s3.get_object(Bucket=bucket, Key=key)
             md5_hash = hashlib.md5()
-            for chunk in response['Body'].iter_chunks(4096):
+            for chunk in response["Body"].iter_chunks(4096):
                 md5_hash.update(chunk)
             return md5_hash.hexdigest()
         except Exception as e:
@@ -114,15 +116,13 @@ class AssetProcessor:
         """Check if file with same MD5 hash exists"""
         try:
             response = self.dynamodb.query(
-                IndexName='FileHashIndex',
-                KeyConditionExpression='FileHash = :hash',
-                ExpressionAttributeValues={
-                    ':hash': md5_hash
-                }
+                IndexName="FileHashIndex",
+                KeyConditionExpression="FileHash = :hash",
+                ExpressionAttributeValues={":hash": md5_hash},
             )
-            
-            if response['Items']:
-                return response['Items'][0]
+
+            if response["Items"]:
+                return response["Items"][0]
             return None
         except ClientError as e:
             logger.exception(f"Error querying DynamoDB for hash {md5_hash}")
@@ -132,7 +132,7 @@ class AssetProcessor:
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3"""
         key = self._decode_s3_event_key(key)
-        
+
         try:
             response = self.s3.head_object(Bucket=bucket, Key=key)
             existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
@@ -145,7 +145,7 @@ class AssetProcessor:
             # Calculate MD5 hash and check for duplicates
             md5_hash = self._calculate_md5(bucket, key)
             existing_file = self._check_existing_file(md5_hash)
-            
+
             if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
                 # Tag the duplicate file with reference to original
@@ -154,10 +154,13 @@ class AssetProcessor:
                     Key=key,
                     Tagging={
                         "TagSet": [
-                            {"Key": "DuplicateOf", "Value": existing_file["InventoryID"]},
-                            {"Key": "FileHash", "Value": md5_hash}
+                            {
+                                "Key": "DuplicateOf",
+                                "Value": existing_file["InventoryID"],
+                            },
+                            {"Key": "FileHash", "Value": md5_hash},
                         ]
-                    }
+                    },
                 )
                 return None
 
@@ -171,8 +174,11 @@ class AssetProcessor:
                 Tagging={
                     "TagSet": [
                         {"Key": "InventoryID", "Value": dynamo_entry["InventoryID"]},
-                        {"Key": "AssetID", "Value": dynamo_entry["DigitalSourceAsset"]["ID"]},
-                        {"Key": "FileHash", "Value": md5_hash}
+                        {
+                            "Key": "AssetID",
+                            "Value": dynamo_entry["DigitalSourceAsset"]["ID"],
+                        },
+                        {"Key": "FileHash", "Value": md5_hash},
                     ]
                 },
             )
@@ -209,8 +215,8 @@ class AssetProcessor:
                         "Hash": {
                             "Algorithm": "SHA256",
                             "Value": s3_response["ETag"].strip('"'),
+                            "MD5Hash": md5_hash,  # Add MD5 hash to metadata
                         },
-                        "MD5Hash": md5_hash,  # Add MD5 hash to metadata
                         "CreateDate": s3_response["LastModified"].isoformat(),
                     },
                 }
@@ -235,7 +241,9 @@ class AssetProcessor:
 
         item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
-            "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["MD5Hash"],  # Add FileHash as top-level attribute
+            "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
+                "MD5Hash"
+            ],
             "DigitalSourceAsset": {
                 "ID": f"asset:img:{asset_id}",
                 "Type": "Image",
@@ -265,6 +273,9 @@ class AssetProcessor:
         try:
             event_detail: AssetRecord = {
                 "InventoryID": inventory_id,
+                "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
+                    "Hash"
+                ]["MD5Hash"],
                 "DigitalSourceAsset": {
                     "ID": asset_id,
                     "Type": "Image",

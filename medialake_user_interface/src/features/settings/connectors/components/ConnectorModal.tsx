@@ -25,6 +25,7 @@ import {
     Close as CloseIcon,
     CloudUpload as CloudUploadIcon,
     Info as InfoIcon,
+    Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
@@ -67,7 +68,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
 
-    const { data: s3BucketsResponse, isLoading: isLoadingBuckets } = useGetS3Buckets();
+    const { data: s3BucketsResponse, isLoading: isLoadingBuckets, refetch: refetchBuckets } = useGetS3Buckets();
     const { mutateAsync: createS3Connector, isPending: isCreating } = useCreateS3Connector();
     const buckets = s3BucketsResponse?.data?.buckets || [];
 
@@ -214,60 +215,75 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     </FormControl>
                 </>
             ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FormControl fullWidth required>
+                            <InputLabel>S3 Connector Type</InputLabel>
+                            <Select
+                                value={s3ConnectorType}
+                                label="S3 Connector Type"
+                                onChange={(e) => setS3ConnectorType(e.target.value)}
+                            >
+                                {S3_CONNECTOR_TYPES.map((type) => (
+                                    <MenuItem key={type.value} value={type.value}>
+                                        {type.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <IconButton onClick={handleInfoClick}>
+                            <InfoIcon />
+                        </IconButton>
+                    </Box>
                     <FormControl fullWidth required>
-                        <InputLabel>S3 Connector Type</InputLabel>
+                        <InputLabel>S3 Integration Method</InputLabel>
                         <Select
-                            value={s3ConnectorType}
-                            label="S3 Connector Type"
-                            onChange={(e) => setS3ConnectorType(e.target.value)}
+                            value={configuration.integrationMethod || ''}
+                            label="S3 Integration Method"
+                            onChange={(e) => setConfiguration({ ...configuration, integrationMethod: e.target.value })}
                         >
-                            {S3_CONNECTOR_TYPES.map((type) => (
-                                <MenuItem key={type.value} value={type.value}>
-                                    {type.label}
+                            {S3_INTEGRATION_METHODS.map((method) => (
+                                <MenuItem key={method.value} value={method.value}>
+                                    {method.label}
                                 </MenuItem>
                             ))}
                         </Select>
                     </FormControl>
-                    <IconButton onClick={handleInfoClick}>
-                        <InfoIcon />
-                    </IconButton>
-                </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <FormControl fullWidth required>
+                            <InputLabel>S3 Bucket</InputLabel>
+                            <Select
+                                value={configuration.bucket || ''}
+                                label="S3 Bucket"
+                                onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                                disabled={isLoadingBuckets}
+                                startAdornment={
+                                    isLoadingBuckets ? (
+                                        <CircularProgress size={20} sx={{ ml: 1 }} />
+                                    ) : null
+                                }
+                            >
+                                {buckets.map((bucket) => (
+                                    <MenuItem key={bucket} value={bucket}>
+                                        {bucket}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <IconButton
+                            onClick={() => refetchBuckets()}
+                            disabled={isLoadingBuckets}
+                            sx={{ mt: 1 }}
+                        >
+                            {isLoadingBuckets ? (
+                                <CircularProgress size={24} />
+                            ) : (
+                                <RefreshIcon />
+                            )}
+                        </IconButton>
+                    </Box>
+                </>
             )}
-            <FormControl fullWidth required>
-                <InputLabel>S3 Integration Method</InputLabel>
-                <Select
-                    value={configuration.integrationMethod || ''}
-                    label="S3 Integration Method"
-                    onChange={(e) => setConfiguration({ ...configuration, integrationMethod: e.target.value })}
-                >
-                    {S3_INTEGRATION_METHODS.map((method) => (
-                        <MenuItem key={method.value} value={method.value}>
-                            {method.label}
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
-            <FormControl fullWidth required>
-                <InputLabel>S3 Bucket</InputLabel>
-                <Select
-                    value={configuration.bucket || ''}
-                    label="S3 Bucket"
-                    onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
-                    disabled={isLoadingBuckets}
-                    startAdornment={
-                        isLoadingBuckets ? (
-                            <CircularProgress size={20} sx={{ ml: 1 }} />
-                        ) : null
-                    }
-                >
-                    {buckets.map((bucket) => (
-                        <MenuItem key={bucket} value={bucket}>
-                            {bucket}
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
         </Box>
     );
 

@@ -81,6 +81,8 @@ class MediaLakeStack(cdk.Stack):
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
+                asset_table_file_hash_index_name=base_infrastructure.asset_table_file_hash_index_name,
+                asset_table_asset_id_index_name=base_infrastructure.asset_table_asset_id_index_name,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             ),
         )
