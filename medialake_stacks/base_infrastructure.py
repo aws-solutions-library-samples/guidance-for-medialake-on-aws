@@ -210,7 +210,7 @@ class BaseInfrastructureStack(Stack):
         #         layers=[opensearch_layer.layer, pynamodb_layer.layer],
         #     ),
         # )
-        
+
         asset_lambda_stream = Lambda(
             self,
             "AssetTableLambdaStream",
@@ -222,7 +222,7 @@ class BaseInfrastructureStack(Stack):
                 environment_variables={
                     "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
                     "OPENSEARCH_INDEX": "media",
-                    "SCOPE": "es"
+                    "SCOPE": "es",
                 },
                 layers=[opensearch_layer.layer, pynamodb_layer.layer],
             ),
@@ -235,26 +235,25 @@ class BaseInfrastructureStack(Stack):
         #         resources=[self.opensearch_serverless.collection_arn],
         #     )
         # )
-        
+
         ## to allow attaching the vpc
         asset_lambda_stream.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "ec2:CreateNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface"
+                    "ec2:DeleteNetworkInterface",
                 ],
                 resources=["*"],
             )
         )
-         
+
         asset_lambda_stream.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["es:ESHttpPost"],
                 resources=["*"],
             )
         )
-        
 
         self._asset_table.table.grant_stream(asset_lambda_stream.function)
         asset_lambda_stream.function.add_event_source(
@@ -281,8 +280,24 @@ class BaseInfrastructureStack(Stack):
         return self._asset_table.table.table_name
 
     @property
+    def asset_table_file_hash_index_name(self) -> str:
+        return "FileHashIndex"
+
+    @property
+    def asset_table_file_hash_index_arn(self) -> str:
+        return f"{self._asset_table.table.table_arn}/index/FileHashIndex"
+
+    @property
+    def asset_table_asset_id_index_name(self) -> str:
+        return "AssetIDIndex"
+
+    @property
+    def asset_table_asset_id_index_arn(self) -> str:
+        return f"{self._asset_table.table.table_arn}/index/AssetIDIndex"
+
+    @property
     def collection_dashboards_url(self) -> str:
-        return self.opensearch_serverless.collection_dashboards_url
+        return self.opensearch_cluster.domain_endpoint + "/_dashboards"
 
     # @property
     # def collection_endpoint(self) -> str:
@@ -291,12 +306,10 @@ class BaseInfrastructureStack(Stack):
     # @property
     # def collection_arn(self) -> str:
     #     return self.opensearch_serverless.collection_arn
-    
-    
+
     @property
     def collection_endpoint(self) -> str:
         return self.opensearch_cluster.domain_endpoint
-
 
     @property
     def collection_arn(self) -> str:
