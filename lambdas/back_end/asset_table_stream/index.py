@@ -10,7 +10,8 @@ import boto3
 import os
 from requests_aws4auth import AWS4Auth
 from opensearchpy import RequestsHttpConnection, OpenSearch, AWSV4SignerAuth
-import time  # Add this import at the top with other imports
+import time  
+import uuid
 
 # Initialize logger with default level WARNING, but check environment variable
 log_level = os.environ.get("LOG_LEVEL", "DEBUG").upper()
@@ -114,6 +115,7 @@ class OpenSearchClient:
                     index=INDEX_NAME,
                     body=data,
                     refresh=True,
+                )
                 logger.info(f"Index result: {json.dumps(result, default=str)}")
                 return result
         except Exception as e:
@@ -406,7 +408,7 @@ def process_dynamodb_record(
         logger.error(f"Error processing document: {str(e)}")
         raise
 
-import uuid
+
 @logger.inject_lambda_context
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     batch_id = uuid.uuid4()
