@@ -107,11 +107,21 @@ def setup_eventbridge_notifications(
     # Get account ID
     account_id = boto3.client("sts").get_caller_identity()["Account"]
 
-    # Create EventBridge rule with more specific event pattern
+    # Create EventBridge rule with comprehensive event pattern
     rule_name = f"medialake-{s3_bucket}-s3-events"
     event_pattern = {
         "source": ["aws.s3"],
-        "detail-type": ["Object Created"],
+        "detail-type": [
+            "Object Created",
+            "Object Deleted",
+            "Object Restore Completed",
+            "Object Restore Initiated",
+            "Object Restore Expired",
+            "Object Tags Added",
+            "Object Tags Deleted",
+            "Object ACL Updated",
+            "Object Storage Class Changed",
+        ],
         "detail": {
             "bucket": {"name": [s3_bucket]},
             "object": {"key": [{"anything-but": ""}]},
@@ -307,10 +317,20 @@ def create_connector(createconnector: S3Connector) -> dict:
             )
             created_resources.append(("queue_policy", queue_url))
 
-            # Configure S3 bucket notifications
+            # Configure S3 bucket notifications with comprehensive event types
             notification_config = {
                 "QueueConfigurations": [
-                    {"QueueArn": queue_arn, "Events": ["s3:ObjectCreated:*"]}
+                    {
+                        "QueueArn": queue_arn,
+                        "Events": [
+                            "s3:ObjectCreated:*",
+                            "s3:ObjectRemoved:*",
+                            "s3:ObjectRestore:*",
+                            "s3:ObjectTagging:*",
+                            "s3:ObjectAcl:Put",
+                            "s3:ObjectStorageClass:Changed",
+                        ],
+                    }
                 ]
             }
             s3.put_bucket_notification_configuration(

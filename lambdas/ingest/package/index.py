@@ -1,6 +1,3 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.metrics import MetricUnit
 from typing import Dict, Optional, TypedDict, List
 import boto3
 import json
@@ -9,6 +6,10 @@ import os
 import urllib.parse
 from datetime import datetime
 import hashlib
+from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.metrics import MetricUnit
+
 from botocore.exceptions import ClientError
 
 logger = Logger()
@@ -19,6 +20,7 @@ metrics = Metrics()
 class FileHash(TypedDict):
     Algorithm: str
     Value: str
+    MD5Hash: str
 
 
 class FileInfo(TypedDict):
@@ -80,6 +82,7 @@ class AssetRecord(TypedDict):
     DigitalSourceAsset: DigitalSourceAsset
     DerivedRepresentations: Optional[List[AssetRepresentation]]
     Metadata: Optional[AssetMetadata]
+    FileHash: str
 
 
 class AssetProcessor:
@@ -88,14 +91,14 @@ class AssetProcessor:
         self.dynamodb = boto3.resource("dynamodb").Table(os.environ["ASSETS_TABLE"])
         self.eventbridge = boto3.client("events")
 
-
-    def _decode_s3_event_key(encoded_key):
+    def _decode_s3_event_key(self, encoded_key: str) -> str:
+        """Decode S3 event key by handling URL encoding and plus signs"""
         # First decode any URL encoding (handles %20, %2B etc.)
         decoded_key = urllib.parse.unquote(encoded_key)
-        
+
         # Then handle plus signs that represent spaces
         decoded_key = decoded_key.replace("+", " ")
-        
+
         return decoded_key
 
     def _calculate_md5(self, bucket: str, key: str) -> str:
@@ -103,36 +106,36 @@ class AssetProcessor:
         try:
             response = self.s3.get_object(Bucket=bucket, Key=key)
             md5_hash = hashlib.md5()
-            for chunk in response['Body'].iter_chunks(4096):
+            for chunk in response["Body"].iter_chunks(4096):
                 md5_hash.update(chunk)
             return md5_hash.hexdigest()
         except Exception as e:
-            logger.exception(f"Error calculating MD5 hash for {bucket}/{key}")
+            logger.exception(
+                f"Error calculating MD5 hash for {bucket}/{key}, error: {e}"
+            )
             raise
 
     def _check_existing_file(self, md5_hash: str) -> Optional[Dict]:
         """Check if file with same MD5 hash exists"""
         try:
             response = self.dynamodb.query(
-                IndexName='FileHashIndex',
-                KeyConditionExpression='FileHash = :hash',
-                ExpressionAttributeValues={
-                    ':hash': md5_hash
-                }
+                IndexName="FileHashIndex",
+                KeyConditionExpression="FileHash = :hash",
+                ExpressionAttributeValues={":hash": md5_hash},
             )
-            
-            if response['Items']:
-                return response['Items'][0]
+
+            if response["Items"]:
+                return response["Items"][0]
             return None
         except ClientError as e:
-            logger.exception(f"Error querying DynamoDB for hash {md5_hash}")
+            logger.exception(f"Error querying DynamoDB for hash {md5_hash}, error {e}")
             raise
 
     @tracer.capture_method
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3"""
         key = self._decode_s3_event_key(key)
-        
+
         try:
             response = self.s3.head_object(Bucket=bucket, Key=key)
             existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
@@ -145,22 +148,73 @@ class AssetProcessor:
             # Calculate MD5 hash and check for duplicates
             md5_hash = self._calculate_md5(bucket, key)
             existing_file = self._check_existing_file(md5_hash)
-            
+
             if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
-                # Tag the duplicate file with reference to original
-                self.s3.put_object_tagging(
-                    Bucket=bucket,
-                    Key=key,
-                    Tagging={
-                        "TagSet": [
-                            {"Key": "DuplicateOf", "Value": existing_file["InventoryID"]},
-                            {"Key": "FileHash", "Value": md5_hash}
-                        ]
-                    }
-                )
-                return None
 
+                # Check if the object key matches
+                existing_object_key = (
+                    existing_file.get("DigitalSourceAsset", {})
+                    .get("MainRepresentation", {})
+                    .get("StorageInfo", {})
+                    .get("PrimaryLocation", {})
+                    .get("ObjectKey", {})
+                    .get("FullPath")
+                )
+
+                if existing_object_key == key:
+                    logger.info(
+                        "Duplicate file with same object key. Tagging with existing IDs"
+                    )
+                    # Tag with the same IDs as the existing file
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {
+                                    "Key": "InventoryID",
+                                    "Value": existing_file["InventoryID"],
+                                },
+                                {
+                                    "Key": "AssetID",
+                                    "Value": existing_file["DigitalSourceAsset"]["ID"],
+                                },
+                                {"Key": "FileHash", "Value": md5_hash},
+                            ]
+                        },
+                    )
+                    return None
+                else:
+                    # Same hash but different key - tag with same InventoryID but new AssetID
+                    logger.info(
+                        "Same hash but different key. Tagging with same InventoryID but new AssetID"
+                    )
+                    new_asset_id = f"asset:img:{str(uuid.uuid4())}"
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {
+                                    "Key": "InventoryID",
+                                    "Value": existing_file["InventoryID"],
+                                },
+                                {
+                                    "Key": "AssetID",
+                                    "Value": new_asset_id,
+                                },
+                                {"Key": "FileHash", "Value": md5_hash},
+                                {
+                                    "Key": "DuplicateHash",
+                                    "Value": "true",
+                                },
+                            ]
+                        },
+                    )
+                    return None
+
+            # Process new unique file...
             metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
             dynamo_entry = self.create_dynamo_entry(metadata)
 
@@ -171,8 +225,11 @@ class AssetProcessor:
                 Tagging={
                     "TagSet": [
                         {"Key": "InventoryID", "Value": dynamo_entry["InventoryID"]},
-                        {"Key": "AssetID", "Value": dynamo_entry["DigitalSourceAsset"]["ID"]},
-                        {"Key": "FileHash", "Value": md5_hash}
+                        {
+                            "Key": "AssetID",
+                            "Value": dynamo_entry["DigitalSourceAsset"]["ID"],
+                        },
+                        {"Key": "FileHash", "Value": md5_hash},
                     ]
                 },
             )
@@ -186,7 +243,7 @@ class AssetProcessor:
             return dynamo_entry
 
         except Exception as e:
-            logger.exception(f"Error processing asset: {key}")
+            logger.exception(f"Error processing asset: {key}, error: {e}")
             raise
 
     def _create_asset_metadata(
@@ -209,8 +266,8 @@ class AssetProcessor:
                         "Hash": {
                             "Algorithm": "SHA256",
                             "Value": s3_response["ETag"].strip('"'),
+                            "MD5Hash": md5_hash,  # Add MD5 hash to metadata
                         },
-                        "MD5Hash": md5_hash,  # Add MD5 hash to metadata
                         "CreateDate": s3_response["LastModified"].isoformat(),
                     },
                 }
@@ -235,7 +292,9 @@ class AssetProcessor:
 
         item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
-            "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["MD5Hash"],  # Add FileHash as top-level attribute
+            "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
+                "MD5Hash"
+            ],
             "DigitalSourceAsset": {
                 "ID": f"asset:img:{asset_id}",
                 "Type": "Image",
@@ -265,6 +324,9 @@ class AssetProcessor:
         try:
             event_detail: AssetRecord = {
                 "InventoryID": inventory_id,
+                "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
+                    "Hash"
+                ]["MD5Hash"],
                 "DigitalSourceAsset": {
                     "ID": asset_id,
                     "Type": "Image",
@@ -304,6 +366,72 @@ class AssetProcessor:
             logger.exception(f"Error publishing event: {str(e)}")
             raise
 
+    @tracer.capture_method
+    def delete_asset(self, bucket: str, key: str) -> None:
+        """Delete asset record from DynamoDB based on S3 object deletion"""
+        try:
+            # First get the object tags to find the InventoryID
+            try:
+                existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
+                tags = {
+                    tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])
+                }
+            except self.s3.exceptions.NoSuchKey:
+                # Object is already deleted, try to find by key
+                logger.info(f"Object already deleted, searching by key: {key}")
+                tags = {}
+
+            if "InventoryID" in tags:
+                inventory_id = tags["InventoryID"]
+                logger.info(f"Deleting asset with InventoryID: {inventory_id}")
+
+                # Delete from DynamoDB
+                self.dynamodb.delete_item(
+                    Key={
+                        "InventoryID": inventory_id,
+                        "ID": "asset",  # Using 'asset' as the sort key
+                    }
+                )
+
+                # Publish deletion event
+                self.publish_deletion_event(inventory_id)
+
+                logger.info(f"Successfully deleted asset: {inventory_id}")
+            else:
+                logger.warning(f"No InventoryID tag found for object: {bucket}/{key}")
+
+        except Exception as e:
+            logger.exception(f"Error deleting asset: {bucket}/{key}, error: {e}")
+            raise
+
+    @tracer.capture_method
+    def publish_deletion_event(self, inventory_id: str):
+        """Publish asset deletion event to EventBridge"""
+        try:
+            event_detail = {
+                "InventoryID": inventory_id,
+                "DeletedAt": datetime.utcnow().isoformat(),
+            }
+
+            logger.info(f"Publishing deletion event: {json.dumps(event_detail)}")
+
+            response = self.eventbridge.put_events(
+                Entries=[
+                    {
+                        "Source": "custom.asset.processor",
+                        "DetailType": "AssetDeleted",
+                        "Detail": json.dumps(event_detail),
+                        "EventBusName": os.environ["EVENT_BUS_NAME"],
+                    }
+                ]
+            )
+
+            logger.info(f"EventBridge response: {json.dumps(response)}")
+
+        except Exception as e:
+            logger.exception(f"Error publishing deletion event: {str(e)}")
+            raise
+
 
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -340,20 +468,31 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
 
                         bucket = s3_record["s3"]["bucket"]["name"]
                         key = s3_record["s3"]["object"]["key"]
+                        event_name = s3_record.get("eventName", "")
 
-                        logger.info(f"Processing asset: {key}")
+                        logger.info(f"Processing {event_name} event for asset: {key}")
 
-                        result = processor.process_asset(bucket, key)
-
-                        if result:
+                        if event_name.startswith("ObjectRemoved:"):
+                            # Handle deletion
+                            processor.delete_asset(bucket, key)
                             metrics.add_metric(
-                                name="ProcessedAssets", unit=MetricUnit.Count, value=1
+                                name="DeletedAssets", unit=MetricUnit.Count, value=1
                             )
-                            logger.info(
-                                f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}"
-                            )
+                            logger.info(f"Asset deletion processed: {key}")
                         else:
-                            logger.info(f"Asset already processed: {key}")
+                            # Handle creation/modification
+                            result = processor.process_asset(bucket, key)
+                            if result:
+                                metrics.add_metric(
+                                    name="ProcessedAssets",
+                                    unit=MetricUnit.Count,
+                                    value=1,
+                                )
+                                logger.info(
+                                    f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}"
+                                )
+                            else:
+                                logger.info(f"Asset already processed: {key}")
                 else:
                     logger.warning("No Records found in message body")
 
