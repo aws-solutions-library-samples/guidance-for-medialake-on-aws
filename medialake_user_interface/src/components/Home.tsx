@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Container, Stack, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
-import { SmartFolders } from './home/SmartFolders';
-import { ConnectedStorage } from './home/ConnectedStorage';
+import { SmartFolders } from '@/features/home/SmartFolders';
+import { ConnectedStorage } from '@/features/home/ConnectedStorage';
 
 const Home: React.FC = () => {
     const theme = useTheme();

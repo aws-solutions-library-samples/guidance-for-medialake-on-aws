@@ -15,6 +15,8 @@ import {
     InputBase,
     Chip,
     Button,
+    Select,
+    SelectChangeEvent,
 } from '@mui/material';
 import {
     Notifications as NotificationsIcon,
@@ -22,12 +24,14 @@ import {
     Warning as WarningIcon,
     Error as ErrorIcon,
     Info as InfoIcon,
+    Language as LanguageIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSearch } from './api/hooks/useSearch';
 import debounce from 'lodash/debounce';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
+import { useTranslation } from 'react-i18next';
 
 interface Notification {
     id: string;
@@ -41,6 +45,11 @@ interface SearchTag {
     key: string;
     value: string;
 }
+
+const languages = {
+    en: { nativeName: 'English' },
+    de: { nativeName: 'Deutsch' }
+};
 
 const mockNotifications: Notification[] = [
     {
@@ -70,8 +79,10 @@ function TopBar() {
     const theme = useTheme();
     const navigate = useNavigate();
     const { setIsAuthenticated } = useAuth();
+    const { t, i18n } = useTranslation();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
+    const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
 
@@ -95,6 +106,10 @@ function TopBar() {
         setAnchorEl(event.currentTarget);
     };
 
+    const handleLanguageClick = (event: React.MouseEvent<HTMLElement>) => {
+        setLanguageAnchor(event.currentTarget);
+    };
+
     const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
         setNotificationsAnchor(event.currentTarget);
     };
@@ -102,6 +117,12 @@ function TopBar() {
     const handleClose = () => {
         setAnchorEl(null);
         setNotificationsAnchor(null);
+        setLanguageAnchor(null);
+    };
+
+    const handleLanguageChange = (lng: string) => {
+        i18n.changeLanguage(lng);
+        handleClose();
     };
 
     const handleLogout = async () => {
@@ -203,10 +224,10 @@ function TopBar() {
             </Box>
             <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    {notification.title}
+                    {t(notification.title)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    {notification.message}
+                    {t(notification.message)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                     {notification.timestamp}
@@ -298,7 +319,7 @@ function TopBar() {
                     }}>
                         <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
                         <InputBase
-                            placeholder="Search or use key:value..."
+                            placeholder={t('common.search')}
                             value={searchInput}
                             onChange={handleSearchInputChange}
                             onKeyPress={handleSearchKeyPress}
@@ -327,28 +348,28 @@ function TopBar() {
                             },
                         }}
                     >
-                        Search
+                        {t('common.search')}
                     </Button>
                 </Box>
 
                 {/* Right section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Tooltip title="Alerts">
+                        <Tooltip title={t('common.alerts')}>
                             <IconButton onClick={handleNotificationsClick}>
                                 <Badge badgeContent={getNotificationCount('alert')} color="error">
                                     <ErrorIcon color="error" />
                                 </Badge>
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title="Warnings">
+                        <Tooltip title={t('common.warnings')}>
                             <IconButton onClick={handleNotificationsClick}>
                                 <Badge badgeContent={getNotificationCount('warning')} color="warning">
                                     <WarningIcon color="warning" />
                                 </Badge>
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title="Notifications">
+                        <Tooltip title={t('common.notifications')}>
                             <IconButton onClick={handleNotificationsClick}>
                                 <Badge badgeContent={getNotificationCount('notification')} color="info">
                                     <NotificationsIcon color="action" />
@@ -357,7 +378,14 @@ function TopBar() {
                         </Tooltip>
                     </Box>
 
-                    <Tooltip title="Profile">
+                    {/* Language Selector */}
+                    <Tooltip title={t('common.language')}>
+                        <IconButton onClick={handleLanguageClick}>
+                            <LanguageIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title={t('common.profile')}>
                         <IconButton onClick={handleProfileClick} sx={{ padding: 0.5 }}>
                             <Avatar
                                 sx={{
@@ -371,6 +399,31 @@ function TopBar() {
                         </IconButton>
                     </Tooltip>
                 </Box>
+
+                {/* Language Menu */}
+                <Menu
+                    anchorEl={languageAnchor}
+                    open={Boolean(languageAnchor)}
+                    onClose={handleClose}
+                    PaperProps={{
+                        sx: {
+                            mt: 1.5,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        }
+                    }}
+                >
+                    {Object.keys(languages).map((lng) => (
+                        <MenuItem
+                            key={lng}
+                            onClick={() => handleLanguageChange(lng)}
+                            sx={{
+                                fontWeight: i18n.resolvedLanguage === lng ? 'bold' : 'normal'
+                            }}
+                        >
+                            {languages[lng as keyof typeof languages].nativeName}
+                        </MenuItem>
+                    ))}
+                </Menu>
 
                 {/* Notifications Menu */}
                 <Menu
@@ -406,10 +459,10 @@ function TopBar() {
                         handleClose();
                         navigate('/settings/profile');
                     }}>
-                        Profile
+                        {t('common.profile')}
                     </MenuItem>
                     <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                        Logout
+                        {t('common.logout')}
                     </MenuItem>
                 </Menu>
             </Toolbar>

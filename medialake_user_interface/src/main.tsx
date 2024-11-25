@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import AppConfigured from "@/components/app-configured";
+import AppConfigured from './components/app-configured';
 import { Amplify } from 'aws-amplify';
+
+// Import and initialize i18next configuration
+import './i18n/i18n';
 
 // Initialize Amplify with the configuration from aws-exports.json
 fetch('/aws-exports.json')
@@ -20,7 +23,9 @@ fetch('/aws-exports.json')
 
     ReactDOM.createRoot(document.getElementById('root')!).render(
       <React.StrictMode>
-        <AppConfigured />
+        <Suspense fallback="Loading...">
+          <AppConfigured />
+        </Suspense>
       </React.StrictMode>
     )
   })
