@@ -61,6 +61,8 @@ Thumbs.db
 dist/
 build/
 out/
+aws-exports.json  
+
 
 # Logs
 logs
