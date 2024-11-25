@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
 import { QUERY_KEYS } from '../queryKeys';
-import { User, CreateUserRequest, UpdateUserRequest } from '../types/api.types';
+import { User, CreateUserRequest, UpdateUserRequest, CreateUserResponse } from '../types/api.types';
 
 interface UsersResponse {
     status: string;
@@ -35,10 +35,24 @@ export const useGetUsers = () => {
 export const useCreateUser = () => {
     const queryClient = useQueryClient();
 
-    return useMutation<User, Error, CreateUserRequest>({
+    return useMutation<CreateUserResponse, Error, CreateUserRequest>({
         mutationFn: async (newUser) => {
-            const { data } = await apiClient.post<User>(API_ENDPOINTS.USERS, newUser);
-            return data;
+            const { data } = await apiClient.post<{ statusCode: number; body: string }>(API_ENDPOINTS.USER, newUser);
+            console.log('Raw API Response:', data);
+
+            // Parse the stringified body
+            const parsedBody = JSON.parse(data.body);
+            console.log('Parsed body:', parsedBody);
+
+            // Return the parsed response with the correct structure
+            return {
+                status: parsedBody.status,
+                message: parsedBody.message,
+                data: {
+                    username: parsedBody.data.username,
+                    userStatus: parsedBody.data.userStatus
+                }
+            };
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
