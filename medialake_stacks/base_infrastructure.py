@@ -240,34 +240,7 @@ class BaseInfrastructureStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
-        # ingest pipeline
-        
-        # ingestion_pipeline_lambda = lambda_.Function(
-        #     self, "IngestionPipelineLambda",
-        #     runtime=lambda_.Runtime.PYTHON_3_12,
-        #     handler="ingestion_pipeline.lambda_handler",
-        #     code=lambda_.Code.from_asset("lambdas/"),
-        #     environment={
-        #         "TABLE_ARN": self._asset_table.table_arn,
-        #         "BUCKET_NAME": self.ddb_export_bucket.bucket.bucket_arn,
-        #         "COLLECTION_ENDPOINT": self.opensearch_cluster.domain_endpoint,  
-        #         # "NETWORK_POLICY_NAME": "network-policy-name",  
-        #         "PIPELINE_ROLE_ARN": self.opensearch_cluster.pipeline_role.role_arn,
-        #         "REGION": self.region,
-        #         "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
-        #         "PIPELINE_NAME": "medialake-asset-pipeline", 
-        #         "SUBNET_IDS_PIPELINE": json.dumps(self.vpc.vpc.select_subnets(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS).subnet_ids),
-        #         "SECURITY_GROUP_IDS": json.dumps([self.security_group.security_group_id]),
-        #     },
-        #     timeout=Duration.minutes(5),
-        # )
-        
-        # pipeline_role = iam.Role(
-        #     self,
-        #     "MediaLakeIngestionRole",
-        #     assumed_by=iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
-        # )
-        
+        # OS ingest pipeline
         
         ingestion_pipeline_lambda = Lambda(
             self,
@@ -275,15 +248,11 @@ class BaseInfrastructureStack(Stack):
             config=LambdaConfig(
                 name=f"{GLOBAL_PREFIX}",
                 timeout_minutes=5,
-                # vpc=self.vpc.vpc,
-                # iam_role_name="pipeline_custom_resource",
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": self._asset_table.table_arn,
                     "BUCKET_NAME": self.ddb_export_bucket.bucket.bucket_name,
                     "COLLECTION_ENDPOINT": self.opensearch_cluster.domain_endpoint,  
-                    # "NETWORK_POLICY_NAME": "network-policy-name",  
-                    # "PIPELINE_ROLE_ARN": pipeline_role.role_arn,
                     "INDEX_NAME":"media",
                     "REGION": self.region,
                     "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
@@ -381,11 +350,6 @@ class BaseInfrastructureStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "iam:PassRole",
-                    # "iam:CreateRole",
-                    # "iam:AttachRolePolicy",
-                    # "iam:DetachRolePolicy",
-                    # "iam:GetRole",
-                    # "iam:DeleteRole",
                 ],
                 resources=[pipeline_role.role_arn],
             )
@@ -506,7 +470,6 @@ class BaseInfrastructureStack(Stack):
                 "TableArn": self._asset_table.table_arn,
                 "BucketName": self.ddb_export_bucket.bucket.bucket_arn,
                 "CollectionEndpoint": self.opensearch_cluster.domain_endpoint,
-                # "NetworkPolicyName": "network-policy-name",  # Replace as needed
                 "PipelineRoleArn":pipeline_role.role_arn,
                 "Region": self.region,
                 "LogGroupName": ingestion_log_group.log_group_name,
@@ -522,19 +485,6 @@ class BaseInfrastructureStack(Stack):
         opensearch_layer = SearchLayer(self, "OpenSearchLayer")
         pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
 
-        # asset_lambda_stream = Lambda(
-        #     self,
-        #     "AssetTableLambdaStream",
-        #     config=LambdaConfig(
-        #         name=f"{GLOBAL_PREFIX}-asset-table-stream",
-        #         entry="lambdas/back_end/asset_table_stream",
-        #         environment_variables={
-        #             "OPENSEARCH_ENDPOINT": self.opensearch_serverless.collection_endpoint,
-        #             "OPENSEARCH_INDEX": "media",
-        #         },
-        #         layers=[opensearch_layer.layer, pynamodb_layer.layer],
-        #     ),
-        # )
 
         asset_lambda_stream = Lambda(
             self,
