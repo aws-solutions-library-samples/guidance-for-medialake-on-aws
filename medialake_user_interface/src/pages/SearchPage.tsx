@@ -34,7 +34,7 @@ const SearchPage: React.FC = () => {
         pageSize: PAGE_SIZE
     });
 
-    const imageResults = searchResults?.data?.results?.filter(item => item.assetType === 'Image') || [];
+    const imageResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Image') || [];
 
     const [filters, setFilters] = useState({
         mediaTypes: {
@@ -208,7 +208,14 @@ const SearchPage: React.FC = () => {
                 {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
                     <ImageResults
                         images={imageResults}
-                        searchMetadata={searchResults.data.searchMetadata}
+                        searchMetadata={{
+                            totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                            page: currentPage,
+                            pageSize: PAGE_SIZE,
+                            // searchTerm: currentQuery,
+                            // facets: searchResults.data.searchMetadata.facets || {},
+                            // suggestions: searchResults.data.searchMetadata.suggestions || [],
+                        }}
                         onPageChange={(newPage) => handleSearch({ page: newPage })}
                     />
                 )}

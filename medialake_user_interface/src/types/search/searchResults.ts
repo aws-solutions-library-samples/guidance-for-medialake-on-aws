@@ -1,52 +1,52 @@
 export interface ImageItem {
-    inventoryId: string;
-    assetId: string;
-    assetType: string;
-    createDate: string;
-    mainRepresentation: {
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string;
+    InventoryID: string;
+    DigitalSourceAsset: {
+        Type: string;
+        MainRepresentation: {
+            Type: string;
+            Format: string;
+            StorageInfo: {
+                PrimaryLocation: {
+                    Status: string;
+                    StorageType: string;
+                    FileInfo: {
+                        Size: number;
+                        Hash: {
+                            Value: string;
+                            MD5Hash: string;
+                            Algorithm: string;
+                        };
+                        CreateDate: string;
+                    };
+                    Bucket: string;
+                    ObjectKey: {
+                        Path: string;
+                        FullPath: string;
+                        Name: string;
+                    };
+                };
+            };
+            Purpose: string;
+            ID: string;
         };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
+        ID: string;
+        CreateDate: string;
+    };
+    FileHash: string;
+    Metadata: {
+        Embedded: {
+            S3: {
+                LastModified: string;
+                ContentType: string;
+                Metadata: Record<string, any>;
+            };
+            ExtractedDate: string;
         };
     };
-    derivedRepresentations: Array<{
-        id: string;
-        type: string;
-        format: string;
-        purpose: string;
-        storage: {
-            storageType: string;
-            bucket: string;
-            path: string;
-            status: string;
-            fileSize: number;
-            hashValue: string | null;
-        };
-        imageSpec?: {
-            colorSpace: string | null;
-            width: number | null;
-            height: number | null;
-            dpi: number | null;
-        };
-    }>;
-    metadata: any;
     score: number;
-    thumbnailUrl: string | null;
+    thumbnailUrl: string;
 }
+
 
 export interface SearchResults {
     images: ImageItem[];
@@ -80,14 +80,14 @@ export interface CardFieldConfig {
 }
 
 export type Order = 'asc' | 'desc';
-export type OrderBy = 'path' | 'format' | 'createDate' | 'fileSize' | 'dimensions';
+export type OrderBy = 'name' | 'format' | 'createDate' | 'fileSize' | 'dimensions';
 
 export interface SearchMetadata {
     totalResults: number;
     page: number;
     pageSize: number;
     searchTerm: string;
-    facets: {
+    facets?: {
         file_types: {
             doc_count_error_upper_bound: number;
             sum_other_doc_count: number;

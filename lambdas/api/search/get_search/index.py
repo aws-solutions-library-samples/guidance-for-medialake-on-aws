@@ -76,62 +76,43 @@ class SearchParams(BaseModelWithConfig):
         return self.pageSize
 
 
-class AssetStorage(BaseModelWithConfig):
-    """Model for asset storage information"""
-
+class StorageInfo(BaseModelWithConfig):
+    """Model for storage information"""
+    status: str
     storageType: str
     bucket: str
     path: str
-    status: str
+    fullPath: str
+    name: str
     fileSize: Optional[int]
     hashValue: Optional[str]
-
-
-class ImageSpec(BaseModelWithConfig):
-    """Model for image specifications"""
-
-    colorSpace: Optional[str]
-    width: Optional[int]
-    height: Optional[int]
-    dpi: Optional[int]
-
+    createDate: Optional[datetime]
 
 class AssetRepresentation(BaseModelWithConfig):
     """Model for asset representation"""
-
     id: str
     type: str
     format: str
     purpose: str
-    storage: AssetStorage
-    imageSpec: ImageSpec
-
+    storageInfo: StorageInfo
 
 class AssetMetadata(BaseModelWithConfig):
     """Model for asset metadata"""
-
     embedded: Optional[Dict[str, Any]]
     generated: Optional[Dict[str, Any]]
     consolidated: Optional[Dict[str, Any]]
 
-
 class AssetSearchResult(BaseModelWithConfig):
     """Model for search result with presigned URL"""
-
-    inventoryId: str
-    assetId: str
-    assetType: str
-    createDate: datetime
-    mainRepresentation: AssetRepresentation
-    derivedRepresentations: List[AssetRepresentation] = []
-    metadata: Optional[AssetMetadata] = None
+    InventoryID: str
+    DigitalSourceAsset: Dict[str, Any]
+    FileHash: str
+    Metadata: Dict[str, Any]
     score: float
     thumbnailUrl: Optional[str] = None
 
-
 class SearchMetadata(BaseModelWithConfig):
     """Model for search metadata"""
-
     totalResults: int
     page: int
     pageSize: int
@@ -142,7 +123,6 @@ class SearchMetadata(BaseModelWithConfig):
 
 class SearchResponse(BaseModelWithConfig):
     """Model for search response"""
-
     status: str
     message: str
     data: Dict[str, Any]
@@ -167,18 +147,15 @@ def get_opensearch_client() -> OpenSearch:
         region=region,
     )
 
-
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     search_fields = params.search_fields or [
-        "mainRepresentation.storage.path^2",  # Boosted field
-        "assetType",
-        "metadata.consolidated.description",
-        "metadata.consolidated.keywords",
-        "*",  # This will search all indexed fields
+        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2",
+        "DigitalSourceAsset.Type",
+        "Metadata.Embedded.S3.ContentType",
+        "*",
     ]
 
-    # Build base query with multi_match
     query = {
         "bool": {
             "should": [
@@ -191,14 +168,12 @@ def build_search_query(params: SearchParams) -> Dict:
                         "prefix_length": 2,
                     }
                 },
-                # Keep wildcard search for exact path matches
-                {"wildcard": {"mainRepresentation.storage.path": f"*{params.q}*"}},
+                {"wildcard": {"DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath": f"*{params.q}*"}},
             ],
             "minimum_should_match": 1,
         }
     }
 
-    # Add filters if they exist
     if params.filters:
         filters = []
         for filter_item in params.filters:
@@ -214,19 +189,19 @@ def build_search_query(params: SearchParams) -> Dict:
         "size": params.size,
         "from": params.from_,
         "aggs": {
-            "file_types": {"terms": {"field": "mainRepresentation.format.keyword"}},
-            "asset_types": {"terms": {"field": "assetType.keyword"}},
+            "file_types": {"terms": {"field": "DigitalSourceAsset.MainRepresentation.Format.keyword"}},
+            "asset_types": {"terms": {"field": "DigitalSourceAsset.Type.keyword"}},
         },
         "suggest": {
             "text": params.q,
             "simple_phrase": {
                 "phrase": {
-                    "field": "mainRepresentation.storage.path",
+                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
                     "size": 1,
                     "gram_size": 3,
                     "direct_generator": [
                         {
-                            "field": "mainRepresentation.storage.path",
+                            "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
                             "suggest_mode": "always",
                         }
                     ],
@@ -237,34 +212,30 @@ def build_search_query(params: SearchParams) -> Dict:
     }
 
 
+
 def process_search_hit(hit: Dict) -> AssetSearchResult:
     """Process a single search hit and add presigned URL if thumbnail representation exists"""
     source = hit["_source"]
+    digital_source_asset = source.get("DigitalSourceAsset", {})
+    main_rep = digital_source_asset.get("MainRepresentation", {})
+    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
 
-    # Find proxy representation if it exists
+    # Generate thumbnail URL if applicable
     thumbnail_url = None
-
-    for rep in source.get("derivedRepresentations", []):
-        if rep.get("purpose") == "thumbnail":
-            storage = rep.get("storage", {})
-            if storage.get("storageType") == "s3":
-                thumbnail_url = generate_presigned_url(
-                    bucket=storage["bucket"], key=storage["path"]
-                )
-                break
+    if storage_info.get("StorageType") == "s3":
+        thumbnail_url = generate_presigned_url(
+            bucket=storage_info.get("Bucket", ""),
+            key=storage_info.get("ObjectKey", {}).get("FullPath", "")
+        )
 
     return AssetSearchResult(
-        inventoryId=source.get("inventoryId"),
-        assetId=source.get("assetId"),
-        assetType=source.get("assetType"),
-        createDate=source.get("createDate"),
-        mainRepresentation=source.get("mainRepresentation"),
-        derivedRepresentations=source.get("derivedRepresentations", []),
-        metadata=source.get("metadata"),
+        InventoryID=source.get("InventoryID", ""),
+        DigitalSourceAsset=digital_source_asset,
+        FileHash=source.get("FileHash", ""),
+        Metadata=source.get("Metadata", {}),
         score=hit["_score"],
-        thumbnailUrl=thumbnail_url,
+        thumbnailUrl=thumbnail_url
     )
-
 
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
@@ -273,12 +244,10 @@ def perform_search(params: SearchParams) -> Dict:
 
     try:
         search_body = build_search_query(params)
-        # Log the search query being sent to OpenSearch
         logger.info("OpenSearch query body:", extra={"query": search_body})
 
         response = client.search(body=search_body, index=index_name)
 
-        # Log total hits and response from OpenSearch
         logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
         logger.info("OpenSearch response:", extra={"response": response})
 
@@ -288,12 +257,11 @@ def perform_search(params: SearchParams) -> Dict:
                 result = process_search_hit(hit)
                 hits.append(result)
             except Exception as e:
-                # Enhanced error logging
                 logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                 continue
 
-        # Log processed hits count
         logger.info(f"Successfully processed hits: {len(hits)}")
+
 
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],
@@ -301,7 +269,7 @@ def perform_search(params: SearchParams) -> Dict:
             pageSize=params.pageSize,
             searchTerm=params.q,
             facets=response.get("aggregations"),
-            suggestions=response.get("suggest"),
+            suggestions=response.get("suggest")
         )
 
         return {
@@ -320,7 +288,6 @@ def perform_search(params: SearchParams) -> Dict:
         logger.error(f"Unexpected error: {str(e)}")
         raise SearchException("An unexpected error occurred")
 
-
 @app.get("/search")
 def handle_search():
     """Handle search requests with validated parameters."""
@@ -333,7 +300,6 @@ def handle_search():
     except SearchException as e:
         logger.error(f"Search error: {str(e)}")
         return {"status": "500", "message": str(e), "data": None}
-
 
 @metrics.log_metrics
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
