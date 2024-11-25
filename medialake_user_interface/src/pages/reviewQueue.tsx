@@ -3,7 +3,7 @@ import { Typography, Tabs, Tab, Box, Paper, Grid, Card, CardContent, Divider, Bu
 import { Assessment, CompareArrows, HighQuality, CheckCircle, Timer } from '@mui/icons-material';
 import DeduplicationComponent from './deduplicationReview';
 import QualityCheckComponent from './videoReview';
-import VideoReviewInterface from './components/VideoReviewInterface';
+import VideoReviewInterface from '../components/VideoReviewInterface';
 
 interface DashboardData {
     totalPendingReviews: number;

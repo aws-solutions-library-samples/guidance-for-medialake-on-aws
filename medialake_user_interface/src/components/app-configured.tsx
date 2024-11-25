@@ -3,25 +3,25 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '@/queryClient';
-import { AwsConfigProvider } from '../common/hooks/aws-config-context';
-import { AuthProvider, useAuth } from '../common/hooks/auth-context';
+import { AwsConfigProvider } from '@/common/hooks/aws-config-context';
+import { AuthProvider, useAuth } from '@/common/hooks/auth-context';
 import { Authenticator, ThemeProvider, Theme, View } from '@aws-amplify/ui-react';
 import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
-import TopBar from '../TopBar';
-import Sidebar from '../Sidebar';
-import SearchPage from '../pages/SearchPage';
+import TopBar from '@/TopBar';
+import Sidebar from '@/Sidebar';
+import SearchPage from '@/pages/SearchPage';
 import { S3Explorer } from './home/S3Explorer';
-import Home from '../pages/Home';
+import Home from '@/pages/Home';
 import SettingsComponent from '@/features/settings/SettingsLayout';
-import ExecutionStatusPage from '../pages/ExecutionStatusPage';
-import PipelinesPage from '../pages/PipelinesPage';
-import ReviewQueue from '../reviewQueue';
-import TagsPage from '../TagsPage';
-import { StorageHelper } from '../common/helpers/storage-helper';
+import ExecutionStatusPage from '@/pages/ExecutionStatusPage';
+import PipelinesPage from '@/pages/PipelinesPage';
+import ReviewQueue from '@/pages/reviewQueue';
+import TagsPage from '@/pages/TagsPage';
+import { StorageHelper } from '@/common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
-import ImageDetailPage from '../pages/ImageDetailPage';
-import PipelineEditorPage from '../pages/PipelineEditorPage';
+import ImageDetailPage from '@/pages/ImageDetailPage';
+import PipelineEditorPage from '@/pages/PipelineEditorPage';
 
 // Custom theme for Authenticator
 const theme: Theme = {
@@ -184,6 +184,15 @@ const AuthPage = () => {
             },
             '& .amplify-text': {
                 color: 'rgba(255, 255, 255, 0.9)',
+            },
+            '& .amplify-label': {
+                color: 'rgba(255, 255, 255, 0.9)',
+            },
+            '& .amplify-heading': {
+                color: 'rgba(255, 255, 255, 0.9)',
+            },
+            '& [data-amplify-footer] .amplify-text': {
+                color: 'white',
             },
             '& a': {
                 color: 'rgba(255, 255, 255, 0.9)',

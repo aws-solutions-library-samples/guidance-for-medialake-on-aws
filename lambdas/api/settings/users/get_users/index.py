@@ -1,20 +1,21 @@
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
-from boto3.session import Session
 import boto3
 from typing import Dict, Any, Optional
 import os
 import json
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.metrics import MetricUnit
+from boto3.session import Session
+
 
 # Initialize PowerTools
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="MediaLake/Users")
 
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 
 # Configure CORS
 cors_config = CORSConfig(

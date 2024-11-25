@@ -60,7 +60,33 @@ class CognitoConstruct(Construct):
             ),
             user_invitation=cognito.UserInvitationConfig(
                 email_subject="Welcome to MediaLake",
-                email_body="Your username is {username} and temporary password is {####}. Please change your password on first sign in.",
+                email_body="""
+                <html>
+                <body>
+                    <p>Hello,</p>
+                    
+                    <p>Welcome to MediaLake! Your account has been created successfully.</p>
+                    
+                    <p><strong>Your login credentials:</strong><br/>
+                    Username: {username}<br/>
+                    Temporary Password: {{####}}</p>
+                    
+                    <p><strong>To get started:</strong></p>
+
+                    <ol>
+                        <li>Sign in with your credentials</li>
+                        <li>You'll be prompted to create a new password on your first login</li>
+                    </ol>
+                    
+                    <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
+                    
+                    <p>If you need assistance, please contact your system administrator.</p>
+                    
+                    <p>Best regards,<br/>
+                    The MediaLake Team</p>
+                </body>
+                </html>
+            """,
             ),
         )
 
