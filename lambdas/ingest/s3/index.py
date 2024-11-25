@@ -89,7 +89,7 @@ class AssetProcessor:
         self.eventbridge = boto3.client("events")
 
 
-    def _decode_s3_event_key(encoded_key):
+    def _decode_s3_event_key(self,encoded_key):
         # First decode any URL encoding (handles %20, %2B etc.)
         decoded_key = urllib.parse.unquote(encoded_key)
         

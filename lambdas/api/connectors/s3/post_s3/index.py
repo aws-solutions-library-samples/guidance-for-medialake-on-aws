@@ -484,7 +484,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "dynamodb:Query",
                             "dynamodb:Scan",
                         ],
-                        "Resource": medialake_asset_table,
+                        "Resource":[ medialake_asset_table,f"{medialake_asset_table}/*"],
                     }
                 ],
             }

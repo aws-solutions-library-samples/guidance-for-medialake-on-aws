@@ -109,3 +109,4 @@ coverage/
 
 ## aws-exports.json
 aws-exports.json
+config.json
