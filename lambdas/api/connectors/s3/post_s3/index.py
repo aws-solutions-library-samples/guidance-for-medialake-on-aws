@@ -328,7 +328,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "s3:ObjectRestore:*",
                             "s3:ObjectTagging:*",
                             "s3:ObjectAcl:Put",
-                            "s3:ObjectStorageClass:Changed",
+                            # "s3:ObjectStorageClass:Changed",
                         ],
                     }
                 ]
@@ -512,8 +512,8 @@ def create_connector(createconnector: S3Connector) -> dict:
                         ],
                         "Resource": [
                             medialake_asset_table,
-                            asset_table_file_hash_index_name,
-                            asset_table_asset_id_index_name,
+                            f"{medialake_asset_table}/index/{asset_table_file_hash_index_name}",
+                            f"{medialake_asset_table}/index/{asset_table_asset_id_index_name}"
                         ],
                     }
                 ],

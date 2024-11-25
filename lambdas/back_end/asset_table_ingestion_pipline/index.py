@@ -33,7 +33,7 @@ dynamodb-pipeline:
         sts_role_arn: "{pipeline_role_arn}"
         region: "{region}"
   routes:
-    - {index_name}_route: '/DigitalSourceAsset.Type == "Image"'
+    - {index_name}_route: '1 == 1'
   
   sink:
     - opensearch:
