@@ -1,29 +1,37 @@
 import React, { Suspense } from 'react';
 import { Box, Stack, Typography, Paper, useTheme, useMediaQuery, CircularProgress, Grid } from '@mui/material';
-import { Statistics } from '../components/home/Statistics';
-import { Collections } from '../components/home/Collections';
-import { SmartFolders } from '../components/home/SmartFolders';
-import { ConnectedStorage } from '../components/home/ConnectedStorage';
-import { SharedCollections } from '../components/home/SharedCollections';
-import { Favorites } from '../components/home/Favorites';
+import { Statistics } from '../features/home/Statistics';
+import { Collections } from '../features/home/Collections';
+import { SmartFolders } from '../features/home/SmartFolders';
+import { ConnectedStorage } from '../features/home/ConnectedStorage';
+import { SharedCollections } from '../features/home/SharedCollections';
+import { Favorites } from '../features/home/Favorites';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useTranslation } from 'react-i18next';
 
-const LoadingFallback = () => (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-        <CircularProgress />
-    </Box>
-);
+const LoadingFallback = () => {
+    const { t } = useTranslation();
+    return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <CircularProgress />
+        </Box>
+    );
+};
 
-const ErrorFallback = ({ error }: { error: Error }) => (
-    <Box sx={{ p: 3, color: 'error.main' }}>
-        <Typography variant="h6">Something went wrong:</Typography>
-        <Typography variant="body1">{error.message}</Typography>
-    </Box>
-);
+const ErrorFallback = ({ error }: { error: Error }) => {
+    const { t } = useTranslation();
+    return (
+        <Box sx={{ p: 3, color: 'error.main' }}>
+            <Typography variant="h6">{t('common.error')}:</Typography>
+            <Typography variant="body1">{error.message}</Typography>
+        </Box>
+    );
+};
 
 const Home: React.FC = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const { t } = useTranslation();
 
     return (
         <Box
@@ -50,13 +58,13 @@ const Home: React.FC = () => {
                             mb: 1
                         }}
                     >
-                        Welcome to MediaLake
+                        {t('home.welcome')}
                     </Typography>
                     <Typography
                         variant="subtitle1"
                         color="text.secondary"
                     >
-                        Manage and organize your media files efficiently
+                        {t('home.description')}
                     </Typography>
                 </Box>
 
