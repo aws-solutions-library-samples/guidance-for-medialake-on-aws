@@ -15,8 +15,13 @@ interface SearchResponseData {
         totalResults: number;
         page: number;
         pageSize: number;
+        facets: any;
+        suggestions: any;
     };
     results: Array<any>;
+    totalResults: number; // Add this line
+    facets: any; // Add this line
+    suggestions: any; // Add this line
 }
 
 interface SearchResponseType {
