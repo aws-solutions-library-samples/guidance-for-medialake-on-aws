@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Box,
     Typography,
@@ -44,6 +45,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 const PAGE_SIZE = 20;
 
 const ExecutionsPage: React.FC = () => {
+    const { t } = useTranslation();
     const theme = useTheme();
     const { timezone } = useTimezone();
     const [filters, setFilters] = useState({
@@ -85,8 +87,10 @@ const ExecutionsPage: React.FC = () => {
         });
     };
 
-    const formatDuration = (seconds: string) => {
+    const formatDuration = (seconds: string | null | undefined) => {
+        if (!seconds) return '';
         const duration = parseFloat(seconds);
+        if (isNaN(duration)) return '';
         if (duration < 60) {
             return `${duration.toFixed(2)}s`;
         }
@@ -108,7 +112,7 @@ const ExecutionsPage: React.FC = () => {
     const columns = useMemo<ColumnDef<PipelineExecution>[]>(
         () => [
             {
-                header: 'Pipeline Name',
+                header: t('executions.columns.pipelineName'),
                 accessorKey: 'pipeline_name',
                 cell: ({ getValue }) => (
                     <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.primary.main }}>
@@ -117,7 +121,7 @@ const ExecutionsPage: React.FC = () => {
                 ),
             },
             {
-                header: 'Status',
+                header: t('executions.columns.status'),
                 accessorKey: 'status',
                 cell: ({ getValue }) => {
                     const status = getValue() as string;
@@ -141,7 +145,7 @@ const ExecutionsPage: React.FC = () => {
                 },
             },
             {
-                header: 'Start Time',
+                header: t('executions.columns.startTime'),
                 accessorKey: 'start_time',
                 cell: ({ getValue }) => (
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
@@ -150,22 +154,25 @@ const ExecutionsPage: React.FC = () => {
                 ),
             },
             {
-                header: 'Duration',
+                header: t('executions.columns.duration'),
                 accessorKey: 'duration_seconds',
-                cell: ({ getValue }) => (
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                        {formatDuration(getValue() as string)}
-                    </Typography>
-                ),
+                cell: ({ getValue }) => {
+                    const duration = formatDuration(getValue() as string);
+                    return duration ? (
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            {duration}
+                        </Typography>
+                    ) : null;
+                },
             },
             {
-                header: 'Actions',
+                header: t('executions.columns.actions'),
                 id: 'actions',
                 cell: ({ row }) => (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, position: 'relative' }}>
                         {row.original.status === 'FAILED' && (
                             <>
-                                <Tooltip title="Retry from current position">
+                                <Tooltip title={t('executions.actions.retryFromCurrent')}>
                                     <IconButton
                                         size="small"
                                         color="primary"
@@ -181,7 +188,7 @@ const ExecutionsPage: React.FC = () => {
                                         <PlayArrowIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Retry from start">
+                                <Tooltip title={t('executions.actions.retryFromStart')}>
                                     <IconButton
                                         size="small"
                                         color="primary"
@@ -202,7 +209,7 @@ const ExecutionsPage: React.FC = () => {
                         <IconButton
                             size="small"
                             color="primary"
-                            title="View Details"
+                            title={t('executions.actions.viewDetails')}
                             sx={{
                                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                 '&:hover': {
@@ -216,7 +223,7 @@ const ExecutionsPage: React.FC = () => {
                 ),
             },
         ],
-        [theme]
+        [theme, t]
     );
 
     const executions = useMemo(() => {
@@ -250,10 +257,10 @@ const ExecutionsPage: React.FC = () => {
                             WebkitBackgroundClip: 'text',
                             color: 'transparent',
                         }}>
-                            Pipeline Executions
+                            {t('executions.title')}
                         </Typography>
                         <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                            Monitor and manage your pipeline executions
+                            {t('executions.description')}
                         </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -264,18 +271,18 @@ const ExecutionsPage: React.FC = () => {
                                 backgroundColor: theme.palette.background.paper,
                             }
                         }}>
-                            <InputLabel>Status</InputLabel>
+                            <InputLabel>{t('common.status')}</InputLabel>
                             <Select
                                 value={filters.status}
-                                label="Status"
+                                label={t('common.status')}
                                 onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                             >
-                                <MenuItem value="">All</MenuItem>
-                                <MenuItem value="SUCCEEDED">Succeeded</MenuItem>
-                                <MenuItem value="FAILED">Failed</MenuItem>
-                                <MenuItem value="RUNNING">Running</MenuItem>
-                                <MenuItem value="TIMED_OUT">Timed Out</MenuItem>
-                                <MenuItem value="ABORTED">Aborted</MenuItem>
+                                <MenuItem value="">{t('common.all')}</MenuItem>
+                                <MenuItem value="SUCCEEDED">{t('executions.status.succeeded')}</MenuItem>
+                                <MenuItem value="FAILED">{t('executions.status.failed')}</MenuItem>
+                                <MenuItem value="RUNNING">{t('executions.status.running')}</MenuItem>
+                                <MenuItem value="TIMED_OUT">{t('executions.status.timedOut')}</MenuItem>
+                                <MenuItem value="ABORTED">{t('executions.status.aborted')}</MenuItem>
                             </Select>
                         </FormControl>
                         <Button
@@ -292,7 +299,7 @@ const ExecutionsPage: React.FC = () => {
                                 },
                             }}
                         >
-                            Refresh
+                            {t('common.refresh')}
                         </Button>
                     </Box>
                 </Box>
@@ -396,7 +403,7 @@ const ExecutionsPage: React.FC = () => {
                                 },
                             }}
                         >
-                            Previous
+                            {t('common.previous')}
                         </Button>
                         <Button
                             onClick={() => table.nextPage()}
@@ -410,11 +417,14 @@ const ExecutionsPage: React.FC = () => {
                                 },
                             }}
                         >
-                            Next
+                            {t('common.next')}
                         </Button>
                     </Box>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                        Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                        {t('executions.pagination.page', {
+                            page: table.getState().pagination.pageIndex + 1,
+                            total: table.getPageCount()
+                        })}
                     </Typography>
                     <Select
                         value={table.getState().pagination.pageSize}
@@ -430,7 +440,7 @@ const ExecutionsPage: React.FC = () => {
                     >
                         {[10, 20, 50].map(pageSize => (
                             <MenuItem key={pageSize} value={pageSize}>
-                                Show {pageSize}
+                                {t('executions.pagination.showEntries', { count: pageSize })}
                             </MenuItem>
                         ))}
                     </Select>
