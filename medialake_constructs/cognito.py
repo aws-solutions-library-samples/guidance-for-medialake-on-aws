@@ -91,7 +91,7 @@ class CognitoConstruct(Construct):
             sign_in_aliases=cognito.SignInAliases(email=self.props.sign_in_with_email),
             lambda_triggers=cognito.UserPoolTriggers(
                 post_confirmation=self._cognito_trigger_lambda.function,
-                post_authentication=self._cognito_trigger_lambda.function,
+                # post_authentication=self._cognito_trigger_lambda.function,
             ),
             password_policy=cognito.PasswordPolicy(
                 min_length=8,
