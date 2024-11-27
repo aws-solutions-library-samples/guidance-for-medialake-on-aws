@@ -155,29 +155,9 @@ class CognitoConstruct(Construct):
             ),
         )
 
-        # identity_pool.authenticated_role.add_to_principal_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=["s3:GetObject"],
-        #         resources=[props.assets_bucket_arn, f"{props.assets_bucket_arn}/*"],
-        #     )
-        # )
-
         self.user_pool_client = user_pool_client
         self.identity_pool = identity_pool
         self.user_pool = user_pool
-
-        # # Add necessary permissions for the Lambda
-        # self._cognito_trigger_lambda.function.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "cognito-idp:AdminUpdateUserAttributes",
-        #             "cognito-idp:AdminAddUserToGroup",
-        #         ],
-        #         resources=[self.user_pool.user_pool_arn],
-        #     )
-        # )
 
         create_user_handler = cr.AwsCustomResource(
             self,

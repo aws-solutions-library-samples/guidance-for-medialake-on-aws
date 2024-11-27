@@ -76,7 +76,6 @@ const ExecutionsPage: React.FC = () => {
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleString(undefined, {
-            timeZone: timezone,
             year: 'numeric',
             month: 'numeric',
             day: 'numeric',
@@ -217,7 +216,7 @@ const ExecutionsPage: React.FC = () => {
                 ),
             },
         ],
-        [theme, timezone]
+        [theme]
     );
 
     const executions = useMemo(() => {
