@@ -185,17 +185,23 @@ class UserSyncService:
 
 
 # Lambda handler
-async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """AWS Lambda handler for Cognito triggers."""
-    sync_service = UserSyncService(
-        region=context.invoked_function_arn.split(":")[3],
-        user_pool_id=event["userPoolId"],
-        user_table_name=os.environ["USER_SETTINGS_TABLE"],
-    )
 
-    try:
-        await sync_service.handle_cognito_event(event)
-        return {"statusCode": 200, "body": "Success"}
-    except Exception as e:
-        logger.error(f"Error handling Cognito event: {str(e)}")
-        return {"statusCode": 500, "body": str(e)}
+    print(event)
+    print(context)
+
+    return {"statusCode": 200, "body": "Success"}
+
+    # sync_service = UserSyncService(
+    #     region=context.invoked_function_arn.split(":")[3],
+    #     user_pool_id=event["userPoolId"],
+    #     user_table_name=os.environ["USER_SETTINGS_TABLE"],
+    # )
+
+    # try:
+    #     await sync_service.handle_cognito_event(event)
+    #     return {"statusCode": 200, "body": "Success"}
+    # except Exception as e:
+    #     logger.error(f"Error handling Cognito event: {str(e)}")
+    #     return {"statusCode": 500, "body": str(e)}
