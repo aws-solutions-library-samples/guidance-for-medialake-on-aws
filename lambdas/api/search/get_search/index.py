@@ -83,7 +83,6 @@ class StorageInfo(BaseModelWithConfig):
     bucket: str
     path: str
     fullPath: str
-    name: str
     fileSize: Optional[int]
     hashValue: Optional[str]
     createDate: Optional[datetime]
@@ -106,6 +105,7 @@ class AssetSearchResult(BaseModelWithConfig):
     """Model for search result with presigned URL"""
     InventoryID: str
     DigitalSourceAsset: Dict[str, Any]
+    DerivedRepresentations: List[Dict[str, Any]] 
     FileHash: str
     Metadata: Dict[str, Any]
     score: float
@@ -217,20 +217,26 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     """Process a single search hit and add presigned URL if thumbnail representation exists"""
     source = hit["_source"]
     digital_source_asset = source.get("DigitalSourceAsset", {})
+    derived_representations = source.get("DerivedRepresentations", [])
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
 
     # Generate thumbnail URL if applicable
     thumbnail_url = None
-    if storage_info.get("StorageType") == "s3":
-        thumbnail_url = generate_presigned_url(
-            bucket=storage_info.get("Bucket", ""),
-            key=storage_info.get("ObjectKey", {}).get("FullPath", "")
-        )
+    for representation in derived_representations:
+        if representation.get("Purpose") == "thumbnail":
+            storage_info = representation.get("StorageInfo", {}).get("PrimaryLocation", {})
+            if storage_info.get("StorageType") == "s3":
+                thumbnail_url = generate_presigned_url(
+                    bucket=storage_info.get("Bucket", ""),
+                    key=storage_info.get("ObjectKey", {}).get("FullPath", "")
+                )
+            break
 
     return AssetSearchResult(
         InventoryID=source.get("InventoryID", ""),
         DigitalSourceAsset=digital_source_asset,
+        DerivedRepresentations=derived_representations,
         FileHash=source.get("FileHash", ""),
         Metadata=source.get("Metadata", {}),
         score=hit["_score"],

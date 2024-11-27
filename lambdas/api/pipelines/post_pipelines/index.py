@@ -19,9 +19,6 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 
 from pydantic import BaseModel
 
-from imapg_pipeline_creator import (
-    create_pipeline
-)
 from image_pipeline_definitions import (
     get_state_machine_definition,
     create_metadata_extractor_lambda,
@@ -462,223 +459,310 @@ def check_resource_exists(
 def create_pipeline(createpipeline: S3Pipeline) -> dict:
     try:
         
-        # # Generate names for resources
-        # queue_name = f"medialake-pipeline-{createpipeline.name}"
-        # rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
-        # role_name = f"medialake-pipeline-{createpipeline.name}-role"
-        # state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        # image_proxy_lambda_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        # pipeline_trigger_lambda_name = f"medialake-pipeline-{createpipeline.name}-executor"
+        # Generate names for resources
+        queue_name = f"medialake-pipeline-{createpipeline.name}"
+        rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
+        role_name = f"medialake-pipeline-{createpipeline.name}-role"
+        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
+        image_proxy_lambda_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
+        pipeline_trigger_lambda_name = f"medialake-pipeline-{createpipeline.name}-executor"
 
-        # # Check if resources exist
-        # resources_exist, error_message = check_resource_exists(
-        #     createpipeline.name,
-        #     queue_name,
-        #     rule_name,
-        #     role_name,
-        #     state_machine_name,
-        #     [
-        #         image_proxy_lambda_name,
-        #         pipeline_trigger_lambda_name,
-        #         f"medialake-pipeline-{createpipeline.name}-metadata"  # Add this
-        #     ]
-        # )
+        # Check if resources exist
+        resources_exist, error_message = check_resource_exists(
+            createpipeline.name,
+            queue_name,
+            rule_name,
+            role_name,
+            state_machine_name,
+            [
+                image_proxy_lambda_name,
+                pipeline_trigger_lambda_name,
+                f"medialake-pipeline-{createpipeline.name}-metadata"  # Add this
+            ]
+        )
 
-        # if resources_exist:
-        #     return {
-        #         "status": "409",
-        #         "message": "Resource conflict",
-        #         "data": {
-        #             "error": error_message
-        #         }
-        #     }
+        if resources_exist:
+            return {
+                "status": "409",
+                "message": "Resource conflict",
+                "data": {
+                    "error": error_message
+                }
+            }
             
-        # # Generate unique ID and timestamps
-        # pipeline_id = str(uuid.uuid4())
-        # current_time = datetime.utcnow().isoformat(timespec='seconds')
-        # deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
-        # pipeline_trigger_deployment_zip = os.environ.get('PIPELINE_TRIGGER_LAMBDA')
-        # image_metadata_extractor_deployment_zip = os.environ.get('IMAGE_METADATA_EXTRACTOR_LAMBDA')
-        # image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
-        # ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
-        # exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
-        # exempitool_layer_arn = os.environ.get('EXEMPITOOL_LAYER_ARN')
+        # Generate unique ID and timestamps
+        pipeline_id = str(uuid.uuid4())
+        current_time = datetime.utcnow().isoformat(timespec='seconds')
+        deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
+        pipeline_trigger_deployment_zip = os.environ.get('PIPELINE_TRIGGER_LAMBDA')
+        image_metadata_extractor_deployment_zip = os.environ.get('IMAGE_METADATA_EXTRACTOR_LAMBDA')
+        image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
+        ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
+        exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
+        exempitool_layer_arn = os.environ.get('EXEMPITOOL_LAYER_ARN')
         
-        # powertools_layer_arn = os.environ.get('POWERTOOLS__LAYER_ARN')
+        powertools_layer_arn = os.environ.get('POWERTOOLS__LAYER_ARN')
         
         
-        # # Common tags for all resources
-        # tags = {
-        #     'medialake': 'true',
-        #     'pipeline_id': pipeline_id,
-        #     'pipeline_name': createpipeline.name
-        # }
+        # Common tags for all resources
+        tags = {
+            'medialake': 'true',
+            'pipeline_id': pipeline_id,
+            'pipeline_name': createpipeline.name
+        }
         
-        # # Create SQS FIFO Queue
-        # queue_name = f"medialake-pipeline-{createpipeline.name}"
-        # queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+        # Create SQS FIFO Queue
+        queue_name = f"medialake-pipeline-{createpipeline.name}"
+        queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
         
-        # # Create EventBridge rule
-        # rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
-        # rule_arn = create_eventbridge_rule(
-        #     rule_name,
-        #     ingest_event_bus_name,
-        #     queue_arn,
-        #     tags
-        # )
+        # Create EventBridge rule
+        rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
+        rule_arn = create_eventbridge_rule(
+            rule_name,
+            ingest_event_bus_name,
+            queue_arn,
+            tags
+        )
         
-        # # Create IAM Role for Lambda and Step Functions
-        # role_name = f"medialake-pipeline-{createpipeline.name}-role"
-        # state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        # role_arn = create_pipeline_role(
-        #     role_name,
-        #     queue_arn,
-        #     state_machine_name,
-        #     tags
-        # )
+        # Create IAM Role for Lambda and Step Functions
+        role_name = f"medialake-pipeline-{createpipeline.name}-role"
+        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
+        role_arn = create_pipeline_role(
+            role_name,
+            queue_arn,
+            state_machine_name,
+            tags
+        )
         
-        # # Wait for IAM role propagation
-        # time.sleep(10)
+        # Wait for IAM role propagation
+        time.sleep(10)
         
-        # # Add this before creating the image proxy lambda
-        # image_metadata_extractor_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-metadata"
-       
-        
-        # image_proxy_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        
-        # # Create metadata extractor lambda
-        # image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
-        #     lambda_client,
-        #     image_metadata_extractor_lambda_function_name,
-        #     role_arn,
-        #     deployment_bucket,
-        #     image_metadata_extractor_deployment_zip,
-        #     exiftool_layer_arn,
-        #     exempitool_layer_arn,
-        #     {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
-        #     tags
-        # )
-
-        # # Create image proxy lambda
-        # image_proxy_lambda_response = create_image_proxy_lambda(
-        #     lambda_client,
-        #     image_proxy_lambda_function_name,
-        #     role_arn,
-        #     deployment_bucket,
-        #     image_proxy_deployment_zip,
-        #     {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
-        #     tags
-        # )
-        
-        # # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
-
-        # bucket_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Sid": "AllowLambdaWriteAccess",
-        #             "Effect": "Allow",
-        #             "Principal": {
-        #                 "Service": "lambda.amazonaws.com"  # Use service principal
-        #             },
-        #             "Action": [
-        #                 "s3:PutObject",
-        #                 "s3:PutObjectAcl"
-        #             ],
-        #             "Resource": [
-        #                 f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
-        #                 f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
-        #             ],
-        #             "Condition": {
-        #                 "ArnLike": {
-        #                     "aws:SourceArn": image_proxy_lambda_response['FunctionArn']
-        #                 }
-        #             }
-        #         }
-        #     ]
-        # }
-        # s3_client.put_bucket_policy(
-        #     Bucket=os.environ.get('MEDIA_ASSETS_BUCKET_NAME'),
-        #     Policy=json.dumps(bucket_policy)
-        # )
-        
-        # # Create Step Function
-        # state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-       
-        # # Get state machine definition
-
-        # state_machine_definition = get_state_machine_definition(
-        #     image_metadata_extractor_lambda_response['FunctionArn'],
-        #     image_proxy_lambda_response['FunctionArn'],
-        #     createpipeline.name,
-        #     os.environ.get('MEDIALAKE_ASSET_TABLE'),
-        #     os.environ.get('MEDIA_ASSETS_BUCKET_NAME')
-        # )
-        
-        # state_machine_arn = create_state_machine(
-        #     state_machine_name,
-        #     role_arn,
-        #     state_machine_definition,
-        #     tags
-        # )
-        
-
-        
-        # # Create Lambda Function
-        # pipeline_trigger_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-executor"
-        # pipeline_trigger_lambda_response = lambda_client.create_function(
-        #     FunctionName=pipeline_trigger_lambda_function_name,
+        # Add this before creating the image proxy lambda
+        image_metadata_extractor_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-metadata"
+        # image_metadata_extractor_lambda_response = lambda_client.create_function(
+        #     FunctionName=image_metadata_extractor_lambda_function_name,
         #     Runtime='python3.12',
         #     Role=role_arn,
         #     Handler='index.lambda_handler',
         #     Code={
         #         'S3Bucket': deployment_bucket,
-        #         'S3Key': pipeline_trigger_deployment_zip
-        #     },
-        #     Environment={
-        #         'Variables': {
-        #             'STEP_FUNCTION_ARN': state_machine_arn
-        #         }
+        #         'S3Key': image_metadata_extractor_deployment_zip
         #     },
         #     Tags=tags
         # )
+
         
-        # # Add SQS trigger to Lambda
-        # lambda_client.create_event_source_mapping(
-        #     EventSourceArn=queue_arn,
-        #     FunctionName=pipeline_trigger_lambda_function_name,
-        #     Enabled=True
-        # )
+        image_proxy_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
+        # image_proxy_lambda_response = lambda_client.create_function(
+        #     FunctionName=image_proxy_lambda_function_name,
+        #     Runtime='python3.12',
+        #     Role=role_arn,
+        #     Handler='index.lambda_handler',
+        #     Code={
+        #         'S3Bucket': deployment_bucket,
+        #         'S3Key': image_proxy_deployment_zip
+        #     },
+        #     Tags=tags
+        # ) 
         
+        # Create metadata extractor lambda
+        image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
+            lambda_client,
+            image_metadata_extractor_lambda_function_name,
+            role_arn,
+            deployment_bucket,
+            image_metadata_extractor_deployment_zip,
+            exiftool_layer_arn,
+            exempitool_layer_arn,
+            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
+            tags
+        )
+
+        # Create image proxy lambda
+        image_proxy_lambda_response = create_image_proxy_lambda(
+            lambda_client,
+            image_proxy_lambda_function_name,
+            role_arn,
+            deployment_bucket,
+            image_proxy_deployment_zip,
+            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
+            tags
+        )
         
+        # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
+
+        bucket_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "AllowLambdaWriteAccess",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"  # Use service principal
+                    },
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:PutObjectAcl"
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
+                    ],
+                    "Condition": {
+                        "ArnLike": {
+                            "aws:SourceArn": image_proxy_lambda_response['FunctionArn']
+                        }
+                    }
+                }
+            ]
+        }
+        s3_client.put_bucket_policy(
+            Bucket=os.environ.get('MEDIA_ASSETS_BUCKET_NAME'),
+            Policy=json.dumps(bucket_policy)
+        )
         
-        # # Save pipeline details to DynamoDB
-        # table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
-        # if not table_name:
-        #     raise ValueError("MEDIALAKE_PIPELINE_TABLE environment variable not set")
-        
-        #  # Convert the definition's float values to Decimal
-        # definition = float_to_decimal(createpipeline.definition)
-        
-        # table = dynamodb.Table(table_name)
-        # pipeline_item = {
-        #     "id": pipeline_id,
-        #     "name": createpipeline.name,
-        #     "type": createpipeline.type,
-        #     "createdAt": current_time,
-        #     "updatedAt": current_time,
-        #     "definition": definition,
-        #     "queueUrl": queue_url,
-        #     "queueArn": queue_arn,
-        #     "eventBridgeRuleArn": rule_arn,
-        #     "triggerLambdaArn": pipeline_trigger_lambda_response['FunctionArn'],
-        #     "stateMachineArn": state_machine_arn,
-        #     "roleArn": role_arn
+        # Create Step Function
+        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
+        # In post_pipelines/index.py, update the state_machine_definition:
+
+        # state_machine_definition = {
+        #     "Comment": f"Pipeline {createpipeline.name}",
+        #     "StartAt": "ExtractMetadata",
+        #     "States": {
+        #         "ExtractMetadata": {
+        #             "Type": "Task",
+        #             "Resource": "arn:aws:states:::lambda:invoke",
+        #             "Parameters": {
+        #                 "FunctionName": image_metadata_extractor_lambda_response['FunctionArn'],
+        #                 "Payload": {
+        #                     "pipeline_id.$": "$.pipeline_id",
+        #                     "input.$": "$.input",
+        #                     "parameters": {
+        #                         "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)"
+        #                     }
+        #                 }
+        #             },
+        #             "ResultPath": "$.metadataResult",
+        #             "Next": "CreateProxy"
+        #         },
+        #         "CreateProxy": {
+        #             "Type": "Task",
+        #             "Resource": "arn:aws:states:::lambda:invoke",
+        #             "Parameters": {
+        #                 "FunctionName": image_proxy_lambda_response['FunctionArn'],
+        #                 "Payload": {
+        #                     "pipeline_id.$": "$.pipeline_id",
+        #                     "input.$": "$.input",
+        #                     "metadata.$": "$.metadataResult.body",
+        #                     "parameters": {
+        #                         "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)",
+        #                         "mode": "proxy",
+        #                         "output_bucket": "YOUR_OUTPUT_BUCKET"
+        #                     }
+        #                 }
+        #             },
+        #             "ResultPath": "$.proxyResult",
+        #             "Next": "UpdateDynamoDB"
+        #         },
+        #         "UpdateDynamoDB": {
+        #             "Type": "Task",
+        #             "Resource": "arn:aws:states:::dynamodb:updateItem",
+        #             "Parameters": {
+        #                 "TableName": "${process.env.MEDIALAKE_ASSET_TABLE}",
+        #                 "Key": {
+        #                     "id": {"S.$": "$.input.id"}
+        #                 },
+        #                 "UpdateExpression": "SET proxyLocation = :proxyLocation, metadata = :metadata",
+        #                 "ExpressionAttributeValues": {
+        #                     ":proxyLocation": {
+        #                         "M": {
+        #                             "bucket": {"S.$": "$.proxyResult.body.bucket"},
+        #                             "key": {"S.$": "$.proxyResult.body.key"},
+        #                             "type": {"S": "S3"}
+        #                         }
+        #                     },
+        #                     ":metadata": {"M.$": "$.metadataResult.body"}
+        #                 }
+        #             },
+        #             "End": true
+        #         }
+        #     }
         # }
+
+
+        # Get state machine definition
+
+        state_machine_definition = get_state_machine_definition(
+            image_metadata_extractor_lambda_response['FunctionArn'],
+            image_proxy_lambda_response['FunctionArn'],
+            createpipeline.name,
+            os.environ.get('MEDIALAKE_ASSET_TABLE'),
+            os.environ.get('MEDIA_ASSETS_BUCKET_NAME')
+        )
         
-        # table.put_item(Item=pipeline_item)
+        state_machine_arn = create_state_machine(
+            state_machine_name,
+            role_arn,
+            state_machine_definition,
+            tags
+        )
         
-        create_pipeline(createpipeline)
+
+        
+        # Create Lambda Function
+        pipeline_trigger_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-executor"
+        pipeline_trigger_lambda_response = lambda_client.create_function(
+            FunctionName=pipeline_trigger_lambda_function_name,
+            Runtime='python3.12',
+            Role=role_arn,
+            Handler='index.lambda_handler',
+            Code={
+                'S3Bucket': deployment_bucket,
+                'S3Key': pipeline_trigger_deployment_zip
+            },
+            Environment={
+                'Variables': {
+                    'STEP_FUNCTION_ARN': state_machine_arn
+                }
+            },
+            Tags=tags
+        )
+        
+        # Add SQS trigger to Lambda
+        lambda_client.create_event_source_mapping(
+            EventSourceArn=queue_arn,
+            FunctionName=pipeline_trigger_lambda_function_name,
+            Enabled=True
+        )
+        
+        
+        
+        # Save pipeline details to DynamoDB
+        table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
+        if not table_name:
+            raise ValueError("MEDIALAKE_PIPELINE_TABLE environment variable not set")
+        
+         # Convert the definition's float values to Decimal
+        definition = float_to_decimal(createpipeline.definition)
+        
+        table = dynamodb.Table(table_name)
+        pipeline_item = {
+            "id": pipeline_id,
+            "name": createpipeline.name,
+            "type": createpipeline.type,
+            "createdAt": current_time,
+            "updatedAt": current_time,
+            "definition": definition,
+            "queueUrl": queue_url,
+            "queueArn": queue_arn,
+            "eventBridgeRuleArn": rule_arn,
+            "triggerLambdaArn": pipeline_trigger_lambda_response['FunctionArn'],
+            "stateMachineArn": state_machine_arn,
+            "roleArn": role_arn
+        }
+        
+        table.put_item(Item=pipeline_item)
+        
         logger.info(f"Created pipeline '{createpipeline.name}' with ID {pipeline_id}")
         
         return {
