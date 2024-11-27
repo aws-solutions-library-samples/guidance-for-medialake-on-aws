@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_events as events,
     aws_dynamodb as dynamodb,
     aws_secretsmanager as secretsmanager,
+    aws_lambda as lambda_,
 )
 from constructs import Construct
 from medialake_constructs.shared_constructs.dynamodb import (
@@ -17,10 +18,8 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.lambda_layers import (
-    ExiftoolLayer, 
+    ExiftoolLayer,
     ExempitoolLayer,
-    PowertoolsLayer,
-    PowertoolsLayerConfig
 )
 
 
@@ -28,14 +27,17 @@ from dataclasses import dataclass
 
 
 @dataclass
-class PipelinesProps:
+class ApiGatewayPipelinesProps:
     """Configuration for Lambda function creation."""
 
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
+    get_pipelines_executions_lambda: lambda_.IFunction
+    post_retry_pipelines_executions_lambda: lambda_.IFunction
+    # pipelines_executions_table: dynamodb.TableV2
 
 
-class PipelinesConstruct(Construct):
+class ApiGatewayPipelinesConstruct(Construct):
     def __init__(
         self,
         scope: Construct,
@@ -46,15 +48,12 @@ class PipelinesConstruct(Construct):
         iac_assets_bucket: s3.Bucket,
         media_assets_bucket: s3.Bucket,
         x_origin_verify_secret: secretsmanager.Secret,
-        props: PipelinesProps,
+        props: ApiGatewayPipelinesProps,
     ) -> None:
         super().__init__(scope, id)
 
         exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
         exempitool_layer = ExempitoolLayer(self, "ExempitoolLayer")
-        
-       
-
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
@@ -77,33 +76,30 @@ class PipelinesConstruct(Construct):
             code_path=["lambdas", "pipelines", "pipeline_trigger"],
         )
 
-        dynamo_table = DynamoDB(
+        self._pipelnes_dynamodb_table = DynamoDB(
             self,
             "PipelinesTable",
             props=DynamoDBProps(
                 name=f"medialake_pipeline_table_{id}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                # removal_policy=RemovalPolicy.DESTROY
             ),
         )
 
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
 
-        # GET /api/pipelines
-        get_pipelines_lambda_config = LambdaConfig(
-            name="GetPipelinesHandler",
-            entry="lambdas/api/pipelines/get_pipelines",
-            environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
-            },
-        )
         get_pipelines_handler = Lambda(
             self,
             "GetPipelinesHandler",
-            config=get_pipelines_lambda_config,
+            config=LambdaConfig(
+                name="GetPipelinesHandler",
+                entry="lambdas/api/pipelines/get_pipelines",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                },
+            ),
         )
 
         pipelines_resource.add_method(
@@ -121,7 +117,7 @@ class PipelinesConstruct(Construct):
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
@@ -130,8 +126,7 @@ class PipelinesConstruct(Construct):
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "AWS_ACCOUNT_ID": scope.account,
                 "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn,
-                "EXEMPITOOL_LAYER_ARN": exempitool_layer.layer_version.layer_version_arn
-                
+                "EXEMPITOOL_LAYER_ARN": exempitool_layer.layer_version.layer_version_arn,
             },
         )
         post_pipelines_handler = Lambda(
@@ -233,8 +228,8 @@ class PipelinesConstruct(Construct):
             name="GetPipelineIdHandler",
             entry=("lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         get_pipeline_id_handler = Lambda(
@@ -255,8 +250,8 @@ class PipelinesConstruct(Construct):
             name="PutPipelineIdHandler",
             entry=("lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         put_pipeline_id_handler = Lambda(
@@ -277,8 +272,8 @@ class PipelinesConstruct(Construct):
             name="DeletePipelineIdHandler",
             entry=("lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_PIPELINE_TABLE": dynamo_table.table_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         del_pipeline_id_handler = Lambda(
@@ -347,7 +342,7 @@ class PipelinesConstruct(Construct):
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
-                resources=[dynamo_table.table.table_arn],
+                resources=[self._pipelnes_dynamodb_table.table.table_arn],
             )
         )
 
@@ -357,3 +352,28 @@ class PipelinesConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
+
+        pipelines_executions_resource = pipelines_resource.add_resource("executions")
+
+        # GET /api/pipelines/executions/ - responds with all pipeline executions
+        pipelines_executions_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(props.get_pipelines_executions_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # Add new execution ID resource and retry endpoint
+        execution_id_resource = pipelines_executions_resource.add_resource(
+            "{executionId}"
+        )
+        retry_resource = execution_id_resource.add_resource("retry")
+
+        # POST /api/pipelines/executions/{executionId}/retry
+
+        # retry_resource.add_method(
+        #     "POST",
+        #     apigateway.LambdaIntegration(props.post_retry_pipelines_executions_lambda),
+        #     authorization_type=apigateway.AuthorizationType.COGNITO,
+        #     authorizer=cognito_authorizer,
+        # )

@@ -12,6 +12,14 @@ export const QUERY_KEYS = {
                 [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, prefix, continuationToken] as const,
         },
     },
+    PIPELINE_EXECUTIONS: {
+        all: ['pipeline-executions'] as const,
+        lists: () => [...QUERY_KEYS.PIPELINE_EXECUTIONS.all, 'list'] as const,
+        list: (page: number, pageSize: number, filters?: Record<string, any>) =>
+            [...QUERY_KEYS.PIPELINE_EXECUTIONS.lists(), { page, pageSize, filters }] as const,
+        details: () => [...QUERY_KEYS.PIPELINE_EXECUTIONS.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.PIPELINE_EXECUTIONS.details(), id] as const,
+    },
     SEARCH: {
         all: ['search'] as const,
     },

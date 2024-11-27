@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Paper,
@@ -13,6 +13,10 @@ import {
     IconButton,
     useTheme,
     Alert,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
 } from '@mui/material';
 import {
     Edit as EditIcon,
@@ -23,7 +27,9 @@ import {
     Security as SecurityIcon,
     Language as LanguageIcon,
     Palette as PaletteIcon,
+    Schedule as ScheduleIcon,
 } from '@mui/icons-material';
+import { useTimezone } from '../../contexts/TimezoneContext';
 
 interface UserProfileData {
     firstName: string;
@@ -40,8 +46,32 @@ interface UserProfileData {
     };
 }
 
+// Common timezones list
+const COMMON_TIMEZONES = [
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'America/Anchorage',
+    'Pacific/Honolulu',
+    'America/Toronto',
+    'America/Vancouver',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Europe/Rome',
+    'Europe/Madrid',
+    'Asia/Dubai',
+    'Asia/Shanghai',
+    'Asia/Tokyo',
+    'Asia/Singapore',
+    'Australia/Sydney',
+    'Pacific/Auckland',
+];
+
 const UserProfile: React.FC = () => {
     const theme = useTheme();
+    const { timezone, setTimezone } = useTimezone();
     const [editing, setEditing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [profileData, setProfileData] = useState<UserProfileData>({
@@ -72,6 +102,10 @@ const UserProfile: React.FC = () => {
     const handleCancel = () => {
         setEditing(false);
         setError(null);
+    };
+
+    const formatTimezone = (tz: string) => {
+        return tz.replace(/_/g, ' ').replace(/\//g, ' / ');
     };
 
     return (
@@ -235,6 +269,28 @@ const UserProfile: React.FC = () => {
                         <Typography variant="h6" sx={{ mb: 3 }}>
                             Preferences
                         </Typography>
+
+                        <Box sx={{ mb: 3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <ScheduleIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="subtitle1">Timezone</Typography>
+                            </Box>
+                            <FormControl fullWidth>
+                                <Select
+                                    value={timezone}
+                                    onChange={(e) => setTimezone(e.target.value)}
+                                    sx={{ mb: 2 }}
+                                >
+                                    {COMMON_TIMEZONES.map((tz) => (
+                                        <MenuItem key={tz} value={tz}>
+                                            {formatTimezone(tz)}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Box>
+
+                        <Divider sx={{ my: 2 }} />
 
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>

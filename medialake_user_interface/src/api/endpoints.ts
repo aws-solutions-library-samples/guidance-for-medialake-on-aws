@@ -3,6 +3,7 @@
 export const API_ENDPOINTS = {
     CONNECTORS: '/connectors',
     PIPELINES: "/pipelines",
+    PIPELINE_EXECUTIONS: "/pipelines/executions",
     SEARCH: "/search",
     ASSETS: {
         GET: (id: string) => `/assets/${id}`,

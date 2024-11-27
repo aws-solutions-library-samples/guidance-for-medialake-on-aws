@@ -42,7 +42,7 @@ const Home: React.FC = () => {
                 left: 240, // Sidebar width
                 right: 0,
                 bottom: 0,
-                bgcolor: '#f6f8fc',
+                bgcolor: 'background.default',
                 overflowY: 'auto',
                 overflowX: 'hidden',
             }}
@@ -80,8 +80,7 @@ const Home: React.FC = () => {
                         sx={{
                             p: 3,
                             borderRadius: 2,
-                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                            backdropFilter: 'blur(10px)',
+                            backgroundColor: 'background.paper',
                             border: '1px solid',
                             borderColor: 'divider'
                         }}
@@ -98,8 +97,7 @@ const Home: React.FC = () => {
                         sx={{
                             p: 3,
                             borderRadius: 2,
-                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                            backdropFilter: 'blur(10px)',
+                            backgroundColor: 'background.paper',
                             border: '1px solid',
                             borderColor: 'divider'
                         }}
@@ -116,8 +114,7 @@ const Home: React.FC = () => {
                         sx={{
                             p: 3,
                             borderRadius: 2,
-                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                            backdropFilter: 'blur(10px)',
+                            backgroundColor: 'background.paper',
                             border: '1px solid',
                             borderColor: 'divider'
                         }}
@@ -137,8 +134,7 @@ const Home: React.FC = () => {
                                     p: 3,
                                     height: '100%',
                                     borderRadius: 2,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                    backdropFilter: 'blur(10px)',
+                                    backgroundColor: 'background.paper',
                                     border: '1px solid',
                                     borderColor: 'divider'
                                 }}
@@ -157,8 +153,7 @@ const Home: React.FC = () => {
                                     p: 3,
                                     height: '100%',
                                     borderRadius: 2,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                    backdropFilter: 'blur(10px)',
+                                    backgroundColor: 'background.paper',
                                     border: '1px solid',
                                     borderColor: 'divider'
                                 }}

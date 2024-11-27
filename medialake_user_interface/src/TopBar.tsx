@@ -1,3 +1,4 @@
+{/* Previous imports remain the same */ }
 import React, { useState, useCallback } from 'react';
 import {
     AppBar,
@@ -10,7 +11,7 @@ import {
     Badge,
     Tooltip,
     Avatar,
-    useTheme,
+    useTheme as useMuiTheme,
     Divider,
     InputBase,
     Chip,
@@ -25,6 +26,8 @@ import {
     Error as ErrorIcon,
     Info as InfoIcon,
     Language as LanguageIcon,
+    Brightness4 as DarkModeIcon,
+    Brightness7 as LightModeIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSearch } from './api/hooks/useSearch';
@@ -32,7 +35,9 @@ import debounce from 'lodash/debounce';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from './hooks/useTheme';
 
+{/* Previous interfaces and mock data remain the same */ }
 interface Notification {
     id: string;
     type: 'notification' | 'warning' | 'alert';
@@ -76,7 +81,8 @@ const mockNotifications: Notification[] = [
 ];
 
 function TopBar() {
-    const theme = useTheme();
+    const muiTheme = useMuiTheme();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const { setIsAuthenticated } = useAuth();
     const { t, i18n } = useTranslation();
@@ -86,6 +92,7 @@ function TopBar() {
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
 
+    {/* Previous functions remain the same */ }
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
         return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
@@ -205,11 +212,11 @@ function TopBar() {
     const getNotificationIcon = (type: string) => {
         switch (type) {
             case 'alert':
-                return <ErrorIcon sx={{ color: theme.palette.error.main }} />;
+                return <ErrorIcon sx={{ color: muiTheme.palette.error.main }} />;
             case 'warning':
-                return <WarningIcon sx={{ color: theme.palette.warning.main }} />;
+                return <WarningIcon sx={{ color: muiTheme.palette.warning.main }} />;
             default:
-                return <InfoIcon sx={{ color: theme.palette.info.main }} />;
+                return <InfoIcon sx={{ color: muiTheme.palette.info.main }} />;
         }
     };
 
@@ -257,8 +264,8 @@ function TopBar() {
         <AppBar
             position="fixed"
             sx={{
-                zIndex: theme.zIndex.drawer + 1,
-                backgroundColor: 'white',
+                zIndex: muiTheme.zIndex.drawer + 1,
+                backgroundColor: theme === 'dark' ? muiTheme.palette.background.default : 'white',
                 color: 'text.primary',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
             }}
@@ -269,14 +276,14 @@ function TopBar() {
                     <img
                         src="/logo.png"
                         alt="MediaLake"
-                        style={{ height: '32px', marginRight: theme.spacing(1) }}
+                        style={{ height: '32px', marginRight: muiTheme.spacing(1) }}
                     />
                     <Typography
                         variant="h6"
                         sx={{
                             fontWeight: 600,
-                            color: theme.palette.primary.main,
-                            marginRight: theme.spacing(2)
+                            color: muiTheme.palette.primary.main,
+                            marginRight: muiTheme.spacing(2)
                         }}
                     >
                         MediaLake
@@ -299,10 +306,10 @@ function TopBar() {
                             onDelete={() => handleDeleteTag(tag)}
                             size="small"
                             sx={{
-                                backgroundColor: theme.palette.primary.light,
-                                color: theme.palette.primary.contrastText,
+                                backgroundColor: muiTheme.palette.primary.light,
+                                color: muiTheme.palette.primary.contrastText,
                                 '& .MuiChip-deleteIcon': {
-                                    color: theme.palette.primary.contrastText,
+                                    color: muiTheme.palette.primary.contrastText,
                                 },
                             }}
                         />
@@ -312,12 +319,15 @@ function TopBar() {
                     <Box sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        backgroundColor: 'rgba(0,0,0,0.04)',
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                         borderRadius: '8px',
                         padding: '4px 12px',
                         flex: 1,
                     }}>
-                        <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                        <SearchIcon sx={{
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            mr: 1
+                        }} />
                         <InputBase
                             placeholder={t('common.search')}
                             value={searchInput}
@@ -326,9 +336,13 @@ function TopBar() {
                             fullWidth
                             sx={{
                                 fontSize: '14px',
-                                color: theme.palette.text.primary,
+                                color: theme === 'dark' ? 'white' : muiTheme.palette.text.primary,
                                 '& input': {
                                     padding: '4px 0',
+                                    '&::placeholder': {
+                                        color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'inherit',
+                                        opacity: 1,
+                                    },
                                 },
                             }}
                         />
@@ -342,9 +356,9 @@ function TopBar() {
                             minWidth: 'unset',
                             px: 3,
                             py: 1,
-                            backgroundColor: theme.palette.primary.main,
+                            backgroundColor: muiTheme.palette.primary.main,
                             '&:hover': {
-                                backgroundColor: theme.palette.primary.dark,
+                                backgroundColor: muiTheme.palette.primary.dark,
                             },
                         }}
                     >
@@ -372,16 +386,26 @@ function TopBar() {
                         <Tooltip title={t('common.notifications')}>
                             <IconButton onClick={handleNotificationsClick}>
                                 <Badge badgeContent={getNotificationCount('notification')} color="info">
-                                    <NotificationsIcon color="action" />
+                                    <NotificationsIcon sx={{ color: theme === 'dark' ? 'white' : 'action.active' }} />
                                 </Badge>
                             </IconButton>
                         </Tooltip>
                     </Box>
 
+                    {/* Theme Toggle Button */}
+                    <Tooltip title={theme === 'light' ? t('common.darkMode') : t('common.lightMode')}>
+                        <IconButton onClick={toggleTheme}>
+                            {theme === 'light' ?
+                                <DarkModeIcon sx={{ color: 'action.active' }} /> :
+                                <LightModeIcon sx={{ color: 'white' }} />
+                            }
+                        </IconButton>
+                    </Tooltip>
+
                     {/* Language Selector */}
                     <Tooltip title={t('common.language')}>
                         <IconButton onClick={handleLanguageClick}>
-                            <LanguageIcon />
+                            <LanguageIcon sx={{ color: theme === 'dark' ? 'white' : 'action.active' }} />
                         </IconButton>
                     </Tooltip>
 
@@ -391,7 +415,7 @@ function TopBar() {
                                 sx={{
                                     width: 32,
                                     height: 32,
-                                    backgroundColor: theme.palette.primary.main,
+                                    backgroundColor: muiTheme.palette.primary.main,
                                 }}
                             >
                                 A
@@ -400,7 +424,7 @@ function TopBar() {
                     </Tooltip>
                 </Box>
 
-                {/* Language Menu */}
+                {/* Menus remain the same */}
                 <Menu
                     anchorEl={languageAnchor}
                     open={Boolean(languageAnchor)}
@@ -425,7 +449,6 @@ function TopBar() {
                     ))}
                 </Menu>
 
-                {/* Notifications Menu */}
                 <Menu
                     anchorEl={notificationsAnchor}
                     open={Boolean(notificationsAnchor)}
@@ -442,7 +465,6 @@ function TopBar() {
                     {renderNotificationItems()}
                 </Menu>
 
-                {/* Profile Menu */}
                 <Menu
                     anchorEl={anchorEl}
                     open={Boolean(anchorEl)}
