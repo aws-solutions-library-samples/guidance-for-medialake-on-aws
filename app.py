@@ -3,24 +3,25 @@
 This module serves as the entry point for the MediaLake CDK application.
 """
 import aws_cdk as cdk
-from aws_cdk import (
-    aws_iam as iam,
-    custom_resources as cr,
-)
 
 # from medialake_config import config
 from config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
-from medialake_constructs.api_gateway_main_construct import ApiGatewayConstruct
-from medialake_constructs.api_gateway_connectors import (
+from medialake_constructs.api_gateway.api_gateway_main_construct import (
+    ApiGatewayConstruct,
+)
+from medialake_constructs.api_gateway.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
 )
-from medialake_constructs.api_gateway_pipelines import (
-    PipelinesConstruct,
-    PipelinesProps,
+from medialake_constructs.api_gateway.api_gateway_pipelines import (
+    ApiGatewayPipelinesConstruct,
+    ApiGatewayPipelinesProps,
 )
-from medialake_constructs.api_gateway_search import SearchConstruct, SearchProps
+from medialake_constructs.api_gateway.api_gateway_search import (
+    SearchConstruct,
+    SearchProps,
+)
 from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
@@ -30,7 +31,11 @@ from medialake_constructs.api_gateway.api_gateway_settings import (
     SettingsConstructProps,
 )
 from medialake_constructs.update_construct import UpdateConstruct, UpdateConstructProps
-
+from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
+from medialake_stacks.pipelines_executions_stack import (
+    PipelinesExecutionsStack,
+    PipelinesExecutionsStackProps,
+)
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -43,6 +48,10 @@ class MediaLakeStack(cdk.Stack):
         # Create base infrastructure
         base_infrastructure = BaseInfrastructureStack(
             self, "BaseInfrastructure", env=kwargs.get("env")
+        )
+
+        cleanup_stack = CleanupStack(
+            self, "CleanupStack", props=CleanupStackProps(stub="test")
         )
 
         # User auth with Cognito
@@ -70,6 +79,15 @@ class MediaLakeStack(cdk.Stack):
             props=UIConstructProps(),
         )
 
+        self._pipelines_executions_stack = PipelinesExecutionsStack(
+            self,
+            "PipelinesExecutions",
+            props=PipelinesExecutionsStackProps(
+                # x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+                test="test",
+            ),
+        )
+
         # Create connectors construct
         _ = ConnectorsConstruct(
             self,
@@ -84,11 +102,12 @@ class MediaLakeStack(cdk.Stack):
                 asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
                 asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+                resource_table=cleanup_stack.resource_table,
             ),
         )
 
         # Create pipelines construct
-        _ = PipelinesConstruct(
+        _ = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
             api_resource=api_gateway.api_resource,
@@ -97,9 +116,11 @@ class MediaLakeStack(cdk.Stack):
             x_origin_verify_secret=api_gateway.x_origin_verify_secret,
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             media_assets_bucket=base_infrastructure.media_assets_bucket,
-            props=PipelinesProps(
+            props=ApiGatewayPipelinesProps(
                 asset_table=base_infrastructure.asset_table,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+                get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
+                post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
             ),
         )
 
@@ -190,7 +211,7 @@ if config.enable_ha and config.secondary_region:
         env=cdk.Environment(region=config.secondary_region, account=app.account),
     )
 
-# Add AWS Solutions checks to the entire app
+# # Add AWS Solutions checks to the entire app
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
 # Optionally, add HIPAA Security checks

@@ -44,6 +44,7 @@ class ConnectorsProps:
     iac_assets_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
+    resource_table: dynamodb.Table
 
 
 class ConnectorsConstruct(Construct):
@@ -114,6 +115,10 @@ class ConnectorsConstruct(Construct):
 
         # Create connectors resource
         connectors_resource = api_resource.root.add_resource("connectors")
+
+        # Add connector_id path parameter resource
+        connector_id_resource = connectors_resource.add_resource("{connector_id}")
+
         connectors_get_lambda_config = LambdaConfig(
             name="connectors_get_lambda",
             entry="lambdas/api/connectors/get_connectors",
@@ -149,10 +154,10 @@ class ConnectorsConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
-        # Delete Connector
+        # Delete Connector Lambda config remains the same
         connectors_del_lambda_config = LambdaConfig(
             name="connectors_del_lambda",
-            entry="lambdas/api/connectors/del_connectors",
+            entry="lambdas/api/connectors/rp_connectorId/del_connectorId",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
                 "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
@@ -182,6 +187,7 @@ class ConnectorsConstruct(Construct):
         #         resources=[dynamo_table.kms_key.key_arn],
         #     )
         # )
+
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem"], resources=[dynamo_table.table_arn]
@@ -273,9 +279,15 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        connectors_resource.add_method(
+        # Move the DELETE method to the connector_id_resource and add path parameter mapping
+        connector_id_resource.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(connectors_del_lambda.function),
+            apigateway.LambdaIntegration(
+                connectors_del_lambda.function,
+                request_templates={
+                    "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
+                },
+            ),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
@@ -308,27 +320,28 @@ class ConnectorsConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
-        connector_s3_post_lambda_config = LambdaConfig(
-            name="connector_s3_post",
-            entry="lambdas/api/connectors/s3/post_s3",
-            environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
-                "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
-                "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
-                "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
-                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
-                "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
-            },
-        )
-
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
-            config=connector_s3_post_lambda_config,
+            config=LambdaConfig(
+                name="connector_s3_post",
+                entry="lambdas/api/connectors/s3/post_s3",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
+                    "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+                    "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
+                    "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
+                    "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
+                    "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+                    "RESOURCE_TABLE": props.resource_table.table_name,
+                },
+            ),
         )
+
+        props.resource_table.grant_read_write_data(connector_s3_post_lambda.function)
 
         if props.iac_assets_bucket.bucket.encryption_key:
             connector_s3_post_lambda.function.add_to_role_policy(
@@ -341,20 +354,22 @@ class ConnectorsConstruct(Construct):
                 )
             )
 
-        connector_s3_post_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:ListBucket",
-                    "s3:GetObjectVersion",
-                    "s3:GetObjectAttributes",
-                ],
-                resources=[
-                    props.iac_assets_bucket.bucket.bucket_arn,
-                    f"{props.iac_assets_bucket.bucket.bucket_arn}/*",
-                ],
-            )
-        )
+        # connector_s3_post_lambda.function.role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "s3:GetObject",
+        #             "s3:ListBucket",
+        #             "s3:GetObjectVersion",
+        #             "s3:GetObjectAttributes",
+        #         ],
+        #         resources=[
+        #             props.iac_assets_bucket.bucket.bucket_arn,
+        #             f"{props.iac_assets_bucket.bucket.bucket_arn}/*",
+        #         ],
+        #     )
+        # )
+
+        iac_assets_bucket.bucket.grant_read_write(connector_s3_post_lambda.function)
 
         # Update SQS policy with account-specific ARN
         connector_s3_post_lambda.function.add_to_role_policy(
@@ -384,7 +399,7 @@ class ConnectorsConstruct(Construct):
                 resources=[
                     f"arn:aws:lambda:*:{account_id}:function:*",
                     f"arn:aws:lambda:*:{account_id}:event-source-mapping:*",
-                    f"arn:aws:lambda:*:*:layer:*:*",  # Powertools layer was in a different account
+                    "arn:aws:lambda:*:*:layer:*:*",
                 ],
             )
         )
@@ -488,19 +503,6 @@ class ConnectorsConstruct(Construct):
                 },
             ),
         )
-
-        # s3_explorer_del_lambda = Lambda(
-        #     self,
-        #     "S3ExplorerDelLambda",  # Changed ID to avoid conflict
-        #     config=LambdaConfig(
-        #         name="s3_explorer_del",
-        #         entry="lambdas/api/connectors/s3/explorer/rp_connector_id/del_connector_id",
-        #         environment_variables={
-        #             "X_ORIGIN_VERIFY_SECRET_ARN": (x_origin_verify_secret.secret_arn),
-        #             "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
-        #         },
-        #     ),
-        # )
 
         # Configure the integration with path parameter mapping
         s3_explorer_integration = apigateway.LambdaIntegration(

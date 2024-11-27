@@ -29,11 +29,12 @@ import {
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ConnectorModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (connector: CreateConnectorRequest) => void;
+    onSave: (connectorData: CreateConnectorRequest) => Promise<void>;
     editingConnector?: ConnectorResponse;
 }
 
@@ -59,6 +60,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     editingConnector,
 }) => {
     const theme = useTheme();
+    const queryClient = useQueryClient();
     const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -114,7 +116,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         try {
             if (type === 's3') {
                 await createS3Connector(connectorData);
-                onClose();
+                // Invalidate the connectors query to trigger a refresh
+                await queryClient.invalidateQueries({ queryKey: ['connectors'] });
+                await onSave(connectorData);
             }
         } catch (err) {
             // Error handling is managed by the mutation hook

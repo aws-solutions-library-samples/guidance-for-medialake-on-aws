@@ -4,11 +4,13 @@ import { Add as AddIcon } from '@mui/icons-material';
 import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
 import { useGetConnectors, useDeleteConnector } from '@/api/hooks/useConnectors';
-import { ConnectorResponse } from '@/api/types/api.types';
+import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ConnectorsPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
+    const queryClient = useQueryClient();
 
     const { data: connectorsResponse, isLoading } = useGetConnectors();
     const { mutateAsync: deleteConnector } = useDeleteConnector();
@@ -30,6 +32,14 @@ const ConnectorsPage: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         await deleteConnector(id);
+        // Invalidate the connectors query to trigger a refresh
+        await queryClient.invalidateQueries({ queryKey: ['connectors'] });
+    };
+
+    const handleSave = async (connectorData: CreateConnectorRequest): Promise<void> => {
+        // Ensure query invalidation happens here as well
+        await queryClient.invalidateQueries({ queryKey: ['connectors'] });
+        handleModalClose();
     };
 
     if (isLoading) {
@@ -66,10 +76,7 @@ const ConnectorsPage: React.FC = () => {
             <ConnectorModal
                 open={isModalOpen}
                 onClose={handleModalClose}
-                onSave={() => {
-                    // Handle save
-                    handleModalClose();
-                }}
+                onSave={handleSave}
                 editingConnector={editingConnector}
             />
         </Box>

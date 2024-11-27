@@ -118,16 +118,6 @@ class BaseInfrastructureStack(Stack):
             self, "IngestEventBus", props=ingest_event_bus_config
         )
 
-        # Create Pipeline Executions EventBus
-        self._pipeline_event_bus = EventBus(
-            self,
-            "PipelineEventBus",
-            props=EventBusConfig(
-                bus_name=f"medialake-pipeline-executions-{region}",
-                log_all=True,
-            ),
-        )
-
         # Configure S3 bucket to send notifications to EventBridge
         # self.media_assets_bucket.bucket.enable_event_bridge_notification()
 
@@ -150,7 +140,7 @@ class BaseInfrastructureStack(Stack):
         #             ],
         #         },
         #     ),
-        #     targets=[self._pipeline_event_bus.event_bus],
+        #     targets=[self._pipelines_executions_event_bus.event_bus],
         # )
 
         # self.opensearch_serverless = OpenSearchServerlessConstruct(
@@ -317,8 +307,8 @@ class BaseInfrastructureStack(Stack):
 
     @property
     def pipeline_event_bus(self) -> events.EventBus:
-        return self._pipeline_event_bus.event_bus
+        return self._pipelines_executions_event_bus.event_bus
 
     @property
     def pipeline_event_bus_name(self) -> str:
-        return self._pipeline_event_bus.event_bus_name
+        return self._pipelines_executions_event_bus.event_bus_name

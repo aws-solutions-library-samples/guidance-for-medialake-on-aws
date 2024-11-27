@@ -4,9 +4,13 @@ type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
     theme: Theme;
+    toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({ theme: 'light' });
+const ThemeContext = createContext<ThemeContextType>({
+    theme: 'light',
+    toggleTheme: () => { }
+});
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [theme, setTheme] = useState<Theme>('light');
@@ -27,8 +31,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, []);
 
+    // Apply theme to document
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    };
+
     return (
-        <ThemeContext.Provider value={{ theme }}>
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
             {children}
         </ThemeContext.Provider>
     );

@@ -14,7 +14,7 @@ import SearchPage from '@/pages/SearchPage';
 import { S3Explorer } from '@/features/home/S3Explorer';
 import Home from '@/pages/Home';
 import SettingsComponent from '@/features/settings/SettingsLayout';
-import ExecutionStatusPage from '@/pages/ExecutionStatusPage';
+import ExecutionsPage from '@/pages/ExecutionsPage';
 import PipelinesPage from '@/pages/PipelinesPage';
 import ReviewQueue from '@/pages/reviewQueue';
 import TagsPage from '@/pages/TagsPage';
@@ -25,8 +25,8 @@ import PipelineEditorPage from '@/pages/PipelineEditorPage';
 import { ModalProvider } from '@/components/common/ModalConnector';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { ThemeWrapper } from '@/components/ThemeWrapper';
+import { TimezoneProvider } from '@/contexts/TimezoneContext';
 
-// Rest of the file remains unchanged
 const theme: Theme = {
     name: 'mediaLakeTheme',
     tokens: {
@@ -133,8 +133,14 @@ const components = {
 };
 
 const AuthPage = () => {
-    const { setIsAuthenticated } = useAuth();
+    const { setIsAuthenticated, isAuthenticated } = useAuth();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/');
+        }
+    }, [isAuthenticated, navigate]);
 
     return (
         <Box sx={{
@@ -280,15 +286,8 @@ const AuthPage = () => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
-    const navigate = useNavigate();
 
-    useEffect(() => {
-        if (!isAuthenticated) {
-            navigate('/auth');
-        }
-    }, [isAuthenticated, navigate]);
-
-    return isAuthenticated ? <>{children}</> : null;
+    return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
 };
 
 const AppLayout = () => {
@@ -330,12 +329,12 @@ const router = createBrowserRouter([
             },
             {
                 path: 'executions',
-                element: <ExecutionStatusPage />
+                element: <ExecutionsPage />
             },
-            {
-                path: 'executions/:executionId',
-                element: <ExecutionStatusPage />
-            },
+            // {
+            //     path: 'executions/:executionId',
+            //     element: <ExecutionStatusPage />
+            // },
             {
                 path: 'pipelines/:pipelineId',
                 element: <PipelineEditorPage />
@@ -400,13 +399,15 @@ const AppConfigured: React.FC = () => {
                 <QueryClientProvider client={queryClient}>
                     <AwsConfigProvider>
                         <AuthProvider>
-                            <ThemeProvider>
-                                <ThemeWrapper>
-                                    <ModalProvider>
-                                        <RouterProvider router={router} />
-                                    </ModalProvider>
-                                </ThemeWrapper>
-                            </ThemeProvider>
+                            <TimezoneProvider>
+                                <ThemeProvider>
+                                    <ThemeWrapper>
+                                        <ModalProvider>
+                                            <RouterProvider router={router} />
+                                        </ModalProvider>
+                                    </ThemeWrapper>
+                                </ThemeProvider>
+                            </TimezoneProvider>
                         </AuthProvider>
                     </AwsConfigProvider>
                 </QueryClientProvider>

@@ -32,12 +32,14 @@ import {
     Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useTheme as useCustomTheme } from './hooks/useTheme';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 72;
 
 function Sidebar() {
     const theme = useTheme();
+    const { theme: customTheme } = useCustomTheme();
     const location = useLocation();
     const navigate = useNavigate();
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -45,6 +47,13 @@ function Sidebar() {
 
     const isActive = (path: string) => location.pathname === path;
     const isSettingsActive = (path: string) => location.pathname.includes(path);
+
+    const getIconColor = (isItemActive: boolean) => {
+        if (isItemActive) {
+            return theme.palette.primary.main;
+        }
+        return customTheme === 'dark' ? 'white' : theme.palette.text.secondary;
+    };
 
     const mainMenuItems = [
         {
@@ -133,7 +142,11 @@ function Sidebar() {
             <Box sx={{ overflow: 'auto', py: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, mb: 1 }}>
                     <IconButton onClick={toggleDrawer}>
-                        {isCollapsed ? <MenuIcon /> : <ChevronLeftIcon />}
+                        {isCollapsed ? (
+                            <MenuIcon sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }} />
+                        ) : (
+                            <ChevronLeftIcon sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }} />
+                        )}
                     </IconButton>
                 </Box>
                 <List>
@@ -161,9 +174,7 @@ function Sidebar() {
                                                     minWidth: 0,
                                                     mr: 'auto',
                                                     justifyContent: 'center',
-                                                    color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
-                                                        ? theme.palette.primary.main
-                                                        : theme.palette.text.secondary,
+                                                    color: getIconColor(isActive(item.path || '') || (item.isExpandable && item.isExpanded)),
                                                 }}
                                             >
                                                 {item.icon}
@@ -188,9 +199,7 @@ function Sidebar() {
                                         }}
                                     >
                                         <ListItemIcon sx={{
-                                            color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
-                                                ? theme.palette.primary.main
-                                                : theme.palette.text.secondary,
+                                            color: getIconColor(isActive(item.path || '') || (item.isExpandable && item.isExpanded)),
                                             minWidth: '40px'
                                         }}>
                                             {item.icon}
@@ -203,7 +212,7 @@ function Sidebar() {
                                                         fontWeight: isActive(item.path || '') || (item.isExpandable && item.isExpanded) ? 600 : 400,
                                                         color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
                                                             ? theme.palette.primary.main
-                                                            : theme.palette.text.primary
+                                                            : customTheme === 'dark' ? 'white' : theme.palette.text.primary
                                                     }}
                                                 >
                                                     {item.text}
@@ -211,7 +220,9 @@ function Sidebar() {
                                             }
                                         />
                                         {item.isExpandable && (
-                                            item.isExpanded ? <ExpandLess /> : <ExpandMore />
+                                            <Box sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }}>
+                                                {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
+                                            </Box>
                                         )}
                                     </ListItemButton>
                                 )}
@@ -239,9 +250,7 @@ function Sidebar() {
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{
-                                                        color: isSettingsActive(subItem.text.toLowerCase())
-                                                            ? theme.palette.primary.main
-                                                            : theme.palette.text.secondary,
+                                                        color: getIconColor(isSettingsActive(subItem.text.toLowerCase())),
                                                         minWidth: '40px'
                                                     }}>
                                                         {subItem.icon}
@@ -254,7 +263,7 @@ function Sidebar() {
                                                                     fontWeight: isSettingsActive(subItem.text.toLowerCase()) ? 600 : 400,
                                                                     color: isSettingsActive(subItem.text.toLowerCase())
                                                                         ? theme.palette.primary.main
-                                                                        : theme.palette.text.primary
+                                                                        : customTheme === 'dark' ? 'white' : theme.palette.text.primary
                                                                 }}
                                                             >
                                                                 {subItem.text}
