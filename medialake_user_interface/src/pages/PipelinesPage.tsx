@@ -15,10 +15,18 @@ import {
     IconButton,
     Tooltip,
     Button,
+    Snackbar,
+    Alert
 } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+
 import EditIcon from '@mui/icons-material/Edit';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
+import { PipelineResponse, CreatePipelineRequest } from '@/api/types/api.types';
+import { useCreatePipeline } from '../api/hooks/usePipelines';
+
 
 const pipelineTypes = {
     INGEST: 'Ingest Triggered',
@@ -36,11 +44,12 @@ interface Pipeline {
 }
 
 const mockPipelines: Pipeline[] = [
-    { id: 1, name: 'Video Analysis', creationDate: '2023-05-01', type: pipelineTypes.INGEST },
-    { id: 2, name: 'Image Analysis', creationDate: '2023-05-02', type: pipelineTypes.INGEST },
-    { id: 3, name: 'Audio Analysis', creationDate: '2023-05-03', type: pipelineTypes.INGEST },
-    { id: 4, name: 'Metadata Extraction', creationDate: '2023-05-04', type: pipelineTypes.MANUAL },
-    { id: 5, name: 'Content Moderation', creationDate: '2023-05-05', type: pipelineTypes.MANUAL },
+    { id: 1, name: 'Default Image Pipeline', creationDate: '2024-11-27', type: pipelineTypes.INGEST },
+    { id: 2, name: 'Video Analysis', creationDate: '2023-05-01', type: pipelineTypes.INGEST },
+    { id: 3, name: 'Image Analysis', creationDate: '2023-05-02', type: pipelineTypes.INGEST },
+    { id: 4, name: 'Audio Analysis', creationDate: '2023-05-03', type: pipelineTypes.INGEST },
+    { id: 5, name: 'Metadata Extraction', creationDate: '2023-05-04', type: pipelineTypes.MANUAL },
+    { id: 6, name: 'Content Moderation', creationDate: '2023-05-05', type: pipelineTypes.MANUAL },
 ];
 
 interface Node {
@@ -99,11 +108,294 @@ const PipelinesPage: React.FC = () => {
     const [sortColumn, setSortColumn] = useState<keyof Pipeline>('name');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [filterText, setFilterText] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
+
+
+    const createPipeline = useCreatePipeline();
     const navigate = useNavigate();
+
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+        open: false,
+        message: '',
+        severity: 'success',
+    });
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     const handleEdit = (id: number) => {
         navigate(`/pipelines/${id}`);
     };
+
+    const hardcodedPipelineData: CreatePipelineRequest = {
+        "name": "image-pipeline",
+        "type": "s3",
+        "definition": {
+            "nodes": [
+                {
+                    "id": "dndnode_0",
+                    "type": "custom",
+                    "position": {
+                        "x": 154,
+                        "y": 273
+                    },
+                    "data": {
+                        "id": "03c23094-d405-4aa7-a243-5a7a8f71d4a5",
+                        "type": "imageasset",
+                        "label": "Image Asset",
+                        "icon": {
+                            "key": null,
+                            "ref": null,
+                            "props": {
+                                "size": 20
+                            },
+                            "_owner": null
+                        },
+                        "inputTypes": [
+                            "image"
+                        ],
+                        "outputTypes": [
+                            "image"
+                        ]
+                    },
+                    "width": 60,
+                    "height": 55,
+                    "positionAbsolute": {
+                        "x": 154,
+                        "y": 273
+                    }
+                },
+                {
+                    "id": "dndnode_2",
+                    "type": "custom",
+                    "position": {
+                        "x": 187,
+                        "y": 380
+                    },
+                    "data": {
+                        "id": "57207390-4b93-4c07-a1cc-e4733710b842",
+                        "type": "imagemetadata",
+                        "label": "Image Metadata",
+                        "icon": {
+                            "key": null,
+                            "ref": null,
+                            "props": {
+                                "size": 20
+                            },
+                            "_owner": null
+                        },
+                        "inputTypes": [
+                            "image"
+                        ],
+                        "outputTypes": [
+                            "image"
+                        ]
+                    },
+                    "width": 60,
+                    "height": 55,
+                    "positionAbsolute": {
+                        "x": 187,
+                        "y": 380
+                    }
+                },
+                {
+                    "id": "dndnode_3",
+                    "type": "custom",
+                    "position": {
+                        "x": 196,
+                        "y": 467
+                    },
+                    "data": {
+                        "id": "9361ac53-13e9-4358-adde-3e4cd023954f",
+                        "type": "imageproxy",
+                        "label": "Image Proxy",
+                        "icon": {
+                            "key": null,
+                            "ref": null,
+                            "props": {
+                                "size": 20
+                            },
+                            "_owner": null
+                        },
+                        "inputTypes": [
+                            "image"
+                        ],
+                        "outputTypes": [
+                            "image"
+                        ]
+                    },
+                    "width": 60,
+                    "height": 55,
+                    "selected": true,
+                    "positionAbsolute": {
+                        "x": 196,
+                        "y": 467
+                    },
+                    "dragging": false
+                },
+                {
+                    "id": "dndnode_4",
+                    "type": "custom",
+                    "position": {
+                        "x": 216,
+                        "y": 582
+                    },
+                    "data": {
+                        "id": "6773f9ef-2161-42c1-9485-11ef1c23f3b4",
+                        "type": "imagethumbnail",
+                        "label": "Image Thumbnail",
+                        "icon": {
+                            "key": null,
+                            "ref": null,
+                            "props": {
+                                "size": 20
+                            },
+                            "_owner": null
+                        },
+                        "inputTypes": [
+                            "image"
+                        ],
+                        "outputTypes": [
+                            "image"
+                        ]
+                    },
+                    "width": 60,
+                    "height": 55,
+                    "positionAbsolute": {
+                        "x": 216,
+                        "y": 582
+                    }
+                },
+                {
+                    "id": "dndnode_5",
+                    "type": "custom",
+                    "position": {
+                        "x": 317.4421648673655,
+                        "y": 644.8991829079268
+                    },
+                    "data": {
+                        "id": "14a670a0-967d-452c-9e0e-cf2f9e92d634",
+                        "type": "medialake",
+                        "label": "MediaLake",
+                        "icon": {
+                            "key": null,
+                            "ref": null,
+                            "props": {
+                                "size": 20
+                            },
+                            "_owner": null
+                        },
+                        "inputTypes": [
+                            "video",
+                            "audio",
+                            "image",
+                            "metadata"
+                        ],
+                        "outputTypes": []
+                    },
+                    "width": 60,
+                    "height": 55,
+                    "positionAbsolute": {
+                        "x": 317.4421648673655,
+                        "y": 644.8991829079268
+                    }
+                }
+            ],
+            "edges": [
+                {
+                    "source": "dndnode_0",
+                    "sourceHandle": null,
+                    "target": "dndnode_2",
+                    "targetHandle": null,
+                    "type": "custom",
+                    "data": {
+                        "text": "to Image Metadata"
+                    },
+                    "id": "reactflow__edge-dndnode_0-dndnode_2"
+                },
+                {
+                    "source": "dndnode_2",
+                    "sourceHandle": null,
+                    "target": "dndnode_3",
+                    "targetHandle": null,
+                    "type": "custom",
+                    "data": {
+                        "text": "to Image Proxy"
+                    },
+                    "id": "reactflow__edge-dndnode_2-dndnode_3"
+                },
+                {
+                    "source": "dndnode_3",
+                    "sourceHandle": null,
+                    "target": "dndnode_4",
+                    "targetHandle": null,
+                    "type": "custom",
+                    "data": {
+                        "text": "to Image Thumbnail"
+                    },
+                    "id": "reactflow__edge-dndnode_3-dndnode_4"
+                },
+                {
+                    "source": "dndnode_4",
+                    "sourceHandle": null,
+                    "target": "dndnode_5",
+                    "targetHandle": null,
+                    "type": "custom",
+                    "data": {
+                        "text": "to MediaLake"
+                    },
+                    "id": "reactflow__edge-dndnode_4-dndnode_5"
+                }
+            ],
+            "viewport": {
+                "x": -130.31858746589876,
+                "y": -141.11180335713357,
+                "zoom": 0.9460576467255969
+            }
+        }
+    };
+
+
+    const handleCreatePipeline = async (pipelineData: CreatePipelineRequest) => {
+        setIsCreatingPipeline(true);
+        try {
+
+            await createPipeline.mutateAsync(pipelineData);
+            setSnackbar({
+                open: true,
+                message: 'Pipeline created successfully',
+                severity: 'success'
+            });
+
+        } catch (err: any) {
+            let errorMessage = 'Failed to create pipeline. Please try again.';
+
+            if (err.response) {
+                // Handle API error responses
+                const { status, data } = err.response;
+                if (status === 409 && data.error) {
+                    errorMessage = data.error;
+                } else if (data.message) {
+                    errorMessage = data.message;
+                }
+            } else if (err.message) {
+                // Handle other error types
+                errorMessage = err.message;
+            }
+
+            setSnackbar({
+                open: true,
+                message: errorMessage,
+                severity: 'error'
+            });
+
+        } finally {
+            setIsCreatingPipeline(false);
+        }
+    };
+
 
     const handleAddNew = () => {
         navigate('/pipeline');
@@ -226,11 +518,28 @@ const PipelinesPage: React.FC = () => {
                                         />
                                     </TableCell>
                                     <TableCell align="right">
-                                        <Tooltip title="Edit Pipeline">
-                                            <IconButton onClick={() => handleEdit(pipeline.id)} size="small">
-                                                <EditIcon />
-                                            </IconButton>
-                                        </Tooltip>
+                                        {pipeline.id !== 1 && (
+                                            <Tooltip title="Edit Pipeline">
+                                                <IconButton onClick={() => handleEdit(pipeline.id)} size="small">
+                                                    <EditIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {pipeline.id === 1 && (
+                                            <Tooltip title="Deploy Pipeline">
+                                                <IconButton
+                                                    onClick={() => handleCreatePipeline(hardcodedPipelineData)}
+                                                    size="small"
+                                                    disabled={isCreatingPipeline}
+                                                >
+                                                    {isCreatingPipeline ? (
+                                                        <CircularProgress size={24} />
+                                                    ) : (
+                                                        <RocketLaunchIcon />
+                                                    )}
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -238,6 +547,15 @@ const PipelinesPage: React.FC = () => {
                     </Table>
                 </TableContainer>
             </Box>
+            <Snackbar
+                open={snackbar.open}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}>
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

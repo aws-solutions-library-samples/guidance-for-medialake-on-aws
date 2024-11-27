@@ -204,3 +204,96 @@ export interface UserResponse {
     user: User;
   }
 }
+
+
+// Pipelines
+
+export interface PipelineNode {
+  id: string;
+  type: string;
+  position: {
+    x: number;
+    y: number;
+  };
+  data: {
+    id: string;
+    type: string;
+    label: string;
+    icon: {
+      key: null;
+      ref: null;
+      props: {
+        size: number;
+      };
+      _owner: null;
+    };
+    inputTypes: string[];
+    outputTypes: string[];
+  };
+  width: number;
+  height: number;
+  positionAbsolute: {
+    x: number;
+    y: number;
+  };
+  selected?: boolean;
+  dragging?: boolean;
+}
+
+export interface PipelineEdge {
+  source: string;
+  sourceHandle: null;
+  target: string;
+  targetHandle: null;
+  type: string;
+  data: {
+    text: string;
+  };
+  id: string;
+}
+
+export interface PipelineViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+
+export interface CreatePipelineRequest {
+  name: string;
+  type: string;
+  definition: {
+    nodes: PipelineNode[];
+    edges: PipelineEdge[];
+    viewport: PipelineViewport;
+  };
+}
+
+export interface PipelineResponse {
+  id: string;
+  name: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
+  definition: {
+    nodes: PipelineNode[];
+    edges: PipelineEdge[];
+    viewport: PipelineViewport;
+  };
+  queueUrl: string;
+  queueArn: string;
+  eventBridgeRuleArn: string;
+  triggerLambdaArn: string;
+  stateMachineArn: string;
+  roleArn: string;
+}
+
+export interface Pipeline extends PipelineResponse { }
+
+export interface PipelineListResponse {
+  status: string;
+  message: string;
+  data: {
+    pipelines: PipelineResponse[];
+  }
+}
