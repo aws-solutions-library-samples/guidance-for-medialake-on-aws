@@ -22,7 +22,7 @@ import boto3
 import os
 import json
 from http import HTTPStatus
-from utils import generate_presigned_url
+from utils import generate_presigned_url, replace_binary_data
 
 
 # Initialize AWS Lambda Powertools
@@ -165,6 +165,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
 
         # Add any additional metadata or computed fields
         enriched_asset = enrich_asset_data(asset_data)
+        print(enriched_asset)
 
         return create_response(
             HTTPStatus.OK,
@@ -172,16 +173,10 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
             {"asset": enriched_asset},
         )
 
-    except AssetDetailsError as e:
-        logger.warning(
-            f"Asset retrieval failed: {str(e)}",
-            extra={"asset_id": asset_id, "error_code": e.status_code},
-        )
-        return create_response(e.status_code, str(e))
-
-    except Exception as e:
+    except Exception as e:  
+        error_message = str(e) if isinstance(str(e), str) else e.args[0] if e.args else "Unknown error"
         logger.error(
-            f"Unexpected error during asset retrieval: {str(e)}",
+            f"Unexpected error during asset retrieval: {error_message}",
             extra={"asset_id": asset_id},
         )
         metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
@@ -202,7 +197,7 @@ def get_url_for_purpose(asset, purpose):
 
 @tracer.capture_method
 def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
-    """Enrich asset data with additional computed fields."""
+    """Enrich asset data with additional computed fields and handle binary data."""
     try:
         thumbnail_url = get_url_for_purpose(asset, "thumbnail")
         proxy_url = get_url_for_purpose(asset, "proxy")
@@ -224,6 +219,10 @@ def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
             "LastModified": asset["DigitalSourceAsset"].get("UpdateDate", asset["DigitalSourceAsset"]["CreateDate"]),
             # Add other computed fields as needed
         }
+
+        # Replace binary data with "BINARY DATA" text
+        asset = replace_binary_data(asset)
+
         return asset
     except Exception as e:
         logger.error(f"Error enriching asset data: {str(e)}")

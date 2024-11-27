@@ -54,3 +54,19 @@ def generate_presigned_url(
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")
         return None
+
+
+def replace_binary_data(data: Any) -> Any:
+    """Recursively replace binary data with "BINARY DATA" text."""
+    if isinstance(data, dict):
+        return {k: replace_binary_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [replace_binary_data(item) for item in data]
+    elif isinstance(data, bytes):
+        return "BINARY DATA"
+    elif isinstance(data, boto3.dynamodb.types.Binary):
+        return "BINARY DATA"
+    elif isinstance(data, boto3.dynamodb.types.Decimal):
+        return float(data)  # Convert Decimal to float for JSON serialization
+    else:
+        return data
