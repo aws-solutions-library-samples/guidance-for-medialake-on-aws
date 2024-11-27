@@ -13,6 +13,7 @@ from opensearchpy import (
     RequestsAWSV4SignerAuth,
     OpenSearch,
     OpenSearchException,
+    helpers
 )
 from datetime import datetime
 import json
