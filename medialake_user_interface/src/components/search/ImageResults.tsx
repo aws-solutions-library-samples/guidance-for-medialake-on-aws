@@ -18,7 +18,8 @@ import SortIcon from '@mui/icons-material/Sort';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { ImageItem, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy } from '@/types/search/searchResults'
 
-const ITEMS_PER_PAGE = 12;
+// const ITEMS_PER_PAGE = 12;
+const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x300';
 
 // Move formatFileSize outside of the component to make it available everywhere
 const formatFileSize = (bytes: number): string => {
@@ -37,16 +38,16 @@ const formatFileSize = (bytes: number): string => {
 const renderCardField = (fieldId: string, image: ImageItem): string => {
     switch (fieldId) {
         case 'name':
-            return image.mainRepresentation.storage.path;
+            return image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
         case 'format':
-            return image.mainRepresentation.format;
+            return image.DigitalSourceAsset.MainRepresentation.Format;
         case 'createDate':
-            return new Date(image.createDate).toLocaleDateString();
+            return new Date(image.DigitalSourceAsset.CreateDate).toLocaleDateString();
         case 'fileSize':
-            return formatFileSize(image.mainRepresentation.storage.fileSize);
-        case 'dimensions':
-            const spec = image.mainRepresentation.imageSpec;
-            return spec?.width && spec?.height ? `${spec.width}x${spec.height}` : '-';
+            return formatFileSize(image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size);
+        // case 'dimensions':
+        //     const spec = image.DigitalSourceAsset.MainRepresentation. .imageSpec;
+        //     return spec?.width && spec?.height ? `${spec.width}x${spec.height}` : '-';
         default:
             return '';
     }
@@ -63,13 +64,14 @@ interface ImageResultsProps {
     onPageChange: (page: number) => void;
 }
 
+
 const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange }) => {
-    // Deduplicate results based on inventoryId
+    // Deduplicate results based on InventoryID
     const uniqueResults = images.reduce((acc, current) => {
         // Take the most complete version of each asset (one with thumbnail)
-        const existing = acc.get(current.inventoryId);
+        const existing = acc.get(current.InventoryID);
         if (!existing || (!existing.thumbnailUrl && current.thumbnailUrl)) {
-            acc.set(current.inventoryId, current);
+            acc.set(current.InventoryID, current);
         }
         return acc;
     }, new Map());
@@ -82,7 +84,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [order, setOrder] = useState<Order>('asc');
-    const [orderBy, setOrderBy] = useState<OrderBy>('path');
+    const [orderBy, setOrderBy] = useState<OrderBy>('name');
     const [page, setPage] = useState(searchMetadata.page);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null);
@@ -101,7 +103,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
             minWidth: 100
         },
         {
-            id: 'path',
+            id: 'name',
             label: 'Name',
             visible: true,
             minWidth: 200,
@@ -126,16 +128,16 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
             minWidth: 100,
             format: (value: number) => formatFileSize(value),
         },
-        {
-            id: 'dimensions',
-            label: 'Dimensions',
-            visible: false,
-            minWidth: 120,
-            format: (image: ImageItem) => {
-                const spec = image.mainRepresentation.imageSpec;
-                return spec?.width && spec?.height ? `${spec.width}x${spec.height}` : '-';
-            },
-        },
+        // {
+        //     id: 'dimensions',
+        //     label: 'Dimensions',
+        //     visible: false,
+        //     minWidth: 120,
+        //     format: (image: ImageItem) => {
+        //         const spec = image.mainRepresentation.imageSpec;
+        //         return spec?.width && spec?.height ? `${spec.width}x${spec.height}` : '-';
+        //     },
+        // },
         {
             id: 'actions',
             label: 'Actions',
@@ -158,6 +160,11 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
         { id: 'fileSize', label: 'File Size', visible: false },
         { id: 'dimensions', label: 'Dimensions', visible: false },
     ]);
+    const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+    const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        event.currentTarget.src = PLACEHOLDER_IMAGE;
+    };
 
     const handleColumnToggle = (columnId: string) => {
         setColumns(columns.map(col =>
@@ -166,6 +173,9 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     };
 
     const getImageUrl = (image: ImageItem) => {
+        if (failedImages.has(image.InventoryID)) {
+            return 'https://via.placeholder.com/400x300';
+        }
         return image.thumbnailUrl || 'https://via.placeholder.com/400x300';
     };
 
@@ -189,13 +199,13 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
 
         switch (action) {
             case 'edit':
-                console.log('Edit:', selectedImage.mainRepresentation.storage.path);
+                console.log('Edit:', selectedImage.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'delete':
-                console.log('Delete:', selectedImage.mainRepresentation.storage.path);
+                console.log('Delete:', selectedImage.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'share':
-                console.log('Share:', selectedImage.mainRepresentation.storage.path);
+                console.log('Share:', selectedImage.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'download':
                 window.open(getImageUrl(selectedImage), '_blank');
@@ -226,30 +236,30 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     const sortedImages = React.useMemo(() => {
         const comparator = (a: ImageItem, b: ImageItem) => {
             switch (orderBy) {
-                case 'path':
+                case 'name':
                     return order === 'asc'
-                        ? a.mainRepresentation.storage.path.localeCompare(b.mainRepresentation.storage.path)
-                        : b.mainRepresentation.storage.path.localeCompare(a.mainRepresentation.storage.path);
+                        ? a.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(b.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name)
+                        : b.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(a.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 case 'format':
                     return order === 'asc'
-                        ? a.mainRepresentation.format.localeCompare(b.mainRepresentation.format)
-                        : b.mainRepresentation.format.localeCompare(a.mainRepresentation.format);
+                        ? a.DigitalSourceAsset.MainRepresentation.Format.localeCompare(b.DigitalSourceAsset.MainRepresentation.Format)
+                        : b.DigitalSourceAsset.MainRepresentation.Format.localeCompare(a.DigitalSourceAsset.MainRepresentation.Format);
                 case 'createDate':
                     return order === 'asc'
-                        ? new Date(a.createDate).getTime() - new Date(b.createDate).getTime()
-                        : new Date(b.createDate).getTime() - new Date(a.createDate).getTime();
+                        ? new Date(a.DigitalSourceAsset.CreateDate).getTime() - new Date(b.DigitalSourceAsset.CreateDate).getTime()
+                        : new Date(b.DigitalSourceAsset.CreateDate).getTime() - new Date(a.DigitalSourceAsset.CreateDate).getTime();
                 case 'fileSize':
-                    const aSize = a.mainRepresentation.storage.fileSize || 0;
-                    const bSize = b.mainRepresentation.storage.fileSize || 0;
+                    const aSize = a.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size || 0;
+                    const bSize = b.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size || 0;
                     return order === 'asc' ? aSize - bSize : bSize - aSize;
-                case 'dimensions':
-                    const aWidth = a.mainRepresentation.imageSpec?.width || 0;
-                    const bWidth = b.mainRepresentation.imageSpec?.width || 0;
-                    const aHeight = a.mainRepresentation.imageSpec?.height || 0;
-                    const bHeight = b.mainRepresentation.imageSpec?.height || 0;
-                    const aPixels = aWidth * aHeight;
-                    const bPixels = bWidth * bHeight;
-                    return order === 'asc' ? aPixels - bPixels : bPixels - aPixels;
+                // case 'dimensions':
+                //     const aWidth = a.mainRepresentation.imageSpec?.width || 0;
+                //     const bWidth = b.mainRepresentation.imageSpec?.width || 0;
+                //     const aHeight = a.mainRepresentation.imageSpec?.height || 0;
+                //     const bHeight = b.mainRepresentation.imageSpec?.height || 0;
+                //     const aPixels = aWidth * aHeight;
+                //     const bPixels = bWidth * bHeight;
+                //     return order === 'asc' ? aPixels - bPixels : bPixels - aPixels;
                 default:
                     return 0;
             }
@@ -272,7 +282,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     const handleDeleteConfirm = async () => {
         if (imageToDelete) {
             try {
-                await deleteAsset.mutateAsync(imageToDelete.inventoryId);
+                await deleteAsset.mutateAsync(imageToDelete.InventoryID);
                 setIsDeleteModalOpen(false);
                 setImageToDelete(null);
             } catch (error) {
@@ -284,8 +294,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     };
 
     const handleStartEditing = (image: ImageItem) => {
-        setEditingImageId(image.inventoryId);
-        setEditedName(image.mainRepresentation.storage.path);
+        setEditingImageId(image.InventoryID);
+        setEditedName(image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
     };
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,7 +303,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     };
 
     const handleNameEditComplete = (image: ImageItem) => {
-        if (editedName !== image.mainRepresentation.storage.path) {
+        if (editedName !== image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
             setImageToRename({ image, newName: editedName });
             setIsRenameDialogOpen(true);
         }
@@ -305,7 +315,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
         if (imageToRename) {
             try {
                 await renameAsset.mutateAsync({
-                    inventoryId: imageToRename.inventoryId,
+                    inventoryId: imageToRename.InventoryID,
                     newName
                 });
                 setIsRenameDialogOpen(false);
@@ -348,7 +358,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     const renderCardView = () => (
         <Grid container spacing={3}>
             {paginatedImages.map((image) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={image.inventoryId}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={image.InventoryID}>
                     <Box
                         sx={{
                             position: 'relative',
@@ -359,7 +369,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                         }}
                     >
                         <Box
-                            onClick={() => handleImageClick(image.inventoryId)}
+                            onClick={() => handleImageClick(image.InventoryID)}
                             sx={{
                                 cursor: 'pointer',
                                 borderRadius: 2,
@@ -377,7 +387,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                             <Box
                                 component="img"
                                 src={getImageUrl(image)}
-                                alt={image.mainRepresentation.storage.path}
+                                alt={image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                onError={handleImageError}
                                 sx={{
                                     width: '100%',
                                     height: 300,
@@ -404,7 +415,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                                                     lineHeight: 1.2,
                                                 }}
                                             >
-                                                {image.mainRepresentation.storage.path}
+                                                {image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                                             </Typography>
                                         </Box>
                                         <Typography
@@ -481,9 +492,9 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                 <TableBody>
                     {paginatedImages.map((image) => (
                         <TableRow
-                            key={image.inventoryId}
+                            key={image.InventoryID}
                             hover
-                            onClick={() => handleImageClick(image.inventoryId)}
+                            onClick={() => handleImageClick(image.InventoryID)}
                             sx={{ cursor: 'pointer' }}
                         >
                             {columns.filter(col => col.visible).map((column) => (
@@ -505,7 +516,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                     <Box
                         component="img"
                         src={getImageUrl(image)}
-                        alt={image.mainRepresentation.storage.path}
+                        alt={image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                        onError={handleImageError}
                         sx={{
                             width: 60,
                             height: 60,
@@ -514,10 +526,10 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                         }}
                     />
                 );
-            case 'path':
+            case 'name':
                 return (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {editingImageId === image.inventoryId ? (
+                        {editingImageId === image.InventoryID ? (
                             <TextField
                                 value={editedName}
                                 onChange={handleNameChange}
@@ -534,7 +546,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                             />
                         ) : (
                             <>
-                                <Typography>{image.mainRepresentation.storage.path}</Typography>
+                                <Typography>{image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}</Typography>
                                 <IconButton
                                     size="small"
                                     onClick={(e) => {
@@ -549,13 +561,13 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                     </Box>
                 );
             case 'format':
-                return image.mainRepresentation.format;
+                return image.DigitalSourceAsset.MainRepresentation.Format;
             case 'createDate':
-                return column.format ? column.format(image.createDate) : image.createDate;
+                return column.format ? column.format(image.DigitalSourceAsset.CreateDate) : image.DigitalSourceAsset.CreateDate;
             case 'fileSize':
-                return column.format ? column.format(image.mainRepresentation.storage.fileSize) : '-';
-            case 'dimensions':
-                return column.format ? column.format(image) : '-';
+                return column.format ? column.format(image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size) : '-';
+            // case 'dimensions':
+            //     return column.format ? column.format(image) : '-';
             case 'actions':
                 return (
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
@@ -579,10 +591,10 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
     };
 
     const handleTableNameEditComplete = async (image: ImageItem) => {
-        if (editedName !== image.mainRepresentation.storage.path) {
+        if (editedName !== image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
             try {
                 await renameAsset.mutateAsync({
-                    inventoryId: image.inventoryId,
+                    inventoryId: image.InventoryID,
                     newName: editedName
                 });
             } catch (error) {
@@ -667,7 +679,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                 </Typography>
                 {[
                     { id: 'createDate', label: 'Created Date' },
-                    { id: 'path', label: 'Name' },
+                    { id: 'name', label: 'Name' },
                     { id: 'format', label: 'Format' },
                     { id: 'fileSize', label: 'File Size' },
                     { id: 'dimensions', label: 'Dimensions' },
@@ -883,7 +895,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
             {viewMode === 'card' ? (
                 <Grid container spacing={3}>
                     {paginatedImages.map((image) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={image.inventoryId}>
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={image.InventoryID}>
                             <Box
                                 sx={{
                                     position: 'relative',
@@ -894,7 +906,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                                 }}
                             >
                                 <Box
-                                    onClick={() => handleImageClick(image.inventoryId)}
+                                    onClick={() => handleImageClick(image.InventoryID)}
                                     sx={{
                                         cursor: 'pointer',
                                         borderRadius: 2,
@@ -909,7 +921,8 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                                     <Box
                                         component="img"
                                         src={getImageUrl(image)}
-                                        alt={image.mainRepresentation.storage.path}
+                                        alt={image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                        onError={handleImageError}
                                         sx={{
                                             width: '100%',
                                             height: 200,
@@ -1006,7 +1019,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
             <ConfirmationModal
                 open={isDeleteModalOpen}
                 title="Delete Image"
-                message={`Are you sure you want to delete "${imageToDelete?.mainRepresentation.storage.path}"? This action cannot be undone.`}
+                message={`Are you sure you want to delete "${imageToDelete?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}"? This action cannot be undone.`}
                 onConfirm={handleDeleteConfirm}
                 onCancel={() => {
                     setIsDeleteModalOpen(false);
@@ -1020,7 +1033,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                 <RenameDialog
                     open={isRenameDialogOpen}
                     title="Rename Asset"
-                    currentName={selectedImage?.mainRepresentation.storage.path || ''}
+                    currentName={selectedImage?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name || ''}
                     onConfirm={handleRenameConfirm}
                     onCancel={() => {
                         setIsRenameDialogOpen(false);

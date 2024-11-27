@@ -33,7 +33,7 @@ def lambda_handler(event, context):
             )
 
             print(
-                f"Started execution for asset {asset['id']}: {response['executionArn']}"
+                f"Started execution for asset {asset['InventoryID']}: {response['executionArn']}"
             )
 
         return {"statusCode": 200, "body": "Successfully processed all assets"}

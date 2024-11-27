@@ -198,17 +198,102 @@ class OpenSearchCluster(Construct):
             resource_type="Custom::OpenSearchCreateIndex",
         )
 
-        # Ensure the custom resource is created after the domain
+        
         create_index_resource.node.add_dependency(self.domain)
 
-        # access_policies = iam.PolicyStatement(
-        #     effect=iam.Effect.ALLOW,
-        #     actions=["es:*"],
-        #     principals=[iam.AnyPrincipal()],
-        #     resources=[f"{self.domain.domain_arn}/*"],
+        # # Create OpenSearch Ingestion Pipeline Role
+        # self.pipeline_role = iam.Role(
+        #     self,
+        #     "IngestionRole",
+        #     assumed_by=iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
         # )
+        
+        # # OpenSearch encryption policy
+        # for collection_name in props.collection_indexes:
+        #     encryption_policy = opensearch.CfnSecurityPolicy(
+        #         self,
+        #         "EncryptionPolicy",
+        #         name="ddb-etl-encryption-policy",
+        #         type="encryption",
+        #         description=f"Encryption policy for {collection_name} collection.",
+        #         policy=json.dumps(
+        #             {
+        #                 "Rules": [
+        #                     {
+        #                         "ResourceType": "collection",
+        #                         "Resource": [f"collection/{collection_name}*"],
+        #                     }
+        #                 ],
+        #                 "AWSOwnedKey": True,
+        #             }
+        #         ),
+        #     )
+            
+            
+        #     # OpenSearch network policy
+        #     network_policy = opensearch.CfnSecurityPolicy(
+        #         self,
+        #         "NetworkPolicy",
+        #         name="ddb-etl-network-policy",
+        #         type="network",
+        #         description=f"Network policy for {collection_name} collection.",
+        #         policy=json.dumps(
+        #             [
+        #                 {
+        #                     "Rules": [
+        #                         {
+        #                             "ResourceType": "collection",
+        #                             "Resource": [f"collection/{collection_name}"],
+        #                         },
+        #                         {
+        #                             "ResourceType": "dashboard",
+        #                             "Resource": [f"collection/{collection_name}"],
+        #                         },
+        #                     ],
+        #                     "AllowFromPublic": True,
+        #                 }
+        #             ]
+        #         ),
+        #     )
 
-        # self.domain.add_access_policies(access_policies)
+        #     # OpenSearch data access policy
+        #     data_access_policy = opensearch.CfnAccessPolicy(
+        #         self,
+        #         "DataAccessPolicy",
+        #         name="ddb-etl-access-policy",
+        #         type="data",
+        #         description=f"Data access policy for {collection_name} collection.",
+        #         policy=json.dumps(
+        #             [
+        #                 {
+        #                     "Rules": [
+        #                         {
+        #                             "ResourceType": "collection",
+        #                             "Resource": [f"collection/{collection_name}*"],
+        #                             "Permission": [
+        #                                 "es:ESHttpGet",
+        #                                 "es:ESHttpPost",
+        #                                 "es:ESHttpPut"
+        #                             ],
+        #                         },
+        #                         {
+        #                             "ResourceType": "index",
+        #                             "Resource": [f"index/{collection_name}*/*"],
+        #                             "Permission": [
+        #                                 "es:ESHttpGet",
+        #                                 "es:ESHttpPost",
+        #                                 "es:ESHttpPut"  
+        #                             ],
+        #                         },
+        #                     ],
+        #                     "Principal": [
+        #                         props.pipeline_role.role_arn,
+        #                         f"arn:aws:iam::{stack.account}:user/Admin",
+        #                     ],
+        #                 }
+        #             ]
+        #         ),
+        #     )
 
     @property
     def domain_endpoint(self) -> str:
@@ -221,3 +306,5 @@ class OpenSearchCluster(Construct):
     @property
     def opensearch_instance(self) -> opensearch.Domain:
         return self.domain
+    
+  
