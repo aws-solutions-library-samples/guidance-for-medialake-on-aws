@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     Box,
     Typography,
@@ -26,9 +26,13 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useS3Explorer } from '../../api/hooks/useS3Explorer';
 import { formatFileSize } from '../../common/helpers/utils';
 
-export const S3Explorer: React.FC = () => {
+interface S3ExplorerProps {
+    connectorId: string;
+}
+
+export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
+    const { t } = useTranslation();
     const theme = useTheme();
-    const { connectorId } = useParams<{ connectorId: string }>();
     const [currentPath, setCurrentPath] = useState<string>('');
     const [continuationToken, setContinuationToken] = useState<string | null>(null);
     const [nameFilter, setNameFilter] = useState<string>('');
@@ -41,7 +45,7 @@ export const S3Explorer: React.FC = () => {
     }, [currentPath]);
 
     const { data, isLoading, error } = useS3Explorer({
-        connectorId: connectorId || '',
+        connectorId,
         prefix: currentPath,
         delimiter: '/',
         continuationToken
@@ -132,7 +136,7 @@ export const S3Explorer: React.FC = () => {
                     }
                     secondary={
                         <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                            Folder
+                            {t('common.folder')}
                         </Typography>
                     }
                 />
@@ -176,9 +180,11 @@ export const S3Explorer: React.FC = () => {
                     }
                     secondary={
                         <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                            Size: {formatFileSize(object.Size)} •
-                            Storage Class: {object.StorageClass} •
-                            Modified: {formatDate(object.LastModified)}
+                            {t('s3Explorer.file.info', {
+                                size: formatFileSize(object.Size),
+                                storageClass: object.StorageClass,
+                                modified: formatDate(object.LastModified)
+                            })}
                         </Typography>
                     }
                 />
@@ -210,7 +216,7 @@ export const S3Explorer: React.FC = () => {
         return (
             <Box p={3}>
                 <Typography color="error">
-                    Error loading S3 objects: {(error as Error).message}
+                    {t('s3Explorer.error.loading', { message: (error as Error).message })}
                 </Typography>
             </Box>
         );
@@ -218,16 +224,22 @@ export const S3Explorer: React.FC = () => {
 
     return (
         <Box p={3}>
-            <Typography variant="h4" sx={{
-                fontWeight: 700,
-                mb: 3,
-                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                color: 'transparent',
-            }}>
-                S3 Explorer
-            </Typography>
+            <Box mb={2}>
+                <TextField
+                    label={t('s3Explorer.filter.label')}
+                    variant="outlined"
+                    size="small"
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    fullWidth
+                    sx={{
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: '8px',
+                            backgroundColor: theme.palette.background.paper,
+                        }
+                    }}
+                />
+            </Box>
 
             <Paper elevation={0} sx={{
                 p: 2,
@@ -253,29 +265,12 @@ export const S3Explorer: React.FC = () => {
                                     },
                                 }}
                             >
-                                {path || 'Root'}
+                                {path || t('common.root')}
                             </Link>
                         );
                     })}
                 </Breadcrumbs>
             </Paper>
-
-            <Box mb={2}>
-                <TextField
-                    label="Filter by name"
-                    variant="outlined"
-                    size="small"
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                    fullWidth
-                    sx={{
-                        '& .MuiOutlinedInput-root': {
-                            borderRadius: '8px',
-                            backgroundColor: theme.palette.background.paper,
-                        }
-                    }}
-                />
-            </Box>
 
             <Paper elevation={0} sx={{
                 borderRadius: '12px',
@@ -306,7 +301,7 @@ export const S3Explorer: React.FC = () => {
                             },
                         }}
                     >
-                        Load More
+                        {t('common.loadMore')}
                     </Button>
                 </Box>
             )}
@@ -334,7 +329,7 @@ export const S3Explorer: React.FC = () => {
                         },
                     }}
                 >
-                    Rename
+                    {t('s3Explorer.menu.rename')}
                 </MenuItem>
                 <MenuItem
                     onClick={handleDelete}
@@ -345,7 +340,7 @@ export const S3Explorer: React.FC = () => {
                         },
                     }}
                 >
-                    Delete
+                    {t('s3Explorer.menu.delete')}
                 </MenuItem>
             </Menu>
         </Box>

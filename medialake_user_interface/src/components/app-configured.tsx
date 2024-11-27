@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '@/queryClient';
 import { AwsConfigProvider } from '@/common/hooks/aws-config-context';
@@ -11,6 +11,8 @@ import { Box, CircularProgress } from '@mui/material';
 import TopBar from '@/TopBar';
 import Sidebar from '@/Sidebar';
 import SearchPage from '@/pages/SearchPage';
+import AssetsPage from '@/pages/AssetsPage';
+import MetadataPage from '@/pages/MetadataPage';
 import { S3Explorer } from '@/features/home/S3Explorer';
 import Home from '@/pages/Home';
 import SettingsComponent from '@/features/settings/SettingsLayout';
@@ -302,6 +304,11 @@ const AppLayout = () => {
     );
 };
 
+const S3ExplorerWrapper = () => {
+    const { connectorId } = useParams<{ connectorId: string }>();
+    return <S3Explorer connectorId={connectorId!} />;
+};
+
 const router = createBrowserRouter([
     {
         path: '/auth',
@@ -321,11 +328,19 @@ const router = createBrowserRouter([
             },
             {
                 path: 's3/explorer/:connectorId',
-                element: <S3Explorer />
+                element: <S3ExplorerWrapper />
             },
             {
                 path: 'settings/*',
                 element: <SettingsComponent />
+            },
+            {
+                path: 'assets',
+                element: <AssetsPage />
+            },
+            {
+                path: 'metadata',
+                element: <MetadataPage />
             },
             {
                 path: 'executions',

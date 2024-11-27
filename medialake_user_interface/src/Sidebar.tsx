@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Drawer,
     List,
@@ -22,14 +23,15 @@ import {
     Storage as StorageIcon,
     Api as ApiIcon,
     AdminPanelSettings as AdminIcon,
-    Search as SearchIcon,
-    Folder as AssetsIcon,
+    PermMedia as MediaAssetsIcon,
+    DataObject as MetadataIcon,
     LocalOffer as TagsIcon,
     PlaylistPlay as ExecutionsIcon,
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
     Group as GroupIcon,
     Security as SecurityIcon,
+    Home as HomeIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
@@ -38,6 +40,7 @@ const drawerWidth = 260;
 const collapsedDrawerWidth = 72;
 
 function Sidebar() {
+    const { t } = useTranslation();
     const theme = useTheme();
     const { theme: customTheme } = useCustomTheme();
     const location = useLocation();
@@ -57,52 +60,52 @@ function Sidebar() {
 
     const mainMenuItems = [
         {
-            text: 'Home',
-            icon: <AssetsIcon />,
+            text: t('sidebar.menu.home'),
+            icon: <HomeIcon />,
             path: '/'
         },
         {
-            text: 'Assets',
-            icon: <SearchIcon />,
+            text: t('sidebar.menu.assets'),
+            icon: <MediaAssetsIcon />,
             path: '/assets'
         },
         {
-            text: 'Metadata',
-            icon: <SearchIcon />,
+            text: t('sidebar.menu.metadata'),
+            icon: <MetadataIcon />,
             path: '/metadata'
         },
         {
-            text: 'Pipelines',
+            text: t('sidebar.menu.pipelines'),
             icon: <PipelineIcon />,
             path: '/pipelines'
         },
         {
-            text: 'Pipeline Executions',
+            text: t('sidebar.menu.pipelineExecutions'),
             icon: <ExecutionsIcon />,
             path: '/executions'
         },
         {
-            text: 'Review Queue',
+            text: t('sidebar.menu.reviewQueue'),
             icon: <ReviewIcon />,
             path: '/review-queue'
         },
         {
-            text: 'Tags',
+            text: t('sidebar.menu.tags'),
             icon: <TagsIcon />,
             path: '/tags'
         },
         {
-            text: 'Settings',
+            text: t('sidebar.menu.settings'),
             icon: <SettingsIcon />,
             onClick: () => setSettingsOpen(!settingsOpen),
             isExpandable: true,
             isExpanded: settingsOpen,
             subItems: [
-                { text: 'Integrations', icon: <ApiIcon />, path: '/settings/integrations' },
-                { text: 'Connectors', icon: <StorageIcon />, path: '/settings/connectors' },
-                { text: 'User Management', icon: <GroupIcon />, path: '/settings/users' },
-                { text: 'Roles', icon: <SecurityIcon />, path: '/settings/roles' },
-                { text: 'System', icon: <AdminIcon />, path: '/settings/system' },
+                { text: t('sidebar.submenu.integrations'), icon: <ApiIcon />, path: '/settings/integrations' },
+                { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
+                { text: t('sidebar.submenu.userManagement'), icon: <GroupIcon />, path: '/settings/users' },
+                { text: t('sidebar.submenu.roles'), icon: <SecurityIcon />, path: '/settings/roles' },
+                { text: t('sidebar.submenu.system'), icon: <AdminIcon />, path: '/settings/system' },
             ]
         }
     ];

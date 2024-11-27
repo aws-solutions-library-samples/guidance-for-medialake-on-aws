@@ -31,7 +31,20 @@ i18n
                         alerts: 'Alerts',
                         warnings: 'Warnings',
                         notifications: 'Notifications',
-                        searchPlaceholder: 'Search or use key:value...'
+                        searchPlaceholder: 'Search or use key:value...',
+                        close: 'Close',
+                        success: 'Success',
+                        refresh: 'Refresh',
+                        previous: 'Previous',
+                        next: 'Next',
+                        show: 'Show',
+                        all: 'All',
+                        status: 'Status',
+                        actions: 'Actions',
+                        rename: 'Rename',
+                        root: 'Root',
+                        folder: 'Folder',
+                        loadMore: 'Load More'
                     },
                     navigation: {
                         home: 'Home',
@@ -55,6 +68,81 @@ i18n
                         'Storage capacity reaching 80%': 'Storage capacity reaching 80%',
                         'Pipeline Failed': 'Pipeline Failed',
                         'Video processing pipeline failed': 'Video processing pipeline failed'
+                    },
+                    modal: {
+                        confirmDelete: 'Are you sure you want to delete this item?',
+                        confirmAction: 'Are you sure you want to perform this action?',
+                        error: 'An error occurred',
+                        success: 'Operation completed successfully'
+                    },
+                    executions: {
+                        title: 'Pipeline Executions',
+                        description: 'Monitor and manage your pipeline executions',
+                        columns: {
+                            pipelineName: 'Pipeline Name',
+                            status: 'Status',
+                            startTime: 'Start Time',
+                            duration: 'Duration',
+                            actions: 'Actions'
+                        },
+                        status: {
+                            succeeded: 'Succeeded',
+                            failed: 'Failed',
+                            running: 'Running',
+                            timedOut: 'Timed Out',
+                            aborted: 'Aborted'
+                        },
+                        actions: {
+                            retryFromCurrent: 'Retry from current position',
+                            retryFromStart: 'Retry from start',
+                            viewDetails: 'View Details'
+                        },
+                        pagination: {
+                            page: 'Page {{page}} of {{total}}',
+                            showEntries: 'Show {{count}}'
+                        }
+                    },
+                    sidebar: {
+                        menu: {
+                            home: 'Home',
+                            assets: 'Assets',
+                            metadata: 'Metadata',
+                            pipelines: 'Pipelines',
+                            pipelineExecutions: 'Pipeline Executions',
+                            reviewQueue: 'Review Queue',
+                            tags: 'Tags',
+                            settings: 'Settings'
+                        },
+                        submenu: {
+                            integrations: 'Integrations',
+                            connectors: 'Connectors',
+                            userManagement: 'User Management',
+                            roles: 'Roles',
+                            system: 'System'
+                        }
+                    },
+                    s3Explorer: {
+                        filter: {
+                            label: 'Filter by name'
+                        },
+                        error: {
+                            loading: 'Error loading S3 objects: {{message}}'
+                        },
+                        file: {
+                            info: 'Size: {{size}} • Storage Class: {{storageClass}} • Modified: {{modified}}'
+                        },
+                        menu: {
+                            rename: 'Rename',
+                            delete: 'Delete'
+                        }
+                    },
+                    assets: {
+                        title: 'Assets',
+                        connectedStorage: 'Connected Storage'
+                    },
+                    metadata: {
+                        title: 'Coming Soon',
+                        description: "We're working to bring you metadata management capabilities. Stay tuned!"
                     }
                 }
             },
