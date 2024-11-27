@@ -17,17 +17,16 @@ import {
     FormControlLabel,
     Checkbox,
     TextField,
+    useTheme,
+    alpha,
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     CloudUpload as CloudUploadIcon,
-    Sort as SortIcon,
-    ViewColumn as ViewColumnIcon,
 } from '@mui/icons-material';
-import { ConnectorResponse } from '@/api/types/api.types';
+import { ConnectorResponse } from '../../../../api/types/api.types';
 
-// First, let's create a utility function for formatting bytes
 const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -53,10 +52,10 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     onEdit,
     onDelete,
 }) => {
+    const theme = useTheme();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [cardFieldsAnchor, setCardFieldsAnchor] = useState<null | HTMLElement>(null);
-    const [cardSortAnchor, setCardSortAnchor] = useState<null | HTMLElement>(null);
     const [isViewDetailsOpen, setIsViewDetailsOpen] = useState(false);
     const [editedDescription, setEditedDescription] = useState(connector.description);
     const [cardFields, setCardFields] = useState<CardFieldConfig[]>([
@@ -101,12 +100,13 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
+        return new Date(dateString).toLocaleString(undefined, {
             year: 'numeric',
-            month: 'short',
+            month: 'numeric',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
         });
     };
 
@@ -115,7 +115,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             field.id === fieldId ? { ...field, visible: !field.visible } : field
         ));
     };
-
 
     const handleViewDetails = () => {
         setIsViewDetailsOpen(true);
@@ -141,7 +140,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             }}
         >
             <Box sx={{ p: 2, minWidth: 200 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                     Show Fields
                 </Typography>
                 <FormGroup>
@@ -170,7 +169,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             maxWidth="sm"
             fullWidth
         >
-            <DialogTitle>Connector Details</DialogTitle>
+            <DialogTitle sx={{ fontWeight: 600 }}>Connector Details</DialogTitle>
             <DialogContent>
                 <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <TextField
@@ -212,8 +211,27 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 </Box>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setIsViewDetailsOpen(false)}>Cancel</Button>
-                <Button onClick={handleSaveDescription} variant="contained">
+                <Button
+                    onClick={() => setIsViewDetailsOpen(false)}
+                    sx={{
+                        color: theme.palette.text.secondary,
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        },
+                    }}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    onClick={handleSaveDescription}
+                    variant="contained"
+                    sx={{
+                        backgroundColor: theme.palette.primary.main,
+                        '&:hover': {
+                            backgroundColor: theme.palette.primary.dark,
+                        },
+                    }}
+                >
                     Save Changes
                 </Button>
             </DialogActions>
@@ -222,19 +240,34 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 
     return (
         <>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Card
+                sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    borderRadius: '12px',
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    backgroundColor: theme.palette.background.paper,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}`,
+                    },
+                }}
+                elevation={0}
+            >
                 <CardContent sx={{ flexGrow: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             {getConnectorIcon(connector.type)}
                             <Box>
                                 {cardFields.find(f => f.id === 'name')?.visible && (
-                                    <Typography variant="h6" component="div">
+                                    <Typography variant="h6" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
                                         {connector.name}
                                     </Typography>
                                 )}
                                 {cardFields.find(f => f.id === 'type')?.visible && (
-                                    <Typography variant="caption" color="text.secondary">
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                                         {getConnectorTypeLabel(connector.type)}
                                     </Typography>
                                 )}
@@ -242,34 +275,52 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                             <Tooltip title="Edit">
-                                <IconButton onClick={handleViewDetails} size="small">
-                                    <EditIcon />
+                                <IconButton
+                                    onClick={handleViewDetails}
+                                    size="small"
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        '&:hover': {
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                        },
+                                    }}
+                                >
+                                    <EditIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>
                             <Tooltip title="Delete">
-                                <IconButton onClick={handleDeleteClick} size="small">
-                                    <DeleteIcon />
+                                <IconButton
+                                    onClick={handleDeleteClick}
+                                    size="small"
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                        '&:hover': {
+                                            backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                        },
+                                    }}
+                                >
+                                    <DeleteIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>
                         </Box>
                     </Box>
                     {cardFields.find(f => f.id === 'bucket')?.visible && connector.settings?.bucket && (
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }} gutterBottom>
                             Bucket: {connector.storageIdentifier}
                         </Typography>
                     )}
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }} gutterBottom>
                         {connector.description || 'No description provided'}
                     </Typography>
 
                     <Box sx={{ mt: 2 }}>
                         {cardFields.find(f => f.id === 'storage')?.visible && (
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                                 Storage: {formatBytes(connector.usage?.total || 0)}
                             </Typography>
                         )}
                         {cardFields.find(f => f.id === 'lastUpdated')?.visible && (
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                                 Last Updated: {formatDate(connector.updatedAt)}
                             </Typography>
                         )}
@@ -278,8 +329,21 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                 <Chip
                                     size="small"
                                     label={connector.status || 'active'}
-                                    color={connector.status === 'error' ? 'error' : 'success'}
-                                    sx={{ textTransform: 'capitalize' }}
+                                    sx={{
+                                        backgroundColor: connector.status === 'error'
+                                            ? alpha(theme.palette.error.main, 0.1)
+                                            : alpha(theme.palette.success.main, 0.1),
+                                        color: connector.status === 'error'
+                                            ? theme.palette.error.main
+                                            : theme.palette.success.main,
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        height: '24px',
+                                        textTransform: 'capitalize',
+                                        '& .MuiChip-label': {
+                                            px: 1.5,
+                                        },
+                                    }}
                                 />
                             </Box>
                         )}
@@ -295,9 +359,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Delete Connector</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 600 }}>Delete Connector</DialogTitle>
                 <DialogContent>
-                    <Typography>
+                    <Typography sx={{ color: theme.palette.text.secondary }}>
                         Are you sure you want to delete the connector "{connector.name}"? This action cannot be undone.
                     </Typography>
                 </DialogContent>
@@ -305,6 +369,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                     <Button
                         onClick={() => setDeleteDialogOpen(false)}
                         disabled={isDeleting}
+                        sx={{
+                            color: theme.palette.text.secondary,
+                            '&:hover': {
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                            },
+                        }}
                     >
                         Cancel
                     </Button>
@@ -313,6 +383,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         color="error"
                         variant="contained"
                         disabled={isDeleting}
+                        sx={{
+                            backgroundColor: theme.palette.error.main,
+                            '&:hover': {
+                                backgroundColor: theme.palette.error.dark,
+                            },
+                        }}
                     >
                         {isDeleting ? 'Deleting...' : 'Delete'}
                     </Button>
@@ -323,4 +399,3 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 };
 
 export default ConnectorCard;
-

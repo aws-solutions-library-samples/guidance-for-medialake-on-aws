@@ -16,7 +16,9 @@ import {
     TextField,
     IconButton,
     Menu,
-    MenuItem
+    MenuItem,
+    useTheme,
+    alpha,
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
@@ -25,6 +27,7 @@ import { useS3Explorer } from '../../api/hooks/useS3Explorer';
 import { formatFileSize } from '../../common/helpers/utils';
 
 export const S3Explorer: React.FC = () => {
+    const theme = useTheme();
     const { connectorId } = useParams<{ connectorId: string }>();
     const [currentPath, setCurrentPath] = useState<string>('');
     const [continuationToken, setContinuationToken] = useState<string | null>(null);
@@ -43,6 +46,17 @@ export const S3Explorer: React.FC = () => {
         delimiter: '/',
         continuationToken
     });
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    };
 
     const handlePathClick = useCallback((path: string) => {
         setCurrentPath(path);
@@ -99,23 +113,40 @@ export const S3Explorer: React.FC = () => {
                 onClick={() => handlePathClick(prefix)}
                 sx={{
                     cursor: 'pointer',
+                    borderRadius: '8px',
+                    my: 0.5,
                     '&:hover': {
-                        backgroundColor: 'action.hover'
-                    }
+                        backgroundColor: alpha(theme.palette.primary.main, 0.02),
+                    },
+                    transition: 'background-color 0.2s ease',
                 }}
             >
                 <ListItemIcon>
-                    <FolderIcon color="primary" />
+                    <FolderIcon sx={{ color: theme.palette.primary.main }} />
                 </ListItemIcon>
                 <ListItemText
-                    primary={prefix.split('/').slice(-2)[0]}
-                    secondary="Folder"
+                    primary={
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.primary.main }}>
+                            {prefix.split('/').slice(-2)[0]}
+                        </Typography>
+                    }
+                    secondary={
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                            Folder
+                        </Typography>
+                    }
                 />
                 <IconButton
                     onClick={(e) => handleMenuClick(e, prefix)}
                     size="small"
+                    sx={{
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                        },
+                    }}
                 >
-                    <MoreVertIcon />
+                    <MoreVertIcon fontSize="small" />
                 </IconButton>
             </ListItem>
         ));
@@ -126,29 +157,42 @@ export const S3Explorer: React.FC = () => {
             <ListItem
                 key={object.Key}
                 sx={{
+                    borderRadius: '8px',
+                    my: 0.5,
                     '&:hover': {
-                        backgroundColor: 'action.hover'
-                    }
+                        backgroundColor: alpha(theme.palette.primary.main, 0.02),
+                    },
+                    transition: 'background-color 0.2s ease',
                 }}
             >
                 <ListItemIcon>
-                    <InsertDriveFileIcon />
+                    <InsertDriveFileIcon sx={{ color: theme.palette.text.secondary }} />
                 </ListItemIcon>
                 <ListItemText
-                    primary={object.Key.split('/').pop()}
+                    primary={
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {object.Key.split('/').pop()}
+                        </Typography>
+                    }
                     secondary={
-                        <>
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                             Size: {formatFileSize(object.Size)} •
                             Storage Class: {object.StorageClass} •
-                            Modified: {new Date(object.LastModified).toLocaleString()}
-                        </>
+                            Modified: {formatDate(object.LastModified)}
+                        </Typography>
                     }
                 />
                 <IconButton
                     onClick={(e) => handleMenuClick(e, object.Key)}
                     size="small"
+                    sx={{
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                        },
+                    }}
                 >
-                    <MoreVertIcon />
+                    <MoreVertIcon fontSize="small" />
                 </IconButton>
             </ListItem>
         ));
@@ -174,11 +218,23 @@ export const S3Explorer: React.FC = () => {
 
     return (
         <Box p={3}>
-            <Typography variant="h5" gutterBottom>
+            <Typography variant="h4" sx={{
+                fontWeight: 700,
+                mb: 3,
+                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+            }}>
                 S3 Explorer
             </Typography>
 
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper elevation={0} sx={{
+                p: 2,
+                mb: 2,
+                borderRadius: '12px',
+                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            }}>
                 <Breadcrumbs>
                     {breadcrumbPaths.map((path, index) => {
                         const fullPath = breadcrumbPaths
@@ -189,8 +245,13 @@ export const S3Explorer: React.FC = () => {
                                 key={path || 'root'}
                                 component="button"
                                 onClick={() => handlePathClick(fullPath)}
-                                color="inherit"
-                                sx={{ textDecoration: 'none' }}
+                                sx={{
+                                    textDecoration: 'none',
+                                    color: theme.palette.primary.main,
+                                    '&:hover': {
+                                        textDecoration: 'underline',
+                                    },
+                                }}
                             >
                                 {path || 'Root'}
                             </Link>
@@ -207,11 +268,21 @@ export const S3Explorer: React.FC = () => {
                     value={nameFilter}
                     onChange={(e) => setNameFilter(e.target.value)}
                     fullWidth
+                    sx={{
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: '8px',
+                            backgroundColor: theme.palette.background.paper,
+                        }
+                    }}
                 />
             </Box>
 
-            <Paper>
-                <List>
+            <Paper elevation={0} sx={{
+                borderRadius: '12px',
+                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                backgroundColor: theme.palette.background.paper,
+            }}>
+                <List sx={{ p: 1 }}>
                     {renderFolders()}
                     {filteredPrefixes.length && filteredObjects.length ? (
                         <Divider sx={{ my: 1 }} />
@@ -223,9 +294,17 @@ export const S3Explorer: React.FC = () => {
             {data?.data.isTruncated && (
                 <Box mt={2} display="flex" justifyContent="center">
                     <Button
-                        variant="outlined"
-                        color="primary"
+                        variant="contained"
                         onClick={handleLoadMore}
+                        sx={{
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            px: 3,
+                            backgroundColor: theme.palette.primary.main,
+                            '&:hover': {
+                                backgroundColor: theme.palette.primary.dark,
+                            },
+                        }}
                     >
                         Load More
                     </Button>
@@ -236,9 +315,38 @@ export const S3Explorer: React.FC = () => {
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
+                PaperProps={{
+                    elevation: 0,
+                    sx: {
+                        borderRadius: '8px',
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                        backgroundColor: theme.palette.background.paper,
+                        overflow: 'visible',
+                        mt: 1,
+                    },
+                }}
             >
-                <MenuItem onClick={handleRename}>Rename</MenuItem>
-                <MenuItem onClick={handleDelete}>Delete</MenuItem>
+                <MenuItem
+                    onClick={handleRename}
+                    sx={{
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        },
+                    }}
+                >
+                    Rename
+                </MenuItem>
+                <MenuItem
+                    onClick={handleDelete}
+                    sx={{
+                        color: theme.palette.error.main,
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.error.main, 0.1),
+                        },
+                    }}
+                >
+                    Delete
+                </MenuItem>
             </Menu>
         </Box>
     );

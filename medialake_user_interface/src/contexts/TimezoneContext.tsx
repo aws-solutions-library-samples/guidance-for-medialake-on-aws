@@ -8,22 +8,13 @@ interface TimezoneContextType {
 const TimezoneContext = createContext<TimezoneContextType | undefined>(undefined);
 
 export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // Initialize with browser's timezone but allow override
+    // Initialize with browser's timezone
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
-
-    useEffect(() => {
-        // Could load saved timezone preference from user settings here
-        const savedTimezone = localStorage.getItem('userTimezone');
-        if (savedTimezone) {
-            setTimezone(savedTimezone);
-        }
-    }, []);
 
     const value = {
         timezone,
         setTimezone: (newTimezone: string) => {
             setTimezone(newTimezone);
-            localStorage.setItem('userTimezone', newTimezone);
         },
     };
 
