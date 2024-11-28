@@ -93,7 +93,7 @@ class BaseInfrastructureStack(Stack):
         ingestion_log_group = logs.LogGroup(
             self,
             "IngestionPipelineLogGroup",
-            log_group_name="/aws/vendedlogs/MediaLakeOpenSearchIngestion/dynamodb-osis-pipeline/audit-logs",
+            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{random.randint(100, 999)}",
             removal_policy=RemovalPolicy.DESTROY,
             retention=logs.RetentionDays.ONE_DAY,
         )
@@ -158,6 +158,7 @@ class BaseInfrastructureStack(Stack):
             description="event bus",
             log_all=True,
         )
+        
         self._ingest_event_bus = EventBus(
             self, "IngestEventBus", props=ingest_event_bus_config
         )
@@ -214,6 +215,7 @@ class BaseInfrastructureStack(Stack):
                 point_in_time_recovery=True,
             ),
         )
+        
         self._asset_table.table.add_global_secondary_index(
             index_name="AssetIDIndex",
             partition_key=dynamodb.Attribute(
@@ -237,7 +239,7 @@ class BaseInfrastructureStack(Stack):
             "AssetTableIngestionPipeline",
             config=LambdaConfig(
                 name=f"{GLOBAL_PREFIX}",
-                timeout_minutes=5,
+                timeout_minutes=15,
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": self._asset_table.table_arn,
@@ -246,70 +248,21 @@ class BaseInfrastructureStack(Stack):
                     "INDEX_NAME":"media",
                     "REGION": self.region,
                     "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
-                    "PIPELINE_NAME": f"{GLOBAL_PREFIX}-etl-{random.randint(100, 999)}", 
+                    "PIPELINE_NAME": f"{GLOBAL_PREFIX}-etl-pipeline", 
                     "SUBNET_IDS_PIPELINE": json.dumps(self.vpc.vpc.select_subnets(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS).subnet_ids),
                     "SECURITY_GROUP_IDS": json.dumps([self.security_group.security_group_id]),
                 }
             ),
         )
         
-        pipeline_role = ingestion_pipeline_lambda.lambda_role
+        ddb_pipeline_cr_role = ingestion_pipeline_lambda.lambda_role
         
-        ingestion_pipeline_lambda.function.add_environment('PIPELINE_ROLE_ARN', pipeline_role.role_arn)
-        
-        pipeline_role.assume_role_policy.add_statements(
-            iam.PolicyStatement(
-                actions=["sts:AssumeRole"],
-                effect=iam.Effect.ALLOW,
-                principals=[iam.ServicePrincipal("osis-pipelines.amazonaws.com")]
-            )
+        pipeline_role = iam.Role(
+            self, 
+            'IngestionRole',
+            assumed_by=iam.ServicePrincipal('osis-pipelines.amazonaws.com')
         )
-        
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "dynamodb:BatchWriteItem",
-                    "dynamodb:CreateTable",
-                    "dynamodb:DeleteTable",
-                    "dynamodb:UpdateContinuousBackups",
-                ],
-                conditions={
-                    "StringEquals": {"dynamodb:TableName": self.asset_table.table_name}
-                },
-                resources=["*"],
-            )
-        )
-        # osis permission
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "osis:CreatePipeline",
-                    "osis:ListPipelineBlueprints",
-				    "osis:ValidatePipeline",
-				    "osis:UpdatePipeline"
-                    # "osis:DeletePipeline",
-                    # "osis:StopPipeline",
-                ],
-                resources=[
-                    "*"
-                ],
-            )
-        )
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "osis:Ingest"
-                ],
-                resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{GLOBAL_PREFIX}-etl-pipeline"
-                ],
-            )
-        )
-                
-        # es permissions
+                # es permissions
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -321,6 +274,7 @@ class BaseInfrastructureStack(Stack):
                 ],
             )
         )
+        
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -329,52 +283,136 @@ class BaseInfrastructureStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:es:*:{self.account}:domain/*"
-                    # "*"
                 ],
             )
         )
-  
-        # iam permissions
+        
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "iam:PassRole",
+                    "dynamodb:DescribeTable",
+                    "dynamodb:DescribeContinuousBackups",
+                    "dynamodb:ExportTableToPointInTime",
+                    "dynamodb:DescribeStream"
                 ],
-                resources=[pipeline_role.role_arn],
+                resources=[
+                    self._asset_table.table_arn,
+                ],
             )
         )
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "iam:*",
+                    "dynamodb:GetRecords",
+                    "dynamodb:GetShardIterator",
+                    "dynamodb:DescribeStream"
                 ],
-                resources=["*"],
+                resources=[
+                    f"{self._asset_table.table_arn}/stream/*"
+                ],
+            )
+        )
+        pipeline_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:DescribeExport"
+                ],
+                resources=[
+                    f"{self._asset_table.table_arn}/export/*"
+                ],
             )
         )
         
-        
-        # s3 permissions
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:DeleteObjectVersion",
+                    "s3:ListBucket",
+                    "s3:DeleteBucket",
                 ],
-                resources=[f"{self.ddb_export_bucket.bucket.bucket_arn}/*"],
+                resources=[self.ddb_export_bucket.bucket.bucket_arn, f"{self.ddb_export_bucket.bucket.bucket_arn}/*"],
+           
             )
         )
+        
 
-        pipeline_role.add_to_policy(
+  
+  
+        
+        ingestion_pipeline_lambda.function.add_environment('PIPELINE_ROLE_ARN', pipeline_role.role_arn)
+        
+      
+        
+  
+        # osis permission
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "osis:CreatePipeline",
+				    "osis:ValidatePipeline",
+                    # "osis:ListPipelineBlueprints",
+				    # "osis:UpdatePipeline",
+                    # "osis:DeletePipeline",
+                    # "osis:StopPipeline",
+                ],
+                resources=[
+                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{GLOBAL_PREFIX}-etl-pipeline"
+                ]
+            )
+        )
+        
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "iam:PassRole",
+                    'iam:CreateRole',
+                    'iam:AttachRolePolicy',
+                    'iam:DetachRolePolicy',
+                    'iam:GetRole',
+                    'iam:DeleteRole'
+                ],
+                resources=[pipeline_role.role_arn],
+            )
+        )
+        
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "logs:CreateLogDelivery",
+                    "logs:PutResourcePolicy",
+                    "logs:UpdateLogDelivery",
+                    "logs:DeleteLogDelivery",
+                    "logs:DescribeResourcePolicies",
+                    "logs:GetLogDelivery",
+                    "logs:ListLogDeliveries",
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogGroups"
+                ],
+                resources=["*"],
+            )
+        )
+        
+        ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["iam:ListPolicies"],
                 resources=["*"],
             )
         )
-
-        pipeline_role.add_to_policy(
+        
+        ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -392,29 +430,14 @@ class BaseInfrastructureStack(Stack):
                 resources=["*"],
             )
         )
+        
 
-        pipeline_role.add_to_policy(
+        
+        ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "logs:CreateLogDelivery",
-                    "logs:PutResourcePolicy",
-                    "logs:UpdateLogDelivery",
-                    "logs:DeleteLogDelivery",
-                    "logs:DescribeResourcePolicies",
-                    "logs:GetLogDelivery",
-                    "logs:ListLogDeliveries",
-                    "logs:*"
-                    
-                ],
-                resources=["*"],
-            )
-        )
-      
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
+                    "s3:GetObject",
                     "s3:ListObjects",
                     "s3:DeleteObject",
                     "s3:DeleteObjectVersion",
@@ -424,8 +447,8 @@ class BaseInfrastructureStack(Stack):
                 resources=[self.ddb_export_bucket.bucket.bucket_arn, f"{self.ddb_export_bucket.bucket.bucket_arn}/*"],
             )
         )
-
-        pipeline_role.add_to_policy(
+        
+        ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -449,13 +472,27 @@ class BaseInfrastructureStack(Stack):
                 resources=["*"],
             )
         )
+   
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "osis:Ingest"
+                ],
+                resources=[
+                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{GLOBAL_PREFIX}-etl-pipeline"
+                ],
+            )
+        )
+                
+
         
         # Grant necessary permissions
-        pipeline_role.grant_pass_role(ingestion_pipeline_lambda.function)
+        # pipeline_role.grant_pass_role(ingestion_pipeline_lambda.function)
         
         ingestion_pipeline_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["osis:*", "opensearch:*", "dynamodb:*", "s3:*", "ec2:*"],
+                actions=["iam:*", "osis:*", "opensearch:*", "dynamodb:*", "s3:*", "ec2:*"],
                 resources=["*"],
             )
         )
@@ -483,7 +520,7 @@ class BaseInfrastructureStack(Stack):
         )
         # Ensure the ingestion pipeline is created after the DynamoDB table is populated
         ingestion_custom_resource.node.add_dependency(self._asset_table)
-        
+        ingestion_custom_resource.node.add_dependency(pipeline_role)
 
 
 
@@ -491,22 +528,22 @@ class BaseInfrastructureStack(Stack):
         pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
 
 
-        asset_lambda_stream = Lambda(
-            self,
-            "AssetTableLambdaStream",
-            config=LambdaConfig(
-                name=f"{GLOBAL_PREFIX}-asset-table-stream",
-                timeout_minutes=15,
-                vpc=self.vpc.vpc,
-                entry="lambdas/back_end/asset_table_stream",
-                environment_variables={
-                    "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
-                    "OPENSEARCH_INDEX": "media",
-                    "SCOPE": "es",
-                },
-                layers=[opensearch_layer.layer, pynamodb_layer.layer],
-            ),
-        )
+        # asset_lambda_stream = Lambda(
+        #     self,
+        #     "AssetTableLambdaStream",
+        #     config=LambdaConfig(
+        #         name=f"{GLOBAL_PREFIX}-asset-table-stream",
+        #         timeout_minutes=15,
+        #         vpc=self.vpc.vpc,
+        #         entry="lambdas/back_end/asset_table_stream",
+        #         environment_variables={
+        #             "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
+        #             "OPENSEARCH_INDEX": "media",
+        #             "SCOPE": "es",
+        #         },
+        #         layers=[opensearch_layer.layer, pynamodb_layer.layer],
+        #     ),
+        # )
 
         # Add OpenSearch policy to Lambda function
         # asset_lambda_stream.function.add_to_role_policy(
@@ -517,23 +554,23 @@ class BaseInfrastructureStack(Stack):
         # )
 
         ## to allow attaching the vpc
-        asset_lambda_stream.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "ec2:CreateNetworkInterface",
-                    "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface",
-                ],
-                resources=["*"],
-            )
-        )
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "ec2:CreateNetworkInterface",
+        #             "ec2:DescribeNetworkInterfaces",
+        #             "ec2:DeleteNetworkInterface",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
 
-        asset_lambda_stream.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["es:ESHttpPost"],
-                resources=["*"],
-            )
-        )
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["es:ESHttpPost"],
+        #         resources=["*"],
+        #     )
+        # )
         
         ## This feature is using OS pipelines.
         # self._asset_table.table.grant_stream(asset_lambda_stream.function)
@@ -590,7 +627,7 @@ class BaseInfrastructureStack(Stack):
 
     @property
     def collection_endpoint(self) -> str:
-        return self.opensearch_cluster.domain_endpoint
+        return  self.opensearch_cluster.domain_endpoint
 
     @property
     def collection_arn(self) -> str:

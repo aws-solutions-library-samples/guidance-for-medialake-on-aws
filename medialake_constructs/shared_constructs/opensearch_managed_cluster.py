@@ -76,6 +76,13 @@ class OpenSearchCluster(Construct):
         # Select the first isolated subnet
         selected_subnet = isolated_subnets[0]
         
+        # Service Linked Role
+        service_linked_role = iam.Role(
+            self, 
+            'ServiceLinkedRole',
+            assumed_by=iam.ServicePrincipal('es.amazonaws.com')
+        )
+        
         self.domain = opensearch.Domain(
             self,
             "OpenSearchDomain",
@@ -129,7 +136,7 @@ class OpenSearchCluster(Construct):
         )
         self.domain.connections.allow_default_port_from_any_ipv4('Allow From All')
         
-        
+        self.domain.node.add_dependency(service_linked_role)
 
         # Create Lambda function for index creation
         create_index_lambda = _lambda.Function(
@@ -201,99 +208,7 @@ class OpenSearchCluster(Construct):
         
         create_index_resource.node.add_dependency(self.domain)
 
-        # # Create OpenSearch Ingestion Pipeline Role
-        # self.pipeline_role = iam.Role(
-        #     self,
-        #     "IngestionRole",
-        #     assumed_by=iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
-        # )
-        
-        # # OpenSearch encryption policy
-        # for collection_name in props.collection_indexes:
-        #     encryption_policy = opensearch.CfnSecurityPolicy(
-        #         self,
-        #         "EncryptionPolicy",
-        #         name="ddb-etl-encryption-policy",
-        #         type="encryption",
-        #         description=f"Encryption policy for {collection_name} collection.",
-        #         policy=json.dumps(
-        #             {
-        #                 "Rules": [
-        #                     {
-        #                         "ResourceType": "collection",
-        #                         "Resource": [f"collection/{collection_name}*"],
-        #                     }
-        #                 ],
-        #                 "AWSOwnedKey": True,
-        #             }
-        #         ),
-        #     )
-            
-            
-        #     # OpenSearch network policy
-        #     network_policy = opensearch.CfnSecurityPolicy(
-        #         self,
-        #         "NetworkPolicy",
-        #         name="ddb-etl-network-policy",
-        #         type="network",
-        #         description=f"Network policy for {collection_name} collection.",
-        #         policy=json.dumps(
-        #             [
-        #                 {
-        #                     "Rules": [
-        #                         {
-        #                             "ResourceType": "collection",
-        #                             "Resource": [f"collection/{collection_name}"],
-        #                         },
-        #                         {
-        #                             "ResourceType": "dashboard",
-        #                             "Resource": [f"collection/{collection_name}"],
-        #                         },
-        #                     ],
-        #                     "AllowFromPublic": True,
-        #                 }
-        #             ]
-        #         ),
-        #     )
-
-        #     # OpenSearch data access policy
-        #     data_access_policy = opensearch.CfnAccessPolicy(
-        #         self,
-        #         "DataAccessPolicy",
-        #         name="ddb-etl-access-policy",
-        #         type="data",
-        #         description=f"Data access policy for {collection_name} collection.",
-        #         policy=json.dumps(
-        #             [
-        #                 {
-        #                     "Rules": [
-        #                         {
-        #                             "ResourceType": "collection",
-        #                             "Resource": [f"collection/{collection_name}*"],
-        #                             "Permission": [
-        #                                 "es:ESHttpGet",
-        #                                 "es:ESHttpPost",
-        #                                 "es:ESHttpPut"
-        #                             ],
-        #                         },
-        #                         {
-        #                             "ResourceType": "index",
-        #                             "Resource": [f"index/{collection_name}*/*"],
-        #                             "Permission": [
-        #                                 "es:ESHttpGet",
-        #                                 "es:ESHttpPost",
-        #                                 "es:ESHttpPut"  
-        #                             ],
-        #                         },
-        #                     ],
-        #                     "Principal": [
-        #                         props.pipeline_role.role_arn,
-        #                         f"arn:aws:iam::{stack.account}:user/Admin",
-        #                     ],
-        #                 }
-        #             ]
-        #         ),
-        #     )
+       
 
     @property
     def domain_endpoint(self) -> str:

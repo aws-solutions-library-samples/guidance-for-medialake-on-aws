@@ -343,10 +343,10 @@ def create_connector(createconnector: S3Connector) -> dict:
             # Get the Lambda environment variable
             ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
             medialake_asset_table = os.environ.get("MEDIALAKE_ASSET_TABLE")
-            asset_table_file_hash_index_name = os.environ.get(
+            asset_table_file_hash_index_arn = os.environ.get(
                 "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX"
             )
-            asset_table_asset_id_index_name = os.environ.get(
+            asset_table_asset_id_index_arn = os.environ.get(
                 "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX"
             )
             layer_arn = os.environ.get("INGEST_MEDIA_PROCESSOR_LAYER")
@@ -512,8 +512,8 @@ def create_connector(createconnector: S3Connector) -> dict:
                         ],
                         "Resource": [
                             medialake_asset_table,
-                            f"{medialake_asset_table}/index/{asset_table_file_hash_index_name}",
-                            f"{medialake_asset_table}/index/{asset_table_asset_id_index_name}"
+                            asset_table_file_hash_index_arn,
+                            asset_table_asset_id_index_arn
                         ],
                     }
                 ],
