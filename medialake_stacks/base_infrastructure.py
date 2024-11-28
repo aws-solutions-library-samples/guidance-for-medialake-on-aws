@@ -344,6 +344,16 @@ class BaseInfrastructureStack(Stack):
                 resources=[pipeline_role.role_arn],
             )
         )
+        pipeline_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "iam:*",
+                ],
+                resources=["*"],
+            )
+        )
+        
         
         # s3 permissions
         pipeline_role.add_to_policy(
@@ -394,6 +404,8 @@ class BaseInfrastructureStack(Stack):
                     "logs:DescribeResourcePolicies",
                     "logs:GetLogDelivery",
                     "logs:ListLogDeliveries",
+                    "logs:*"
+                    
                 ],
                 resources=["*"],
             )
@@ -447,6 +459,8 @@ class BaseInfrastructureStack(Stack):
                 resources=["*"],
             )
         )
+        
+        
         # Define Custom Resource for Ingestion Pipeline
         ingestion_provider = cr.Provider(
             self, "IngestionProvider",
@@ -469,6 +483,7 @@ class BaseInfrastructureStack(Stack):
         )
         # Ensure the ingestion pipeline is created after the DynamoDB table is populated
         ingestion_custom_resource.node.add_dependency(self._asset_table)
+        
 
 
 
