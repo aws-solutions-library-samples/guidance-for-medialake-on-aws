@@ -44,8 +44,9 @@ def extract_iptc_data(image_content):
         logger.info("Starting IPTC extraction")
         
         # Create a temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, mode='wb') as temp_file:
             temp_file.write(image_content)
+            temp_file.flush()  # Ensure the content is written to disk
             temp_file_path = temp_file.name
 
         # Use the temporary file path to create IPTCInfo object
@@ -53,7 +54,7 @@ def extract_iptc_data(image_content):
             iptc_info = IPTCInfo(file)
 
             if bool(iptc_info):
-                iptc_data =  {IPTCData._key_as_str(k): v for k, v in iptc_info._data.items()}
+                iptc_data = {IPTCData._key_as_str(k): v for k, v in iptc_info._data.items()}
         
         # Remove the temporary file
         os.unlink(temp_file_path)
@@ -65,9 +66,16 @@ def extract_iptc_data(image_content):
     return iptc_data
 
 
+import os.path
+
 def extract_exif_data(temp_file_path):
     try:
         logger.info(f"Starting EXIF extraction from {temp_file_path}")
+
+        # Validate the input file path
+        if not os.path.isfile(temp_file_path):
+            logger.error(f"Invalid file path: {temp_file_path}")
+            return {}
 
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"  # Path to exiftool in Lambda layer
@@ -105,6 +113,7 @@ def extract_exif_data(temp_file_path):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
+
 
 def process_image_file(bucket, key):
     try:
