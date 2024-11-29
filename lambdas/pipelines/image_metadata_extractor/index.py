@@ -2,6 +2,7 @@ import os
 import boto3
 import json
 import re
+import shlex
 import os.path
 import subprocess
 from decimal import Decimal
@@ -67,15 +68,19 @@ def extract_iptc_data(image_content):
     return iptc_data
 
 
-
-
 def extract_exif_data(temp_file_path):
     try:
         logger.info(f"Starting EXIF extraction from {temp_file_path}")
 
-        # Validate and sanitize the input file path
+        # Validate the input file path
         if not os.path.isfile(temp_file_path):
             logger.error(f"Invalid file path: {temp_file_path}")
+            return {}
+
+        # Implement a whitelist for allowed characters
+        allowed_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_/.-")
+        if not all(char in allowed_chars for char in temp_file_path):
+            logger.error(f"File path contains invalid characters: {temp_file_path}")
             return {}
 
         # Sanitize the file path to prevent command injection
@@ -83,11 +88,14 @@ def extract_exif_data(temp_file_path):
         if safe_file_path != temp_file_path:
             logger.warning(f"File path sanitized: {temp_file_path} -> {safe_file_path}")
 
+        # Use shlex.quote() for an extra layer of safety
+        quoted_file_path = shlex.quote(safe_file_path)
+
         # Use the exiftool binary from the Lambda layer
-        exiftool_path = "/opt/bin/exiftool"  # Path to exiftool in Lambda layer
-        
+        exiftool_path = "/opt/bin/exiftool"
+
         # Construct the command as a list of arguments
-        command = [exiftool_path, "-json", "-fast", safe_file_path]
+        command = [exiftool_path, "-json", "-fast", quoted_file_path]
 
         # Run the command
         result = subprocess.run(
@@ -95,7 +103,7 @@ def extract_exif_data(temp_file_path):
             capture_output=True,
             text=True,
             check=True,
-            shell=False  # Explicitly set shell=False for added security
+            shell=False
         )
 
         if result.stderr:
@@ -119,7 +127,6 @@ def extract_exif_data(temp_file_path):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
-
 def process_image_file(bucket, key):
     try:
         # Retrieve the image from S3
