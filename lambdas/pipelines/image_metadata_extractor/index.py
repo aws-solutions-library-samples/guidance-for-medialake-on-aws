@@ -1,10 +1,11 @@
 import os
 import boto3
 import json
-import shlex
+import re
+import os.path
 import subprocess
 from decimal import Decimal
-from aws_lambda_powertools import Logger
+from aws_lambda_pimpowertools import Logger
 from iptcinfo3 import IPTCInfo, IPTCData
 import tempfile
 from io import BytesIO
@@ -66,22 +67,27 @@ def extract_iptc_data(image_content):
     return iptc_data
 
 
-import os.path
+
 
 def extract_exif_data(temp_file_path):
     try:
         logger.info(f"Starting EXIF extraction from {temp_file_path}")
 
-        # Validate the input file path
+        # Validate and sanitize the input file path
         if not os.path.isfile(temp_file_path):
             logger.error(f"Invalid file path: {temp_file_path}")
             return {}
+
+        # Sanitize the file path to prevent command injection
+        safe_file_path = re.sub(r'[^a-zA-Z0-9_/.-]', '', temp_file_path)
+        if safe_file_path != temp_file_path:
+            logger.warning(f"File path sanitized: {temp_file_path} -> {safe_file_path}")
 
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"  # Path to exiftool in Lambda layer
         
         # Construct the command as a list of arguments
-        command = [exiftool_path, "-json", "-fast", temp_file_path]
+        command = [exiftool_path, "-json", "-fast", safe_file_path]
 
         # Run the command
         result = subprocess.run(
@@ -113,7 +119,6 @@ def extract_exif_data(temp_file_path):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
-
 
 def process_image_file(bucket, key):
     try:
