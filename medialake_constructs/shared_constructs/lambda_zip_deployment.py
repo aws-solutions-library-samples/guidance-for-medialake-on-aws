@@ -9,6 +9,7 @@ import os
 import shutil
 from pathlib import Path
 from dataclasses import dataclass
+import subprocess
 
 @dataclass
 class LambdaZipDeploymentProps:
@@ -63,18 +64,20 @@ class LambdaZipDeployment(Construct):
 
         # Install dependencies and create zip if requirements.txt exists
         if os.path.exists(requirements_path):
-            pip_cmd = (
-                f'pip install -r {requirements_path} '
-                f'-t {lambda_package_path}'
-            )
-            os.system(pip_cmd)
-            
+            subprocess.run([
+                'pip', 'install',
+                '-r', requirements_path,
+                '-t', lambda_package_path
+            ], check=True)
+
             # Copy Lambda source files to package directory
-            cp_cmd = (
-                f'cp {os.path.join(lambda_source_path, "*")} '
-                f'{lambda_package_path}'
-            )
-            os.system(cp_cmd)
+            for item in os.listdir(lambda_source_path):
+                s = os.path.join(lambda_source_path, item)
+                d = os.path.join(lambda_package_path, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
             
             # Create zip file from package directory
             shutil.make_archive(

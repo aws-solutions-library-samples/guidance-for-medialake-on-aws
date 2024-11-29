@@ -102,10 +102,10 @@ class AssetProcessor:
         return decoded_key
 
     def _calculate_md5(self, bucket: str, key: str) -> str:
-        """Calculate MD5 hash of S3 object"""
+        """Calculate MD5 hash of S3 object for file identification purposes"""
         try:
             response = self.s3.get_object(Bucket=bucket, Key=key)
-            md5_hash = hashlib.md5()
+            md5_hash = hashlib.md5(usedforsecurity=False)
             for chunk in response["Body"].iter_chunks(4096):
                 md5_hash.update(chunk)
             return md5_hash.hexdigest()

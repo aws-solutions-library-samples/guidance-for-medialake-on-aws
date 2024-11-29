@@ -1,6 +1,7 @@
 import os
 import boto3
 import json
+import shlex
 import subprocess
 from decimal import Decimal
 from aws_lambda_powertools import Logger
@@ -71,31 +72,43 @@ def extract_exif_data(temp_file_path):
 
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"  # Path to exiftool in Lambda layer
-        command = [exiftool_path, "-json", "-fast", temp_file_path]
+        
+        # Safely quote the file path
+        safe_file_path = shlex.quote(temp_file_path)
+        
+        # Construct the command as a list of arguments
+        command = [exiftool_path, "-json", "-fast", safe_file_path]
 
-        process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        # Run the command
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=False  # Explicitly set shell=False for added security
         )
 
-        stdout, stderr = process.communicate()
+        if result.stderr:
+            logger.warning(f"ExifTool stderr: {result.stderr}")
 
-        if stderr:
-            logger.warning(f"ExifTool stderr: {stderr.decode()}")
-
-        if stdout:
-            exif_data = json.loads(stdout.decode())[0]
+        if result.stdout:
+            exif_data = json.loads(result.stdout)[0]
             logger.info(f"Extracted EXIF data: {exif_data}")
             return exif_data
         else:
             logger.warning("No EXIF data extracted")
             return {}
 
+    except subprocess.CalledProcessError as e:
+        logger.error(f"ExifTool process error: {e}")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error: {e}")
+        return {}
     except Exception as exif_error:
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
-
-
 def process_image_file(bucket, key):
     try:
         # Retrieve the image from S3
@@ -105,23 +118,20 @@ def process_image_file(bucket, key):
         logger.info(f"Retrieved image size: {len(image_content)} bytes")
 
         # Create a temporary file
-        temp_file_path = f"/tmp/{key.split('/')[-1]}"
-        logger.info(f"Creating temporary file: {temp_file_path}")
-
-        with open(temp_file_path, "wb") as temp_file:
+        with tempfile.NamedTemporaryFile(mode='wb', delete=True, dir=tempfile.gettempdir()) as temp_file:
+            logger.info(f"Creating temporary file: {temp_file.name}")
             temp_file.write(image_content)
+            temp_file.flush()
 
-        logger.info(f"Temporary file created, size: {os.path.getsize(temp_file_path)}")
+            logger.info(f"Temporary file created, size: {os.path.getsize(temp_file.name)}")
 
-        # Extract EXIF data using ExifTool binary
-        exif_data = extract_exif_data(temp_file_path)
+            # Extract EXIF data using ExifTool binary
+            exif_data = extract_exif_data(temp_file.name)
 
-        # Extract IPTC data
-        iptc_data = extract_iptc_data(image_content)
+            # Extract IPTC data
+            iptc_data = extract_iptc_data(image_content)
 
-        # Clean up temporary file
-        os.remove(temp_file_path)
-        logger.info("Temporary file removed")
+        logger.info("Temporary file automatically removed")
 
         # Combine EXIF and IPTC data
         metadata = {"EXIF": exif_data, "IPTC": iptc_data}

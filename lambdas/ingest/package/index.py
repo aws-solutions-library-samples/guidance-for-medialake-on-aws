@@ -101,17 +101,17 @@ class AssetProcessor:
 
         return decoded_key
 
-    def _calculate_md5(self, bucket: str, key: str) -> str:
-        """Calculate MD5 hash of S3 object"""
+    def _calculate_file_identifier(self, bucket: str, key: str) -> str:
+        """Calculate a file identifier (using MD5, not for security purposes)"""
         try:
             response = self.s3.get_object(Bucket=bucket, Key=key)
-            md5_hash = hashlib.md5()
+            file_hash = hashlib.md5(usedforsecurity=False)
             for chunk in response["Body"].iter_chunks(4096):
-                md5_hash.update(chunk)
-            return md5_hash.hexdigest()
+                file_hash.update(chunk)
+            return file_hash.hexdigest()
         except Exception as e:
             logger.exception(
-                f"Error calculating MD5 hash for {bucket}/{key}, error: {e}"
+                f"Error calculating file identifier for {bucket}/{key}, error: {e}"
             )
             raise
 
@@ -146,7 +146,7 @@ class AssetProcessor:
                 return None
 
             # Calculate MD5 hash and check for duplicates
-            md5_hash = self._calculate_md5(bucket, key)
+            md5_hash = self._calculate_file_identifier(bucket, key)
             existing_file = self._check_existing_file(md5_hash)
 
             if existing_file:

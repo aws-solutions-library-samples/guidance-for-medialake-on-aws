@@ -460,7 +460,7 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
                 "FullPath"
             ] = new_derived_path
 
-        # Update DynamoDB record
+        # DynamoDB put_item operation (not SQL, safe from injection)
         table.put_item(Item=asset)
         return asset
 

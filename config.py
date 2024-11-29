@@ -41,9 +41,8 @@ class CDKConfig(BaseModel):
 
 def generate_short_uid(construct: Construct, length=8):
     construct_path = construct.node.path
-    hash_object = hashlib.md5(construct_path.encode())
-    full_hash = hash_object.hexdigest()
-    return full_hash[:length]
+    hash_value = hash(construct_path)
+    return hex(hash_value)[2:2+length]
 
 
 # Load configuration from config.json

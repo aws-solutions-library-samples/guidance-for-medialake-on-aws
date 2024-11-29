@@ -9,6 +9,7 @@ from aws_cdk import (
 )
 import os
 import shutil
+import subprocess
 
 from constructs import Construct
 
@@ -38,12 +39,21 @@ class LambdaDeployment(Construct):
             # --platform: Specifies the target platform for wheel installation
             # --only-binary=:all: Forces pip to use pre-built wheels instead of building from source
             # This helps avoid compatibility issues that can occur when packages are built on different platforms
-            pip_cmd = f'pip install -r {requirements_path} -t {lambda_package_path} --platform manylinux2014_x86_64 --only-binary=:all:'
-            os.system(pip_cmd)
-            
-            # Copy Lambda source files to package directory
-            cp_cmd = f'cp {os.path.join(lambda_source_path, "*")} {lambda_package_path}'
-            os.system(cp_cmd)
+            # For pip install
+            subprocess.run([
+                'pip', 'install',
+                '-r', requirements_path,
+                '-t', lambda_package_path,
+                '--platform', 'manylinux2014_x86_64',
+                '--only-binary=:all:'
+            ], check=True)
+
+            # Use shutil.copy instead of subprocess.run for copying files
+            for item in os.listdir(lambda_source_path):
+                s = os.path.join(lambda_source_path, item)
+                d = os.path.join(lambda_package_path, item)
+                if os.path.isfile(s):
+                    shutil.copy2(s, d)
             
             # Create zip file from package directory
             shutil.make_archive(zip_path.replace('.zip', ''), 'zip', lambda_package_path)

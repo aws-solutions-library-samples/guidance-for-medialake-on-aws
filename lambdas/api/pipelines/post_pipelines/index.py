@@ -43,6 +43,16 @@ class S3Pipeline(BaseModel):
     name: str
     type: str
 
+def wait_for_iam_role_propagation(role_name, max_retries=10, delay=5):
+    iam = boto3.client('iam')
+    for _ in range(max_retries):
+        try:
+            iam.get_role(RoleName=role_name)
+            return True
+        except iam.exceptions.NoSuchEntityException:
+            time.sleep(delay)
+    return False
+
 def float_to_decimal(obj):
     """Convert float values to Decimal for DynamoDB compatibility"""
     if isinstance(obj, float):
@@ -535,7 +545,10 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         )
         
         # Wait for IAM role propagation
-        time.sleep(10)
+        if wait_for_iam_role_propagation(role_name):
+            # Continue with your code
+        else:
+            raise Exception("IAM role propagation timed out")
         
         # Add this before creating the image proxy lambda
         image_metadata_extractor_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-metadata"

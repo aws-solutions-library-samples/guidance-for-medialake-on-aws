@@ -96,7 +96,10 @@ class OpenSearchClient:
         try:
             # Add sleep before searching
             logger.info("Sleeping for 5 seconds before searching...")
-            time.sleep(20)
+            SEARCH_DELAY = float(os.environ.get('SEARCH_DELAY', '0'))
+            if SEARCH_DELAY > 0:
+                logger.info(f"Sleeping for {SEARCH_DELAY} seconds before searching...")
+                time.sleep(SEARCH_DELAY)
 
             # First search for existing document
             search_result = self.search_by_inventory_id(inventory_id)

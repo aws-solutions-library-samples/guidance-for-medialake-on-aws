@@ -41,6 +41,28 @@ class S3Connector(BaseModel):
     name: str
     type: str
 
+def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=1):
+    for attempt in range(max_retries):
+        try:
+            iam_client.get_role(RoleName=role_name)
+            return True
+        except iam_client.exceptions.NoSuchEntityException:
+            delay = (2 ** attempt) * base_delay
+            time.sleep(delay)
+    return False
+
+def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=1):
+    for attempt in range(max_retries):
+        try:
+            attached_policies = iam_client.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
+            if any(policy['PolicyArn'] == policy_arn for policy in attached_policies):
+                return True
+            delay = (2 ** attempt) * base_delay
+            time.sleep(delay)
+        except iam_client.exceptions.NoSuchEntityException:
+            delay = (2 ** attempt) * base_delay
+            time.sleep(delay)
+    return False
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
@@ -371,8 +393,11 @@ def create_connector(createconnector: S3Connector) -> dict:
             lambda_role_arn = create_role_response["Role"]["Arn"]
             created_resources.append(("iam_role", role_name))
 
-            # Add delay to allow IAM role to propagate
-            time.sleep(5)
+            # Wait for role to be available
+   
+            if not wait_for_iam_role_propagation(iam_client, role_name):
+                raise Exception(f"IAM role {role_name} did not propagate in time")
+
 
             # Attach policies to the role
             iam_client.attach_role_policy(
@@ -409,8 +434,10 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
             )
 
-            # Add delay to allow policy to propagate
-            time.sleep(10)
+          
+            # Wait for policy attachment to propagate
+            if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
+                raise Exception(
 
             # Attach policies to the role
             iam_client.attach_role_policy(
