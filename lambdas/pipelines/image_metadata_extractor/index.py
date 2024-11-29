@@ -65,7 +65,6 @@ def extract_iptc_data(image_content):
     return iptc_data
 
 
-
 def extract_exif_data(temp_file_path):
     try:
         logger.info(f"Starting EXIF extraction from {temp_file_path}")
@@ -73,11 +72,8 @@ def extract_exif_data(temp_file_path):
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"  # Path to exiftool in Lambda layer
         
-        # Safely quote the file path
-        safe_file_path = shlex.quote(temp_file_path)
-        
         # Construct the command as a list of arguments
-        command = [exiftool_path, "-json", "-fast", safe_file_path]
+        command = [exiftool_path, "-json", "-fast", temp_file_path]
 
         # Run the command
         result = subprocess.run(
@@ -109,6 +105,7 @@ def extract_exif_data(temp_file_path):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
+
 def process_image_file(bucket, key):
     try:
         # Retrieve the image from S3
@@ -143,6 +140,7 @@ def process_image_file(bucket, key):
         logger.error("Error processing image file: %s", str(e))
         logger.error(f"Error type: {type(e)}")
         return None
+
 
 
 def lambda_handler(event, context):
