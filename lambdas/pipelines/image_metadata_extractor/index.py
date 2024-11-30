@@ -91,47 +91,30 @@ def is_safe_file_path(file_path):
 def extract_exif_data(temp_file_path):
     try:
         logger.info(f"Starting EXIF extraction from {temp_file_path}")
-
         if not is_safe_file_path(temp_file_path):
             logger.error(f"Invalid or unsafe file path: {temp_file_path}")
             return {}
-
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"
-
         # Construct the command as a list of arguments
         command = [exiftool_path, "-json", "-fast", temp_file_path]
-
         # Run the command
-        # The use of subprocess.run here is safe because:
+        # The use of subprocess.check_output here is safe because:
         # - temp_file_path is generated internally and validated.
         # - We are using shell=False and passing the command as a list.
         # - There is no user-controlled input that could lead to command injection.
         # nosemgrep: python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use-audit
-        
-        # semgrep-disable
-        result = subprocess.run(
+        output = subprocess.check_output(
             command,
-            capture_output=True,
             text=True,
-            check=True,
+            stderr=subprocess.STDOUT,  # Captures stderr in the output
             shell=False
         )
-        # semgrep-enable
-
-        if result.stderr:
-            logger.warning(f"ExifTool stderr: {result.stderr}")
-
-        if result.stdout:
-            exif_data = json.loads(result.stdout)[0]
-            logger.info(f"Extracted EXIF data: {exif_data}")
-            return exif_data
-        else:
-            logger.warning("No EXIF data extracted")
-            return {}
-
+        exif_data = json.loads(output)[0]
+        logger.info(f"Extracted EXIF data: {exif_data}")
+        return exif_data
     except subprocess.CalledProcessError as e:
-        logger.error(f"ExifTool process error: {e}")
+        logger.error(f"ExifTool process error: {e.output}")
         return {}
     except json.JSONDecodeError as e:
         logger.error(f"JSON parsing error: {e}")
@@ -140,7 +123,6 @@ def extract_exif_data(temp_file_path):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
-    
     
 def process_image_file(bucket, key):
     try:
