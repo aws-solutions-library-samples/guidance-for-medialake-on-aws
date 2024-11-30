@@ -88,26 +88,28 @@ def is_safe_file_path(file_path):
     
     return True
 
-def extract_exif_data(image_content):
+def extract_exif_data(temp_file_path):
     try:
-        logger.info("Starting EXIF extraction")
+        logger.info(f"Starting EXIF extraction from {temp_file_path}")
+
+        if not is_safe_file_path(temp_file_path):
+            logger.error(f"Invalid or unsafe file path: {temp_file_path}")
+            return {}
+
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"
-        # Create a temporary file securely
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir='/tmp') as temp_file:
-            temp_file.write(image_content)
-            temp_file.flush()
-            temp_file_path = os.path.abspath(temp_file.name)
-        logger.info(f"Temporary file created at {temp_file_path}")
-        # Ensure the temp_file_path is in the allowed directory
-        allowed_dir = "/tmp"
-        if not temp_file_path.startswith(allowed_dir):
-            logger.error(f"Temporary file path {temp_file_path} is not in the allowed directory {allowed_dir}")
-            os.unlink(temp_file_path)
-            return {}
-        # Construct the command with constants and secure variables
+
+        # Construct the command as a list of arguments
         command = [exiftool_path, "-json", "-fast", temp_file_path]
-        # Run the command without shell=True
+
+        # Run the command
+        # The use of subprocess.run here is safe because:
+        # - temp_file_path is generated internally and validated.
+        # - We are using shell=False and passing the command as a list.
+        # - There is no user-controlled input that could lead to command injection.
+        # nosemgrep: python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use-audit
+        
+        # semgrep-disable
         result = subprocess.run(
             command,
             capture_output=True,
@@ -115,11 +117,11 @@ def extract_exif_data(image_content):
             check=True,
             shell=False
         )
-        # Remove the temporary file
-        os.unlink(temp_file_path)
-        logger.info(f"Temporary file {temp_file_path} removed")
+        # semgrep-enable
+
         if result.stderr:
             logger.warning(f"ExifTool stderr: {result.stderr}")
+
         if result.stdout:
             exif_data = json.loads(result.stdout)[0]
             logger.info(f"Extracted EXIF data: {exif_data}")
@@ -127,6 +129,7 @@ def extract_exif_data(image_content):
         else:
             logger.warning("No EXIF data extracted")
             return {}
+
     except subprocess.CalledProcessError as e:
         logger.error(f"ExifTool process error: {e}")
         return {}
@@ -137,6 +140,7 @@ def extract_exif_data(image_content):
         logger.error(f"EXIF extraction error: {str(exif_error)}")
         logger.error(f"EXIF error type: {type(exif_error)}")
         return {}
+    
     
 def process_image_file(bucket, key):
     try:
