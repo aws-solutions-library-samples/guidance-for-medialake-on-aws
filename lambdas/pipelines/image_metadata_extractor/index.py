@@ -100,7 +100,8 @@ def extract_exif_data(temp_file_path):
         exiftool_path = "/opt/bin/exiftool"
 
         # Construct the command as a list of arguments
-        command = [exiftool_path, "-json", "-fast", temp_file_path]
+        # command = [exiftool_path, "-json", "-fast", temp_file_path]
+        command = [exiftool_path, "-a", "-G1","-s","-json" ,temp_file_path]
 
         # Run the command
         # The use of subprocess.run here is safe because:
@@ -124,8 +125,20 @@ def extract_exif_data(temp_file_path):
 
         if result.stdout:
             exif_data = json.loads(result.stdout)[0]
-            logger.info(f"Extracted EXIF data: {exif_data}")
-            return exif_data
+            
+            # Group the data by the first part of the key
+            grouped_data = {}
+            for key, value in exif_data.items():
+                group, _, subkey = key.partition(':')
+                if group not in grouped_data:
+                    grouped_data[group] = {}
+                if subkey:
+                    grouped_data[group][subkey] = value
+                else:
+                    grouped_data[group] = value
+
+            logger.info(f"Extracted and grouped EXIF data: {grouped_data}")
+            return grouped_data
         else:
             logger.warning("No EXIF data extracted")
             return {}
@@ -167,7 +180,8 @@ def process_image_file(bucket, key):
         logger.info("Temporary file automatically removed")
 
         # Combine EXIF and IPTC data
-        metadata = {"EXIF": exif_data, "IPTC": iptc_data}
+        # metadata = {"EXIF": exif_data, "IPTC": iptc_data}
+        metadata = exif_data
         logger.info("Extracted metadata: %s", metadata)
 
         return metadata
