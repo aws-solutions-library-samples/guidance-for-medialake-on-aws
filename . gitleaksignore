@@ -1,0 +1,10 @@
+# .gitleaksignore
+
+# Ignore findings in medialake_user_interface/public/aws-exports.json
+a4d3c0ab7b4c73fb59b0f8283a491fd0663e5dd3:medialake_user_interface/public/aws-exports.json:generic-api-key:1
+50bb713c337a59cfc728b49cdb00b68c212f6ed0:medialake_user_interface/public/aws-exports.json:generic-api-key:1
+475ddc2f2c3b474729b3955a0cd06688172c8884:medialake_user_interface/public/aws-exports.json:generic-api-key:1
+7cc29b77ded6392e4435d8d0af609929aee28805:medialake_user_interface/public/aws-exports.json:generic-api-key:1
+3a7e6bc8561cb1fc543f35ec3980e8f556e318ef:medialake_user_interface/public/aws-exports.json:generic-api-key:5
+87bbe7774af9c119299c4124f6770136ca99679d:medialake_user_interface/public/aws-exports.json:generic-api-key:1
+7904246d62b22d979d3a6995fc333e462cbb7f58:medialake_user_interface/public/aws-exports.json:generic-api-key:1

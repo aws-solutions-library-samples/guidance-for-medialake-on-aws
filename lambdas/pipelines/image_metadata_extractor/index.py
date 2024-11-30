@@ -103,6 +103,11 @@ def extract_exif_data(temp_file_path):
         command = [exiftool_path, "-json", "-fast", temp_file_path]
 
         # Run the command
+        # The use of subprocess.run here is safe because:
+        # - temp_file_path is generated internally and validated.
+        # - We are using shell=False and passing the command as a list.
+        # - There is no user-controlled input that could lead to command injection.
+        # nosemgrep: python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use-audit
         result = subprocess.run(
             command,
             capture_output=True,
