@@ -41,21 +41,25 @@ class S3Connector(BaseModel):
     name: str
     type: str
 
-def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=1):
+def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
     for attempt in range(max_retries):
         try:
             iam_client.get_role(RoleName=role_name)
+            print("Was able to get role",iam_client.get_role(RoleName=role_name))
+            time.sleep(base_delay)
             return True
         except iam_client.exceptions.NoSuchEntityException:
             delay = (2 ** attempt) * base_delay
             time.sleep(delay)
     return False
 
-def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=1):
+def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=10):
     for attempt in range(max_retries):
         try:
             attached_policies = iam_client.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
             if any(policy['PolicyArn'] == policy_arn for policy in attached_policies):
+                print("Was able to verify attachment",attached_policies)
+                time.sleep(base_delay)
                 return True
             delay = (2 ** attempt) * base_delay
             time.sleep(delay)
@@ -395,9 +399,7 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             # Wait for role to be available
    
-            if not wait_for_iam_role_propagation(iam_client, role_name):
-                raise Exception(f"IAM role {role_name} did not propagate in time")
-
+           
 
             # Attach policies to the role
             iam_client.attach_role_policy(
@@ -425,19 +427,18 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ],
             }
 
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy",
-                PolicyDocument=json.dumps(sqs_policy),
-            )
-            created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
-            )
+            # Define the policy ARN
+            policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
-          
-            # Wait for policy attachment to propagate
-            if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-                raise Exception(
+            # Attach policies to the role
+            iam_client.attach_role_policy(
+                RoleName=role_name,
+                PolicyArn=policy_arn
+            )
+            created_resources.append(("role_policy", (role_name, "AWSLambdaBasicExecutionRole")))
+
+       
+
 
             # Attach policies to the role
             iam_client.attach_role_policy(
@@ -565,7 +566,13 @@ def create_connector(createconnector: S3Connector) -> dict:
             layers = [layer_arn] if layer_arn else []
             # Add AWS SDK layer
             layers.append(aws_sdk_layer_arn)
-
+             # Wait for policy attachment to propagate
+            if not wait_for_iam_role_propagation(iam_client, role_name):
+                raise Exception(f"IAM role {role_name} did not propagate in time")
+            print("OKAY0")
+            if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
+                raise Exception(f"Policy {policy_arn} did not attach to role {role_name} in time")
+            print("OKAY")
             # Deploy the lambda with proper S3 configuration
             create_function_response = lambda_client.create_function(
                 FunctionName=target_function_name,

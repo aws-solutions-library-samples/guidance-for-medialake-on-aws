@@ -426,11 +426,12 @@ class ConnectorsConstruct(Construct):
                     "iam:AttachRolePolicy",
                     "iam:PassRole",
                     "iam:DeleteRolePolicy",
+                    "ListAttachedRolePolicies",
                     "iam:CreateRole",
                     "iam:TagRole",
                     "iam:AttachRolePolicy",
                     "iam:DetachRolePolicy",
-                    "iam:PassRole",
+                    "iam:GetRole",
                 ],
                 resources=[f"arn:aws:iam::{account_id}:role/*"],
             )

@@ -192,16 +192,16 @@ class OpenSearchCluster(Construct):
             encoding="utf-8"
         )
 
-        code_hash = hashlib.sha256(lambda_code.encode()).hexdigest()
+        # code_hash = hashlib.sha256(lambda_code.encode()).hexdigest()
 
         create_index_resource = CustomResource(
             self,
             "IndexCreateResource",
             service_token=provider.service_token,
-            properties={
-                "code_hash": code_hash,
-                "timestamp": str(int(time.time())),
-            },
+            # properties={
+            #     "code_hash": code_hash,
+            #     "timestamp": str(int(time.time())),
+            # },
             resource_type="Custom::OpenSearchCreateIndex",
         )
 
