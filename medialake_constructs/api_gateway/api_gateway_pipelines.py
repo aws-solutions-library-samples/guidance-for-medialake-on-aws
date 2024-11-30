@@ -112,6 +112,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # POST /api/pipelines
         post_pipelines_lambda_config = LambdaConfig(
             name="PostPipelinesHandler",
+            timeout_minutes=10,
             entry="lambdas/api/pipelines/post_pipelines",
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
@@ -153,6 +154,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "iam:TagRole",
                     "iam:CreateRole",
                     "iam:AttachRolePolicy",
+                    "iam:ListAttachedRolePolicies",
                     "iam:PassRole",
                     "iam:PutRolePolicy",
                     "iam:GetRole",

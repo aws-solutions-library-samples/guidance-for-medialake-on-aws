@@ -24,12 +24,12 @@ def lambda_handler(event, context):
       print(f"Pipeline {pipeline_name} already exists. Deleting it...")
 
       # Delete the existing pipeline
-      osis_client.delete_pipeline(PipelineName=pipeline_name)
+      # osis_client.delete_pipeline(PipelineName=pipeline_name)
       
       # Wait for the pipeline to be deleted
-      wait_for_pipeline_deletion(osis_client, pipeline_name)
+      # wait_for_pipeline_deletion(osis_client, pipeline_name)
       
-      print(f"Pipeline {pipeline_name} has been deleted.")
+      # print(f"Pipeline {pipeline_name} has been deleted.")
     except osis_client.exceptions.ResourceNotFoundException:
       print(f"Pipeline {pipeline_name} does not exist. Proceeding with creation.")
     except ClientError as e:

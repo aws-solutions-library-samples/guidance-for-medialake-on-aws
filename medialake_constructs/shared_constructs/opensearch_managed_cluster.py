@@ -155,12 +155,12 @@ class OpenSearchCluster(Construct):
             },
         )
 
-        # layer = PythonLayerVersion(
-        #     self,
-        #     "RequestsLayer",
-        #     entry="lambdas/back_end/create_oss_index",
-        #     compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
-        # )
+        layer = PythonLayerVersion(
+            self,
+            "RequestsLayer",
+            entry="lambdas/back_end/create_oss_index",
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+        )
 
         create_index_lambda.add_layers(layer)
 

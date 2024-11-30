@@ -426,7 +426,7 @@ class ConnectorsConstruct(Construct):
                     "iam:AttachRolePolicy",
                     "iam:PassRole",
                     "iam:DeleteRolePolicy",
-                    "ListAttachedRolePolicies",
+                    "iam:ListAttachedRolePolicies",
                     "iam:CreateRole",
                     "iam:TagRole",
                     "iam:AttachRolePolicy",

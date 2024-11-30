@@ -43,13 +43,28 @@ class S3Pipeline(BaseModel):
     name: str
     type: str
 
-def wait_for_iam_role_propagation(role_name, max_retries=10, delay=5):
-    iam = boto3.client('iam')
-    for _ in range(max_retries):
+def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
+    for attempt in range(max_retries):
         try:
-            iam.get_role(RoleName=role_name)
+            iam_client.get_role(RoleName=role_name)
+            time.sleep(base_delay)
             return True
-        except iam.exceptions.NoSuchEntityException:
+        except iam_client.exceptions.NoSuchEntityException:
+            delay = (2 ** attempt) * base_delay
+            time.sleep(delay)
+    return False
+
+def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=10):
+    for attempt in range(max_retries):
+        try:
+            attached_policies = iam_client.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
+            if any(policy['PolicyArn'] == policy_arn for policy in attached_policies):
+                time.sleep(base_delay)
+                return True
+            delay = (2 ** attempt) * base_delay
+            time.sleep(delay)
+        except iam_client.exceptions.NoSuchEntityException:
+            delay = (2 ** attempt) * base_delay
             time.sleep(delay)
     return False
 
@@ -216,6 +231,7 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                 "Action": "sts:AssumeRole"
             }]
         }
+        policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
         
         response = iam_client.create_role(
             RoleName=role_name,
@@ -223,11 +239,24 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
             Tags=[{'Key': k, 'Value': v} for k, v in tags.items()]
         )
         
-        # Attach necessary policies
+       
+        # Attach policies to the role
         iam_client.attach_role_policy(
             RoleName=role_name,
-            PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+            PolicyArn=policy_arn
         )
+           
+       
+        # Attach policies to the role
+        iam_client.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+        )
+        
+        if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
+            raise Exception(f"Policy {policy_arn} did not attach to role {role_name} in time")
+          
+          
         
         # Create and attach SQS policy
         sqs_policy = {
@@ -521,6 +550,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             'pipeline_name': createpipeline.name
         }
         
+
+        
+        
         # Create SQS FIFO Queue
         queue_name = f"medialake-pipeline-{createpipeline.name}"
         queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
@@ -533,9 +565,11 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             queue_arn,
             tags
         )
+   
+  
+
         
         # Create IAM Role for Lambda and Step Functions
-        role_name = f"medialake-pipeline-{createpipeline.name}-role"
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
         role_arn = create_pipeline_role(
             role_name,
@@ -543,40 +577,14 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             state_machine_name,
             tags
         )
-        
-        # Wait for IAM role propagation
-        if wait_for_iam_role_propagation(role_name):
-            # Continue with your code
-        else:
-            raise Exception("IAM role propagation timed out")
+       
+      
+
         
         # Add this before creating the image proxy lambda
         image_metadata_extractor_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-metadata"
-        # image_metadata_extractor_lambda_response = lambda_client.create_function(
-        #     FunctionName=image_metadata_extractor_lambda_function_name,
-        #     Runtime='python3.12',
-        #     Role=role_arn,
-        #     Handler='index.lambda_handler',
-        #     Code={
-        #         'S3Bucket': deployment_bucket,
-        #         'S3Key': image_metadata_extractor_deployment_zip
-        #     },
-        #     Tags=tags
-        # )
-
         
         image_proxy_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        # image_proxy_lambda_response = lambda_client.create_function(
-        #     FunctionName=image_proxy_lambda_function_name,
-        #     Runtime='python3.12',
-        #     Role=role_arn,
-        #     Handler='index.lambda_handler',
-        #     Code={
-        #         'S3Bucket': deployment_bucket,
-        #         'S3Key': image_proxy_deployment_zip
-        #     },
-        #     Tags=tags
-        # ) 
         
         # Create metadata extractor lambda
         image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
@@ -636,72 +644,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         
         # Create Step Function
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        # In post_pipelines/index.py, update the state_machine_definition:
-
-        # state_machine_definition = {
-        #     "Comment": f"Pipeline {createpipeline.name}",
-        #     "StartAt": "ExtractMetadata",
-        #     "States": {
-        #         "ExtractMetadata": {
-        #             "Type": "Task",
-        #             "Resource": "arn:aws:states:::lambda:invoke",
-        #             "Parameters": {
-        #                 "FunctionName": image_metadata_extractor_lambda_response['FunctionArn'],
-        #                 "Payload": {
-        #                     "pipeline_id.$": "$.pipeline_id",
-        #                     "input.$": "$.input",
-        #                     "parameters": {
-        #                         "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)"
-        #                     }
-        #                 }
-        #             },
-        #             "ResultPath": "$.metadataResult",
-        #             "Next": "CreateProxy"
-        #         },
-        #         "CreateProxy": {
-        #             "Type": "Task",
-        #             "Resource": "arn:aws:states:::lambda:invoke",
-        #             "Parameters": {
-        #                 "FunctionName": image_proxy_lambda_response['FunctionArn'],
-        #                 "Payload": {
-        #                     "pipeline_id.$": "$.pipeline_id",
-        #                     "input.$": "$.input",
-        #                     "metadata.$": "$.metadataResult.body",
-        #                     "parameters": {
-        #                         "s3_uri.$": "States.Format('s3://{}/{}', $.input.sourceLocation.bucket, $.input.sourceLocation.path)",
-        #                         "mode": "proxy",
-        #                         "output_bucket": "YOUR_OUTPUT_BUCKET"
-        #                     }
-        #                 }
-        #             },
-        #             "ResultPath": "$.proxyResult",
-        #             "Next": "UpdateDynamoDB"
-        #         },
-        #         "UpdateDynamoDB": {
-        #             "Type": "Task",
-        #             "Resource": "arn:aws:states:::dynamodb:updateItem",
-        #             "Parameters": {
-        #                 "TableName": "${process.env.MEDIALAKE_ASSET_TABLE}",
-        #                 "Key": {
-        #                     "id": {"S.$": "$.input.id"}
-        #                 },
-        #                 "UpdateExpression": "SET proxyLocation = :proxyLocation, metadata = :metadata",
-        #                 "ExpressionAttributeValues": {
-        #                     ":proxyLocation": {
-        #                         "M": {
-        #                             "bucket": {"S.$": "$.proxyResult.body.bucket"},
-        #                             "key": {"S.$": "$.proxyResult.body.key"},
-        #                             "type": {"S": "S3"}
-        #                         }
-        #                     },
-        #                     ":metadata": {"M.$": "$.metadataResult.body"}
-        #                 }
-        #             },
-        #             "End": true
-        #         }
-        #     }
-        # }
-
+       
 
         # Get state machine definition
 
@@ -719,9 +662,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             state_machine_definition,
             tags
         )
-        
+     
 
-        
+      
         # Create Lambda Function
         pipeline_trigger_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-executor"
         pipeline_trigger_lambda_response = lambda_client.create_function(

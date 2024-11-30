@@ -433,9 +433,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                 RoleName=role_name,
                 PolicyArn=policy_arn
             )
-            created_resources.append(("role_policy", (role_name, "AWSLambdaBasicExecutionRole")))
-
-       
+            
 
 
             # Attach policies to the role
@@ -443,9 +441,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                 RoleName=role_name,
                 PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
             )
-            created_resources.append(
-                ("role_policy", (role_name, "AWSLambdaBasicExecutionRole"))
-            )
+          
 
             # Create custom policy for SQS permissions
             sqs_policy = {

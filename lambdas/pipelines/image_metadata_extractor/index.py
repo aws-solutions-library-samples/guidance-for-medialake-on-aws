@@ -6,7 +6,7 @@ import shlex
 import os.path
 import subprocess
 from decimal import Decimal
-from aws_lambda_pimpowertools import Logger
+from aws_lambda_powertools import Logger
 from iptcinfo3 import IPTCInfo, IPTCData
 import tempfile
 from io import BytesIO
