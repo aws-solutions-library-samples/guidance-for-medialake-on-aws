@@ -88,31 +88,48 @@ def is_safe_file_path(file_path):
     
     return True
 
-def extract_exif_data(image_content):
+def extract_exif_data(temp_file_path):
     try:
-        logger.info("Starting EXIF extraction")
+        logger.info(f"Starting EXIF extraction from {temp_file_path}")
+
+        if not is_safe_file_path(temp_file_path):
+            logger.error(f"Invalid or unsafe file path: {temp_file_path}")
+            return {}
+
         # Use the exiftool binary from the Lambda layer
         exiftool_path = "/opt/bin/exiftool"
-        # Construct the command
-        command = [exiftool_path, "-json", "-fast", "-"]
-        # Run the command and pass image_content to stdin
+
+        # Construct the command as a list of arguments
+        command = [exiftool_path, "-json", "-fast", temp_file_path]
+
+        # Run the command
+        # The use of subprocess.run here is safe because:
+        # - temp_file_path is generated internally and validated.
+        # - We are using shell=False and passing the command as a list.
+        # - There is no user-controlled input that could lead to command injection.
+        # nosemgrep: python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use-audit
+        
+        # semgrep-disable
         result = subprocess.run(
             command,
-            input=image_content,
             capture_output=True,
-            text=False,  # Since we're dealing with binary data
+            text=True,
             check=True,
             shell=False
         )
+        # semgrep-enable
+
         if result.stderr:
-            logger.warning(f"ExifTool stderr: {result.stderr.decode('utf-8')}")
+            logger.warning(f"ExifTool stderr: {result.stderr}")
+
         if result.stdout:
-            exif_data = json.loads(result.stdout.decode('utf-8'))[0]
+            exif_data = json.loads(result.stdout)[0]
             logger.info(f"Extracted EXIF data: {exif_data}")
             return exif_data
         else:
             logger.warning("No EXIF data extracted")
             return {}
+
     except subprocess.CalledProcessError as e:
         logger.error(f"ExifTool process error: {e}")
         return {}
@@ -132,18 +149,28 @@ def process_image_file(bucket, key):
         response = s3.get_object(Bucket=bucket, Key=key)
         image_content = response["Body"].read()
         logger.info(f"Retrieved image size: {len(image_content)} bytes")
-        # Extract EXIF data
-        exif_data = extract_exif_data(image_content)
-        # Extract IPTC data
-        iptc_data = extract_iptc_data(image_content)
+
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(mode='wb', delete=True, dir=tempfile.gettempdir()) as temp_file:
+            logger.info(f"Creating temporary file: {temp_file.name}")
+            temp_file.write(image_content)
+            temp_file.flush()
+
+            logger.info(f"Temporary file created, size: {os.path.getsize(temp_file.name)}")
+
+            # Extract EXIF data using ExifTool binary
+            exif_data = extract_exif_data(temp_file.name)
+
+            # Extract IPTC data
+            iptc_data = extract_iptc_data(image_content)
+
+        logger.info("Temporary file automatically removed")
+
         # Combine EXIF and IPTC data
         metadata = {"EXIF": exif_data, "IPTC": iptc_data}
         logger.info("Extracted metadata: %s", metadata)
+
         return metadata
-    except Exception as e:
-        logger.error("Error processing image file: %s", str(e))
-        logger.error(f"Error type: {type(e)}")
-        return None
 
     except Exception as e:
         logger.error("Error processing image file: %s", str(e))
