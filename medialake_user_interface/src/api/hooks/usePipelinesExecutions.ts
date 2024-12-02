@@ -12,23 +12,37 @@ export const usePipelineExecutions = (
 ) => {
     const { showError } = useErrorModal();
 
-    return useInfiniteQuery<PipelineExecutionsResponse, Error>({
-        queryKey: [QUERY_KEYS.PIPELINE_EXECUTIONS.all, { pageSize, filters }],
-        initialPageParam: 1,
+    return useInfiniteQuery({
+        queryKey: [QUERY_KEYS.PIPELINE_EXECUTIONS.all, pageSize, filters] as const,
+        initialPageParam: null as string | null,
         queryFn: async ({ pageParam }) => {
             try {
-                const params = new URLSearchParams({
-                    page: pageParam.toString(),
+                const params: Record<string, string> = {
                     pageSize: pageSize.toString(),
-                    ...(filters?.status && { status: filters.status }),
-                    ...(filters?.startDate && { startDate: filters.startDate }),
-                    ...(filters?.endDate && { endDate: filters.endDate }),
-                    ...(filters?.sortBy && { sortBy: filters.sortBy }),
-                    ...(filters?.sortOrder && { sortOrder: filters.sortOrder }),
-                });
+                };
 
+                if (pageParam) {
+                    params.nextToken = pageParam;
+                }
+                if (filters?.status) {
+                    params.status = filters.status;
+                }
+                if (filters?.startDate) {
+                    params.startDate = filters.startDate;
+                }
+                if (filters?.endDate) {
+                    params.endDate = filters.endDate;
+                }
+                if (filters?.sortBy) {
+                    params.sortBy = filters.sortBy;
+                }
+                if (filters?.sortOrder) {
+                    params.sortOrder = filters.sortOrder;
+                }
+
+                const searchParams = new URLSearchParams(params);
                 const response = await apiClient.get<PipelineExecutionsResponse>(
-                    `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${params.toString()}`
+                    `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${searchParams.toString()}`
                 );
                 return response.data;
             } catch (error) {
@@ -37,19 +51,12 @@ export const usePipelineExecutions = (
                 throw error;
             }
         },
-        getNextPageParam: (lastPage, pages) => {
-            const { searchMetadata } = lastPage.data;
-            const totalPages = Math.ceil(searchMetadata.totalResults / searchMetadata.pageSize);
-            if (searchMetadata.page < totalPages) {
-                return searchMetadata.page + 1;
-            }
-            return undefined;
+        getNextPageParam: (lastPage) => {
+            return lastPage.data.searchMetadata.nextToken || null;
         },
-        getPreviousPageParam: (firstPage, pages) => {
-            if (firstPage.data.searchMetadata.page > 1) {
-                return firstPage.data.searchMetadata.page - 1;
-            }
-            return undefined;
-        },
+        select: (data) => ({
+            pages: data.pages,
+            pageParams: data.pageParams
+        })
     });
 };

@@ -2,6 +2,7 @@ from aws_cdk import (
     Stack,
     CustomResource,
     RemovalPolicy,
+    aws_iam as iam,
     aws_dynamodb as dynamodb,
     custom_resources as cr,
 )
@@ -50,6 +51,21 @@ class CleanupStack(Stack):
                     "RESOURCE_TABLE": table_name,
                 },
             ),
+        )
+
+        self._clean_up_lambda.lambda_role.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "events:ListEventBuses",
+                    "events:ListRules",
+                    "events:ListTargetsByRule",
+                    "events:RemoveTargets",
+                    "events:DeleteRule",
+                ],
+                # You might want to restrict this to specific event buses
+                resources=["*"],
+            )
         )
 
         self._resource_table.table.grant_read_write_data(self._clean_up_lambda.function)

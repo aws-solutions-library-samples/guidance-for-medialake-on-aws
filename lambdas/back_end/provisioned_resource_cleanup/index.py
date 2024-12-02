@@ -1,151 +1,206 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import event_source
-from aws_lambda_powertools.metrics import MetricUnit
-from boto3.dynamodb.conditions import Attr
-import boto3
 import os
-from typing import Dict, List
-import json
+from typing import Dict, Any, List
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.data_classes import (
+    event_source,
+    APIGatewayProxyEvent,
+)
+from aws_lambda_powertools.utilities.validation import validate_request_parameters
+from pydantic import BaseModel, Field
+from boto3.session import Session
 from botocore.exceptions import ClientError
 
-# Initialize Power Tools
-logger = Logger(service="provisioned-resource-cleanup")
-tracer = Tracer(service="provisioned-resource-cleanup")
-metrics = Metrics(namespace="ProvisionedResourceCleanup")
+# Initialize AWS X-Ray tracer
+tracer = Tracer()
 
-# Initialize AWS clients with X-Ray tracing
-session = boto3.Session()
-dynamodb = session.resource("dynamodb")
-sts = session.client("sts")
+# Initialize metrics with namespace and service name
+metrics = Metrics(namespace="EventBridgeCleanup", service="EventManagement")
 
-
-@tracer.capture_method
-def get_aws_account_id() -> str:
-    """Get current AWS account ID."""
-    return sts.get_caller_identity()["Account"]
+# Initialize logger with custom log levels based on environment variable
+log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+logger = Logger(
+    service="EventManagement",
+    level=log_level,
+    json_serializer=lambda x: x,  # Use raw JSON output
+)
 
 
-@tracer.capture_method
-def parse_arn(arn: str) -> Dict:
-    """Parse an ARN into its components."""
-    parts = arn.split(":")
-    service = parts[2]
-    region = parts[3]
-    account = parts[4]
-    resource_type = parts[5].split("/")[0] if "/" in parts[5] else parts[5]
-    resource_id = "/".join(parts[5].split("/")[1:]) if "/" in parts[5] else ""
+class CleanupRequest(BaseModel):
+    """Pydantic model for request validation"""
 
-    return {
-        "service": service,
-        "region": region,
-        "account": account,
-        "resource_type": resource_type,
-        "resource_id": resource_id,
-    }
+    dry_run: bool = Field(
+        default=False, description="If true, only list rules without deleting"
+    )
+    region: str = Field(default="us-east-1", description="AWS region to scan")
 
 
-@tracer.capture_method
-def delete_resource(arn: str) -> bool:
-    """Delete a resource based on its ARN."""
-    try:
-        arn_parts = parse_arn(arn)
-        service = arn_parts["service"]
+class EventBridgeCleaner:
+    def __init__(self, region: str):
+        self.session = Session()
+        self.client = self.session.client("events", region_name=region)
 
-        # Get the appropriate client for the service
-        client = session.client(service, region_name=arn_parts["region"])
+    @tracer.capture_method
+    def list_event_buses(self) -> List[str]:
+        """List all non-default event buses"""
+        try:
+            paginator = self.client.get_paginator("list_event_buses")
+            event_buses = []
 
-        # Handle different resource types
-        if service == "s3":
-            client.delete_bucket(Bucket=arn_parts["resource_id"])
-        elif service == "dynamodb":
-            client.delete_table(TableName=arn_parts["resource_id"])
-        # Add more service-specific deletion logic as needed
+            for page in paginator.paginate():
+                for bus in page["EventBuses"]:
+                    if bus["Name"] != "default":
+                        event_buses.append(bus["Name"])
 
-        logger.info(f"Successfully deleted resource: {arn}")
-        metrics.add_metric(
-            name="ResourceDeletionSuccess", unit=MetricUnit.Count, value=1
-        )
-        return True
+            logger.debug(
+                {
+                    "message": "Retrieved event buses",
+                    "count": len(event_buses),
+                    "event_buses": event_buses,
+                }
+            )
+            return event_buses
+        except ClientError as e:
+            logger.error({"message": "Failed to list event buses", "error": str(e)})
+            raise
 
-    except ClientError as e:
-        logger.error(f"Failed to delete resource {arn}: {str(e)}")
-        metrics.add_metric(
-            name="ResourceDeletionFailure", unit=MetricUnit.Count, value=1
-        )
-        return False
+    @tracer.capture_method
+    def list_rules_for_bus(self, bus_name: str) -> List[Dict[str, Any]]:
+        """List all rules for a given event bus"""
+        try:
+            paginator = self.client.get_paginator("list_rules")
+            rules = []
+
+            for page in paginator.paginate(EventBusName=bus_name):
+                rules.extend(page["Rules"])
+
+            logger.debug(
+                {
+                    "message": "Retrieved rules for event bus",
+                    "bus_name": bus_name,
+                    "rule_count": len(rules),
+                }
+            )
+            return rules
+        except ClientError as e:
+            logger.error(
+                {
+                    "message": "Failed to list rules for event bus",
+                    "bus_name": bus_name,
+                    "error": str(e),
+                }
+            )
+            raise
+
+    @tracer.capture_method
+    def delete_rule(self, bus_name: str, rule_name: str) -> None:
+        """Delete a specific rule from an event bus"""
+        try:
+            # First, remove all targets associated with the rule
+            targets = self.client.list_targets_by_rule(
+                Rule=rule_name, EventBusName=bus_name
+            )["Targets"]
+
+            if targets:
+                target_ids = [target["Id"] for target in targets]
+                self.client.remove_targets(
+                    Rule=rule_name, EventBusName=bus_name, Ids=target_ids
+                )
+
+            # Then delete the rule
+            self.client.delete_rule(Name=rule_name, EventBusName=bus_name)
+
+            logger.info(
+                {
+                    "message": "Successfully deleted rule",
+                    "bus_name": bus_name,
+                    "rule_name": rule_name,
+                    "target_count": len(targets),
+                }
+            )
+
+            # Record metric for successful deletion
+            metrics.add_metric(name="RulesDeleted", value=1, unit="Count")
+
+        except ClientError as e:
+            logger.error(
+                {
+                    "message": "Failed to delete rule",
+                    "bus_name": bus_name,
+                    "rule_name": rule_name,
+                    "error": str(e),
+                }
+            )
+            metrics.add_metric(name="RuleDeletionFailures", value=1, unit="Count")
+            raise
 
 
-@tracer.capture_method
-def get_resources_to_delete() -> List[str]:
-    """Retrieve resources to delete from DynamoDB."""
-    table = dynamodb.Table(os.environ["RESOURCE_TABLE"])
-
-    try:
-        response = table.scan(FilterExpression=Attr("status").eq("PENDING_DELETION"))
-        return [item["resourceArn"] for item in response.get("Items", [])]
-    except ClientError as e:
-        logger.error(f"Failed to scan DynamoDB table: {str(e)}")
-        raise
-
-
-@logger.inject_lambda_context(log_event=True)
 @tracer.capture_lambda_handler
-@metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: Dict, context: LambdaContext) -> Dict:
-    """
-    Main Lambda handler for resource cleanup.
-
-    Args:
-        event: Lambda event
-        context: Lambda context
-
-    Returns:
-        Dict containing execution results
-    """
+@metrics.log_metrics
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     try:
-        # Get account ID for cross-account validation
-        account_id = get_aws_account_id()
+        # Parse and validate request
+        if isinstance(event, dict) and "body" in event:
+            body = event["body"]
+        else:
+            body = event
 
-        # Get resources to delete
-        resources = get_resources_to_delete()
-        logger.info(f"Found {len(resources)} resources to delete")
+        request = CleanupRequest(**body)
 
-        results = {"successful_deletions": [], "failed_deletions": []}
+        # Initialize cleaner
+        cleaner = EventBridgeCleaner(request.region)
 
-        # Process each resource
-        for arn in resources:
-            try:
-                # Validate resource belongs to current account
-                arn_parts = parse_arn(arn)
-                if arn_parts["account"] != account_id:
-                    logger.warning(
-                        f"Skipping resource {arn} - belongs to different account"
-                    )
-                    results["failed_deletions"].append(
-                        {"arn": arn, "reason": "Resource belongs to different account"}
-                    )
-                    continue
+        # Get all non-default event buses
+        event_buses = cleaner.list_event_buses()
 
-                # Delete the resource
-                if delete_resource(arn):
-                    results["successful_deletions"].append(arn)
-                else:
-                    results["failed_deletions"].append(
-                        {"arn": arn, "reason": "Deletion failed"}
-                    )
+        deleted_rules_count = 0
+        failed_deletions_count = 0
 
-            except Exception as e:
-                logger.error(f"Error processing resource {arn}: {str(e)}")
-                results["failed_deletions"].append({"arn": arn, "reason": str(e)})
+        # Process each event bus
+        for bus_name in event_buses:
+            rules = cleaner.list_rules_for_bus(bus_name)
 
-        # Log summary metrics
+            for rule in rules:
+                if not request.dry_run:
+                    try:
+                        cleaner.delete_rule(bus_name, rule["Name"])
+                        deleted_rules_count += 1
+                    except ClientError:
+                        failed_deletions_count += 1
+                        continue
+
+        # Add summary metrics
         metrics.add_metric(
-            name="TotalResourcesProcessed", unit=MetricUnit.Count, value=len(resources)
+            name="TotalRulesProcessed",
+            value=deleted_rules_count + failed_deletions_count,
+            unit="Count",
         )
 
-        return {"statusCode": 200, "body": json.dumps(results)}
+        response = {
+            "statusCode": 200,
+            "body": {
+                "message": "EventBridge cleanup completed",
+                "dry_run": request.dry_run,
+                "deleted_rules": deleted_rules_count,
+                "failed_deletions": failed_deletions_count,
+            },
+        }
+
+        logger.info(
+            {
+                "message": "Lambda execution completed successfully",
+                "details": response["body"],
+            }
+        )
+
+        return response
 
     except Exception as e:
-        logger.exception("Failed to process resource cleanup")
-        raise
+        logger.error({"message": "Lambda execution failed", "error": str(e)})
+
+        return {
+            "statusCode": 500,
+            "body": {"message": "Internal server error", "error": str(e)},
+        }

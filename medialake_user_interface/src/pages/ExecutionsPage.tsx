@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Typography,
@@ -34,7 +35,6 @@ import {
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
-    getPaginationRowModel,
     flexRender,
     ColumnDef,
 } from '@tanstack/react-table';
@@ -47,6 +47,7 @@ const PAGE_SIZE = 20;
 const ExecutionsPage: React.FC = () => {
     const { t } = useTranslation();
     const theme = useTheme();
+    const navigate = useNavigate();
     const { timezone } = useTimezone();
     const [filters, setFilters] = useState({
         status: '',
@@ -54,7 +55,7 @@ const ExecutionsPage: React.FC = () => {
         sortOrder: 'desc' as 'asc' | 'desc'
     });
 
-    const { data, isLoading, refetch } = usePipelineExecutions(PAGE_SIZE, {
+    const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipelineExecutions(PAGE_SIZE, {
         status: filters.status || undefined,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder
@@ -107,6 +108,10 @@ const ExecutionsPage: React.FC = () => {
     const handleRetryFromStart = (executionId: string) => {
         // TODO: Implement retry from start
         console.log('Retry from start:', executionId);
+    };
+
+    const handleViewDetails = (executionId: string) => {
+        navigate(`/executions/${executionId}`);
     };
 
     const columns = useMemo<ColumnDef<PipelineExecution>[]>(
@@ -206,28 +211,31 @@ const ExecutionsPage: React.FC = () => {
                                 </Tooltip>
                             </>
                         )}
-                        <IconButton
-                            size="small"
-                            color="primary"
-                            title={t('executions.actions.viewDetails')}
-                            sx={{
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                '&:hover': {
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                },
-                            }}
-                        >
-                            <VisibilityIcon fontSize="small" />
-                        </IconButton>
+                        <Tooltip title={t('executions.actions.viewDetails')}>
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleViewDetails(row.original.execution_id)}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
                 ),
             },
         ],
-        [theme, t]
+        [theme, t, navigate]
     );
 
     const executions = useMemo(() => {
-        return data?.pages.flatMap(page => page.data.executions) || [];
+        if (!data?.pages) return [];
+        return data.pages.flatMap(page => page.data.executions);
     }, [data]);
 
     const table = useReactTable({
@@ -236,12 +244,6 @@ const ExecutionsPage: React.FC = () => {
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        initialState: {
-            pagination: {
-                pageSize: PAGE_SIZE,
-            },
-        },
     });
 
     return (
@@ -386,14 +388,14 @@ const ExecutionsPage: React.FC = () => {
                 <Box sx={{
                     p: 2,
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justifyContent: 'center',
                     alignItems: 'center',
                     borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    {hasNextPage && (
                         <Button
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
+                            onClick={() => fetchNextPage()}
+                            disabled={!hasNextPage || isFetchingNextPage}
                             sx={{
                                 textTransform: 'none',
                                 borderRadius: '8px',
@@ -403,47 +405,11 @@ const ExecutionsPage: React.FC = () => {
                                 },
                             }}
                         >
-                            {t('common.previous')}
+                            {isFetchingNextPage
+                                ? t('common.loading')
+                                : t('common.loadMore')}
                         </Button>
-                        <Button
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                            sx={{
-                                textTransform: 'none',
-                                borderRadius: '8px',
-                                color: theme.palette.text.secondary,
-                                '&:hover': {
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                },
-                            }}
-                        >
-                            {t('common.next')}
-                        </Button>
-                    </Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                        {t('executions.pagination.page', {
-                            page: table.getState().pagination.pageIndex + 1,
-                            total: table.getPageCount()
-                        })}
-                    </Typography>
-                    <Select
-                        value={table.getState().pagination.pageSize}
-                        onChange={e => table.setPageSize(Number(e.target.value))}
-                        size="small"
-                        sx={{
-                            minWidth: 120,
-                            borderRadius: '8px',
-                            '& .MuiOutlinedInput-notchedOutline': {
-                                borderColor: alpha(theme.palette.divider, 0.2),
-                            },
-                        }}
-                    >
-                        {[10, 20, 50].map(pageSize => (
-                            <MenuItem key={pageSize} value={pageSize}>
-                                {t('executions.pagination.showEntries', { count: pageSize })}
-                            </MenuItem>
-                        ))}
-                    </Select>
+                    )}
                 </Box>
             </Paper>
         </Box>
