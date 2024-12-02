@@ -26,12 +26,10 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
 )
-
-# from medialake_constructs.shared_constructs.opensearch_serverless import (
-#     OpenSearchServerlessConstruct,
-#     OpenSearchServerlessProps,
-# )
-
+from medialake_constructs.shared_constructs.opensearch_serverless import (
+    OpenSearchServerlessConstruct,
+    OpenSearchServerlessProps,
+)
 from medialake_constructs.shared_constructs.lambda_layers import (
     SearchLayer,
     PynamoDbLambdaLayer,
@@ -351,6 +349,10 @@ class BaseInfrastructureStack(Stack):
                 actions=[
                     "osis:CreatePipeline",
                     "osis:ValidatePipeline",
+                    # "osis:ListPipelineBlueprints",
+                    # "osis:UpdatePipeline",
+                    # "osis:DeletePipeline",
+                    # "osis:StopPipeline",
                 ],
                 resources=[
                     f"arn:aws:osis:{self.region}:{self.account}:pipeline/{GLOBAL_PREFIX}-etl-pipeline"
@@ -473,6 +475,9 @@ class BaseInfrastructureStack(Stack):
             )
         )
 
+        # Grant necessary permissions
+        # pipeline_role.grant_pass_role(ingestion_pipeline_lambda.function)
+
         ingestion_pipeline_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -513,28 +518,31 @@ class BaseInfrastructureStack(Stack):
                 "SecurityGroupIds": json.dumps([self.security_group.security_group_id]),
             },
         )
-        opensearch_layer = SearchLayer(self, "OpenSearchLayer")
-        pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
+        # Ensure the ingestion pipeline is created after the DynamoDB table is populated
+        ingestion_custom_resource.node.add_dependency(self._asset_table)
+        ingestion_custom_resource.node.add_dependency(pipeline_role)
 
-        asset_lambda_stream = Lambda(
-            self,
-            "AssetTableLambdaStream",
-            config=LambdaConfig(
-                name=f"{GLOBAL_PREFIX}-asset-table-stream",
-                timeout_minutes=15,
-                vpc=self.vpc.vpc,
-                entry="lambdas/back_end/asset_table_stream",
-                environment_variables={
-                    "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
-                    "OPENSEARCH_INDEX": "media",
-                    "SCOPE": "es",
-                },
-                layers=[opensearch_layer.layer, pynamodb_layer.layer],
-            ),
-        )
+        # opensearch_layer = SearchLayer(self, "OpenSearchLayer")
+        # pynamodb_layer = PynamoDbLambdaLayer(self, "PynamoDbLayer")
+
+        # asset_lambda_stream = Lambda(
+        #     self,
+        #     "AssetTableLambdaStream",
+        #     config=LambdaConfig(
+        #         name=f"{GLOBAL_PREFIX}-asset-table-stream",
+        #         timeout_minutes=15,
+        #         vpc=self.vpc.vpc,
+        #         entry="lambdas/back_end/asset_table_stream",
+        #         environment_variables={
+        #             "OPENSEARCH_ENDPOINT": self.opensearch_cluster.domain_endpoint,
+        #             "OPENSEARCH_INDEX": "media",
+        #             "SCOPE": "es",
+        #         },
+        #         layers=[opensearch_layer.layer, pynamodb_layer.layer],
+        #     ),
+        # )
 
         # Add OpenSearch policy to Lambda function
-
         # asset_lambda_stream.function.add_to_role_policy(
         #     iam.PolicyStatement(
         #         actions=["aoss:APIAccessAll"],
@@ -542,33 +550,33 @@ class BaseInfrastructureStack(Stack):
         #     )
         # )
 
-        # to allow attaching the vpc
-        asset_lambda_stream.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "ec2:CreateNetworkInterface",
-                    "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface",
-                ],
-                resources=["*"],
-            )
-        )
+        ## to allow attaching the vpc
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "ec2:CreateNetworkInterface",
+        #             "ec2:DescribeNetworkInterfaces",
+        #             "ec2:DeleteNetworkInterface",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
 
-        asset_lambda_stream.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["es:ESHttpPost"],
-                resources=["*"],
-            )
-        )
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["es:ESHttpPost"],
+        #         resources=["*"],
+        #     )
+        # )
 
-        # This feature is using OS pipelines.
-        self._asset_table.table.grant_stream(asset_lambda_stream.function)
-        asset_lambda_stream.function.add_event_source(
-            eventsources.DynamoEventSource(
-                self._asset_table.table,
-                starting_position=lambda_.StartingPosition.LATEST,
-            )
-        )
+        ## This feature is using OS pipelines.
+        # self._asset_table.table.grant_stream(asset_lambda_stream.function)
+        # asset_lambda_stream.function.add_event_source(
+        #     eventsources.DynamoEventSource(
+        #         self._asset_table.table,
+        #         starting_position=lambda_.StartingPosition.LATEST,
+        #     )
+        # )
 
     @property
     def ingest_event_bus(self) -> events.EventBus:
@@ -621,3 +629,11 @@ class BaseInfrastructureStack(Stack):
     @property
     def collection_arn(self) -> str:
         return self.opensearch_cluster.domain_arn
+
+    @property
+    def pipeline_event_bus(self) -> events.EventBus:
+        return self._pipelines_executions_event_bus.event_bus
+
+    @property
+    def pipeline_event_bus_name(self) -> str:
+        return self._pipelines_executions_event_bus.event_bus_name
