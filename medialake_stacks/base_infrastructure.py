@@ -26,10 +26,12 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
 )
-from medialake_constructs.shared_constructs.opensearch_serverless import (
-    OpenSearchServerlessConstruct,
-    OpenSearchServerlessProps,
-)
+
+# from medialake_constructs.shared_constructs.opensearch_serverless import (
+#     OpenSearchServerlessConstruct,
+#     OpenSearchServerlessProps,
+# )
+
 from medialake_constructs.shared_constructs.lambda_layers import (
     SearchLayer,
     PynamoDbLambdaLayer,
@@ -533,12 +535,12 @@ class BaseInfrastructureStack(Stack):
 
         # Add OpenSearch policy to Lambda function
 
-        asset_lambda_stream.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["aoss:APIAccessAll"],
-                resources=[self.opensearch_serverless.collection_arn],
-            )
-        )
+        # asset_lambda_stream.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["aoss:APIAccessAll"],
+        #         resources=[self.opensearch_serverless.collection_arn],
+        #     )
+        # )
 
         # to allow attaching the vpc
         asset_lambda_stream.function.add_to_role_policy(

@@ -23,7 +23,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import { useTheme } from '@mui/material/styles';
-import type { ExecutionDetails, ExecutionHistoryEvent } from '/Users/raverrr/codebase/medialake_dev4/medialake-4/medialake_user_interface/src/api/types/pipelineExecutionDetails.types';
+import type { ExecutionDetails, ExecutionHistoryEvent } from '@/api/types/pipelineExecutionDetails.types';
 
 // Mock data for development
 const mockExecutionDetails: ExecutionDetails = {

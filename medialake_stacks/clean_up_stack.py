@@ -53,7 +53,7 @@ class CleanupStack(Stack):
             ),
         )
 
-        self._clean_up_lambda.lambda_role.lambda_role.add_to_policy(
+        self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
