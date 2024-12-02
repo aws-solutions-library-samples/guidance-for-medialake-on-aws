@@ -3,11 +3,6 @@ from typing import Dict, Any, List
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import (
-    event_source,
-    APIGatewayProxyEvent,
-)
-from aws_lambda_powertools.utilities.validation import validate_request_parameters
 from pydantic import BaseModel, Field
 from boto3.session import Session
 from botocore.exceptions import ClientError

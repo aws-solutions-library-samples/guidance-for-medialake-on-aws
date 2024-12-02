@@ -37,7 +37,7 @@ class S3Bucket(Construct):
             removal_policy=RemovalPolicy.DESTROY,  # Changed to RETAIN to prevent deletion
             enable_key_rotation=True,  # Added key rotation as a security best practice
         )
-
+        print(s3_config.bucket_name)
         # Create S3 bucket with security best practices
         self.bucket = s3.Bucket(
             self,

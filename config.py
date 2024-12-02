@@ -12,8 +12,10 @@ class CDKConfig(BaseModel):
     enable_ha: bool = False
     primary_region: str = "us-east-1"
     account_id: Optional[str] = None
+    environment: str = None
     secondary_region: Optional[str] = None
     small_uid: str = ""
+    global_prefix: str = "medialake"
     assets_bucket_name: str = "medialake-assets"
     # lambda_runtime_version: str = "3.11"
     bedrock_region: str = "us-east-1"

@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_s3_notifications as s3n,
     aws_s3 as s3,
+    CfnResource,
     aws_ec2 as ec2,
     custom_resources as cr,
     CustomResource,
@@ -69,6 +70,21 @@ class BaseInfrastructureStack(Stack):
             props=CustomVpcProps(vpc_name=f"{GLOBAL_PREFIX}-vpc-{region}"),
         )
 
+        # slr = iam.CfnServiceLinkedRole(self, "OpenSearchServiceLinkedRole",
+        #     aws_service_name="opensearch.amazonaws.com"
+        # )
+        
+
+        # service_linked_role = CfnResource(
+        #     self, 
+        #     "OpenSearchServiceLinkedRole",
+        #     type="AWS::IAM::ServiceLinkedRole",
+        #     properties={
+        #         "AWSServiceName": "es.amazonaws.com",
+        #         "Description": "Service-linked role for OpenSearch Service"
+        #     }
+        # )
+        
         self.security_group = ec2.SecurityGroup(
             self,
             "MediaLakeSecurityGroup",
@@ -93,7 +109,7 @@ class BaseInfrastructureStack(Stack):
         ingestion_log_group = logs.LogGroup(
             self,
             "IngestionPipelineLogGroup",
-            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{random.randint(100, 999)}",
+            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{short_uid}",
             removal_policy=RemovalPolicy.DESTROY,
             retention=logs.RetentionDays.ONE_DAY,
         )
@@ -112,7 +128,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaAssets",
             s3_config=S3Config(
-                bucket_name=f"{GLOBAL_PREFIX}-asset-bucket-{config.account_id}-{region}-{short_uid}",
+                bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{region}-{config.environment}",
                 cors=[
                     s3.CorsRule(
                         allowed_methods=[
@@ -139,7 +155,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             s3_config=S3Config(
-                bucket_name=f"medialake-iac-assets-{config.account_id}-{short_uid}",
+                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}",
             ),
         )
 
@@ -148,7 +164,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             s3_config=S3Config(
-                bucket_name=f"medialake-ddb-export-{config.account_id}-{short_uid}",
+                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}",
             ),
         )
 
