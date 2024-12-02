@@ -36,10 +36,6 @@ class CleanupStack(Stack):
             ),
         )
 
-        table_name = str(
-            "medialake-provisioned-resources-table"
-        )  # Use hardcoded string
-
         self._clean_up_lambda = Lambda(
             self,
             "MediaLakeProvisionedResourceCleanUpLambda",
@@ -48,7 +44,7 @@ class CleanupStack(Stack):
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
                 environment_variables={
-                    "RESOURCE_TABLE": table_name,
+                    "RESOURCE_TABLE": self._resource_table.table.table_name,
                 },
             ),
         )
@@ -63,7 +59,6 @@ class CleanupStack(Stack):
                     "events:RemoveTargets",
                     "events:DeleteRule",
                 ],
-                # You might want to restrict this to specific event buses
                 resources=["*"],
             )
         )
@@ -79,7 +74,7 @@ class CleanupStack(Stack):
             "CleanupResource",
             service_token=self.provider.service_token,
             properties={
-                "TableName": table_name,
+                "TableName": self._resource_table.table_name,
                 "Version": "1.0.0",
             },
             removal_policy=RemovalPolicy.RETAIN,
