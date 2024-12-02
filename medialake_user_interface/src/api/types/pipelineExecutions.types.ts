@@ -1,29 +1,19 @@
 export interface PipelineExecution {
     execution_id: string;
+    pipeline_id: string;
     pipeline_name: string;
-    status: 'SUCCEEDED' | 'FAILED' | 'RUNNING' | 'TIMED_OUT' | 'ABORTED';
-    state_machine_arn: string;
+    status: string;
     start_time: string;
     end_time?: string;
-    duration_seconds: string;
-    last_updated: string;
-    ttl: string;
-    execution_arn: string;
-}
-
-export interface SearchMetadata {
-    totalResults: number;
-    page: number;
-    pageSize: number;
-}
-
-export interface PipelineExecutionsResponse {
-    status: string;
-    message: string;
-    data: {
-        searchMetadata: SearchMetadata;
-        executions: PipelineExecution[];
-    };
+    duration_seconds?: string;
+    error_message?: string;
+    steps?: Array<{
+        step_id: string;
+        status: string;
+        start_time: string;
+        end_time?: string;
+        error_message?: string;
+    }>;
 }
 
 export interface PipelineExecutionFilters {
@@ -32,4 +22,19 @@ export interface PipelineExecutionFilters {
     endDate?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+}
+
+export interface PipelineExecutionsSearchMetadata {
+    totalResults: number;
+    pageSize: number;
+    nextToken?: string;
+}
+
+export interface PipelineExecutionsResponse {
+    status: string;
+    message: string;
+    data: {
+        searchMetadata: PipelineExecutionsSearchMetadata;
+        executions: PipelineExecution[];
+    };
 }

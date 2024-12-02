@@ -10,6 +10,7 @@ import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
 import TopBar from '@/TopBar';
 import Sidebar from '@/Sidebar';
+import PipelineExecutionDetailsPage from '@/pages/pipelines/PipelineExecutionDetailsPage';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
 import MetadataPage from '@/pages/MetadataPage';
@@ -350,6 +351,10 @@ const router = createBrowserRouter([
             //     path: 'executions/:executionId',
             //     element: <ExecutionStatusPage />
             // },
+            {
+                path: 'executions/:executionId',
+                element: <PipelineExecutionDetailsPage />
+            },
             {
                 path: 'pipelines/:pipelineId',
                 element: <PipelineEditorPage />

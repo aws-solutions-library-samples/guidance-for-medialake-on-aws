@@ -12,13 +12,12 @@ from typing import Dict, Any, List
 from botocore.exceptions import ClientError
 from aws_lambda_powertools.metrics import Metrics
 from urllib.parse import parse_qs
+import base64
 
 # Initialize Powertools
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="Pipelines")
-# app = APIGatewayRestResolver()
-
 
 # Configure CORS
 cors_config = CORSConfig(
@@ -37,13 +36,13 @@ app = APIGatewayRestResolver(
     strip_prefixes=["/api"],
     cors=cors_config,
 )
+
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["PIPELINES_EXECUTIONS_TABLE_NAME"])
 
 # Default pagination values
 DEFAULT_PAGE_SIZE = 20
-DEFAULT_PAGE = 1
 
 
 class PipelineExecutionError(Exception):
@@ -52,47 +51,69 @@ class PipelineExecutionError(Exception):
     pass
 
 
+def encode_last_evaluated_key(last_evaluated_key: Dict) -> str:
+    """Encode the LastEvaluatedKey to a base64 string"""
+    if not last_evaluated_key:
+        return ""
+    return base64.b64encode(json.dumps(last_evaluated_key).encode()).decode()
+
+
+def decode_last_evaluated_key(encoded_key: str) -> Dict:
+    """Decode the base64 string back to LastEvaluatedKey"""
+    if not encoded_key:
+        return None
+    try:
+        return json.loads(base64.b64decode(encoded_key.encode()).decode())
+    except:
+        return None
+
+
 @tracer.capture_method
-def get_pipeline_executions(page: int, page_size: int) -> Dict[str, Any]:
+def get_pipeline_executions(
+    page_size: int, next_token: str = None, status: str = None
+) -> Dict[str, Any]:
     """
-    Retrieve paginated pipeline executions from DynamoDB
+    Retrieve paginated pipeline executions from DynamoDB using Scan operation with filtering
 
     Args:
-        page: Page number (1-based)
         page_size: Number of items per page
+        next_token: Base64 encoded LastEvaluatedKey for pagination
+        status: Optional status filter
 
     Returns:
         Dict containing status, message, and paginated pipeline executions data
-
-    Raises:
-        PipelineExecutionError: When DynamoDB operations fail
     """
     try:
-        # Calculate pagination parameters
-        start_key = None
-        if page > 1:
-            # Skip previous pages
-            for _ in range(page - 1):
-                scan_params = {"Limit": page_size}
-                if start_key:
-                    scan_params["ExclusiveStartKey"] = start_key
-
-                response = table.scan(**scan_params)
-                start_key = response.get("LastEvaluatedKey")
-                if not start_key:
-                    break
-
-        # Get items for current page
+        # Base scan parameters
         scan_params = {"Limit": page_size}
-        if start_key:
-            scan_params["ExclusiveStartKey"] = start_key
 
+        # Add status filter if provided
+        if status:
+            scan_params.update(
+                {
+                    "FilterExpression": "#status = :status",
+                    "ExpressionAttributeNames": {"#status": "status"},
+                    "ExpressionAttributeValues": {":status": status},
+                }
+            )
+
+        # Add LastEvaluatedKey if next_token is provided
+        if next_token:
+            last_evaluated_key = decode_last_evaluated_key(next_token)
+            if last_evaluated_key:
+                scan_params["ExclusiveStartKey"] = last_evaluated_key
+
+        # Execute scan
         response = table.scan(**scan_params)
         executions = response.get("Items", [])
 
-        # Get total count
-        count_response = table.scan(Select="COUNT")
-        total_count = count_response.get("Count", 0)
+        # Sort executions by start_time in descending order
+        executions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
+
+        # Get the next token for pagination
+        next_token = None
+        if "LastEvaluatedKey" in response:
+            next_token = encode_last_evaluated_key(response["LastEvaluatedKey"])
 
         # Add metrics for monitoring
         metrics.add_metric(name="SuccessfulQueries", unit="Count", value=1)
@@ -102,9 +123,9 @@ def get_pipeline_executions(page: int, page_size: int) -> Dict[str, Any]:
             "message": "ok",
             "data": {
                 "searchMetadata": {
-                    "totalResults": total_count,
-                    "page": page,
+                    "totalResults": response.get("Count", 0),
                     "pageSize": page_size,
+                    "nextToken": next_token,
                 },
                 "executions": executions,
             },
@@ -133,17 +154,18 @@ def handle_get_executions() -> Dict[str, Any]:
 
         # Parse pagination parameters
         try:
-            page = int(query_string.get("page", DEFAULT_PAGE))
             page_size = int(query_string.get("pageSize", DEFAULT_PAGE_SIZE))
+            page_size = max(1, min(100, page_size))  # Limit page size between 1 and 100
         except (ValueError, TypeError):
-            page = DEFAULT_PAGE
             page_size = DEFAULT_PAGE_SIZE
 
-        # Validate pagination parameters
-        page = max(1, page)  # Ensure page is at least 1
-        page_size = max(1, min(100, page_size))  # Limit page size between 1 and 100
+        # Get the next token for pagination
+        next_token = query_string.get("nextToken")
 
-        return get_pipeline_executions(page, page_size)
+        # Get status filter if provided
+        status = query_string.get("status")
+
+        return get_pipeline_executions(page_size, next_token, status)
     except PipelineExecutionError as e:
         logger.exception("Error processing pipeline executions request")
         return {
@@ -152,8 +174,8 @@ def handle_get_executions() -> Dict[str, Any]:
             "data": {
                 "searchMetadata": {
                     "totalResults": 0,
-                    "page": 1,
                     "pageSize": DEFAULT_PAGE_SIZE,
+                    "nextToken": None,
                 },
                 "executions": [],
             },
@@ -188,8 +210,8 @@ def lambda_handler(
                 "data": {
                     "searchMetadata": {
                         "totalResults": 0,
-                        "page": 1,
                         "pageSize": DEFAULT_PAGE_SIZE,
+                        "nextToken": None,
                     },
                     "executions": [],
                 },
