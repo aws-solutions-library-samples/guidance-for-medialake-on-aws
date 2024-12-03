@@ -291,6 +291,35 @@ class Lambda(Construct):
         """
         return self._function
 
+    def add_environment_variables(self, new_variables: Dict[str, str]) -> None:
+        """
+        Add or update environment variables for the Lambda function while preserving existing ones.
+
+        Args:
+            new_variables (Dict[str, str]): Dictionary of new environment variables to add/update
+
+        Example:
+            lambda_construct.add_environment_variables({
+                "NEW_KEY": "new_value",
+                "ANOTHER_KEY": "another_value"
+            })
+        """
+        logger = Logger()
+        logger.debug(f"Adding/updating environment variables: {new_variables}")
+
+        # Get current environment variables
+        current_env = dict(self._function.get_environment() or {})
+
+        # Merge new variables with existing ones
+        updated_env = {**current_env, **new_variables}
+
+        # Update the function's environment
+        self._function.add_environment_variables(updated_env)
+
+        logger.info(
+            f"Successfully updated environment variables for function: {self.function_name}"
+        )
+
     @property
     def function_name(self) -> str:
         """

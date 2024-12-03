@@ -15,7 +15,6 @@ from constructs import Construct
 from dataclasses import dataclass
 
 # Local imports
-from config import GLOBAL_PREFIX, generate_short_uid, config
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps

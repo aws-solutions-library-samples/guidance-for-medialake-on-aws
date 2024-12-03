@@ -51,14 +51,23 @@ npm install
 
 ## 🔧 Configuration
 
-1. Configure your AWS credentials:
+1. Configure your AWS credentials if you haven't already:
 ```bash
 aws configure
 ```
 
-2. Set up configuration variables:
+2. Create a `config.json` file in the project root:
 ```bash
-cdk_config
+touch config.json
+```
+3. Add the following configuration to `config.json` (modify values as needed):
+```json
+{
+  "environment": "dev",
+  "project": "medialake",
+  "region": "us-east-1",
+  "account": "your-aws-account-id"
+}
 ```
 
 ## 🚀 Deployment
@@ -104,12 +113,31 @@ medialake/
 - Customizable processing steps
 - Event-driven architecture
 
-## 🧪 Testing
+## ☁️ AWS Services
 
-Run the test suite:
-```bash
-pytest
-```
+### Core Services
+- **AWS Lambda** - Serverless compute for API handlers and media processing
+- **Amazon S3** - Object storage for media assets, metadata, and temporary processing files
+- **AWS Step Functions** - Orchestration of media processing workflows
+- **Amazon SQS** - queues for ordered media processing and flow control
+- **Amazon EventBridge** - Event routing and processing pipeline triggers
+- **Amazon API Gateway** - REST API endpoint management
+- **Amazon DynamoDB** - Database for asset metadata, storage connector configuration, pipeline configuration, resource state, and pipeline execution history
+
+### Security & Authentication
+- **AWS Cognito** - User authentication and authorization
+- **AWS KMS** - Encryption key management
+- **AWS IAM** - Resource access control and permissions
+
+### Monitoring & Logging
+- **Amazon CloudWatch** - Metrics, logging, and alerting
+- **AWS X-Ray** - Distributed tracing and performance monitoring
+- **Amazon CloudTrail** - API activity and resource change tracking
+
+### Development & Deployment
+- **AWS CDK** - Infrastructure as code
+- **AWS CloudFormation** - Resource provisioning
+- **Amazon ECR** - Container registry for Lambda container images
 
 ## 📚 API Documentation
 
@@ -124,7 +152,7 @@ The API includes the following main endpoints:
 
 ## 🔒 Security
 
-- AWS Cognito authentication
+- AWS Cognito authentication and authorization including support for local username and password as well as federated authentication via SAML.
 - KMS encryption for sensitive data
 - IAM role-based access control
 - CORS-enabled API endpoints
@@ -133,7 +161,6 @@ The API includes the following main endpoints:
 
 - Robert Raver
 - Lior Berezinski
-- Karthik Rengasamy
 
 ## 📄 License
 

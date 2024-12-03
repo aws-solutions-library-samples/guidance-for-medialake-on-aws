@@ -136,13 +136,14 @@ class EventBridgeCleaner:
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     try:
-        # Parse and validate request
-        if isinstance(event, dict) and "body" in event:
-            body = event["body"]
-        else:
-            body = event
+    #     Parse and validate request
+    #     if isinstance(event, dict) and "body" in event:
+    #         body = event["body"]
+    #     else:
+    #         body = event
+        
 
-        request = CleanupRequest(**body)
+        # request = CleanupRequest(**body)
 
         # Initialize cleaner
         cleaner = EventBridgeCleaner(request.region)
