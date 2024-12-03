@@ -22,9 +22,9 @@ class CDKConfig(BaseModel):
 
     @property
     def regions(self) -> List[str]:
-        regions = [self.primary_region]
-        if self.enable_ha and self.secondary_region:
-            regions.append(self.secondary_region)
+        regions = [config.primary_region]
+        if config.enable_ha and config.secondary_region:
+            regions.append(config.secondary_region)
         return regions
 
     @property
@@ -34,26 +34,19 @@ class CDKConfig(BaseModel):
     @classmethod
     def load_from_file(cls, filename="config.json"):
         try:
-            with open(filename, "r") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
             return cls(**config_data)
         except FileNotFoundError:
             return cls()
 
 
-def generate_short_uid(construct: Construct, length=8):
-    construct_path = construct.node.path
-    hash_value = hash(construct_path)
-    return hex(hash_value)[2:2+length]
-
-
 # Load configuration from config.json
 config = CDKConfig.load_from_file()
 
 # Define constants based on config values
-GLOBAL_PREFIX = "medialake"
-API_TEMPLATES_BUCKET_NAME = "mne-mscdemo-api-templates"
-DEMO_MEDIA_ASSETS_KMS_ALIAS_NAME = "alias/mne-mscdemo-media-assets-bucket"
-API_TEMPLATES_KMS_ALIAS_NAME = "alias/mne-mscdemo-api-templates-bucket"
+# API_TEMPLATES_BUCKET_NAME = "mne-mscdemo-api-templates"
+# DEMO_MEDIA_ASSETS_KMS_ALIAS_NAME = "alias/mne-mscdemo-media-assets-bucket"
+# API_TEMPLATES_KMS_ALIAS_NAME = "alias/mne-mscdemo-api-templates-bucket"
 WORKFLOW_PAYLOAD_TEMP_BUCKET = "mne-mscdemo-workflow-payload-temp-data"
-ACCESS_LOGS_BUCKET = config.access_logs_bucket
+# ACCESS_LOGS_BUCKET = config.access_logs_bucket

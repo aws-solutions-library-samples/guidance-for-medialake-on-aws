@@ -470,6 +470,7 @@ class BaseInfrastructureStack(Stack):
             "IngestionProvider",
             on_event_handler=ingestion_pipeline_lambda.function,
         )
+
         ingestion_custom_resource = CustomResource(
             self,
             "CreateIngestionPipeline",
@@ -605,3 +606,13 @@ class BaseInfrastructureStack(Stack):
             str: ARN of the OpenSearch domain
         """
         return self._opensearch_cluster.domain_arn
+
+    @property
+    def vpc(self) -> ec2.Vpc:
+        """
+        Returns the VPC of vpc.
+
+        Returns:
+            str: VPC
+        """
+        return self._vpc.vpc

@@ -143,7 +143,7 @@ class MediaLakeStack(cdk.Stack):
                 open_search_endpoint=base_infrastructure.collection_endpoint,
                 open_search_arn=base_infrastructure.collection_arn,
                 open_search_index="media",
-                vpc=base_infrastructure.vpc.vpc,
+                vpc=base_infrastructure.vpc,
             ),
         )
         search.node.add_dependency(cleanup_stack)

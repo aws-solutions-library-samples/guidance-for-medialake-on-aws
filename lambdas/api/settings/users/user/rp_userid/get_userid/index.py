@@ -20,7 +20,6 @@ class UserProfileResponse(BaseModel):
     """Response model for user profile data"""
 
     username: str
-    user_id: str
     email: str
     given_name: str | None = None
     family_name: str | None = None
@@ -36,10 +35,6 @@ def extract_user_claims(event: APIGatewayProxyEvent) -> Dict[str, Any]:
         authorizer_context = event.request_context.authorizer
         claims = authorizer_context.get("claims", {})
 
-        if not claims:
-            logger.error("No claims found in authorizer context")
-            raise ValueError("No authorization claims found")
-
         logger.debug("Extracted user claims", extra={"claims": claims})
         return claims
     except Exception as e:
@@ -48,42 +43,13 @@ def extract_user_claims(event: APIGatewayProxyEvent) -> Dict[str, Any]:
 
 
 @tracer.capture_method
-def validate_user_access(route_user_id: str, claims: Dict[str, Any]) -> bool:
-    """
-    Validate that the requesting user has access to the requested user profile
-    """
-    try:
-        # Get the user ID from the claims
-        token_user_id = claims.get("sub")
-
-        if not token_user_id:
-            logger.error("No user ID found in token claims")
-            return False
-
-        # Check if the user ID in the route matches the token
-        is_authorized = route_user_id == token_user_id
-
-        if not is_authorized:
-            logger.warning(
-                "User ID mismatch",
-                extra={"route_user_id": route_user_id, "token_user_id": token_user_id},
-            )
-
-        return is_authorized
-    except Exception as e:
-        logger.error("Error validating user access", extra={"error": str(e)})
-        return False
-
-
-@tracer.capture_method
-def build_user_profile(user_id: str, claims: Dict[str, Any]) -> UserProfileResponse:
+def build_user_profile(claims: Dict[str, Any]) -> UserProfileResponse:
     """
     Build user profile from claims
     """
     try:
         profile = UserProfileResponse(
             username=claims.get("cognito:username"),
-            user_id=user_id,
             email=claims.get("email"),
             given_name=claims.get("given_name"),
             family_name=claims.get("family_name"),
@@ -97,9 +63,9 @@ def build_user_profile(user_id: str, claims: Dict[str, Any]) -> UserProfileRespo
         raise ValueError("Invalid user profile data")
 
 
-@app.get("/settings/user/<user_id>")
+@app.get("/settings/user")
 @tracer.capture_method
-def get_user_profile(user_id: str) -> Dict[str, Any]:
+def get_user_profile() -> Dict[str, Any]:
     """
     Get user profile endpoint handler
     """
@@ -110,15 +76,8 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         # Extract user claims from the request
         claims = extract_user_claims(event)
 
-        # Validate user access
-        if not validate_user_access(user_id, claims):
-            metrics.add_metric(
-                name="UnauthorizedAccessAttempts", unit=MetricUnit.Count, value=1
-            )
-            return {"statusCode": 403, "body": {"error": "Unauthorized access"}}
-
         # Build user profile
-        profile = build_user_profile(user_id, claims)
+        profile = build_user_profile(claims)
 
         # Record metric for successful profile retrieval
         metrics.add_metric(
@@ -126,11 +85,10 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         )
 
         logger.info(
-            "Successfully retrieved user profile",
-            extra={"username": profile.username, "user_id": user_id},
+            "Successfully retrieved user profile", extra={"username": profile.username}
         )
 
-        return {"statusCode": 200, "body": profile.dict()}
+        return {"status": 200, "data": profile.dict()}
 
     except ValueError as ve:
         logger.error("Validation error in get_user_profile", extra={"error": str(ve)})
