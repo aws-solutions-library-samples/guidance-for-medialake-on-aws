@@ -125,6 +125,9 @@ class BaseInfrastructureStack(Stack):
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
                 vpc=self._vpc.vpc,
                 collection_indexes=["media"],
+                security_group=self.security_group,
+                master_password=config.opensearch_master_password,
+                master_username=config.opensearch_master_username,
             ),
         )
 
