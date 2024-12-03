@@ -257,9 +257,7 @@ class BaseInfrastructureStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["es:ESHttp*"],
-                resources=[
-                    f"arn:aws:es:*:{self.account}:domain/{config.global_prefix}-opensearch/*"
-                ],
+                resources=[f"{self._opensearch_cluster.domain_arn}/*"],
             )
         )
 
