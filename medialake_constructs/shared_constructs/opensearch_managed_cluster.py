@@ -19,6 +19,7 @@ import json, time
 import hashlib
 from pathlib import Path
 
+
 @dataclass
 class OpenSearchClusterProps:
     domain_name: str
@@ -33,7 +34,10 @@ class OpenSearchClusterProps:
     encryption_at_rest: bool = True
     master_node_instance_type: str = "t2.medium.search"
     master_node_count: int = 1
-    collection_indexes: List[str] = field(default_factory=lambda: ["my-collection-index"])
+    collection_indexes: List[str] = field(
+        default_factory=lambda: ["my-collection-index"]
+    )
+
 
 class OpenSearchCluster(Construct):
     def __init__(
@@ -43,7 +47,7 @@ class OpenSearchCluster(Construct):
         props: OpenSearchClusterProps,
     ) -> None:
         super().__init__(scope, id)
-       
+
         # Determine the current stack
         stack = Stack.of(self)
 
@@ -51,23 +55,17 @@ class OpenSearchCluster(Construct):
         self.region = stack.region
         self.account_id = stack.account
 
-         # Create an access policy using the VPC's CIDR
+        # Create an access policy using the VPC's CIDR
         vpc_cidr = props.vpc.vpc_cidr_block
         # handling error - Apply a restrictive access policy to your domain
         access_policy = iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=[
-                "es:ESHttpGet",
-                "es:ESHttpPost",
-                "es:ESHttpPut"
-            ],
+            actions=["es:ESHttpGet", "es:ESHttpPost", "es:ESHttpPut"],
             principals=[iam.AnyPrincipal()],
-            resources=[f"arn:aws:es:{self.region}:{self.account_id}:domain/{props.domain_name}/*"],
-            conditions={
-                "IpAddress": {
-                    "aws:SourceIp": [vpc_cidr]
-                }
-            }
+            resources=[
+                f"arn:aws:es:{self.region}:{self.account_id}:domain/{props.domain_name}/*"
+            ],
+            conditions={"IpAddress": {"aws:SourceIp": [vpc_cidr]}},
         )
         isolated_subnets = props.vpc.isolated_subnets
         if not isolated_subnets:
@@ -75,14 +73,14 @@ class OpenSearchCluster(Construct):
 
         # Select the first isolated subnet
         selected_subnet = isolated_subnets[0]
-        
+
         # Service Linked Role
         service_linked_role = iam.Role(
-            self, 
-            'ServiceLinkedRole',
-            assumed_by=iam.ServicePrincipal('es.amazonaws.com')
+            self,
+            "ServiceLinkedRole",
+            assumed_by=iam.ServicePrincipal("es.amazonaws.com"),
         )
-        
+
         self.domain = opensearch.Domain(
             self,
             "OpenSearchDomain",
@@ -117,7 +115,6 @@ class OpenSearchCluster(Construct):
             # VPC configuration
             vpc=props.vpc,
             vpc_subnets=[ec2.SubnetSelection(subnets=[selected_subnet])],
-    
             # vpc_subnets=[ec2.SubnetSelection(
             #     subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
             # )],
@@ -134,8 +131,8 @@ class OpenSearchCluster(Construct):
             },
             removal_policy=RemovalPolicy.DESTROY,
         )
-        self.domain.connections.allow_default_port_from_any_ipv4('Allow From All')
-        
+        self.domain.connections.allow_default_port_from_any_ipv4("Allow From All")
+
         self.domain.node.add_dependency(service_linked_role)
 
         # Create Lambda function for index creation
@@ -205,10 +202,7 @@ class OpenSearchCluster(Construct):
             resource_type="Custom::OpenSearchCreateIndex",
         )
 
-        
         create_index_resource.node.add_dependency(self.domain)
-
-       
 
     @property
     def domain_endpoint(self) -> str:
@@ -221,5 +215,3 @@ class OpenSearchCluster(Construct):
     @property
     def opensearch_instance(self) -> opensearch.Domain:
         return self.domain
-    
-  
