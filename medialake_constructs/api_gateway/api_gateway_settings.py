@@ -232,7 +232,7 @@ class SettingsConstruct(Construct):
             config=LambdaConfig(
                 name="user_put",
                 iam_role_name="user_put",
-                entry="lambdas/api/settings/users/user/rp_userid/get_user",
+                entry="lambdas/api/settings/users/user/rp_userid/get_userid",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn

@@ -128,6 +128,9 @@ medialake/
 - **AWS Cognito** - User authentication and authorization
 - **AWS KMS** - Encryption key management
 - **AWS IAM** - Resource access control and permissions
+- **AWS Secrets Manager** - Secret management
+- **AWS Amplify** - Frontend development framework
+- **AWS WAF** - Web application firewall
 
 ### Monitoring & Logging
 - **Amazon CloudWatch** - Metrics, logging, and alerting
@@ -137,7 +140,7 @@ medialake/
 ### Development & Deployment
 - **AWS CDK** - Infrastructure as code
 - **AWS CloudFormation** - Resource provisioning
-- **Amazon ECR** - Container registry for Lambda container images
+
 
 ## 📚 API Documentation
 
@@ -156,11 +159,6 @@ The API includes the following main endpoints:
 - KMS encryption for sensitive data
 - IAM role-based access control
 - CORS-enabled API endpoints
-
-## 👥 Authors
-
-- Robert Raver
-- Lior Berezinski
 
 ## 📄 License
 
