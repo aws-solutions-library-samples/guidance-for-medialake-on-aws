@@ -4,7 +4,6 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_opensearchservice as opensearch,
     aws_ec2 as ec2,
-    aws_secretsmanager as secretsmanager,
     CustomResource,
     custom_resources as cr,
     aws_logs as logs,
@@ -13,6 +12,7 @@ from aws_cdk import (
     CfnOutput,
 )
 import hashlib
+import json
 from constructs import Construct
 from typing import Optional, List
 from dataclasses import dataclass, field
@@ -67,24 +67,19 @@ class OpenSearchCluster(Construct):
             raise ValueError("A VPC must be provided for the OpenSearch domain.")
 
         # Create a Security Group with restricted access
-        # security_group = ec2.SecurityGroup(
-        #     self,
-        #     "OpenSearchSG",
-        #     vpc=props.vpc,
-        #     description="Allow limited access to OpenSearch",
-        #     allow_all_outbound=True,
-        # )
+        os_security_group = ec2.SecurityGroup(
+            self,
+            "OpenSearchSG",
+            vpc=props.vpc,
+            description="Allow limited access to OpenSearch",
+            allow_all_outbound=True,
+        )
 
-        # # Restrict access to specific IP ranges or security groups
-
-        # trusted_sg = ec2.SecurityGroup.from_security_group_id(
-        #     self, "TrustedSG", "sg-12345678"
-        # )
-        # security_group.add_ingress_rule(
-        #     peer=trusted_sg,
-        #     connection=ec2.Port.tcp(443),
-        #     description="Allow HTTPS access from trusted security group",
-        # )
+        os_security_group.add_ingress_rule(
+            peer=props.security_group,
+            connection=ec2.Port.tcp(443),
+            description="Allow HTTPS access from trusted security group",
+        )
 
         # Create IAM Role for OpenSearch to publish audit logs to CloudWatch
         audit_log_role = iam.Role(
@@ -112,18 +107,6 @@ class OpenSearchCluster(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # Create Secrets Manager secret for OpenSearch master user
-        secret = secretsmanager.Secret(
-            self,
-            "OpenSearchMasterSecret",
-            secret_name="OpenSearchMasterUserSecret",
-            generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"username":"admin"}',
-                generate_string_key="AZMediaLake1!",
-                exclude_punctuation=True,
-            ),
-        )
-
         # Define OpenSearch Domain
         self.domain = opensearch.Domain(
             self,
@@ -132,6 +115,7 @@ class OpenSearchCluster(Construct):
             version=props.engine_version,
             # Capacity configuration
             capacity=opensearch.CapacityConfig(
+                multi_az_with_standby_enabled=False,
                 data_nodes=props.instance_count,
                 data_node_instance_type=props.instance_type,
                 master_nodes=props.master_node_count,
@@ -153,11 +137,6 @@ class OpenSearchCluster(Construct):
             node_to_node_encryption=props.node_to_node_encryption,
             encryption_at_rest=opensearch.EncryptionAtRestOptions(
                 enabled=props.encryption_at_rest,
-            ),
-            # Fine-grained access control
-            fine_grained_access_control=opensearch.AdvancedSecurityOptions(
-                master_user_name="admin",
-                master_user_password=secret.secret_value_from_json("password"),
             ),
             # Logging configuration
             logging=opensearch.LoggingOptions(
@@ -184,34 +163,35 @@ class OpenSearchCluster(Construct):
                 ),
             ),
             # Access policies
-            access_policies=[
-                iam.PolicyStatement(
-                    effect=iam.Effect.ALLOW,
-                    actions=[
-                        "es:ESHttpGet",
-                        "es:ESHttpPost",
-                        "es:ESHttpPut",
-                        "es:ESHttpDelete",
-                        "es:ESHttpHead",
-                    ],
-                    principals=[iam.AnyPrincipal()],
-                    resources=[
-                        f"arn:aws:es:{self.region}:{self.account_id}:domain/{props.domain_name}/*"
-                    ],
-                    conditions={
-                        "IpAddress": {
-                            "aws:SourceIp": [
-                                "203.0.113.0/24"
-                            ]  # Replace with your trusted IP range
-                        }
-                    },
-                )
-            ],
+            # access_policies=[
+            #     iam.PolicyStatement(
+            #         effect=iam.Effect.ALLOW,
+            #         actions=[
+            #             "es:ESHttpGet",
+            #             "es:ESHttpPost",
+            #             "es:ESHttpPut",
+            #             "es:ESHttpDelete",
+            #             "es:ESHttpHead",
+            #         ],
+            #         principals=[iam.AnyPrincipal()],
+            #         resources=[
+            #             f"arn:aws:es:{self.region}:{self.account_id}:domain/{props.domain_name}/*"
+            #         ],
+            #         conditions={
+            #             "IpAddress": {
+            #                 "aws:SourceIp": [
+            #                     "203.0.113.0/24"
+            #                 ]  # Replace with your trusted IP range
+            #             }
+            #         },
+            #     )
+            # ],
             # VPC configuration
             vpc=props.vpc,
             vpc_subnets=[
                 ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
             ],
+            security_groups=[os_security_group],
             # Maintenance window (off-peak)
             off_peak_window_enabled=props.off_peak_window_enabled,
             off_peak_window_start=props.off_peak_window_start,
@@ -227,7 +207,7 @@ class OpenSearchCluster(Construct):
         )
 
         # Attach the security group to the domain
-        self.domain.connections.add_security_group(props.security_group)
+        # self.domain.connections.add_security_group(os_security_group)
 
         # Create a service-linked role if it doesn't exist
         slr = iam.CfnServiceLinkedRole(
@@ -244,6 +224,7 @@ class OpenSearchCluster(Construct):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="index.handler",
             vpc=props.vpc,
+            security_groups=[props.security_group],
             code=_lambda.Code.from_asset("lambdas/back_end/create_oss_index/"),
             timeout=Duration.seconds(60),
             environment={

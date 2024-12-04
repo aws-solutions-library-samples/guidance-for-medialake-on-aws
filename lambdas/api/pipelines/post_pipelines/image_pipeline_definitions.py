@@ -24,7 +24,6 @@ def get_state_machine_definition(
                 "ResultPath": "$.metadataResult",
                 "Next": "CreateProxy",
             },
-       
             "CreateProxy": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -40,7 +39,6 @@ def get_state_machine_definition(
                 "ResultPath": "$.proxyResult",
                 "Next": "CreateThumbnail",
             },
-           
             "CreateThumbnail": {
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
@@ -58,7 +56,6 @@ def get_state_machine_definition(
                 "ResultPath": None,
                 "End": True,
             },
-          
         },
     }
 
@@ -70,9 +67,8 @@ def create_metadata_extractor_lambda(
     deployment_bucket: str,
     deployment_zip: str,
     exiftool_layer_arn: str,
-    exempitool_layer_arn: str,
     environment_variables: dict,
-    tags: dict,   
+    tags: dict,
 ) -> dict:
     """Creates the metadata extractor lambda function"""
     return lambda_client.create_function(
@@ -82,10 +78,8 @@ def create_metadata_extractor_lambda(
         Timeout=900,
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Layers=[exiftool_layer_arn,exempitool_layer_arn],
-        Environment={
-            'Variables': environment_variables
-        },
+        Layers=[exiftool_layer_arn],
+        Environment={"Variables": environment_variables},
         Tags=tags,
     )
 
@@ -108,9 +102,9 @@ def create_image_proxy_lambda(
         MemorySize=10240,
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Layers=["arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:56"],
-        Environment={
-            'Variables': environment_variables
-        },
+        Layers=[
+            "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:56"
+        ],
+        Environment={"Variables": environment_variables},
         Tags=tags,
     )

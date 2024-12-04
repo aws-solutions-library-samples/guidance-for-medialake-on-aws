@@ -126,6 +126,7 @@ class LambdaConfig:
     layers: Optional[List[PythonLayerVersion]] = None
     iam_role_name: Optional[str] = None
     vpc: Optional[ec2.IVpc] = None
+    security_groups: Optional[List[ec2.ISecurityGroup]] = None
 
 
 class Lambda(Construct):
@@ -271,6 +272,16 @@ class Lambda(Construct):
             logger.debug(f"Adding VPC configuration: {config.vpc}")
             lambda_vpc = config.vpc
             lambda_props["vpc"] = lambda_vpc
+
+        # Add Security Groups if provided
+        if config.security_groups:
+            logger.debug(f"Adding security groups: {config.security_groups}")
+            if not config.vpc:
+                logger.error("Security groups provided without VPC configuration")
+                raise ValueError(
+                    "Security groups can only be added when a VPC is configured"
+                )
+            lambda_props["security_groups"] = config.security_groups
 
         # Create the Lambda function
         logger.debug("Creating Lambda function with properties")

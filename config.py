@@ -19,6 +19,8 @@ class CDKConfig(BaseModel):
     assets_bucket_name: str = "medialake-assets"
     # lambda_runtime_version: str = "3.11"
     bedrock_region: str = "us-east-1"
+    opensearch_master_password: str = None
+    opensearch_master_username: str = None
 
     @property
     def regions(self) -> List[str]:
@@ -44,7 +46,7 @@ class CDKConfig(BaseModel):
 def generate_short_uid(construct: Construct, length=8):
     construct_path = construct.node.path
     hash_value = hash(construct_path)
-    return hex(hash_value)[2:2+length]
+    return hex(hash_value)[2 : 2 + length]
 
 
 # Load configuration from config.json

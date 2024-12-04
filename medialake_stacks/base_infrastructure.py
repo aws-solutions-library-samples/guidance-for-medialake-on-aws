@@ -92,6 +92,7 @@ class BaseInfrastructureStack(Stack):
         self._security_group = ec2.SecurityGroup(
             self,
             "MediaLakeSecurityGroup",
+            description="MediaLake Security Group",
             vpc=self._vpc.vpc,
         )
 
@@ -125,7 +126,7 @@ class BaseInfrastructureStack(Stack):
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
                 vpc=self._vpc.vpc,
                 collection_indexes=["media"],
-                security_group=self.security_group,
+                security_group=self._security_group,
                 master_password=config.opensearch_master_password,
                 master_username=config.opensearch_master_username,
             ),
@@ -227,6 +228,8 @@ class BaseInfrastructureStack(Stack):
             config=LambdaConfig(
                 name=f"{config.global_prefix}",
                 timeout_minutes=15,
+                vpc=self._vpc.vpc,
+                security_groups=[self._security_group],
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": self._asset_table.table_arn,

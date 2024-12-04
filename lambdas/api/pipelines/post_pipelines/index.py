@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from image_pipeline_definitions import (
     get_state_machine_definition,
     create_metadata_extractor_lambda,
-    create_image_proxy_lambda
+    create_image_proxy_lambda,
 )
 
 tracer = Tracer()
@@ -31,17 +31,18 @@ app = APIGatewayRestResolver(enable_validation=True)
 
 # Initialize AWS clients
 s3_client = boto3.client("s3")
-dynamodb = boto3.resource('dynamodb')
-lambda_client = boto3.client('lambda')
-iam_client = boto3.client('iam')
-sqs_client = boto3.client('sqs')
-sfn_client = boto3.client('stepfunctions')
+dynamodb = boto3.resource("dynamodb")
+lambda_client = boto3.client("lambda")
+iam_client = boto3.client("iam")
+sqs_client = boto3.client("sqs")
+sfn_client = boto3.client("stepfunctions")
 
 
 class S3Pipeline(BaseModel):
     definition: dict
     name: str
     type: str
+
 
 def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
     for attempt in range(max_retries):
@@ -50,23 +51,29 @@ def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_del
             time.sleep(base_delay)
             return True
         except iam_client.exceptions.NoSuchEntityException:
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
     return False
 
-def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=10):
+
+def wait_for_policy_attachment(
+    iam_client, role_name, policy_arn, max_retries=5, base_delay=10
+):
     for attempt in range(max_retries):
         try:
-            attached_policies = iam_client.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
-            if any(policy['PolicyArn'] == policy_arn for policy in attached_policies):
+            attached_policies = iam_client.list_attached_role_policies(
+                RoleName=role_name
+            )["AttachedPolicies"]
+            if any(policy["PolicyArn"] == policy_arn for policy in attached_policies):
                 time.sleep(base_delay)
                 return True
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
         except iam_client.exceptions.NoSuchEntityException:
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
     return False
+
 
 def float_to_decimal(obj):
     """Convert float values to Decimal for DynamoDB compatibility"""
@@ -78,12 +85,11 @@ def float_to_decimal(obj):
         return [float_to_decimal(x) for x in obj]
     return obj
 
+
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
     logger.error(
-        "Request failed validation",
-        path=app.current_event.path,
-        errors=ex.errors()
+        "Request failed validation", path=app.current_event.path, errors=ex.errors()
     )
     return Response(
         status_code=422,
@@ -96,8 +102,6 @@ def handle_validation_error(ex: RequestValidationError):
             },
         },
     )
-    
-
 
 
 def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
@@ -107,21 +111,20 @@ def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
         response = sqs_client.create_queue(
             QueueName=f"{queue_name}.fifo",
             Attributes={
-                'FifoQueue': 'true',
-                'ContentBasedDeduplication': 'true',
-                'DeduplicationScope': 'messageGroup',
-                'FifoThroughputLimit': 'perMessageGroupId'
+                "FifoQueue": "true",
+                "ContentBasedDeduplication": "true",
+                "DeduplicationScope": "messageGroup",
+                "FifoThroughputLimit": "perMessageGroupId",
             },
-            tags=tags
+            tags=tags,
         )
-        queue_url = response['QueueUrl']
+        queue_url = response["QueueUrl"]
 
         # Get queue ARN
         queue_attributes = sqs_client.get_queue_attributes(
-            QueueUrl=queue_url,
-            AttributeNames=['QueueArn']
+            QueueUrl=queue_url, AttributeNames=["QueueArn"]
         )
-        queue_arn = queue_attributes['Attributes']['QueueArn']
+        queue_arn = queue_attributes["Attributes"]["QueueArn"]
 
         # Add permission for EventBridge to send messages
         queue_policy = {
@@ -130,21 +133,16 @@ def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
                 {
                     "Sid": "EventBridgeToSQS",
                     "Effect": "Allow",
-                    "Principal": {
-                        "Service": "events.amazonaws.com"
-                    },
+                    "Principal": {"Service": "events.amazonaws.com"},
                     "Action": "sqs:SendMessage",
-                    "Resource": queue_arn
+                    "Resource": queue_arn,
                 }
-            ]
+            ],
         }
 
         # Set the queue policy
         sqs_client.set_queue_attributes(
-            QueueUrl=queue_url,
-            Attributes={
-                'Policy': json.dumps(queue_policy)
-            }
+            QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
         )
 
         return queue_url, queue_arn
@@ -154,10 +152,7 @@ def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
 
 
 def create_state_machine(
-    state_machine_name: str,
-    role_arn: str,
-    definition: dict,
-    tags: dict
+    state_machine_name: str, role_arn: str, definition: dict, tags: dict
 ) -> str:
     """Create Step Function state machine and return its ARN"""
     try:
@@ -165,99 +160,91 @@ def create_state_machine(
             name=state_machine_name,
             definition=json.dumps(definition),
             roleArn=role_arn,
-            type='STANDARD',
-            tags=[{'key': k, 'value': v} for k, v in tags.items()]
+            type="STANDARD",
+            tags=[{"key": k, "value": v} for k, v in tags.items()],
         )
-        return response['stateMachineArn']
+        return response["stateMachineArn"]
     except Exception as e:
         logger.error(f"Failed to create Step Function: {str(e)}")
         raise
 
+
 def create_eventbridge_rule(
-    rule_name: str, 
-    event_bus_name: str, 
-    queue_arn: str,
-    tags: dict
+    rule_name: str, event_bus_name: str, queue_arn: str, tags: dict
 ) -> str:
     """Create EventBridge rule to send all events to SQS FIFO queue"""
     try:
-        eventbridge = boto3.client('events')
-        
+        eventbridge = boto3.client("events")
+
         # Create the rule
         response = rule = eventbridge.put_rule(
             Name=rule_name,
             EventBusName=event_bus_name,
-            EventPattern=json.dumps({
-                "detail-type": ["AssetCreated"]
-            }),
-            State='ENABLED',
-            Tags=[{'Key': k, 'Value': v} for k, v in tags.items()]
+            EventPattern=json.dumps({"detail-type": ["AssetCreated"]}),
+            State="ENABLED",
+            Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
         )
-        
+
         # Add target (SQS queue)
         eventbridge.put_targets(
             Rule=rule_name,
             EventBusName=event_bus_name,
             Targets=[
                 {
-                    'Id': f"{rule_name}-target",
-                    'Arn': queue_arn,
-                    'SqsParameters': {
-                        'MessageGroupId': 'default'  # Required for FIFO queues
-                    }
+                    "Id": f"{rule_name}-target",
+                    "Arn": queue_arn,
+                    "SqsParameters": {
+                        "MessageGroupId": "default"  # Required for FIFO queues
+                    },
                 }
-            ]
+            ],
         )
-        
-        return response['RuleArn']
+
+        return response["RuleArn"]
     except Exception as e:
         logger.error(f"Failed to create EventBridge rule: {str(e)}")
         raise
 
 
-def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str, tags: dict) -> str:
+def create_pipeline_role(
+    role_name: str, queue_arn: str, state_machine_name: str, tags: dict
+) -> str:
     """Create IAM role for pipeline execution"""
     try:
         assume_role_policy = {
             "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": [
-                        "lambda.amazonaws.com",
-                        "states.amazonaws.com"
-                    ]
-                },
-                "Action": "sts:AssumeRole"
-            }]
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": ["lambda.amazonaws.com", "states.amazonaws.com"]
+                    },
+                    "Action": "sts:AssumeRole",
+                }
+            ],
         }
         policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-        
+
         response = iam_client.create_role(
             RoleName=role_name,
             AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-            Tags=[{'Key': k, 'Value': v} for k, v in tags.items()]
+            Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
         )
-        
-       
+
         # Attach policies to the role
-        iam_client.attach_role_policy(
-            RoleName=role_name,
-            PolicyArn=policy_arn
-        )
-           
-       
+        iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+
         # Attach policies to the role
         iam_client.attach_role_policy(
             RoleName=role_name,
             PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
         )
-        
+
         if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-            raise Exception(f"Policy {policy_arn} did not attach to role {role_name} in time")
-          
-          
-        
+            raise Exception(
+                f"Policy {policy_arn} did not attach to role {role_name} in time"
+            )
+
         # Create and attach SQS policy
         sqs_policy = {
             "Version": "2012-10-17",
@@ -269,13 +256,13 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                         "sqs:DeleteMessage",
                         "sqs:GetQueueAttributes",
                         "sqs:ChangeMessageVisibility",
-                        "sqs:SendMessage" 
+                        "sqs:SendMessage",
                     ],
-                    "Resource": queue_arn
+                    "Resource": queue_arn,
                 }
-            ]
+            ],
         }
-        
+
         # Create and attach Step Functions execution policy
         step_functions_policy = {
             "Version": "2012-10-17",
@@ -285,28 +272,28 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                     "Action": [
                         "states:StartExecution",
                         "states:DescribeExecution",
-                        "states:StopExecution"
+                        "states:StopExecution",
                     ],
                     "Resource": [
                         f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:stateMachine:{state_machine_name}",
-                        f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:execution:{state_machine_name}:*"
-                    ]
+                        f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:execution:{state_machine_name}:*",
+                    ],
                 }
-            ]
+            ],
         }
-        
+
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-sqs-policy",
-            PolicyDocument=json.dumps(sqs_policy)
+            PolicyDocument=json.dumps(sqs_policy),
         )
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-stepfunctions-policy",
-            PolicyDocument=json.dumps(step_functions_policy)
+            PolicyDocument=json.dumps(step_functions_policy),
         )
-        
+
         # Create and attach DynamoDB policy
         dynamodb_policy = {
             "Version": "2012-10-17",
@@ -315,43 +302,39 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                     "Effect": "Allow",
                     "Action": [
                         "dynamodb:UpdateItem",
-                        "dynamodb:GetItem",  
-                        "dynamodb:PutItem"   
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem",
                     ],
-                    "Resource": [
-                        f"{os.environ['MEDIALAKE_ASSET_TABLE']}"
-                    ]
+                    "Resource": [f"{os.environ['MEDIALAKE_ASSET_TABLE']}"],
                 }
-            ]
+            ],
         }
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-dynamodb-policy",
-            PolicyDocument=json.dumps(dynamodb_policy)
+            PolicyDocument=json.dumps(dynamodb_policy),
         )
-        
+
         lambda_policy = {
             "Version": "2012-10-17",
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Action": [
-                        "lambda:InvokeFunction"
-                    ],
+                    "Action": ["lambda:InvokeFunction"],
                     "Resource": [
                         f"arn:aws:lambda:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:function:medialake-pipeline-*"
-                    ]
+                    ],
                 }
-            ]
+            ],
         }
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-lambda-policy",
-            PolicyDocument=json.dumps(lambda_policy)
+            PolicyDocument=json.dumps(lambda_policy),
         )
-        
+
         # Create and attach S3 policy
         s3_policy = {
             "Version": "2012-10-17",
@@ -361,67 +344,55 @@ def create_pipeline_role(role_name: str, queue_arn: str, state_machine_name: str
                     "Action": [
                         "s3:GetObject",
                     ],
-                    "Resource": [
-                        "arn:aws:s3:::*/*"
-                    ]
+                    "Resource": ["arn:aws:s3:::*/*"],
                 }
-            ]
+            ],
         }
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-read-s3-policy",
-            PolicyDocument=json.dumps(s3_policy)
+            PolicyDocument=json.dumps(s3_policy),
         )
-        
+
         s3_write_policy = {
             "Version": "2012-10-17",
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Action": [
-                        "s3:PutObject",
-                        "s3:PutObjectAcl"
-                    ],
+                    "Action": ["s3:PutObject", "s3:PutObjectAcl"],
                     "Resource": [
                         f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}/*",
-                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
-                    ]
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
+                    ],
                 }
-            ]
+            ],
         }
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-write-s3-policy",
-            PolicyDocument=json.dumps(s3_write_policy)
+            PolicyDocument=json.dumps(s3_write_policy),
         )
-        
-        
+
         kms_policy = {
             "Version": "2012-10-17",
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Action": [
-                        "kms:GenerateDataKey"
-                    ],
-                    "Resource": [
-                        os.environ['MEDIA_ASSETS_BUCKET_NAME_KMS_KEY']
-                    ]
+                    "Action": ["kms:GenerateDataKey"],
+                    "Resource": [os.environ["MEDIA_ASSETS_BUCKET_NAME_KMS_KEY"]],
                 }
-            ]
+            ],
         }
 
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-kms-policy",
-            PolicyDocument=json.dumps(kms_policy)
+            PolicyDocument=json.dumps(kms_policy),
         )
 
-        
-        
-        return response['Role']['Arn']
+        return response["Role"]["Arn"]
     except Exception as e:
         logger.error(f"Failed to create IAM role: {str(e)}")
         raise
@@ -433,7 +404,7 @@ def check_resource_exists(
     rule_name: str,
     role_name: str,
     state_machine_name: str,
-    lambda_names: list
+    lambda_names: list,
 ) -> tuple[bool, str]:
     """Check if any of the resources already exist"""
     try:
@@ -446,7 +417,7 @@ def check_resource_exists(
 
         # Check EventBridge Rule
         try:
-            eventbridge = boto3.client('events')
+            eventbridge = boto3.client("events")
             eventbridge.describe_rule(Name=rule_name)
             return True, f"EventBridge Rule {rule_name} already exists"
         except eventbridge.exceptions.ResourceNotFoundException:
@@ -481,11 +452,11 @@ def check_resource_exists(
         if table_name:
             table = dynamodb.Table(table_name)
             response = table.scan(
-                FilterExpression='#name = :name',
-                ExpressionAttributeNames={'#name': 'name'},
-                ExpressionAttributeValues={':name': pipeline_name}
+                FilterExpression="#name = :name",
+                ExpressionAttributeNames={"#name": "name"},
+                ExpressionAttributeValues={":name": pipeline_name},
             )
-            if response['Items']:
+            if response["Items"]:
                 return True, f"Pipeline with name {pipeline_name} already exists"
 
         return False, ""
@@ -494,17 +465,22 @@ def check_resource_exists(
         logger.error(f"Error checking resource existence: {str(e)}")
         raise
 
+
 @app.post("/pipelines")
 def create_pipeline(createpipeline: S3Pipeline) -> dict:
     try:
-        
+
         # Generate names for resources
         queue_name = f"medialake-pipeline-{createpipeline.name}"
         rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
         role_name = f"medialake-pipeline-{createpipeline.name}-role"
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        image_proxy_lambda_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        pipeline_trigger_lambda_name = f"medialake-pipeline-{createpipeline.name}-executor"
+        image_proxy_lambda_name = (
+            f"medialake-pipeline-{createpipeline.name}-image-proxy"
+        )
+        pipeline_trigger_lambda_name = (
+            f"medialake-pipeline-{createpipeline.name}-executor"
+        )
 
         # Check if resources exist
         resources_exist, error_message = check_resource_exists(
@@ -516,76 +492,62 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             [
                 image_proxy_lambda_name,
                 pipeline_trigger_lambda_name,
-                f"medialake-pipeline-{createpipeline.name}-metadata"  # Add this
-            ]
+                f"medialake-pipeline-{createpipeline.name}-metadata",  # Add this
+            ],
         )
 
         if resources_exist:
             return {
                 "status": "409",
                 "message": "Resource conflict",
-                "data": {
-                    "error": error_message
-                }
+                "data": {"error": error_message},
             }
-            
+
         # Generate unique ID and timestamps
         pipeline_id = str(uuid.uuid4())
-        current_time = datetime.utcnow().isoformat(timespec='seconds')
-        deployment_bucket = os.environ.get('IAC_ASSETS_BUCKET')
-        pipeline_trigger_deployment_zip = os.environ.get('PIPELINE_TRIGGER_LAMBDA')
-        image_metadata_extractor_deployment_zip = os.environ.get('IMAGE_METADATA_EXTRACTOR_LAMBDA')
-        image_proxy_deployment_zip = os.environ.get('IMAGE_PROXY_LAMBDA')
-        ingest_event_bus_name = os.environ.get('INGEST_EVENT_BUS')
-        exiftool_layer_arn = os.environ.get('EXIFTOOL_LAYER_ARN')
-        exempitool_layer_arn = os.environ.get('EXEMPITOOL_LAYER_ARN')
-        
-        powertools_layer_arn = os.environ.get('POWERTOOLS__LAYER_ARN')
-        
-        
+        current_time = datetime.utcnow().isoformat(timespec="seconds")
+        deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
+        pipeline_trigger_deployment_zip = os.environ.get("PIPELINE_TRIGGER_LAMBDA")
+        image_metadata_extractor_deployment_zip = os.environ.get(
+            "IMAGE_METADATA_EXTRACTOR_LAMBDA"
+        )
+        image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
+        ingest_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
+        exiftool_layer_arn = os.environ.get("EXIFTOOL_LAYER_ARN")
+        exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
+
+        powertools_layer_arn = os.environ.get("POWERTOOLS__LAYER_ARN")
+
         # Common tags for all resources
         tags = {
-            'medialake': 'true',
-            'pipeline_id': pipeline_id,
-            'pipeline_name': createpipeline.name
+            "medialake": "true",
+            "pipeline_id": pipeline_id,
+            "pipeline_name": createpipeline.name,
         }
-        
 
-        
-        
         # Create SQS FIFO Queue
         queue_name = f"medialake-pipeline-{createpipeline.name}"
         queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
-        
+
         # Create EventBridge rule
         rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
         rule_arn = create_eventbridge_rule(
-            rule_name,
-            ingest_event_bus_name,
-            queue_arn,
-            tags
+            rule_name, ingest_event_bus_name, queue_arn, tags
         )
-   
-  
 
-        
         # Create IAM Role for Lambda and Step Functions
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        role_arn = create_pipeline_role(
-            role_name,
-            queue_arn,
-            state_machine_name,
-            tags
-        )
-       
-      
+        role_arn = create_pipeline_role(role_name, queue_arn, state_machine_name, tags)
 
-        
         # Add this before creating the image proxy lambda
-        image_metadata_extractor_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-metadata"
-        
-        image_proxy_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        
+        image_metadata_extractor_lambda_function_name = (
+            f"medialake-pipeline-{createpipeline.name}-metadata"
+        )
+
+        image_proxy_lambda_function_name = (
+            f"medialake-pipeline-{createpipeline.name}-image-proxy"
+        )
+
         # Create metadata extractor lambda
         image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
             lambda_client,
@@ -594,9 +556,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             deployment_bucket,
             image_metadata_extractor_deployment_zip,
             exiftool_layer_arn,
-            exempitool_layer_arn,
-            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
-            tags
+            {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+            tags,
         )
 
         # Create image proxy lambda
@@ -606,10 +567,10 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             role_arn,
             deployment_bucket,
             image_proxy_deployment_zip,
-            {"MEDIALAKE_ASSET_TABLE":os.environ.get('MEDIALAKE_ASSET_TABLE')},
-            tags
+            {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+            tags,
         )
-        
+
         # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
 
         bucket_policy = {
@@ -621,86 +582,73 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                     "Principal": {
                         "Service": "lambda.amazonaws.com"  # Use service principal
                     },
-                    "Action": [
-                        "s3:PutObject",
-                        "s3:PutObjectAcl"
-                    ],
+                    "Action": ["s3:PutObject", "s3:PutObjectAcl"],
                     "Resource": [
                         f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
-                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}"
+                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
                     ],
                     "Condition": {
                         "ArnLike": {
-                            "aws:SourceArn": image_proxy_lambda_response['FunctionArn']
+                            "aws:SourceArn": image_proxy_lambda_response["FunctionArn"]
                         }
-                    }
+                    },
                 }
-            ]
+            ],
         }
         s3_client.put_bucket_policy(
-            Bucket=os.environ.get('MEDIA_ASSETS_BUCKET_NAME'),
-            Policy=json.dumps(bucket_policy)
+            Bucket=os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
+            Policy=json.dumps(bucket_policy),
         )
-        
+
         # Create Step Function
         state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-       
 
         # Get state machine definition
 
         state_machine_definition = get_state_machine_definition(
-            image_metadata_extractor_lambda_response['FunctionArn'],
-            image_proxy_lambda_response['FunctionArn'],
+            image_metadata_extractor_lambda_response["FunctionArn"],
+            image_proxy_lambda_response["FunctionArn"],
             createpipeline.name,
-            os.environ.get('MEDIALAKE_ASSET_TABLE'),
-            os.environ.get('MEDIA_ASSETS_BUCKET_NAME')
+            os.environ.get("MEDIALAKE_ASSET_TABLE"),
+            os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
         )
-        
-        state_machine_arn = create_state_machine(
-            state_machine_name,
-            role_arn,
-            state_machine_definition,
-            tags
-        )
-     
 
-      
+        state_machine_arn = create_state_machine(
+            state_machine_name, role_arn, state_machine_definition, tags
+        )
+
         # Create Lambda Function
-        pipeline_trigger_lambda_function_name = f"medialake-pipeline-{createpipeline.name}-executor"
+        pipeline_trigger_lambda_function_name = (
+            f"medialake-pipeline-{createpipeline.name}-executor"
+        )
         pipeline_trigger_lambda_response = lambda_client.create_function(
             FunctionName=pipeline_trigger_lambda_function_name,
-            Runtime='python3.12',
+            Runtime="python3.12",
             Role=role_arn,
-            Handler='index.lambda_handler',
+            Handler="index.lambda_handler",
             Code={
-                'S3Bucket': deployment_bucket,
-                'S3Key': pipeline_trigger_deployment_zip
+                "S3Bucket": deployment_bucket,
+                "S3Key": pipeline_trigger_deployment_zip,
             },
-            Environment={
-                'Variables': {
-                    'STEP_FUNCTION_ARN': state_machine_arn
-                }
-            },
-            Tags=tags
+            Environment={"Variables": {"STEP_FUNCTION_ARN": state_machine_arn}},
+            Tags=tags,
         )
-        
+
         # Add SQS trigger to Lambda
         lambda_client.create_event_source_mapping(
             EventSourceArn=queue_arn,
             FunctionName=pipeline_trigger_lambda_function_name,
-            Enabled=True
+            Enabled=True,
         )
-        
-        
-        
+
         # Save pipeline details to DynamoDB
         table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
         if not table_name:
             raise ValueError("MEDIALAKE_PIPELINE_TABLE environment variable not set")
-        
-         # Convert the definition's float values to Decimal
+
+        # Convert the definition's float values to Decimal
         definition = float_to_decimal(createpipeline.definition)
-        
+
         table = dynamodb.Table(table_name)
         pipeline_item = {
             "id": pipeline_id,
@@ -712,19 +660,19 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             "queueUrl": queue_url,
             "queueArn": queue_arn,
             "eventBridgeRuleArn": rule_arn,
-            "triggerLambdaArn": pipeline_trigger_lambda_response['FunctionArn'],
+            "triggerLambdaArn": pipeline_trigger_lambda_response["FunctionArn"],
             "stateMachineArn": state_machine_arn,
-            "roleArn": role_arn
+            "roleArn": role_arn,
         }
-        
+
         table.put_item(Item=pipeline_item)
-        
+
         logger.info(f"Created pipeline '{createpipeline.name}' with ID {pipeline_id}")
-        
+
         return {
             "status": "200",
             "message": "Pipeline created successfully",
-            "data": pipeline_item
+            "data": pipeline_item,
         }
 
     except Exception as e:
@@ -734,8 +682,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             "body": {
                 "status": "500",
                 "message": f"Failed to create pipeline: {str(e)}",
-                "data": {}
-            }
+                "data": {},
+            },
         }
 
 
