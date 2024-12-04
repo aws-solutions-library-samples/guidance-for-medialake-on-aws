@@ -1,4 +1,5 @@
 import json
+import json
 from aws_cdk import (
     Stack,
     Environment,
@@ -20,6 +21,7 @@ from constructs import Construct
 
 # Local imports
 from config import config
+from config import config
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
@@ -28,12 +30,24 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchClusterProps,
 )
 
+
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
 
+"""
+Base infrastructure stack that sets up core AWS resources for the MediaLake application.
+
+This stack creates and configures:
+- VPC and networking components
+- OpenSearch cluster
+- S3 buckets for media assets, IAC assets, and DynamoDB exports  
+- EventBridge event bus
+- DynamoDB tables for asset management
+- Ingestion pipeline for syncing DynamoDB to OpenSearch
+"""
 """
 Base infrastructure stack that sets up core AWS resources for the MediaLake application.
 
@@ -60,6 +74,18 @@ class BaseInfrastructureStack(Stack):
         **kwargs: Additional arguments passed to Stack
     """
 
+    """
+    Core infrastructure stack containing foundational AWS resources.
+
+    Creates and configures the base infrastructure components needed by the MediaLake
+    application including networking, storage, search, and data persistence layers.
+
+    Args:
+        scope (Construct): CDK construct scope
+        construct_id (str): Unique identifier for the stack
+        **kwargs: Additional arguments passed to Stack
+    """
+
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
@@ -67,9 +93,12 @@ class BaseInfrastructureStack(Stack):
         region = env.region if isinstance(env, Environment) else config.primary_region
 
         # Use the generated name for your Lambda function
-        self._vpc = CustomVpc(
+        self.__vpc = CustomVpc(
             self,
             "MediaLakeVPC",
+            props=CustomVpcProps(
+                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
+            ),
             props=CustomVpcProps(
                 vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
             ),
@@ -80,6 +109,7 @@ class BaseInfrastructureStack(Stack):
         # )
 
         # service_linked_role = CfnResource(
+        #     self,
         #     self,
         #     "OpenSearchServiceLinkedRole",
         #     type="AWS::IAM::ServiceLinkedRole",
@@ -93,19 +123,19 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeSecurityGroup",
             description="MediaLake Security Group",
-            vpc=self._vpc.vpc,
+            vpc=self.__vpc.vpc,
         )
 
         # Allow HTTPS ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+        self.__security_group.add_ingress_rule(
+            peer=ec2.Peer.ipv4(self.__vpc.vpc.vpc_cidr_block),
             connection=ec2.Port.tcp(443),
             description="Allow HTTPS ingress from VPC CIDR",
         )
 
         # Allow HTTP ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+        self.__security_group.add_ingress_rule(
+            peer=ec2.Peer.ipv4(self.__vpc.vpc.vpc_cidr_block),
             connection=ec2.Port.tcp(80),
             description="Allow HTTP ingress from VPC CIDR",
         )
@@ -115,14 +145,17 @@ class BaseInfrastructureStack(Stack):
             self,
             "IngestionPipelineLogGroup",
             log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}",
+            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}",
             removal_policy=RemovalPolicy.DESTROY,
             retention=logs.RetentionDays.ONE_DAY,
         )
 
-        self._opensearch_cluster = OpenSearchCluster(
+        self.__opensearch_cluster = OpenSearchCluster(
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
+                domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
+                vpc=self._vpc.vpc,
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
                 vpc=self._vpc.vpc,
                 collection_indexes=["media"],
@@ -163,21 +196,22 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             s3_config=S3Config(
-                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower(),
+                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
             ),
         )
 
         # Create S3 Bucket for DynamoDB Exports
-        self._ddb_export_bucket = S3Bucket(
+        self.__ddb_export_bucket = S3Bucket(
             self,
             "DynamodbExportBucket",
             s3_config=S3Config(
-                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
+                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
             ),
         )
 
         # Create EventBus with retention policy
         ingest_event_bus_config = EventBusConfig(
+            bus_name=f"{config.global_prefix}-ingest-{self.region}-{config.environment}",
             bus_name=f"{config.global_prefix}-ingest-{self.region}-{config.environment}",
             description="event bus",
             log_all=True,
@@ -195,8 +229,8 @@ class BaseInfrastructureStack(Stack):
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name="medialake-dynamodb-etl-pipeline",
-                # pipeline_role=self._opensearch_cluster.pipeline_role,
-                ddb_export_bucket=self._ddb_export_bucket,
+                # pipeline_role=self.__opensearch_cluster.pipeline_role,
+                ddb_export_bucket=self.__ddb_export_bucket,
                 sort_key_name="ID",
                 sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
@@ -227,25 +261,27 @@ class BaseInfrastructureStack(Stack):
             "AssetTableIngestionPipeline",
             config=LambdaConfig(
                 name=f"{config.global_prefix}",
+                name=f"{config.global_prefix}",
                 timeout_minutes=15,
                 vpc=self._vpc.vpc,
                 security_groups=[self._security_group],
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": self._asset_table.table_arn,
-                    "BUCKET_NAME": self._ddb_export_bucket.bucket.bucket_name,
-                    "COLLECTION_ENDPOINT": self._opensearch_cluster.domain_endpoint,
+                    "BUCKET_NAME": self.__ddb_export_bucket.bucket.bucket_name,
+                    "COLLECTION_ENDPOINT": self.__opensearch_cluster.domain_endpoint,
                     "INDEX_NAME": "media",
                     "REGION": self.region,
                     "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
                     "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
+                    "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
                     "SUBNET_IDS_PIPELINE": json.dumps(
-                        self._vpc.vpc.select_subnets(
+                        self.__vpc.vpc.select_subnets(
                             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
                         ).subnet_ids
                     ),
                     "SECURITY_GROUP_IDS": json.dumps(
-                        [self._security_group.security_group_id]
+                        [self.__security_group.security_group_id]
                     ),
                 },
             ),
@@ -263,6 +299,7 @@ class BaseInfrastructureStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["es:ESHttp*"],
+                resources=[f"{self._opensearch_cluster.domain_arn}/*"],
                 resources=[f"{self._opensearch_cluster.domain_arn}/*"],
             )
         )
@@ -320,8 +357,8 @@ class BaseInfrastructureStack(Stack):
                     "s3:DeleteBucket",
                 ],
                 resources=[
-                    self._ddb_export_bucket.bucket.bucket_arn,
-                    f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
+                    self.__ddb_export_bucket.bucket.bucket_arn,
+                    f"{self.__ddb_export_bucket.bucket.bucket_arn}/*",
                 ],
             )
         )
@@ -339,6 +376,7 @@ class BaseInfrastructureStack(Stack):
                     "osis:ValidatePipeline",
                 ],
                 resources=[
+                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                     f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
@@ -418,8 +456,8 @@ class BaseInfrastructureStack(Stack):
                     "s3:DeleteBucket",
                 ],
                 resources=[
-                    self._ddb_export_bucket.bucket.bucket_arn,
-                    f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
+                    self.__ddb_export_bucket.bucket.bucket_arn,
+                    f"{self.__ddb_export_bucket.bucket.bucket_arn}/*",
                 ],
             )
         )
@@ -450,6 +488,7 @@ class BaseInfrastructureStack(Stack):
                 actions=["osis:Ingest"],
                 resources=[
                     f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -474,6 +513,7 @@ class BaseInfrastructureStack(Stack):
             "IngestionProvider",
             on_event_handler=ingestion_pipeline_lambda.function,
         )
+
         ingestion_custom_resource = CustomResource(
             self,
             "CreateIngestionPipeline",
@@ -481,18 +521,18 @@ class BaseInfrastructureStack(Stack):
             properties={
                 "PipelineName": "medialake-asset-pipeline",  # Replace as needed
                 "TableArn": self._asset_table.table_arn,
-                "BucketName": self._ddb_export_bucket.bucket.bucket_arn,
-                "CollectionEndpoint": self._opensearch_cluster.domain_endpoint,
+                "BucketName": self.__ddb_export_bucket.bucket.bucket_arn,
+                "CollectionEndpoint": self.__opensearch_cluster.domain_endpoint,
                 "PipelineRoleArn": pipeline_role.role_arn,
                 "Region": self.region,
                 "LogGroupName": ingestion_log_group.log_group_name,
                 "SubnetIdsPipeline": json.dumps(
-                    self._vpc.vpc.select_subnets(
+                    self.__vpc.vpc.select_subnets(
                         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
                     ).subnet_ids
                 ),
                 "SecurityGroupIds": json.dumps(
-                    [self._security_group.security_group_id]
+                    [self.__security_group.security_group_id]
                 ),
             },
         )
@@ -502,6 +542,12 @@ class BaseInfrastructureStack(Stack):
 
     @property
     def ingest_event_bus(self) -> events.EventBus:
+        """
+        Returns the EventBridge event bus used for ingestion events.
+
+        Returns:
+            events.EventBus: The configured EventBridge event bus
+        """
         """
         Returns the EventBridge event bus used for ingestion events.
 
@@ -518,10 +564,22 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: Name of the EventBridge event bus
         """
+        """
+        Returns the name of the ingestion event bus.
+
+        Returns:
+            str: Name of the EventBridge event bus
+        """
         return self._ingest_event_bus.event_bus_name
 
     @property
     def asset_table(self) -> dynamodb.TableV2:
+        """
+        Returns the DynamoDB table used for storing media asset metadata.
+
+        Returns:
+            dynamodb.TableV2: The configured DynamoDB table
+        """
         """
         Returns the DynamoDB table used for storing media asset metadata.
 
@@ -538,10 +596,22 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: Name of the DynamoDB table
         """
+        """
+        Returns the name of the asset DynamoDB table.
+
+        Returns:
+            str: Name of the DynamoDB table
+        """
         return self._asset_table.table.table_name
 
     @property
     def asset_table_file_hash_index_name(self) -> str:
+        """
+        Returns the name of the FileHash GSI on the asset table.
+
+        Returns:
+            str: Name of the FileHash global secondary index
+        """
         """
         Returns the name of the FileHash GSI on the asset table.
 
@@ -558,10 +628,22 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: ARN of the FileHash global secondary index
         """
+        """
+        Returns the ARN of the FileHash GSI on the asset table.
+
+        Returns:
+            str: ARN of the FileHash global secondary index
+        """
         return f"{self._asset_table.table.table_arn}/index/FileHashIndex"
 
     @property
     def asset_table_asset_id_index_name(self) -> str:
+        """
+        Returns the name of the AssetID GSI on the asset table.
+
+        Returns:
+            str: Name of the AssetID global secondary index
+        """
         """
         Returns the name of the AssetID GSI on the asset table.
 
@@ -578,6 +660,12 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: ARN of the AssetID global secondary index
         """
+        """
+        Returns the ARN of the AssetID GSI on the asset table.
+
+        Returns:
+            str: ARN of the AssetID global secondary index
+        """
         return f"{self._asset_table.table.table_arn}/index/AssetIDIndex"
 
     @property
@@ -588,7 +676,13 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: OpenSearch Dashboards URL
         """
-        return self._opensearch_cluster.domain_endpoint + "/_dashboards"
+        """
+        Returns the URL for the OpenSearch Dashboards interface.
+
+        Returns:
+            str: OpenSearch Dashboards URL
+        """
+        return self.__opensearch_cluster.domain_endpoint + "/_dashboards"
 
     @property
     def collection_endpoint(self) -> str:
@@ -598,7 +692,13 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: OpenSearch cluster endpoint
         """
-        return self._opensearch_cluster.domain_endpoint
+        """
+        Returns the endpoint URL for the OpenSearch cluster.
+
+        Returns:
+            str: OpenSearch cluster endpoint
+        """
+        return self.__opensearch_cluster.domain_endpoint
 
     @property
     def collection_arn(self) -> str:
@@ -608,4 +708,20 @@ class BaseInfrastructureStack(Stack):
         Returns:
             str: ARN of the OpenSearch domain
         """
-        return self._opensearch_cluster.domain_arn
+        """
+        Returns the ARN of the OpenSearch cluster.
+
+        Returns:
+            str: ARN of the OpenSearch domain
+        """
+        return self.__opensearch_cluster.domain_arn
+
+    @property
+    def vpc(self) -> ec2.Vpc:
+        """
+        Returns the VPC of vpc.
+
+        Returns:
+            str: VPC
+        """
+        return self._vpc.vpc

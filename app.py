@@ -56,12 +56,19 @@ class MediaLakeStack(cdk.Stack):
         )
         base_infrastructure.add_dependency(cleanup_stack)
 
+        # Create base infrastructure with cleanup dependency
+        base_infrastructure = BaseInfrastructureStack(
+            self, "BaseInfrastructure", env=kwargs.get("env")
+        )
+        base_infrastructure.add_dependency(cleanup_stack)
+
         # User auth with Cognito
         self._cognito = CognitoConstruct(
             self,
             "Cognito",
             props=CognitoProps(),
         )
+        self._cognito.node.add_dependency(cleanup_stack)
         self._cognito.node.add_dependency(cleanup_stack)
 
         # Create main API Gateway construct
@@ -70,6 +77,7 @@ class MediaLakeStack(cdk.Stack):
             "ApiGateway",
             user_pool=self._cognito.user_pool,
         )
+        api_gateway.node.add_dependency(cleanup_stack)
         api_gateway.node.add_dependency(cleanup_stack)
 
         # Create User Interface
@@ -83,6 +91,7 @@ class MediaLakeStack(cdk.Stack):
             props=UIConstructProps(),
         )
         self._ui.node.add_dependency(cleanup_stack)
+        self._ui.node.add_dependency(cleanup_stack)
 
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,
@@ -93,8 +102,10 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         self._pipelines_executions_stack.node.add_dependency(cleanup_stack)
+        self._pipelines_executions_stack.node.add_dependency(cleanup_stack)
 
         # Create connectors construct
+        connectors = ConnectorsConstruct(
         connectors = ConnectorsConstruct(
             self,
             "Connectors",
@@ -112,8 +123,10 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         connectors.node.add_dependency(cleanup_stack)
+        connectors.node.add_dependency(cleanup_stack)
 
         # Create pipelines construct
+        pipelines = ApiGatewayPipelinesConstruct(
         pipelines = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
@@ -131,7 +144,9 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         pipelines.node.add_dependency(cleanup_stack)
+        pipelines.node.add_dependency(cleanup_stack)
 
+        search = SearchConstruct(
         search = SearchConstruct(
             self,
             "Search",
@@ -143,11 +158,13 @@ class MediaLakeStack(cdk.Stack):
                 open_search_endpoint=base_infrastructure.collection_endpoint,
                 open_search_arn=base_infrastructure.collection_arn,
                 open_search_index="media",
-                vpc=base_infrastructure._vpc.vpc,
+                vpc=base_infrastructure._vpc,
             ),
         )
         search.node.add_dependency(cleanup_stack)
+        search.node.add_dependency(cleanup_stack)
 
+        assets = AssetsConstruct(
         assets = AssetsConstruct(
             self,
             "ApiGatewayAssets",
@@ -159,7 +176,9 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         assets.node.add_dependency(cleanup_stack)
+        assets.node.add_dependency(cleanup_stack)
 
+        settings = SettingsConstruct(
         settings = SettingsConstruct(
             self,
             "ApiSettingsConstruct",
@@ -172,7 +191,9 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         settings.node.add_dependency(cleanup_stack)
+        settings.node.add_dependency(cleanup_stack)
 
+        update_config = UpdateConstruct(
         update_config = UpdateConstruct(
             self,
             "UpdateConfiguration",
@@ -181,6 +202,7 @@ class MediaLakeStack(cdk.Stack):
                 distribution_url=self._ui.distribution_url,
             ),
         )
+        update_config.node.add_dependency(cleanup_stack)
         update_config.node.add_dependency(cleanup_stack)
 
         # Export the User Interface CloudFront URL

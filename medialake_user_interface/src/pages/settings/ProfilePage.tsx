@@ -6,48 +6,66 @@ import {
     Grid,
     Avatar,
     Button,
-    Divider,
     List,
     ListItem,
     ListItemText,
     ListItemIcon,
     useTheme,
     Chip,
+    CircularProgress,
 } from '@mui/material';
 import {
     Email as EmailIcon,
-    Phone as PhoneIcon,
-    Business as BusinessIcon,
-    LocationOn as LocationIcon,
-    Schedule as ScheduleIcon,
+    Person as PersonIcon,
     Security as SecurityIcon,
     Notifications as NotificationsIcon,
     Language as LanguageIcon,
 } from '@mui/icons-material';
+import { useGetUser } from '../../api/hooks/useUsers';
+import { getCurrentUser } from 'aws-amplify/auth';
+import { useEffect, useState } from 'react';
 
 const ProfilePage: React.FC = () => {
     const theme = useTheme();
+    const [userId, setUserId] = useState<string | null>(null);
 
-    const userProfile = {
-        name: 'Alex Johnson',
-        role: 'Senior Media Manager',
-        email: 'alex.johnson@medialake.com',
-        phone: '+1 (555) 123-4567',
-        organization: 'MediaLake Inc.',
-        location: 'San Francisco, CA',
-        timezone: 'Pacific Time (PT)',
-        joinDate: 'January 2023',
-        recentActivity: [
-            { action: 'Created new pipeline', time: '2 hours ago' },
-            { action: 'Updated asset metadata', time: '4 hours ago' },
-            { action: 'Reviewed content', time: '1 day ago' },
-        ],
-        stats: [
-            { label: 'Assets Managed', value: '1,234' },
-            { label: 'Pipelines Created', value: '45' },
-            { label: 'Reviews Completed', value: '328' },
-        ],
-    };
+    useEffect(() => {
+        const getCurrentAuthUser = async () => {
+            try {
+                const { username } = await getCurrentUser();
+                setUserId(username);
+            } catch (error) {
+                console.error('Error getting current user:', error);
+            }
+        };
+        getCurrentAuthUser();
+    }, []);
+
+    const { data: userProfile, isLoading, error } = useGetUser(userId || '');
+
+    if (isLoading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Box>
+                <Typography color="error">Error loading profile: {error.message}</Typography>
+            </Box>
+        );
+    }
+
+    if (!userProfile) {
+        return (
+            <Box>
+                <Typography>No profile data available</Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box>
@@ -73,13 +91,13 @@ const ProfilePage: React.FC = () => {
                                 fontSize: '3rem',
                             }}
                         >
-                            {userProfile.name.charAt(0)}
+                            {userProfile.data.given_name?.[0] || userProfile.data.username?.[0]}
                         </Avatar>
                         <Typography variant="h5" gutterBottom>
-                            {userProfile.name}
+                            {`${userProfile.data.given_name || ''} ${userProfile.data.family_name || ''}`}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                            {userProfile.role}
+                            {userProfile.data.username}
                         </Typography>
                         <Chip
                             label="Active"
@@ -95,94 +113,33 @@ const ProfilePage: React.FC = () => {
                             Edit Profile
                         </Button>
                     </Paper>
-
-                    {/* Quick Stats */}
-                    <Paper sx={{ p: 3, mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Activity Overview
-                        </Typography>
-                        <Grid container spacing={2}>
-                            {userProfile.stats.map((stat) => (
-                                <Grid item xs={12} key={stat.label}>
-                                    <Box sx={{ textAlign: 'center', p: 1 }}>
-                                        <Typography variant="h4" color="primary">
-                                            {stat.value}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {stat.label}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                            ))}
-                        </Grid>
-                    </Paper>
                 </Grid>
 
                 {/* Profile Details */}
                 <Grid item xs={12} md={8}>
                     <Paper sx={{ p: 3, mb: 3 }}>
                         <Typography variant="h6" gutterBottom>
-                            Contact Information
+                            Profile Information
                         </Typography>
                         <List>
+                            <ListItem>
+                                <ListItemIcon>
+                                    <PersonIcon color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Username"
+                                    secondary={userProfile.data.username}
+                                />
+                            </ListItem>
                             <ListItem>
                                 <ListItemIcon>
                                     <EmailIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
                                     primary="Email"
-                                    secondary={userProfile.email}
+                                    secondary={userProfile.data.email}
                                 />
                             </ListItem>
-                            <ListItem>
-                                <ListItemIcon>
-                                    <PhoneIcon color="primary" />
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary="Phone"
-                                    secondary={userProfile.phone}
-                                />
-                            </ListItem>
-                            <ListItem>
-                                <ListItemIcon>
-                                    <BusinessIcon color="primary" />
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary="Organization"
-                                    secondary={userProfile.organization}
-                                />
-                            </ListItem>
-                            <ListItem>
-                                <ListItemIcon>
-                                    <LocationIcon color="primary" />
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary="Location"
-                                    secondary={userProfile.location}
-                                />
-                            </ListItem>
-                        </List>
-                    </Paper>
-
-                    <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Recent Activity
-                        </Typography>
-                        <List>
-                            {userProfile.recentActivity.map((activity, index) => (
-                                <React.Fragment key={index}>
-                                    <ListItem>
-                                        <ListItemIcon>
-                                            <ScheduleIcon color="action" />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={activity.action}
-                                            secondary={activity.time}
-                                        />
-                                    </ListItem>
-                                    {index < userProfile.recentActivity.length - 1 && <Divider />}
-                                </React.Fragment>
-                            ))}
                         </List>
                     </Paper>
 

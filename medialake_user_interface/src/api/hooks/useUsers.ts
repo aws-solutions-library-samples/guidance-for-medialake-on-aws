@@ -17,6 +17,17 @@ interface UsersResponse {
     };
 }
 
+interface UserProfileResponse {
+    status: number;
+    data: {
+        username: string;
+        email: string;
+        given_name: string;
+        family_name: string;
+        custom_settings: string;
+    };
+}
+
 export const useGetUsers = () => {
     return useQuery<User[], Error>({
         queryKey: [QUERY_KEYS.USERS],
@@ -29,6 +40,17 @@ export const useGetUsers = () => {
                 roles: user.roles || [] // Ensure roles is always present
             }));
         },
+    });
+};
+
+export const useGetUser = (userId: string) => {
+    return useQuery<UserProfileResponse, Error>({
+        queryKey: QUERY_KEYS.USERS.detail(userId),
+        queryFn: async () => {
+            const { data } = await apiClient.get<UserProfileResponse>(`${API_ENDPOINTS.USER}/${userId}`);
+            return data;
+        },
+        enabled: !!userId,
     });
 };
 

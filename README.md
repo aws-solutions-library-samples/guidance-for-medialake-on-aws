@@ -51,14 +51,23 @@ npm install
 
 ## 🔧 Configuration
 
-1. Configure your AWS credentials:
+1. Configure your AWS credentials if you haven't already:
 ```bash
 aws configure
 ```
 
-2. Set up configuration variables:
+2. Create a `config.json` file in the project root:
 ```bash
-cdk_config
+touch config.json
+```
+3. Add the following configuration to `config.json` (modify values as needed):
+```json
+{
+  "environment": "dev",
+  "project": "medialake",
+  "region": "us-east-1",
+  "account": "your-aws-account-id"
+}
 ```
 
 ## 🚀 Deployment
@@ -104,12 +113,34 @@ medialake/
 - Customizable processing steps
 - Event-driven architecture
 
-## 🧪 Testing
+## ☁️ AWS Services
 
-Run the test suite:
-```bash
-pytest
-```
+### Core Services
+- **AWS Lambda** - Serverless compute for API handlers and media processing
+- **Amazon S3** - Object storage for media assets, metadata, and temporary processing files
+- **AWS Step Functions** - Orchestration of media processing workflows
+- **Amazon SQS** - queues for ordered media processing and flow control
+- **Amazon EventBridge** - Event routing and processing pipeline triggers
+- **Amazon API Gateway** - REST API endpoint management
+- **Amazon DynamoDB** - Database for asset metadata, storage connector configuration, pipeline configuration, resource state, and pipeline execution history
+
+### Security & Authentication
+- **AWS Cognito** - User authentication and authorization
+- **AWS KMS** - Encryption key management
+- **AWS IAM** - Resource access control and permissions
+- **AWS Secrets Manager** - Secret management
+- **AWS Amplify** - Frontend development framework
+- **AWS WAF** - Web application firewall
+
+### Monitoring & Logging
+- **Amazon CloudWatch** - Metrics, logging, and alerting
+- **AWS X-Ray** - Distributed tracing and performance monitoring
+- **Amazon CloudTrail** - API activity and resource change tracking
+
+### Development & Deployment
+- **AWS CDK** - Infrastructure as code
+- **AWS CloudFormation** - Resource provisioning
+
 
 ## 📚 API Documentation
 
@@ -124,16 +155,10 @@ The API includes the following main endpoints:
 
 ## 🔒 Security
 
-- AWS Cognito authentication
+- AWS Cognito authentication and authorization including support for local username and password as well as federated authentication via SAML.
 - KMS encryption for sensitive data
 - IAM role-based access control
 - CORS-enabled API endpoints
-
-## 👥 Authors
-
-- Robert Raver
-- Lior Berezinski
-- Karthik Rengasamy
 
 ## 📄 License
 
@@ -144,3 +169,14 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - AWS CDK team for the excellent infrastructure as code framework
 - AWS Lambda Powertools for Python
 - The open-source community for various tools and libraries used in this project
+
+
+LICENSE
+
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
