@@ -28,6 +28,7 @@ class SearchProps:
     open_search_arn: str
     open_search_index: str
     vpc: Optional[ec2.IVpc] = None
+    security_group: Optional[ec2.SecurityGroup] = None
 
 
 class SearchConstruct(Construct):
@@ -49,6 +50,7 @@ class SearchConstruct(Construct):
             config=LambdaConfig(
                 name="search_get_lambda",
                 vpc=props.vpc,
+                security_groups=[props.security_group],
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -57,17 +59,17 @@ class SearchConstruct(Construct):
                     ),
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.open_search_index,
-                    "SCOPE": "es"
+                    "SCOPE": "es",
                 },
             ),
         )
-        
+
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "ec2:CreateNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface"
+                    "ec2:DeleteNetworkInterface",
                 ],
                 resources=["*"],
             )
@@ -89,7 +91,7 @@ class SearchConstruct(Construct):
                     "es:ESHttpDelete",
                     "es:DescribeElasticsearchDomain",
                     "es:ListDomainNames",
-                    "es:ESHttpHead"
+                    "es:ESHttpHead",
                 ],
                 resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
             )

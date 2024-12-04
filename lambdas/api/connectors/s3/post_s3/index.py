@@ -41,6 +41,7 @@ class S3Connector(BaseModel):
     name: str
     type: str
 
+
 def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
     for attempt in range(max_retries):
         try:
@@ -48,23 +49,29 @@ def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_del
             time.sleep(base_delay)
             return True
         except iam_client.exceptions.NoSuchEntityException:
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
     return False
 
-def wait_for_policy_attachment(iam_client, role_name, policy_arn, max_retries=5, base_delay=10):
+
+def wait_for_policy_attachment(
+    iam_client, role_name, policy_arn, max_retries=5, base_delay=10
+):
     for attempt in range(max_retries):
         try:
-            attached_policies = iam_client.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
-            if any(policy['PolicyArn'] == policy_arn for policy in attached_policies):
+            attached_policies = iam_client.list_attached_role_policies(
+                RoleName=role_name
+            )["AttachedPolicies"]
+            if any(policy["PolicyArn"] == policy_arn for policy in attached_policies):
                 time.sleep(base_delay)
                 return True
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
         except iam_client.exceptions.NoSuchEntityException:
-            delay = (2 ** attempt) * base_delay
+            delay = (2**attempt) * base_delay
             time.sleep(delay)
     return False
+
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
@@ -396,8 +403,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             created_resources.append(("iam_role", role_name))
 
             # Wait for role to be available
-   
-           
 
             # Attach policies to the role
             iam_client.attach_role_policy(
@@ -426,22 +431,18 @@ def create_connector(createconnector: S3Connector) -> dict:
             }
 
             # Define the policy ARN
-            policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+            policy_arn = (
+                "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+            )
 
             # Attach policies to the role
-            iam_client.attach_role_policy(
-                RoleName=role_name,
-                PolicyArn=policy_arn
-            )
-            
-
+            iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
 
             # Attach policies to the role
             iam_client.attach_role_policy(
                 RoleName=role_name,
                 PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
             )
-          
 
             # Create custom policy for SQS permissions
             sqs_policy = {
@@ -535,7 +536,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "Resource": [
                             medialake_asset_table,
                             asset_table_file_hash_index_arn,
-                            asset_table_asset_id_index_arn
+                            asset_table_asset_id_index_arn,
                         ],
                     }
                 ],
@@ -563,10 +564,12 @@ def create_connector(createconnector: S3Connector) -> dict:
             # Wait for policy attachment to propagate
             if not wait_for_iam_role_propagation(iam_client, role_name):
                 raise Exception(f"IAM role {role_name} did not propagate in time")
-  
+
             if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-                raise Exception(f"Policy {policy_arn} did not attach to role {role_name} in time")
-          
+                raise Exception(
+                    f"Policy {policy_arn} did not attach to role {role_name} in time"
+                )
+
             # Deploy the lambda with proper S3 configuration
             create_function_response = lambda_client.create_function(
                 FunctionName=target_function_name,

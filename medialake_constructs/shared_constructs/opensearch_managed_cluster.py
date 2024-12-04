@@ -26,17 +26,17 @@ import time
 class OpenSearchClusterProps:
     domain_name: str
     engine_version: str = opensearch.EngineVersion.OPENSEARCH_2_15
-    instance_type: str = "c5.large.search"
+    instance_type: str = (
+        "c5.large.search"  # T3 instance type does not support Multi-AZ with standby feature.
+    )
     instance_count: int = 2  # high availability
-    volume_size: int = 30  # better performance
+    volume_size: int = 30
     availability_zone_count: int = 2  #  2 for cross-zone replication
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     enforce_https: bool = True
     node_to_node_encryption: bool = True
     encryption_at_rest: bool = True
-    master_username: str = None
-    master_password: str = None
     master_node_instance_type: str = "c5.large.search"
     master_node_count: int = 3  # Typically, 3 master nodes for production
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
@@ -124,9 +124,9 @@ class OpenSearchCluster(Construct):
             # EBS configuration
             ebs=opensearch.EbsOptions(
                 volume_size=props.volume_size,
-                volume_type=ec2.EbsDeviceVolumeType.GP3,  # Updated to GP3 for better performance
-                throughput=125,  # Optional: set throughput for GP3
-                iops=3000,  # Optional: set IOPS for GP3
+                volume_type=ec2.EbsDeviceVolumeType.GP2,
+                # throughput=125, # for GP3
+                # iops=3000,
             ),
             # Zone awareness configuration for cross-zone replication
             zone_awareness=opensearch.ZoneAwarenessConfig(
@@ -162,30 +162,6 @@ class OpenSearchCluster(Construct):
                     removal_policy=RemovalPolicy.DESTROY,
                 ),
             ),
-            # Access policies
-            # access_policies=[
-            #     iam.PolicyStatement(
-            #         effect=iam.Effect.ALLOW,
-            #         actions=[
-            #             "es:ESHttpGet",
-            #             "es:ESHttpPost",
-            #             "es:ESHttpPut",
-            #             "es:ESHttpDelete",
-            #             "es:ESHttpHead",
-            #         ],
-            #         principals=[iam.AnyPrincipal()],
-            #         resources=[
-            #             f"arn:aws:es:{self.region}:{self.account_id}:domain/{props.domain_name}/*"
-            #         ],
-            #         conditions={
-            #             "IpAddress": {
-            #                 "aws:SourceIp": [
-            #                     "203.0.113.0/24"
-            #                 ]  # Replace with your trusted IP range
-            #             }
-            #         },
-            #     )
-            # ],
             # VPC configuration
             vpc=props.vpc,
             vpc_subnets=[
@@ -205,9 +181,6 @@ class OpenSearchCluster(Construct):
             # Automatic upgrades
             enable_auto_software_update=True,
         )
-
-        # Attach the security group to the domain
-        # self.domain.connections.add_security_group(os_security_group)
 
         # Create a service-linked role if it doesn't exist
         slr = iam.CfnServiceLinkedRole(

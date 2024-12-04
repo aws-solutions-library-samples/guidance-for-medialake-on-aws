@@ -19,8 +19,6 @@ class CDKConfig(BaseModel):
     assets_bucket_name: str = "medialake-assets"
     # lambda_runtime_version: str = "3.11"
     bedrock_region: str = "us-east-1"
-    opensearch_master_password: str = None
-    opensearch_master_username: str = None
 
     @property
     def regions(self) -> List[str]:

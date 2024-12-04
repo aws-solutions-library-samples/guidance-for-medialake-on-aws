@@ -59,3 +59,4 @@ OWL-ViT (short for Vision Transformer for Open-World Localization) model under t
 CLIP (Contrastive Language-Image Pretraining) under the Massachusetts Institute of Technology (MIT) license
 FAISS under the Massachusetts Institute of Technology (MIT) license
 BLIP (Bootstrapping Language-Image Pre-training for Unified Vision-Language Understanding and Generation) under BSD 3-Clause "New" or "Revised" License
+Python Pillow under the CMU License (MIT-CMU) (MIT-CMU)
