@@ -115,7 +115,7 @@ const PipelinesPage: React.FC = () => {
     const createPipeline = useCreatePipeline();
     const navigate = useNavigate();
 
-    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>({
         open: false,
         message: '',
         severity: 'success',
@@ -357,31 +357,46 @@ const PipelinesPage: React.FC = () => {
         }
     };
 
-
     const handleCreatePipeline = async (pipelineData: CreatePipelineRequest) => {
         setIsCreatingPipeline(true);
         try {
+            const response: PipelineResponse = await createPipeline.mutateAsync(pipelineData);
+            console.log('Pipeline creation response:', response);
 
-            await createPipeline.mutateAsync(pipelineData);
-            setSnackbar({
-                open: true,
-                message: 'Pipeline created successfully',
-                severity: 'success'
-            });
-
+            if (response.status === "409") {
+                const errorMessage = `${response.message}: ${response.data.error || ''}`;
+                setSnackbar({
+                    open: true,
+                    message: errorMessage,
+                    severity: 'error'
+                });
+            } else if (response.status === "200") {
+                setSnackbar({
+                    open: true,
+                    message: 'Pipeline created successfully',
+                    severity: 'success'
+                });
+            } else {
+                // Changed from 'warning' to 'error' for unknown responses
+                setSnackbar({
+                    open: true,
+                    message: response.message || 'Unknown response from server',
+                    severity: 'error'
+                });
+            }
         } catch (err: any) {
+            console.error('Pipeline creation error:', err);
             let errorMessage = 'Failed to create pipeline. Please try again.';
 
             if (err.response) {
-                // Handle API error responses
+                console.log('Error response:', err.response);
                 const { status, data } = err.response;
-                if (status === 409 && data.error) {
-                    errorMessage = data.error;
+                if (status === 409) {
+                    errorMessage = `${data.message}: ${data.data?.error || ''}`;
                 } else if (data.message) {
                     errorMessage = data.message;
                 }
             } else if (err.message) {
-                // Handle other error types
                 errorMessage = err.message;
             }
 
@@ -390,7 +405,6 @@ const PipelinesPage: React.FC = () => {
                 message: errorMessage,
                 severity: 'error'
             });
-
         } finally {
             setIsCreatingPipeline(false);
         }

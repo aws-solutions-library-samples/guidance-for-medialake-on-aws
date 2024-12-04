@@ -270,22 +270,28 @@ export interface CreatePipelineRequest {
 }
 
 export interface PipelineResponse {
-  id: string;
-  name: string;
-  type: string;
-  createdAt: string;
-  updatedAt: string;
-  definition: {
-    nodes: PipelineNode[];
-    edges: PipelineEdge[];
-    viewport: PipelineViewport;
+  status: string;
+  message: string;
+  data: {
+    error?: string;
+    // ... other fields from the original PipelineResponse ...
+    id?: string;
+    name?: string;
+    type?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    definition?: {
+      nodes: PipelineNode[];
+      edges: PipelineEdge[];
+      viewport: PipelineViewport;
+    };
+    queueUrl?: string;
+    queueArn?: string;
+    eventBridgeRuleArn?: string;
+    triggerLambdaArn?: string;
+    stateMachineArn?: string;
+    roleArn?: string;
   };
-  queueUrl: string;
-  queueArn: string;
-  eventBridgeRuleArn: string;
-  triggerLambdaArn: string;
-  stateMachineArn: string;
-  roleArn: string;
 }
 
 export interface Pipeline extends PipelineResponse { }
