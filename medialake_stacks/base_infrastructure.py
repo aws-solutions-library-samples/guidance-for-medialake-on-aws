@@ -225,7 +225,6 @@ class BaseInfrastructureStack(Stack):
                     "REGION": self.region,
                     "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
                     "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
-                    "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
                     "SUBNET_IDS_PIPELINE": json.dumps(
                         self._vpc.vpc.select_subnets(
                             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
@@ -328,7 +327,6 @@ class BaseInfrastructureStack(Stack):
                     "osis:ValidatePipeline",
                 ],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                     f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
@@ -439,7 +437,6 @@ class BaseInfrastructureStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["osis:Ingest"],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                     f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )

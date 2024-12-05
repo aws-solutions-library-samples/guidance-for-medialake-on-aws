@@ -42,6 +42,7 @@ class S3Pipeline(BaseModel):
     definition: dict
     name: str
     type: str
+    system: bool
 
 
 def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
@@ -448,7 +449,7 @@ def check_resource_exists(
                 pass
 
         # Check DynamoDB for pipeline name
-        table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
+        table_name = os.environ.get("PIPELINES_TABLE_NAME")
         if table_name:
             table = dynamodb.Table(table_name)
             response = table.scan(
@@ -514,9 +515,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
         ingest_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
         exiftool_layer_arn = os.environ.get("EXIFTOOL_LAYER_ARN")
-        exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
+        # exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
 
-        powertools_layer_arn = os.environ.get("POWERTOOLS__LAYER_ARN")
+        # powertools_layer_arn = os.environ.get("POWERTOOLS__LAYER_ARN")
 
         # Common tags for all resources
         tags = {
@@ -642,9 +643,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         )
 
         # Save pipeline details to DynamoDB
-        table_name = os.environ.get("MEDIALAKE_PIPELINE_TABLE")
+        table_name = os.environ.get("PIPELINES_TABLE_NAME")
         if not table_name:
-            raise ValueError("MEDIALAKE_PIPELINE_TABLE environment variable not set")
+            raise ValueError("PIPELINES_TABLE_NAME environment variable not set")
 
         # Convert the definition's float values to Decimal
         definition = float_to_decimal(createpipeline.definition)
@@ -653,6 +654,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         pipeline_item = {
             "id": pipeline_id,
             "name": createpipeline.name,
+            "system": createpipeline.system,
             "type": createpipeline.type,
             "createdAt": current_time,
             "updatedAt": current_time,

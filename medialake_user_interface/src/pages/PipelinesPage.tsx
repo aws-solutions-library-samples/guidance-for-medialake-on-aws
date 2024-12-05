@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -9,24 +9,45 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    TableSortLabel,
-    TextField,
     Chip,
     IconButton,
-    Tooltip,
+    useTheme,
     Button,
+    CircularProgress,
+    TableSortLabel,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    alpha,
+    TextField,
+    Stack,
     Snackbar,
-    Alert
+    Alert,
 } from '@mui/material';
-import { CircularProgress } from '@mui/material';
-
-import EditIcon from '@mui/icons-material/Edit';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import AddIcon from '@mui/icons-material/Add';
+import {
+    Edit as EditIcon,
+    Add as AddIcon,
+    RocketLaunch as RocketLaunchIcon,
+} from '@mui/icons-material';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getSortedRowModel,
+    getPaginationRowModel,
+    flexRender,
+    ColumnDef,
+} from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { PipelineResponse, CreatePipelineRequest } from '@/api/types/api.types';
+import { PipelineResponse, CreatePipelineRequest, Pipeline } from '@/api/types/pipeline.types';
+import { usePipeline } from '../api/hooks/usePipelines';
+import { useMediaQuery } from '@mui/material';
+import Tooltip from '@mui/material/Tooltip';
 import { useCreatePipeline } from '../api/hooks/usePipelines';
+import { useTranslation } from 'react-i18next';
 
+const PAGE_SIZE = 20;
 
 const pipelineTypes = {
     INGEST: 'Ingest Triggered',
@@ -34,104 +55,238 @@ const pipelineTypes = {
     ANALYSIS: 'Analysis Triggered',
 } as const;
 
-type PipelineType = typeof pipelineTypes[keyof typeof pipelineTypes];
 
-interface Pipeline {
-    id: number;
-    name: string;
-    creationDate: string;
-    type: PipelineType;
-}
-
-const mockPipelines: Pipeline[] = [
-    { id: 1, name: 'Default Image Pipeline', creationDate: '2024-11-27', type: pipelineTypes.INGEST },
-    { id: 2, name: 'Video Analysis', creationDate: '2023-05-01', type: pipelineTypes.INGEST },
-    { id: 3, name: 'Image Analysis', creationDate: '2023-05-02', type: pipelineTypes.INGEST },
-    { id: 4, name: 'Audio Analysis', creationDate: '2023-05-03', type: pipelineTypes.INGEST },
-    { id: 5, name: 'Metadata Extraction', creationDate: '2023-05-04', type: pipelineTypes.MANUAL },
-    { id: 6, name: 'Content Moderation', creationDate: '2023-05-05', type: pipelineTypes.MANUAL },
-];
-
-interface Node {
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: {
-        label: string;
-        icon: string;
-        inputTypes: string[];
-        outputTypes: string[];
-    };
-}
-
-interface Edge {
-    id: string;
-    source: string;
-    target: string;
-    type: string;
-    data: {
-        text: string;
-    };
-}
-
-interface PipelineData extends Pipeline {
-    nodes: Node[];
-    edges: Edge[];
-}
-
-// Simulated API call to fetch pipeline data
-const fetchPipelineData = (id: number): Promise<PipelineData | null> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const pipeline = mockPipelines.find(p => p.id === id);
-            if (pipeline) {
-                // Simulate different data for each pipeline
-                const nodes: Node[] = [
-                    { id: '1', type: 'custom', position: { x: 0, y: 0 }, data: { label: 'Input', icon: 'FaFileVideo', inputTypes: ['video'], outputTypes: ['video'] } },
-                    { id: '2', type: 'custom', position: { x: 200, y: 0 }, data: { label: pipeline.name, icon: 'FaVideo', inputTypes: ['video'], outputTypes: ['video'] } },
-                    { id: '3', type: 'custom', position: { x: 400, y: 0 }, data: { label: 'Output', icon: 'FaDatabase', inputTypes: ['video'], outputTypes: [] } },
-                ];
-                const edges: Edge[] = [
-                    { id: 'e1-2', source: '1', target: '2', type: 'custom', data: { text: 'Process' } },
-                    { id: 'e2-3', source: '2', target: '3', type: 'custom', data: { text: 'Store' } },
-                ];
-                resolve({ ...pipeline, nodes, edges });
-            } else {
-                resolve(null);
-            }
-        }, 500);
-    });
-};
 
 const PipelinesPage: React.FC = () => {
-    const [pipelines, setPipelines] = useState<Pipeline[]>(mockPipelines);
-    const [sortColumn, setSortColumn] = useState<keyof Pipeline>('name');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-    const [filterText, setFilterText] = useState('');
-    const [error, setError] = useState<string | null>(null);
+    const { t } = useTranslation();
+    const theme = useTheme();
+    const navigate = useNavigate();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('lg'));
+    const createPipeline = useCreatePipeline();
+    const [pipelines, setPipelines] = useState<Pipeline[]>([]);
     const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
 
+    const [globalSearch, setGlobalSearch] = useState('');
 
-    const createPipeline = useCreatePipeline();
-    const navigate = useNavigate();
 
-    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>({
+    const [filters, setFilters] = useState({
+        type: '',
+        name: '',
+        system: '',
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as 'asc' | 'desc'
+    });
+    const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipeline(PAGE_SIZE, {
+        status: filters.type || undefined,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder
+    });
+
+    const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
-        severity: 'success',
+        severity: 'success' as 'success' | 'error',
     });
 
     const handleCloseSnackbar = () => {
         setSnackbar({ ...snackbar, open: false });
     };
 
-    const handleEdit = (id: number) => {
+
+    useEffect(() => {
+        setGlobalSearch(filters.name);
+    }, [filters.name, setGlobalSearch]);
+
+    useEffect(() => {
+        if (data && data.pages) {
+            const allPipelines = data.pages.flatMap(page => page.data.s);
+            setPipelines(allPipelines);
+        }
+    }, [data]);
+
+
+    const getChipColor = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'Ingest Triggered':
+                return theme.palette.primary.main;
+            case 'Manually Triggered':
+                return theme.palette.secondary.main;
+            case 'Analysis Triggered':
+                return theme.palette.success.main;
+            default:
+                return theme.palette.grey[500];
+        }
+    };
+
+
+    const columns = useMemo<ColumnDef<Pipeline>[]>(
+        () => [
+            {
+                header: 'Name',
+                accessorKey: 'name',
+                cell: ({ getValue }) => (
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.primary.main }}>
+                        {getValue() as string}
+                    </Typography>
+                ),
+            },
+            {
+                header: 'Creation Date',
+                accessorKey: 'createdAt',
+                cell: ({ getValue }) => (
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                        {new Date(getValue() as string).toLocaleString()}
+                    </Typography>
+                ),
+            },
+            {
+                header: 'System',
+                accessorKey: 'system',
+                cell: ({ getValue }) => {
+                    const isSystem = getValue() as boolean;
+                    return (
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            {isSystem ? 'Yes' : 'No'}
+                        </Typography>
+                    );
+                },
+            },
+            {
+                header: 'Type',
+                accessorKey: 'type',
+                cell: ({ getValue }) => {
+                    const type = getValue() as string;
+                    const color = getChipColor(type);
+                    return (
+                        <Chip
+                            label={type}
+                            size="small"
+                            sx={{
+                                backgroundColor: alpha(color, 0.1),
+                                color: color,
+                                fontWeight: 600,
+                                borderRadius: '6px',
+                                height: '24px',
+                                '& .MuiChip-label': {
+                                    px: 1.5,
+                                },
+                            }}
+                        />
+                    );
+                },
+            },
+            {
+                header: 'Actions',
+                id: 'actions',
+                cell: ({ row }) => (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        {!row.original.system && ( // Only render if system is false or undefined
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleEdit(row.original.id)}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        )}
+                    </Box>
+                ),
+            },
+        ],
+        [theme]
+    );
+
+    const table = useReactTable({
+        data: pipelines,
+        columns,
+        state: { globalFilter: globalSearch },
+        onGlobalFilterChange: setGlobalSearch,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        initialState: {
+            pagination: {
+                pageSize: PAGE_SIZE,
+            },
+        },
+
+    });
+
+    const handleEdit = (id: string) => {
         navigate(`/pipelines/${id}`);
+    };
+
+    const handleCreatePipeline = async (pipelineData: CreatePipelineRequest) => {
+        setIsCreatingPipeline(true);
+        try {
+            const response: PipelineResponse = await createPipeline.mutateAsync(pipelineData);
+            console.log('Pipeline creation response:', response);
+
+            if (response.status === "409") {
+                const errorMessage = `${response.message}: ${response.data.error || ''}`;
+                setSnackbar({
+                    open: true,
+                    message: errorMessage,
+                    severity: 'error'
+                });
+            } else if (response.status === "200") {
+                setSnackbar({
+                    open: true,
+                    message: 'Pipeline created successfully',
+                    severity: 'success'
+                });
+                // Refetch the data after successful pipeline creation
+                refetch();
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: response.message || 'Unknown response from server',
+                    severity: 'error'
+                });
+            }
+        } catch (err: any) {
+            console.error('Pipeline creation error:', err);
+            let errorMessage = 'Failed to create pipeline. Please try again.';
+
+            if (err.response) {
+                console.log('Error response:', err.response);
+                const { status, data } = err.response;
+                if (status === 409) {
+                    errorMessage = `${data.message}: ${data.data?.error || ''}`;
+                } else if (data.message) {
+                    errorMessage = data.message;
+                }
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+
+            setSnackbar({
+                open: true,
+                message: errorMessage,
+                severity: 'error'
+            });
+        } finally {
+            setIsCreatingPipeline(false);
+        }
+    };
+
+
+
+    const handleAddNew = () => {
+        navigate('/pipeline');
     };
 
     const hardcodedPipelineData: CreatePipelineRequest = {
         "name": "image-pipeline",
-        "type": "s3",
+        "type": "Ingest Triggered",
+        "system": true,
         "definition": {
             "nodes": [
                 {
@@ -357,210 +512,269 @@ const PipelinesPage: React.FC = () => {
         }
     };
 
-    const handleCreatePipeline = async (pipelineData: CreatePipelineRequest) => {
-        setIsCreatingPipeline(true);
-        try {
-            const response: PipelineResponse = await createPipeline.mutateAsync(pipelineData);
-            console.log('Pipeline creation response:', response);
-
-            if (response.status === "409") {
-                const errorMessage = `${response.message}: ${response.data.error || ''}`;
-                setSnackbar({
-                    open: true,
-                    message: errorMessage,
-                    severity: 'error'
-                });
-            } else if (response.status === "200") {
-                setSnackbar({
-                    open: true,
-                    message: 'Pipeline created successfully',
-                    severity: 'success'
-                });
-            } else {
-                // Changed from 'warning' to 'error' for unknown responses
-                setSnackbar({
-                    open: true,
-                    message: response.message || 'Unknown response from server',
-                    severity: 'error'
-                });
-            }
-        } catch (err: any) {
-            console.error('Pipeline creation error:', err);
-            let errorMessage = 'Failed to create pipeline. Please try again.';
-
-            if (err.response) {
-                console.log('Error response:', err.response);
-                const { status, data } = err.response;
-                if (status === 409) {
-                    errorMessage = `${data.message}: ${data.data?.error || ''}`;
-                } else if (data.message) {
-                    errorMessage = data.message;
-                }
-            } else if (err.message) {
-                errorMessage = err.message;
-            }
-
-            setSnackbar({
-                open: true,
-                message: errorMessage,
-                severity: 'error'
-            });
-        } finally {
-            setIsCreatingPipeline(false);
-        }
-    };
-
-
-    const handleAddNew = () => {
-        navigate('/pipeline');
-    };
-
-    const handleSort = (column: keyof Pipeline) => {
-        if (column === sortColumn) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortColumn(column);
-            setSortOrder('asc');
-        }
-    };
-
-    const filteredPipelines = useMemo(() => {
-        return pipelines.filter((pipeline) =>
-            pipeline.name.toLowerCase().includes(filterText.toLowerCase())
-        );
-    }, [pipelines, filterText]);
-
-    const sortedPipelines = useMemo(() => {
-        return [...filteredPipelines].sort((a, b) => {
-            const order = sortOrder === 'asc' ? 1 : -1;
-            if (a[sortColumn] < b[sortColumn]) {
-                return -1 * order;
-            }
-            if (a[sortColumn] > b[sortColumn]) {
-                return 1 * order;
-            }
-            return 0;
-        });
-    }, [filteredPipelines, sortColumn, sortOrder]);
-
-    const getChipColor = (type: PipelineType) => {
-        switch (type) {
-            case pipelineTypes.INGEST:
-                return 'primary';
-            case pipelineTypes.MANUAL:
-                return 'secondary';
-            case pipelineTypes.ANALYSIS:
-                return 'success';
-            default:
-                return 'default';
-        }
-    };
 
     return (
-        <Box sx={{ flexGrow: 1, p: 3, mt: 8 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
-                    Pipelines
-                </Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={handleAddNew}
-                >
-                    Add New Pipeline
-                </Button>
+        <Box sx={{ px: 4, py: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                    <Box>
+                        <Typography variant="h4" sx={{
+                            fontWeight: 700,
+                            mb: 1,
+                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            color: 'transparent',
+                        }}>
+                            Pipelines
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+                            Manage and monitor your media pipelines
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Stack direction="row" spacing={2}>
+                            <Tooltip title={isCreatingPipeline ? "Deploying Image Pipeline" : "Deploy Image Pipeline"}>
+                                {isSmallScreen ? (
+                                    <Button
+                                        onClick={() => handleCreatePipeline(hardcodedPipelineData)}
+                                        disabled={isCreatingPipeline}
+                                        sx={{
+                                            minWidth: 0,
+                                            p: 1,
+                                            borderRadius: '50%',
+                                            color: theme.palette.secondary.contrastText,
+                                            backgroundColor: theme.palette.secondary.main,
+                                            '&:hover': {
+                                                backgroundColor: theme.palette.secondary.dark,
+                                            },
+                                        }}
+                                    >
+                                        {isCreatingPipeline ? (
+                                            <CircularProgress size={24} color="inherit" />
+                                        ) : (
+                                            <RocketLaunchIcon />
+                                        )}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="contained"
+                                        color="secondary"
+                                        startIcon={isCreatingPipeline ? <CircularProgress size={24} color="inherit" /> : <RocketLaunchIcon />}
+                                        onClick={() => handleCreatePipeline(hardcodedPipelineData)}
+                                        disabled={isCreatingPipeline}
+                                        sx={{
+                                            borderRadius: '8px',
+                                            textTransform: 'none',
+                                            px: 3,
+                                        }}
+                                    >
+                                        {isCreatingPipeline ? 'Deploying Image Pipeline' : 'Deploy Image Pipeline'}
+                                    </Button>
+                                )}
+                            </Tooltip>
+
+                            <Tooltip title="Add New Pipeline">
+                                {isSmallScreen ? (
+                                    <Button
+                                        onClick={handleAddNew}
+                                        sx={{
+                                            minWidth: 0,
+                                            p: 1,
+                                            borderRadius: '50%',
+                                            color: theme.palette.primary.contrastText,
+                                            backgroundColor: theme.palette.primary.main,
+                                            '&:hover': {
+                                                backgroundColor: theme.palette.primary.dark,
+                                            },
+                                        }}
+                                    >
+                                        <AddIcon />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<AddIcon />}
+                                        onClick={handleAddNew}
+                                        sx={{
+                                            borderRadius: '8px',
+                                            textTransform: 'none',
+                                            px: 3,
+                                        }}
+                                    >
+                                        Add New Pipeline
+                                    </Button>
+                                )}
+                            </Tooltip>
+
+
+                        </Stack>
+                    </Box>
+
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                    <TextField
+                        size="small"
+                        placeholder="Filter by name"
+                        value={filters.name}
+                        onChange={(e) => setFilters(prev => ({ ...prev, name: e.target.value }))}
+                        sx={{
+                            minWidth: 200,
+                            '& .MuiOutlinedInput-root': {
+                                borderRadius: '8px',
+                            }
+                        }}
+                    />
+                    <FormControl size="small" sx={{
+                        minWidth: 120,
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: '8px',
+                        }
+                    }}>
+                        <InputLabel>Type</InputLabel>
+                        <Select
+                            value={filters.type}
+                            label="Type"
+                            onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                        >
+                            <MenuItem value="">All</MenuItem>
+                            <MenuItem value={pipelineTypes.INGEST}>Ingest Triggered</MenuItem>
+                            <MenuItem value={pipelineTypes.MANUAL}>Manually Triggered</MenuItem>
+                            <MenuItem value={pipelineTypes.ANALYSIS}>Analysis Triggered</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{
+                        minWidth: 120,
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: '8px',
+                        }
+                    }}>
+                        <InputLabel>System</InputLabel>
+                        <Select
+                            value={filters.system}
+                            label="System"
+                            onChange={(e) => setFilters(prev => ({ ...prev, system: e.target.value }))}
+                        >
+                            <MenuItem value="">All</MenuItem>
+                            <MenuItem value="true">Yes</MenuItem>
+                            <MenuItem value="false">No</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
             </Box>
-            <Box sx={{ width: '80%', margin: '0 auto' }}>
-                <TextField
-                    label="Filter Pipelines"
-                    variant="outlined"
-                    fullWidth
-                    value={filterText}
-                    onChange={(e) => setFilterText(e.target.value)}
-                    sx={{ mb: 2 }}
-                />
-                <TableContainer component={Paper}>
-                    <Table sx={{ minWidth: 650 }} aria-label="pipelines table">
+
+            <Paper elevation={0} sx={{
+                flex: 1,
+                borderRadius: '12px',
+                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                overflow: 'hidden',
+                backgroundColor: theme.palette.background.paper,
+            }}>
+                <TableContainer sx={{ maxHeight: 'calc(100vh - 300px)' }}>
+                    <Table stickyHeader>
                         <TableHead>
-                            <TableRow>
-                                <TableCell>
-                                    <TableSortLabel
-                                        active={sortColumn === 'name'}
-                                        direction={sortColumn === 'name' ? sortOrder : 'asc'}
-                                        onClick={() => handleSort('name')}
-                                    >
-                                        Name
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell align="right">
-                                    <TableSortLabel
-                                        active={sortColumn === 'creationDate'}
-                                        direction={sortColumn === 'creationDate' ? sortOrder : 'asc'}
-                                        onClick={() => handleSort('creationDate')}
-                                    >
-                                        Creation Date
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell align="right">
-                                    <TableSortLabel
-                                        active={sortColumn === 'type'}
-                                        direction={sortColumn === 'type' ? sortOrder : 'asc'}
-                                        onClick={() => handleSort('type')}
-                                    >
-                                        Type
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell align="right">Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {sortedPipelines.map((pipeline) => (
-                                <TableRow
-                                    key={pipeline.id}
-                                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                                >
-                                    <TableCell component="th" scope="row">
-                                        {pipeline.name}
-                                    </TableCell>
-                                    <TableCell align="right">{pipeline.creationDate}</TableCell>
-                                    <TableCell align="right">
-                                        <Chip
-                                            label={pipeline.type}
-                                            color={getChipColor(pipeline.type)}
-                                            size="small"
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {pipeline.id !== 1 && (
-                                            <Tooltip title="Edit Pipeline">
-                                                <IconButton onClick={() => handleEdit(pipeline.id)} size="small">
-                                                    <EditIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                        {pipeline.id === 1 && (
-                                            <Tooltip title="Deploy Pipeline">
-                                                <IconButton
-                                                    onClick={() => handleCreatePipeline(hardcodedPipelineData)}
-                                                    size="small"
-                                                    disabled={isCreatingPipeline}
+                            {table.getHeaderGroups().map(headerGroup => (
+                                <TableRow key={headerGroup.id}>
+                                    {headerGroup.headers.map(header => (
+                                        <TableCell
+                                            key={header.id}
+                                            sx={{
+                                                backgroundColor: theme.palette.background.paper,
+                                                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                py: 2,
+                                            }}
+                                        >
+                                            {header.isPlaceholder ? null : (
+                                                <TableSortLabel
+                                                    active={header.column.getIsSorted() !== false}
+                                                    direction={header.column.getIsSorted() === 'desc' ? 'desc' : 'asc'}
+                                                    onClick={header.column.getToggleSortingHandler()}
+                                                    sx={{
+                                                        fontWeight: 600,
+                                                        color: theme.palette.text.primary,
+                                                    }}
                                                 >
-                                                    {isCreatingPipeline ? (
-                                                        <CircularProgress size={24} />
-                                                    ) : (
-                                                        <RocketLaunchIcon />
+                                                    {flexRender(
+                                                        header.column.columnDef.header,
+                                                        header.getContext()
                                                     )}
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                    </TableCell>
+                                                </TableSortLabel>
+                                            )}
+                                        </TableCell>
+                                    ))}
                                 </TableRow>
                             ))}
+                        </TableHead>
+                        <TableBody>
+                            {isLoading || !data ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                        <CircularProgress />
+                                    </TableCell>
+                                </TableRow>
+                            ) : table.getRowModel().rows.map(row => (
+                                <TableRow
+                                    key={row.id}
+                                    sx={{
+                                        '&:hover': {
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.02),
+                                        },
+                                        transition: 'background-color 0.2s ease',
+                                    }}
+                                >
+                                    {row.getVisibleCells().map(cell => (
+                                        <TableCell
+                                            key={cell.id}
+                                            sx={{
+                                                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                py: 2,
+                                            }}
+                                        >
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))}
+                            {!isLoading && data && table.getRowModel().rows.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                        No pipelines found
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
+
                     </Table>
                 </TableContainer>
-            </Box>
+
+                <Box sx={{
+                    p: 2,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                }}>
+                    {hasNextPage && (
+                        <Button
+                            onClick={() => fetchNextPage()}
+                            disabled={!hasNextPage || isFetchingNextPage}
+                            sx={{
+                                textTransform: 'none',
+                                borderRadius: '8px',
+                                color: theme.palette.text.secondary,
+                                '&:hover': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                },
+                            }}
+                        >
+                            {isFetchingNextPage
+                                ? t('common.loading')
+                                : t('common.loadMore')}
+                        </Button>
+                    )}
+                </Box>
+            </Paper>
             <Snackbar
                 open={snackbar.open}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
@@ -570,6 +784,7 @@ const PipelinesPage: React.FC = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
         </Box>
     );
 };

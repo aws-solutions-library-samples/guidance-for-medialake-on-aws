@@ -1,3 +1,26 @@
+export interface Pipeline {
+    id: string;
+    name: string;
+    system: boolean;
+    type: string;
+    createdAt: string;
+    updatedAt: string;
+    eventBridgeRuleArn: string;
+    roleArn: string;
+    queueUrl: string;
+    queueArn: string;
+    stateMachineArn: string;
+    triggerLambdaArn: string;
+}
+
+export interface PipelineFilters {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
 export interface StepFunctionDefinition {
     Comment?: string;
     StartAt: string;
@@ -47,4 +70,112 @@ export interface PipelineDetailsResponse {
         details: PipelineDetails;
         metrics: PipelineMetrics;
     };
+}
+
+
+// Pipelines
+
+export interface PipelineNode {
+    id: string;
+    type: string;
+    position: {
+        x: number;
+        y: number;
+    };
+    data: {
+        id: string;
+        type: string;
+        label: string;
+        icon: {
+            key: null;
+            ref: null;
+            props: {
+                size: number;
+            };
+            _owner: null;
+        };
+        inputTypes: string[];
+        outputTypes: string[];
+    };
+    width: number;
+    height: number;
+    positionAbsolute: {
+        x: number;
+        y: number;
+    };
+    selected?: boolean;
+    dragging?: boolean;
+}
+
+export interface PipelineEdge {
+    source: string;
+    sourceHandle: null;
+    target: string;
+    targetHandle: null;
+    type: string;
+    data: {
+        text: string;
+    };
+    id: string;
+}
+
+export interface PipelineViewport {
+    x: number;
+    y: number;
+    zoom: number;
+}
+
+
+export interface CreatePipelineRequest {
+    name: string;
+    type: string;
+    system: boolean;
+    definition: {
+        nodes: PipelineNode[];
+        edges: PipelineEdge[];
+        viewport: PipelineViewport;
+    };
+}
+
+export interface PipelineResponse {
+    status: string;
+    message: string;
+    data: {
+        searchMetadata: PipelineSearchMetadata;
+        s: Pipeline[]; // If the API actually returns 's'
+        error?: string;
+        // ... other fields from the original PipelineResponse ...
+        id?: string;
+        name?: string;
+        type?: string;
+        createdAt?: string;
+        updatedAt?: string;
+        definition?: {
+            nodes: PipelineNode[];
+            edges: PipelineEdge[];
+            viewport: PipelineViewport;
+        };
+        queueUrl?: string;
+        queueArn?: string;
+        eventBridgeRuleArn?: string;
+        triggerLambdaArn?: string;
+        stateMachineArn?: string;
+        roleArn?: string;
+    };
+}
+
+export interface Pipeline extends PipelineResponse { }
+
+export interface PipelineListResponse {
+    status: string;
+    message: string;
+    data: {
+        pipelines: PipelineResponse[];
+    }
+}
+
+export interface PipelineSearchMetadata {
+    totalResults: number;
+    pageSize: number;
+    nextToken?: string;
 }

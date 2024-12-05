@@ -93,9 +93,16 @@ class ApiGatewayPipelinesConstruct(Construct):
                 entry="lambdas/api/pipelines/get_pipelines",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                    "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
                 },
             ),
+        )
+
+        get_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:Scan"],
+                resources=[self._pipelnes_dynamodb_table.table_arn],
+            )
         )
 
         pipelines_resource.add_method(
@@ -114,7 +121,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
-                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
@@ -185,7 +192,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:PutItem", "dynamodb:Scan"],
-                resources=["*"],
+                resources=[self._pipelnes_dynamodb_table.table_arn],
             )
         )
 
@@ -223,10 +230,10 @@ class ApiGatewayPipelinesConstruct(Construct):
         # GET /api/pipelines/{pipelineId}
         get_pipeline_id_lambda_config = LambdaConfig(
             name="GetPipelineIdHandler",
-            entry=("lambdas/api/pipelines/rp_pipeline_id/get_pipeline_id"),
+            entry=("lambdas/api/pipelines/rp_pipelineId/get_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         get_pipeline_id_handler = Lambda(
@@ -245,10 +252,10 @@ class ApiGatewayPipelinesConstruct(Construct):
         # PUT /api/pipelines/{pipelineId}
         put_pipeline_id_lambda_config = LambdaConfig(
             name="PutPipelineIdHandler",
-            entry=("lambdas/api/pipelines/rp_pipeline_id/put_pipeline_id"),
+            entry=("lambdas/api/pipelines/rp_pipelineId/put_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         put_pipeline_id_handler = Lambda(
@@ -267,10 +274,10 @@ class ApiGatewayPipelinesConstruct(Construct):
         # DELETE /api/pipelines/{pipelineId}
         del_pipeline_id_lambda_config = LambdaConfig(
             name="DeletePipelineIdHandler",
-            entry=("lambdas/api/pipelines/rp_pipeline_id/del_pipeline_id"),
+            entry=("lambdas/api/pipelines/rp_pipelineId/del_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIALAKE_PIPELINE_TABLE": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
             },
         )
         del_pipeline_id_handler = Lambda(
