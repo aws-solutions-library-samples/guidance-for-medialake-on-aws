@@ -5,6 +5,9 @@ import time
 import boto3
 from decimal import Decimal
 from datetime import datetime
+from contextlib import ExitStack
+from botocore.exceptions import ClientError
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
@@ -467,226 +470,283 @@ def check_resource_exists(
         raise
 
 
+def rollback_resources(resources_to_delete):
+    for resource_type, resource_id in resources_to_delete:
+        try:
+            if resource_type == "sqs":
+                sqs_client.delete_queue(QueueUrl=resource_id)
+            elif resource_type == "eventbridge":
+                eventbridge = boto3.client("events")
+                eventbridge.delete_rule(Name=resource_id)
+            elif resource_type == "iam_role":
+                # Detach policies and delete role
+                for policy in iam_client.list_attached_role_policies(
+                    RoleName=resource_id
+                )["AttachedPolicies"]:
+                    iam_client.detach_role_policy(
+                        RoleName=resource_id, PolicyArn=policy["PolicyArn"]
+                    )
+                iam_client.delete_role(RoleName=resource_id)
+            elif resource_type == "lambda":
+                lambda_client.delete_function(FunctionName=resource_id)
+            elif resource_type == "step_function":
+                sfn_client.delete_state_machine(stateMachineArn=resource_id)
+            logger.info(f"Rolled back {resource_type}: {resource_id}")
+        except ClientError as e:
+            logger.error(
+                f"Failed to roll back {resource_type}: {resource_id}. Error: {str(e)}"
+            )
+
+
 @app.post("/pipelines")
 def create_pipeline(createpipeline: S3Pipeline) -> dict:
-    try:
+    resources_to_delete = []
 
-        # Generate names for resources
-        queue_name = f"medialake-pipeline-{createpipeline.name}"
-        rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
-        role_name = f"medialake-pipeline-{createpipeline.name}-role"
-        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        image_proxy_lambda_name = (
-            f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        )
-        pipeline_trigger_lambda_name = (
-            f"medialake-pipeline-{createpipeline.name}-executor"
-        )
+    with ExitStack() as stack:
+        stack.callback(rollback_resources, resources_to_delete)
 
-        # Check if resources exist
-        resources_exist, error_message = check_resource_exists(
-            createpipeline.name,
-            queue_name,
-            rule_name,
-            role_name,
-            state_machine_name,
-            [
-                image_proxy_lambda_name,
-                pipeline_trigger_lambda_name,
-                f"medialake-pipeline-{createpipeline.name}-metadata",  # Add this
-            ],
-        )
+        try:
 
-        if resources_exist:
-            return {
-                "status": "409",
-                "message": "Resource conflict",
-                "data": {"error": error_message},
+            # Generate names for resources
+            queue_name = f"medialake-pipeline-{createpipeline.name}"
+            rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
+            role_name = f"medialake-pipeline-{createpipeline.name}-role"
+            state_machine_name = f"medialake-pipeline-{createpipeline.name}"
+            image_proxy_lambda_name = (
+                f"medialake-pipeline-{createpipeline.name}-image-proxy"
+            )
+            pipeline_trigger_lambda_name = (
+                f"medialake-pipeline-{createpipeline.name}-executor"
+            )
+
+            # Check if resources exist
+            resources_exist, error_message = check_resource_exists(
+                createpipeline.name,
+                queue_name,
+                rule_name,
+                role_name,
+                state_machine_name,
+                [
+                    image_proxy_lambda_name,
+                    pipeline_trigger_lambda_name,
+                    f"medialake-pipeline-{createpipeline.name}-metadata",  # Add this
+                ],
+            )
+
+            if resources_exist:
+                return {
+                    "status": "409",
+                    "message": "Resource conflict",
+                    "data": {"error": error_message},
+                }
+
+            # Generate unique ID and timestamps
+            pipeline_id = str(uuid.uuid4())
+            current_time = datetime.utcnow().isoformat(timespec="seconds")
+            deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
+            pipeline_trigger_deployment_zip = os.environ.get("PIPELINE_TRIGGER_LAMBDA")
+            image_metadata_extractor_deployment_zip = os.environ.get(
+                "IMAGE_METADATA_EXTRACTOR_LAMBDA"
+            )
+            image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
+            ingest_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
+            # exiftool_layer_arn = os.environ.get("EXIFTOOL_LAYER_ARN")
+            # exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
+
+            # powertools_layer_arn = os.environ.get("POWERTOOLS__LAYER_ARN")
+
+            # Common tags for all resources
+            tags = {
+                "medialake": "true",
+                "pipeline_id": pipeline_id,
+                "pipeline_name": createpipeline.name,
             }
 
-        # Generate unique ID and timestamps
-        pipeline_id = str(uuid.uuid4())
-        current_time = datetime.utcnow().isoformat(timespec="seconds")
-        deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
-        pipeline_trigger_deployment_zip = os.environ.get("PIPELINE_TRIGGER_LAMBDA")
-        image_metadata_extractor_deployment_zip = os.environ.get(
-            "IMAGE_METADATA_EXTRACTOR_LAMBDA"
-        )
-        image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
-        ingest_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
-        exiftool_layer_arn = os.environ.get("EXIFTOOL_LAYER_ARN")
-        # exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
+            # Create SQS FIFO Queue
+            queue_name = f"medialake-pipeline-{createpipeline.name}"
+            queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+            resources_to_delete.append(("sqs", queue_url))
 
-        # powertools_layer_arn = os.environ.get("POWERTOOLS__LAYER_ARN")
+            # Create EventBridge rule
+            rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
+            rule_arn = create_eventbridge_rule(
+                rule_name, ingest_event_bus_name, queue_arn, tags
+            )
+            resources_to_delete.append(("eventbridge", rule_name))
 
-        # Common tags for all resources
-        tags = {
-            "medialake": "true",
-            "pipeline_id": pipeline_id,
-            "pipeline_name": createpipeline.name,
-        }
+            # Create IAM Role for Lambda and Step Functions
+            state_machine_name = f"medialake-pipeline-{createpipeline.name}"
 
-        # Create SQS FIFO Queue
-        queue_name = f"medialake-pipeline-{createpipeline.name}"
-        queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+            role_arn = create_pipeline_role(
+                role_name, queue_arn, state_machine_name, tags
+            )
+            resources_to_delete.append(("iam_role", role_name))
 
-        # Create EventBridge rule
-        rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
-        rule_arn = create_eventbridge_rule(
-            rule_name, ingest_event_bus_name, queue_arn, tags
-        )
+            # Add this before creating the image proxy lambda
+            image_metadata_extractor_lambda_function_name = (
+                f"medialake-pipeline-{createpipeline.name}-metadata"
+            )
 
-        # Create IAM Role for Lambda and Step Functions
-        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-        role_arn = create_pipeline_role(role_name, queue_arn, state_machine_name, tags)
+            image_proxy_lambda_function_name = (
+                f"medialake-pipeline-{createpipeline.name}-image-proxy"
+            )
 
-        # Add this before creating the image proxy lambda
-        image_metadata_extractor_lambda_function_name = (
-            f"medialake-pipeline-{createpipeline.name}-metadata"
-        )
+            # Create metadata extractor lambda
+            image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
+                lambda_client,
+                image_metadata_extractor_lambda_function_name,
+                role_arn,
+                deployment_bucket,
+                image_metadata_extractor_deployment_zip,
+                {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+                tags,
+            )
+            resources_to_delete.append(
+                ("lambda", image_metadata_extractor_lambda_function_name)
+            )
 
-        image_proxy_lambda_function_name = (
-            f"medialake-pipeline-{createpipeline.name}-image-proxy"
-        )
+            # Create image proxy lambda
+            image_proxy_lambda_response = create_image_proxy_lambda(
+                lambda_client,
+                image_proxy_lambda_function_name,
+                role_arn,
+                deployment_bucket,
+                image_proxy_deployment_zip,
+                {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+                tags,
+            )
+            resources_to_delete.append(("lambda", image_proxy_lambda_function_name))
 
-        # Create metadata extractor lambda
-        image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
-            lambda_client,
-            image_metadata_extractor_lambda_function_name,
-            role_arn,
-            deployment_bucket,
-            image_metadata_extractor_deployment_zip,
-            exiftool_layer_arn,
-            {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
-            tags,
-        )
+            # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
 
-        # Create image proxy lambda
-        image_proxy_lambda_response = create_image_proxy_lambda(
-            lambda_client,
-            image_proxy_lambda_function_name,
-            role_arn,
-            deployment_bucket,
-            image_proxy_deployment_zip,
-            {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
-            tags,
-        )
+            bucket_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "AllowLambdaWriteAccess",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "lambda.amazonaws.com"  # Use service principal
+                        },
+                        "Action": ["s3:PutObject", "s3:PutObjectAcl"],
+                        "Resource": [
+                            f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
+                            f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
+                        ],
+                        "Condition": {
+                            "ArnLike": {
+                                "aws:SourceArn": image_proxy_lambda_response[
+                                    "FunctionArn"
+                                ]
+                            }
+                        },
+                    }
+                ],
+            }
+            s3_client.put_bucket_policy(
+                Bucket=os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
+                Policy=json.dumps(bucket_policy),
+            )
 
-        # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
+            # Create Step Function
+            state_machine_name = f"medialake-pipeline-{createpipeline.name}"
 
-        bucket_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "AllowLambdaWriteAccess",
-                    "Effect": "Allow",
-                    "Principal": {
-                        "Service": "lambda.amazonaws.com"  # Use service principal
-                    },
-                    "Action": ["s3:PutObject", "s3:PutObjectAcl"],
-                    "Resource": [
-                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}/*",
-                        f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
-                    ],
-                    "Condition": {
-                        "ArnLike": {
-                            "aws:SourceArn": image_proxy_lambda_response["FunctionArn"]
-                        }
-                    },
-                }
-            ],
-        }
-        s3_client.put_bucket_policy(
-            Bucket=os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
-            Policy=json.dumps(bucket_policy),
-        )
+            # Get state machine definition
 
-        # Create Step Function
-        state_machine_name = f"medialake-pipeline-{createpipeline.name}"
+            state_machine_definition = get_state_machine_definition(
+                image_metadata_extractor_lambda_response["FunctionArn"],
+                image_proxy_lambda_response["FunctionArn"],
+                createpipeline.name,
+                os.environ.get("MEDIALAKE_ASSET_TABLE"),
+                os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
+            )
 
-        # Get state machine definition
+            state_machine_arn = create_state_machine(
+                state_machine_name, role_arn, state_machine_definition, tags
+            )
+            resources_to_delete.append(("step_function", state_machine_arn))
 
-        state_machine_definition = get_state_machine_definition(
-            image_metadata_extractor_lambda_response["FunctionArn"],
-            image_proxy_lambda_response["FunctionArn"],
-            createpipeline.name,
-            os.environ.get("MEDIALAKE_ASSET_TABLE"),
-            os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
-        )
+            # Create Lambda Function
+            pipeline_trigger_lambda_function_name = (
+                f"medialake-pipeline-{createpipeline.name}-executor"
+            )
+            pipeline_trigger_lambda_response = lambda_client.create_function(
+                FunctionName=pipeline_trigger_lambda_function_name,
+                Runtime="python3.12",
+                Role=role_arn,
+                Handler="index.lambda_handler",
+                Code={
+                    "S3Bucket": deployment_bucket,
+                    "S3Key": pipeline_trigger_deployment_zip,
+                },
+                Environment={"Variables": {"STEP_FUNCTION_ARN": state_machine_arn}},
+                Tags=tags,
+            )
+            resources_to_delete.append(
+                ("lambda", pipeline_trigger_lambda_function_name)
+            )
 
-        state_machine_arn = create_state_machine(
-            state_machine_name, role_arn, state_machine_definition, tags
-        )
+            if not wait_for_iam_role_propagation(iam_client, role_name):
+                raise Exception(f"Role {role_name} is not ready in time")
+            # Add SQS trigger to Lambda
+            event_source_mapping = lambda_client.create_event_source_mapping(
+                EventSourceArn=queue_arn,
+                FunctionName=pipeline_trigger_lambda_function_name,
+                Enabled=True,
+            )
+            resources_to_delete.append(
+                ("event_source_mapping", event_source_mapping["UUID"])
+            )
 
-        # Create Lambda Function
-        pipeline_trigger_lambda_function_name = (
-            f"medialake-pipeline-{createpipeline.name}-executor"
-        )
-        pipeline_trigger_lambda_response = lambda_client.create_function(
-            FunctionName=pipeline_trigger_lambda_function_name,
-            Runtime="python3.12",
-            Role=role_arn,
-            Handler="index.lambda_handler",
-            Code={
-                "S3Bucket": deployment_bucket,
-                "S3Key": pipeline_trigger_deployment_zip,
-            },
-            Environment={"Variables": {"STEP_FUNCTION_ARN": state_machine_arn}},
-            Tags=tags,
-        )
+            # Save pipeline details to DynamoDB
+            table_name = os.environ.get("PIPELINES_TABLE_NAME")
+            if not table_name:
+                raise ValueError("PIPELINES_TABLE_NAME environment variable not set")
 
-        # Add SQS trigger to Lambda
-        lambda_client.create_event_source_mapping(
-            EventSourceArn=queue_arn,
-            FunctionName=pipeline_trigger_lambda_function_name,
-            Enabled=True,
-        )
+            # Convert the definition's float values to Decimal
+            definition = float_to_decimal(createpipeline.definition)
 
-        # Save pipeline details to DynamoDB
-        table_name = os.environ.get("PIPELINES_TABLE_NAME")
-        if not table_name:
-            raise ValueError("PIPELINES_TABLE_NAME environment variable not set")
+            table = dynamodb.Table(table_name)
+            pipeline_item = {
+                "id": pipeline_id,
+                "name": createpipeline.name,
+                "system": createpipeline.system,
+                "type": createpipeline.type,
+                "createdAt": current_time,
+                "updatedAt": current_time,
+                "definition": definition,
+                "queueUrl": queue_url,
+                "queueArn": queue_arn,
+                "eventBridgeRuleArn": rule_arn,
+                "triggerLambdaArn": pipeline_trigger_lambda_response["FunctionArn"],
+                "stateMachineArn": state_machine_arn,
+                "roleArn": role_arn,
+            }
 
-        # Convert the definition's float values to Decimal
-        definition = float_to_decimal(createpipeline.definition)
+            table.put_item(Item=pipeline_item)
 
-        table = dynamodb.Table(table_name)
-        pipeline_item = {
-            "id": pipeline_id,
-            "name": createpipeline.name,
-            "system": createpipeline.system,
-            "type": createpipeline.type,
-            "createdAt": current_time,
-            "updatedAt": current_time,
-            "definition": definition,
-            "queueUrl": queue_url,
-            "queueArn": queue_arn,
-            "eventBridgeRuleArn": rule_arn,
-            "triggerLambdaArn": pipeline_trigger_lambda_response["FunctionArn"],
-            "stateMachineArn": state_machine_arn,
-            "roleArn": role_arn,
-        }
+            logger.info(
+                f"Created pipeline '{createpipeline.name}' with ID {pipeline_id}"
+            )
+            stack.pop_all()
 
-        table.put_item(Item=pipeline_item)
+            return {
+                "status": "200",
+                "message": "Pipeline created successfully",
+                "data": pipeline_item,
+            }
 
-        logger.info(f"Created pipeline '{createpipeline.name}' with ID {pipeline_id}")
-
-        return {
-            "status": "200",
-            "message": "Pipeline created successfully",
-            "data": pipeline_item,
-        }
-
-    except Exception as e:
-        logger.exception(f"Failed to create pipeline: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": {
-                "status": "500",
-                "message": f"Failed to create pipeline: {str(e)}",
-                "data": {},
-            },
-        }
+        except Exception as e:
+            logger.exception(f"Failed to create pipeline: {str(e)}")
+            raise  # Re-raise the exception to trigger the rollback
+    return {
+        "statusCode": 500,
+        "body": {
+            "status": "500",
+            "message": f"Failed to create pipeline: {str(e)}",
+            "data": {},
+        },
+    }
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)

@@ -17,7 +17,8 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
-from medialake_constructs.shared_constructs.lambda_layers import ExiftoolLayer
+
+# from medialake_constructs.shared_constructs.lambda_layers import ExiftoolLayer
 
 
 from dataclasses import dataclass
@@ -49,13 +50,14 @@ class ApiGatewayPipelinesConstruct(Construct):
     ) -> None:
         super().__init__(scope, id)
 
-        exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
+        # exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "ImageMetadataExtractorLambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
             code_path=["lambdas", "pipelines", "image_metadata_extractor"],
+            runtime="nodejs22.x",
         )
 
         self.image_proxy_lambda_deployment = LambdaDeployment(
@@ -129,7 +131,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "AWS_ACCOUNT_ID": scope.account,
-                "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn,
+                # "EXIFTOOL_LAYER_ARN": exiftool_layer.layer_version.layer_version_arn,
             },
         )
         post_pipelines_handler = Lambda(

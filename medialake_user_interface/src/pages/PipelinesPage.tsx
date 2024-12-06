@@ -242,9 +242,9 @@ const PipelinesPage: React.FC = () => {
                     message: 'Pipeline created successfully',
                     severity: 'success'
                 });
-                // Refetch the data after successful pipeline creation
                 refetch();
             } else {
+                // Handle other status codes, including 500
                 setSnackbar({
                     open: true,
                     message: response.message || 'Unknown response from server',
@@ -258,7 +258,11 @@ const PipelinesPage: React.FC = () => {
             if (err.response) {
                 console.log('Error response:', err.response);
                 const { status, data } = err.response;
-                if (status === 409) {
+                if (status === 500 && data.body) {
+                    // Handle the specific 500 error response
+                    const bodyData = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+                    errorMessage = bodyData.message || 'An unknown error occurred';
+                } else if (status === 409) {
                     errorMessage = `${data.message}: ${data.data?.error || ''}`;
                 } else if (data.message) {
                     errorMessage = data.message;
@@ -276,6 +280,7 @@ const PipelinesPage: React.FC = () => {
             setIsCreatingPipeline(false);
         }
     };
+
 
 
 

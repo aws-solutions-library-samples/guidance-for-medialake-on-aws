@@ -66,22 +66,44 @@ def create_metadata_extractor_lambda(
     role_arn: str,
     deployment_bucket: str,
     deployment_zip: str,
-    exiftool_layer_arn: str,
     environment_variables: dict,
     tags: dict,
 ) -> dict:
     """Creates the metadata extractor lambda function"""
     return lambda_client.create_function(
         FunctionName=function_name,
-        Runtime="python3.12",
+        Runtime="nodejs22.x",
         Role=role_arn,
         Timeout=900,
         Handler="index.lambda_handler",
         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Layers=[exiftool_layer_arn],
         Environment={"Variables": environment_variables},
         Tags=tags,
     )
+
+
+# def create_metadata_extractor_lambda(
+#     lambda_client,
+#     function_name: str,
+#     role_arn: str,
+#     deployment_bucket: str,
+#     deployment_zip: str,
+#     exiftool_layer_arn: str,
+#     environment_variables: dict,
+#     tags: dict,
+# ) -> dict:
+#     """Creates the metadata extractor lambda function"""
+#     return lambda_client.create_function(
+#         FunctionName=function_name,
+#         Runtime="python3.12",
+#         Role=role_arn,
+#         Timeout=900,
+#         Handler="index.lambda_handler",
+#         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+#         Layers=[exiftool_layer_arn],
+#         Environment={"Variables": environment_variables},
+#         Tags=tags,
+#     )
 
 
 def create_image_proxy_lambda(
