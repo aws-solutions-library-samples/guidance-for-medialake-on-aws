@@ -174,6 +174,16 @@ class BaseInfrastructureStack(Stack):
             self, "IngestEventBus", props=ingest_event_bus_config
         )
 
+        self._pipelne_table = DynamoDB(
+            self,
+            "PipelinesTable",
+            props=DynamoDBProps(
+                name=f"medialake_pipeline_table",
+                partition_key_name="id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+            ),
+        )
+
         self._asset_table = DynamoDB(
             self,
             "MediaLakeAssetTable",
@@ -521,6 +531,17 @@ class BaseInfrastructureStack(Stack):
         """
 
         return self._asset_table
+
+    @property
+    def pipeline_table(self) -> dynamodb.TableV2:
+        """
+        Returns the DynamoDB table used for storing pipelines.
+
+        Returns:
+            dynamodb.TableV2: The configured DynamoDB table
+        """
+
+        return self._pipelne_table
 
     @property
     def asset_table_name(self) -> str:

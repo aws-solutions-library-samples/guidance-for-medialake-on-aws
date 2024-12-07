@@ -36,6 +36,10 @@ from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
 )
+from medialake_stacks.pipeline_nodes_stack import (
+    PipelineNodesStack,
+    PipelineNodesStackProps,
+)
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
@@ -94,6 +98,15 @@ class MediaLakeStack(cdk.Stack):
         )
         self._pipelines_executions_stack.node.add_dependency(cleanup_stack)
 
+        self._pipeline_nodes_stack = PipelineNodesStack(
+            self,
+            "PipelineNodes",
+            props=PipelineNodesStackProps(
+                asset_table=base_infrastructure.asset_table,
+            ),
+        )
+        self._pipeline_nodes_stack.node.add_dependency(base_infrastructure)
+
         # Create connectors construct
         connectors = ConnectorsConstruct(
             self,
@@ -127,6 +140,7 @@ class MediaLakeStack(cdk.Stack):
             media_assets_bucket=base_infrastructure.media_assets_bucket,
             props=ApiGatewayPipelinesProps(
                 asset_table=base_infrastructure.asset_table,
+                pipeline_table=base_infrastructure.pipeline_table,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,

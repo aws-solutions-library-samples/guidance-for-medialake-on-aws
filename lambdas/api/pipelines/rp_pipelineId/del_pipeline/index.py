@@ -35,6 +35,9 @@ def delete_lambda_function(function_arn: str):
             for mapping in mappings.get("EventSourceMappings", []):
                 try:
                     lambda_client.delete_event_source_mapping(UUID=mapping["UUID"])
+                    logger.info(
+                        f"Successfully deleted event source mapping {mapping['UUID']}"
+                    )
                 except ClientError as e:
                     if e.response["Error"]["Code"] != "ResourceNotFoundException":
                         raise
@@ -58,6 +61,9 @@ def delete_state_machine(state_machine_arn: str):
     """Delete Step Functions state machine"""
     try:
         sfn_client.delete_state_machine(stateMachineArn=state_machine_arn)
+        logger.info(
+            f"Successfully deleted Step Functions state machine {state_machine_arn}"
+        )
     except ClientError as e:
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
@@ -68,6 +74,7 @@ def delete_sqs_queue(queue_url: str):
     """Delete SQS queue"""
     try:
         sqs_client.delete_queue(QueueUrl=queue_url)
+        logger.info(f"Successfully deleted SQS queue {queue_url}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "AWS.SimpleQueueService.NonExistentQueue":
             raise
@@ -141,6 +148,9 @@ def delete_iam_role(role_arn: str):
                     iam_client.detach_role_policy(
                         RoleName=role_name, PolicyArn=policy["PolicyArn"]
                     )
+                    logger.info(
+                        f"Successfully detached managed policy {policy['PolicyArn']} from role {role_name}"
+                    )
                 except ClientError as e:
                     if e.response["Error"]["Code"] != "NoSuchEntity":
                         raise
@@ -158,6 +168,9 @@ def delete_iam_role(role_arn: str):
                     iam_client.delete_role_policy(
                         RoleName=role_name, PolicyName=policy_name
                     )
+                    logger.info(
+                        f"Successfully deleted inline policy {policy_name} from role {role_name}"
+                    )
                 except ClientError as e:
                     if e.response["Error"]["Code"] != "NoSuchEntity":
                         raise
@@ -169,6 +182,7 @@ def delete_iam_role(role_arn: str):
 
         # Delete the role
         iam_client.delete_role(RoleName=role_name)
+        logger.info(f"Successfully deleted IAM role {role_arn}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "NoSuchEntity":
             raise
@@ -237,11 +251,14 @@ def delete_pipeline(pipeline_id: str):
                     deletion_errors.append(f"Failed to delete SQS queue: {str(e)}")
 
         # Delete EventBridge rule
-        if "eventBridgeRuleArn" in pipeline:
+        if (
+            "eventBridgeDetails" in pipeline
+            and "eventBridgeRuleArn" in pipeline["eventBridgeDetails"]
+        ):
             try:
                 delete_eventbridge_rule(
-                    pipeline["eventBridgeRuleArn"],
-                    os.environ.get("INGEST_EVENT_BUS", "default"),
+                    pipeline["eventBridgeDetails"]["eventBridgeRuleArn"],
+                    pipeline["eventBridgeDetails"].get("parentEventBusName", "default"),
                 )
             except Exception as e:
                 if (

@@ -29,6 +29,7 @@ class ApiGatewayPipelinesProps:
     """Configuration for Lambda function creation."""
 
     asset_table: dynamodb.TableV2
+    pipeline_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
@@ -52,36 +53,26 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # exiftool_layer = ExiftoolLayer(self, "ExiftoolLayer")
 
-        self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
-            self,
-            "ImageMetadataExtractorLambdaDeployment",
-            destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "image_metadata_extractor"],
-            runtime="nodejs22.x",
-        )
+        # self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
+        #     self,
+        #     "ImageMetadataExtractorLambdaDeployment",
+        #     destination_bucket=iac_assets_bucket.bucket,
+        #     code_path=["lambdas", "pipelines", "image_metadata_extractor"],
+        #     runtime="nodejs22.x",
+        # )
 
-        self.image_proxy_lambda_deployment = LambdaDeployment(
-            self,
-            "ImageProxyLambdaDeployment",
-            destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "image_proxy"],
-        )
+        # self.image_proxy_lambda_deployment = LambdaDeployment(
+        #     self,
+        #     "ImageProxyLambdaDeployment",
+        #     destination_bucket=iac_assets_bucket.bucket,
+        #     code_path=["lambdas", "pipelines", "image_proxy"],
+        # )
 
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",
             destination_bucket=iac_assets_bucket.bucket,
             code_path=["lambdas", "pipelines", "pipeline_trigger"],
-        )
-
-        self._pipelnes_dynamodb_table = DynamoDB(
-            self,
-            "PipelinesTable",
-            props=DynamoDBProps(
-                name=f"medialake_pipeline_table_{id}",
-                partition_key_name="id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-            ),
         )
 
         # Create pipelines resource
@@ -95,7 +86,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 entry="lambdas/api/pipelines/get_pipelines",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                    "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
+                    "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 },
             ),
         )
@@ -103,7 +94,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         get_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Scan"],
-                resources=[self._pipelnes_dynamodb_table.table_arn],
+                resources=[props.pipeline_table.table_arn],
             )
         )
 
@@ -123,10 +114,10 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
-                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
-                "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
+                # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
+                # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
                 "PIPELINE_TRIGGER_LAMBDA": self.pipeline_trigger_lambda_deployment.deployment_key,
                 "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
@@ -194,7 +185,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:PutItem", "dynamodb:Scan"],
-                resources=[self._pipelnes_dynamodb_table.table_arn],
+                resources=[props.pipeline_table.table_arn],
             )
         )
 
@@ -235,7 +226,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelineId/get_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
         get_pipeline_id_handler = Lambda(
@@ -257,7 +248,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelineId/put_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
         put_pipeline_id_handler = Lambda(
@@ -279,7 +270,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelineId/del_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": self._pipelnes_dynamodb_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
         del_pipeline_id_handler = Lambda(
@@ -348,7 +339,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
-                resources=[self._pipelnes_dynamodb_table.table.table_arn],
+                resources=[props.pipeline_table.table.table_arn],
             )
         )
 

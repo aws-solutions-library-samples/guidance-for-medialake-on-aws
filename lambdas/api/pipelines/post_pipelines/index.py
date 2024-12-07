@@ -24,8 +24,8 @@ from pydantic import BaseModel
 
 from image_pipeline_definitions import (
     get_state_machine_definition,
-    create_metadata_extractor_lambda,
-    create_image_proxy_lambda,
+    # create_metadata_extractor_lambda,
+    # create_image_proxy_lambda,
 )
 
 tracer = Tracer()
@@ -39,6 +39,7 @@ lambda_client = boto3.client("lambda")
 iam_client = boto3.client("iam")
 sqs_client = boto3.client("sqs")
 sfn_client = boto3.client("stepfunctions")
+eventbridge = boto3.client("events")
 
 
 class S3Pipeline(BaseModel):
@@ -178,10 +179,9 @@ def create_eventbridge_rule(
 ) -> str:
     """Create EventBridge rule to send all events to SQS FIFO queue"""
     try:
-        eventbridge = boto3.client("events")
 
         # Create the rule
-        response = rule = eventbridge.put_rule(
+        response = eventbridge.put_rule(
             Name=rule_name,
             EventBusName=event_bus_name,
             EventPattern=json.dumps({"detail-type": ["AssetCreated"]}),
@@ -421,7 +421,6 @@ def check_resource_exists(
 
         # Check EventBridge Rule
         try:
-            eventbridge = boto3.client("events")
             eventbridge.describe_rule(Name=rule_name)
             return True, f"EventBridge Rule {rule_name} already exists"
         except eventbridge.exceptions.ResourceNotFoundException:
@@ -475,8 +474,7 @@ def rollback_resources(resources_to_delete):
         try:
             if resource_type == "sqs":
                 sqs_client.delete_queue(QueueUrl=resource_id)
-            elif resource_type == "eventbridge":
-                eventbridge = boto3.client("events")
+            elif resource_type == "eventbridge_rule":
                 eventbridge.delete_rule(Name=resource_id)
             elif resource_type == "iam_role":
                 # Detach policies and delete role
@@ -512,12 +510,12 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
             role_name = f"medialake-pipeline-{createpipeline.name}-role"
             state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-            image_proxy_lambda_name = (
-                f"medialake-pipeline-{createpipeline.name}-image-proxy"
-            )
-            pipeline_trigger_lambda_name = (
-                f"medialake-pipeline-{createpipeline.name}-executor"
-            )
+            # image_proxy_lambda_name = (
+            #     f"medialake-pipeline-{createpipeline.name}-image-proxy"
+            # )
+            # pipeline_trigger_lambda_name = (
+            #     f"medialake-pipeline-{createpipeline.name}-executor"
+            # )
 
             # Check if resources exist
             resources_exist, error_message = check_resource_exists(
@@ -527,8 +525,8 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 role_name,
                 state_machine_name,
                 [
-                    image_proxy_lambda_name,
-                    pipeline_trigger_lambda_name,
+                    # image_proxy_lambda_name,
+                    # pipeline_trigger_lambda_name,
                     f"medialake-pipeline-{createpipeline.name}-metadata",  # Add this
                 ],
             )
@@ -545,11 +543,11 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             current_time = datetime.utcnow().isoformat(timespec="seconds")
             deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
             pipeline_trigger_deployment_zip = os.environ.get("PIPELINE_TRIGGER_LAMBDA")
-            image_metadata_extractor_deployment_zip = os.environ.get(
-                "IMAGE_METADATA_EXTRACTOR_LAMBDA"
-            )
-            image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
-            ingest_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
+            # image_metadata_extractor_deployment_zip = os.environ.get(
+            #     "IMAGE_METADATA_EXTRACTOR_LAMBDA"
+            # )
+            # image_proxy_deployment_zip = os.environ.get("IMAGE_PROXY_LAMBDA")
+            parent_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
             # exiftool_layer_arn = os.environ.get("EXIFTOOL_LAYER_ARN")
             # exempitool_layer_arn = os.environ.get("EXEMPITOOL_LAYER_ARN")
 
@@ -570,9 +568,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             # Create EventBridge rule
             rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
             rule_arn = create_eventbridge_rule(
-                rule_name, ingest_event_bus_name, queue_arn, tags
+                rule_name, parent_event_bus_name, queue_arn, tags
             )
-            resources_to_delete.append(("eventbridge", rule_name))
+            resources_to_delete.append(("eventbridge_rule", rule_name))
 
             # Create IAM Role for Lambda and Step Functions
             state_machine_name = f"medialake-pipeline-{createpipeline.name}"
@@ -583,39 +581,39 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             resources_to_delete.append(("iam_role", role_name))
 
             # Add this before creating the image proxy lambda
-            image_metadata_extractor_lambda_function_name = (
-                f"medialake-pipeline-{createpipeline.name}-metadata"
-            )
+            # image_metadata_extractor_lambda_function_name = (
+            #     f"medialake-pipeline-{createpipeline.name}-metadata"
+            # )
 
-            image_proxy_lambda_function_name = (
-                f"medialake-pipeline-{createpipeline.name}-image-proxy"
-            )
+            # image_proxy_lambda_function_name = (
+            #     f"medialake-pipeline-{createpipeline.name}-image-proxy"
+            # )
 
             # Create metadata extractor lambda
-            image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
-                lambda_client,
-                image_metadata_extractor_lambda_function_name,
-                role_arn,
-                deployment_bucket,
-                image_metadata_extractor_deployment_zip,
-                {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
-                tags,
-            )
-            resources_to_delete.append(
-                ("lambda", image_metadata_extractor_lambda_function_name)
-            )
+            # image_metadata_extractor_lambda_response = create_metadata_extractor_lambda(
+            #     lambda_client,
+            #     image_metadata_extractor_lambda_function_name,
+            #     role_arn,
+            #     deployment_bucket,
+            #     image_metadata_extractor_deployment_zip,
+            #     {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+            #     tags,
+            # )
+            # resources_to_delete.append(
+            #     ("lambda", image_metadata_extractor_lambda_function_name)
+            # )
 
             # Create image proxy lambda
-            image_proxy_lambda_response = create_image_proxy_lambda(
-                lambda_client,
-                image_proxy_lambda_function_name,
-                role_arn,
-                deployment_bucket,
-                image_proxy_deployment_zip,
-                {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
-                tags,
-            )
-            resources_to_delete.append(("lambda", image_proxy_lambda_function_name))
+            # image_proxy_lambda_response = create_image_proxy_lambda(
+            #     lambda_client,
+            #     image_proxy_lambda_function_name,
+            #     role_arn,
+            #     deployment_bucket,
+            #     image_proxy_deployment_zip,
+            #     {"MEDIALAKE_ASSET_TABLE": os.environ.get("MEDIALAKE_ASSET_TABLE")},
+            #     tags,
+            # )
+            # resources_to_delete.append(("lambda", image_proxy_lambda_function_name))
 
             # media_assets_bucket = s3_client.get_bucket(os.environ.get('AWS_ACCOUNT_ID'),os.environ.get('MEDIA_ASSETS_BUCKET_NAME'))
 
@@ -654,10 +652,10 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             # Get state machine definition
 
             state_machine_definition = get_state_machine_definition(
-                image_metadata_extractor_lambda_response["FunctionArn"],
-                image_proxy_lambda_response["FunctionArn"],
+                # image_metadata_extractor_lambda_response["FunctionArn"],
+                # image_proxy_lambda_response["FunctionArn"],
                 createpipeline.name,
-                os.environ.get("MEDIALAKE_ASSET_TABLE"),
+                # os.environ.get("MEDIALAKE_ASSET_TABLE"),
                 os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
             )
 
@@ -717,7 +715,11 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 "definition": definition,
                 "queueUrl": queue_url,
                 "queueArn": queue_arn,
-                "eventBridgeRuleArn": rule_arn,
+                # "eventBridgeRuleArn": rule_arn,
+                "eventBridgeDetails": {
+                    "eventBridgeRuleArn": rule_arn,
+                    "parentEventBusName": parent_event_bus_name,
+                },
                 "triggerLambdaArn": pipeline_trigger_lambda_response["FunctionArn"],
                 "stateMachineArn": state_machine_arn,
                 "roleArn": role_arn,
