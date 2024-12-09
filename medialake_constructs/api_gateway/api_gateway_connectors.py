@@ -180,10 +180,26 @@ class ConnectorsConstruct(Construct):
                     "s3:PutBucketNotification",
                     "s3:GetBucketNotification",
                     "s3:DeleteBucketNotification",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                    "s3:DeleteBucketNotification",
                 ],
-                resources=[f"arn:aws:s3:::{account_id}:*"],
+                resources=["arn:aws:s3::::*"],
             )
         )
+        # Policy for S3 actions
+        # connectors_del_lambda.function.role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "s3:ListBucket",
+        #             "s3:GetBucketLocation",
+        #             "s3:PutBucketNotification",
+        #             "s3:GetBucketNotification",
+        #             "s3:DeleteBucketNotification",
+        #         ],
+        #         resources=["arn:aws:s3::::*"],
+        #     )
+        # )
 
         # Separate IAM policy with account-specific ARNs
         connectors_del_lambda.function.add_to_role_policy(
@@ -217,17 +233,6 @@ class ConnectorsConstruct(Construct):
         #     )
         # )
 
-        # Policy for S3 actions
-        connectors_del_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                    "s3:PutBucketNotification",
-                ],
-                resources=[f"arn:aws:s3:::{account_id}:*"],
-            )
-        )
         # SQS policy for s3 connectors lambda that builds SQS queues
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -274,7 +279,7 @@ class ConnectorsConstruct(Construct):
         connector_s3_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=["s3:ListAllMyBuckets"],
-                resources=[f"arn:aws:s3:::{account_id}:*"],
+                resources=["*"],
             )
         )
 
@@ -293,7 +298,7 @@ class ConnectorsConstruct(Construct):
 
         s3_explorer_get_lambda = Lambda(
             self,
-            "S3ExplorerGetLambda",  # Changed ID to avoid conflict
+            "S3ExplorerGetLambda",
             config=LambdaConfig(
                 name="s3_explorer_get",
                 entry="lambdas/api/connectors/s3/explorer/rp_connector_id",
@@ -324,15 +329,24 @@ class ConnectorsConstruct(Construct):
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
-                    "s3:*",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                    "s3:ListBucketVersions",
+                    "s3:GetObject",
+                    "s3:ListBucketMultipartUploads",
                 ],
-                resources=[f"arn:aws:s3:::{account_id}:*"],
+                resources=[
+                    "arn:aws:s3::::*",  # For bucket-level operations
+                    "arn:aws:s3::::*/*",  # For object-level operations
+                ],
             )
         )
 
-        s3_explorer_get_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:Scan", "dynamodb:Query", "dynamodb:GetItem"],
-                resources=[dynamo_table.table_arn],
-            )
-        )
+        # s3_explorer_get_lambda.function.role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         actions=["dynamodb:Scan", "dynamodb:Query", "dynamodb:GetItem"],
+        #         resources=[dynamo_table.table_arn],
+        #     )
+        # )
+
+        dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
