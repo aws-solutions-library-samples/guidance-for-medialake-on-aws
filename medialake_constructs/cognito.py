@@ -80,7 +80,7 @@ class CognitoConstruct(Construct):
         # Use provided props or create default props
         self.props = props or CognitoProps()
 
-        user_pool = cognito.UserPool(
+        self.cognito_user_pool = cognito.UserPool(
             self,
             "MediaLakeUserPool",
             removal_policy=self.props.removal_policy,
@@ -133,7 +133,7 @@ class CognitoConstruct(Construct):
             ),
         )
 
-        user_pool_client = user_pool.add_client(
+        self.cognito_user_pool_client = self.cognito_user_pool.add_client(
             "MediaLakeUserPoolClient",
             generate_secret=self.props.generate_secret,
             auth_flows=cognito.AuthFlow(
@@ -143,21 +143,21 @@ class CognitoConstruct(Construct):
             ),
         )
 
-        identity_pool = IdentityPool(
+        self.cognito_identity_pool = IdentityPool(
             self,
             "MediaLakeIdentityPool",
             authentication_providers=IdentityPoolAuthenticationProviders(
                 user_pools=[
                     UserPoolAuthenticationProvider(
-                        user_pool=user_pool, user_pool_client=user_pool_client
+                        user_pool=self.cognito_user_pool,
+                        user_pool_client=self.cognito_user_pool_client,
                     )
                 ],
             ),
         )
 
-        self.user_pool_client = user_pool_client
-        self.identity_pool = identity_pool
-        self.user_pool = user_pool
+        # self.config_user_pool_client = user_pool_client
+        # self.identity_pool = identity_pool
 
         create_user_handler = cr.AwsCustomResource(
             self,
@@ -166,7 +166,7 @@ class CognitoConstruct(Construct):
                 service="CognitoIdentityServiceProvider",
                 action="adminCreateUser",
                 parameters={
-                    "UserPoolId": user_pool.user_pool_id,
+                    "UserPoolId": self.cognito_user_pool.user_pool_id,
                     "Username": "mne-mscdemo+medialake@amazon.com",
                     "TemporaryPassword": "ChangeMe123!",
                     "UserAttributes": [
@@ -180,15 +180,46 @@ class CognitoConstruct(Construct):
                 [
                     iam.PolicyStatement(
                         actions=["cognito-idp:AdminCreateUser"],
-                        resources=[user_pool.user_pool_arn],
+                        resources=[self.cognito_user_pool.user_pool_arn],
                     )
                 ]
             ),
         )
 
         # Ensure the user is created after the user pool
-        create_user_handler.node.add_dependency(user_pool)
+        create_user_handler.node.add_dependency(self.cognito_user_pool)
 
         # Outputs
-        CfnOutput(self, "UserPoolId", value=user_pool.user_pool_id)
-        CfnOutput(self, "UserPoolClientId", value=user_pool_client.user_pool_client_id)
+        CfnOutput(self, "UserPoolId", value=self.cognito_user_pool.user_pool_id)
+        # CfnOutput(
+        #     self,
+        #     "UserPoolClientId",
+        #     value=self.config_user_pool_client.user_pool_client_id,
+        # )
+
+    @property
+    def user_pool(self) -> cognito.UserPool:
+        """
+        The function `user_pool` returns the cognito user pool associated with the object.
+        :return: The `cognito_user_pool` attribute of the `self` object, which is expected to be an
+        instance of `cognito.UserPool`, is being returned.
+        """
+        return self.cognito_user_pool
+
+    @property
+    def identity_pool(self) -> cognito.CfnIdentityPool:
+        """
+        The function returns the CfnIdentityPool object associated with the cognito_identity_pool
+        attribute.
+        :return: The `cognito_identity_pool` object of type `cognito.CfnIdentityPool` is being returned.
+        """
+        return self.cognito_identity_pool
+
+    @property
+    def user_pool_client(self) -> cognito.CfnUserPoolClient:
+        """
+        The function returns the Cognito user pool client associated with the object.
+        :return: The `cognito_user_pool_client` attribute of the class, which is of type
+        `cognito.CfnUserPoolClient`, is being returned.
+        """
+        return self.cognito_user_pool_client

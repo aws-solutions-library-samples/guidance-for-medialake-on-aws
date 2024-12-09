@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ''
+Resources:
+  CloudTrail:
+    Type: 'AWS::CloudTrail::Trail'
+    Properties:
+      TrailName: GlobalS3DataEventsTrail
+      IsLogging: true
+      EnableLogFileValidation: true
+      EventSelectors:
+        - DataResources:
+            - Type: 'AWS::DynamoDB::Table'
+              Values:
+                - 'arn:aws:dynamodb'
+          ReadWriteType: All
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      S3BucketName:
+        Ref: S3BucketForCloudTrailCloudTrail
+    DependsOn: S3BucketPolicy
+  S3BucketForCloudTrailCloudTrail:
+    Type: 'AWS::S3::Bucket'
+    Properties: {}
+  S3BucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket:
+        Ref: S3BucketForCloudTrailCloudTrail
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailBucketPermissionsCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: 's3:GetBucketAcl'
+            Resource:
+              'Fn::GetAtt':
+                - S3BucketForCloudTrailCloudTrail
+                - Arn
+          - Sid: ' AWSConfigBucketDelivery'
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: 's3:PutObject'
+            Resource:
+              'Fn::Join':
+                - ''
+                - - 'Fn::GetAtt':
+                      - S3BucketForCloudTrailCloudTrail
+                      - Arn
+                  - /AWSLogs/*
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': bucket-owner-full-control
+Parameters: {}
+Metadata: {}
+Conditions: {}

@@ -6,6 +6,7 @@ import aws_cdk as cdk
 
 # from medialake_config import config
 from config import config
+from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
@@ -38,6 +39,7 @@ from medialake_stacks.pipelines_executions_stack import (
 )
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
+from medialake_stacks.medialake_monitoring_stack import MediaLakeMonitoringStack
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
 
@@ -45,7 +47,7 @@ class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: cdk.App, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Create cleanup stack first
+        # Create cleanup stack first, this stack is used to cleanup resources that have been created within MediaLake and haven't been deleted in the UI prior to deleting MediaLake.
         cleanup_stack = CleanupStack(
             self, "CleanupStack", props=CleanupStackProps(stub="test")
         )
@@ -56,6 +58,32 @@ class MediaLakeStack(cdk.Stack):
         )
         base_infrastructure.add_dependency(cleanup_stack)
 
+        # Create monitoring stack with base infrastructure dependency
+        # monitoring_stack = MediaLakeMonitoringStack(
+        #     self,
+        #     "Monitoring",
+        #     domain_name=f"{config.global_prefix}-os-{config.primary_region}-{config.environment}",
+        #     table_name="medialake-asset-table",
+        #     env=kwargs.get("env"),
+        # )
+        # monitoring_stack.add_dependency(base_infrastructure)
+
+        # api_gateway_stack = ApiGatewayStack(
+        #     self,
+        #     "ApiGatewayStack",
+        #     props=ApiGatewayStackProps(
+        #         cognit_user_pool=self._cognito.user_pool,
+        #         iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+        #         media_assets_bucket=base_infrastructure.media_assets_bucket,
+        #         asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
+        #         asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,
+        #         resource_table=cleanup_stack.resource_table,
+        #         ingest_event_bus=base_infrastructure.ingest_event_bus,
+        #     ),
+        # )
+
+        # api_gateway_stack.node.add_dependency(cleanup_stack)
+
         # User auth with Cognito
         self._cognito = CognitoConstruct(
             self,
@@ -65,18 +93,18 @@ class MediaLakeStack(cdk.Stack):
         self._cognito.node.add_dependency(cleanup_stack)
 
         # Create main API Gateway construct
-        api_gateway = ApiGatewayConstruct(
+        self.api_gateway = ApiGatewayConstruct(
             self,
             "ApiGateway",
             user_pool=self._cognito.user_pool,
         )
-        api_gateway.node.add_dependency(cleanup_stack)
+        self.api_gateway.node.add_dependency(cleanup_stack)
 
         # Create User Interface
         self._ui = UIConstruct(
             self,
             "UserInterface",
-            api_gateway.rest_api.rest_api_id,
+            self.api_gateway.rest_api.rest_api_id,
             self._cognito.user_pool,
             self._cognito.user_pool_client,
             self._cognito.identity_pool,
@@ -88,8 +116,7 @@ class MediaLakeStack(cdk.Stack):
             self,
             "PipelinesExecutions",
             props=PipelinesExecutionsStackProps(
-                # x_origin_verify_secret=api_gateway.x_origin_verify_secret,
-                test="test",
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
             ),
         )
         self._pipelines_executions_stack.node.add_dependency(cleanup_stack)
@@ -98,17 +125,16 @@ class MediaLakeStack(cdk.Stack):
         connectors = ConnectorsConstruct(
             self,
             "Connectors",
-            api_resource=api_gateway.api_resource,
-            cognito_authorizer=api_gateway.cognito_authorizer,
-            x_origin_verify_secret=api_gateway.x_origin_verify_secret,
-            ingest_event_bus=base_infrastructure.ingest_event_bus,
-            iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             props=ConnectorsProps(
                 asset_table=base_infrastructure.asset_table,
                 asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
                 asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
                 resource_table=cleanup_stack.resource_table,
+                api_resource=self.api_gateway.rest_api,
+                cognito_authorizer=self.api_gateway.cognito_authorizer,
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+                ingest_event_bus=base_infrastructure.ingest_event_bus,
             ),
         )
 
@@ -119,10 +145,10 @@ class MediaLakeStack(cdk.Stack):
         pipelines = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
-            api_resource=api_gateway.api_resource,
-            cognito_authorizer=api_gateway.cognito_authorizer,
+            api_resource=self.api_gateway.rest_api,
+            cognito_authorizer=self.api_gateway.cognito_authorizer,
             ingest_event_bus=base_infrastructure.ingest_event_bus,
-            x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+            x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
             iac_assets_bucket=base_infrastructure.iac_assets_bucket,
             media_assets_bucket=base_infrastructure.media_assets_bucket,
             props=ApiGatewayPipelinesProps(
@@ -139,9 +165,9 @@ class MediaLakeStack(cdk.Stack):
             "Search",
             props=SearchProps(
                 asset_table=base_infrastructure.asset_table,
-                api_resource=api_gateway.api_resource,
-                cognito_authorizer=api_gateway.cognito_authorizer,
-                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+                api_resource=self.api_gateway.rest_api,
+                cognito_authorizer=self.api_gateway.cognito_authorizer,
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
                 open_search_endpoint=base_infrastructure.collection_endpoint,
                 open_search_arn=base_infrastructure.collection_arn,
                 open_search_index="media",
@@ -157,9 +183,9 @@ class MediaLakeStack(cdk.Stack):
             "ApiGatewayAssets",
             props=AssetsProps(
                 asset_table=base_infrastructure.asset_table,
-                api_resource=api_gateway.api_resource,
-                cognito_authorizer=api_gateway.cognito_authorizer,
-                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+                api_resource=self.api_gateway.rest_api,
+                cognito_authorizer=self.api_gateway.cognito_authorizer,
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
             ),
         )
         assets.node.add_dependency(cleanup_stack)
@@ -168,11 +194,11 @@ class MediaLakeStack(cdk.Stack):
             self,
             "ApiSettingsConstruct",
             props=SettingsConstructProps(
-                api_resource=api_gateway.api_resource,
-                cognito_authorizer=api_gateway.cognito_authorizer,
+                api_resource=self.api_gateway.rest_api,
+                cognito_authorizer=self.api_gateway.cognito_authorizer,
                 cognito_user_pool=self._cognito.user_pool,
                 cognito_app_client=self._cognito.user_pool_client,
-                x_origin_verify_secret=api_gateway.x_origin_verify_secret,
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
             ),
         )
         settings.node.add_dependency(cleanup_stack)

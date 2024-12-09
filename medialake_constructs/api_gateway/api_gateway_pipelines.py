@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
@@ -18,11 +19,6 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 
-# from medialake_constructs.shared_constructs.lambda_layers import ExiftoolLayer
-
-
-from dataclasses import dataclass
-
 
 @dataclass
 class ApiGatewayPipelinesProps:
@@ -32,7 +28,6 @@ class ApiGatewayPipelinesProps:
     iac_assets_bucket: s3.Bucket
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
-    # pipelines_executions_table: dynamodb.TableV2
 
 
 class ApiGatewayPipelinesConstruct(Construct):

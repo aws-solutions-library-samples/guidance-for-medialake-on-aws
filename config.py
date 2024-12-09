@@ -1,8 +1,7 @@
 import json
 from typing import List, Optional
 from pydantic import BaseModel
-import hashlib
-from aws_cdk import Stack, aws_iam as iam, UniqueResourceNameOptions
+from aws_cdk import aws_iam as iam
 from constructs import Construct
 
 
@@ -14,11 +13,10 @@ class CDKConfig(BaseModel):
     account_id: Optional[str] = None
     environment: str = None
     secondary_region: Optional[str] = None
-    small_uid: str = ""
     global_prefix: str = "medialake"
-    assets_bucket_name: str = "medialake-assets"
-    # lambda_runtime_version: str = "3.11"
+    # assets_bucket_name: str = "medialake-assets"
     bedrock_region: str = "us-east-1"
+    api_path: str = "/prod"
 
     @property
     def regions(self) -> List[str]:

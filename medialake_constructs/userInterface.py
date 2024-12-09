@@ -7,6 +7,7 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,
     aws_s3_deployment as s3deploy,
     aws_secretsmanager as secretsmanager,
+    aws_cloudfront_origins as origins,
     Duration,
     RemovalPolicy,
     ILocalBundling,
@@ -31,12 +32,10 @@ class LocalBundling:
             # Define options for subprocess
             options = {"cwd": self.app_path, "env": os.environ.copy(), "shell": True}
 
-            # subprocess.check_call("rm -f package-lock.json && rm -r node_modules", **options)
             subprocess.check_call("npm install", **options)
             subprocess.check_call("npm run build", **options)
 
             # Copy the build output to the expected location
-            # build_path = os.path.join(self.app_path, "build")
             if os.path.exists(self.build_path):
                 dist_path = self.build_path
                 print(f"Using 'build' directory at: {dist_path}")
@@ -64,6 +63,10 @@ class LocalBundling:
 
 @dataclass
 class UIConstructProps:
+    rest_api_id: str = None
+    user_pool: str = None
+    user_pool_client: str = None
+    identity_pool: str = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -147,6 +150,109 @@ class UIConstruct(Construct):
             ),
         )
 
+        # Enhanced security headers policy
+        response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "SecurityHeadersPolicy",
+            security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                content_security_policy={
+                    "content_security_policy": (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173; "
+                        "style-src 'self' 'unsafe-inline'; "
+                        "img-src 'self' data: https: blob:; "
+                        "font-src 'self' data:; "
+                        "connect-src 'self' http://localhost:5173 https://*.amazonaws.com https://*.amazoncognito.com; "
+                        "frame-ancestors 'none'; "
+                        "base-uri 'self'; "
+                        "form-action 'self'; "
+                        "object-src 'none'; "
+                        "upgrade-insecure-requests;"
+                    ),
+                    "override": True,
+                },
+                strict_transport_security={
+                    "override": True,
+                    "access_control_max_age": Duration.seconds(31536000),
+                    "include_subdomains": True,
+                    "preload": True,
+                },
+                content_type_options={"override": True},
+                frame_options={
+                    "frame_option": cloudfront.HeadersFrameOption.DENY,
+                    "override": True,
+                },
+                xss_protection={
+                    "protection": True,
+                    "mode_block": True,
+                    "override": True,
+                },
+                referrer_policy={
+                    "referrer_policy": cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+                    "override": True,
+                },
+            ),
+            custom_headers_behavior=cloudfront.ResponseCustomHeadersBehavior(
+                custom_headers=[
+                    cloudfront.ResponseCustomHeader(
+                        header="Permissions-Policy",
+                        value="camera=(), microphone=(), geolocation=()",
+                        override=True,
+                    ),
+                ]
+            ),
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=[
+                    "Authorization",
+                    "Content-Type",
+                    "X-Api-Key",
+                    "X-Amz-Date",
+                    "X-Amz-Security-Token",
+                    "X-Forwarded-User",
+                ],
+                access_control_allow_methods=[
+                    "GET",
+                    "HEAD",
+                    "POST",
+                    "DELETE",
+                    "OPTIONS",
+                ],
+                access_control_allow_origins=["http://localhost:5173"],
+                origin_override=True,
+                access_control_expose_headers=["*"],
+                access_control_max_age=Duration.seconds(7200),
+            ),
+        )
+
+        new_distribution = cloudfront.Distribution(
+            self,
+            "myDist",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=origins.S3BucketOrigin.with_origin_access_control(
+                    website_bucket
+                ),
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+            ),
+            additional_behaviors={
+                "/prod/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{rest_api_id}.execute-api.{scope.region}.amazonaws.com",
+                        # origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
+                        # protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+                    ),
+                ),
+            },
+            minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2016,
+            ssl_support_method=cloudfront.SSLMethod.SNI,
+            # allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+            # cached_methods=cloudfront.CachedMethods.GET_HEAD,
+            # price_class=cloudfront.PriceClass.PRICE_CLASS_100,
+            # default_root_object=self.props.distribution_default_root_object,
+        )
+
         distribution = cloudfront.CloudFrontWebDistribution(
             self,
             "Distribution",
@@ -156,7 +262,21 @@ class UIConstruct(Construct):
                         s3_bucket_source=website_bucket,
                         origin_access_identity=origin_access_identity,
                     ),
-                    behaviors=[cloudfront.Behavior(is_default_behavior=True)],
+                    behaviors=[
+                        cloudfront.Behavior(
+                            is_default_behavior=True,
+                            allowed_methods=cloudfront.CloudFrontAllowedMethods.ALL,
+                            cached_methods=cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD_OPTIONS,
+                            compress=True,
+                            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                            forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                                query_string=True,
+                                cookies=cloudfront.CfnDistribution.CookiesProperty(
+                                    forward="all"
+                                ),
+                            ),
+                        )
+                    ],
                 ),
                 cloudfront.SourceConfiguration(
                     custom_origin_source=cloudfront.CustomOriginConfig(
@@ -172,16 +292,19 @@ class UIConstruct(Construct):
                         cloudfront.Behavior(
                             path_pattern="/prod/*",
                             allowed_methods=cloudfront.CloudFrontAllowedMethods.ALL,
-                            cached_methods=cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD,
-                            compress=False,
+                            cached_methods=cloudfront.CloudFrontAllowedCachedMethods.GET_HEAD_OPTIONS,
+                            compress=True,
                             forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                                 query_string=True,
                                 headers=list(self.props.origin_headers),
+                                cookies=cloudfront.CfnDistribution.CookiesProperty(
+                                    forward="all"
+                                ),
                             ),
                             default_ttl=Duration.seconds(0),
                             is_default_behavior=False,
                             max_ttl=Duration.minutes(self.props.max_ttl_minutes),
-                            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+                            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                         ),
                     ],
                 ),
