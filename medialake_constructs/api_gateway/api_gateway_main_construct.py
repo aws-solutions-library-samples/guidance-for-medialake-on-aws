@@ -35,7 +35,7 @@ class ApiGatewayConstruct(Construct):
         )
 
         # Create Cognito Authorizer first
-        cognito_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+        self.cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
             self,
             "CognitoAuthorizer",
             identity_source="method.request.header.Authorization",
@@ -43,7 +43,7 @@ class ApiGatewayConstruct(Construct):
         )
 
         # Create the Rest API
-        rest_api = apigateway.RestApi(
+        self.api_gateway_rest_api = apigateway.RestApi(
             self,
             "MediaLakeApi",
             endpoint_types=[apigateway.EndpointType.REGIONAL],
@@ -51,9 +51,6 @@ class ApiGatewayConstruct(Construct):
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=[
                     "http://localhost:5173",
-                    "http://localhost:3000",
-                    "https://localhost:5173",
-                    "https://localhost:3000",
                 ],
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=[
@@ -80,11 +77,11 @@ class ApiGatewayConstruct(Construct):
             ),
             default_method_options=apigateway.MethodOptions(
                 authorization_type=apigateway.AuthorizationType.COGNITO,
-                authorizer=cognito_authorizer,
+                authorizer=self.cognito_user_pool_authorizer,
             ),
         )
 
-        x_origin_verify_secret = secretsmanager.Secret(
+        self.api_gateway_x_origin_verify_secret = secretsmanager.Secret(
             self,
             "XOriginVerifySecret",
             removal_policy=RemovalPolicy.DESTROY,
@@ -95,7 +92,14 @@ class ApiGatewayConstruct(Construct):
             ),
         )
 
-        self.rest_api = rest_api
-        self.api_resource = rest_api
-        self.cognito_authorizer = cognito_authorizer
-        self.x_origin_verify_secret = x_origin_verify_secret
+    @property
+    def rest_api(self) -> apigateway.RestApi:
+        return self.api_gateway_rest_api
+
+    @property
+    def x_origin_verify_secret(self) -> secretsmanager.Secret:
+        return self.api_gateway_x_origin_verify_secret
+
+    @property
+    def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
+        return self.cognito_user_pool_authorizer

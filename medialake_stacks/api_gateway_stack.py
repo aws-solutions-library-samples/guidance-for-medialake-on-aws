@@ -2,22 +2,69 @@ from aws_cdk import (
     Stack,
     aws_cognito as cognito,
     aws_iam as iam,
+    aws_dynamodb as dynamodb,
+    aws_s3 as s3,
+    aws_events as events,
 )
 from constructs import Construct
+from dataclasses import dataclass
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
 )
-from medialake_constructs.api_gateway import (
+
+from medialake_constructs.api_gateway.api_gateway_pipelines import (
+    ApiGatewayPipelinesConstruct,
+)
+
+from config import config
+from medialake_constructs.cognito import CognitoConstruct, CognitoProps
+from medialake_constructs.api_gateway.api_gateway_main_construct import (
+    ApiGatewayConstruct,
+)
+from medialake_constructs.api_gateway.api_gateway_connectors import (
     ConnectorsConstruct,
+    ConnectorsProps,
 )
 from medialake_constructs.api_gateway.api_gateway_pipelines import (
-    PipelinesConstruct,
+    ApiGatewayPipelinesConstruct,
+    ApiGatewayPipelinesProps,
 )
+from medialake_constructs.api_gateway.api_gateway_search import (
+    SearchConstruct,
+    SearchProps,
+)
+from medialake_constructs.api_gateway.api_gateway_assets import (
+    AssetsConstruct,
+    AssetsProps,
+)
+from medialake_constructs.api_gateway.api_gateway_settings import (
+    SettingsConstruct,
+    SettingsConstructProps,
+)
+from medialake_constructs.update_construct import UpdateConstruct, UpdateConstructProps
+from medialake_stacks.pipelines_executions_stack import (
+    PipelinesExecutionsStack,
+    PipelinesExecutionsStackProps,
+)
+from medialake_constructs.userInterface import UIConstruct, UIConstructProps
+
+
+@dataclass
+class ApiGatewayStackProps:
+    """Configuration for Lambda function creation."""
+
+    cognit_user_pool: cognito.UserPool
+    iac_assets_bucket: s3.Bucket
+    media_assets_bucket: s3.Bucket
+    asset_table_file_hash_index_arn: str
+    asset_table_asset_id_index_arn: str
+    resource_table: dynamodb.Table
+    ingest_event_bus: events.EventBus
 
 
 class ApiGatewayStack(Stack):
     def __init__(
-        self, scope: Construct, id: str, user_pool: cognito.UserPool, **kwargs
+        self, scope: Construct, id: str, props: ApiGatewayStackProps, **kwargs
     ):
         super().__init__(scope, id, **kwargs)
 
@@ -25,44 +72,94 @@ class ApiGatewayStack(Stack):
         self.api_gateway = ApiGatewayConstruct(
             self,
             "ApiGateway",
-            user_pool=user_pool,
+            user_pool=props.cognit_user_pool,
         )
 
-        # Create Lambda execution role
-        lambda_execution_role = iam.Role(
+        self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,
-            "LambdaExecutionRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            "PipelinesExecutions",
+            props=PipelinesExecutionsStackProps(
+                x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+            ),
         )
 
-        # Add necessary permissions to Lambda role
-        lambda_execution_role.add_to_principal_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["s3:ListAllMyBuckets"],
-                resources=["*"],
-            )
-        )
+        # connectors = ConnectorsConstruct(
+        #     self,
+        #     "Connectors",
+        #     props=ConnectorsProps(
+        #         asset_table=props.asset_table,
+        #         asset_table_file_hash_index_arn=props.asset_table_file_hash_index_arn,
+        #         asset_table_asset_id_index_arn=props.asset_table_asset_id_index_arn,
+        #         iac_assets_bucket=props.iac_assets_bucket,
+        #         resource_table=props.resource_table,
+        #         api_resource=self.api_gateway.rest_api,
+        #         cognito_authorizer=self.api_gateway.cognito_authorizer,
+        #         x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+        #         ingest_event_bus=props.ingest_event_bus,
+        #     ),
+        # )
 
-        # Create connectors construct
-        _ = ConnectorsConstruct(
-            self,
-            "Connectors",
-            api_resource=self.api_gateway.api_resource,
-            cognito_authorizer=self.api_gateway.cognito_authorizer,
-            lambda_execution_role=lambda_execution_role,
-            x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
-            iac_assets_bucket=self.iac_assets_bucket,
-        )
+        # pipelines = ApiGatewayPipelinesConstruct(
+        #     self,
+        #     "Pipelines",
+        #     api_resource=self.api_gateway.rest_api,
+        #     cognito_authorizer=self.api_gateway.cognito_authorizer,
+        #     ingest_event_bus=props.ingest_event_bus,
+        #     x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+        #     iac_assets_bucket=props.iac_assets_bucket,
+        #     media_assets_bucket=props.media_assets_bucket,
+        #     props=ApiGatewayPipelinesProps(
+        #         asset_table=props.asset_table,
+        #         iac_assets_bucket=props.iac_assets_bucket,
+        #         get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
+        #         post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+        #     ),
+        # )
 
-        # Create pipelines construct
-        _ = PipelinesConstruct(
-            self,
-            "Pipelines",
-            api_resource=self.api_gateway.api_resource,
-            cognito_authorizer=self.api_gateway.cognito_authorizer,
-            lambda_execution_role=lambda_execution_role,
-            x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
-            iac_assets_bucket=self.iac_assets_bucket,
-            media_assets_bucket=self.media_assets_bucket,
-        )
+        # search = SearchConstruct(
+        #     self,
+        #     "Search",
+        #     props=SearchProps(
+        #         asset_table=props.asset_table,
+        #         api_resource=self.api_gateway.rest_api,
+        #         cognito_authorizer=self.api_gateway.cognito_authorizer,
+        #         x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+        #         open_search_endpoint=props.collection_endpoint,
+        #         open_search_arn=props.collection_arn,
+        #         open_search_index="media",
+        #         vpc=props.vpc,
+        #         security_group=props.security_group,
+        #     ),
+        # )
+
+        # assets = AssetsConstruct(
+        #     self,
+        #     "ApiGatewayAssets",
+        #     props=AssetsProps(
+        #         asset_table=props.asset_table,
+        #         api_resource=self.api_gateway.rest_api,
+        #         cognito_authorizer=self.api_gateway.cognito_authorizer,
+        #         x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+        #     ),
+        # )
+
+        # settings = SettingsConstruct(
+        #     self,
+        #     "ApiSettingsConstruct",
+        #     props=SettingsConstructProps(
+        #         api_resource=self.api_gateway.rest_api,
+        #         cognito_authorizer=self.api_gateway.cognito_authorizer,
+        #         cognito_user_pool=self._cognito.user_pool,
+        #         cognito_app_client=self._cognito.user_pool_client,
+        #         x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,
+        #     ),
+        # )
+
+        # update_config = UpdateConstruct(
+        #     self,
+        #     "UpdateConfiguration",
+        #     props=UpdateConstructProps(
+        #         user_pool=self._cognito.user_pool,
+        #         distribution_url=self._ui.distribution_url,
+        #     ),
+        # )

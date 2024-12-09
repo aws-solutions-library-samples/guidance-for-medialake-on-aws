@@ -1,5 +1,4 @@
 import json
-import json
 from aws_cdk import (
     Stack,
     Environment,
@@ -19,8 +18,11 @@ from constructs import Construct
 
 # Local imports
 from config import config
-from config import config
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
+from medialake_constructs.shared_constructs.dynamodb_data_acess_logs import (
+    DynamoDBCloudTrailLogs,
+    DynamoDBCloudTrailLogsProps,
+)
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
@@ -65,6 +67,22 @@ class BaseInfrastructureStack(Stack):
 
         env = kwargs.get("env")
         region = env.region if isinstance(env, Environment) else config.primary_region
+
+        self.access_logs_bucket = S3Bucket(
+            self,
+            "AccessLogsBucket",
+            props=S3BucketProps(
+                bucket_name=f"{config.global_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+            ),
+        )
+
+        # self.dynamodb_cloudtrail_logs = DynamoDBCloudTrailLogs(
+        #     self,
+        #     "DynamoDBCloudTrailLogs",
+        #     props=DynamoDBCloudTrailLogsProps(
+        #         access_logs_bucket=self.access_logs_bucket.bucket,
+        #     ),
+        # )
 
         # Use the generated name for your Lambda function
         self._vpc = CustomVpc(
@@ -119,11 +137,13 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Create media asset bucket
-        self.media_assets_bucket = S3Bucket(
+        self.media_assets_s3_bucket = S3Bucket(
             self,
             "MediaAssets",
-            s3_config=S3Config(
+            props=S3BucketProps(
                 bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{region}-{config.environment}",
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket.bucket,
                 cors=[
                     s3.CorsRule(
                         allowed_methods=[
@@ -149,8 +169,10 @@ class BaseInfrastructureStack(Stack):
         self.iac_assets_bucket = S3Bucket(
             self,
             "IACAssets",
-            s3_config=S3Config(
+            props=S3BucketProps(
                 bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket.bucket,
             ),
         )
 
@@ -158,20 +180,21 @@ class BaseInfrastructureStack(Stack):
         self._ddb_export_bucket = S3Bucket(
             self,
             "DynamodbExportBucket",
-            s3_config=S3Config(
+            props=S3BucketProps(
                 bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket.bucket,
             ),
         )
 
-        # Create EventBus with retention policy
-        ingest_event_bus_config = EventBusConfig(
-            bus_name=f"{config.global_prefix}-ingest-{self.region}-{config.environment}",
-            description="event bus",
-            log_all=True,
-        )
-
         self._ingest_event_bus = EventBus(
-            self, "IngestEventBus", props=ingest_event_bus_config
+            self,
+            "IngestEventBus",
+            props=EventBusConfig(
+                bus_name=f"{config.global_prefix}-ingest-{self.region}-{config.environment}",
+                description="event bus",
+                log_all=True,
+            ),
         )
 
         self._pipelne_table = DynamoDB(
@@ -318,8 +341,8 @@ class BaseInfrastructureStack(Stack):
                     "s3:DeleteBucket",
                 ],
                 resources=[
-                    self._ddb_export_bucket.bucket.bucket_arn,
-                    f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
+                    self._ddb_export_bucket.bucket_arn,
+                    f"{self._ddb_export_bucket.bucket_arn}/*",
                 ],
             )
         )
@@ -650,3 +673,14 @@ class BaseInfrastructureStack(Stack):
             str: SecurityGroup
         """
         return self._security_group
+
+    @property
+    def media_assets_bucket(self) -> s3.IBucket:
+        """
+        Returns the URL for the OpenSearch Dashboards interface.
+
+        Returns:
+            s3.IBucket: S3 bucket object
+        """
+
+        return self.media_assets_s3_bucket

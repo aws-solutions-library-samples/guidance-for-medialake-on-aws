@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from constructs import Construct
 from aws_cdk import (
     Stack,
     CustomResource,
@@ -6,8 +8,6 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     custom_resources as cr,
 )
-from constructs import Construct
-from dataclasses import dataclass
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 

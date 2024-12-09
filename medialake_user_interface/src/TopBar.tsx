@@ -98,15 +98,13 @@ function TopBar() {
         return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
     }, [searchTags, searchInput]);
 
-    const { data: searchResults } = useSearch(getSearchQuery() || '');
-
     const debouncedSearch = useCallback(
         debounce((query: string) => {
             if (query.trim()) {
-                navigate('/search', { state: { query: getSearchQuery() } });
+                navigate('/search', { state: { query } });
             }
         }, 500),
-        [navigate, getSearchQuery]
+        [navigate]
     );
 
     const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -167,6 +165,7 @@ function TopBar() {
 
     const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target.value;
+        setSearchInput(value);
 
         if (value.endsWith(' ') && value.includes(':')) {
             const potentialTag = value.trim();
@@ -175,10 +174,11 @@ function TopBar() {
             }
         }
 
-        setSearchInput(value);
-
         if (!value.includes(':')) {
-            debouncedSearch(value);
+            const currentQuery = value.trim() ?
+                `${searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ')}${searchTags.length > 0 ? ' ' : ''}${value}` :
+                searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
+            debouncedSearch(currentQuery);
         }
     };
 

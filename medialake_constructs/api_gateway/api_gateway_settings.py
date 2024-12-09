@@ -287,7 +287,6 @@ class SettingsConstruct(Construct):
                     "cognito-idp:AdminUpdateUserAttributes",
                     "cognito-idp:AdminGetUser",
                     "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminRemoveUserFromGroup",
                     "cognito-idp:AdminListGroupsForUser",
                     "cognito-idp:ListGroups",
                     "cognito-idp:AdminSetUserPassword",

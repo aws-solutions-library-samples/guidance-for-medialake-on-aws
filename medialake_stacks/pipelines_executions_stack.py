@@ -15,21 +15,7 @@ from constructs import Construct
 from dataclasses import dataclass
 
 # Local imports
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3Config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.vpc import CustomVpc, CustomVpcProps
-from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
-    OpenSearchCluster,
-    OpenSearchClusterProps,
-)
-from medialake_constructs.shared_constructs.opensearch_serverless import (
-    OpenSearchServerlessConstruct,
-    OpenSearchServerlessProps,
-)
-from medialake_constructs.shared_constructs.lambda_layers import (
-    SearchLayer,
-    PynamoDbLambdaLayer,
-)
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -39,8 +25,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 
 @dataclass
 class PipelinesExecutionsStackProps:
-    # x_origin_verify_secret: secretsmanager.Secret
-    test: str
+    x_origin_verify_secret: secretsmanager.Secret
 
 
 class PipelinesExecutionsStack(Stack):

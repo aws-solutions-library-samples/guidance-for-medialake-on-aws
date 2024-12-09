@@ -5,13 +5,13 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_dynamodb as dynamodb,
     custom_resources as cr,
-    RemovalPolicy
+    RemovalPolicy,
 )
 
 from constructs import Construct
 
 from dataclasses import dataclass
-from typing import Dict, Optional, List
+from typing import Optional
 
 
 @dataclass
@@ -27,7 +27,7 @@ class DynamoDBProps:
     sort_key_name: Optional[str] = None
     sort_key_type: Optional[dynamodb.AttributeType] = None
     stream: Optional[dynamodb.StreamViewType] = None
-    point_in_time_recovery: Optional[bool] = False
+    point_in_time_recovery: Optional[bool] = True
 
 
 class DynamoDB(Construct):
@@ -35,10 +35,10 @@ class DynamoDB(Construct):
         super().__init__(scope, id, **kwargs)
 
         stack = Stack.of(self)
-        
+
         self.region = stack.region
         self.account_id = stack.account
-        
+
         # Create a custom KMS key for encryption
         self._kms_key = kms.Key(
             self, "DynamoDBKMSKey", removal_policy=RemovalPolicy.DESTROY
@@ -57,9 +57,7 @@ class DynamoDB(Construct):
             removal_policy=RemovalPolicy.DESTROY,
             dynamo_stream=props.stream,
         )
-        
-      
-        
+
     # dynamo_db_pipeline_custom_resource_provider = cr.Provider(
     #         self,
     #         "DynamoDBPipelineCustomResourceProvider",
@@ -72,8 +70,7 @@ class DynamoDB(Construct):
     #         "DynamoDBPipelineCustomResource",
     #         service_token=dynamo_db_pipeline_custom_resource_provider.service_token,
     #     )
-    
-       
+
     @property
     def table(self) -> dynamodb.TableV2:
         return self._table
@@ -85,7 +82,3 @@ class DynamoDB(Construct):
     @property
     def table_arn(self) -> str:
         return self._table.table_arn
-
-    # @property
-    # def kms_key(self) -> kms.Key:
-    #     return self._kms_key
