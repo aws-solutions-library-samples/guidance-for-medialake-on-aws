@@ -408,26 +408,6 @@ class BaseInfrastructureStack(Stack):
             )
         )
 
-        # ddb_pipeline_cr_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "logs:CreateLogDelivery",
-        #             "logs:PutResourcePolicy",
-        #             "logs:UpdateLogDelivery",
-        #             "logs:DeleteLogDelivery",
-        #             "logs:DescribeResourcePolicies",
-        #             "logs:GetLogDelivery",
-        #             "logs:ListLogDeliveries",
-        #             "logs:CreateLogGroup",
-        #             "logs:CreateLogStream",
-        #             "logs:PutLogEvents",
-        #             "logs:DescribeLogGroups",
-        #         ],
-        #         resources=["*"],
-        #     )
-        # )
-
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -481,25 +461,6 @@ class BaseInfrastructureStack(Stack):
             )
         )
 
-        # ddb_pipeline_cr_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "iam:CreatePolicy",
-        #             "iam:DeletePolicy",
-        #         ],
-        #         conditions={
-        #             "StringEquals": {
-        #                 "iam:PolicyName": [
-        #                     "IngestionPipelinePolicy",
-        #                     "DynamoDBIngestionPolicy",
-        #                 ]
-        #             }
-        #         },
-        #         resources=["*"],
-        #     )
-        # )
-
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -518,24 +479,6 @@ class BaseInfrastructureStack(Stack):
                 resources=[f"arn:aws:iam::{self.account}:policy/*"],
             )
         )
-
-        # ddb_pipeline_cr_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "s3:GetObject",
-        #             "s3:ListObjects",
-        #             "s3:DeleteObject",
-        #             "s3:DeleteObjectVersion",
-        #             "s3:ListBucket",
-        #             "s3:DeleteBucket",
-        #         ],
-        #         resources=[
-        #             self._ddb_export_bucket.bucket.bucket_arn,
-        #             f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
-        #         ],
-        #     )
-        # )
 
         ingestion_pipeline_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -569,26 +512,6 @@ class BaseInfrastructureStack(Stack):
                 # These actions typically require '*' as they operate across all log groups
             )
         )
-
-        # ddb_pipeline_cr_role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=[
-        #             "ec2:CreateVpcEndpoint",
-        #             "ec2:DeleteVpcEndpoints",
-        #             "ec2:ListVpcEndpoints",
-        #             "ec2:DescribeVpcEndpoints",
-        #             "ec2:DescribeVpcs",
-        #             "ec2:DescribeSubnets",
-        #             "ec2:DescribeSecurityGroups",
-        #             "ec2:CreateTags",
-        #             "ec2:DeleteTags",
-        #             "route53:AssociateVPCWithHostedZone",
-        #             "route53:DisassociateVPCFromHostedZone",
-        #         ],
-        #         resources=["*"],
-        #     )
-        # )
 
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
@@ -653,20 +576,6 @@ class BaseInfrastructureStack(Stack):
                 ],
             )
         )
-
-        # ingestion_pipeline_lambda.function.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         actions=[
-        #             "iam:*",
-        #             "osis:*",
-        #             "opensearch:*",
-        #             "dynamodb:*",
-        #             "s3:*",
-        #             "ec2:*",
-        #         ],
-        #         resources=["*"],
-        #     )
-        # )
 
         # Define Custom Resource for Ingestion Pipeline
         ingestion_provider = cr.Provider(
