@@ -30,15 +30,10 @@ from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB,
     DynamoDBProps,
 )
-
-
 @dataclass
 class ConnectorsProps:
-    """Configuration for Lambda function creation."""
-
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
-    resource_table: dynamodb.Table
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     ingest_event_bus: str | None
@@ -56,17 +51,119 @@ class ConnectorsConstruct(Construct):
         self,
         scope: Construct,
         constructor_id: str,
-        # api_resource: apigateway.IResource,
-        # cognito_authorizer: apigateway.IAuthorizer,
-        # x_origin_verify_secret: secretsmanager.Secret,
-        # ingest_event_bus: events.EventBus,
-        # iac_assets_bucket: s3.Bucket,
         props: ConnectorsProps,
     ) -> None:
         super().__init__(scope, constructor_id)
 
         # Get the current account ID
         account_id = Stack.of(self).account
+
+        lambda_iam_boundry_policy = iam.ManagedPolicy(
+            self,
+            "ServiceBoundaryPolicy",
+            statements=[
+                # Allow service-specific actions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "lambda:*",
+                        "s3:*",
+                        "sqs:*",
+                        "sns:*",
+                        "dynamodb:*",
+                        "events:*",
+                    ],
+                    resources=["*"],
+                ),
+                # Allow IAM operations for these services
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "iam:CreateRole",
+                        "iam:DeleteRole",
+                        "iam:PutRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:AttachRolePolicy",
+                        "iam:DetachRolePolicy",
+                        "iam:UpdateRole",
+                        "iam:UpdateRoleDescription",
+                        "iam:GetRole",
+                        "iam:ListRoles",
+                        "iam:TagRole",
+                        "iam:UntagRole",
+                    ],
+                    resources=["*"],
+                    conditions={
+                        "StringLike": {
+                            "iam:PassedToService": [
+                                "lambda.amazonaws.com",
+                                "s3.amazonaws.com",
+                                "sqs.amazonaws.com",
+                                "sns.amazonaws.com",
+                                "dynamodb.amazonaws.com",
+                                "events.amazonaws.com",
+                            ]
+                        }
+                    },
+                ),
+                # Deny all other IAM operations
+                iam.PolicyStatement(
+                    effect=iam.Effect.DENY,
+                    actions=["iam:*"],
+                    resources=["*"],
+                    conditions={
+                        "StringNotLike": {
+                            "iam:PassedToService": [
+                                "lambda.amazonaws.com",
+                                "s3.amazonaws.com",
+                                "sqs.amazonaws.com",
+                                "sns.amazonaws.com",
+                                "dynamodb.amazonaws.com",
+                                "events.amazonaws.com",
+                            ]
+                        }
+                    },
+                ),
+            ],
+        )
+
+        # Create request validator
+        body_validator = apigateway.RequestValidator(
+            self,
+            "BodyValidator",
+            rest_api=props.api_resource,
+            validate_request_parameters=False,
+            validate_request_body=True,
+            request_validator_name="body-only-validator",
+        )
+
+        # Create validators
+        params_validator = apigateway.RequestValidator(
+            self,
+            "ParamsValidator",
+            rest_api=props.api_resource,
+            validate_request_parameters=True,
+            validate_request_body=False,
+            request_validator_name="params-only-validator",
+        )
+
+        request_model = apigateway.Model(
+            self,
+            "RequestModel",
+            rest_api=props.api_resource,
+            content_type="application/json",
+            model_name="RequestModel",
+            schema=apigateway.JsonSchema(
+                type=apigateway.JsonSchemaType.OBJECT,
+                required=["username"],
+                properties={
+                    "username": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    ),
+                    "age": apigateway.JsonSchema(type=apigateway.JsonSchemaType.NUMBER),
+                },
+            ),
+        )
 
         self.lambda_deployment = LambdaDeployment(
             self,
@@ -82,7 +179,6 @@ class ConnectorsConstruct(Construct):
                 name=f"medialake_connector_table_{constructor_id}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                # removal_policy=RemovalPolicy.DESTROY
             ),
         )
 
@@ -92,18 +188,19 @@ class ConnectorsConstruct(Construct):
         # Add connector_id path parameter resource
         connector_id_resource = connectors_resource.add_resource("{connector_id}")
 
-        connectors_get_lambda_config = LambdaConfig(
-            name="connectors_get_lambda",
-            entry="lambdas/api/connectors/get_connectors",
-            environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": (props.x_origin_verify_secret.secret_arn),
-                "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
-            },
-        )
         connectors_get_lambda = Lambda(
             self,
             "ConnectorsGetLambda",
-            config=connectors_get_lambda_config,
+            config=LambdaConfig(
+                name="connectors_get_lambda",
+                entry="lambdas/api/connectors/get_connectors",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": (
+                        props.x_origin_verify_secret.secret_arn
+                    ),
+                    "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
+                },
+            ),
         )
 
         # connectors_get_lambda.function.role.add_to_policy(
@@ -121,13 +218,13 @@ class ConnectorsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        # Delete Connector Lambda config remains the same
         connectors_del_lambda = Lambda(
             self,
             "ConnectorsDelLambda",
             config=LambdaConfig(
                 name="connectors_del_lambda",
                 entry="lambdas/api/connectors/rp_connectorId/del_connectorId",
+                iam_role_boundary_policy=lambda_iam_boundry_policy,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
@@ -156,37 +253,43 @@ class ConnectorsConstruct(Construct):
 
         dynamo_table.table.grant_read_write_data(connectors_del_lambda.function)
 
+        # connectors_del_lambda.lambda_role.permissions_boundary(
+        #     lambda_iam_boundry_policy
+        # )
+
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "lambda:CreateFunction",
-                    "lambda:UpdateFunctionCode",
-                    "lambda:UpdateFunctionConfiguration",
                     "lambda:DeleteFunction",
-                    "lambda:TagResource",
-                    "lambda:CreateEventSourceMapping",
+                    "lambda:DeleteEventSourceMapping",
+                    "sqs:DeleteQueue",
+                    "s3:DeleteBucketNotification",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
                 ],
                 resources=[
                     f"arn:aws:lambda:*:{account_id}:function:*",
-                    f"arn:aws:lambda:*:{account_id}:event-source-mapping:*",  # Added resource
+                    f"arn:aws:lambda:*:{account_id}:event-source-mapping:*",
+                    f"arn:aws:sqs:*:{account_id}:*",
+                    "arn:aws:s3:::*",
                 ],
             )
         )
 
         # Update IAM/S3 policy with account-specific ARNs
-        connectors_del_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:PutBucketNotification",
-                    "s3:GetBucketNotification",
-                    "s3:DeleteBucketNotification",
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                    "s3:DeleteBucketNotification",
-                ],
-                resources=["arn:aws:s3::::*"],
-            )
-        )
+        # connectors_del_lambda.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "s3:PutBucketNotification",
+        #             "s3:GetBucketNotification",
+        #             "s3:DeleteBucketNotification",
+        #             "s3:ListBucket",
+        #             "s3:GetBucketLocation",
+        #             "s3:DeleteBucketNotification",
+        #         ],
+        #         resources=["arn:aws:s3:*"],
+        #     )
+        # )
         # Policy for S3 actions
         # connectors_del_lambda.function.role.add_to_policy(
         #     iam.PolicyStatement(
@@ -206,12 +309,12 @@ class ConnectorsConstruct(Construct):
             iam.PolicyStatement(
                 actions=[
                     "iam:DeleteRole",
-                    "iam:UpdateRole",
-                    "iam:PutRolePolicy",
+                    # "iam:UpdateRole",
+                    # "iam:PutRolePolicy",
                     "iam:DeleteRolePolicy",
-                    "iam:AttachRolePolicy",
+                    # "iam:AttachRolePolicy",
                     "iam:DetachRolePolicy",
-                    "iam:PassRole",
+                    # "iam:PassRole",
                     "iam:ListAttachedRolePolicies",
                     "iam:ListRolePolicies",
                     "iam:GetRolePolicy",
@@ -238,9 +341,9 @@ class ConnectorsConstruct(Construct):
             iam.PolicyStatement(
                 actions=[
                     "sqs:GetQueueAttributes",
-                    "sqs:CreateQueue",
-                    # "sqs:DeleteQueue",
-                    "sqs:SetQueueAttributes",
+                    # "sqs:CreateQueue",
+                    "sqs:DeleteQueue",
+                    # "sqs:SetQueueAttributes",
                 ],
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
@@ -311,21 +414,8 @@ class ConnectorsConstruct(Construct):
             ),
         )
 
-        # Configure the integration with path parameter mapping
-        s3_explorer_integration = apigateway.LambdaIntegration(
-            s3_explorer_get_lambda.function,
-            request_templates={
-                "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
-            },
-        )
-
-        s3_explorer_connector_resource.add_method(
-            "GET",
-            s3_explorer_integration,
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
-
+        # IAM Permissions - grant read to connectors table and access S3 buckets
+        dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -336,10 +426,24 @@ class ConnectorsConstruct(Construct):
                     "s3:ListBucketMultipartUploads",
                 ],
                 resources=[
-                    "arn:aws:s3::::*",  # For bucket-level operations
-                    "arn:aws:s3::::*/*",  # For object-level operations
+                    "arn:aws:s3:::*",
+                    "arn:aws:s3:::*/*",
                 ],
             )
+        )
+
+        # Configure the integration with path parameter mapping
+        s3_explorer_integration = apigateway.LambdaIntegration(
+            s3_explorer_get_lambda.function,
+            request_templates={
+                "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
+            },
+        )
+        s3_explorer_connector_resource.add_method(
+            "GET",
+            s3_explorer_integration,
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
         )
 
         # s3_explorer_get_lambda.function.role.add_to_policy(
@@ -348,5 +452,3 @@ class ConnectorsConstruct(Construct):
         #         resources=[dynamo_table.table_arn],
         #     )
         # )
-
-        dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)

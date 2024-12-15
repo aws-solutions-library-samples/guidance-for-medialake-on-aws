@@ -15,7 +15,6 @@ from constructs import Construct
 from dataclasses import dataclass
 
 # Local imports
-from config import GLOBAL_PREFIX, generate_short_uid, config
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 

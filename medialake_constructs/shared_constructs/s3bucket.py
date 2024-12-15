@@ -7,17 +7,22 @@ from aws_cdk import (
 )
 from constructs import Construct
 from typing import Optional, List
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
 class S3BucketProps:
     bucket_name: str
     access_logs: bool = False
-    access_logs_bucket: Optional[s3.Bucket] = None
-    lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
     destroy_on_delete: bool = True
+    access_logs_bucket: Optional[s3.Bucket] = None
     cors: Optional[List[s3.CorsRule]] = None
+    website_index_document: Optional[str] = None
+    website_error_document: Optional[str] = None
+    intelligent_tiering_configurations: Optional[
+        List[s3.IntelligentTieringConfiguration]
+    ] = None
+    lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
 
 
 class S3Bucket(Construct):
@@ -29,9 +34,8 @@ class S3Bucket(Construct):
         **kwargs,
     ):
         super().__init__(scope, id, **kwargs)
-        stack = Stack.of(self)
 
-        # Create KMS key for bucket encryption with RETAIN policy
+        # Create KMS key for bucket encryption
         self.kms_key = kms.Key(
             self,
             "BucketEncryptionKey",
@@ -39,46 +43,38 @@ class S3Bucket(Construct):
             enable_key_rotation=True,
         )
 
-        # Create S3 bucket with security best practices
-        self._bucket = s3.Bucket(
-            self,
-            "S3Bucket",
-            bucket_name=props.bucket_name,
-            encryption=s3.BucketEncryption.KMS,
-            encryption_key=self.kms_key,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            versioned=True,
-            lifecycle_rules=props.lifecycle_rules,
-            cors=props.cors,
-            removal_policy=(
+        bucket_props = {
+            "encryption": s3.BucketEncryption.KMS,
+            "encryption_key": self.kms_key,
+            "block_public_access": s3.BlockPublicAccess.BLOCK_ALL,
+            "versioned": True,
+            "enforce_ssl": True,
+            "removal_policy": (
                 RemovalPolicy.DESTROY
                 if props.destroy_on_delete
                 else RemovalPolicy.RETAIN
             ),
-            auto_delete_objects=True if props.destroy_on_delete else False,
-            server_access_logs_bucket=props.access_logs_bucket,
-            server_access_logs_prefix=(
-                f"{props.bucket_name}/" if props.access_logs_bucket else None
-            ),
-        )
+            "auto_delete_objects": props.destroy_on_delete,
+        }
+        # Add optional properties from props if they exist
+        props_dict = asdict(props)
+        optional_props = {
+            "bucket_name": "bucket_name",
+            "lifecycle_rules": "lifecycle_rules",
+            "cors": "cors",
+            "server_access_logs_bucket": "access_logs_bucket",
+        }
 
-        # Add logging bucket permissions if access_logs_bucket is provided
+        for prop_name, bucket_prop_name in optional_props.items():
+            if props_dict.get(prop_name) is not None:
+                bucket_props[bucket_prop_name] = props_dict[prop_name]
+
+        # Add server access logs prefix if access_logs_bucket is provided
         if props.access_logs_bucket:
-            props.access_logs_bucket.add_to_resource_policy(
-                iam.PolicyStatement(
-                    effect=iam.Effect.ALLOW,
-                    actions=["s3:PutObject"],
-                    resources=[
-                        props.access_logs_bucket.bucket_arn,
-                        f"{props.access_logs_bucket.bucket_arn}/*",
-                    ],
-                    principals=[iam.ServicePrincipal("logging.s3.amazonaws.com")],
-                    conditions={
-                        "StringEquals": {"aws:SourceAccount": stack.account},
-                        "ArnLike": {"aws:SourceArn": self._bucket.bucket_arn},
-                    },
-                )
-            )
+            bucket_props["server_access_logs_prefix"] = f"{props.bucket_name}/"
+
+        # Create S3 bucket with combined properties
+        self._bucket = s3.Bucket(self, "S3Bucket", **bucket_props)
 
     @property
     def bucket(self) -> s3.IBucket:

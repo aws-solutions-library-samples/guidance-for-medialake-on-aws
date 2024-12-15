@@ -1,10 +1,10 @@
 import json
+from constructs import Construct
 from aws_cdk import (
     Stack,
     Environment,
     aws_events as events,
     aws_dynamodb as dynamodb,
-    aws_lambda as lambda_,
     aws_iam as iam,
     aws_logs as logs,
     aws_s3 as s3,
@@ -12,12 +12,12 @@ from aws_cdk import (
     custom_resources as cr,
     CustomResource,
     RemovalPolicy,
+    Duration,
 )
-from aws_cdk import aws_lambda_event_sources as eventsources
-from constructs import Construct
-
-# Local imports
 from config import config
+from medialake_constructs.shared_constructs.s3_logging import (
+    add_s3_access_logging_policy,
+)
 from medialake_constructs.shared_constructs.dynamodb_data_acess_logs import (
     DynamoDBCloudTrailLogs,
     DynamoDBCloudTrailLogsProps,
@@ -29,7 +29,6 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
 )
-
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -67,12 +66,35 @@ class BaseInfrastructureStack(Stack):
 
         env = kwargs.get("env")
         region = env.region if isinstance(env, Environment) else config.primary_region
+        account = env.account if isinstance(env, Environment) else config.account_id
 
         self.access_logs_bucket = S3Bucket(
             self,
             "AccessLogsBucket",
             props=S3BucketProps(
                 bucket_name=f"{config.global_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                intelligent_tiering_configurations=[
+                    s3.IntelligentTieringConfiguration(
+                        name="All",
+                        archive_access_tier_time=Duration.days(90),
+                        deep_archive_access_tier_time=Duration.days(180),
+                    )
+                ],
+                lifecycle_rules=[
+                    s3.LifecycleRule(
+                        enabled=True,
+                        abort_incomplete_multipart_upload_after=Duration.days(7),
+                    ),
+                    s3.LifecycleRule(
+                        enabled=True,
+                        transitions=[
+                            s3.Transition(
+                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                                transition_after=Duration.minutes(0),
+                            )
+                        ],
+                    ),
+                ],
             ),
         )
 
@@ -84,7 +106,7 @@ class BaseInfrastructureStack(Stack):
         #     ),
         # )
 
-        # Use the generated name for your Lambda function
+        # VPC used for OpenSearch, Lambda's, and VPC Endpoints
         self._vpc = CustomVpc(
             self,
             "MediaLakeVPC",
@@ -93,7 +115,7 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        # Create Security group for Lambdas
+        # Security group for Lambdas
         self._security_group = ec2.SecurityGroup(
             self,
             "MediaLakeSecurityGroup",
@@ -141,7 +163,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaAssets",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{region}-{config.environment}",
+                bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
                 cors=[
@@ -165,12 +187,18 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
+        add_s3_access_logging_policy(
+            self,
+            access_logs_bucket=self.access_logs_bucket.bucket,
+            source_bucket=self.media_assets_s3_bucket.bucket,
+        )
+
         # Create IAC assets bucket with explicit name including region
         self.iac_assets_bucket = S3Bucket(
             self,
             "IACAssets",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
+                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower(),
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
@@ -181,7 +209,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower().lower(),
+                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
@@ -491,7 +519,7 @@ class BaseInfrastructureStack(Stack):
             "CreateIngestionPipeline",
             service_token=ingestion_provider.service_token,
             properties={
-                "PipelineName": "medialake-asset-pipeline",  # Replace as needed
+                "PipelineName": "medialake-asset-pipeline",
                 "TableArn": self._asset_table.table_arn,
                 "BucketName": self._ddb_export_bucket.bucket.bucket_arn,
                 "CollectionEndpoint": self._opensearch_cluster.domain_endpoint,
@@ -663,3 +691,13 @@ class BaseInfrastructureStack(Stack):
         """
 
         return self.media_assets_s3_bucket
+
+    @property
+    def access_log_bucket(self) -> s3.IBucket:
+        """
+        Returns the access log bucket.
+
+        Returns:
+            s3.IBucket: S3 bucket object
+        """
+        return self.access_logs_bucket.bucket

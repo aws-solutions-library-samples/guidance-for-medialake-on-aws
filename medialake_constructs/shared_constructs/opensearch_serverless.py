@@ -124,7 +124,7 @@ class OpenSearchServerlessConstruct(Construct):
         create_index_lambda = _lambda.Function(
             self,
             "Index",
-            runtime=_lambda.Runtime.PYTHON_3_12,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=_lambda.Code.from_asset("lambdas/back_end/create_oss_index/"),
             timeout=Duration.seconds(60),
@@ -140,7 +140,7 @@ class OpenSearchServerlessConstruct(Construct):
             self,
             "RequestsLayer",
             entry="lambdas/back_end/create_oss_index",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
         )
 
         create_index_lambda.add_layers(layer)
@@ -229,8 +229,9 @@ class OpenSearchServerlessConstruct(Construct):
             encoding="utf-8"
         )
 
-        code_hash = hashlib.sha256(lambda_code.encode(), usedforsecurity=False).hexdigest()
-
+        code_hash = hashlib.sha256(
+            lambda_code.encode(), usedforsecurity=False
+        ).hexdigest()
 
         create_index_resource = CustomResource(
             self,

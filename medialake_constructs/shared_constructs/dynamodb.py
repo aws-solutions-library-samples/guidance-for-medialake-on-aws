@@ -41,7 +41,11 @@ class DynamoDB(Construct):
 
         # Create a custom KMS key for encryption
         self._kms_key = kms.Key(
-            self, "DynamoDBKMSKey", removal_policy=RemovalPolicy.DESTROY
+            self,
+            "DynamoDBKMSKey",
+            removal_policy=RemovalPolicy.DESTROY,
+            enable_key_rotation=True,
+            description="KMS key for DynamoDB table encryption",
         )
 
         # Create the DynamoDB table with the provided configuration

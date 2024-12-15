@@ -40,7 +40,7 @@ class SettingsConstructProps:
     api_resource: api_gateway.IResource
     cognito_authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
-    cognito_app_client: cognito.UserPoolClient
+    cognito_app_client: str
 
 
 class SettingsConstruct(Construct):
@@ -274,7 +274,7 @@ class SettingsConstruct(Construct):
                         props.x_origin_verify_secret.secret_arn
                     ),
                     "USER_POOL_ID": (props.cognito_user_pool.user_pool_id),
-                    "APP_CLIENT_ID": (props.cognito_app_client.user_pool_client_id),
+                    "APP_CLIENT_ID": (props.cognito_app_client),
                 },
             ),
         )

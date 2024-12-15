@@ -194,7 +194,7 @@ class OpenSearchCluster(Construct):
         create_index_lambda = _lambda.Function(
             self,
             "IndexCreationFunction",
-            runtime=_lambda.Runtime.PYTHON_3_12,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             handler="index.handler",
             vpc=props.vpc,
             security_groups=[props.security_group],
@@ -213,7 +213,7 @@ class OpenSearchCluster(Construct):
             self,
             "RequestsLayer",
             entry="lambdas/back_end/create_oss_index",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
         )
 
         create_index_lambda.add_layers(layer)

@@ -37,7 +37,7 @@ from config import WORKFLOW_PAYLOAD_TEMP_BUCKET
 # Constants
 DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
-DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
+DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_13
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
 LOG_RETENTION = logs.RetentionDays.SIX_MONTHS
 MAX_LAMBDA_NAME_LENGTH = 64
@@ -109,7 +109,7 @@ class LambdaConfig:
         memory_size (int): Memory allocation in MB (default: 128)
         timeout_minutes (int): Function timeout in minutes (default: 5)
         environment_variables (Optional[Dict[str, str]]): Environment variables for the function
-        runtime (lambda_.Runtime): Lambda runtime (default: PYTHON_3_12)
+        runtime (lambda_.Runtime): Lambda runtime (default: PYTHON_3_13)
         architecture (lambda_.Architecture): CPU architecture (default: X86_64)
         layers (Optional[List[PythonLayerVersion]]): Lambda layers to attach
         iam_role_name (Optional[str]): Custom IAM role name
@@ -127,6 +127,7 @@ class LambdaConfig:
     iam_role_name: Optional[str] = None
     vpc: Optional[ec2.IVpc] = None
     security_groups: Optional[List[ec2.ISecurityGroup]] = None
+    iam_role_boundary_policy: Optional[iam.ManagedPolicy] = None
 
 
 class Lambda(Construct):
@@ -215,29 +216,36 @@ class Lambda(Construct):
 
         # Create IAM role
         logger.debug("Setting up IAM role")
-        basic_execution_policy = iam.ManagedPolicy.from_aws_managed_policy_name(
-            "service-role/AWSLambdaBasicExecutionRole"
+
+        # Create custom policy for log group access
+        logs_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+            ],
+            resources=[f"{lambda_log_group.log_group_arn}:*"],
         )
 
+        ## Creation of IAM role for Lambda function
+        role_id = f"{lambda_function_name}ExecutionRole"
+        role_props = {
+            "assumed_by": iam.ServicePrincipal("lambda.amazonaws.com"),
+        }
+
         if config.iam_role_name:
-            role_id = f"{lambda_function_name}ExecutionRole"
             logger.debug(f"Using custom role name: {config.iam_role_name}")
-            self._lambda_role = iam.Role(
-                self,
-                role_id,
-                assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-                role_name=config.iam_role_name,
-                managed_policies=[basic_execution_policy],
-            )
-        else:
-            role_id = f"{lambda_function_name}ExecutionRole"
-            logger.debug(f"Creating default role: {role_id}")
-            self._lambda_role = iam.Role(
-                self,
-                role_id,
-                assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-                managed_policies=[basic_execution_policy],
-            )
+            role_props["role_name"] = config.iam_role_name
+
+        if config.iam_role_boundary_policy:
+            logger.debug("Adding boundary permissions to role")
+            role_props["permissions_boundary"] = config.iam_role_boundary_policy
+
+        self._lambda_role = iam.Role(self, role_id, **role_props)
+
+        # Add the logs policy to the role
+        self._lambda_role.add_to_policy(logs_policy)
 
         # Prepare Lambda props
         logger.debug("Preparing Lambda function properties")
@@ -353,6 +361,16 @@ class Lambda(Construct):
 
     @property
     def lambda_role(self) -> iam.Role:
+        """
+        Get the IAM role associated with the Lambda function.
+
+        Returns:
+            iam.Role: The IAM role attached to the Lambda function
+        """
+        return self._lambda_role
+
+    @property
+    def iam_role(self) -> iam.Role:
         """
         Get the IAM role associated with the Lambda function.
 

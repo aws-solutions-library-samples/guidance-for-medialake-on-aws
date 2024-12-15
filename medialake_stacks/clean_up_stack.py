@@ -5,6 +5,7 @@ from aws_cdk import (
     CustomResource,
     RemovalPolicy,
     aws_iam as iam,
+    aws_events as events,
     aws_dynamodb as dynamodb,
     custom_resources as cr,
 )
@@ -14,7 +15,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 
 @dataclass
 class CleanupStackProps:
-    stub: str
+    ingest_event_bus: events.EventBus
 
 
 class CleanupStack(Stack):
@@ -32,7 +33,6 @@ class CleanupStack(Stack):
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="type",
                 sort_key_type=dynamodb.AttributeType.STRING,
-                point_in_time_recovery=True,
             ),
         )
 

@@ -65,8 +65,10 @@ touch config.json
 {
   "environment": "dev",
   "project": "medialake",
-  "region": "us-east-1",
-  "account": "your-aws-account-id"
+  "region": "your-deployment-region",
+  "account_id": "your-aws-account-id",
+  "global_prefix": "medialake",
+  "primary_region": "us-east-1"
 }
 ```
 
