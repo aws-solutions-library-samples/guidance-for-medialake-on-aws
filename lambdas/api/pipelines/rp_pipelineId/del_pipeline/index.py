@@ -270,9 +270,29 @@ def delete_pipeline(pipeline_id: str):
                     )
 
         # Delete IAM role
-        if "roleArn" in pipeline:
+        if "sfnRoleArn" in pipeline:
             try:
-                delete_iam_role(pipeline["roleArn"])
+                delete_iam_role(pipeline["sfnRoleArn"])
+            except Exception as e:
+                if (
+                    not isinstance(e, ClientError)
+                    or e.response["Error"]["Code"] != "NoSuchEntity"
+                ):
+                    deletion_errors.append(f"Failed to delete IAM role: {str(e)}")
+
+        if "executerRoleArn" in pipeline:
+            try:
+                delete_iam_role(pipeline["executerRoleArn"])
+            except Exception as e:
+                if (
+                    not isinstance(e, ClientError)
+                    or e.response["Error"]["Code"] != "NoSuchEntity"
+                ):
+                    deletion_errors.append(f"Failed to delete IAM role: {str(e)}")
+
+        if "s3DynamoRWRoleArn" in pipeline:
+            try:
+                delete_iam_role(pipeline["s3DynamoRWRoleArn"])
             except Exception as e:
                 if (
                     not isinstance(e, ClientError)

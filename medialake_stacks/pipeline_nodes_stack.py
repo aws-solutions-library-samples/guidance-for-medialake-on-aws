@@ -134,12 +134,12 @@ class PipelineNodesStack(Stack):
         )
 
     @property
-    def image_metadata_extractor(self) -> dict:
-        return self._image_metadata_extractor_item
+    def image_metadata_extractor_lambda(self) -> dict:
+        return self._image_metadata_extractor_lambda
 
     @property
-    def image_proxy_item(self) -> dict:
-        return self._image_proxy_item
+    def image_proxy_lambda(self) -> dict:
+        return self._image_proxy_lambda
 
     @property
     def pipelne_nodes_table(self) -> dynamodb.TableV2:

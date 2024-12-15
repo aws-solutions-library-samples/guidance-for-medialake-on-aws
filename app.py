@@ -37,6 +37,7 @@ from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
 )
+
 from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStack,
     PipelineNodesStackProps,
@@ -166,7 +167,10 @@ class MediaLakeStack(cdk.Stack):
             media_assets_bucket=base_infrastructure.media_assets_bucket,
             props=ApiGatewayPipelinesProps(
                 asset_table=base_infrastructure.asset_table,
+                connector_table=connectors.connector_table,
                 pipeline_table=base_infrastructure.pipeline_table,
+                image_proxy_lambda=self._pipeline_nodes_stack.image_proxy_lambda,
+                image_metadata_extractor_lambda=self._pipeline_nodes_stack.image_metadata_extractor_lambda,
                 iac_assets_bucket=base_infrastructure.iac_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
@@ -179,6 +183,7 @@ class MediaLakeStack(cdk.Stack):
             "Search",
             props=SearchProps(
                 asset_table=base_infrastructure.asset_table,
+                media_assets_bucket=base_infrastructure.media_assets_bucket,
                 api_resource=self.api_gateway.rest_api,
                 cognito_authorizer=self.api_gateway.cognito_authorizer,
                 x_origin_verify_secret=self.api_gateway.x_origin_verify_secret,

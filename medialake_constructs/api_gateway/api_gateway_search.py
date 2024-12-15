@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
     aws_ec2 as ec2,
+    aws_s3 as s3,
     Duration,
     aws_iam as iam,
 )
@@ -21,6 +22,7 @@ from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 @dataclass
 class SearchProps:
     asset_table: dynamodb.TableV2
+    media_assets_bucket: s3.Bucket
     api_resource: apigateway.IResource
     cognito_authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
@@ -109,8 +111,8 @@ class SearchConstruct(Construct):
                     "kms:GenerateDataKey",
                 ],
                 resources=[
-                    "arn:aws:s3:::medialake-asset-bucket-*/*",
-                    "arn:aws:s3:::medialake-asset-bucket-*",
+                    f"{props.media_assets_bucket.bucket_arn}/*",
+                    f"{props.media_assets_bucket.bucket_arn}",
                     "arn:aws:kms:*:*:key/*",
                 ],
             )

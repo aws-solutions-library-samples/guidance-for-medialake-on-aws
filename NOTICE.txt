@@ -38,8 +38,7 @@ Crypto-js under the Massachusetts Institute of Technology (MIT) license
 aws-elasticsearch-connector under the Massachusetts Institute of Technology (MIT) license
 node-xml2js under the Massachusetts Institute of Technology (MIT) license
 Rusha (NodeJS) under the Massachusetts Institute of Technology (MIT) license
-ExitTool by Phil Harvey - This package is distributed under Artistic License 1.0 (Perl). Amazon expressly elects to distribute the package under the Artistic License 1.0 (Perl) and NOT under GNU General Public License Version 1.
-Perl/Perl5 - This package is distributed under Artistic License 1.0 (Perl). Amazon expressly elects to distribute the package under the Artistic License 1.0 (Perl) and NOT under GNU General Public License Version 1.
+exifr under the Massachusetts Institute of Technology (MIT) license
 Fontawesome icon under Font Awesome Free License
 MediaInfo under the BSD-2-Clause License
 Apache ECharts under the Apache License Version 2.0

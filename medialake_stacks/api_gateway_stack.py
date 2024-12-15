@@ -25,10 +25,7 @@ from medialake_constructs.api_gateway.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
 )
-from medialake_constructs.api_gateway.api_gateway_pipelines import (
-    ApiGatewayPipelinesConstruct,
-    ApiGatewayPipelinesProps,
-)
+
 from medialake_constructs.api_gateway.api_gateway_search import (
     SearchConstruct,
     SearchProps,

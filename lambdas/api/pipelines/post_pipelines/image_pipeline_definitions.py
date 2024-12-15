@@ -2,8 +2,8 @@
 
 
 def get_state_machine_definition(
-    # image_metadata_extractor_arn: str,
-    # image_proxy_lambda_arn: str,
+    image_metadata_extractor_arn: str,
+    image_proxy_lambda_arn: str,
     pipeline_name: str,
     # asset_table_name: str,
     output_bucket_name: str,
@@ -18,7 +18,7 @@ def get_state_machine_definition(
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
                 "Parameters": {
-                    "FunctionName": "image_metadata_extractor_arn",
+                    "FunctionName": image_metadata_extractor_arn,
                     "Payload": {"pipeline_id.$": "$.pipeline_id", "input.$": "$.input"},
                 },
                 "ResultPath": "$.metadataResult",
@@ -28,7 +28,7 @@ def get_state_machine_definition(
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
                 "Parameters": {
-                    "FunctionName": "image_proxy_lambda_arn",
+                    "FunctionName": image_proxy_lambda_arn,
                     "Payload": {
                         "pipeline_id.$": "$.pipeline_id",
                         "input.$": "$.input",
@@ -43,7 +43,7 @@ def get_state_machine_definition(
                 "Type": "Task",
                 "Resource": "arn:aws:states:::lambda:invoke",
                 "Parameters": {
-                    "FunctionName": "image_proxy_lambda_arn",
+                    "FunctionName": image_proxy_lambda_arn,
                     "Payload": {
                         "pipeline_id.$": "$.pipeline_id",
                         "input.$": "$.input",

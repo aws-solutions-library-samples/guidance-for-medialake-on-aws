@@ -229,8 +229,9 @@ class OpenSearchServerlessConstruct(Construct):
             encoding="utf-8"
         )
 
-        code_hash = hashlib.sha256(lambda_code.encode(), usedforsecurity=False).hexdigest()
-
+        code_hash = hashlib.sha256(
+            lambda_code.encode(), usedforsecurity=False
+        ).hexdigest()
 
         create_index_resource = CustomResource(
             self,

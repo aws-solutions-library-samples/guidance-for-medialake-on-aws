@@ -1,6 +1,7 @@
 from aws_cdk import (
     aws_opensearchservice as opensearch,
     aws_ec2 as ec2,
+    aws_logs as logs,
     Stack,
     RemovalPolicy,
     CfnOutput,
@@ -63,25 +64,42 @@ class CustomVpc(Construct):
 
         self.vpc_id = self.vpc.vpc_id
 
-    # def _add_interface_endpoints(self) -> None:
-    # """Add VPC interface endpoints for common AWS services"""
-    # self.vpc.add_interface_endpoint(
-    #     "ECRDockerEndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER
-    # )
+        # def _add_interface_endpoints(self) -> None:
+        # """Add VPC interface endpoints for common AWS services"""
+        # self.vpc.add_interface_endpoint(
+        #     "ECRDockerEndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER
+        # )
 
-    # self.vpc.add_interface_endpoint(
-    #     "ECREndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR
-    # )
+        # self.vpc.add_interface_endpoint(
+        #     "ECREndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR
+        # )
 
-    # self.vpc.add_interface_endpoint(
-    #     "CloudWatchLogsEndpoint",
-    #     service=ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-    # )
+        # self.vpc.add_interface_endpoint(
+        #     "CloudWatchLogsEndpoint",
+        #     service=ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+        # )
 
-    # self.vpc.add_interface_endpoint(
-    #     "SecretsManagerEndpoint",
-    #     service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-    # )
+        # self.vpc.add_interface_endpoint(
+        #     "SecretsManagerEndpoint",
+        #     service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        # )
+
+        # Create a CloudWatch Log Group for Flow Logs
+        flow_log_group = logs.LogGroup(
+            self,
+            "VpcFlowLogGroup",
+            log_group_name=f"{props.vpc_name}-flow-logs",
+            retention=logs.RetentionDays.ONE_MONTH,  # Adjust retention as needed
+            removal_policy=RemovalPolicy.DESTROY,  # Change as per compliance requirements
+        )
+        #  Enable VPC Flow Logs
+        flow_log = ec2.FlowLog(
+            self,
+            "VpcFlowLog",
+            resource_type=ec2.FlowLogResourceType.from_vpc(self.vpc),
+            traffic_type=ec2.FlowLogTrafficType.ALL,  # Capture all traffic
+            destination=ec2.FlowLogDestination.to_cloud_watch_logs(flow_log_group),
+        )
 
     def get_subnet_ids(self, subnet_type: ec2.SubnetType) -> List[str]:
         """Get subnet IDs for a specific subnet type"""
