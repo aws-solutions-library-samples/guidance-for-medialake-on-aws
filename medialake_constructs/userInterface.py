@@ -493,6 +493,14 @@ class UIConstruct(Construct):
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_root_object=props.distribution_default_root_object,
             geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
+            error_responses=[
+                cloudfront.ErrorResponse(
+                    http_status=403,
+                    response_http_status=200,
+                    response_page_path="/index.html",
+                    ttl=Duration.minutes(0),
+                )
+            ],
         )
 
         # S3 Deployment
