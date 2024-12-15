@@ -19,6 +19,7 @@ from medialake_constructs.api_gateway.api_gateway_main_construct import (
 
 from medialake_constructs.api_gateway.api_gateway_pipelines import (
     ApiGatewayPipelinesConstruct,
+    ApiGatewayPipelinesProps,
 )
 
 from config import config
@@ -66,6 +67,7 @@ class ApiGatewayStackProps:
     collection_endpoint: str
     collection_arn: str
     access_log_bucket: s3.Bucket
+    pipeline_table: dynamodb.TableV2
     # medialake_ui_s3_bucket: s3.Bucket
 
 
@@ -114,9 +116,9 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _pipelines_api_gateway = ApiGatewayPipelinesConstruct(
+        pipelines = ApiGatewayPipelinesConstruct(
             self,
-            "PipelinesApiGateway",
+            "Pipelines",
             api_resource=self._api_gateway.rest_api,
             cognito_authorizer=self._api_gateway.cognito_authorizer,
             ingest_event_bus=props.ingest_event_bus,
@@ -125,6 +127,10 @@ class ApiGatewayStack(Stack):
             media_assets_bucket=props.media_assets_bucket,
             props=ApiGatewayPipelinesProps(
                 asset_table=props.asset_table,
+                connector_table=self._connectors_api_gateway.connector_table,
+                pipeline_table=props.pipeline_table,
+                image_proxy_lambda=self._pipeline_nodes_stack.image_proxy_lambda,
+                image_metadata_extractor_lambda=self._pipeline_nodes_stack.image_metadata_extractor_lambda,
                 iac_assets_bucket=props.iac_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
@@ -179,7 +185,6 @@ class ApiGatewayStack(Stack):
                 cognito_identity_pool=self._cognito_construct.identity_pool,
                 api_gateway_rest_id=self._api_gateway.rest_api.rest_api_id,
                 access_log_bucket=props.access_log_bucket,
-                # medialake_ui_s3_bucket=props.medialake_ui_s3_bucket,
             ),
         )
 

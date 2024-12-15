@@ -30,15 +30,12 @@ from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB,
     DynamoDBProps,
 )
-<<<<<<< HEAD
-=======
 
 from medialake_constructs.shared_constructs.lambda_layers import (
     IngestMediaProcessorLayer,
 )
 
 
->>>>>>> 94f2e8deb899e6bc3d0362ae66ec5fdc5675b665
 @dataclass
 class ConnectorsProps:
     asset_table: dynamodb.TableV2
@@ -197,8 +194,6 @@ class ConnectorsConstruct(Construct):
         # Add connector_id path parameter resource
         connector_id_resource = connectors_resource.add_resource("{connector_id}")
 
-<<<<<<< HEAD
-=======
         connectors_get_lambda_config = LambdaConfig(
             name="connectors_get_lambda",
             entry="lambdas/api/connectors/get_connectors",
@@ -207,7 +202,7 @@ class ConnectorsConstruct(Construct):
                 "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
             },
         )
->>>>>>> 94f2e8deb899e6bc3d0362ae66ec5fdc5675b665
+
         connectors_get_lambda = Lambda(
             self,
             "ConnectorsGetLambda",
@@ -218,7 +213,7 @@ class ConnectorsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "MEDIALAKE_CONNECTOR_TABLE": dynamo_table.table_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
                 },
             ),
         )
@@ -297,7 +292,6 @@ class ConnectorsConstruct(Construct):
         )
 
         # Update IAM/S3 policy with account-specific ARNs
-<<<<<<< HEAD
         # connectors_del_lambda.function.add_to_role_policy(
         #     iam.PolicyStatement(
         #         actions=[
@@ -311,7 +305,6 @@ class ConnectorsConstruct(Construct):
         #         resources=["arn:aws:s3:*"],
         #     )
         # )
-=======
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -325,7 +318,7 @@ class ConnectorsConstruct(Construct):
                 resources=["arn:aws:s3:::*"],
             )
         )
->>>>>>> 94f2e8deb899e6bc3d0362ae66ec5fdc5675b665
+
         # Policy for S3 actions
         # connectors_del_lambda.function.role.add_to_policy(
         #     iam.PolicyStatement(
@@ -377,15 +370,9 @@ class ConnectorsConstruct(Construct):
             iam.PolicyStatement(
                 actions=[
                     "sqs:GetQueueAttributes",
-<<<<<<< HEAD
-                    # "sqs:CreateQueue",
-                    "sqs:DeleteQueue",
-                    # "sqs:SetQueueAttributes",
-=======
                     "sqs:CreateQueue",
                     "sqs:DeleteQueue",  ## needed for delete connector
                     "sqs:SetQueueAttributes",
->>>>>>> 94f2e8deb899e6bc3d0362ae66ec5fdc5675b665
                 ],
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
@@ -429,12 +416,12 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
                     "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
-                    "RESOURCE_TABLE": props.resource_table.table_name,
+                    # "RESOURCE_TABLE": props.resource_table.table_name,
                 },
             ),
         )
 
-        props.resource_table.grant_read_write_data(connector_s3_post_lambda.function)
+        # props.resource_table.grant_read_write_data(connector_s3_post_lambda.function)
 
         if props.iac_assets_bucket.bucket.encryption_key:
             connector_s3_post_lambda.function.add_to_role_policy(
@@ -619,7 +606,7 @@ class ConnectorsConstruct(Construct):
         )
 
         # IAM Permissions - grant read to connectors table and access S3 buckets
-        dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
+        self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -656,8 +643,6 @@ class ConnectorsConstruct(Construct):
         #         resources=[self.dynamo_table.table_arn],
         #     )
         # )
-<<<<<<< HEAD
-=======
 
         self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
 
@@ -665,4 +650,3 @@ class ConnectorsConstruct(Construct):
     def connector_table(self) -> str:
 
         return self.dynamo_table
->>>>>>> 94f2e8deb899e6bc3d0362ae66ec5fdc5675b665
