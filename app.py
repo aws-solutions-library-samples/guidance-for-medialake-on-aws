@@ -10,6 +10,10 @@ from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackP
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from medialake_stacks.medialake_monitoring_stack import MediaLakeMonitoringStack
+from medialake_stacks.pipeline_nodes_stack import (
+    PipelineNodesStack,
+    PipelineNodesStackProps,
+)
 
 app = cdk.App()
 
@@ -20,6 +24,11 @@ base_infrastructure = BaseInfrastructureStack(
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
+pipeline_nodes_stack = PipelineNodesStack(
+    app,
+    "MediaLakePipelineNodes",
+    props=PipelineNodesStackProps(asset_table=base_infrastructure.asset_table),
+)
 
 # Create API Gateway Stack with explicit dependencies
 api_gateway_stack = ApiGatewayStack(
@@ -38,6 +47,8 @@ api_gateway_stack = ApiGatewayStack(
         collection_arn=base_infrastructure.collection_arn,
         access_log_bucket=base_infrastructure.access_log_bucket,
         pipeline_table=base_infrastructure.pipeline_table,
+        image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+        image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )

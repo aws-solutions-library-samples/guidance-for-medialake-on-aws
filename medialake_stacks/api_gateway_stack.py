@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_ec2 as ec2,
+    aws_lambda as lambda_,
     aws_events as events,
     aws_apigateway as apigateway,
     aws_logs as logs,
@@ -68,6 +69,8 @@ class ApiGatewayStackProps:
     collection_arn: str
     access_log_bucket: s3.Bucket
     pipeline_table: dynamodb.TableV2
+    image_metadata_extractor_lambda: lambda_.Function
+    image_proxy_lambda: lambda_.Function
     # medialake_ui_s3_bucket: s3.Bucket
 
 
@@ -93,7 +96,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _connectors_api_gateway = ConnectorsConstruct(
+        self._connectors_api_gateway = ConnectorsConstruct(
             self,
             "ConnectorsApiGateway",
             props=ConnectorsProps(
@@ -129,8 +132,8 @@ class ApiGatewayStack(Stack):
                 asset_table=props.asset_table,
                 connector_table=self._connectors_api_gateway.connector_table,
                 pipeline_table=props.pipeline_table,
-                image_proxy_lambda=self._pipeline_nodes_stack.image_proxy_lambda,
-                image_metadata_extractor_lambda=self._pipeline_nodes_stack.image_metadata_extractor_lambda,
+                image_proxy_lambda=props.image_proxy_lambda,
+                image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
                 iac_assets_bucket=props.iac_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
