@@ -225,6 +225,16 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
+        self._pipelne_table = DynamoDB(
+            self,
+            "PipelinesTable",
+            props=DynamoDBProps(
+                name=f"medialake_pipeline_table",
+                partition_key_name="id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+            ),
+        )
+
         self._asset_table = DynamoDB(
             self,
             "MediaLakeAssetTable",
@@ -398,6 +408,52 @@ class BaseInfrastructureStack(Stack):
             )
         )
 
+        # ddb_pipeline_cr_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=[
+        #             "logs:CreateLogDelivery",
+        #             "logs:PutResourcePolicy",
+        #             "logs:UpdateLogDelivery",
+        #             "logs:DeleteLogDelivery",
+        #             "logs:DescribeResourcePolicies",
+        #             "logs:GetLogDelivery",
+        #             "logs:ListLogDeliveries",
+        #             "logs:CreateLogGroup",
+        #             "logs:CreateLogStream",
+        #             "logs:PutLogEvents",
+        #             "logs:DescribeLogGroups",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
+
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=[
+                    f"arn:aws:logs:{self.region}:{self.account}:log-group:{ingestion_log_group.log_group_name}:*"
+                ],
+            )
+        )
+
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:DescribeLogGroups",
+                ],
+                resources=[
+                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-*"
+                ],
+            )
+        )
+
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -409,12 +465,10 @@ class BaseInfrastructureStack(Stack):
                     "logs:DescribeResourcePolicies",
                     "logs:GetLogDelivery",
                     "logs:ListLogDeliveries",
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                    "logs:DescribeLogGroups",
                 ],
-                resources=["*"],
+                resources=[
+                    "*"
+                ],  # These actions typically require '*' as they operate across all log groups
             )
         )
 
@@ -423,8 +477,28 @@ class BaseInfrastructureStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["iam:ListPolicies"],
                 resources=["*"],
+                # These actions typically require '*' as they operate across all log groups
             )
         )
+
+        # ddb_pipeline_cr_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=[
+        #             "iam:CreatePolicy",
+        #             "iam:DeletePolicy",
+        #         ],
+        #         conditions={
+        #             "StringEquals": {
+        #                 "iam:PolicyName": [
+        #                     "IngestionPipelinePolicy",
+        #                     "DynamoDBIngestionPolicy",
+        #                 ]
+        #             }
+        #         },
+        #         resources=["*"],
+        #     )
+        # )
 
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
@@ -441,27 +515,80 @@ class BaseInfrastructureStack(Stack):
                         ]
                     }
                 },
-                resources=["*"],
+                resources=[f"arn:aws:iam::{self.account}:policy/*"],
             )
         )
 
-        ddb_pipeline_cr_role.add_to_policy(
+        # ddb_pipeline_cr_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=[
+        #             "s3:GetObject",
+        #             "s3:ListObjects",
+        #             "s3:DeleteObject",
+        #             "s3:DeleteObjectVersion",
+        #             "s3:ListBucket",
+        #             "s3:DeleteBucket",
+        #         ],
+        #         resources=[
+        #             self._ddb_export_bucket.bucket.bucket_arn,
+        #             f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
+        #         ],
+        #     )
+        # )
+
+        ingestion_pipeline_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetBucketLocation",
+                    "s3:ListBucket",
+                ],
+                resources=[self._ddb_export_bucket.bucket.bucket_arn],
+            )
+        )
+
+        ingestion_pipeline_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                ],
+                resources=[f"{self._ddb_export_bucket.bucket.bucket_arn}/*"],
+            )
+        )
+        ingestion_pipeline_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "s3:GetObject",
-                    "s3:ListObjects",
-                    "s3:DeleteObject",
-                    "s3:DeleteObjectVersion",
-                    "s3:ListBucket",
-                    "s3:DeleteBucket",
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
                 ],
-                resources=[
-                    self._ddb_export_bucket.bucket.bucket_arn,
-                    f"{self._ddb_export_bucket.bucket.bucket_arn}/*",
-                ],
+                resources=["*"],
+                # These actions typically require '*' as they operate across all log groups
             )
         )
+
+        # ddb_pipeline_cr_role.add_to_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=[
+        #             "ec2:CreateVpcEndpoint",
+        #             "ec2:DeleteVpcEndpoints",
+        #             "ec2:ListVpcEndpoints",
+        #             "ec2:DescribeVpcEndpoints",
+        #             "ec2:DescribeVpcs",
+        #             "ec2:DescribeSubnets",
+        #             "ec2:DescribeSecurityGroups",
+        #             "ec2:CreateTags",
+        #             "ec2:DeleteTags",
+        #             "route53:AssociateVPCWithHostedZone",
+        #             "route53:DisassociateVPCFromHostedZone",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
 
         ddb_pipeline_cr_role.add_to_policy(
             iam.PolicyStatement(
@@ -476,10 +603,19 @@ class BaseInfrastructureStack(Stack):
                     "ec2:DescribeSecurityGroups",
                     "ec2:CreateTags",
                     "ec2:DeleteTags",
+                ],
+                resources=[f"arn:aws:ec2:{self.region}:{self.account}:*"],
+            )
+        )
+
+        ddb_pipeline_cr_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
                     "route53:AssociateVPCWithHostedZone",
                     "route53:DisassociateVPCFromHostedZone",
                 ],
-                resources=["*"],
+                resources=[f"arn:aws:route53:::hostedzone/*"],
             )
         )
 
@@ -496,16 +632,41 @@ class BaseInfrastructureStack(Stack):
         ingestion_pipeline_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "iam:*",
-                    "osis:*",
-                    "opensearch:*",
-                    "dynamodb:*",
-                    "s3:*",
-                    "ec2:*",
+                    "opensearch:CreateDomain",
+                    "opensearch:DeleteDomain",
+                    "opensearch:DescribeDomain",
                 ],
-                resources=["*"],
+                resources=[f"arn:aws:opensearch:{self.region}:{self.account}:domain/*"],
             )
         )
+
+        ingestion_pipeline_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "osis:GetPipeline",
+                    "osis:CreatePipeline",
+                    "osis:DeletePipeline",
+                ],
+                resources=[
+                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
+                ],
+            )
+        )
+
+        # ingestion_pipeline_lambda.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "iam:*",
+        #             "osis:*",
+        #             "opensearch:*",
+        #             "dynamodb:*",
+        #             "s3:*",
+        #             "ec2:*",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
 
         # Define Custom Resource for Ingestion Pipeline
         ingestion_provider = cr.Provider(
@@ -572,6 +733,17 @@ class BaseInfrastructureStack(Stack):
         """
 
         return self._asset_table
+
+    @property
+    def pipeline_table(self) -> dynamodb.TableV2:
+        """
+        Returns the DynamoDB table used for storing pipelines.
+
+        Returns:
+            dynamodb.TableV2: The configured DynamoDB table
+        """
+
+        return self._pipelne_table
 
     @property
     def asset_table_name(self) -> str:

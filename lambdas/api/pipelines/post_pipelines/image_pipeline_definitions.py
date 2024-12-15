@@ -1,11 +1,11 @@
-import os
+# import os
 
 
 def get_state_machine_definition(
     image_metadata_extractor_arn: str,
     image_proxy_lambda_arn: str,
     pipeline_name: str,
-    asset_table_name: str,
+    # asset_table_name: str,
     output_bucket_name: str,
 ) -> dict:
     """Returns the state machine definition with the provided ARNs"""
@@ -60,26 +60,26 @@ def get_state_machine_definition(
     }
 
 
-def create_metadata_extractor_lambda(
-    lambda_client,
-    function_name: str,
-    role_arn: str,
-    deployment_bucket: str,
-    deployment_zip: str,
-    environment_variables: dict,
-    tags: dict,
-) -> dict:
-    """Creates the metadata extractor lambda function"""
-    return lambda_client.create_function(
-        FunctionName=function_name,
-        Runtime="nodejs22.x",
-        Role=role_arn,
-        Timeout=900,
-        Handler="index.lambda_handler",
-        Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Environment={"Variables": environment_variables},
-        Tags=tags,
-    )
+# def create_metadata_extractor_lambda(
+#     lambda_client,
+#     function_name: str,
+#     role_arn: str,
+#     deployment_bucket: str,
+#     deployment_zip: str,
+#     environment_variables: dict,
+#     tags: dict,
+# ) -> dict:
+#     """Creates the metadata extractor lambda function"""
+#     return lambda_client.create_function(
+#         FunctionName=function_name,
+#         Runtime="nodejs22.x",
+#         Role=role_arn,
+#         Timeout=900,
+#         Handler="index.lambda_handler",
+#         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+#         Environment={"Variables": environment_variables},
+#         Tags=tags,
+#     )
 
 
 # def create_metadata_extractor_lambda(
@@ -106,27 +106,27 @@ def create_metadata_extractor_lambda(
 #     )
 
 
-def create_image_proxy_lambda(
-    lambda_client,
-    function_name: str,
-    role_arn: str,
-    deployment_bucket: str,
-    deployment_zip: str,
-    environment_variables: dict,
-    tags: dict,
-) -> dict:
-    """Creates the image proxy lambda function"""
-    return lambda_client.create_function(
-        FunctionName=function_name,
-        Runtime="python3.12",
-        Role=role_arn,
-        Timeout=900,
-        MemorySize=10240,
-        Handler="index.lambda_handler",
-        Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-        Layers=[
-            "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:56"
-        ],
-        Environment={"Variables": environment_variables},
-        Tags=tags,
-    )
+# def create_image_proxy_lambda(
+#     lambda_client,
+#     function_name: str,
+#     role_arn: str,
+#     deployment_bucket: str,
+#     deployment_zip: str,
+#     environment_variables: dict,
+#     tags: dict,
+# ) -> dict:
+#     """Creates the image proxy lambda function"""
+#     return lambda_client.create_function(
+#         FunctionName=function_name,
+#         Runtime="python3.12",
+#         Role=role_arn,
+#         Timeout=900,
+#         MemorySize=10240,
+#         Handler="index.lambda_handler",
+#         Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+#         Layers=[
+#             "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:56"
+#         ],
+#         Environment={"Variables": environment_variables},
+#         Tags=tags,
+#     )

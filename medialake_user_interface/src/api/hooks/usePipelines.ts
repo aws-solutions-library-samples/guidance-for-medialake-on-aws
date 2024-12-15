@@ -64,6 +64,41 @@ export const useCreatePipeline = () => {
     });
 };
 
+export const useDeletePipeline = () => {
+    const { showError } = useErrorModal();
+
+    return useMutation<void, Error, string>({
+        mutationFn: async (pipelineId) => {
+            await apiClient.delete(`${API_ENDPOINTS.PIPELINES}/${pipelineId}`);
+        },
+        onError: (error) => {
+            logger.error('Delete pipeline error:', error);
+            if (error.message === 'Network Error') {
+                showError('Unable to delete pipeline - API is not available');
+            } else {
+                showError(`Failed to delete pipeline: ${error.message}`);
+            }
+        },
+        onSuccess: (_, deletedPipelineId) => {
+            queryClient.setQueryData<PipelineListResponse>(
+                [QUERY_KEYS.PIPELINES],
+                (old) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        data: {
+                            ...old.data,
+                            pipelines: old.data.pipelines.filter(
+                                (pipeline) => pipeline.id !== deletedPipelineId
+                            )
+                        }
+                    };
+                }
+            );
+        },
+    });
+};
+
 
 export const usePipeline = (
     pageSize: number = 20,
@@ -85,6 +120,9 @@ export const usePipeline = (
                 }
                 if (filters?.status) {
                     params.status = filters.status;
+                }
+                if (filters?.system) {
+                    params.system = filters.system;
                 }
                 if (filters?.startDate) {
                     params.startDate = filters.startDate;

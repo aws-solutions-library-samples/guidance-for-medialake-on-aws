@@ -15,6 +15,7 @@ export interface Pipeline {
 
 export interface PipelineFilters {
     status?: string;
+    system?: string;
     startDate?: string;
     endDate?: string;
     sortBy?: string;
@@ -125,6 +126,9 @@ export interface PipelineViewport {
     zoom: number;
 }
 
+export interface DeletePipelineRequest {
+    id: string;
+}
 
 export interface CreatePipelineRequest {
     name: string;
@@ -138,13 +142,13 @@ export interface CreatePipelineRequest {
 }
 
 export interface PipelineResponse {
+    id: string;
     status: string;
     message: string;
     data: {
         searchMetadata: PipelineSearchMetadata;
-        s: Pipeline[]; // If the API actually returns 's'
+        s: Pipeline[]; // need to update the lambda to return pipelines instead of s
         error?: string;
-        // ... other fields from the original PipelineResponse ...
         id?: string;
         name?: string;
         type?: string;

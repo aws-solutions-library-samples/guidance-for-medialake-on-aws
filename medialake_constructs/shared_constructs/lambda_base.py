@@ -9,7 +9,7 @@ Lambda deployment including standardized naming conventions and resource validat
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 import re
-import logging
+import os
 
 from aws_cdk import (
     aws_lambda as lambda_,
@@ -25,6 +25,11 @@ from aws_cdk.aws_lambda_python_alpha import (
     BundlingOptions,
     PythonLayerVersion,
 )
+from aws_cdk.aws_lambda_nodejs import (
+    NodejsFunction,
+    BundlingOptions as NodeJSBundlingOptions,
+)
+
 from constructs import Construct
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
@@ -247,21 +252,18 @@ class Lambda(Construct):
         # Add the logs policy to the role
         self._lambda_role.add_to_policy(logs_policy)
 
-        # Prepare Lambda props
+        # Prepare common Lambda props
         logger.debug("Preparing Lambda function properties")
-        lambda_props = {
+        common_lambda_props = {
             "function_name": lambda_function_name,
-            "entry": config.entry or f"lambdas/{lambda_function_name}",
             "handler": "lambda_handler",
+            "entry": config.entry or f"lambdas/{lambda_function_name}",
             "role": self._lambda_role,
             "log_group": lambda_log_group,
             "runtime": config.runtime,
             "architecture": config.architecture,
             "timeout": Duration.minutes(config.timeout_minutes),
             "memory_size": config.memory_size,
-            "bundling": BundlingOptions(
-                asset_excludes=[".venv", "cdk.out"],
-            ),
             "tracing": lambda_.Tracing.ACTIVE,
             "layers": layer_objects,
         }
@@ -273,13 +275,12 @@ class Lambda(Construct):
             lambda_environment_variables["external_payload_s3_bucket"] = (
                 f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
             )
-            lambda_props["environment"] = config.environment_variables
+            common_lambda_props["environment"] = lambda_environment_variables
 
         # Add VPC if provided
         if config.vpc:
             logger.debug(f"Adding VPC configuration: {config.vpc}")
-            lambda_vpc = config.vpc
-            lambda_props["vpc"] = lambda_vpc
+            common_lambda_props["vpc"] = config.vpc
 
         # Add Security Groups if provided
         if config.security_groups:
@@ -289,12 +290,56 @@ class Lambda(Construct):
                 raise ValueError(
                     "Security groups can only be added when a VPC is configured"
                 )
-            lambda_props["security_groups"] = config.security_groups
+            common_lambda_props["security_groups"] = config.security_groups
 
-        # Create the Lambda function
-        logger.debug("Creating Lambda function with properties")
+        # Create the Lambda function based on runtime
+        logger.debug(
+            f"Creating {config.runtime.family} Lambda function with properties"
+        )
         try:
-            self._function = PythonFunction(self, "StandardLambda", **lambda_props)
+            if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
+                logger.debug("Creating Node.js Lambda function")
+                common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
+                # common_lambda_props["architecture"] = lambda_.Architecture.ARM_64
+                common_lambda_props["project_root"] = common_lambda_props["entry"]
+                common_lambda_props["deps_lock_file_path"] = (
+                    f"{common_lambda_props["entry"]}/lock.json"
+                )
+                common_lambda_props["entry"] = (
+                    f"{common_lambda_props["entry"]}/index.js"
+                )
+                print("!!!!!")
+                common_lambda_props["entry"] = os.path.abspath(
+                    common_lambda_props["entry"]
+                )
+                common_lambda_props["deps_lock_file_path"] = os.path.abspath(
+                    common_lambda_props["deps_lock_file_path"]
+                )
+
+                print(common_lambda_props["deps_lock_file_path"])
+
+                self._function = NodejsFunction(
+                    self,
+                    "StandardNodeJSLambda",
+                    bundling=NodeJSBundlingOptions(
+                        # external_modules=[
+                        #     "aws-sdk",
+                        # ],
+                        node_modules=[
+                            "exifr",
+                            "aws-sdk",
+                        ],
+                        force_docker_bundling=True,
+                    ),
+                    **common_lambda_props,
+                )
+            else:
+                logger.debug("Creating Python Lambda function")
+                self._function = PythonFunction(
+                    self,
+                    "StandardPythonLambda",
+                    **common_lambda_props,
+                )
             logger.info(f"Successfully created Lambda function: {lambda_function_name}")
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)

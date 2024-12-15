@@ -66,6 +66,24 @@ class OpenSearchCluster(Construct):
         if not props.vpc:
             raise ValueError("A VPC must be provided for the OpenSearch domain.")
 
+        # Define Access Policy
+        access_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            principals=[
+                iam.ServicePrincipal("es.amazonaws.com"),
+            ],
+            actions=[
+                "es:ESHttpPut",
+                "es:ESHttpPost",
+                "es:ESHttpGet",
+                "es:ESHttpDelete",
+                "es:ESHttpHead",
+            ],
+            resources=[
+                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*"
+            ],
+        )
+
         # Create a Security Group with restricted access
         os_security_group = ec2.SecurityGroup(
             self,
@@ -168,6 +186,8 @@ class OpenSearchCluster(Construct):
                 ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
             ],
             security_groups=[os_security_group],
+            # Access Policy added here
+            access_policies=[access_policy],
             # Maintenance window (off-peak)
             off_peak_window_enabled=props.off_peak_window_enabled,
             off_peak_window_start=props.off_peak_window_start,

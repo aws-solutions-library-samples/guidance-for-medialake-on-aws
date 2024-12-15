@@ -20,13 +20,19 @@ import {
     FormControl,
     InputLabel,
     alpha,
-    TextField,
     Stack,
     Snackbar,
     Alert,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    TextField,
 } from '@mui/material';
 import {
     Edit as EditIcon,
+    Delete as DeleteIcon,
     Add as AddIcon,
     RocketLaunch as RocketLaunchIcon,
 } from '@mui/icons-material';
@@ -40,11 +46,10 @@ import {
     ColumnDef,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { PipelineResponse, CreatePipelineRequest, Pipeline } from '@/api/types/pipeline.types';
-import { usePipeline } from '../api/hooks/usePipelines';
+import { PipelineResponse, DeletePipelineRequest, CreatePipelineRequest, Pipeline } from '@/api/types/pipeline.types';
 import { useMediaQuery } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
-import { useCreatePipeline } from '../api/hooks/usePipelines';
+import { useCreatePipeline, usePipeline, useDeletePipeline } from '../api/hooks/usePipelines';
 import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 20;
@@ -56,28 +61,44 @@ const pipelineTypes = {
 } as const;
 
 
-
 const PipelinesPage: React.FC = () => {
     const { t } = useTranslation();
     const theme = useTheme();
     const navigate = useNavigate();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down('lg'));
     const createPipeline = useCreatePipeline();
+    const deletePipeline = useDeletePipeline();
     const [pipelines, setPipelines] = useState<Pipeline[]>([]);
     const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
+    const [showDeleteButton, setShowDeleteButton] = useState(false);
+
 
     const [globalSearch, setGlobalSearch] = useState('');
 
+    const [deleteDialog, setDeleteDialog] = useState({
+        open: false,
+        pipelineId: '',
+        pipelineName: '',
+        userInput: '',
+    });
 
-    const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<{
+        type: string;
+        name: string;
+        system: string; // now it's always a string
+        sortBy: string;
+        sortOrder: 'asc' | 'desc';
+    }>({
         type: '',
         name: '',
         system: '',
         sortBy: 'createdAt',
-        sortOrder: 'desc' as 'asc' | 'desc'
+        sortOrder: 'desc',
     });
+
     const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipeline(PAGE_SIZE, {
-        status: filters.type || undefined,
+        status: filters.type === "" ? undefined : filters.type,
+        system: filters.system === "" ? undefined : filters.system,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder
     });
@@ -98,25 +119,93 @@ const PipelinesPage: React.FC = () => {
     }, [filters.name, setGlobalSearch]);
 
     useEffect(() => {
+        let keySequence: string[] = [];
+        let shiftKeyPressed = false;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+
+
+            if (event.shiftKey) {
+                shiftKeyPressed = true;
+            }
+
+            if (shiftKeyPressed && ['d', 'e', 'l'].includes(event.key.toLowerCase())) {
+                keySequence.push(event.key.toLowerCase());
+
+
+                if (keySequence.join('') === 'del') {
+                    event.preventDefault(); // Prevent default browser behavior
+                    setShowDeleteButton(prev => {
+
+                        return !prev;
+                    });
+
+                    keySequence = []; // Reset the sequence after toggling
+                }
+            } else if (shiftKeyPressed) {
+                // Reset the sequence only if the key pressed is not part of "del"
+                keySequence = [];
+
+            }
+        };
+
+        const handleKeyUp = (event: KeyboardEvent) => {
+
+            if (event.key === 'Shift') {
+                shiftKeyPressed = false;
+                keySequence = []; // Reset the sequence when Shift is released
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, []);
+
+
+    useEffect(() => {
         if (data && data.pages) {
             const allPipelines = data.pages.flatMap(page => page.data.s);
             setPipelines(allPipelines);
         }
     }, [data]);
 
+    const openDeleteDialog = (id: string, name: string) => {
+        setDeleteDialog({
+            open: true,
+            pipelineId: id,
+            pipelineName: name,
+            userInput: '',
+        });
+    };
+
+    const closeDeleteDialog = () => {
+        setDeleteDialog({
+            open: false,
+            pipelineId: '',
+            pipelineName: '',
+            userInput: '',
+        });
+    };
 
     const getChipColor = (type: string) => {
         switch (type.toLowerCase()) {
-            case 'Ingest Triggered':
+
+            case 'ingest triggered':
                 return theme.palette.primary.main;
-            case 'Manually Triggered':
+            case 'manual triggered':
                 return theme.palette.secondary.main;
-            case 'Analysis Triggered':
+            case 'analysis triggered':
                 return theme.palette.success.main;
             default:
                 return theme.palette.grey[500];
         }
     };
+
 
 
     const columns = useMemo<ColumnDef<Pipeline>[]>(
@@ -195,11 +284,27 @@ const PipelinesPage: React.FC = () => {
                                 <EditIcon fontSize="small" />
                             </IconButton>
                         )}
+                        {showDeleteButton && (
+                            <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => openDeleteDialog(row.original.id, row.original.name)}
+                                disabled={deletePipeline.isPending}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        )}
                     </Box>
                 ),
             },
         ],
-        [theme]
+        [theme, showDeleteButton]
     );
 
     const table = useReactTable({
@@ -222,6 +327,36 @@ const PipelinesPage: React.FC = () => {
     const handleEdit = (id: string) => {
         navigate(`/pipelines/${id}`);
     };
+
+    const handleDeletePipeline = async () => {
+        if (deleteDialog.userInput !== deleteDialog.pipelineName) {
+            setSnackbar({
+                open: true,
+                message: 'Pipeline name does not match. Deletion cancelled.',
+                severity: 'error'
+            });
+            return;
+        }
+
+        try {
+            await deletePipeline.mutateAsync(deleteDialog.pipelineId);
+            setSnackbar({
+                open: true,
+                message: 'Pipeline deleted successfully',
+                severity: 'success'
+            });
+            refetch(); // Refetch the pipelines list
+        } catch (error) {
+            setSnackbar({
+                open: true,
+                message: 'Failed to delete pipeline',
+                severity: 'error'
+            });
+        } finally {
+            closeDeleteDialog();
+        }
+    };
+
 
     const handleCreatePipeline = async (pipelineData: CreatePipelineRequest) => {
         setIsCreatingPipeline(true);
@@ -641,12 +776,12 @@ const PipelinesPage: React.FC = () => {
                         <Select
                             value={filters.type}
                             label="Type"
-                            onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                            onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value as string }))}
                         >
                             <MenuItem value="">All</MenuItem>
-                            <MenuItem value={pipelineTypes.INGEST}>Ingest Triggered</MenuItem>
-                            <MenuItem value={pipelineTypes.MANUAL}>Manually Triggered</MenuItem>
-                            <MenuItem value={pipelineTypes.ANALYSIS}>Analysis Triggered</MenuItem>
+                            <MenuItem value="INGEST">Ingest Triggered</MenuItem>
+                            <MenuItem value="MANUAL">Manually Triggered</MenuItem>
+                            <MenuItem value="ANALYSIS">Analysis Triggered</MenuItem>
                         </Select>
                     </FormControl>
                     <FormControl size="small" sx={{
@@ -658,14 +793,18 @@ const PipelinesPage: React.FC = () => {
                         <InputLabel>System</InputLabel>
                         <Select
                             value={filters.system}
+                            onChange={(e) => {
+                                const val = e.target.value as string;
+                                setFilters((prev) => ({ ...prev, system: val }));
+                            }}
                             label="System"
-                            onChange={(e) => setFilters(prev => ({ ...prev, system: e.target.value }))}
                         >
                             <MenuItem value="">All</MenuItem>
                             <MenuItem value="true">Yes</MenuItem>
                             <MenuItem value="false">No</MenuItem>
                         </Select>
                     </FormControl>
+
                 </Box>
             </Box>
 
@@ -781,14 +920,49 @@ const PipelinesPage: React.FC = () => {
                 </Box>
             </Paper>
             <Snackbar
-                open={snackbar.open}
+                open={snackbar.open || deletePipeline.isPending}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 autoHideDuration={6000}
-                onClose={handleCloseSnackbar}>
-                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
+                onClose={handleCloseSnackbar}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={deletePipeline.isPending ? 'info' : snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {deletePipeline.isPending ? 'Deleting pipeline...' : snackbar.message}
                 </Alert>
             </Snackbar>
+            <Dialog open={deleteDialog.open} onClose={closeDeleteDialog}>
+                <DialogTitle>Confirm Pipeline Deletion</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This action cannot be undone. To confirm, please type the pipeline name:
+                        <strong>{deleteDialog.pipelineName}</strong>
+                    </DialogContentText>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Pipeline Name"
+                        fullWidth
+                        variant="outlined"
+                        value={deleteDialog.userInput}
+                        onChange={(e) => setDeleteDialog(prev => ({ ...prev, userInput: e.target.value }))}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDeleteDialog} color="primary">
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeletePipeline}
+                        color="error"
+                        disabled={deleteDialog.userInput !== deleteDialog.pipelineName || deletePipeline.isPending}
+                    >
+                        {deletePipeline.isPending ? <CircularProgress size={24} /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
         </Box>
     );
