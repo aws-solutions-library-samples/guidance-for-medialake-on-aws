@@ -8,8 +8,6 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_events as events,
     aws_apigateway as apigateway,
-    aws_logs as logs,
-    aws_wafv2 as wafv2,
 )
 from constructs import Construct
 from dataclasses import dataclass
@@ -71,7 +69,6 @@ class ApiGatewayStackProps:
     pipeline_table: dynamodb.TableV2
     image_metadata_extractor_lambda: lambda_.Function
     image_proxy_lambda: lambda_.Function
-    # medialake_ui_s3_bucket: s3.Bucket
 
 
 class ApiGatewayStack(Stack):
@@ -119,7 +116,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        pipelines = ApiGatewayPipelinesConstruct(
+        _ = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
             api_resource=self._api_gateway.rest_api,
@@ -140,7 +137,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _search_api_gateway = SearchConstruct(
+        _ = SearchConstruct(
             self,
             "SearchApiGateway",
             props=SearchProps(
@@ -157,7 +154,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _assets_api_gateway = AssetsConstruct(
+        _ = AssetsConstruct(
             self,
             "AssetsApiGateway",
             props=AssetsProps(
@@ -168,7 +165,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _settings_api_gateway = SettingsConstruct(
+        _ = SettingsConstruct(
             self,
             "SettingsApiGateway",
             props=SettingsConstructProps(

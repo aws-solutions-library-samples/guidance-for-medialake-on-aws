@@ -226,9 +226,9 @@ class SettingsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        settings_users_user_userid_put_lambda = Lambda(
+        settings_users_user_userid_get_lambda = Lambda(
             self,
-            "SettingsUsersUserUseridPutLambda",
+            "SettingsUsersUserUseridGetLambda",
             config=LambdaConfig(
                 name="user_put",
                 iam_role_name="user_put",
@@ -242,7 +242,7 @@ class SettingsConstruct(Construct):
             ),
         )
 
-        settings_users_user_userid_put_lambda.function.add_to_role_policy(
+        settings_users_user_userid_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -258,7 +258,9 @@ class SettingsConstruct(Construct):
 
         settings_users_user_userid_resource.add_method(
             "GET",
-            api_gateway.LambdaIntegration(settings_user_put_lambda.function),
+            api_gateway.LambdaIntegration(
+                settings_users_user_userid_get_lambda.function
+            ),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
