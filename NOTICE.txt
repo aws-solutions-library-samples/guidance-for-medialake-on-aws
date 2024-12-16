@@ -21,6 +21,7 @@ This software includes third party software subject to the following copyrights:
 
 AWS SDK under the Apache License Version 2.0
 Amazon Cognito Identity SDK for JavaScript under the Apache License Version 2.0
+MediaInfo under the BSD-2-Clause License
 
 
 
@@ -40,7 +41,6 @@ node-xml2js under the Massachusetts Institute of Technology (MIT) license
 Rusha (NodeJS) under the Massachusetts Institute of Technology (MIT) license
 exifr under the Massachusetts Institute of Technology (MIT) license
 Fontawesome icon under Font Awesome Free License
-MediaInfo under the BSD-2-Clause License
 Apache ECharts under the Apache License Version 2.0
 Cropper.js under the Massachusetts Institute of Technology (MIT) license
 Video.js Markers under the Massachusetts Institute of Technology (MIT) license

@@ -89,69 +89,6 @@ interface DeleteAssetResponse {
     };
 }
 
-
-// interface Asset {
-//     id: string;
-//     inventoryId: string;
-//     assetType: string;
-//     createDate: string;
-//     mainRepresentation: {
-//         id: string;
-//         type: string;
-//         format: string;
-//         purpose: string;
-//         storage: {
-//             storageType: string;
-//             bucket: string;
-//             path: string;
-//             status: string;
-//             fileSize: number;
-//             hashValue: string;
-//         };
-//         imageSpec?: {
-//             colorSpace: string | null;
-//             width: number | null;
-//             height: number | null;
-//             dpi: number | null;
-//         };
-//     };
-//     derivedRepresentations: Array<{
-//         id: string;
-//         type: string;
-//         format: string;
-//         purpose: string;
-//         storage: {
-//             storageType: string;
-//             bucket: string;
-//             path: string;
-//             status: string;
-//             fileSize: number;
-//             hashValue: string | null;
-//         };
-//         imageSpec?: {
-//             colorSpace: string | null;
-//             width: number | null;
-//             height: number | null;
-//             dpi: number | null;
-//         };
-//     }>;
-//     metadata: any;
-// }
-
-// interface AssetResponse {
-//     status: string;
-//     message: string;
-//     data: Asset;
-// }
-
-// interface DeleteAssetResponse {
-//     status: string;
-//     message: string;
-//     data: {
-//         inventoryId: string;
-//     };
-// }
-
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
     const { showError } = useErrorModal();

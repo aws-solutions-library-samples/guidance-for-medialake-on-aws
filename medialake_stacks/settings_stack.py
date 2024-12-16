@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from aws_cdk import (
     Stack,
     Environment,
@@ -10,12 +11,9 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
 )
-from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
-from dataclasses import dataclass
 
 # Local imports
-from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 from medialake_constructs.shared_constructs.lambda_base import (
@@ -26,7 +24,6 @@ from medialake_constructs.shared_constructs.lambda_base import (
 
 @dataclass
 class SettingsStackProps:
-    # x_origin_verify_secret: secretsmanager.Secret
     test: str
 
 
@@ -40,12 +37,12 @@ class SettingsStack(Stack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
-        # self._user_settings_table = DynamoDB(
-        #     self,
-        #     "UserSettingsTable",
-        #     props=DynamoDBProps(
-        #         name="medialake_user_settings_table",
-        #         partition_key_name="user_id",
-        #         partition_key_type=dynamodb.AttributeType.STRING,
-        #     ),
-        # )
+        self._user_settings_table = DynamoDB(
+            self,
+            "UserSettingsTable",
+            props=DynamoDBProps(
+                name="medialake_user_settings_table",
+                partition_key_name="user_id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+            ),
+        )
