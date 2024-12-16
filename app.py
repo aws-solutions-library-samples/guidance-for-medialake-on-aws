@@ -9,7 +9,6 @@ from config import config
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
-from medialake_stacks.medialake_monitoring_stack import MediaLakeMonitoringStack
 from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStack,
     PipelineNodesStackProps,
