@@ -106,6 +106,7 @@ def get_user_profile() -> Dict[str, Any]:
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
+    print(event)
     """
     Lambda handler for user profile API
     """

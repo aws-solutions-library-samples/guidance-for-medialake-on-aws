@@ -250,10 +250,60 @@ def create_eventbridge_role(
     return role["Role"]["Arn"]
 
 
+def check_existing_connector(s3_bucket: str) -> dict | None:
+    """
+    Check if a connector already exists for the given S3 bucket
+
+    Args:
+        s3_bucket: The name of the S3 bucket to check
+
+    Returns:
+        dict: The existing connector details if found, None otherwise
+    """
+    try:
+        table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
+        if not table_name:
+            raise ValueError(
+                "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
+            )
+
+        table = dynamodb.Table(table_name)
+
+        # Scan the table for matching storage identifier
+        # Note: In production, you might want to create a GSI on storageIdentifier for better performance
+        response = table.scan(
+            FilterExpression="storageIdentifier = :bucket",
+            ExpressionAttributeValues={":bucket": s3_bucket},
+        )
+
+        if response["Items"]:
+            return response["Items"][0]
+
+        return None
+
+    except Exception as e:
+        logger.error(f"Error checking for existing connector: {str(e)}")
+        raise
+
+
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
     created_resources = []
     try:
+        s3_bucket = createconnector.configuration.bucket
+
+        # Check for existing connector
+        existing_connector = check_existing_connector(s3_bucket)
+        if existing_connector:
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "message": f"Connector already exists for bucket {s3_bucket}",
+                    "connector": existing_connector,
+                },
+            }
+
         # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
         medialake_tag = "medialake"
         # Get deployment configuration from environment variables
@@ -269,7 +319,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             return "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
 
         # Get request variables from request body
-        s3_bucket = createconnector.configuration.bucket
         connector_name = createconnector.name
         integration_method = createconnector.configuration.s3IntegrationMethod
 
@@ -618,7 +667,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                 "body": {
                     "status": "500",
                     "message": (
-                        "MEDIALAKE_CONNECTOR_TABLE environment variable " "is not set"
+                        "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
                     ),
                     "data": {},
                 },
@@ -646,6 +695,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         return {"status": "200", "message": "ok", "data": connector_item}
 
     except Exception as e:
+        eventbridge = boto3.client("events")
         logger.exception(f"Unexpected error: {str(e)}")
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
