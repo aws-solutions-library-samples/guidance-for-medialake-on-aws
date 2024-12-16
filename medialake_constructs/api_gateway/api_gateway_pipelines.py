@@ -50,6 +50,163 @@ class ApiGatewayPipelinesConstruct(Construct):
     ) -> None:
         super().__init__(scope, id)
 
+        del_lambda_iam_boundary_policy = iam.ManagedPolicy(
+            self,
+            "DelPipelineServiceBoundaryPolicy",
+            statements=[
+                # Broad Allow for non-IAM actions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "lambda:*",
+                        "s3:*",
+                        "sqs:*",
+                        "sns:*",
+                        "dynamodb:*",
+                        "events:*",
+                        "states:*",
+                    ],
+                    resources=["*"],
+                ),
+                # Unconditional Allow for specific IAM read-only actions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "iam:GetRole",
+                        "iam:ListRoles",
+                        "iam:GetRolePolicy",
+                        "iam:ListRolePolicies",
+                        "iam:ListAttachedRolePolicies",
+                        "iam:CreateRole",
+                        "iam:DeleteRole",
+                        "iam:PutRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:AttachRolePolicy",
+                        "iam:DetachRolePolicy",
+                        "iam:UpdateRole",
+                        "iam:UpdateRoleDescription",
+                        "iam:TagRole",
+                        "iam:UntagRole",
+                        "iam:PassRole",
+                    ],
+                    resources=["*"],
+                ),
+                # Conditional Allow for IAM write actions that involve passing roles
+                # iam.PolicyStatement(
+                #     effect=iam.Effect.ALLOW,
+                #     actions=[
+                #         "iam:CreateRole",
+                #         "iam:DeleteRole",
+                #         "iam:PutRolePolicy",
+                #         "iam:DeleteRolePolicy",
+                #         "iam:AttachRolePolicy",
+                #         "iam:DetachRolePolicy",
+                #         "iam:UpdateRole",
+                #         "iam:UpdateRoleDescription",
+                #         "iam:TagRole",
+                #         "iam:UntagRole",
+                #         "iam:PassRole",
+                #     ],
+                #     resources=["*"],
+                #     conditions={
+                #         "StringLike": {
+                #             "iam:PassedToService": [
+                #                 "lambda.amazonaws.com",
+                #                 "s3.amazonaws.com",
+                #                 "sqs.amazonaws.com",
+                #                 "sns.amazonaws.com",
+                #                 "dynamodb.amazonaws.com",
+                #                 "events.amazonaws.com",
+                #                 "states.amazonaws.com",
+                #             ]
+                #         }
+                #     },
+                # ),
+            ],
+        )
+
+        post_lambda_iam_boundary_policy = iam.ManagedPolicy(
+            self,
+            "PostPipelineServiceBoundaryPolicy",
+            statements=[
+                # Broad Allow for non-IAM actions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "lambda:*",
+                        "s3:*",
+                        "sqs:*",
+                        "sns:*",
+                        "dynamodb:*",
+                        "events:*",
+                        "states:*",
+                    ],
+                    resources=["*"],
+                ),
+                # Unconditional Allow for specific IAM read-only actions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "iam:CreateRole",
+                        "iam:GetRole",
+                        "iam:ListRoles",
+                        "iam:GetRolePolicy",
+                        "iam:ListRolePolicies",
+                        "iam:ListAttachedRolePolicies",
+                        "iam:DeleteRole",
+                        "iam:PutRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:AttachRolePolicy",
+                        "iam:DetachRolePolicy",
+                        "iam:UpdateRole",
+                        "iam:UpdateRoleDescription",
+                        "iam:TagRole",
+                        "iam:UntagRole",
+                        "iam:PassRole",
+                    ],
+                    resources=["*"],
+                ),
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "kms:Decrypt",
+                    ],
+                    resources=["*"],
+                ),
+                # Conditional Allow for IAM write actions that involve passing roles
+                # iam.PolicyStatement(
+                #     effect=iam.Effect.ALLOW,
+                #     actions=[
+                #         "iam:CreateRole",
+                #         "iam:DeleteRole",
+                #         "iam:PutRolePolicy",
+                #         "iam:DeleteRolePolicy",
+                #         "iam:AttachRolePolicy",
+                #         "iam:DetachRolePolicy",
+                #         "iam:UpdateRole",
+                #         "iam:UpdateRoleDescription",
+                #         "iam:TagRole",
+                #         "iam:UntagRole",
+                #         "iam:PassRole",
+                #     ],
+                #     resources=["*"],
+                #     conditions={
+                #         "StringLike": {
+                #             "iam:PassedToService": [
+                #                 "lambda.amazonaws.com",
+                #                 "s3.amazonaws.com",
+                #                 "sqs.amazonaws.com",
+                #                 "sns.amazonaws.com",
+                #                 "dynamodb.amazonaws.com",
+                #                 "events.amazonaws.com",
+                #                 "states.amazonaws.com",
+                #             ]
+                #         }
+                #     },
+                # ),
+            ],
+        )
+
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",
@@ -92,6 +249,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             name="PostPipelinesHandler",
             timeout_minutes=10,
             entry="lambdas/api/pipelines/post_pipelines",
+            iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
@@ -230,6 +388,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
+
         get_pipeline_id_handler = Lambda(
             self,
             "GetPipelineIdHandler",
@@ -247,11 +406,13 @@ class ApiGatewayPipelinesConstruct(Construct):
         put_pipeline_id_lambda_config = LambdaConfig(
             name="PutPipelineIdHandler",
             entry=("lambdas/api/pipelines/rp_pipelineId/put_pipeline"),
+            iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
+
         put_pipeline_id_handler = Lambda(
             self,
             "PutPipelineIdHandler",
@@ -269,11 +430,13 @@ class ApiGatewayPipelinesConstruct(Construct):
         del_pipeline_id_lambda_config = LambdaConfig(
             name="DeletePipelineIdHandler",
             entry=("lambdas/api/pipelines/rp_pipelineId/del_pipeline"),
+            iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
+
         del_pipeline_id_handler = Lambda(
             self,
             "DeletePipelineIdHandler",
@@ -365,6 +528,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         execution_id_resource = pipelines_executions_resource.add_resource(
             "{executionId}"
         )
+
         retry_resource = execution_id_resource.add_resource("retry")
 
         # POST /api/pipelines/executions/{executionId}/retry

@@ -298,9 +298,7 @@ class Lambda(Construct):
         )
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
-                logger.debug("Creating Node.js Lambda function")
                 common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
-                # common_lambda_props["architecture"] = lambda_.Architecture.ARM_64
                 common_lambda_props["project_root"] = common_lambda_props["entry"]
                 common_lambda_props["deps_lock_file_path"] = (
                     f"{common_lambda_props["entry"]}/lock.json"
@@ -308,16 +306,12 @@ class Lambda(Construct):
                 common_lambda_props["entry"] = (
                     f"{common_lambda_props["entry"]}/index.js"
                 )
-                print("!!!!!")
                 common_lambda_props["entry"] = os.path.abspath(
                     common_lambda_props["entry"]
                 )
                 common_lambda_props["deps_lock_file_path"] = os.path.abspath(
                     common_lambda_props["deps_lock_file_path"]
                 )
-
-                print(common_lambda_props["deps_lock_file_path"])
-
                 self._function = NodejsFunction(
                     self,
                     "StandardNodeJSLambda",

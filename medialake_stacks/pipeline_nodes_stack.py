@@ -64,6 +64,7 @@ class PipelineNodesStack(Stack):
             "ImageProxyNode",
             config=LambdaConfig(
                 name="image_proxy_node",
+                memory_size=10240,
                 timeout_minutes=15,
                 entry="lambdas/nodes/image_proxy",
                 environment_variables={

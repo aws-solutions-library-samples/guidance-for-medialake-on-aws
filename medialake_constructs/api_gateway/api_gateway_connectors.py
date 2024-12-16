@@ -68,7 +68,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ServiceBoundaryPolicy",
             statements=[
-                # Allow service-specific actions
+                # Broad Allow for non-IAM actions
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=[
@@ -78,61 +78,68 @@ class ConnectorsConstruct(Construct):
                         "sns:*",
                         "dynamodb:*",
                         "events:*",
+                        "states:*",
                     ],
                     resources=["*"],
                 ),
-                # Allow IAM operations for these services
+                # Unconditional Allow for specific IAM read-only actions
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=[
-                        "iam:CreateRole",
-                        "iam:DeleteRole",
-                        "iam:PutRolePolicy",
-                        "iam:DeleteRolePolicy",
-                        "iam:AttachRolePolicy",
-                        "iam:DetachRolePolicy",
-                        "iam:ListAttachedRolePolicies",
-                        "iam:ListRolePolicies",
-                        "iam:GetRolePolicy",
-                        "iam:UpdateRole",
-                        "iam:UpdateRoleDescription",
                         "iam:GetRole",
                         "iam:ListRoles",
+                        "iam:GetRolePolicy",
+                        "iam:DetachRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:DeleteRole",
+                        "iam:ListRolePolicies",
+                        "iam:ListAttachedRolePolicies",
+                        "iam:CreateRole",
+                        "iam:PutRolePolicy",
+                        "iam:AttachRolePolicy",
+                        "iam:UpdateRole",
+                        "iam:UpdateRoleDescription",
                         "iam:TagRole",
                         "iam:UntagRole",
+                        "iam:PassRole",
                     ],
                     resources=["*"],
-                    conditions={
-                        "StringLike": {
-                            "iam:PassedToService": [
-                                "lambda.amazonaws.com",
-                                "s3.amazonaws.com",
-                                "sqs.amazonaws.com",
-                                "sns.amazonaws.com",
-                                "dynamodb.amazonaws.com",
-                                "events.amazonaws.com",
-                            ]
-                        }
-                    },
                 ),
-                # Deny all other IAM operations
                 iam.PolicyStatement(
-                    effect=iam.Effect.DENY,
-                    actions=["iam:*"],
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "kms:Decrypt",
+                    ],
                     resources=["*"],
-                    conditions={
-                        "StringNotLike": {
-                            "iam:PassedToService": [
-                                "lambda.amazonaws.com",
-                                "s3.amazonaws.com",
-                                "sqs.amazonaws.com",
-                                "sns.amazonaws.com",
-                                "dynamodb.amazonaws.com",
-                                "events.amazonaws.com",
-                            ]
-                        }
-                    },
                 ),
+                # Conditional Allow for IAM write actions that involve passing roles
+                # iam.PolicyStatement(
+                #     effect=iam.Effect.ALLOW,
+                #     actions=[
+                #         "iam:CreateRole",
+                #         "iam:PutRolePolicy",
+                #         "iam:AttachRolePolicy",
+                #         "iam:UpdateRole",
+                #         "iam:UpdateRoleDescription",
+                #         "iam:TagRole",
+                #         "iam:UntagRole",
+                #         "iam:PassRole",
+                #     ],
+                #     resources=["*"],
+                #     conditions={
+                #         "StringLike": {
+                #             "iam:PassedToService": [
+                #                 "lambda.amazonaws.com",
+                #                 "s3.amazonaws.com",
+                #                 "sqs.amazonaws.com",
+                #                 "sns.amazonaws.com",
+                #                 "dynamodb.amazonaws.com",
+                #                 "events.amazonaws.com",
+                #                 "states.amazonaws.com",
+                #             ]
+                #         }
+                #     },
+                # ),
             ],
         )
 
@@ -328,6 +335,7 @@ class ConnectorsConstruct(Construct):
             config=LambdaConfig(
                 name="connector_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
+                iam_role_boundary_policy=lambda_iam_boundry_policy,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
@@ -438,6 +446,7 @@ class ConnectorsConstruct(Construct):
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
                     "dynamodb:DeleteItem",
+                    "dynamodb:Scan",
                 ],
                 resources=[self.dynamo_table.table_arn],
             )
