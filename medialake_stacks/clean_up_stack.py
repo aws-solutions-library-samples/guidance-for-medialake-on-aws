@@ -16,6 +16,8 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 @dataclass
 class CleanupStackProps:
     ingest_event_bus: events.EventBus
+    pipeline_table: dynamodb.TableV2
+    connector_table: dynamodb.TableV2
 
 
 class CleanupStack(Stack):
@@ -44,7 +46,8 @@ class CleanupStack(Stack):
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
                 environment_variables={
-                    "RESOURCE_TABLE": self._resource_table.table.table_name,
+                    "CONNECTOR_TABLE": props.connector_table.table_name,
+                    "PIPELINE_TABLE": props.pipeline_table.table_name,
                 },
             ),
         )

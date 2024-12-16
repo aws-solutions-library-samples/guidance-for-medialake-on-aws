@@ -21,7 +21,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
             size="small"
             value={searchQuery}
             onChange={onSearchChange}
-            onKeyPress={(e) => e.key === 'Enter' && onSearchSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
+            // onKeyPress={(e) => e.key === 'Enter' && onSearchSubmit()}
             sx={{ flexGrow: 1, mr: 2, bgcolor: 'background.paper' }}
         />
         <Button

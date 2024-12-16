@@ -7,35 +7,30 @@ import {
     Paper,
     Button,
     useTheme,
-    Divider,
     Alert,
 } from '@mui/material';
 import {
     Add as AddIcon,
     Storage as StorageIcon,
     Api as ApiIcon,
-    Settings as SettingsIcon,
     Person as PersonIcon,
     AdminPanelSettings as AdminIcon,
     Group as GroupIcon,
 } from '@mui/icons-material';
 import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '@/api/hooks/useConnectors';
 import { Integration, ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
-import IntegrationsView from '@/features/settings/integrations/components/IntegrationsView';
 import { ConnectorsList } from '@/features/settings/connectors/components/ConnectorsList';
-import IntegrationModal from '@/features/settings/integrations/components/IntegrationModal';
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
 import UserProfile from '../components/settings/UserProfile';
-import AdminSettings from '../components/settings/AdminSettings';
 import UserManagement from './settings/UserManagement';
 
 interface TabPanelProps {
-    children?: React.ReactNode;
-    index: number;
-    value: number;
+    readonly children?: React.ReactNode;
+    readonly index: number;
+    readonly value: number;
 }
 
-function TabPanel(props: TabPanelProps) {
+function TabPanel(props: Readonly<TabPanelProps>) {
     const { children, value, index, ...other } = props;
 
     return (
@@ -55,7 +50,6 @@ function TabPanel(props: TabPanelProps) {
 const SettingsPage = () => {
     const theme = useTheme();
     const [activeTab, setActiveTab] = useState(0);
-    const [openIntegrationModal, setOpenIntegrationModal] = useState(false);
     const [openConnectorModal, setOpenConnectorModal] = useState(false);
     const [editingIntegration, setEditingIntegration] = useState<Integration | undefined>();
     const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
@@ -71,31 +65,11 @@ const SettingsPage = () => {
         setActiveTab(newValue);
     };
 
-    const handleAddIntegration = () => {
-        setEditingIntegration(undefined);
-        setOpenIntegrationModal(true);
-    };
-
     const handleAddConnector = () => {
         setEditingConnector(undefined);
         setOpenConnectorModal(true);
     };
 
-    const handleSaveIntegration = (integration: Integration) => {
-        try {
-            if (editingIntegration) {
-                setIntegrations(integrations.map(i =>
-                    i.id === integration.id ? integration : i
-                ));
-            } else {
-                setIntegrations([...integrations, integration]);
-            }
-            setOpenIntegrationModal(false);
-            setEditingIntegration(undefined);
-        } catch (err) {
-            setError('Failed to save integration. Please try again.');
-        }
-    };
 
     const handleSaveConnector = async (connectorData: CreateConnectorRequest) => {
         try {
@@ -116,10 +90,6 @@ const SettingsPage = () => {
         } catch (err) {
             setError('Failed to save connector. Please try again.');
         }
-    };
-
-    const handleDeleteIntegration = (id: string) => {
-        setIntegrations(integrations.filter(i => i.id !== id));
     };
 
     const handleDeleteConnector = async (id: string) => {
@@ -209,21 +179,6 @@ const SettingsPage = () => {
                     </Box>
                 </TabPanel>
 
-                <TabPanel value={activeTab} index={1}>
-                    <Box sx={{ px: 2 }}>
-                        <IntegrationsView
-                            integrations={integrations}
-                            onAddIntegration={handleAddIntegration}
-                            onEditIntegration={(integration) => {
-                                setEditingIntegration(integration);
-                                setOpenIntegrationModal(true);
-                            }}
-                            onDeleteIntegration={handleDeleteIntegration}
-                            onConfigureIntegration={() => { }}
-                        />
-                    </Box>
-                </TabPanel>
-
                 <TabPanel value={activeTab} index={2}>
                     <Box sx={{ px: 2 }}>
                         <UserProfile />
@@ -236,24 +191,9 @@ const SettingsPage = () => {
                     </Box>
                 </TabPanel>
 
-                <TabPanel value={activeTab} index={4}>
-                    <Box sx={{ px: 2 }}>
-                        <AdminSettings />
-                    </Box>
-                </TabPanel>
             </Paper>
 
             {/* Modals */}
-            <IntegrationModal
-                open={openIntegrationModal}
-                onClose={() => {
-                    setOpenIntegrationModal(false);
-                    setEditingIntegration(undefined);
-                }}
-                onSave={handleSaveIntegration}
-                editingIntegration={editingIntegration}
-            />
-
             <ConnectorModal
                 open={openConnectorModal}
                 onClose={() => {

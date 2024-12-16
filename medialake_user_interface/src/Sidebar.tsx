@@ -16,16 +16,11 @@ import {
 } from '@mui/material';
 import {
     AccountTree as PipelineIcon,
-    Reviews as ReviewIcon,
     Settings as SettingsIcon,
     ExpandLess,
     ExpandMore,
     Storage as StorageIcon,
-    Api as ApiIcon,
-    AdminPanelSettings as AdminIcon,
     PermMedia as MediaAssetsIcon,
-    DataObject as MetadataIcon,
-    LocalOffer as TagsIcon,
     PlaylistPlay as ExecutionsIcon,
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
@@ -70,11 +65,6 @@ function Sidebar() {
             path: '/assets'
         },
         {
-            text: t('sidebar.menu.metadata'),
-            icon: <MetadataIcon />,
-            path: '/metadata'
-        },
-        {
             text: t('sidebar.menu.pipelines'),
             icon: <PipelineIcon />,
             path: '/pipelines'
@@ -85,27 +75,15 @@ function Sidebar() {
             path: '/executions'
         },
         {
-            text: t('sidebar.menu.reviewQueue'),
-            icon: <ReviewIcon />,
-            path: '/review-queue'
-        },
-        {
-            text: t('sidebar.menu.tags'),
-            icon: <TagsIcon />,
-            path: '/tags'
-        },
-        {
             text: t('sidebar.menu.settings'),
             icon: <SettingsIcon />,
             onClick: () => setSettingsOpen(!settingsOpen),
             isExpandable: true,
             isExpanded: settingsOpen,
             subItems: [
-                { text: t('sidebar.submenu.integrations'), icon: <ApiIcon />, path: '/settings/integrations' },
                 { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
                 { text: t('sidebar.submenu.userManagement'), icon: <GroupIcon />, path: '/settings/users' },
                 { text: t('sidebar.submenu.roles'), icon: <SecurityIcon />, path: '/settings/roles' },
-                { text: t('sidebar.submenu.system'), icon: <AdminIcon />, path: '/settings/system' },
             ]
         }
     ];

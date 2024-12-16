@@ -1,4 +1,3 @@
-{/* Previous imports remain the same */ }
 import React, { useState, useCallback } from 'react';
 import {
     AppBar,
@@ -8,43 +7,25 @@ import {
     Box,
     Menu,
     MenuItem,
-    Badge,
     Tooltip,
     Avatar,
     useTheme as useMuiTheme,
-    Divider,
     InputBase,
     Chip,
     Button,
-    Select,
-    SelectChangeEvent,
 } from '@mui/material';
 import {
-    Notifications as NotificationsIcon,
     Search as SearchIcon,
-    Warning as WarningIcon,
-    Error as ErrorIcon,
-    Info as InfoIcon,
-    Language as LanguageIcon,
     Brightness4 as DarkModeIcon,
     Brightness7 as LightModeIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useSearch } from './api/hooks/useSearch';
 import debounce from 'lodash/debounce';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
 
-{/* Previous interfaces and mock data remain the same */ }
-interface Notification {
-    id: string;
-    type: 'notification' | 'warning' | 'alert';
-    title: string;
-    message: string;
-    timestamp: string;
-}
 
 interface SearchTag {
     key: string;
@@ -56,29 +37,6 @@ const languages = {
     de: { nativeName: 'Deutsch' }
 };
 
-const mockNotifications: Notification[] = [
-    {
-        id: '1',
-        type: 'notification',
-        title: 'Pipeline Complete',
-        message: 'Asset processing pipeline completed successfully',
-        timestamp: '2 min ago'
-    },
-    {
-        id: '2',
-        type: 'warning',
-        title: 'Storage Warning',
-        message: 'Storage capacity reaching 80%',
-        timestamp: '10 min ago'
-    },
-    {
-        id: '3',
-        type: 'alert',
-        title: 'Pipeline Failed',
-        message: 'Video processing pipeline failed',
-        timestamp: '15 min ago'
-    }
-];
 
 function TopBar() {
     const muiTheme = useMuiTheme();
@@ -87,12 +45,11 @@ function TopBar() {
     const { setIsAuthenticated } = useAuth();
     const { t, i18n } = useTranslation();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
     const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
 
-    {/* Previous functions remain the same */ }
+
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
         return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
@@ -111,17 +68,9 @@ function TopBar() {
         setAnchorEl(event.currentTarget);
     };
 
-    const handleLanguageClick = (event: React.MouseEvent<HTMLElement>) => {
-        setLanguageAnchor(event.currentTarget);
-    };
-
-    const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
-        setNotificationsAnchor(event.currentTarget);
-    };
 
     const handleClose = () => {
         setAnchorEl(null);
-        setNotificationsAnchor(null);
         setLanguageAnchor(null);
     };
 
@@ -209,57 +158,6 @@ function TopBar() {
         });
     };
 
-    const getNotificationIcon = (type: string) => {
-        switch (type) {
-            case 'alert':
-                return <ErrorIcon sx={{ color: muiTheme.palette.error.main }} />;
-            case 'warning':
-                return <WarningIcon sx={{ color: muiTheme.palette.warning.main }} />;
-            default:
-                return <InfoIcon sx={{ color: muiTheme.palette.info.main }} />;
-        }
-    };
-
-    const getNotificationCount = (type: string) => {
-        return mockNotifications.filter(n => n.type === type).length;
-    };
-
-    const renderNotificationContent = (notification: Notification) => (
-        <Box sx={{ display: 'flex', width: '100%', gap: 1 }}>
-            <Box sx={{ pt: 0.5 }}>
-                {getNotificationIcon(notification.type)}
-            </Box>
-            <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    {t(notification.title)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                    {t(notification.message)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                    {notification.timestamp}
-                </Typography>
-            </Box>
-        </Box>
-    );
-
-    const renderNotificationItems = () => {
-        const items: JSX.Element[] = [];
-        mockNotifications.forEach((notification, index) => {
-            items.push(
-                <MenuItem key={`item-${notification.id}`}>
-                    {renderNotificationContent(notification)}
-                </MenuItem>
-            );
-            if (index < mockNotifications.length - 1) {
-                items.push(
-                    <Divider key={`divider-${notification.id}`} />
-                );
-            }
-        });
-        return items;
-    };
-
     return (
         <AppBar
             position="fixed"
@@ -332,7 +230,8 @@ function TopBar() {
                             placeholder={t('common.search')}
                             value={searchInput}
                             onChange={handleSearchInputChange}
-                            onKeyPress={handleSearchKeyPress}
+                            // onKeyPress={handleSearchKeyPress}
+                            onKeyUp={handleSearchKeyPress}
                             fullWidth
                             sx={{
                                 fontSize: '14px',
@@ -368,29 +267,6 @@ function TopBar() {
 
                 {/* Right section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Tooltip title={t('common.alerts')}>
-                            <IconButton onClick={handleNotificationsClick}>
-                                <Badge badgeContent={getNotificationCount('alert')} color="error">
-                                    <ErrorIcon color="error" />
-                                </Badge>
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title={t('common.warnings')}>
-                            <IconButton onClick={handleNotificationsClick}>
-                                <Badge badgeContent={getNotificationCount('warning')} color="warning">
-                                    <WarningIcon color="warning" />
-                                </Badge>
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title={t('common.notifications')}>
-                            <IconButton onClick={handleNotificationsClick}>
-                                <Badge badgeContent={getNotificationCount('notification')} color="info">
-                                    <NotificationsIcon sx={{ color: theme === 'dark' ? 'white' : 'action.active' }} />
-                                </Badge>
-                            </IconButton>
-                        </Tooltip>
-                    </Box>
 
                     {/* Theme Toggle Button */}
                     <Tooltip title={theme === 'light' ? t('common.darkMode') : t('common.lightMode')}>
@@ -399,13 +275,6 @@ function TopBar() {
                                 <DarkModeIcon sx={{ color: 'action.active' }} /> :
                                 <LightModeIcon sx={{ color: 'white' }} />
                             }
-                        </IconButton>
-                    </Tooltip>
-
-                    {/* Language Selector */}
-                    <Tooltip title={t('common.language')}>
-                        <IconButton onClick={handleLanguageClick}>
-                            <LanguageIcon sx={{ color: theme === 'dark' ? 'white' : 'action.active' }} />
                         </IconButton>
                     </Tooltip>
 
@@ -447,22 +316,6 @@ function TopBar() {
                             {languages[lng as keyof typeof languages].nativeName}
                         </MenuItem>
                     ))}
-                </Menu>
-
-                <Menu
-                    anchorEl={notificationsAnchor}
-                    open={Boolean(notificationsAnchor)}
-                    onClose={handleClose}
-                    PaperProps={{
-                        sx: {
-                            width: '320px',
-                            maxHeight: '400px',
-                            mt: 1.5,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                        }
-                    }}
-                >
-                    {renderNotificationItems()}
                 </Menu>
 
                 <Menu

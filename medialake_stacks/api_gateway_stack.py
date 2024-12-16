@@ -192,3 +192,7 @@ class ApiGatewayStack(Stack):
     @property
     def rest_api(self) -> apigateway.RestApi:
         return self._api_gateway.rest_api
+
+    @property
+    def connector_table(self) -> dynamodb.TableV2:
+        return self._connectors_api_gateway.connector_table

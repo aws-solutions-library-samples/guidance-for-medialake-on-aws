@@ -53,16 +53,19 @@ api_gateway_stack = ApiGatewayStack(
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
-
 cleanup_stack = CleanupStack(
     app,
     "MediaLakeCleanupStack",
-    props=CleanupStackProps(ingest_event_bus=base_infrastructure.ingest_event_bus),
+    props=CleanupStackProps(
+        ingest_event_bus=base_infrastructure.ingest_event_bus,
+        pipeline_table=base_infrastructure.pipeline_table,
+        connector_table=api_gateway_stack.connector_table,
+    ),
 )
 
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
-
+cleanup_stack.add_dependency(pipeline_nodes_stack)
 
 cdk.Tags.of(app).add("Application", "MediaLake")
 

@@ -10,21 +10,16 @@ import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
 import TopBar from '@/TopBar';
 import Sidebar from '@/Sidebar';
-import PipelineExecutionDetailsPage from '@/pages/pipelines/PipelineExecutionDetailsPage';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
-import MetadataPage from '@/pages/MetadataPage';
 import { S3Explorer } from '@/features/home/S3Explorer';
 import Home from '@/pages/Home';
 import SettingsComponent from '@/features/settings/SettingsLayout';
 import ExecutionsPage from '@/pages/ExecutionsPage';
 import PipelinesPage from '@/pages/PipelinesPage';
-import ReviewQueue from '@/pages/reviewQueue';
-import TagsPage from '@/pages/TagsPage';
 import { StorageHelper } from '@/common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
 import ImageDetailPage from '@/pages/ImageDetailPage';
-import PipelineEditorPage from '@/pages/PipelineEditorPage';
 import { ModalProvider } from '@/components/common/ModalConnector';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { ThemeWrapper } from '@/components/ThemeWrapper';
@@ -89,7 +84,7 @@ const theme: Theme = {
     },
 };
 
-// Custom components for Authenticator
+// Custom UI components for Auth
 const components = {
     Header() {
         return (
@@ -125,13 +120,13 @@ const components = {
                         margin: '0.5rem 0 0',
                     }}
                 >
-                    A data lake for your media, metadata, and media pipelines
+                    A data lake for your media, metadata, and media pipelines.
                 </p>
             </Box>
         );
     },
     Footer() {
-        return null; // Remove the footer from the form container
+        return null;
     },
 };
 
@@ -328,6 +323,10 @@ const router = createBrowserRouter([
                 element: <Home />
             },
             {
+                path: 'search',
+                element: <SearchPage />
+            },
+            {
                 path: 's3/explorer/:connectorId',
                 element: <S3ExplorerWrapper />
             },
@@ -340,40 +339,12 @@ const router = createBrowserRouter([
                 element: <AssetsPage />
             },
             {
-                path: 'metadata',
-                element: <MetadataPage />
-            },
-            {
                 path: 'executions',
                 element: <ExecutionsPage />
-            },
-            // {
-            //     path: 'executions/:executionId',
-            //     element: <ExecutionStatusPage />
-            // },
-            {
-                path: 'executions/:executionId',
-                element: <PipelineExecutionDetailsPage />
-            },
-            {
-                path: 'pipelines/:pipelineId',
-                element: <PipelineEditorPage />
-            },
-            {
-                path: 'review-queue',
-                element: <ReviewQueue />
             },
             {
                 path: 'pipelines',
                 element: <PipelinesPage />
-            },
-            {
-                path: 'tags',
-                element: <TagsPage />
-            },
-            {
-                path: 'search',
-                element: <SearchPage />
             },
             {
                 path: 'images/:id',

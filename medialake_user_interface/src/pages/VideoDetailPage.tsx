@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Grid } from '@mui/material';
 import { useParams } from 'react-router-dom';
-import ChatWindow from './ChatWindow';  // Make sure to create this component
 
 // Add interface for video object
 interface Video {
@@ -98,7 +97,6 @@ const VideoDetailPage: React.FC = () => {
                         zIndex: 9999,
                     }}
                 >
-                    <ChatWindow chatId={`asset-${id}`} />
                 </Box>
             )}
         </Box>
