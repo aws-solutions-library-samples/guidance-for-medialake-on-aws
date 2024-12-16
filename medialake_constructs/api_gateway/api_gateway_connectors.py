@@ -485,7 +485,6 @@ class ConnectorsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        # GET
         connector_s3_get_lambda = Lambda(
             self,
             "ConnectorS3GetLambda",
@@ -535,7 +534,6 @@ class ConnectorsConstruct(Construct):
             ),
         )
 
-        # IAM Permissions - grant read to connectors table and access S3 buckets
         self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
@@ -570,6 +568,6 @@ class ConnectorsConstruct(Construct):
         self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
 
     @property
-    def connector_table(self) -> str:
+    def connector_table(self) -> dynamodb.TableV2:
 
-        return self.dynamo_table
+        return self.dynamo_table.table

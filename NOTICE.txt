@@ -1,4 +1,4 @@
-MediaLake Solution
+MediaLake Solution Guidance
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
@@ -22,40 +22,4 @@ This software includes third party software subject to the following copyrights:
 AWS SDK under the Apache License Version 2.0
 Amazon Cognito Identity SDK for JavaScript under the Apache License Version 2.0
 MediaInfo under the BSD-2-Clause License
-
-
-
-
-
-AWS IoT SDK for JavaScript under the Apache License Version 2.0
-VideoJS under the Apache License Version 2.0
-JQuery under the Massachusetts Institute of Technology (MIT) license
-Bootstrap under the Massachusetts Institute of Technology (MIT) license
-Popper under the Massachusetts Institute of Technology (MIT) license
-SparkMD5 under the Massachusetts Institute of Technology (MIT) license
-Mime under the Massachusetts Institute of Technology (MIT) license
-adm-zip under the Massachusetts Institute of Technology (MIT) license
-Crypto-js under the Massachusetts Institute of Technology (MIT) license
-aws-elasticsearch-connector under the Massachusetts Institute of Technology (MIT) license
-node-xml2js under the Massachusetts Institute of Technology (MIT) license
-Rusha (NodeJS) under the Massachusetts Institute of Technology (MIT) license
-exifr under the Massachusetts Institute of Technology (MIT) license
-Fontawesome icon under Font Awesome Free License
-Apache ECharts under the Apache License Version 2.0
-Cropper.js under the Massachusetts Institute of Technology (MIT) license
-Video.js Markers under the Massachusetts Institute of Technology (MIT) license
-Node Canvas under the Massachusetts Institute of Technology (MIT) license
-WebVTT compiler parser and segmenter under the Massachusetts Institute of Technology (MIT) license
-sqlstring under the Massachusetts Institute of Technology (MIT) license
-tar-stream under the Massachusetts Institute of Technology (MIT) license
-Jimp under the Massachusetts Institute of Technology (MIT) license
-PDF.JS under the Apache License Version 2.0
-@npcz/magic under the BSD-3-Clause License
-TinkerPop3 (Gremlin JS) under the Apache License Version 2.0
-OpenSearch Node.js client under the Apache License Version 2.0
-winkNLP under the Massachusetts Institute of Technology (MIT) license
-OWL-ViT (short for Vision Transformer for Open-World Localization) model under the Apache License Version 2.0
-CLIP (Contrastive Language-Image Pretraining) under the Massachusetts Institute of Technology (MIT) license
-FAISS under the Massachusetts Institute of Technology (MIT) license
-BLIP (Bootstrapping Language-Image Pre-training for Unified Vision-Language Understanding and Generation) under BSD 3-Clause "New" or "Revised" License
-Python Pillow under the CMU License (MIT-CMU) (MIT-CMU)
+ReactFlow uunder the Massachusetts Institute of Technology (MIT) license

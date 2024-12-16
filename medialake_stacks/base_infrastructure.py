@@ -34,6 +34,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
 """
 Base infrastructure stack that sets up core AWS resources for the MediaLake application.
@@ -243,7 +244,6 @@ class BaseInfrastructureStack(Stack):
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name="medialake-dynamodb-etl-pipeline",
-                # pipeline_role=self._opensearch_cluster.pipeline_role,
                 ddb_export_bucket=self._ddb_export_bucket,
                 sort_key_name="ID",
                 sort_key_type=dynamodb.AttributeType.STRING,

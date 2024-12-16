@@ -469,7 +469,7 @@ class UIConstruct(Construct):
                 response_headers_policy=ui_response_headers_policy,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
-                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
             ),
             additional_behaviors={

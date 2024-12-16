@@ -59,3 +59,56 @@ def add_s3_access_logging_policy(
             },
         )
     )
+
+
+def enable_s3_server_access_logging(
+    scope: Construct,
+    access_logs_bucket: s3.IBucket,
+    source_bucket: s3.IBucket,
+) -> None:
+    """
+    Enables server access logging for an S3 bucket, directing logs to a specified logging bucket
+    with a prefix matching the source bucket name.
+
+    Args:
+        scope: The construct scope
+        access_logs_bucket: The destination bucket that will store access logs
+        source_bucket: The source bucket to enable logging for
+
+    Returns:
+        None
+    """
+    stack = Stack.of(scope)
+
+    # Enable ACLs for S3 server access logging
+    if isinstance(access_logs_bucket, s3.Bucket):
+        access_logs_bucket.node.default_child.add_property_override(
+            "OwnershipControls",
+            {"Rules": [{"ObjectOwnership": "BucketOwnerPreferred"}]},
+        )
+
+    # Add the S3 logging service principal permissions to the destination bucket
+    access_logs_bucket.add_to_resource_policy(
+        iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["s3:PutObject"],
+            resources=[
+                f"{access_logs_bucket.bucket_arn}/*",
+            ],
+            principals=[iam.ServicePrincipal("logging.s3.amazonaws.com")],
+            conditions={
+                "StringEquals": {"aws:SourceAccount": stack.account},
+                "ArnLike": {"aws:SourceArn": source_bucket.bucket_arn},
+            },
+        )
+    )
+
+    # Enable server access logging on the source bucket
+    if isinstance(source_bucket, s3.Bucket):
+        source_bucket.node.default_child.add_property_override(
+            "LoggingConfiguration",
+            {
+                "DestinationBucketName": access_logs_bucket.bucket_name,
+                "LogFilePrefix": f"{source_bucket.bucket_name}/",
+            },
+        )

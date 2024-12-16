@@ -26,23 +26,11 @@ class CleanupStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self._resource_table = DynamoDB(
-            self,
-            "MediaLakeAssetResourcesTable",
-            props=DynamoDBProps(
-                name="medialake-provisioned-resources-table",
-                partition_key_name="ARN",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="type",
-                sort_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
-
         self._clean_up_lambda = Lambda(
             self,
-            "MediaLakeProvisionedResourceCleanUpLambda",
+            "MediaLakeCleanUp",
             config=LambdaConfig(
-                name="test",
+                name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
                 environment_variables={
@@ -51,6 +39,9 @@ class CleanupStack(Stack):
                 },
             ),
         )
+
+        # props.connector_table.grant_read_data(self._clean_up_lambda.function)
+        # props.pipeline_table.grant_read_data(self._clean_up_lambda.function)
 
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
@@ -66,7 +57,45 @@ class CleanupStack(Stack):
             )
         )
 
-        self._resource_table.table.grant_read_write_data(self._clean_up_lambda.function)
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "sqs:DeleteQueue",
+                    "sqs:GetQueueAttributes",
+                    "sqs:ListQueues",
+                    "sqs:ListQueueTags",
+                ],
+                resources=[f"arn:aws:sqs:*:{Stack.of(self).account}:*"],
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3:GetBucketNotification",
+                    "s3:PutBucketNotification",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "iam:GetRole",
+                    "iam:ListRoles",
+                    "iam:DeleteRole",
+                    "iam:ListRolePolicies",
+                    "iam:ListAttachedRolePolicies",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                ],
+                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/*"],
+            )
+        )
 
         self.provider = cr.Provider(
             self, "CleanupProvider", on_event_handler=self._clean_up_lambda.function
@@ -77,12 +106,7 @@ class CleanupStack(Stack):
             "CleanupResource",
             service_token=self.provider.service_token,
             properties={
-                "TableName": self._resource_table.table_name,
                 "Version": "1.0.0",
             },
             removal_policy=RemovalPolicy.RETAIN,
         )
-
-    @property
-    def resource_table(self) -> dynamodb.Table:
-        return self._resource_table.table
