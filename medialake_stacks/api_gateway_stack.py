@@ -43,6 +43,10 @@ from medialake_constructs.api_gateway.api_gateway_settings import (
     SettingsConstruct,
     SettingsConstructProps,
 )
+from medialake_constructs.api_gateway.api_gateway_users import (
+    UsersApi,
+    UsersApiProps,
+)
 from medialake_constructs.update_construct import UpdateConstruct, UpdateConstructProps
 from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
@@ -183,6 +187,17 @@ class ApiGatewayStack(Stack):
             ),
         )
 
+        _ = UsersApi(
+            self,
+            "UsersApiGateway",
+            props=UsersApiProps(
+                api_resource=self._api_gateway.rest_api,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
+                cognito_user_pool=self._cognito_construct.user_pool,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+            ),
+        )
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -202,3 +217,7 @@ class ApiGatewayStack(Stack):
     @property
     def connector_table(self) -> dynamodb.TableV2:
         return self._connectors_api_gateway.connector_table
+
+    @property
+    def user_interface_url(self) -> str:
+        return self._ui.user_interface_url

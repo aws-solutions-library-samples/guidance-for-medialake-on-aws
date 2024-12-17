@@ -74,5 +74,11 @@ cdk.Tags.of(app).add("Application", "MediaLake")
 # Add AWS Solutions checks to the entire app
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
+cdk.CfnOutput(
+    api_gateway_stack,
+    "UserInterfaceUrl",
+    value=api_gateway_stack.user_interface_url,
+    description="URL for the MediaLake User Interface",
+)
 
 app.synth()

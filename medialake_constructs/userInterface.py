@@ -479,7 +479,12 @@ class UIConstruct(Construct):
                         origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
                         protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
                     ),
-                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    cache_policy=cloudfront.CachePolicy(
+                        self,
+                        "APIBehaviorCachePolicy",
+                        default_ttl=Duration.seconds(0),
+                    ),
+                    # cache_behavior=cloudfront.CachePolicy
                     response_headers_policy=api_response_headers_policy,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
@@ -544,8 +549,6 @@ class UIConstruct(Construct):
             distribution_paths=["/*"],
         )
 
-        # Outputs
-        self.distribution_url = (
-            f"https://{self.cloudfront_distribution.distribution_domain_name}"
-        )
-        self.medialake_ui_s3_bucket = medialake_ui_s3_bucket.bucket
+    @property
+    def user_interface_url(self) -> str:
+        return f"https://{self.cloudfront_distribution.distribution_domain_name}"
