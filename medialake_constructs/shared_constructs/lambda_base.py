@@ -13,16 +13,15 @@ import os
 
 from aws_cdk import (
     aws_lambda as lambda_,
-    Stack,
     aws_logs as logs,
     aws_iam as iam,
     aws_ec2 as ec2,
+    Stack,
     RemovalPolicy,
     Duration,
 )
 from aws_cdk.aws_lambda_python_alpha import (
     PythonFunction,
-    BundlingOptions,
     PythonLayerVersion,
 )
 from aws_cdk.aws_lambda_nodejs import (
@@ -37,32 +36,28 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 )
 from aws_lambda_powertools import Logger
 
-from config import WORKFLOW_PAYLOAD_TEMP_BUCKET
+from config import WORKFLOW_PAYLOAD_TEMP_BUCKET, config as env_config
 
 # Constants
 DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
-DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_13
+DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
 LOG_RETENTION = logs.RetentionDays.SIX_MONTHS
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
 
-# Add debug logging in key methods
 
-
-def validate_lambda_resources_names(base_name: str, construct_id: str) -> str:
+def validate_lambda_resources_names(base_name: str) -> str:
     """
     Validates and constructs Lambda resource names ensuring they meet AWS requirements.
     """
     logger = Logger()
-    logger.debug(
-        f"Validating lambda resource names - base_name: {base_name}, construct_id: {construct_id}"
-    )
+    logger.debug(f"Validating lambda resource names - base_name: {base_name}")
 
     # Combine base_name and id
-    lambda_full_name = f"{base_name}-{construct_id}"
+    lambda_full_name = f"{base_name}-{env_config.environment}"
     logger.debug(f"Generated lambda_full_name: {lambda_full_name}")
 
     # Check if the base_name is empty
@@ -121,7 +116,7 @@ class LambdaConfig:
         vpc (Optional[ec2.IVpc]): VPC configuration for the Lambda
     """
 
-    name: str
+    name: Optional[str] = None
     entry: Optional[str] = None
     memory_size: int = DEFAULT_MEMORY_SIZE
     timeout_minutes: int = DEFAULT_TIMEOUT_MINUTES
@@ -133,6 +128,7 @@ class LambdaConfig:
     vpc: Optional[ec2.IVpc] = None
     security_groups: Optional[List[ec2.ISecurityGroup]] = None
     iam_role_boundary_policy: Optional[iam.ManagedPolicy] = None
+    lambda_handler: Optional[str] = "lambda_handler"
 
 
 class Lambda(Construct):
@@ -190,9 +186,10 @@ class Lambda(Construct):
         stack = Stack.of(self)
         logger.debug(f"Using stack region: {stack.region}")
 
-        lambda_function_name = validate_lambda_resources_names(
-            config.name, construct_id
-        )
+        if config.name is not None:
+            lambda_function_name = validate_lambda_resources_names(config.name)
+        else:
+            lambda_function_name = f"{construct_id}-{env_config.environment}"
         logger.debug(f"Validated function name: {lambda_function_name}")
 
         # Create powertools layer
@@ -262,7 +259,7 @@ class Lambda(Construct):
         logger.debug("Preparing Lambda function properties")
         common_lambda_props = {
             "function_name": lambda_function_name,
-            "handler": "lambda_handler",
+            "handler": config.lambda_handler,
             "entry": config.entry or f"lambdas/{lambda_function_name}",
             "role": self._lambda_role,
             "log_group": lambda_log_group,
@@ -322,9 +319,6 @@ class Lambda(Construct):
                     self,
                     "StandardNodeJSLambda",
                     bundling=NodeJSBundlingOptions(
-                        # external_modules=[
-                        #     "aws-sdk",
-                        # ],
                         node_modules=[
                             "exifr",
                             "aws-sdk",

@@ -5,13 +5,14 @@ import ConnectorCard from '@/features/settings/connectors/components/ConnectorCa
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
 import { useGetConnectors, useDeleteConnector } from '@/api/hooks/useConnectors';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
-import { useQueryClient } from '@tanstack/react-query';
+// import { useQueryClient } from '@tanstack/react-query';
+import queryClient from '@/api/queryClient';
 
 const ConnectorsPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
     const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
-    const queryClient = useQueryClient();
+    // const queryClient = useQueryClient();
 
     const { data: connectorsResponse, isLoading } = useGetConnectors();
     const { mutateAsync: deleteConnector } = useDeleteConnector();

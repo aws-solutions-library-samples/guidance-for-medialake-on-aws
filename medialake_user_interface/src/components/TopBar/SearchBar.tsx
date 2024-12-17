@@ -1,4 +1,3 @@
-// components/TopBar/SearchBar.tsx
 import React from 'react';
 import { TextField, Button, Box } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';

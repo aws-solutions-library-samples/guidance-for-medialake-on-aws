@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/api/queryKeys';
 import { apiClient } from '@/api/apiClient';
-import { logger } from '../../common/helpers/logger';
-import { useErrorModal } from '../../hooks/useErrorModal';
+import { logger } from '@/common/helpers/logger';
+import { useErrorModal } from '@/hooks/useErrorModal';
 
 interface Asset {
     asset: {

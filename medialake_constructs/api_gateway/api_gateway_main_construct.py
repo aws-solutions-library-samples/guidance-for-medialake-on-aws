@@ -39,7 +39,7 @@ class ApiGatewayConstruct(Construct):
             "WafLogGroup",
             log_group_name=f"aws-waf-logs-{config.global_prefix}-api-gateway-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         self.api_gateway_waf_acl = wafv2.CfnWebACL(

@@ -25,6 +25,29 @@ import { useGetUser } from '../../api/hooks/useUsers';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { useEffect, useState } from 'react';
 
+interface UserAttributes {
+    email: string;
+    email_verified: string;
+    name: string;
+    family_name: string;
+    sub: string;
+}
+
+interface UserProfileData {
+    username: string;
+    user_status: string;
+    enabled: boolean;
+    user_created: string;
+    last_modified: string;
+    attributes: UserAttributes;
+}
+
+interface UserProfileResponse {
+    status: string;
+    message: string;
+    data: UserProfileData;
+}
+
 const ProfilePage: React.FC = () => {
     const theme = useTheme();
     const [userId, setUserId] = useState<string | null>(null);
@@ -67,6 +90,10 @@ const ProfilePage: React.FC = () => {
         );
     }
 
+    const email = userProfile.data.attributes?.email || 'Unavailable';
+    const firstName = userProfile.data.attributes?.name || 'Unavailable';
+    const lastName = userProfile.data.attributes?.family_name || 'Unavailable';
+
     return (
         <Box>
             <Box sx={{ mb: 4 }}>
@@ -91,13 +118,13 @@ const ProfilePage: React.FC = () => {
                                 fontSize: '3rem',
                             }}
                         >
-                            {userProfile.data.given_name?.[0] || userProfile.data.username?.[0]}
+                            {email !== 'Unavailable' ? email[0].toUpperCase() : 'U'}
                         </Avatar>
                         <Typography variant="h5" gutterBottom>
-                            {`${userProfile.data.given_name || ''} ${userProfile.data.family_name || ''}`}
+                            {`${firstName} ${lastName}`}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                            {userProfile.data.username}
+                            {email}
                         </Typography>
                         <Chip
                             label="Active"
@@ -124,20 +151,29 @@ const ProfilePage: React.FC = () => {
                         <List>
                             <ListItem>
                                 <ListItemIcon>
-                                    <PersonIcon color="primary" />
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary="Username"
-                                    secondary={userProfile.data.username}
-                                />
-                            </ListItem>
-                            <ListItem>
-                                <ListItemIcon>
                                     <EmailIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
                                     primary="Email"
-                                    secondary={userProfile.data.email}
+                                    secondary={email}
+                                />
+                            </ListItem>
+                            <ListItem>
+                                <ListItemIcon>
+                                    <PersonIcon color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="First Name"
+                                    secondary={firstName}
+                                />
+                            </ListItem>
+                            <ListItem>
+                                <ListItemIcon>
+                                    <PersonIcon color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Last Name"
+                                    secondary={lastName}
                                 />
                             </ListItem>
                         </List>

@@ -1,7 +1,8 @@
 from typing import Dict, Any, Optional
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.event_handler import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.parser import parse
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from pydantic import BaseModel, Field
@@ -12,7 +13,7 @@ from botocore.exceptions import ClientError
 # Initialize AWS PowerTools
 logger = Logger(service="user-service", level=os.getenv("LOG_LEVEL", "WARNING"))
 tracer = Tracer(service="user-service")
-metrics = Metrics(namespace="UserService", service="user-service")
+metrics = Metrics(namespace="medialake", service="users-userid-get")
 
 # Initialize Cognito client
 cognito = boto3.client("cognito-idp")
@@ -34,7 +35,7 @@ class UserResponse(BaseModel):
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(
-    event: APIGatewayProxyEvent, context: LambdaContext
+    event: APIGatewayProxyEventModel, context: LambdaContext
 ) -> Dict[str, Any]:
     """
     Lambda handler to fetch user details from Cognito User Pool

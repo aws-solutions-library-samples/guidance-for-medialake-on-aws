@@ -3,8 +3,8 @@ import queryClient from '@/api/queryClient'
 import { apiClient } from '@/api/apiClient';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { QUERY_KEYS } from '@/api/queryKeys';
-import { logger } from '../../common/helpers/logger';
-import { useErrorModal } from '../../hooks/useErrorModal';
+import { logger } from '@/common/helpers/logger';
+import { useErrorModal } from '@/hooks/useErrorModal';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type {

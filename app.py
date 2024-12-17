@@ -27,6 +27,7 @@ pipeline_nodes_stack = PipelineNodesStack(
     app,
     "MediaLakePipelineNodes",
     props=PipelineNodesStackProps(asset_table=base_infrastructure.asset_table),
+    env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
 # Create API Gateway Stack - includes auth and ui
@@ -60,6 +61,7 @@ cleanup_stack = CleanupStack(
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=api_gateway_stack.connector_table,
     ),
+    env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
 cleanup_stack.add_dependency(api_gateway_stack)

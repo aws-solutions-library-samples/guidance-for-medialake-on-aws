@@ -1,8 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { QUERY_KEYS } from '../queryKeys';
-import { Role, CreateRoleRequest, UpdateRoleRequest, RoleListResponse, RoleResponse } from '../types/api.types';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
+import { QUERY_KEYS } from '@/api/queryKeys';
+import { Role, CreateRoleRequest, UpdateRoleRequest, RoleListResponse, RoleResponse } from '@/api/types/api.types';
+import queryClient from '@/api/queryClient';
 
 export const useGetRoles = () => {
     return useQuery<Role[], Error>({
@@ -16,7 +17,7 @@ export const useGetRoles = () => {
 };
 
 export const useCreateRole = () => {
-    const queryClient = useQueryClient();
+    // const queryClient = useQueryClient();
 
     return useMutation<Role, Error, CreateRoleRequest>({
         mutationFn: async (newRole) => {
@@ -30,7 +31,7 @@ export const useCreateRole = () => {
 };
 
 export const useUpdateRole = () => {
-    const queryClient = useQueryClient();
+    // const queryClient = useQueryClient();
 
     return useMutation<Role, Error, { id: string; updates: UpdateRoleRequest }>({
         mutationFn: async ({ id, updates }) => {
@@ -44,7 +45,7 @@ export const useUpdateRole = () => {
 };
 
 export const useDeleteRole = () => {
-    const queryClient = useQueryClient();
+    // const queryClient = useQueryClient();
 
     return useMutation<void, Error, string>({
         mutationFn: async (id) => {

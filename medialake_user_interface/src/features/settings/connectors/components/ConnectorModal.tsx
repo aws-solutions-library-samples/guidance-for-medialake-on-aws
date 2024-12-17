@@ -29,8 +29,8 @@ import {
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
-import { useQueryClient } from '@tanstack/react-query';
-
+// import { useQueryClient } from '@tanstack/react-query';
+import queryClient from '@/api/queryClient';
 interface ConnectorModalProps {
     open: boolean;
     onClose: () => void;
@@ -60,7 +60,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     editingConnector,
 }) => {
     const theme = useTheme();
-    const queryClient = useQueryClient();
+    // const queryClient = useQueryClient();
     const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');

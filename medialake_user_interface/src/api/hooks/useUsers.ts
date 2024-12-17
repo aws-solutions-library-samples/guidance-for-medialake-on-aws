@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { QUERY_KEYS } from '../queryKeys';
-import { User, CreateUserRequest, UpdateUserRequest, CreateUserResponse } from '../types/api.types';
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
+import { QUERY_KEYS } from '@/api/queryKeys';
+import { User, CreateUserRequest, UpdateUserRequest, CreateUserResponse } from '@/api/types/api.types';
 
 interface UsersResponse {
     status: string;
@@ -17,14 +17,24 @@ interface UsersResponse {
     };
 }
 
+interface UserAttributes {
+    email: string;
+    email_verified: string;
+    name: string;
+    family_name: string;
+    sub: string;
+}
+
 interface UserProfileResponse {
-    status: number;
+    status: string;
+    message: string;
     data: {
         username: string;
-        email: string;
-        given_name: string;
-        family_name: string;
-        custom_settings: string;
+        user_status: string;
+        enabled: boolean;
+        user_created: string;
+        last_modified: string;
+        attributes: UserAttributes;
     };
 }
 

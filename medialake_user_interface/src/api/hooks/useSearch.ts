@@ -1,9 +1,8 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { SearchResponse } from '../../types/search';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { logger } from '../../common/helpers/logger';
-import { useErrorModal } from '../../hooks/useErrorModal';
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
+import { logger } from '@/common/helpers/logger';
+import { useErrorModal } from '@/hooks/useErrorModal';
 
 interface SearchParams {
     page?: number;
@@ -19,9 +18,9 @@ interface SearchResponseData {
         suggestions: any;
     };
     results: Array<any>;
-    totalResults: number; // Add this line
-    facets: any; // Add this line
-    suggestions: any; // Add this line
+    totalResults: number;
+    facets: any;
+    suggestions: any;
 }
 
 interface SearchResponseType {
@@ -57,6 +56,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
         },
         placeholderData: keepPreviousData,
         enabled: !!query,
-        staleTime: 0
+        staleTime: 0,
+        gcTime: 0
     });
 };
