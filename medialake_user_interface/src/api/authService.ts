@@ -1,5 +1,5 @@
 // src/services/authService.ts
-import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
+import { fetchAuthSession, getCurrentUser, fetchUserAttributes } from 'aws-amplify/auth';
 import { StorageHelper } from '../common/helpers/storage-helper';
 
 class AuthService {
@@ -71,6 +71,17 @@ class AuthService {
             return !!user;
         } catch {
             return false;
+        }
+    }
+
+    async getUserInitial(): Promise<string> {
+        try {
+            const attributes = await fetchUserAttributes();
+            const firstName = attributes.given_name || attributes.name?.split(' ')[0] || '';
+            return firstName.charAt(0).toUpperCase() || 'A';
+        } catch (error) {
+            console.error('Error getting user attributes:', error);
+            return 'A';
         }
     }
 }

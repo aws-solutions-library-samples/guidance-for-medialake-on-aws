@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     AppBar,
     Toolbar,
@@ -25,7 +25,7 @@ import { signOut } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
-
+import { authService } from './api/authService';
 
 interface SearchTag {
     key: string;
@@ -37,7 +37,6 @@ const languages = {
     de: { nativeName: 'Deutsch' }
 };
 
-
 function TopBar() {
     const muiTheme = useMuiTheme();
     const { theme, toggleTheme } = useTheme();
@@ -48,7 +47,15 @@ function TopBar() {
     const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
+    const [userInitial, setUserInitial] = useState('A');
 
+    useEffect(() => {
+        const loadUserInitial = async () => {
+            const initial = await authService.getUserInitial();
+            setUserInitial(initial);
+        };
+        loadUserInitial();
+    }, []);
 
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
@@ -68,7 +75,6 @@ function TopBar() {
         setAnchorEl(event.currentTarget);
     };
 
-
     const handleClose = () => {
         setAnchorEl(null);
         setLanguageAnchor(null);
@@ -83,7 +89,7 @@ function TopBar() {
         try {
             await signOut();
             setIsAuthenticated(false);
-            navigate('/auth');
+            navigate('/sign-in');
         } catch (error) {
             console.error('Error signing out:', error);
         }
@@ -230,7 +236,6 @@ function TopBar() {
                             placeholder={t('common.search')}
                             value={searchInput}
                             onChange={handleSearchInputChange}
-                            // onKeyPress={handleSearchKeyPress}
                             onKeyUp={handleSearchKeyPress}
                             fullWidth
                             sx={{
@@ -267,7 +272,6 @@ function TopBar() {
 
                 {/* Right section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-
                     {/* Theme Toggle Button */}
                     <Tooltip title={theme === 'light' ? t('common.darkMode') : t('common.lightMode')}>
                         <IconButton onClick={toggleTheme}>
@@ -287,13 +291,13 @@ function TopBar() {
                                     backgroundColor: muiTheme.palette.primary.main,
                                 }}
                             >
-                                A
+                                {userInitial}
                             </Avatar>
                         </IconButton>
                     </Tooltip>
                 </Box>
 
-                {/* Menus remain the same */}
+                {/* Menus */}
                 <Menu
                     anchorEl={languageAnchor}
                     open={Boolean(languageAnchor)}

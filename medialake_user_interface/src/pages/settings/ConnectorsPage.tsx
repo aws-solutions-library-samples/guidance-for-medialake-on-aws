@@ -43,28 +43,28 @@ const ConnectorsPage: React.FC = () => {
     };
 
     const handleSave = async (connectorData: CreateConnectorRequest): Promise<void> => {
-        try {
-            const response = await fetch('/api/connectors', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(connectorData),
-            });
+        // try {
+        //     const response = await fetch('/api/connectors', {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify(connectorData),
+        //     });
 
-            const data = await response.json();
+        //     const data = await response.json();
 
-            if (response.status === 200 && data.status === 200 && data.message === 'ok') {
-                setAlert({ message: 'Connector created successfully', severity: 'success' });
-                // Invalidate the connectors query to trigger a refresh
-                await queryClient.invalidateQueries({ queryKey: ['connectors'] });
-                handleModalClose();
-            } else {
-                setAlert({ message: 'Connector creation failed', severity: 'error' });
-            }
-        } catch (error) {
-            setAlert({ message: 'Connector creation failed', severity: 'error' });
-        }
+        //     if (response.status === 200 && data.status === 200 && data.message === 'ok') {
+        //         setAlert({ message: 'Connector created successfully', severity: 'success' });
+        //         // Invalidate the connectors query to trigger a refresh
+        //         await queryClient.invalidateQueries({ queryKey: ['connectors'] });
+        //         handleModalClose();
+        //     } else {
+        //         setAlert({ message: 'Connector creation failed', severity: 'error' });
+        //     }
+        // } catch (error) {
+        //     setAlert({ message: 'Connector creation failed', severity: 'error' });
+        // }
     };
 
     const handleAlertClose = () => {

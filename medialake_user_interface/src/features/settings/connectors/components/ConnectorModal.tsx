@@ -116,7 +116,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         try {
             if (type === 's3') {
                 await createS3Connector(connectorData);
-                // Invalidate the connectors query to trigger a refresh
                 await queryClient.invalidateQueries({ queryKey: ['connectors'] });
                 await onSave(connectorData);
             }
