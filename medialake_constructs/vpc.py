@@ -60,28 +60,16 @@ class CustomVpc(Construct):
         )
 
         # Add interface endpoints
-        # self._add_interface_endpoints()
+        # self.add_interface_endpoints()
 
         self.vpc_id = self.vpc.vpc_id
 
-        # def _add_interface_endpoints(self) -> None:
-        # """Add VPC interface endpoints for common AWS services"""
+        # **Add API Gateway Interface Endpoint**
         # self.vpc.add_interface_endpoint(
-        #     "ECRDockerEndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER
-        # )
-
-        # self.vpc.add_interface_endpoint(
-        #     "ECREndpoint", service=ec2.InterfaceVpcEndpointAwsService.ECR
-        # )
-
-        # self.vpc.add_interface_endpoint(
-        #     "CloudWatchLogsEndpoint",
-        #     service=ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-        # )
-
-        # self.vpc.add_interface_endpoint(
-        #     "SecretsManagerEndpoint",
-        #     service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        #     "ApiGatewayEndpoint",
+        #     service=ec2.InterfaceVpcEndpointAwsService("execute-api"),
+        #     subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+        #     private_dns_enabled=True,
         # )
 
         # Create a CloudWatch Log Group for Flow Logs

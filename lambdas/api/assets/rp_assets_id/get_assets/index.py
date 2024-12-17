@@ -152,7 +152,9 @@ def create_response(
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(
+    event: APIGatewayProxyEvent, context: LambdaContext
+) -> Dict[str, Any]:
     """Lambda handler for getting asset details."""
     try:
         # Extract and validate asset ID
@@ -173,8 +175,12 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
             {"asset": enriched_asset},
         )
 
-    except Exception as e:  
-        error_message = str(e) if isinstance(str(e), str) else e.args[0] if e.args else "Unknown error"
+    except Exception as e:
+        error_message = (
+            str(e)
+            if isinstance(str(e), str)
+            else e.args[0] if e.args else "Unknown error"
+        )
         logger.error(
             f"Unexpected error during asset retrieval: {error_message}",
             extra={"asset_id": asset_id},
@@ -184,16 +190,17 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
             HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error"
         )
 
+
 def get_url_for_purpose(asset, purpose):
     for rep in asset.get("DerivedRepresentations", []):
         if rep.get("Purpose") == purpose:
             storage = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
             if storage.get("StorageType") == "s3":
                 return generate_presigned_url(
-                    bucket=storage["Bucket"],
-                    key=storage["ObjectKey"]["FullPath"]
+                    bucket=storage["Bucket"], key=storage["ObjectKey"]["FullPath"]
                 )
     return None
+
 
 @tracer.capture_method
 def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
@@ -215,8 +222,12 @@ def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
                 rep["StorageInfo"]["PrimaryLocation"]["FileInfo"].get("Size", 0)
                 for rep in asset.get("DerivedRepresentations", [])
             )
-            + asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]["FileInfo"].get("Size", 0),
-            "LastModified": asset["DigitalSourceAsset"].get("UpdateDate", asset["DigitalSourceAsset"]["CreateDate"]),
+            + asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+                "PrimaryLocation"
+            ]["FileInfo"].get("Size", 0),
+            "LastModified": asset["DigitalSourceAsset"].get(
+                "UpdateDate", asset["DigitalSourceAsset"]["CreateDate"]
+            ),
             # Add other computed fields as needed
         }
 

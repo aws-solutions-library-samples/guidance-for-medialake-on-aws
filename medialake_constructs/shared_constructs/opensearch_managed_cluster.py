@@ -80,7 +80,8 @@ class OpenSearchCluster(Construct):
                 "es:ESHttpHead",
             ],
             resources=[
-                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*"
+                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}",
+                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*",  # Include if specific resources are not feasible
             ],
         )
 
@@ -113,7 +114,9 @@ class OpenSearchCluster(Construct):
                     "logs:CreateLogStream",
                     "logs:PutLogEvents",
                 ],
-                resources=["arn:aws:logs:*:*:*"],
+                resources=[
+                    f"arn:aws:logs:{stack.region}:{stack.account}:log-group:/aws/opensearch/{props.domain_name}:*"
+                ],
             )
         )
 

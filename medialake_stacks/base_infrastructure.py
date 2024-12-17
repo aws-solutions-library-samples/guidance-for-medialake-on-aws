@@ -610,6 +610,22 @@ class BaseInfrastructureStack(Stack):
         ingestion_custom_resource.node.add_dependency(self._asset_table)
         ingestion_custom_resource.node.add_dependency(pipeline_role)
 
+        # self.api_gateway_endpoint = self._vpc.vpc.add_interface_endpoint(
+        #     "ApiGatewayInterfaceEndpoint",
+        #     service=ec2.InterfaceVpcEndpointAwsService.APIGATEWAY,
+        #     subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+        #     private_dns_enabled=True,
+        # )
+
+    # @property
+    # def vpc_endpoint(self) -> ec2.IVpcEndpoint:
+    #     return self.api_gateway_endpoint
+
+    # #  expose the security group
+    # @property
+    # def api_gateway_endpoint_security_group(self) -> ec2.SecurityGroup:
+    #     return self.api_gateway_endpoint.connections.security_groups[0]
+
     @property
     def ingest_event_bus(self) -> events.EventBus:
         """

@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_wafv2 as wafv2,
+    aws_ec2 as ec2,
     Duration,
     RemovalPolicy,
     aws_cognito as cognito,
@@ -21,6 +22,9 @@ from config import config
 class ApiGatewayProps:
     access_log_bucket: s3.Bucket
     user_pool: cognito.UserPool
+    # api_gateway_endpoint: ec2.IInterfaceVpcEndpoint
+    # cloudfront_vpc_endpoint: ec2.IInterfaceVpcEndpoint
+    # vpc_endpoint: ec2.IVpcEndpoint
 
 
 class ApiGatewayConstruct(Construct):
@@ -140,10 +144,31 @@ class ApiGatewayConstruct(Construct):
             cognito_user_pools=[self.props.user_pool],
         )
 
+        # Create a resource policy
+        # resource_policy = iam.PolicyDocument(
+        #     statements=[
+        #         iam.PolicyStatement(
+        #             actions=["execute-api:Invoke"],
+        #             effect=iam.Effect.ALLOW,
+        #             principals=[iam.AnyPrincipal()],
+        #             resources=["execute-api:/*"],
+        #             conditions={
+        #                 "StringEquals": {
+        #                     "aws:SourceVpce": [
+        #                         props.api_gateway_vpc_endpoint.vpc_endpoint_id,
+        #                     ]
+        #                 }
+        #             },
+        #         )
+        #     ]
+        # )
+
         self.api_gateway_rest_api = apigateway.RestApi(
             self,
             "MediaLakeApi",
             endpoint_types=[apigateway.EndpointType.REGIONAL],
+            # endpoint_types=[apigateway.EndpointType.PRIVATE],
+            # policy=resource_policy,
             cloud_watch_role=True,
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=[
@@ -196,6 +221,7 @@ class ApiGatewayConstruct(Construct):
             ),
         )
 
+        # Associate WAF with API Gateway
         self.api_gateway_waf_association = wafv2.CfnWebACLAssociation(
             self,
             "ApiWafAssociation",
@@ -206,6 +232,13 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_waf_association.node.add_dependency(
             self.api_gateway_rest_api.deployment_stage
         )
+
+        # self.api_gateway_endpoint = props.api_gateway_endpoint
+
+        # Restrict Security Group Ingress**
+        # self.api_gateway_endpoint.connections.allow_from_any_ipv4(
+        #     ec2.Port.tcp(443), "Allow HTTPS traffic from anywhere within the VPC"
+        # )
 
     @property
     def rest_api(self) -> apigateway.RestApi:

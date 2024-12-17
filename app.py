@@ -49,6 +49,9 @@ api_gateway_stack = ApiGatewayStack(
         pipeline_table=base_infrastructure.pipeline_table,
         image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+        # api_gateway_endpoint=base_infrastructure.api_gateway_endpoint,
+        # cloudfront_vpc_endpoint=base_infrastructure.cloudfront_endpoint,
+        # vpc_endpoint=base_infrastructure.vpc_endpoint,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )

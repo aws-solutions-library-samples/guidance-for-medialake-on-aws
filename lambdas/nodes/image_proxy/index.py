@@ -1,6 +1,6 @@
 import boto3
 import base64
-from PIL import Image
+from PIL import Image, ExifTags
 import io
 import os
 from aws_lambda_powertools import Logger, Tracer
@@ -12,8 +12,37 @@ logger = Logger()
 tracer = Tracer()
 
 
+def get_image_rotation(image):
+    try:
+        exif = image._getexif()
+        if not exif:
+            return 0
+        orientation_key = next(
+            (key for key, value in ExifTags.TAGS.items() if value == "Orientation"),
+            None,
+        )
+        if not orientation_key or orientation_key not in exif:
+            return 0
+        orientation = exif[orientation_key]
+        rotation_map = {
+            1: 0,
+            3: 180,
+            6: 270,
+            8: 90,
+        }
+        return rotation_map.get(orientation, 0)
+    except Exception as e:
+        logger.warning(f"Error getting image rotation: {e}")
+        return 0
+
+
 def create_thumbnail(img, width, height, crop=False):
     """Create a thumbnail, optionally center-cropped"""
+
+    rotation = get_image_rotation(img)
+    if rotation:
+        img = img.rotate(rotation, expand=True)
+
     if crop:
         # Existing center-crop logic
         target_ratio = width / height
@@ -40,9 +69,11 @@ def create_thumbnail(img, width, height, crop=False):
     return img
 
 
-
 def create_proxy(img):
     """Create a proxy image with same dimensions"""
+    rotation = get_image_rotation(img)
+    if rotation:
+        img = img.rotate(rotation, expand=True)
     return img
 
 
@@ -111,17 +142,19 @@ def lambda_handler(event, context: LambdaContext):
         image_data = s3_response["Body"].read()
         img = Image.open(io.BytesIO(image_data))
 
-    
         if mode == "thumbnail":
             # Get thumbnail parameters
             params = event.get("thumbnail")
             width = event.get("width")
             height = event.get("height")
-            crop = event.get("crop", False) 
+            crop = event.get("crop", False)
 
             # Check if both width and height are None
             if width is None and height is None:
-                return {"statusCode": 400, "body": "Both width and height cannot be None for thumbnail creation"}
+                return {
+                    "statusCode": 400,
+                    "body": "Both width and height cannot be None for thumbnail creation",
+                }
 
             # If one dimension is None, calculate it based on the aspect ratio
             if width is None:
@@ -132,7 +165,7 @@ def lambda_handler(event, context: LambdaContext):
             # Ensure width and height are integers
             width = int(width)
             height = int(height)
-            
+
             # Process image
             processed_img = create_thumbnail(img, width, height, crop)
 
