@@ -69,6 +69,9 @@ class ApiGatewayStackProps:
     pipeline_table: dynamodb.TableV2
     image_metadata_extractor_lambda: lambda_.Function
     image_proxy_lambda: lambda_.Function
+    # api_gateway_endpoint: ec2.IInterfaceVpcEndpoint
+    # cloudfront_vpc_endpoint: ec2.IVpcEndpoint
+    # vpc_endpoint: ec2.IVpcEndpoint
 
 
 class ApiGatewayStack(Stack):
@@ -90,6 +93,9 @@ class ApiGatewayStack(Stack):
             props=ApiGatewayProps(
                 user_pool=self._cognito_construct.user_pool,
                 access_log_bucket=props.access_log_bucket,
+                # api_gateway_endpoint=props.api_gateway_endpoint,
+                # cloudfront_vpc_endpoint=props.cloudfront_vpc_endpoint,
+                # vpc_endpoint=props.vpc_endpoint,
             ),
         )
 

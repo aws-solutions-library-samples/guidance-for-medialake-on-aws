@@ -51,6 +51,7 @@ class PipelineNodesStack(Stack):
                 name="image_metadata_extractor_node",
                 runtime=lambda_.Runtime.NODEJS_18_X,
                 timeout_minutes=15,
+                memory_size=10240,
                 architecture=lambda_.Architecture.ARM_64,
                 entry="lambdas/nodes/image_metadata_extractor",
                 environment_variables={

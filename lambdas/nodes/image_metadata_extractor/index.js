@@ -48,20 +48,20 @@ async function extractOrganizedMetadata(imageBuffer) {
         tiff: true,
         xmp: true,
         icc: true,
-        iptc: true,
+        iptc: false, // TODO: breaks index - need investigate 
         jfif: true,
         ihdr: true,
         ifd0: true,
         ifd1: true,
         exif: true,
         gps: true,
-        interop: true,
-        makerNote: true,
-        userComment: true,
+        interop: false,
+        makerNote: false,
+        userComment: false,
         mergeOutput: false,
-        translateKeys: true,
-        translateValues: true,
-        reviveValues: true,
+        translateKeys: false,
+        translateValues: false,
+        reviveValues: false
     };
 
     const exr = new exifr.Exifr(options);
