@@ -29,7 +29,7 @@ pipeline_nodes_stack = PipelineNodesStack(
     props=PipelineNodesStackProps(asset_table=base_infrastructure.asset_table),
 )
 
-# Create API Gateway Stack with explicit dependencies
+# Create API Gateway Stack - includes auth and ui
 api_gateway_stack = ApiGatewayStack(
     app,
     "MediaLakeApiGatewayStack",

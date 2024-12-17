@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosRequestHeaders, InternalAxiosRequestConfig } from 'axios';
-import { ApiClientBase } from './apiClientBase';
-import { StorageHelper } from '../common/helpers/storage-helper';
-import { authService } from './authService';
+import { ApiClientBase } from '@/api/apiClientBase';
+import { StorageHelper } from '@/common/helpers/storage-helper';
+import { authService } from '@/api/authService';
 
 class ApiClient extends ApiClientBase {
     private axiosInstance: AxiosInstance;
@@ -59,7 +59,6 @@ class ApiClient extends ApiClientBase {
                     !originalRequest._retry) {
 
                     if (this.isRefreshing) {
-                        // If refresh is already in progress, queue this request
                         return new Promise((resolve, reject) => {
                             this.failedQueue.push({ resolve, reject });
                         })

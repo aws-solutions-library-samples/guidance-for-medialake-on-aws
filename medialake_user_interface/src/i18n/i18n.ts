@@ -44,7 +44,9 @@ i18n
                         rename: 'Rename',
                         root: 'Root',
                         folder: 'Folder',
-                        loadMore: 'Load More'
+                        loadMore: 'Load More',
+                        darkMode: 'Dark Mode',
+                        lightMode: 'Light Mode'
                     },
                     navigation: {
                         home: 'Home',
@@ -162,7 +164,9 @@ i18n
                         alerts: 'Warnungen',
                         warnings: 'Warnhinweise',
                         notifications: 'Benachrichtigungen',
-                        searchPlaceholder: 'Suchen oder Schlüssel:Wert verwenden...'
+                        searchPlaceholder: 'Suchen oder Schlüssel:Wert verwenden...',
+                        darkMode: 'Dunkelmodus',
+                        lightMode: 'Hellmodus'
                     },
                     navigation: {
                         home: 'Startseite',

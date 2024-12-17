@@ -285,7 +285,7 @@ const AuthPage = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
 
-    return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
+    return isAuthenticated ? <>{children}</> : <Navigate to="/sign-in" replace />;
 };
 
 const AppLayout = () => {
@@ -307,7 +307,7 @@ const S3ExplorerWrapper = () => {
 
 const router = createBrowserRouter([
     {
-        path: '/auth',
+        path: '/sign-in',
         element: <AuthPage />
     },
     {

@@ -1,4 +1,4 @@
-import { StorageHelper } from '../common/helpers/storage-helper';
+import { StorageHelper } from '@/common/helpers/storage-helper';
 
 export abstract class ApiClientBase {
     protected async getHeaders() {
@@ -11,7 +11,6 @@ export abstract class ApiClientBase {
         };
     }
 
-    // You can keep this method for fallback or future use
     protected async getIdToken() {
         const token = StorageHelper.getToken();
         if (token) {

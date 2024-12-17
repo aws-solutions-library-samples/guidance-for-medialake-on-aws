@@ -223,15 +223,15 @@ class Lambda(Construct):
         logger.debug("Setting up IAM role")
 
         # Create custom policy for log group access
-        logs_policy = iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=[
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-            ],
-            resources=[f"{lambda_log_group.log_group_arn}:*"],
-        )
+        # logs_policy = iam.PolicyStatement(
+        #     effect=iam.Effect.ALLOW,
+        #     actions=[
+        #         "logs:CreateLogGroup",
+        #         "logs:CreateLogStream",
+        #         "logs:PutLogEvents",
+        #     ],
+        #     resources=[f"{lambda_log_group.log_group_arn}:*"],
+        # )
 
         ## Creation of IAM role for Lambda function
         role_id = f"{lambda_function_name}ExecutionRole"
@@ -250,8 +250,14 @@ class Lambda(Construct):
         self._lambda_role = iam.Role(self, role_id, **role_props)
 
         # Add the logs policy to the role
-        self._lambda_role.add_to_policy(logs_policy)
+        # self._lambda_role.add_to_policy(logs_policy)
 
+        logger.debug("Adding AWSLambdaBasicExecutionRole to Lambda role")
+        self._lambda_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "service-role/AWSLambdaBasicExecutionRole"
+            )
+        )
         # Prepare common Lambda props
         logger.debug("Preparing Lambda function properties")
         common_lambda_props = {
