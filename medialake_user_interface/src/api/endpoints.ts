@@ -11,6 +11,6 @@ export const API_ENDPOINTS = {
         RENAME: (id: string) => `/assets/${id}/rename`,
     },
     USERS: '/settings/users',
-    USER: '/settings/users/user',
+    USER: '/users/user',
     ROLES: '/settings/roles'
 };
