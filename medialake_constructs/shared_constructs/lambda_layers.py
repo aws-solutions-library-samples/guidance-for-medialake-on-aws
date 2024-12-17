@@ -26,8 +26,9 @@ class PowertoolsLayer(Construct):
         self.layer = lambda_.LayerVersion.from_layer_version_arn(
             self,
             "PowertoolsLayer",
-            f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV2{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
+            f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:4",
         )
+        # f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
 
 
 class ExiftoolLayer(Construct):

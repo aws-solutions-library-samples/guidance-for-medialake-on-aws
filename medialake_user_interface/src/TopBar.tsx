@@ -21,11 +21,10 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
-import { signOut } from 'aws-amplify/auth';
+import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
-import { authService } from './api/authService';
 
 interface SearchTag {
     key: string;
@@ -47,12 +46,20 @@ function TopBar() {
     const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
-    const [userInitial, setUserInitial] = useState('A');
+    const [userInitial, setUserInitial] = useState('U');
 
     useEffect(() => {
         const loadUserInitial = async () => {
-            const initial = await authService.getUserInitial();
-            setUserInitial(initial);
+            try {
+                const attributes = await fetchUserAttributes();
+                if (attributes.name && attributes.name.trim()) {
+                    setUserInitial(attributes.name.trim()[0].toUpperCase());
+                } else if (attributes.email && attributes.email.trim()) {
+                    setUserInitial(attributes.email.trim()[0].toUpperCase());
+                }
+            } catch (error) {
+                console.error('Error loading user attributes:', error);
+            }
         };
         loadUserInitial();
     }, []);

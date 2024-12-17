@@ -1,174 +1,150 @@
-import os
-from typing import Dict, Any, List
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.session import Session
+import boto3
+import cfnresponse
+import logging
 from botocore.exceptions import ClientError
+from aws_lambda_powertools import Logger, Tracer
 
+# Initialize AWS Lambda Powertools
+logger = Logger()
 tracer = Tracer()
-metrics = Metrics(namespace="EventBridgeCleanup", service="EventManagement")
-log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
-logger = Logger(
-    service="EventManagement",
-    level=log_level,
-    json_serializer=lambda x: x,
-)
+
+# Initialize AWS clients
+dynamodb = boto3.resource("dynamodb")
+lambda_client = boto3.client("lambda")
+iam = boto3.client("iam")
+s3 = boto3.client("s3")
+sqs = boto3.client("sqs")
 
 
-class EventBridgeCleaner:
-    def __init__(self, region: str):
-        self.session = Session()
-        self.client = self.session.client("events", region_name=region)
-
-    @tracer.capture_method
-    def list_event_buses(self) -> List[str]:
-        """List all non-default event buses"""
+def delete_lambda_function(function_arn: str):
+    """Delete Lambda function and its event source mappings"""
+    try:
+        # Delete event source mappings first
         try:
-            response = self.client.list_event_buses()
-            event_buses = [
-                bus["Name"]
-                for bus in response["EventBuses"]
-                if bus["Name"] != "default"
-            ]
-
-            logger.debug(
-                {
-                    "message": "Retrieved event buses",
-                    "count": len(event_buses),
-                    "event_buses": event_buses,
-                }
+            mappings = lambda_client.list_event_source_mappings(
+                FunctionName=function_arn
             )
-            return event_buses
+            for mapping in mappings.get("EventSourceMappings", []):
+                try:
+                    lambda_client.delete_event_source_mapping(UUID=mapping["UUID"])
+                    logger.info(f"Deleted event source mapping {mapping['UUID']}")
+                except ClientError as e:
+                    if e.response["Error"]["Code"] != "ResourceNotFoundException":
+                        raise
         except ClientError as e:
-            logger.error({"message": "Failed to list event buses", "error": str(e)})
+            if e.response["Error"]["Code"] != "ResourceNotFoundException":
+                raise
+
+        # Delete the function
+        lambda_client.delete_function(FunctionName=function_arn.split(":")[-1])
+        logger.info(f"Deleted Lambda function {function_arn}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
+        logger.warning(f"Lambda function {function_arn} already deleted")
 
-    @tracer.capture_method
-    def list_rules_for_bus(self, bus_name: str) -> List[Dict[str, Any]]:
-        try:
-            paginator = self.client.get_paginator("list_rules")
-            rules = []
 
-            for page in paginator.paginate(EventBusName=bus_name):
-                rules.extend(page["Rules"])
+def delete_iam_role(role_arn: str):
+    """Delete IAM role and its policies"""
+    try:
+        role_name = role_arn.split("/")[-1]
 
-            logger.debug(
-                {
-                    "message": "Retrieved rules for event bus",
-                    "bus_name": bus_name,
-                    "rule_count": len(rules),
-                }
-            )
-            return rules
-        except ClientError as e:
-            logger.error(
-                {
-                    "message": "Failed to list rules for event bus",
-                    "bus_name": bus_name,
-                    "error": str(e),
-                }
-            )
+        # Detach managed policies
+        attached_policies = iam.list_attached_role_policies(RoleName=role_name)[
+            "AttachedPolicies"
+        ]
+        for policy in attached_policies:
+            iam.detach_role_policy(RoleName=role_name, PolicyArn=policy["PolicyArn"])
+            logger.info(f"Detached policy {policy['PolicyArn']} from role {role_name}")
+
+        # Delete inline policies
+        inline_policies = iam.list_role_policies(RoleName=role_name)["PolicyNames"]
+        for policy_name in inline_policies:
+            iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+            logger.info(f"Deleted inline policy {policy_name} from role {role_name}")
+
+        # Delete the role
+        iam.delete_role(RoleName=role_name)
+        logger.info(f"Deleted IAM role {role_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "NoSuchEntity":
             raise
-
-    @tracer.capture_method
-    def delete_rule(self, bus_name: str, rule_name: str) -> None:
-        try:
-            targets = self.client.list_targets_by_rule(
-                Rule=rule_name, EventBusName=bus_name
-            )["Targets"]
-
-            if targets:
-                target_ids = [target["Id"] for target in targets]
-                self.client.remove_targets(
-                    Rule=rule_name, EventBusName=bus_name, Ids=target_ids
-                )
-
-            self.client.delete_rule(Name=rule_name, EventBusName=bus_name)
-
-            logger.info(
-                {
-                    "message": "Successfully deleted rule",
-                    "bus_name": bus_name,
-                    "rule_name": rule_name,
-                    "target_count": len(targets),
-                }
-            )
-
-            metrics.add_metric(name="RulesDeleted", value=1, unit="Count")
-
-        except ClientError as e:
-            logger.error(
-                {
-                    "message": "Failed to delete rule",
-                    "bus_name": bus_name,
-                    "rule_name": rule_name,
-                    "error": str(e),
-                }
-            )
-            metrics.add_metric(name="RuleDeletionFailures", value=1, unit="Count")
-            raise
+        logger.warning(f"IAM role {role_name} already deleted")
 
 
 @tracer.capture_lambda_handler
-@metrics.log_metrics
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(event, context):
     try:
-        if isinstance(event, dict) and "body" in event:
-            request = event["body"]
+        logger.info("Received event: %s", event)
+        request_type = event["RequestType"]
+
+        if request_type == "Delete":
+            table_name = event["ResourceProperties"]["TableName"]
+            table = dynamodb.Table(table_name)
+
+            # Scan the table to get all connectors
+            response = table.scan()
+            items = response["Items"]
+
+            while "LastEvaluatedKey" in response:
+                response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+                items.extend(response["Items"])
+
+            # Process each connector for cleanup
+            for item in items:
+                try:
+                    logger.info("Cleaning up connector: %s", item["id"])
+
+                    # Delete Lambda function
+                    if "lambdaArn" in item:
+                        delete_lambda_function(item["lambdaArn"])
+
+                    # Delete IAM role
+                    if "iamRoleArn" in item:
+                        delete_iam_role(item["iamRoleArn"])
+
+                    # Delete SQS queue
+                    if "queueUrl" in item:
+                        try:
+                            sqs.delete_queue(QueueUrl=item["queueUrl"])
+                            logger.info(f"Deleted SQS queue {item['queueUrl']}")
+                        except ClientError as e:
+                            if (
+                                e.response["Error"]["Code"]
+                                != "AWS.SimpleQueueService.NonExistentQueue"
+                            ):
+                                raise
+
+                    # Remove S3 bucket notification
+                    if "storageIdentifier" in item:
+                        try:
+                            s3.put_bucket_notification_configuration(
+                                Bucket=item["storageIdentifier"],
+                                NotificationConfiguration={},
+                            )
+                            logger.info(
+                                f"Removed notifications from bucket {item['storageIdentifier']}"
+                            )
+                        except ClientError as e:
+                            if e.response["Error"]["Code"] != "NoSuchBucket":
+                                raise
+
+                    # Delete the connector record
+                    table.delete_item(Key={"id": item["id"]})
+                    logger.info(f"Deleted connector record {item['id']}")
+
+                except Exception as e:
+                    logger.error(
+                        "Error cleaning up connector %s: %s", item["id"], str(e)
+                    )
+                    continue
+
+            logger.info("Cleanup completed successfully")
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
         else:
-            request = event
-
-        dry_run = request.get("dry_run", False)
-        region = request.get("region", "us-east-1")
-
-        cleaner = EventBridgeCleaner(region)
-        event_buses = cleaner.list_event_buses()
-
-        deleted_rules_count = 0
-        failed_deletions_count = 0
-
-        for bus_name in event_buses:
-            rules = cleaner.list_rules_for_bus(bus_name)
-
-            for rule in rules:
-                if not dry_run:
-                    try:
-                        cleaner.delete_rule(bus_name, rule["Name"])
-                        deleted_rules_count += 1
-                    except ClientError:
-                        failed_deletions_count += 1
-                        continue
-
-        metrics.add_metric(
-            name="TotalRulesProcessed",
-            value=deleted_rules_count + failed_deletions_count,
-            unit="Count",
-        )
-
-        response = {
-            "statusCode": 200,
-            "body": {
-                "message": "EventBridge cleanup completed",
-                "dry_run": dry_run,
-                "deleted_rules": deleted_rules_count,
-                "failed_deletions": failed_deletions_count,
-            },
-        }
-
-        logger.info(
-            {
-                "message": "Lambda execution completed successfully",
-                "details": response["body"],
-            }
-        )
-
-        return response
+            # For Create/Update events, just respond success
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
 
     except Exception as e:
-        logger.error({"message": "Lambda execution failed", "error": str(e)})
-        return {
-            "statusCode": 500,
-            "body": {"message": "Internal server error", "error": str(e)},
-        }
+        logger.error("Error during cleanup: %s", str(e))
+        cfnresponse.send(event, context, cfnresponse.FAILED, {})
