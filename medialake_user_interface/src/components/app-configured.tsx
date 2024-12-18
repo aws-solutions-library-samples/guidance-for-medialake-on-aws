@@ -285,7 +285,7 @@ const AuthPage = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
 
-    return isAuthenticated ? <>{children}</> : <Navigate to="/sign-in" replace />;
+    return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const AppLayout = () => {

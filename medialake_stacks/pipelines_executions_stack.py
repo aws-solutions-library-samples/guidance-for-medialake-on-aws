@@ -94,6 +94,7 @@ class PipelinesExecutionsStack(Stack):
             self._pipeline_executions_event_processor.function
         )
 
+        # Create a rule to trigger the pipeline executions event processor lambda
         pipelines_executions_lambda_rule = events.Rule(
             self,
             "PipelinesExecutionsLambdaRule",

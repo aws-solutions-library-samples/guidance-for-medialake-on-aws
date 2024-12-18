@@ -296,6 +296,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                         backgroundColor: alpha(theme.palette.error.main, 0.1),
                                         '&:hover': {
                                             backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                            width: 40,
+                                            height: 40,
                                         },
                                     }}
                                 >

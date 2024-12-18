@@ -16,13 +16,15 @@ import {
     Person as PersonIcon,
     AdminPanelSettings as AdminIcon,
     Group as GroupIcon,
+    Security as SecurityIcon,
 } from '@mui/icons-material';
-import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '@/api/hooks/useConnectors';
-import { Integration, ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
-import { ConnectorsList } from '@/features/settings/connectors/components/ConnectorsList';
-import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
+import { useGetConnectors, useCreateConnector, useUpdateConnector, useDeleteConnector } from '../api/hooks/useConnectors';
+import { Integration, ConnectorResponse, CreateConnectorRequest } from '../api/types/api.types';
+import { ConnectorsList } from '../features/settings/connectors/components/ConnectorsList';
+import ConnectorModal from '../features/settings/connectors/components/ConnectorModal';
 import UserProfile from '../components/settings/UserProfile';
 import UserManagement from './settings/UserManagement';
+import RoleManagement from './settings/RoleManagement';
 
 interface TabPanelProps {
     readonly children?: React.ReactNode;
@@ -69,7 +71,6 @@ const SettingsPage = () => {
         setEditingConnector(undefined);
         setOpenConnectorModal(true);
     };
-
 
     const handleSaveConnector = async (connectorData: CreateConnectorRequest) => {
         try {
@@ -157,6 +158,11 @@ const SettingsPage = () => {
                             iconPosition="start"
                         />
                         <Tab
+                            icon={<SecurityIcon sx={{ mr: 1 }} />}
+                            label="Roles"
+                            iconPosition="start"
+                        />
+                        <Tab
                             icon={<AdminIcon sx={{ mr: 1 }} />}
                             label="Admin"
                             iconPosition="start"
@@ -188,6 +194,12 @@ const SettingsPage = () => {
                 <TabPanel value={activeTab} index={3}>
                     <Box sx={{ px: 2 }}>
                         <UserManagement />
+                    </Box>
+                </TabPanel>
+
+                <TabPanel value={activeTab} index={4}>
+                    <Box sx={{ px: 2 }}>
+                        <RoleManagement />
                     </Box>
                 </TabPanel>
 

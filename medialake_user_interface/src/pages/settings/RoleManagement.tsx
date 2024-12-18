@@ -1,53 +1,52 @@
 import React, { useState } from 'react';
 import {
     Box,
+    Button,
     Typography,
-    Paper,
-    Alert,
-    Snackbar,
     CircularProgress,
+    Alert,
 } from '@mui/material';
-import RoleManagementComponent from '../../features/settings/usermanagement/components/RoleManagement';
-import { useGetRoles, useCreateRole, useUpdateRole, useDeleteRole } from '../../api/hooks/useRoles';
+import AddIcon from '@mui/icons-material/Add';
 import { Role, CreateRoleRequest } from '../../api/types/api.types';
+import { useGetRoles, useCreateRole, useUpdateRole, useDeleteRole } from '../../api/hooks/useRoles';
+import RoleList from '../../features/settings/roles/components/RoleList';
+import RoleForm from '../../features/settings/roles/components/RoleForm';
 
 const RoleManagement: React.FC = () => {
+    const [openRoleForm, setOpenRoleForm] = useState(false);
+    const [editingRole, setEditingRole] = useState<Role | undefined>();
     const [error, setError] = useState<string | null>(null);
 
+    // API Hooks
     const { data: roles, isLoading: isLoadingRoles, error: rolesError } = useGetRoles();
     const createRoleMutation = useCreateRole();
     const updateRoleMutation = useUpdateRole();
     const deleteRoleMutation = useDeleteRole();
 
-    const handleAddRole = async (roleData: Omit<Role, 'id'>) => {
-        try {
-            const createData: CreateRoleRequest = {
-                name: roleData.name,
-                description: roleData.description,
-                permissions: roleData.permissions
-            };
-            await createRoleMutation.mutateAsync(createData);
-            setError(null);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while creating the role');
-            console.error('Error creating role:', error);
-        }
+    const handleAddRole = () => {
+        setEditingRole(undefined);
+        setOpenRoleForm(true);
     };
 
-    const handleEditRole = async (updatedRole: Role) => {
+    const handleEditRole = (role: Role) => {
+        setEditingRole(role);
+        setOpenRoleForm(true);
+    };
+
+    const handleSaveRole = async (roleData: CreateRoleRequest) => {
         try {
-            await updateRoleMutation.mutateAsync({
-                id: updatedRole.id,
-                updates: {
-                    name: updatedRole.name,
-                    description: updatedRole.description,
-                    permissions: updatedRole.permissions
-                }
-            });
+            if (editingRole) {
+                await updateRoleMutation.mutateAsync({
+                    id: editingRole.id,
+                    updates: roleData
+                });
+            } else {
+                await createRoleMutation.mutateAsync(roleData);
+            }
+            setOpenRoleForm(false);
             setError(null);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while updating the role');
-            console.error('Error updating role:', error);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An error occurred while saving the role');
         }
     };
 
@@ -55,57 +54,64 @@ const RoleManagement: React.FC = () => {
         try {
             await deleteRoleMutation.mutateAsync(roleId);
             setError(null);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while deleting the role');
-            console.error('Error deleting role:', error);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An error occurred while deleting the role');
         }
     };
 
+    if (rolesError) {
+        return (
+            <Alert severity="error" sx={{ mt: 2 }}>
+                {rolesError instanceof Error ? rolesError.message : 'An error occurred while loading roles'}
+            </Alert>
+        );
+    }
+
     return (
-        <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
-            <Box sx={{ mb: 4 }}>
+        <Box sx={{ p: 3 }}>
+            <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
                     Role Management
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                    Manage system roles and their permissions
+                    Create and manage roles to control user permissions
                 </Typography>
             </Box>
 
-            <Paper sx={{ width: '100%', mb: 2 }}>
-                <Box sx={{ p: 3 }}>
-                    {isLoadingRoles ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                            <CircularProgress />
-                        </Box>
-                    ) : rolesError ? (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            Failed to load roles: {rolesError instanceof Error ? rolesError.message : 'Unknown error'}
-                        </Alert>
-                    ) : (
-                        <RoleManagementComponent
-                            roles={roles || []}
-                            onAddRole={handleAddRole}
-                            onEditRole={handleEditRole}
-                            onDeleteRole={handleDeleteRole}
-                        />
-                    )}
-                </Box>
-            </Paper>
-
-            <Snackbar
-                open={!!error}
-                autoHideDuration={6000}
-                onClose={() => setError(null)}
-            >
-                <Alert
-                    severity="error"
-                    onClose={() => setError(null)}
-                    sx={{ width: '100%' }}
-                >
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
                     {error}
                 </Alert>
-            </Snackbar>
+            )}
+
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleAddRole}
+                >
+                    Add Role
+                </Button>
+            </Box>
+
+            {isLoadingRoles ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                    <CircularProgress />
+                </Box>
+            ) : (
+                <RoleList
+                    roles={roles || []}
+                    onEditRole={handleEditRole}
+                    onDeleteRole={handleDeleteRole}
+                />
+            )}
+
+            <RoleForm
+                open={openRoleForm}
+                onClose={() => setOpenRoleForm(false)}
+                onSave={handleSaveRole}
+                role={editingRole}
+            />
         </Box>
     );
 };
