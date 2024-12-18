@@ -72,8 +72,7 @@ class AssetsConstruct(Construct):
                 },
             ),
         )
-        
-        
+
         get_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -222,7 +221,8 @@ class AssetsConstruct(Construct):
                     "s3:GetObject",
                     "s3:PutObject",
                     "s3:DeleteObject",
-                    "s3:CopyObject",
+                    "s3:ListBucket",
+                    "s3:PutObjectTagging",
                 ],
                 resources=[
                     "arn:aws:s3:::*/*",  # Access to all objects in all buckets

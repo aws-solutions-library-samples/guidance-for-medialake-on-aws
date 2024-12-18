@@ -260,6 +260,13 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
         main_rep["Name"] = get_object_name_from_path(new_name)
         new_path = f"{new_name}"
 
+        # Check if main representation already exists
+        if check_object_exists(source_bucket, new_path):
+            raise AssetRenameError(
+                f"An object with the name {new_name} already exists",
+                HTTPStatus.CONFLICT,
+            )
+
         logger.info(
             "Starting main representation copy",
             extra={
@@ -443,11 +450,16 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
     try:
         main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
         old_path = main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+        new_object_name = get_object_name_from_path(new_name)
 
-        # Update main representation path
+        # Update main representation path and name
         main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"] = new_name
+        main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
+            "Name"
+        ] = new_object_name
+        main_rep["Name"] = new_object_name
 
-        # Update derived representation paths
+        # Update derived representation paths and names
         for derived in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
             if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
                 continue
@@ -460,6 +472,13 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
                 "FullPath"
             ] = new_derived_path
 
+            new_derived_name = get_object_name_from_path(new_derived_path)
+            derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
+                "Name"
+            ] = new_derived_name
+            if "Name" in derived:
+                derived["Name"] = new_derived_name
+
         # DynamoDB put_item operation (not SQL, safe from injection)
         table.put_item(Item=asset)
         return asset
@@ -467,6 +486,18 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
     except ClientError as e:
         logger.error(f"Failed to update asset record: {str(e)}")
         raise AssetRenameError(f"Failed to update asset record: {str(e)}")
+
+
+@tracer.capture_method
+def check_object_exists(bucket: str, key: str) -> bool:
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+        return True
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            return False
+        else:
+            raise
 
 
 def create_response(
@@ -493,7 +524,9 @@ def create_response(
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(
+    event: APIGatewayProxyEvent, context: LambdaContext
+) -> Dict[str, Any]:
     """Lambda handler for asset renaming."""
     try:
         # Extract and validate parameters

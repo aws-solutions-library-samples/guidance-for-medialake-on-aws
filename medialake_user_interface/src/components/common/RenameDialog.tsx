@@ -66,16 +66,16 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <TextField
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    {/* <TextField
                         label="Current Name"
                         value={currentName}
                         disabled
                         fullWidth
-                    />
+                    /> */}
                     <TextField
                         label="New Name"
-                        value={newName}
+                        // value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         fullWidth
                         autoFocus
