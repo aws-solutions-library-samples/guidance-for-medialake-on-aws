@@ -1,9 +1,10 @@
 import json
 from typing import List, Optional
-from aws_cdk import aws_logs as logs
-from pydantic import BaseModel
+from aws_cdk import aws_logs as logs, aws_opensearchservice as opensearch
+from pydantic import BaseModel, validator
 from aws_cdk import aws_iam as iam
 from constructs import Construct
+from config_utils import validate_opensearch_instance_type
 
 
 class LoggingConfig(BaseModel):
@@ -45,6 +46,27 @@ class LoggingConfig(BaseModel):
         return retention_map[closest_days]
 
 
+class OpenSearchClusterSettings(BaseModel):
+    master_node_count: int = 2
+    master_node_instance_type: str = "r7g.medium.search"
+    data_node_count: int = 3
+    data_node_instance_type: str = "r7g.medium.search"
+    data_node_volume_size: int = 10
+    data_node_volume_type: str = "gp3"
+    data_node_volume_iops: int = 3000
+    availability_zone_count: int = 2
+
+    _validate_instance_type = validator(
+        "master_node_instance_type", "data_node_instance_type", allow_reuse=True
+    )(validate_opensearch_instance_type)
+
+
+class UserConfig(BaseModel):
+    email: str
+    first_name: str
+    last_name: str
+
+
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
@@ -55,8 +77,10 @@ class CDKConfig(BaseModel):
     resource_prefix: str
     api_path: str
     initial_user_email: str
+    initial_user: UserConfig
     logging: LoggingConfig = LoggingConfig()
     secondary_region: Optional[str] = None
+    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
 
     @property
     def regions(self) -> List[str]:

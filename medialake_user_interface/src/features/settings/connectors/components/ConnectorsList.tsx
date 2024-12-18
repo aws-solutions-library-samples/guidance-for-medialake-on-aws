@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { Box, CircularProgress, Typography, Grid, Button } from '@mui/material';
-import { useGetConnectors, useDeleteConnector } from '@/api/hooks/useConnectors';
+import { useGetConnectors, useDeleteConnector, useToggleConnector } from '@/api/hooks/useConnectors';
 import { ConnectorResponse, ConnectorListResponse } from '@/api/types/api.types';
 import ConnectorCard from './ConnectorCard';
 import { UseQueryResult } from '@tanstack/react-query';
@@ -35,6 +35,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
     }: UseQueryResult<ConnectorListResponse, Error> = useGetConnectors();
 
     const deleteConnector = useDeleteConnector();
+    const toggleConnector = useToggleConnector();
 
     const handleEdit = (connector: ConnectorResponse) => {
         // TODO: Implement edit functionality
@@ -46,6 +47,14 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
             await deleteConnector.mutateAsync(id);
         } catch (error) {
             console.error('Failed to delete connector:', error);
+        }
+    };
+
+    const handleToggleStatus = async (id: string, enabled: boolean) => {
+        try {
+            await toggleConnector.mutateAsync({ id, enabled });
+        } catch (error) {
+            console.error('Failed to toggle connector status:', error);
         }
     };
 
@@ -82,6 +91,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
                                 connector={connector}
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
+                                onToggleStatus={handleToggleStatus}
                             />
                         </Grid>
                     ))}

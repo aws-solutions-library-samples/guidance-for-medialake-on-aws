@@ -3,6 +3,7 @@ import cfnresponse
 import logging
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
+import os
 
 # Initialize AWS Lambda Powertools
 logger = Logger()
@@ -79,7 +80,7 @@ def lambda_handler(event, context):
         request_type = event["RequestType"]
 
         if request_type == "Delete":
-            table_name = event["ResourceProperties"]["TableName"]
+            table_name = os.environ["CONNECTOR_TABLE"]
             table = dynamodb.Table(table_name)
 
             # Scan the table to get all connectors

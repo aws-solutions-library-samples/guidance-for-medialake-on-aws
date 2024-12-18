@@ -284,21 +284,6 @@ class UIConstruct(Construct):
                         "sampledRequestsEnabled": True,
                     },
                 },
-                # {
-                #     "name": "BlockCountries",
-                #     "priority": 4,
-                #     "overrideAction": {"block": {}},
-                #     "statement": {
-                #         "geoMatchStatement": {
-                #             "countryCodes": ["RU", "CN"]  # Add country codes to block
-                #         }
-                #     },
-                #     "visibilityConfig": {
-                #         "cloudWatchMetricsEnabled": True,
-                #         "metricName": "GeoBlockMetric",
-                #         "sampledRequestsEnabled": True,
-                #     },
-                # },
             ],
         )
 

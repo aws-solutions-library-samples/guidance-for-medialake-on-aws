@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, } from '@tanstack/react-query';
-import queryClient from '@/api/queryClient'
+import queryClient from '@/api/queryClient';
 import { apiClient } from '@/api/apiClient';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { QUERY_KEYS } from '@/api/queryKeys';
@@ -169,6 +169,58 @@ export const useUpdateConnector = () => {
             } else {
                 showError(`Failed to update connector: ${error.message}`);
             }
+        }
+    });
+};
+
+export const useToggleConnector = () => {
+    const { showError } = useErrorModal();
+
+    return useMutation<ConnectorResponse, Error, { id: string; enabled: boolean }>({
+        mutationFn: async ({ id, enabled }) => {
+            const response = await apiClient.put<ConnectorResponse>(
+                `${API_ENDPOINTS.CONNECTORS}/${id}/status`,
+                { status: enabled ? 'active' : 'disabled' }
+            );
+            return response.data;
+        },
+        onMutate: async ({ id, enabled }) => {
+            await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
+
+            const previousConnectors = queryClient.getQueryData<ConnectorListResponse>(
+                [QUERY_KEYS.CONNECTORS]
+            );
+
+            queryClient.setQueryData<ConnectorListResponse>(
+                [QUERY_KEYS.CONNECTORS],
+                (old) => {
+                    if (!old) return previousConnectors;
+                    return {
+                        status: old.status,
+                        message: old.message,
+                        data: {
+                            ...old.data,
+                            connectors: old.data.connectors.map(connector =>
+                                connector.id === id
+                                    ? { ...connector, status: enabled ? 'active' : 'disabled' }
+                                    : connector
+                            )
+                        }
+                    };
+                }
+            );
+
+            return { previousConnectors };
+        },
+        onError: (error, variables, context: { previousConnectors?: ConnectorListResponse }) => {
+            if (context?.previousConnectors) {
+                queryClient.setQueryData(
+                    [QUERY_KEYS.CONNECTORS],
+                    context.previousConnectors
+                );
+            }
+            logger.error('Toggle connector error:', error);
+            showError(`Failed to ${variables.enabled ? 'enable' : 'disable'} connector`);
         }
     });
 };

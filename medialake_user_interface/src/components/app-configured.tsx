@@ -285,7 +285,7 @@ const AuthPage = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
 
-    return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+    return isAuthenticated ? <>{children}</> : <Navigate to="/sign-in" replace />;
 };
 
 const AppLayout = () => {
@@ -349,6 +349,10 @@ const router = createBrowserRouter([
             {
                 path: 'images/:id',
                 element: <ImageDetailPage />
+            },
+            {
+                path: '*',
+                element: <Navigate to="/" replace />
             }
         ]
     }

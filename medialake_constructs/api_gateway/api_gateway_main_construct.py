@@ -22,9 +22,6 @@ from config import config
 class ApiGatewayProps:
     access_log_bucket: s3.Bucket
     user_pool: cognito.UserPool
-    # api_gateway_endpoint: ec2.IInterfaceVpcEndpoint
-    # cloudfront_vpc_endpoint: ec2.IInterfaceVpcEndpoint
-    # vpc_endpoint: ec2.IVpcEndpoint
 
 
 class ApiGatewayConstruct(Construct):

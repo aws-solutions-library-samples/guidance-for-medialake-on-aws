@@ -668,7 +668,7 @@ class BaseInfrastructureStack(Stack):
             dynamodb.TableV2: The configured DynamoDB table
         """
 
-        return self._pipelne_table
+        return self._pipelne_table.table
 
     @property
     def asset_table_name(self) -> str:

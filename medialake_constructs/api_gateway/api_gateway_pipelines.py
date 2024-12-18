@@ -440,7 +440,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
-                resources=[props.pipeline_table.table.table_arn],
+                resources=[props.pipeline_table.table_arn],
             )
         )
 

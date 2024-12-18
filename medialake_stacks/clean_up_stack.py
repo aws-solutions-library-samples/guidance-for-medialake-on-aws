@@ -40,8 +40,8 @@ class CleanupStack(Stack):
             ),
         )
 
-        # props.connector_table.grant_read_data(self._clean_up_lambda.function)
-        # props.pipeline_table.grant_read_data(self._clean_up_lambda.function)
+        props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
+        props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
