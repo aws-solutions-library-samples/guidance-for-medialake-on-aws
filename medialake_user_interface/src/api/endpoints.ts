@@ -12,5 +12,7 @@ export const API_ENDPOINTS = {
     },
     USERS: '/settings/users',
     USER: '/users/user',
-    ROLES: '/settings/roles'
+    ROLES: '/settings/roles',
+    DISABLE_USER: (userId: string) => `/users/user/${userId}/disableuser`,
+    ENABLE_USER: (userId: string) => `/users/user/${userId}/enableuser`
 };

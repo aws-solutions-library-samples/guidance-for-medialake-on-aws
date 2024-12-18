@@ -113,12 +113,12 @@ class PipelinesExecutionsStack(Stack):
             ],
         )
 
-        # GET /api/pipelines/executions/
+        # GET /pipelines/executions/
         self._get_pipelines_executions_lambda = Lambda(
             self,
             "GetPipelinesExecutionsHandler",
             config=LambdaConfig(
-                name="getexecutions",
+                name="get_executions",
                 entry="lambdas/api/pipelines/executions/get_executions",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
@@ -136,7 +136,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsExecutionIdHandler",
             config=LambdaConfig(
-                name="geid",
+                name="executions_executionid",
                 entry="lambdas/api/pipelines/executions/rp_executionId/get_execution",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,

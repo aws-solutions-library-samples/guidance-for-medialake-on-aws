@@ -9,10 +9,10 @@ import {
     CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import UserList from '../../features/settings/usermanagement/components/UserList';
-import UserForm from '../../features/settings/usermanagement/components/UserForm';
-import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../../api/hooks/useUsers';
-import { User, CreateUserRequest, UpdateUserRequest } from '../../api/types/api.types';
+import UserList from '@/features/settings/usermanagement/components/UserList';
+import UserForm from '@/features/settings/usermanagement/components/UserForm';
+import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useDisableUser, useEnableUser } from '@/api/hooks/useUsers';
+import { User, CreateUserRequest, UpdateUserRequest } from '@/api/types/api.types';
 
 const availableRoles = ['Admin', 'Editor', 'Viewer'];
 
@@ -26,6 +26,8 @@ const UserManagement: React.FC = () => {
     const createUserMutation = useCreateUser();
     const updateUserMutation = useUpdateUser();
     const deleteUserMutation = useDeleteUser();
+    const disableUserMutation = useDisableUser();
+    const enableUserMutation = useEnableUser();
 
     const handleAddUser = () => {
         setEditingUser(undefined);
@@ -83,14 +85,13 @@ const UserManagement: React.FC = () => {
 
     const handleToggleUserStatus = async (username: string, newEnabled: boolean) => {
         try {
-            const updateData: UpdateUserRequest = {
-                username,
-                enabled: newEnabled
-            };
-            await updateUserMutation.mutateAsync({
-                username,
-                updates: updateData
-            });
+            if (newEnabled) {
+                // Enable user
+                await enableUserMutation.mutateAsync(username);
+            } else {
+                // Disable user
+                await disableUserMutation.mutateAsync(username);
+            }
             setError(null);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'An error occurred while updating user status');

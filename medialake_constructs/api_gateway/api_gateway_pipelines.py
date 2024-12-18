@@ -77,7 +77,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                         "iam:GetRolePolicy",
                         "iam:ListRolePolicies",
                         "iam:ListAttachedRolePolicies",
-                        "iam:CreateRole",
                         "iam:DeleteRole",
                         "iam:PutRolePolicy",
                         "iam:DeleteRolePolicy",
@@ -91,37 +90,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
-                # Conditional Allow for IAM write actions that involve passing roles
-                # iam.PolicyStatement(
-                #     effect=iam.Effect.ALLOW,
-                #     actions=[
-                #         "iam:CreateRole",
-                #         "iam:DeleteRole",
-                #         "iam:PutRolePolicy",
-                #         "iam:DeleteRolePolicy",
-                #         "iam:AttachRolePolicy",
-                #         "iam:DetachRolePolicy",
-                #         "iam:UpdateRole",
-                #         "iam:UpdateRoleDescription",
-                #         "iam:TagRole",
-                #         "iam:UntagRole",
-                #         "iam:PassRole",
-                #     ],
-                #     resources=["*"],
-                #     conditions={
-                #         "StringLike": {
-                #             "iam:PassedToService": [
-                #                 "lambda.amazonaws.com",
-                #                 "s3.amazonaws.com",
-                #                 "sqs.amazonaws.com",
-                #                 "sns.amazonaws.com",
-                #                 "dynamodb.amazonaws.com",
-                #                 "events.amazonaws.com",
-                #                 "states.amazonaws.com",
-                #             ]
-                #         }
-                #     },
-                # ),
             ],
         )
 
@@ -173,37 +141,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
-                # Conditional Allow for IAM write actions that involve passing roles
-                # iam.PolicyStatement(
-                #     effect=iam.Effect.ALLOW,
-                #     actions=[
-                #         "iam:CreateRole",
-                #         "iam:DeleteRole",
-                #         "iam:PutRolePolicy",
-                #         "iam:DeleteRolePolicy",
-                #         "iam:AttachRolePolicy",
-                #         "iam:DetachRolePolicy",
-                #         "iam:UpdateRole",
-                #         "iam:UpdateRoleDescription",
-                #         "iam:TagRole",
-                #         "iam:UntagRole",
-                #         "iam:PassRole",
-                #     ],
-                #     resources=["*"],
-                #     conditions={
-                #         "StringLike": {
-                #             "iam:PassedToService": [
-                #                 "lambda.amazonaws.com",
-                #                 "s3.amazonaws.com",
-                #                 "sqs.amazonaws.com",
-                #                 "sns.amazonaws.com",
-                #                 "dynamodb.amazonaws.com",
-                #                 "events.amazonaws.com",
-                #                 "states.amazonaws.com",
-                #             ]
-                #         }
-                #     },
-                # ),
             ],
         )
 
@@ -516,7 +453,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         pipelines_executions_resource = pipelines_resource.add_resource("executions")
 
-        # GET /api/pipelines/executions/ - responds with all pipeline executions
+        # GET /pipelines/executions/ - responds with all pipeline executions
         pipelines_executions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(props.get_pipelines_executions_lambda),

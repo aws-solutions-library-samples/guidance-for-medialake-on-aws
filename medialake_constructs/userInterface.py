@@ -222,7 +222,7 @@ class UIConstruct(Construct):
             "WafLogGroup",
             log_group_name=f"aws-waf-logs-{config.global_prefix}-{config.primary_region}-{config.account_id}-user-interface-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         self.user_interface_waf_acl = wafv2.CfnWebACL(
