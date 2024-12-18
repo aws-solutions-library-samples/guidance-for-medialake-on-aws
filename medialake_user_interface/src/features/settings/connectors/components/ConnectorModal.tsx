@@ -125,12 +125,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         try {
             if (type === 's3') {
                 await createS3Connector(connectorData);
-                // Wait for query invalidation to complete before closing modal and showing success message
                 await queryClient.invalidateQueries({ queryKey: ['connectors'] });
-                await onSave(connectorData);
-                // Close modal first to prevent UI glitches
+                await queryClient.refetchQueries({ queryKey: ['connectors'] });
                 onClose();
-                // Show success message after modal is closed
                 setSnackbar({
                     open: true,
                     message: 'Connector created successfully',
@@ -138,7 +135,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 });
             }
         } catch (err) {
-            // Error handling is managed by the mutation hook
             setSnackbar({
                 open: true,
                 message: 'Failed to create connector',
@@ -164,8 +160,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         value={name}
                         disabled
                         fullWidth
-                        InputProps={{
-                            sx: { bgcolor: 'action.disabledBackground' }
+                        slotProps={{
+                            input: {
+                                sx: { bgcolor: 'action.disabledBackground' }
+                            }
                         }}
                         helperText="Connector name cannot be modified after creation"
                     />
@@ -466,10 +464,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     }}
                 >
                     <Box sx={{ p: 2, maxWidth: 400 }}>
-                        <Typography variant="body2" paragraph>
+                        <Typography variant="body2" sx={{ mb: 2 }}>
                             • MediaLake Non-Managed (If/when other remote storage systems are introduced this would be that category)
                         </Typography>
-                        <Typography variant="body2" paragraph>
+                        <Typography variant="body2" sx={{ mb: 2 }}>
                             • Original files are kept on bucket, folder structure is not modified
                         </Typography>
                         <Typography variant="body2">
