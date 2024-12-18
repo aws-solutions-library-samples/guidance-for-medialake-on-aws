@@ -12,7 +12,6 @@ import {
     FormControlLabel,
     Checkbox,
     Box,
-    Typography,
     Alert,
 } from '@mui/material';
 import { Role, CreateRoleRequest } from '../../../../api/types/api.types';

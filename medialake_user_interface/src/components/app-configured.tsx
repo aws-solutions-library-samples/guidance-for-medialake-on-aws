@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '@/api/queryClient';
 import { AwsConfigProvider } from '@/common/hooks/aws-config-context';
 import { AuthProvider, useAuth } from '@/common/hooks/auth-context';
-import { Authenticator, ThemeProvider as AmplifyThemeProvider, Theme, View } from '@aws-amplify/ui-react';
+import { Authenticator, ThemeProvider as AmplifyThemeProvider, Theme } from '@aws-amplify/ui-react';
 import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
 import TopBar from '@/TopBar';

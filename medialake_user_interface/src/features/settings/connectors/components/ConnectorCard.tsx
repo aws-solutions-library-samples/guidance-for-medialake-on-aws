@@ -280,8 +280,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                     size="small"
                                     sx={{
                                         backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        width: 40,
+                                        height: 40,
                                         '&:hover': {
                                             backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                            width: 40,
+                                            height: 40,
                                         },
                                     }}
                                 >
@@ -294,6 +298,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                     size="small"
                                     sx={{
                                         backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                        width: 40,
+                                        height: 40,
                                         '&:hover': {
                                             backgroundColor: alpha(theme.palette.error.main, 0.2),
                                             width: 40,

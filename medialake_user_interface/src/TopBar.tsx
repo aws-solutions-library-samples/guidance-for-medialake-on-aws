@@ -13,6 +13,8 @@ import {
     InputBase,
     Chip,
     Button,
+    Theme,
+    SxProps,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -171,6 +173,17 @@ function TopBar() {
         });
     };
 
+    const menuPaperStyles: SxProps<Theme> = {
+        mt: 1.5,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    };
+
+    const profileMenuPaperStyles: SxProps<Theme> = {
+        width: '200px',
+        mt: 1.5,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    };
+
     return (
         <AppBar
             position="fixed"
@@ -309,10 +322,9 @@ function TopBar() {
                     anchorEl={languageAnchor}
                     open={Boolean(languageAnchor)}
                     onClose={handleClose}
-                    PaperProps={{
-                        sx: {
-                            mt: 1.5,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    slotProps={{
+                        paper: {
+                            sx: menuPaperStyles
                         }
                     }}
                 >
@@ -333,11 +345,9 @@ function TopBar() {
                     anchorEl={anchorEl}
                     open={Boolean(anchorEl)}
                     onClose={handleClose}
-                    PaperProps={{
-                        sx: {
-                            width: '200px',
-                            mt: 1.5,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    slotProps={{
+                        paper: {
+                            sx: profileMenuPaperStyles
                         }
                     }}
                 >

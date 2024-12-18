@@ -125,17 +125,25 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         try {
             if (type === 's3') {
                 await createS3Connector(connectorData);
+                // Wait for query invalidation to complete before closing modal and showing success message
                 await queryClient.invalidateQueries({ queryKey: ['connectors'] });
                 await onSave(connectorData);
+                // Close modal first to prevent UI glitches
+                onClose();
+                // Show success message after modal is closed
                 setSnackbar({
                     open: true,
                     message: 'Connector created successfully',
                     severity: 'success'
                 });
-                onClose();
             }
         } catch (err) {
             // Error handling is managed by the mutation hook
+            setSnackbar({
+                open: true,
+                message: 'Failed to create connector',
+                severity: 'error'
+            });
         }
     };
 

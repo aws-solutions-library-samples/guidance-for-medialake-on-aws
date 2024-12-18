@@ -244,7 +244,7 @@ class ConnectorsConstruct(Construct):
             config=LambdaConfig(
                 name="connectors_del_lambda",
                 entry="lambdas/api/connectors/rp_connectorId/del_connectorId",
-                iam_role_boundary_policy=lambda_iam_boundry_policy,
+                # iam_role_boundary_policy=lambda_iam_boundry_policy,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
