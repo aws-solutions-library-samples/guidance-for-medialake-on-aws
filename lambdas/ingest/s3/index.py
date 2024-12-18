@@ -461,6 +461,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
 
                 # Handle S3 event directly from SQS message
                 if "Records" in body:
+                    # Existing logic for handling S3 events
                     for s3_record in body["Records"]:
                         if "s3" not in s3_record:
                             logger.warning("No S3 data in record")
@@ -493,8 +494,30 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                                 )
                             else:
                                 logger.info(f"Asset already processed: {key}")
+                elif "detail-type" in body:
+                    # New logic for handling EventBridge-style events
+                    if body.get("detail-type") == "Object Created":
+                        bucket = body["detail"]["bucket"]["name"]
+                        key = body["detail"]["object"]["key"]
+
+                        logger.info(f"Processing creation event for asset: {key}")
+
+                        result = processor.process_asset(bucket, key)
+                        if result:
+                            metrics.add_metric(
+                                name="ProcessedAssets", unit=MetricUnit.Count, value=1
+                            )
+                            logger.info(
+                                f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}"
+                            )
+                        else:
+                            logger.info(f"Asset already processed: {key}")
+                    else:
+                        logger.warning(
+                            f"Unexpected event type: {body.get('detail-type')}"
+                        )
                 else:
-                    logger.warning("No Records found in message body")
+                    logger.warning("Unrecognized event format in message body")
 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse SQS message body: {e}")

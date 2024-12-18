@@ -478,6 +478,16 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Policy for EventBridge actions
+        connector_s3_post_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["events:PutRule", "events:PutTargets", "events:DeleteRule"],
+                resources=[
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
+                ],
+            )
+        )
+
         connector_s3_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(connector_s3_post_lambda.function),
