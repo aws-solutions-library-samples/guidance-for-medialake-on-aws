@@ -20,6 +20,7 @@ import {
     useTheme,
     Popover,
     CircularProgress,
+    Snackbar,
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -29,8 +30,8 @@ import {
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
-// import { useQueryClient } from '@tanstack/react-query';
 import queryClient from '@/api/queryClient';
+
 interface ConnectorModalProps {
     open: boolean;
     onClose: () => void;
@@ -60,7 +61,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     editingConnector,
 }) => {
     const theme = useTheme();
-    // const queryClient = useQueryClient();
     const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -69,6 +69,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [configuration, setConfiguration] = useState<Record<string, string>>({});
     const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+        open: false,
+        message: '',
+        severity: 'success'
+    });
 
     const { data: s3BucketsResponse, isLoading: isLoadingBuckets, refetch: refetchBuckets } = useGetS3Buckets();
     const { mutateAsync: createS3Connector, isPending: isCreating } = useCreateS3Connector();
@@ -96,6 +101,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         setActiveStep((prev) => prev - 1);
     };
 
+    const handleSnackbarClose = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
+
     const handleSave = async () => {
         if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket || !configuration.integrationMethod))) {
             setError('Please fill in all required fields');
@@ -118,6 +127,12 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 await createS3Connector(connectorData);
                 await queryClient.invalidateQueries({ queryKey: ['connectors'] });
                 await onSave(connectorData);
+                setSnackbar({
+                    open: true,
+                    message: 'Connector created successfully',
+                    severity: 'success'
+                });
+                onClose();
             }
         } catch (err) {
             // Error handling is managed by the mutation hook
@@ -345,116 +360,128 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     };
 
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{
-                sx: {
-                    borderRadius: '12px',
-                }
-            }}
-        >
-            <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="h6">
-                    {editingConnector ? 'Edit Connector' : 'Add New Connector'}
-                </Typography>
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        color: theme.palette.grey[500],
-                        width: 40,
-                        height: 40,
-                    }}
-
-                >
-                    <CloseIcon />
-                </IconButton>
-            </DialogTitle>
-
-            <DialogContent dividers>
-                {!editingConnector && (
-                    <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-                        {steps.map((label) => (
-                            <Step key={label}>
-                                <StepLabel>{label}</StepLabel>
-                            </Step>
-                        ))}
-                    </Stepper>
-                )}
-
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                        {error}
-                    </Alert>
-                )}
-
-                {renderStepContent(activeStep)}
-            </DialogContent>
-
-            <DialogActions sx={{ p: 2, gap: 1 }}>
-                {!editingConnector && activeStep > 0 && (
-                    <Button onClick={handleBack} disabled={isCreating}>
-                        Back
-                    </Button>
-                )}
-                <Button onClick={onClose} color="inherit" disabled={isCreating}>
-                    Cancel
-                </Button>
-                {(activeStep === steps.length - 1 || editingConnector) ? (
-                    <Button
-                        variant="contained"
-                        onClick={handleSave}
-                        disabled={isCreating}
-                        startIcon={isCreating ? <CircularProgress size={20} /> : null}
-                        sx={{
-                            backgroundColor: theme.palette.primary.main,
-                            '&:hover': {
-                                backgroundColor: theme.palette.primary.dark,
-                            },
-                        }}
-                    >
-                        {editingConnector ? 'Save Changes' : 'Add Connector'}
-                    </Button>
-                ) : (
-                    <Button
-                        variant="contained"
-                        onClick={handleNext}
-                        disabled={!type || isCreating}
-                    >
-                        Next
-                    </Button>
-                )}
-            </DialogActions>
-
-            <Popover
-                open={Boolean(infoAnchorEl)}
-                anchorEl={infoAnchorEl}
-                onClose={handleInfoClose}
-                anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'center',
-                }}
-                transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'center',
+        <>
+            <Dialog
+                open={open}
+                onClose={onClose}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: '12px',
+                    }
                 }}
             >
-                <Box sx={{ p: 2, maxWidth: 400 }}>
-                    <Typography variant="body2" paragraph>
-                        • MediaLake Non-Managed (If/when other remote storage systems are introduced this would be that category)
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="h6">
+                        {editingConnector ? 'Edit Connector' : 'Add New Connector'}
                     </Typography>
-                    <Typography variant="body2" paragraph>
-                        • Original files are kept on bucket, folder structure is not modified
-                    </Typography>
-                    <Typography variant="body2">
-                        • Representations of files created, such as proxies, will be put in a MediaLake managed bucket with a shadow folder structure
-                    </Typography>
-                </Box>
-            </Popover>
-        </Dialog>
+                    <IconButton
+                        aria-label="close"
+                        onClick={onClose}
+                        sx={{
+                            color: theme.palette.grey[500],
+                            width: 40,
+                            height: 40,
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent dividers>
+                    {!editingConnector && (
+                        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+                            {steps.map((label) => (
+                                <Step key={label}>
+                                    <StepLabel>{label}</StepLabel>
+                                </Step>
+                            ))}
+                        </Stepper>
+                    )}
+
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    {renderStepContent(activeStep)}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    {!editingConnector && activeStep > 0 && (
+                        <Button onClick={handleBack} disabled={isCreating}>
+                            Back
+                        </Button>
+                    )}
+                    <Button onClick={onClose} color="inherit" disabled={isCreating}>
+                        Cancel
+                    </Button>
+                    {(activeStep === steps.length - 1 || editingConnector) ? (
+                        <Button
+                            variant="contained"
+                            onClick={handleSave}
+                            disabled={isCreating}
+                            startIcon={isCreating ? <CircularProgress size={20} /> : null}
+                            sx={{
+                                backgroundColor: theme.palette.primary.main,
+                                '&:hover': {
+                                    backgroundColor: theme.palette.primary.dark,
+                                },
+                            }}
+                        >
+                            {editingConnector ? 'Save Changes' : 'Add Connector'}
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            onClick={handleNext}
+                            disabled={!type || isCreating}
+                        >
+                            Next
+                        </Button>
+                    )}
+                </DialogActions>
+
+                <Popover
+                    open={Boolean(infoAnchorEl)}
+                    anchorEl={infoAnchorEl}
+                    onClose={handleInfoClose}
+                    anchorOrigin={{
+                        vertical: 'bottom',
+                        horizontal: 'center',
+                    }}
+                    transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'center',
+                    }}
+                >
+                    <Box sx={{ p: 2, maxWidth: 400 }}>
+                        <Typography variant="body2" paragraph>
+                            • MediaLake Non-Managed (If/when other remote storage systems are introduced this would be that category)
+                        </Typography>
+                        <Typography variant="body2" paragraph>
+                            • Original files are kept on bucket, folder structure is not modified
+                        </Typography>
+                        <Typography variant="body2">
+                            • Representations of files created, such as proxies, will be put in a MediaLake managed bucket with a shadow folder structure
+                        </Typography>
+                    </Box>
+                </Popover>
+            </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </>
     );
 };
 

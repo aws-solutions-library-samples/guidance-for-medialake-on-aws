@@ -1,7 +1,5 @@
 from aws_cdk import (
     Stack,
-    aws_cognito as cognito,
-    aws_iam as iam,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_ec2 as ec2,
@@ -47,7 +45,6 @@ from medialake_constructs.api_gateway.api_gateway_users import (
     UsersApi,
     UsersApiProps,
 )
-from medialake_constructs.update_construct import UpdateConstruct, UpdateConstructProps
 from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
@@ -73,9 +70,6 @@ class ApiGatewayStackProps:
     pipeline_table: dynamodb.TableV2
     image_metadata_extractor_lambda: lambda_.Function
     image_proxy_lambda: lambda_.Function
-    # api_gateway_endpoint: ec2.IInterfaceVpcEndpoint
-    # cloudfront_vpc_endpoint: ec2.IVpcEndpoint
-    # vpc_endpoint: ec2.IVpcEndpoint
 
 
 class ApiGatewayStack(Stack):
@@ -97,9 +91,6 @@ class ApiGatewayStack(Stack):
             props=ApiGatewayProps(
                 user_pool=self._cognito_construct.user_pool,
                 access_log_bucket=props.access_log_bucket,
-                # api_gateway_endpoint=props.api_gateway_endpoint,
-                # cloudfront_vpc_endpoint=props.cloudfront_vpc_endpoint,
-                # vpc_endpoint=props.vpc_endpoint,
             ),
         )
 

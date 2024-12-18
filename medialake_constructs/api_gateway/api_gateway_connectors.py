@@ -11,6 +11,7 @@ and associated Lambda functions for managing media connectors. It handles:
 """
 
 from dataclasses import dataclass
+from config import config
 from constructs import Construct
 from aws_cdk import (
     aws_apigateway as apigateway,
@@ -68,7 +69,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ServiceBoundaryPolicy",
             statements=[
-                # Broad Allow for non-IAM actions
+                # non-IAM permissions
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=[
@@ -82,7 +83,7 @@ class ConnectorsConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
-                # Unconditional Allow for specific IAM read-only actions
+                # CloudWatch and X-Ray permissions
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=[
@@ -93,12 +94,10 @@ class ConnectorsConstruct(Construct):
                         "dynamodb:*",
                         "events:*",
                         "states:*",
-                        # Add CloudWatch permissions
                         "cloudwatch:PutMetricData",
                         "logs:CreateLogGroup",
                         "logs:CreateLogStream",
                         "logs:PutLogEvents",
-                        # Add X-Ray permissions
                         "xray:PutTraceSegments",
                         "xray:PutTelemetryRecords",
                         "xray:GetSamplingRules",
@@ -107,6 +106,7 @@ class ConnectorsConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
+                # KMS permissions
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=[
@@ -114,34 +114,42 @@ class ConnectorsConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
-                # Conditional Allow for IAM write actions that involve passing roles
-                # iam.PolicyStatement(
-                #     effect=iam.Effect.ALLOW,
-                #     actions=[
-                #         "iam:CreateRole",
-                #         "iam:PutRolePolicy",
-                #         "iam:AttachRolePolicy",
-                #         "iam:UpdateRole",
-                #         "iam:UpdateRoleDescription",
-                #         "iam:TagRole",
-                #         "iam:UntagRole",
-                #         "iam:PassRole",
-                #     ],
-                #     resources=["*"],
-                #     conditions={
-                #         "StringLike": {
-                #             "iam:PassedToService": [
-                #                 "lambda.amazonaws.com",
-                #                 "s3.amazonaws.com",
-                #                 "sqs.amazonaws.com",
-                #                 "sns.amazonaws.com",
-                #                 "dynamodb.amazonaws.com",
-                #                 "events.amazonaws.com",
-                #                 "states.amazonaws.com",
-                #             ]
-                #         }
-                #     },
-                # ),
+                # IAM Role Management permissions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "iam:ListRoles",
+                        "iam:GetRole",
+                        "iam:CreateRole",
+                        "iam:DeleteRole",
+                        "iam:PutRolePolicy",
+                        "iam:DeleteRolePolicy",
+                        "iam:AttachRolePolicy",
+                        "iam:DetachRolePolicy",
+                        "iam:UpdateRole",
+                        "iam:UpdateRoleDescription",
+                        "iam:TagRole",
+                        "iam:UntagRole",
+                        "iam:PassRole",
+                    ],
+                    resources=[
+                        # f"arn:aws:iam::{account_id}:role/{config.resource_prefix}-*",
+                        f"arn:aws:iam::{account_id}:role/*",
+                    ],  # Restrict to roles with prefix
+                    conditions={
+                        "StringLike": {
+                            "iam:PassedToService": [
+                                "lambda.amazonaws.com",
+                                "s3.amazonaws.com",
+                                "sqs.amazonaws.com",
+                                "sns.amazonaws.com",
+                                "dynamodb.amazonaws.com",
+                                "events.amazonaws.com",
+                                "states.amazonaws.com",
+                            ]
+                        }
+                    },
+                ),
             ],
         )
 
