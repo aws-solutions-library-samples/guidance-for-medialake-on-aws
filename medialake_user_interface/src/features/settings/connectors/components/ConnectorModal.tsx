@@ -365,7 +365,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     onClick={onClose}
                     sx={{
                         color: theme.palette.grey[500],
+                        width: 40,
+                        height: 40,
                     }}
+
                 >
                     <CloseIcon />
                 </IconButton>

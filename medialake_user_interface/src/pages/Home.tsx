@@ -1,30 +1,54 @@
-import React, { Suspense } from 'react';
-import { Box, Stack, Typography, Paper, useTheme, useMediaQuery, CircularProgress, Grid } from '@mui/material';
-import { Statistics } from '../features/home/Statistics';
-import { Collections } from '../features/home/Collections';
-import { SmartFolders } from '../features/home/SmartFolders';
-import { ConnectedStorage } from '../features/home/ConnectedStorage';
-import { SharedCollections } from '../features/home/SharedCollections';
-import { Favorites } from '../features/home/Favorites';
-import { ErrorBoundary } from 'react-error-boundary';
+import React from 'react';
+import { Box, Stack, Typography, Paper, useTheme, useMediaQuery, Grid } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import CollectionsIcon from '@mui/icons-material/Collections';
+import ShareIcon from '@mui/icons-material/Share';
 
-const LoadingFallback = () => {
-    const { t } = useTranslation();
+const FeatureCard: React.FC<{
+    title: string;
+    icon: React.ReactNode;
+}> = ({ title, icon }) => {
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-            <CircularProgress />
-        </Box>
-    );
-};
-
-const ErrorFallback = ({ error }: { error: Error }) => {
-    const { t } = useTranslation();
-    return (
-        <Box sx={{ p: 3, color: 'error.main' }}>
-            <Typography variant="h6">{t('common.error')}:</Typography>
-            <Typography variant="body1">{error.message}</Typography>
-        </Box>
+        <Paper
+            elevation={0}
+            sx={{
+                p: 3,
+                height: '100%',
+                borderRadius: 2,
+                backgroundColor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                transition: 'transform 0.2s ease-in-out',
+                '&:hover': {
+                    transform: 'translateY(-4px)',
+                }
+            }}
+        >
+            <Box sx={{
+                color: 'primary.main',
+                mb: 2,
+                '& svg': {
+                    fontSize: 48
+                }
+            }}>
+                {icon}
+            </Box>
+            <Typography variant="h6" gutterBottom>
+                {title}
+            </Typography>
+            <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 1 }}
+            >
+                Coming Soon
+            </Typography>
+        </Paper>
     );
 };
 
@@ -38,8 +62,8 @@ const Home: React.FC = () => {
             component="main"
             sx={{
                 position: 'fixed',
-                top: 64, // Header height
-                left: 240, // Sidebar width
+                top: 64,
+                left: 240,
                 right: 0,
                 bottom: 0,
                 bgcolor: 'background.default',
@@ -48,125 +72,53 @@ const Home: React.FC = () => {
             }}
         >
             <Box sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ mb: 4 }}>
+                <Box sx={{
+                    mb: 6,
+                    textAlign: 'center',
+                    maxWidth: 800,
+                    mx: 'auto'
+                }}>
                     <Typography
-                        variant="h4"
+                        variant="h3"
                         component="h1"
                         sx={{
-                            fontWeight: 600,
+                            fontWeight: 700,
                             color: 'primary.main',
-                            mb: 1
+                            mb: 2
                         }}
                     >
-                        {t('home.welcome')}
+                        MediaLake
                     </Typography>
                     <Typography
-                        variant="subtitle1"
+                        variant="h5"
                         color="text.secondary"
+                        sx={{ mb: 4 }}
                     >
-                        {t('home.description')}
+                        Your data lake for Media, user home is coming soon
                     </Typography>
                 </Box>
 
-                <Stack spacing={3}>
-                    <ErrorBoundary FallbackComponent={ErrorFallback}>
-                        <Suspense fallback={<LoadingFallback />}>
-                            <Statistics />
-                        </Suspense>
-                    </ErrorBoundary>
-
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 3,
-                            borderRadius: 2,
-                            backgroundColor: 'background.paper',
-                            border: '1px solid',
-                            borderColor: 'divider'
-                        }}
-                    >
-                        <ErrorBoundary FallbackComponent={ErrorFallback}>
-                            <Suspense fallback={<LoadingFallback />}>
-                                <Collections />
-                            </Suspense>
-                        </ErrorBoundary>
-                    </Paper>
-
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 3,
-                            borderRadius: 2,
-                            backgroundColor: 'background.paper',
-                            border: '1px solid',
-                            borderColor: 'divider'
-                        }}
-                    >
-                        <ErrorBoundary FallbackComponent={ErrorFallback}>
-                            <Suspense fallback={<LoadingFallback />}>
-                                <SharedCollections />
-                            </Suspense>
-                        </ErrorBoundary>
-                    </Paper>
-
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 3,
-                            borderRadius: 2,
-                            backgroundColor: 'background.paper',
-                            border: '1px solid',
-                            borderColor: 'divider'
-                        }}
-                    >
-                        <ErrorBoundary FallbackComponent={ErrorFallback}>
-                            <Suspense fallback={<LoadingFallback />}>
-                                <Favorites />
-                            </Suspense>
-                        </ErrorBoundary>
-                    </Paper>
-
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                            <Paper
-                                elevation={0}
-                                sx={{
-                                    p: 3,
-                                    height: '100%',
-                                    borderRadius: 2,
-                                    backgroundColor: 'background.paper',
-                                    border: '1px solid',
-                                    borderColor: 'divider'
-                                }}
-                            >
-                                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                                    <Suspense fallback={<LoadingFallback />}>
-                                        <SmartFolders />
-                                    </Suspense>
-                                </ErrorBoundary>
-                            </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Paper
-                                elevation={0}
-                                sx={{
-                                    p: 3,
-                                    height: '100%',
-                                    borderRadius: 2,
-                                    backgroundColor: 'background.paper',
-                                    border: '1px solid',
-                                    borderColor: 'divider'
-                                }}
-                            >
-                                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                                    <Suspense fallback={<LoadingFallback />}>
-                                        <ConnectedStorage />
-                                    </Suspense>
-                                </ErrorBoundary>
-                            </Paper>
-                        </Grid>
+                <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
+                    <Grid item xs={12} md={4}>
+                        <FeatureCard
+                            title="Favorites"
+                            icon={<FavoriteIcon />}
+                        />
                     </Grid>
-                </Stack>
+                    <Grid item xs={12} md={4}>
+                        <FeatureCard
+                            title="Collections"
+                            icon={<CollectionsIcon />}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <FeatureCard
+                            title="Sharing"
+                            icon={<ShareIcon />}
+                        />
+                    </Grid>
+                </Grid>
+
             </Box>
         </Box>
     );

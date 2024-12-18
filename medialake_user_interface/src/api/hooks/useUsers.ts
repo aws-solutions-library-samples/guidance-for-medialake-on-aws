@@ -118,3 +118,29 @@ export const useDeleteUser = () => {
         },
     });
 };
+
+export const useDisableUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, string>({
+        mutationFn: async (userId) => {
+            await apiClient.post(API_ENDPOINTS.DISABLE_USER(userId));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
+        },
+    });
+};
+
+export const useEnableUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, string>({
+        mutationFn: async (userId) => {
+            await apiClient.post(API_ENDPOINTS.ENABLE_USER(userId));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });
+        },
+    });
+};

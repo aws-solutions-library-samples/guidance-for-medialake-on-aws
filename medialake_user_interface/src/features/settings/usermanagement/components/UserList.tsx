@@ -19,9 +19,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
-import { User as ApiUser } from '../../../../api/types/api.types';
-
-export type User = ApiUser;
+import { User } from '@/api/types/api.types';
 
 interface UserListProps {
     users: User[];
