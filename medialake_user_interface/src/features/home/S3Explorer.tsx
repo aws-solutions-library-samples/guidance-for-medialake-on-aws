@@ -84,17 +84,17 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
         setSelectedObject(null);
     };
 
-    const handleRename = () => {
-        // TODO: Implement rename functionality
-        console.log('Rename:', selectedObject);
-        handleMenuClose();
-    };
+    // const handleRename = () => {
+    //     // TODO: Implement rename functionality
+    //     console.log('Rename:', selectedObject);
+    //     handleMenuClose();
+    // };
 
-    const handleDelete = () => {
-        // TODO: Implement delete functionality
-        console.log('Delete:', selectedObject);
-        handleMenuClose();
-    };
+    // const handleDelete = () => {
+    //     // TODO: Implement delete functionality
+    //     console.log('Delete:', selectedObject);
+    //     handleMenuClose();
+    // };
 
     const filteredObjects = useMemo(() => {
         if (!data?.data.objects) return [];
@@ -140,7 +140,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                         </Typography>
                     }
                 />
-                <IconButton
+                {/* <IconButton
                     onClick={(e) => handleMenuClick(e, prefix)}
                     size="small"
                     sx={{
@@ -151,7 +151,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                     }}
                 >
                     <MoreVertIcon fontSize="small" />
-                </IconButton>
+                </IconButton> */}
             </ListItem>
         ));
     };
@@ -188,7 +188,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                         </Typography>
                     }
                 />
-                <IconButton
+                {/* <IconButton
                     onClick={(e) => handleMenuClick(e, object.Key)}
                     size="small"
                     sx={{
@@ -199,7 +199,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                     }}
                 >
                     <MoreVertIcon fontSize="small" />
-                </IconButton>
+                </IconButton> */}
             </ListItem>
         ));
     };
@@ -306,7 +306,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                 </Box>
             )}
 
-            <Menu
+            {/* <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
@@ -342,7 +342,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                 >
                     {t('s3Explorer.menu.delete')}
                 </MenuItem>
-            </Menu>
+            </Menu> */}
         </Box>
     );
 };

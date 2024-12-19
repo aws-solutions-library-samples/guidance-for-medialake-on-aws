@@ -304,6 +304,16 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["*"],
+            )
+        )
+
         iac_assets_bucket.bucket.grant_read_write(post_pipelines_handler.function)
 
         pipelines_resource.add_method(

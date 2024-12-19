@@ -1,6 +1,7 @@
 import boto3
 import cfnresponse
 import logging
+import time
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 import os
@@ -73,6 +74,165 @@ def delete_iam_role(role_arn: str):
         logger.warning(f"IAM role {role_name} already deleted")
 
 
+def clean_up_table_resources(table_name, clean_up_function):
+    table = dynamodb.Table(table_name)
+    response = table.scan()
+    items = response["Items"]
+
+    while "LastEvaluatedKey" in response:
+        response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+        items.extend(response["Items"])
+
+    for item in items:
+        try:
+            logger.info(f"Cleaning up {table_name} item: %s", item["id"])
+            clean_up_function(item, table)
+        except Exception as e:
+            logger.error(
+                f"Error cleaning up {table_name} item %s: %s", item["id"], str(e)
+            )
+            continue
+
+
+def clean_up_connector(item, table):
+    # Existing connector cleanup logic
+    if "lambdaArn" in item:
+        delete_lambda_function(item["lambdaArn"])
+    if "iamRoleArn" in item:
+        delete_iam_role(item["iamRoleArn"])
+    if "queueUrl" in item:
+        delete_sqs_queue(item["queueUrl"])
+    if "storageIdentifier" in item:
+        remove_s3_bucket_notification(item["storageIdentifier"])
+
+    # Delete the connector record
+    table.delete_item(Key={"id": item["id"]})
+    logger.info(f"Deleted connector record {item['id']}")
+
+
+def clean_up_pipeline(item, table):
+    if "dependentResources" in item:
+        for resource in item["dependentResources"]:
+            resource_type = resource[0]
+            resource_identifier = resource[1]
+
+            if resource_type == "sqs":
+                delete_sqs_queue(resource_identifier)
+            elif resource_type == "eventbridge_rule":
+                delete_eventbridge_rule(
+                    resource_identifier,
+                    item["eventBridgeDetails"]["parentEventBusName"],
+                )
+            elif (
+                resource_type == "iam_stepfunction_role"
+                or resource_type == "iam_lambda_executer_role"
+            ):
+                delete_iam_role(resource_identifier)
+            elif resource_type == "step_function":
+                delete_step_function(resource_identifier)
+            elif resource_type == "lambda":
+                delete_lambda_function(resource_identifier)
+            elif resource_type == "event_source_mapping":
+                delete_event_source_mapping(resource_identifier)
+
+    table.delete_item(Key={"id": item["id"]})
+    logger.info(f"Deleted pipeline record {item['id']}")
+
+    # Delete the pipeline record
+    table.delete_item(Key={"id": item["id"]})
+    logger.info(f"Deleted pipeline record {item['id']}")
+
+
+def delete_sqs_queue(queue_url):
+    try:
+        sqs.delete_queue(QueueUrl=queue_url)
+        logger.info(f"Deleted SQS queue {queue_url}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "AWS.SimpleQueueService.NonExistentQueue":
+            raise
+        logger.warning(f"SQS queue {queue_url} already deleted")
+
+
+def delete_eventbridge_rule(rule_name, event_bus_name):
+    try:
+        events = boto3.client("events")
+        # Remove targets from the rule
+        targets = events.list_targets_by_rule(
+            Rule=rule_name, EventBusName=event_bus_name
+        )
+        if targets["Targets"]:
+            target_ids = [t["Id"] for t in targets["Targets"]]
+            events.remove_targets(
+                Rule=rule_name, EventBusName=event_bus_name, Ids=target_ids
+            )
+
+        # Delete the rule
+        events.delete_rule(Name=rule_name, EventBusName=event_bus_name)
+        logger.info(
+            f"Deleted EventBridge rule {rule_name} from event bus {event_bus_name}"
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        logger.warning(f"EventBridge rule {rule_name} already deleted")
+
+
+def delete_step_function(state_machine_arn):
+    try:
+        sfn = boto3.client("stepfunctions")
+        sfn.delete_state_machine(stateMachineArn=state_machine_arn)
+        logger.info(f"Deleted Step Function {state_machine_arn}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "StateMachineDoesNotExist":
+            raise
+        logger.warning(f"Step Function {state_machine_arn} already deleted")
+
+
+def delete_event_source_mapping(uuid):
+    max_retries = 30
+    base_delay = 1  # Start with a 1-second delay
+
+    for attempt in range(max_retries):
+        try:
+            lambda_client.delete_event_source_mapping(UUID=uuid)
+            logger.info(f"Deleted event source mapping {uuid}")
+            return
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                logger.warning(f"Event source mapping {uuid} already deleted")
+                return
+            elif e.response["Error"]["Code"] == "ResourceInUseException":
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2**attempt)  # Exponential backoff
+                    logger.warning(
+                        f"Event source mapping {uuid} in use. Retrying in {delay} seconds..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(
+                        f"Failed to delete event source mapping {uuid} after {max_retries} attempts"
+                    )
+                    raise
+            else:
+                raise
+
+    logger.error(
+        f"Failed to delete event source mapping {uuid} after {max_retries} attempts"
+    )
+
+
+def remove_s3_bucket_notification(bucket_name):
+    try:
+        s3.put_bucket_notification_configuration(
+            Bucket=bucket_name, NotificationConfiguration={}
+        )
+        logger.info(f"Removed notifications from bucket {bucket_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "NoSuchBucket":
+            raise
+        logger.warning(f"S3 bucket {bucket_name} not found")
+
+
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     try:
@@ -80,65 +240,14 @@ def lambda_handler(event, context):
         request_type = event["RequestType"]
 
         if request_type == "Delete":
-            table_name = os.environ["CONNECTOR_TABLE"]
-            table = dynamodb.Table(table_name)
+            connector_table_name = os.environ["CONNECTOR_TABLE"]
+            pipeline_table_name = os.environ["PIPELINE_TABLE"]
 
-            # Scan the table to get all connectors
-            response = table.scan()
-            items = response["Items"]
+            # Clean up connector resources
+            clean_up_table_resources(connector_table_name, clean_up_connector)
 
-            while "LastEvaluatedKey" in response:
-                response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
-                items.extend(response["Items"])
-
-            # Process each connector for cleanup
-            for item in items:
-                try:
-                    logger.info("Cleaning up connector: %s", item["id"])
-
-                    # Delete Lambda function
-                    if "lambdaArn" in item:
-                        delete_lambda_function(item["lambdaArn"])
-
-                    # Delete IAM role
-                    if "iamRoleArn" in item:
-                        delete_iam_role(item["iamRoleArn"])
-
-                    # Delete SQS queue
-                    if "queueUrl" in item:
-                        try:
-                            sqs.delete_queue(QueueUrl=item["queueUrl"])
-                            logger.info(f"Deleted SQS queue {item['queueUrl']}")
-                        except ClientError as e:
-                            if (
-                                e.response["Error"]["Code"]
-                                != "AWS.SimpleQueueService.NonExistentQueue"
-                            ):
-                                raise
-
-                    # Remove S3 bucket notification
-                    if "storageIdentifier" in item:
-                        try:
-                            s3.put_bucket_notification_configuration(
-                                Bucket=item["storageIdentifier"],
-                                NotificationConfiguration={},
-                            )
-                            logger.info(
-                                f"Removed notifications from bucket {item['storageIdentifier']}"
-                            )
-                        except ClientError as e:
-                            if e.response["Error"]["Code"] != "NoSuchBucket":
-                                raise
-
-                    # Delete the connector record
-                    table.delete_item(Key={"id": item["id"]})
-                    logger.info(f"Deleted connector record {item['id']}")
-
-                except Exception as e:
-                    logger.error(
-                        "Error cleaning up connector %s: %s", item["id"], str(e)
-                    )
-                    continue
+            # Clean up pipeline resources
+            clean_up_table_resources(pipeline_table_name, clean_up_pipeline)
 
             logger.info("Cleanup completed successfully")
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
