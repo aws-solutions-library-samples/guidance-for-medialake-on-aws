@@ -6,7 +6,7 @@ export interface User {
   created: string;
   modified: string;
   email_verified: string;
-  given_name: string | null;
+  name: string | null;
   family_name: string | null;
   groups: string[];
   roles?: string[];
@@ -18,6 +18,8 @@ export interface CreateUserRequest {
   enabled?: boolean;
   groups?: string[];
   roles?: string[];
+  name?: string;
+  family_name?: string;
 }
 
 export interface CreateUserResponse {
@@ -35,6 +37,8 @@ export interface UpdateUserRequest {
   enabled?: boolean;
   groups?: string[];
   roles?: string[];
+  name?: string;
+  family_name?: string;
 }
 
 export interface ToggleUserStatusRequest {
@@ -204,5 +208,3 @@ export interface UserResponse {
     user: User;
   }
 }
-
-

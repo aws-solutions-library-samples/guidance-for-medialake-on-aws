@@ -20,12 +20,12 @@ import {
     Alert,
 } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
-import { User, CreateUserRequest } from '../../../../api/types/api.types';
+import { User, CreateUserRequest, UpdateUserRequest } from '../../../../api/types/api.types';
 
 interface UserFormProps {
     open: boolean;
     onClose: () => void;
-    onSave: (user: CreateUserRequest) => Promise<any>;
+    onSave: (user: CreateUserRequest | UpdateUserRequest) => Promise<any>;
     user?: User;
     availableRoles: string[];
 }
@@ -49,7 +49,7 @@ const UserForm: React.FC<UserFormProps> = ({
     availableRoles,
 }) => {
     const [formData, setFormData] = useState({
-        given_name: '',
+        name: '',
         family_name: '',
         email: '',
         email_verified: '',
@@ -69,7 +69,7 @@ const UserForm: React.FC<UserFormProps> = ({
     useEffect(() => {
         if (user) {
             setFormData({
-                given_name: user.given_name || '',
+                name: user.name || '',
                 family_name: user.family_name || '',
                 email: user.email || '',
                 email_verified: user.email_verified || '',
@@ -77,7 +77,7 @@ const UserForm: React.FC<UserFormProps> = ({
             });
         } else {
             setFormData({
-                given_name: '',
+                name: '',
                 family_name: '',
                 email: '',
                 email_verified: '',
@@ -113,22 +113,39 @@ const UserForm: React.FC<UserFormProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Create the request object with the email as username
-            const requestData: CreateUserRequest = {
-                username: formData.email,
-                email: formData.email,
-                roles: formData.roles,
-            };
+            let requestData;
+
+            if (user) {
+                // Update existing user
+                requestData = {
+                    username: user.username,
+                    email: formData.email,
+                    name: formData.name,
+                    family_name: formData.family_name,
+                    roles: formData.roles,
+                    enabled: true
+                } as UpdateUserRequest;
+            } else {
+                // Create new user
+                requestData = {
+                    username: formData.email,
+                    email: formData.email,
+                    name: formData.name,
+                    family_name: formData.family_name,
+                    roles: formData.roles,
+                    enabled: true
+                } as CreateUserRequest;
+            }
 
             console.log('Submitting user data:', requestData);
             const response = await onSave(requestData);
             console.log('Response from onSave:', response);
 
             // Check if response exists and has the correct status
-            if (response?.status === 201) {
+            if (response?.status === 201 || response?.status === 200) {
                 setSnackbar({
                     open: true,
-                    message: response.message || 'User Created Successfully',
+                    message: response.message || (user ? 'User Updated Successfully' : 'User Created Successfully'),
                     severity: 'success',
                 });
                 onClose();
@@ -140,7 +157,7 @@ const UserForm: React.FC<UserFormProps> = ({
             console.error('Error in handleSubmit:', error);
             setSnackbar({
                 open: true,
-                message: `Unable to create user, error message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                message: `Unable to ${user ? 'update' : 'create'} user, error message: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 severity: 'error',
             });
         }
@@ -158,9 +175,9 @@ const UserForm: React.FC<UserFormProps> = ({
                     <DialogContent>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
                             <TextField
-                                name="given_name"
+                                name="name"
                                 label="First Name"
-                                value={formData.given_name}
+                                value={formData.name}
                                 onChange={handleChange}
                                 required
                                 fullWidth

@@ -76,11 +76,20 @@ def create_user():
             }
         )
 
-        # Prepare user attributes
+        # Prepare user attributes with only required fields
         user_attributes = [
             {"Name": "email", "Value": request_data["email"]},
             {"Name": "email_verified", "Value": "true"},
         ]
+
+        # Add optional attributes if they exist
+        if "name" in request_data:
+            user_attributes.append({"Name": "name", "Value": request_data["name"]})
+        if "family_name" in request_data:
+            user_attributes.append(
+                {"Name": "family_name", "Value": request_data["family_name"]}
+            )
+
         logger.debug(
             {
                 "message": "Prepared user attributes",

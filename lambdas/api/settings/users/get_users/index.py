@@ -12,7 +12,7 @@ from boto3.session import Session
 
 
 # Initialize PowerTools
-logger = Logger()
+logger = Logger(level=os.getenv("LOG_LEVEL", "INFO"))
 tracer = Tracer()
 metrics = Metrics(namespace="MediaLake/Users")
 
@@ -60,32 +60,39 @@ INPUT_SCHEMA = {
 
 
 @tracer.capture_method
-def get_user_attributes(user: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract and format user attributes."""
-    attributes = {}
-    for attr in user.get("Attributes", []):
-        attributes[attr["Name"]] = attr["Value"]
+def get_detailed_user_info(username: str) -> Dict[str, Any]:
+    """Get detailed user information using admin_get_user."""
+    try:
+        response = cognito.admin_get_user(UserPoolId=USER_POOL_ID, Username=username)
 
-    return {
-        "username": user.get("Username"),
-        "enabled": user.get("Enabled", False),
-        "status": user.get("UserStatus"),
-        "created": (
-            user.get("UserCreateDate").isoformat()
-            if user.get("UserCreateDate")
-            else None
-        ),
-        "modified": (
-            user.get("UserLastModifiedDate").isoformat()
-            if user.get("UserLastModifiedDate")
-            else None
-        ),
-        "email": attributes.get("email"),
-        "email_verified": attributes.get("email_verified"),
-        "given_name": attributes.get("given_name"),
-        "family_name": attributes.get("family_name"),
-        "groups": user.get("Groups", []),
-    }
+        # Extract attributes
+        attributes = {}
+        for attr in response.get("UserAttributes", []):
+            attributes[attr["Name"]] = attr["Value"]
+
+        return {
+            "username": username,
+            "enabled": response.get("Enabled", False),
+            "status": response.get("UserStatus"),
+            "created": (
+                response.get("UserCreateDate").isoformat()
+                if response.get("UserCreateDate")
+                else None
+            ),
+            "modified": (
+                response.get("UserLastModifiedDate").isoformat()
+                if response.get("UserLastModifiedDate")
+                else None
+            ),
+            "email": attributes.get("email"),
+            "email_verified": attributes.get("email_verified"),
+            "name": attributes.get("name"),
+            "family_name": attributes.get("family_name"),
+            "groups": [],  # Groups will be handled separately if needed
+        }
+    except Exception as e:
+        logger.error(f"Error getting detailed user info for {username}: {str(e)}")
+        return None
 
 
 @app.get("/settings/users")
@@ -146,8 +153,14 @@ def get_users():
                 "has_pagination_token", bool(params.get("PaginationToken"))
             )
 
-        # Process users
-        users = [get_user_attributes(user) for user in response.get("Users", [])]
+        # Process users with detailed information
+        users = []
+        with tracer.provider.in_subsegment("## get-detailed-users"):
+            for user in response.get("Users", []):
+                username = user.get("Username")
+                detailed_user = get_detailed_user_info(username)
+                if detailed_user:
+                    users.append(detailed_user)
 
         # Prepare search metadata
         search_metadata = {
