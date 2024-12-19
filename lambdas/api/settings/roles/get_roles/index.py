@@ -32,7 +32,7 @@ def get_cognito_roles(user_pool_id: str) -> List[Dict]:
     """
     try:
         roles = []
-        paginator = cognito_idp.get_paginator("list_roles")
+        paginator = cognito_idp.get_paginator("list_groups")
 
         for page in paginator.paginate(UserPoolId=user_pool_id):
             roles.extend(page.get("Roles", []))
@@ -48,7 +48,8 @@ def get_cognito_roles(user_pool_id: str) -> List[Dict]:
         raise
 
 
-@app.get("/roles")
+# cognito-idp:ListUserPoolClients
+@app.get("/settings/roles")
 @tracer.capture_method
 def get_roles():
     """Handle GET request to fetch Cognito roles"""

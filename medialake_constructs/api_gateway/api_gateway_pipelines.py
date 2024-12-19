@@ -307,6 +307,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
+                    "logs:CreateLogGroup",
                     "logs:CreateLogStream",
                     "logs:PutLogEvents",
                 ],
