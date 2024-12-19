@@ -188,7 +188,7 @@ class UsersApi(Construct):
             "UsersUserPostLambda",
             config=LambdaConfig(
                 name="users_user_post",
-                entry="lambdas/api/users/user/rp_userid/put_userid",
+                entry="lambdas/api/users/user/post_user",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
