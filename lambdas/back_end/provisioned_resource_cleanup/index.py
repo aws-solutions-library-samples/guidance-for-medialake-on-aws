@@ -105,6 +105,17 @@ def clean_up_connector(item, table):
     if "storageIdentifier" in item:
         remove_s3_bucket_notification(item["storageIdentifier"])
 
+    # New EventBridge cleanup logic
+    if "eventBridgeDetails" in item:
+        event_bus_name = item["eventBridgeDetails"].get("eventBusName")
+        if event_bus_name:
+            delete_event_bus_and_rules(event_bus_name)
+
+        rule_name = item["eventBridgeDetails"].get("ruleName")
+        parent_event_bus_name = item["eventBridgeDetails"].get("parentEventBusName")
+        if rule_name and parent_event_bus_name:
+            delete_eventbridge_rule(rule_name, parent_event_bus_name)
+
     # Delete the connector record
     table.delete_item(Key={"id": item["id"]})
     logger.info(f"Deleted connector record {item['id']}")
@@ -119,14 +130,9 @@ def clean_up_pipeline(item, table):
             if resource_type == "sqs":
                 delete_sqs_queue(resource_identifier)
             elif resource_type == "eventbridge_rule":
-                delete_eventbridge_rule(
-                    resource_identifier,
-                    item["eventBridgeDetails"]["parentEventBusName"],
-                )
-            elif (
-                resource_type == "iam_stepfunction_role"
-                or resource_type == "iam_lambda_executer_role"
-            ):
+                # We'll handle this when deleting the event bus
+                pass
+            elif resource_type in ["iam_stepfunction_role", "iam_lambda_executer_role"]:
                 delete_iam_role(resource_identifier)
             elif resource_type == "step_function":
                 delete_step_function(resource_identifier)
@@ -135,8 +141,12 @@ def clean_up_pipeline(item, table):
             elif resource_type == "event_source_mapping":
                 delete_event_source_mapping(resource_identifier)
 
-    table.delete_item(Key={"id": item["id"]})
-    logger.info(f"Deleted pipeline record {item['id']}")
+    # Delete the event bus and all its rules
+    if (
+        "eventBridgeDetails" in item
+        and "parentEventBusName" in item["eventBridgeDetails"]
+    ):
+        delete_event_bus_and_rules(item["eventBridgeDetails"]["parentEventBusName"])
 
     # Delete the pipeline record
     table.delete_item(Key={"id": item["id"]})
@@ -175,6 +185,25 @@ def delete_eventbridge_rule(rule_name, event_bus_name):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge rule {rule_name} already deleted")
+
+
+def delete_event_bus_and_rules(event_bus_name):
+    events = boto3.client("events")
+
+    # List all rules for the event bus
+    paginator = events.get_paginator("list_rules")
+    for page in paginator.paginate(EventBusName=event_bus_name):
+        for rule in page["Rules"]:
+            delete_eventbridge_rule(rule["Name"], event_bus_name)
+
+    # Delete the event bus
+    try:
+        events.delete_event_bus(Name=event_bus_name)
+        logger.info(f"Deleted EventBridge event bus {event_bus_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        logger.warning(f"EventBridge event bus {event_bus_name} already deleted")
 
 
 def delete_step_function(state_machine_arn):
