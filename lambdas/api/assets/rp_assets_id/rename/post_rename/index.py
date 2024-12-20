@@ -117,7 +117,7 @@ def get_asset(inventory_id: str) -> Dict[str, Any]:
                 ].get("ObjectKey"),
             ]
         ):
-            raise AssetRenameError("Invalid asset structure", HTTPStatus.BAD_REQUEST)
+            raise AssetRenameError("Invalid asset location", HTTPStatus.BAD_REQUEST)
 
         return asset
 
@@ -479,7 +479,7 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
             if "Name" in derived:
                 derived["Name"] = new_derived_name
 
-        # DynamoDB put_item operation (not SQL, safe from injection)
+        # DynamoDB put_item operation
         table.put_item(Item=asset)
         return asset
 
