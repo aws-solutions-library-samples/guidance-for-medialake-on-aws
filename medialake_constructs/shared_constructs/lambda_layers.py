@@ -111,17 +111,24 @@ class FFProbeLayer(Construct):
                     command=[
                         "/bin/bash",
                         "-c",
-                        "yum update -y && yum install -y wget xz zip tar && "
-                        "wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && "
-                        "wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5 && "
-                        "md5sum -c ffmpeg-release-amd64-static.tar.xz.md5 && "
-                        "rm -r ffmpeg-release-amd64 && "
-                        "mkdir ffmpeg-release-amd64 && "
-                        "tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64 && "
-                        "mkdir -p ffprobe/bin && "
-                        "cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/ && "
-                        "cd ffprobe && zip -9 -r ../ffprobe.zip . && "
-                        "cp ../ffprobe.zip /asset-output/",
+                        f"""
+                        set -e
+                        yum update -y && yum install -y wget xz zip tar
+                        TEMP_DIR=$(mktemp -d)
+                        cd $TEMP_DIR
+                        wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+                        wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5
+                        md5sum -c ffmpeg-release-amd64-static.tar.xz.md5
+                        mkdir ffmpeg-release-amd64
+                        tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64
+                        mkdir -p ffprobe/bin
+                        cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/
+                        cd ffprobe
+                        zip -9 -r $TEMP_DIR/ffprobe.zip .
+                        cp $TEMP_DIR/ffprobe.zip /asset-output/
+                        cd /
+                        rm -rf $TEMP_DIR
+                        """,
                     ],
                     user="root",
                     image=DockerImage.from_registry(
