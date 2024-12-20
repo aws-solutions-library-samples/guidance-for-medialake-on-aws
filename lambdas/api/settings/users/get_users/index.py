@@ -12,10 +12,10 @@ from boto3.session import Session
 
 
 # Initialize PowerTools
-logger = Logger(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = Logger(level=os.getenv("LOG_LEVEL", "WARNING"))
 tracer = Tracer()
-metrics = Metrics(namespace="MediaLake/Users")
-
+metrics = Metrics(namespace="medialake", service="get-users")
+logger = Logger(service="get-users")
 
 # Configure CORS
 cors_config = CORSConfig(
@@ -88,7 +88,7 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
             "email_verified": attributes.get("email_verified"),
             "name": attributes.get("name"),
             "family_name": attributes.get("family_name"),
-            "groups": [],  # Groups will be handled separately if needed
+            "groups": [],
         }
     except Exception as e:
         logger.error(f"Error getting detailed user info for {username}: {str(e)}")

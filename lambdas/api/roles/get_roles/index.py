@@ -48,7 +48,7 @@ def get_cognito_roles(user_pool_id: str) -> List[Dict]:
         raise
 
 
-@app.get("/settings/roles")
+@app.get("/roles")
 @tracer.capture_method
 def get_roles():
     """Handle GET request to fetch Cognito roles"""

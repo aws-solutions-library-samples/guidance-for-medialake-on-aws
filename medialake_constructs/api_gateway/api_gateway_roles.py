@@ -77,8 +77,8 @@ class RolesApi(Construct):
             self,
             "RolesGetLambda",
             config=LambdaConfig(
-                name="userid_get_lambda",
-                entry="lambdas/api/users/user/rp_userid/get_userid",
+                name="get_roles",
+                entry="lambdas/api/roles/get_roles",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn

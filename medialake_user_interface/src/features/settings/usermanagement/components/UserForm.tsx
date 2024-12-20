@@ -41,6 +41,14 @@ const MenuProps = {
     },
 };
 
+const initialFormData = {
+    name: '',
+    family_name: '',
+    email: '',
+    email_verified: '',
+    roles: [] as string[],
+};
+
 const UserForm: React.FC<UserFormProps> = ({
     open,
     onClose,
@@ -48,13 +56,7 @@ const UserForm: React.FC<UserFormProps> = ({
     user,
     availableRoles,
 }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        family_name: '',
-        email: '',
-        email_verified: '',
-        roles: [] as string[],
-    });
+    const [formData, setFormData] = useState(initialFormData);
 
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
@@ -76,15 +78,9 @@ const UserForm: React.FC<UserFormProps> = ({
                 roles: user.roles || [],
             });
         } else {
-            setFormData({
-                name: '',
-                family_name: '',
-                email: '',
-                email_verified: '',
-                roles: [],
-            });
+            setFormData(initialFormData);
         }
-    }, [user]);
+    }, [user, open]); // Added 'open' dependency to reset form when dialog opens/closes
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -108,6 +104,11 @@ const UserForm: React.FC<UserFormProps> = ({
             ...formData,
             email_verified: event.target.checked ? 'true' : 'false',
         });
+    };
+
+    const handleClose = () => {
+        setFormData(initialFormData); // Reset form data when closing
+        onClose();
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -148,7 +149,7 @@ const UserForm: React.FC<UserFormProps> = ({
                     message: response.message || (user ? 'User Updated Successfully' : 'User Created Successfully'),
                     severity: 'success',
                 });
-                onClose();
+                handleClose();
             } else {
                 console.log('Status check failed:', response?.status);
                 throw new Error(response?.message || 'Unknown error occurred');
@@ -169,7 +170,7 @@ const UserForm: React.FC<UserFormProps> = ({
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <form onSubmit={handleSubmit}>
                     <DialogTitle>{user ? 'Edit User' : 'Add New User'}</DialogTitle>
                     <DialogContent>
@@ -236,7 +237,7 @@ const UserForm: React.FC<UserFormProps> = ({
                         </Box>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleClose}>Cancel</Button>
                         <Button type="submit" variant="contained" color="primary">
                             {user ? 'Save Changes' : 'Add User'}
                         </Button>
