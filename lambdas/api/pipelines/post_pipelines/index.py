@@ -8,6 +8,7 @@ from datetime import datetime
 from contextlib import ExitStack
 from botocore.exceptions import ClientError
 
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
@@ -226,75 +227,12 @@ def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
                 }
             ],
         }
-        # policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
         response = iam_client.create_role(
             RoleName=role_name,
             AssumeRolePolicyDocument=json.dumps(assume_role_policy),
             Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
         )
-
-        # Attach policies to the role
-        # iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
-
-        # Attach policies to the role
-        # iam_client.attach_role_policy(
-        #     RoleName=role_name,
-        #     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-        # )
-
-        # if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-        #     raise Exception(
-        #         f"Policy {policy_arn} did not attach to role {role_name} in time"
-        #     )
-
-        # Create and attach SQS policy
-        # sqs_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Effect": "Allow",
-        #             "Action": [
-        #                 "sqs:ReceiveMessage",
-        #                 "sqs:DeleteMessage",
-        #                 "sqs:GetQueueAttributes",
-        #                 "sqs:ChangeMessageVisibility",
-        #                 "sqs:SendMessage",
-        #             ],
-        #             "Resource": queue_arn,
-        #         }
-        #     ],
-        # }
-
-        # Create and attach Step Functions execution policy
-
-        # iam_client.put_role_policy(
-        #     RoleName=role_name,
-        #     PolicyName=f"{role_name}-sqs-policy",
-        #     PolicyDocument=json.dumps(sqs_policy),
-        # )
-
-        # Create and attach DynamoDB policy
-        # dynamodb_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Effect": "Allow",
-        #             "Action": [
-        #                 "dynamodb:UpdateItem",
-        #                 "dynamodb:GetItem",
-        #                 "dynamodb:PutItem",
-        #             ],
-        #             "Resource": [f"{os.environ['MEDIALAKE_ASSET_TABLE']}"],
-        #         }
-        #     ],
-        # }
-
-        # iam_client.put_role_policy(
-        #     RoleName=role_name,
-        #     PolicyName=f"{role_name}-dynamodb-policy",
-        #     PolicyDocument=json.dumps(dynamodb_policy),
-        # )
 
         lambda_policy = {
             "Version": "2012-10-17",
@@ -315,63 +253,6 @@ def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
             PolicyName=f"{role_name}-lambda-policy",
             PolicyDocument=json.dumps(lambda_policy),
         )
-
-        # Create and attach S3 policy
-        # s3_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Effect": "Allow",
-        #             "Action": [
-        #                 "s3:GetObject",
-        #             ],
-        #             "Resource": ["arn:aws:s3:::*/*"],
-        #         }
-        #     ],
-        # }
-
-        # iam_client.put_role_policy(
-        #     RoleName=role_name,
-        #     PolicyName=f"{role_name}-read-s3-policy",
-        #     PolicyDocument=json.dumps(s3_policy),
-        # )
-
-        # s3_write_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Effect": "Allow",
-        #             "Action": ["s3:PutObject", "s3:PutObjectAcl"],
-        #             "Resource": [
-        #                 f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}/*",
-        #                 f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
-        #             ],
-        #         }
-        #     ],
-        # }
-
-        # iam_client.put_role_policy(
-        #     RoleName=role_name,
-        #     PolicyName=f"{role_name}-write-s3-policy",
-        #     PolicyDocument=json.dumps(s3_write_policy),
-        # )
-
-        # kms_policy = {
-        #     "Version": "2012-10-17",
-        #     "Statement": [
-        #         {
-        #             "Effect": "Allow",
-        #             "Action": ["kms:GenerateDataKey"],
-        #             "Resource": [os.environ["MEDIA_ASSETS_BUCKET_NAME_KMS_KEY"]],
-        #         }
-        #     ],
-        # }
-
-        # iam_client.put_role_policy(
-        #     RoleName=role_name,
-        #     PolicyName=f"{role_name}-kms-policy",
-        #     PolicyDocument=json.dumps(kms_policy),
-        # )
 
         return response["Role"]["Arn"]
     except Exception as e:
@@ -464,120 +345,6 @@ def create_executer_lambda_role(
         raise
 
 
-# def create_lambda_s3_dynamo_rw_role(role_name: str, tags: dict) -> str:
-#     """Create IAM role for image proxy node execution"""
-#     try:
-#         assume_role_policy = {
-#             "Version": "2012-10-17",
-#             "Statement": [
-#                 {
-#                     "Effect": "Allow",
-#                     "Principal": {"Service": ["lambda.amazonaws.com"]},
-#                     "Action": "sts:AssumeRole",
-#                 }
-#             ],
-#         }
-#         policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-
-#         response = iam_client.create_role(
-#             RoleName=role_name,
-#             AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-#             Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
-#         )
-
-#         # Attach policies to the role
-#         iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
-
-#         if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-#             raise Exception(
-#                 f"Policy {policy_arn} did not attach to role {role_name} in time"
-#             )
-
-#         # Create and attach DynamoDB policy
-#         dynamodb_policy = {
-#             "Version": "2012-10-17",
-#             "Statement": [
-#                 {
-#                     "Effect": "Allow",
-#                     "Action": [
-#                         "dynamodb:UpdateItem",
-#                         "dynamodb:GetItem",
-#                         "dynamodb:PutItem",
-#                     ],
-#                     "Resource": [f"{os.environ['MEDIALAKE_ASSET_TABLE']}"],
-#                 }
-#             ],
-#         }
-
-#         iam_client.put_role_policy(
-#             RoleName=role_name,
-#             PolicyName=f"{role_name}-dynamodb-policy",
-#             PolicyDocument=json.dumps(dynamodb_policy),
-#         )
-
-#         # Create and attach S3 policy
-#         s3_policy = {
-#             "Version": "2012-10-17",
-#             "Statement": [
-#                 {
-#                     "Effect": "Allow",
-#                     "Action": [
-#                         "s3:GetObject",
-#                     ],
-#                     "Resource": ["arn:aws:s3:::*/*"],
-#                 }
-#             ],
-#         }
-
-#         iam_client.put_role_policy(
-#             RoleName=role_name,
-#             PolicyName=f"{role_name}-read-s3-policy",
-#             PolicyDocument=json.dumps(s3_policy),
-#         )
-
-#         s3_write_policy = {
-#             "Version": "2012-10-17",
-#             "Statement": [
-#                 {
-#                     "Effect": "Allow",
-#                     "Action": ["s3:PutObject", "s3:PutObjectAcl"],
-#                     "Resource": [
-#                         f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}/*",
-#                         f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
-#                     ],
-#                 }
-#             ],
-#         }
-
-#         iam_client.put_role_policy(
-#             RoleName=role_name,
-#             PolicyName=f"{role_name}-write-s3-policy",
-#             PolicyDocument=json.dumps(s3_write_policy),
-#         )
-
-#         kms_policy = {
-#             "Version": "2012-10-17",
-#             "Statement": [
-#                 {
-#                     "Effect": "Allow",
-#                     "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
-#                     "Resource": [os.environ["MEDIA_ASSETS_BUCKET_NAME_KMS_KEY"], "*"],
-#                 }
-#             ],
-#         }
-
-#         iam_client.put_role_policy(
-#             RoleName=role_name,
-#             PolicyName=f"{role_name}-kms-policy",
-#             PolicyDocument=json.dumps(kms_policy),
-#         )
-
-#         return response["Role"]["Arn"]
-#     except Exception as e:
-#         logger.error(f"Failed to create IAM role: {str(e)}")
-#         raise
-
-
 def update_lambda_role_permissions(function_name, new_policy):
     # Get the current function configuration
     function_config = lambda_client.get_function(FunctionName=function_name)
@@ -596,6 +363,20 @@ def update_lambda_role_permissions(function_name, new_policy):
         logger.info(f"Successfully added new policy to role {role_name}")
     except Exception as e:
         logger.error(f"Failed to add policy to role {role_name}: {str(e)}")
+        raise
+
+
+def check_event_source_mappings(lambda_name: str) -> bool:
+    """Check if a Lambda function has any event source mappings"""
+    try:
+        response = lambda_client.list_event_source_mappings(FunctionName=lambda_name)
+        if response["EventSourceMappings"]:
+            return True
+        return False
+    except Exception as e:
+        logger.error(
+            f"Error checking event source mappings for {lambda_name}: {str(e)}"
+        )
         raise
 
 
@@ -655,6 +436,11 @@ def check_resource_exists(
         for lambda_name in lambda_names:
             try:
                 lambda_client.get_function(FunctionName=lambda_name)
+                if check_event_source_mappings(lambda_name):
+                    return (
+                        True,
+                        f"Lambda Function {lambda_name} with event source mappings already exists",
+                    )
                 return True, f"Lambda Function {lambda_name} already exists"
             except lambda_client.exceptions.ResourceNotFoundException:
                 pass
@@ -829,6 +615,10 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             )
             state_machine_name = f"{global_prefix}-pl-{createpipeline.name}"
 
+            pipeline_trigger_lambda_function_name = (
+                f"medialake-pipeline-{createpipeline.name}-executor"
+            )
+
             # Check if resources exist
             resources_exist, error_message = check_resource_exists(
                 createpipeline.name,
@@ -838,11 +628,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 lambda_s3_dynamo_rw_role_name,
                 lambda_executer_role_name,
                 state_machine_name,
-                [
-                    # image_proxy_lambda_name,
-                    # pipeline_trigger_lambda_name,
-                    f"medialake-pipeline-{createpipeline.name}-metadata",  # Add this
-                ],
+                [pipeline_trigger_lambda_function_name],
             )
 
             if resources_exist:
@@ -868,8 +654,18 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
 
             # Create SQS FIFO Queue
             queue_name = f"medialake-pipeline-{createpipeline.name}"
-            queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
-            resources_to_delete.append(("sqs", queue_url))
+            try:
+                queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+                resources_to_delete.append(("sqs", queue_url))
+            except sqs_client.exceptions.QueueDeletedRecently as e:
+                logger.error(f"Failed to create pipeline: {str(e)}")
+                return {
+                    "status": "400",
+                    "message": "SQS FIFO queue creation failed: 60-second wait required after deletion before reusing name.",
+                    "data": {
+                        "error": "You must wait 60 seconds after deleting a queue before you can create another with the same name."
+                    },
+                }
 
             # Create EventBridge rule
             rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
@@ -894,7 +690,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy(
                 connector_buckets
             )
-            print(iam_lambda_s3_dynamo_rw_policy)
+            # print(iam_lambda_s3_dynamo_rw_policy)
 
             update_lambda_role_permissions(
                 os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
@@ -950,9 +746,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             resources_to_delete.append(("step_function", state_machine_arn))
 
             # Create Lambda Function
-            pipeline_trigger_lambda_function_name = (
-                f"medialake-pipeline-{createpipeline.name}-executor"
-            )
+
             pipeline_trigger_lambda_response = lambda_client.create_function(
                 FunctionName=pipeline_trigger_lambda_function_name,
                 Runtime="python3.12",

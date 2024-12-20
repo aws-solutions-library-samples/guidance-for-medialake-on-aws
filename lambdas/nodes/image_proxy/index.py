@@ -144,7 +144,7 @@ def lambda_handler(event, context: LambdaContext):
 
         if mode == "thumbnail":
             # Get thumbnail parameters
-            params = event.get("thumbnail")
+            # params = event.get("thumbnail")
             width = event.get("width")
             height = event.get("height")
             crop = event.get("crop", False)

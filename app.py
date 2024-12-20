@@ -9,6 +9,10 @@ from config import config
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
+from medialake_stacks.pipeline_stack import (
+    PipelineStack,
+    # PipelineStackProps,
+)
 from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStack,
     PipelineNodesStackProps,
@@ -22,6 +26,14 @@ base_infrastructure = BaseInfrastructureStack(
     "MediaLakeBaseInfrastructure",
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
+
+pipeline_stack = PipelineStack(
+    app,
+    "MediaLakePipeline",
+    props=None,
+    env=cdk.Environment(region=config.primary_region, account=app.account),
+)
+
 
 pipeline_nodes_stack = PipelineNodesStack(
     app,
@@ -46,7 +58,7 @@ api_gateway_stack = ApiGatewayStack(
         collection_endpoint=base_infrastructure.collection_endpoint,
         collection_arn=base_infrastructure.collection_arn,
         access_log_bucket=base_infrastructure.access_log_bucket,
-        pipeline_table=base_infrastructure.pipeline_table,
+        pipeline_table=pipeline_stack.pipeline_table,
         image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
     ),
@@ -58,7 +70,7 @@ cleanup_stack = CleanupStack(
     "MediaLakeCleanupStack",
     props=CleanupStackProps(
         ingest_event_bus=base_infrastructure.ingest_event_bus,
-        pipeline_table=base_infrastructure.pipeline_table,
+        pipeline_table=pipeline_stack.pipeline_table,
         connector_table=api_gateway_stack.connector_table,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),

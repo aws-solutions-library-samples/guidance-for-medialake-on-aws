@@ -18,10 +18,7 @@ from config import config
 from medialake_constructs.shared_constructs.s3_logging import (
     add_s3_access_logging_policy,
 )
-from medialake_constructs.shared_constructs.dynamodb_data_acess_logs import (
-    DynamoDBCloudTrailLogs,
-    DynamoDBCloudTrailLogsProps,
-)
+
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
@@ -29,11 +26,12 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
+from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
+    OpenSearchIngestionPipeline,
+    OpenSearchIngestionPipelineProps,
 )
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
 """
@@ -68,6 +66,7 @@ class BaseInfrastructureStack(Stack):
         env = kwargs.get("env")
         region = env.region if isinstance(env, Environment) else config.primary_region
         account = env.account if isinstance(env, Environment) else config.account_id
+        opensearch_index_name = "media"
 
         self.access_logs_bucket = S3Bucket(
             self,
@@ -107,6 +106,16 @@ class BaseInfrastructureStack(Stack):
         #     ),
         # )
 
+        self.ddb_export_bucket = S3Bucket(
+            self,
+            "DynamodbExportBucket",
+            props=S3BucketProps(
+                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket.bucket,
+            ),
+        )
+
         # VPC used for OpenSearch, Lambda's, and VPC Endpoints
         self._vpc = CustomVpc(
             self,
@@ -138,15 +147,6 @@ class BaseInfrastructureStack(Stack):
             description="Allow HTTP ingress from VPC CIDR",
         )
 
-        # Create CloudWatch logs for Ingestion Pipeline
-        ingestion_log_group = logs.LogGroup(
-            self,
-            "IngestionPipelineLogGroup",
-            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}",
-            removal_policy=RemovalPolicy.DESTROY,
-            retention=logs.RetentionDays.ONE_DAY,
-        )
-
         # Create OpenSearch managed cluster
         self._opensearch_cluster = OpenSearchCluster(
             self,
@@ -154,7 +154,7 @@ class BaseInfrastructureStack(Stack):
             props=OpenSearchClusterProps(
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
                 vpc=self._vpc.vpc,
-                collection_indexes=["media"],
+                collection_indexes=[opensearch_index_name],
                 security_group=self._security_group,
             ),
         )
@@ -205,17 +205,6 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        # Create S3 Bucket for DynamoDB Exports
-        self._ddb_export_bucket = S3Bucket(
-            self,
-            "DynamodbExportBucket",
-            props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
-                access_logs=True,
-                access_logs_bucket=self.access_logs_bucket.bucket,
-            ),
-        )
-
         self._ingest_event_bus = EventBus(
             self,
             "IngestEventBus",
@@ -226,15 +215,15 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        self._pipelne_table = DynamoDB(
-            self,
-            "PipelinesTable",
-            props=DynamoDBProps(
-                name=f"medialake_pipeline_table",
-                partition_key_name="id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
+        # self._pipelne_table = DynamoDB(
+        #     self,
+        #     "PipelinesTable",
+        #     props=DynamoDBProps(
+        #         name=f"medialake_pipeline_table",
+        #         partition_key_name="id",
+        #         partition_key_type=dynamodb.AttributeType.STRING,
+        #     ),
+        # )
 
         self._asset_table = DynamoDB(
             self,
@@ -243,8 +232,8 @@ class BaseInfrastructureStack(Stack):
                 name="medialake-asset-table",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                pipeline_name="medialake-dynamodb-etl-pipeline",
-                ddb_export_bucket=self._ddb_export_bucket,
+                pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
+                ddb_export_bucket=self.ddb_export_bucket,
                 sort_key_name="ID",
                 sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
@@ -268,363 +257,19 @@ class BaseInfrastructureStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
-        # OS ingest pipeline
-        ingestion_pipeline_lambda = Lambda(
+        self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
             self,
-            "AssetTableIngestionPipeline",
-            config=LambdaConfig(
-                name=f"{config.global_prefix}",
-                timeout_minutes=15,
-                vpc=self._vpc.vpc,
-                security_groups=[self._security_group],
-                entry="lambdas/back_end/asset_table_ingestion_pipline",
-                environment_variables={
-                    "TABLE_ARN": self._asset_table.table_arn,
-                    "BUCKET_NAME": self._ddb_export_bucket.bucket.bucket_name,
-                    "COLLECTION_ENDPOINT": self._opensearch_cluster.domain_endpoint,
-                    "INDEX_NAME": "media",
-                    "REGION": self.region,
-                    "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
-                    "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
-                    "SUBNET_IDS_PIPELINE": json.dumps(
-                        self._vpc.vpc.select_subnets(
-                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-                        ).subnet_ids
-                    ),
-                    "SECURITY_GROUP_IDS": json.dumps(
-                        [self._security_group.security_group_id]
-                    ),
-                },
+            "MediaLakeOSIngestionPipeline",
+            props=OpenSearchIngestionPipelineProps(
+                asset_table=self._asset_table,
+                access_logs_bucket=self.access_logs_bucket,
+                opensearch_cluster=self._opensearch_cluster,
+                ddb_export_bucket=self.ddb_export_bucket,
+                index_name=opensearch_index_name,
+                vpc=self._vpc,
+                security_group=self._security_group,
             ),
         )
-
-        ddb_pipeline_cr_role = ingestion_pipeline_lambda.lambda_role
-
-        pipeline_role = iam.Role(
-            self,
-            "IngestionRole",
-            assumed_by=iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
-        )
-        # es permissions
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["es:ESHttp*"],
-                resources=[f"{self._opensearch_cluster.domain_arn}/*"],
-            )
-        )
-
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["es:DescribeDomain"],
-                resources=[f"arn:aws:es:*:{self.account}:domain/*"],
-            )
-        )
-
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "dynamodb:DescribeTable",
-                    "dynamodb:DescribeContinuousBackups",
-                    "dynamodb:ExportTableToPointInTime",
-                    "dynamodb:DescribeStream",
-                ],
-                resources=[
-                    self._asset_table.table_arn,
-                ],
-            )
-        )
-
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "dynamodb:GetRecords",
-                    "dynamodb:GetShardIterator",
-                    "dynamodb:DescribeStream",
-                ],
-                resources=[f"{self._asset_table.table_arn}/stream/*"],
-            )
-        )
-
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["dynamodb:DescribeExport"],
-                resources=[f"{self._asset_table.table_arn}/export/*"],
-            )
-        )
-
-        pipeline_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:DeleteObject",
-                    "s3:DeleteObjectVersion",
-                    "s3:ListBucket",
-                    "s3:DeleteBucket",
-                ],
-                resources=[
-                    self._ddb_export_bucket.bucket_arn,
-                    f"{self._ddb_export_bucket.bucket_arn}/*",
-                ],
-            )
-        )
-
-        ingestion_pipeline_lambda.function.add_environment(
-            "PIPELINE_ROLE_ARN", pipeline_role.role_arn
-        )
-
-        # osis permission
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "osis:CreatePipeline",
-                    "osis:ValidatePipeline",
-                ],
-                resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
-                ],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "iam:PassRole",
-                    "iam:CreateRole",
-                    "iam:AttachRolePolicy",
-                    "iam:DetachRolePolicy",
-                    "iam:GetRole",
-                    "iam:DeleteRole",
-                ],
-                resources=[pipeline_role.role_arn],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                ],
-                resources=[
-                    f"arn:aws:logs:{self.region}:{self.account}:log-group:{ingestion_log_group.log_group_name}:*"
-                ],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "logs:CreateLogGroup",
-                    "logs:DescribeLogGroups",
-                ],
-                resources=[
-                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-*"
-                ],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "logs:CreateLogDelivery",
-                    "logs:PutResourcePolicy",
-                    "logs:UpdateLogDelivery",
-                    "logs:DeleteLogDelivery",
-                    "logs:DescribeResourcePolicies",
-                    "logs:GetLogDelivery",
-                    "logs:ListLogDeliveries",
-                ],
-                resources=[
-                    "*"
-                ],  # These actions typically require '*' as they operate across all log groups
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["iam:ListPolicies"],
-                resources=["*"],
-                # These actions typically require '*' as they operate across all log groups
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "iam:CreatePolicy",
-                    "iam:DeletePolicy",
-                ],
-                conditions={
-                    "StringEquals": {
-                        "iam:PolicyName": [
-                            "IngestionPipelinePolicy",
-                            "DynamoDBIngestionPolicy",
-                        ]
-                    }
-                },
-                resources=[f"arn:aws:iam::{self.account}:policy/*"],
-            )
-        )
-
-        ingestion_pipeline_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetBucketLocation",
-                    "s3:ListBucket",
-                ],
-                resources=[self._ddb_export_bucket.bucket.bucket_arn],
-            )
-        )
-
-        ingestion_pipeline_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:DeleteObject",
-                ],
-                resources=[f"{self._ddb_export_bucket.bucket.bucket_arn}/*"],
-            )
-        )
-        ingestion_pipeline_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ec2:CreateNetworkInterface",
-                    "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface",
-                ],
-                resources=["*"],
-                # These actions typically require '*' as they operate across all log groups
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ec2:CreateVpcEndpoint",
-                    "ec2:DeleteVpcEndpoints",
-                    "ec2:ListVpcEndpoints",
-                    "ec2:DescribeVpcEndpoints",
-                    "ec2:DescribeVpcs",
-                    "ec2:DescribeSubnets",
-                    "ec2:DescribeSecurityGroups",
-                    "ec2:CreateTags",
-                    "ec2:DeleteTags",
-                ],
-                resources=[f"arn:aws:ec2:{self.region}:{self.account}:*"],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "route53:AssociateVPCWithHostedZone",
-                    "route53:DisassociateVPCFromHostedZone",
-                ],
-                resources=[f"arn:aws:route53:::hostedzone/*"],
-            )
-        )
-
-        ddb_pipeline_cr_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["osis:Ingest"],
-                resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
-                ],
-            )
-        )
-
-        ingestion_pipeline_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "opensearch:CreateDomain",
-                    "opensearch:DeleteDomain",
-                    "opensearch:DescribeDomain",
-                ],
-                resources=[f"arn:aws:opensearch:{self.region}:{self.account}:domain/*"],
-            )
-        )
-
-        ingestion_pipeline_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "osis:GetPipeline",
-                    "osis:CreatePipeline",
-                    "osis:DeletePipeline",
-                ],
-                resources=[
-                    f"arn:aws:osis:{self.region}:{self.account}:pipeline/{config.global_prefix}-etl-pipeline"
-                ],
-            )
-        )
-
-        # Define Custom Resource for Ingestion Pipeline
-        ingestion_provider = cr.Provider(
-            self,
-            "IngestionProvider",
-            on_event_handler=ingestion_pipeline_lambda.function,
-        )
-
-        ingestion_custom_resource = CustomResource(
-            self,
-            "CreateIngestionPipeline",
-            service_token=ingestion_provider.service_token,
-            properties={
-                "PipelineName": "medialake-asset-pipeline",
-                "TableArn": self._asset_table.table_arn,
-                "BucketName": self._ddb_export_bucket.bucket.bucket_arn,
-                "CollectionEndpoint": self._opensearch_cluster.domain_endpoint,
-                "PipelineRoleArn": pipeline_role.role_arn,
-                "Region": self.region,
-                "LogGroupName": ingestion_log_group.log_group_name,
-                "SubnetIdsPipeline": json.dumps(
-                    self._vpc.vpc.select_subnets(
-                        subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-                    ).subnet_ids
-                ),
-                "SecurityGroupIds": json.dumps(
-                    [self._security_group.security_group_id]
-                ),
-            },
-        )
-        # Ensure the ingestion pipeline is created after the DynamoDB table is populated
-        ingestion_custom_resource.node.add_dependency(self._asset_table)
-        ingestion_custom_resource.node.add_dependency(pipeline_role)
-
-        # self.api_gateway_endpoint = self._vpc.vpc.add_interface_endpoint(
-        #     "ApiGatewayInterfaceEndpoint",
-        #     service=ec2.InterfaceVpcEndpointAwsService.APIGATEWAY,
-        #     subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-        #     private_dns_enabled=True,
-        # )
-
-    # @property
-    # def vpc_endpoint(self) -> ec2.IVpcEndpoint:
-    #     return self.api_gateway_endpoint
-
-    # #  expose the security group
-    # @property
-    # def api_gateway_endpoint_security_group(self) -> ec2.SecurityGroup:
-    #     return self.api_gateway_endpoint.connections.security_groups[0]
 
     @property
     def ingest_event_bus(self) -> events.EventBus:
@@ -658,17 +303,6 @@ class BaseInfrastructureStack(Stack):
         """
 
         return self._asset_table
-
-    @property
-    def pipeline_table(self) -> dynamodb.TableV2:
-        """
-        Returns the DynamoDB table used for storing pipelines.
-
-        Returns:
-            dynamodb.TableV2: The configured DynamoDB table
-        """
-
-        return self._pipelne_table.table
 
     @property
     def asset_table_name(self) -> str:

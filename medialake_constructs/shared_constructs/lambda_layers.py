@@ -1,5 +1,11 @@
 import os
-from aws_cdk import Stack, aws_lambda as lambda_, BundlingOptions
+from aws_cdk import (
+    Stack,
+    aws_lambda as lambda_,
+    BundlingOptions,
+    BundlingOptions,
+    DockerImage,
+)
 from constructs import Construct
 from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from dataclasses import dataclass
@@ -29,31 +35,6 @@ class PowertoolsLayer(Construct):
             f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:4",
         )
         # f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
-
-
-class ExiftoolLayer(Construct):
-    def __init__(self, scope: Construct, id: str, **kwargs):
-        super().__init__(scope, id, **kwargs)
-
-        # Define the Lambda layer from the zip file
-        self.layer = lambda_.LayerVersion(
-            self,
-            "ExiftoolLayer",
-            code=lambda_.Code.from_asset(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "medialake_constructs",
-                    "shared_constructs",
-                    "exiftool_x86_64.zip",
-                )
-            ),
-            description="Exiftool binary and dependencies",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-        )
-
-    @property
-    def layer_version(self) -> lambda_.LayerVersion:
-        return self.layer
 
 
 class JinjaLambdaLayer(Construct):
@@ -109,6 +90,45 @@ class PyMediaInfo(Construct):
             entry="lambdas/layers/pymediainfo",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             description="A Lambda layer with pymediainfo library",
+        )
+
+
+class FFProbeLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        self.layer = lambda_.LayerVersion(
+            self,
+            "FFProbeLayer",
+            layer_version_name="ffprobe-layer",
+            compatible_runtimes=[
+                lambda_.Runtime.PYTHON_3_12,
+            ],
+            description="Layer containing ffprobe binary",
+            code=lambda_.Code.from_asset(
+                path=".",
+                bundling=BundlingOptions(
+                    command=[
+                        "/bin/bash",
+                        "-c",
+                        "yum update -y && yum install -y wget xz zip tar && "
+                        "wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && "
+                        "wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5 && "
+                        "md5sum -c ffmpeg-release-amd64-static.tar.xz.md5 && "
+                        "rm -r ffmpeg-release-amd64 && "
+                        "mkdir ffmpeg-release-amd64 && "
+                        "tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64 && "
+                        "mkdir -p ffprobe/bin && "
+                        "cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/ && "
+                        "cd ffprobe && zip -9 -r ../ffprobe.zip . && "
+                        "cp ../ffprobe.zip /asset-output/",
+                    ],
+                    user="root",
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:latest"
+                    ),
+                ),
+            ),
         )
 
 
