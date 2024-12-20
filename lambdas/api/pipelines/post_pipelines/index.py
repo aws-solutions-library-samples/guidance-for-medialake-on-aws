@@ -737,9 +737,7 @@ def rollback_resources(resources_to_delete):
             )
 
 
-def create_iam_lambda_s3_dynamo_rw_policy(pipeline_type):
-    connector_buckets = get_connector_buckets(pipeline_type)
-    print(connector_buckets)
+def create_iam_lambda_s3_dynamo_rw_policy(connector_buckets):
     iam_lambda_s3_dynamo_rw_policy = {
         "Version": "2012-10-17",
         "Statement": [
@@ -792,6 +790,9 @@ def get_connector_buckets(pipeline_type):
         if "storageIdentifier" in item:
             buckets.append(item["storageIdentifier"])
 
+    if not buckets:
+        raise ValueError("No connectors found. Pipeline creation cannot proceed.")
+
     return buckets
 
 
@@ -801,8 +802,19 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
 
     with ExitStack() as stack:
         stack.callback(rollback_resources, resources_to_delete)
-
+        connector_buckets = None
         try:
+
+            try:
+                connector_buckets = get_connector_buckets(createpipeline.type)
+            except ValueError as e:
+                logger.error(f"Failed to create pipeline: {str(e)}")
+                return {
+                    "status": "400",
+                    "message": str(e),
+                    "data": {"error": str(e)},
+                }
+
             global_prefix = os.environ["GLOBAL_PREFIX"]
             # Generate names for resources
             queue_name = f"{global_prefix}-pl-{createpipeline.name}"
@@ -880,7 +892,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             )
 
             iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy(
-                createpipeline.type
+                connector_buckets
             )
             print(iam_lambda_s3_dynamo_rw_policy)
 

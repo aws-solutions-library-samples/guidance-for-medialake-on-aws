@@ -108,6 +108,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                         "dynamodb:*",
                         "events:*",
                         "states:*",
+                        "logs:*",
                     ],
                     resources=["*"],
                 ),
@@ -300,6 +301,17 @@ class ApiGatewayPipelinesConstruct(Construct):
         post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                resources=["*"],
+            )
+        )
+
+        post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    # "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
                 resources=["*"],
             )
         )

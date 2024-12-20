@@ -47,6 +47,39 @@ class CleanupStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
+                    "lambda:ListEventSourceMappings",
+                    "lambda:DeleteEventSourceMapping",
+                ],
+                resources=[
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*"
+                ],
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["lambda:DeleteFunction"],
+                resources=[
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*"
+                ],  # TODO add resource prefix i.e. medialake
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["states:DeleteStateMachine"],
+                resources=[
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*"
+                ],  # TODO add resource prefix i.e. medialake
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
                     "events:ListEventBuses",
                     "events:ListRules",
                     "events:ListTargetsByRule",

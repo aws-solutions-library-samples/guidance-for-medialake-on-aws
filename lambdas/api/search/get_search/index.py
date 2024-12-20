@@ -13,7 +13,9 @@ from opensearchpy import (
     RequestsAWSV4SignerAuth,
     OpenSearch,
     OpenSearchException,
-    helpers
+    RequestError,
+    NotFoundError,
+    helpers,
 )
 from datetime import datetime
 import json
@@ -79,6 +81,7 @@ class SearchParams(BaseModelWithConfig):
 
 class StorageInfo(BaseModelWithConfig):
     """Model for storage information"""
+
     status: str
     storageType: str
     bucket: str
@@ -88,32 +91,40 @@ class StorageInfo(BaseModelWithConfig):
     hashValue: Optional[str]
     createDate: Optional[datetime]
 
+
 class AssetRepresentation(BaseModelWithConfig):
     """Model for asset representation"""
+
     id: str
     type: str
     format: str
     purpose: str
     storageInfo: StorageInfo
 
+
 class AssetMetadata(BaseModelWithConfig):
     """Model for asset metadata"""
+
     embedded: Optional[Dict[str, Any]]
     generated: Optional[Dict[str, Any]]
     consolidated: Optional[Dict[str, Any]]
 
+
 class AssetSearchResult(BaseModelWithConfig):
     """Model for search result with presigned URL"""
+
     InventoryID: str
     DigitalSourceAsset: Dict[str, Any]
-    DerivedRepresentations: List[Dict[str, Any]] 
+    DerivedRepresentations: List[Dict[str, Any]]
     FileHash: str
     Metadata: Dict[str, Any]
     score: float
     thumbnailUrl: Optional[str] = None
 
+
 class SearchMetadata(BaseModelWithConfig):
     """Model for search metadata"""
+
     totalResults: int
     page: int
     pageSize: int
@@ -124,6 +135,7 @@ class SearchMetadata(BaseModelWithConfig):
 
 class SearchResponse(BaseModelWithConfig):
     """Model for search response"""
+
     status: str
     message: str
     data: Dict[str, Any]
@@ -148,6 +160,7 @@ def get_opensearch_client() -> OpenSearch:
         region=region,
     )
 
+
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     search_fields = params.search_fields or [
@@ -169,7 +182,11 @@ def build_search_query(params: SearchParams) -> Dict:
                         "prefix_length": 2,
                     }
                 },
-                {"wildcard": {"DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath": f"*{params.q}*"}},
+                {
+                    "wildcard": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath": f"*{params.q}*"
+                    }
+                },
             ],
             "minimum_should_match": 1,
         }
@@ -190,7 +207,11 @@ def build_search_query(params: SearchParams) -> Dict:
         "size": params.size,
         "from": params.from_,
         "aggs": {
-            "file_types": {"terms": {"field": "DigitalSourceAsset.MainRepresentation.Format.keyword"}},
+            "file_types": {
+                "terms": {
+                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword"
+                }
+            },
             "asset_types": {"terms": {"field": "DigitalSourceAsset.Type.keyword"}},
         },
         "suggest": {
@@ -213,7 +234,6 @@ def build_search_query(params: SearchParams) -> Dict:
     }
 
 
-
 def process_search_hit(hit: Dict) -> AssetSearchResult:
     """Process a single search hit and add presigned URL if thumbnail representation exists"""
     source = hit["_source"]
@@ -226,11 +246,13 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     thumbnail_url = None
     for representation in derived_representations:
         if representation.get("Purpose") == "thumbnail":
-            storage_info = representation.get("StorageInfo", {}).get("PrimaryLocation", {})
+            storage_info = representation.get("StorageInfo", {}).get(
+                "PrimaryLocation", {}
+            )
             if storage_info.get("StorageType") == "s3":
                 thumbnail_url = generate_presigned_url(
                     bucket=storage_info.get("Bucket", ""),
-                    key=storage_info.get("ObjectKey", {}).get("FullPath", "")
+                    key=storage_info.get("ObjectKey", {}).get("FullPath", ""),
                 )
             break
 
@@ -241,8 +263,9 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         FileHash=source.get("FileHash", ""),
         Metadata=source.get("Metadata", {}),
         score=hit["_score"],
-        thumbnailUrl=thumbnail_url
+        thumbnailUrl=thumbnail_url,
     )
+
 
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
@@ -269,14 +292,13 @@ def perform_search(params: SearchParams) -> Dict:
 
         logger.info(f"Successfully processed hits: {len(hits)}")
 
-
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],
             page=params.page,
             pageSize=params.pageSize,
             searchTerm=params.q,
             facets=response.get("aggregations"),
-            suggestions=response.get("suggest")
+            suggestions=response.get("suggest"),
         )
 
         return {
@@ -288,12 +310,42 @@ def perform_search(params: SearchParams) -> Dict:
             },
         }
 
-    except OpenSearchException as e:
-        logger.error(f"OpenSearch error: {str(e)}")
-        raise SearchException(f"Search operation failed: {str(e)}")
+    except (RequestError, NotFoundError) as e:
+        logger.warning(f"OpenSearch error: {str(e)}")
+        # Check if the error is due to missing field mapping
+        if "no mapping found for field" in str(e):
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "searchMetadata": SearchMetadata(
+                        totalResults=0,
+                        page=params.page,
+                        pageSize=params.pageSize,
+                        searchTerm=params.q,
+                    ).model_dump(by_alias=True),
+                    "results": [],
+                },
+            }
+        else:
+            # For other types of RequestError or NotFoundError, still return empty results
+            return {
+                "status": "200",
+                "message": "No results found",
+                "data": {
+                    "searchMetadata": SearchMetadata(
+                        totalResults=0,
+                        page=params.page,
+                        pageSize=params.pageSize,
+                        searchTerm=params.q,
+                    ).model_dump(by_alias=True),
+                    "results": [],
+                },
+            }
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise SearchException("An unexpected error occurred")
+
 
 @app.get("/search")
 def handle_search():
@@ -307,6 +359,7 @@ def handle_search():
     except SearchException as e:
         logger.error(f"Search error: {str(e)}")
         return {"status": "500", "message": str(e), "data": None}
+
 
 @metrics.log_metrics
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)

@@ -304,10 +304,10 @@ class Lambda(Construct):
                 common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
                 common_lambda_props["project_root"] = common_lambda_props["entry"]
                 common_lambda_props["deps_lock_file_path"] = (
-                    f"{common_lambda_props["entry"]}/lock.json"
+                    f"{common_lambda_props['entry']}/lock.json"
                 )
                 common_lambda_props["entry"] = (
-                    f"{common_lambda_props["entry"]}/index.js"
+                    f"{common_lambda_props['entry']}/index.js"
                 )
                 common_lambda_props["entry"] = os.path.abspath(
                     common_lambda_props["entry"]
