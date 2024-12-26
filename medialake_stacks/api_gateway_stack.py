@@ -117,7 +117,7 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _ = ApiGatewayPipelinesConstruct(
+        self._pipeline_stack = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
             api_resource=self._api_gateway.rest_api,
@@ -212,3 +212,7 @@ class ApiGatewayStack(Stack):
     @property
     def user_interface_url(self) -> str:
         return self._ui.user_interface_url
+
+    @property
+    def pipelines_create_handler(self) -> lambda_.Function:
+        return self._pipeline_stack.pipelines_create_handler

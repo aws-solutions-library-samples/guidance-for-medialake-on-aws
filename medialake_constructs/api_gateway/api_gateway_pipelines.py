@@ -203,13 +203,13 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "GLOBAL_PREFIX": config.global_prefix,
             },
         )
-        post_pipelines_handler = Lambda(
+        self._post_pipelines_handler = Lambda(
             self,
             "PostPipelinesHandler",
             config=post_pipelines_lambda_config,
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "sqs:CreateQueue",
@@ -222,7 +222,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "iam:TagRole",
@@ -241,7 +241,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:CreateFunction",
@@ -256,7 +256,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "states:CreateStateMachine",
@@ -268,21 +268,21 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:PutItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:Scan"],
                 resources=[props.connector_table.table_arn],
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "events:TagResource",
@@ -295,14 +295,14 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
                 resources=["*"],
             )
         )
 
-        post_pipelines_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     # "logs:CreateLogGroup",
@@ -313,11 +313,11 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        iac_assets_bucket.bucket.grant_read_write(post_pipelines_handler.function)
+        iac_assets_bucket.bucket.grant_read_write(self._post_pipelines_handler.function)
 
         pipelines_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(post_pipelines_handler.function),
+            apigateway.LambdaIntegration(self._post_pipelines_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
@@ -485,3 +485,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         #     authorization_type=apigateway.AuthorizationType.COGNITO,
         #     authorizer=cognito_authorizer,
         # )
+
+    @property
+    def pipelines_create_handler(self) -> lambda_.Function:
+
+        return self._post_pipelines_handler

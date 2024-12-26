@@ -523,7 +523,7 @@ def rollback_resources(resources_to_delete):
             )
 
 
-def create_iam_lambda_s3_dynamo_rw_policy(connector_buckets):
+def create_iam_lambda_s3_dynamo_rw_policy():
     iam_lambda_s3_dynamo_rw_policy = {
         "Version": "2012-10-17",
         "Statement": [
@@ -544,11 +544,19 @@ def create_iam_lambda_s3_dynamo_rw_policy(connector_buckets):
                     f"arn:aws:s3:::{os.environ.get('MEDIA_ASSETS_BUCKET_NAME')}",
                 ],
             },
+            # {
+            #     "Effect": "Allow",
+            #     "Action": ["s3:GetObject"],
+            #     "Resource": [f"arn:aws:s3:::{bucket}/*" for bucket in connector_buckets]
+            #     + [f"arn:aws:s3:::{bucket}" for bucket in connector_buckets],
+            # },
             {
                 "Effect": "Allow",
                 "Action": ["s3:GetObject"],
-                "Resource": [f"arn:aws:s3:::{bucket}/*" for bucket in connector_buckets]
-                + [f"arn:aws:s3:::{bucket}" for bucket in connector_buckets],
+                "Resource": [
+                    f"arn:aws:s3:::*",
+                    f"arn:aws:s3:::*/*",
+                ],
             },
             {
                 "Effect": "Allow",
@@ -563,13 +571,11 @@ def create_iam_lambda_s3_dynamo_rw_policy(connector_buckets):
 
 
 def get_connector_buckets(pipeline_type):
-    print(os.environ["CONNECTOR_TABLE"])
 
     connector_table = dynamodb.Table(os.environ["CONNECTOR_TABLE"])
     response = connector_table.scan(
         FilterExpression=boto3.dynamodb.conditions.Attr("type").eq("s3")
     )
-    print(response)
 
     buckets = []
     for item in response["Items"]:
@@ -591,15 +597,15 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
         connector_buckets = None
         try:
 
-            try:
-                connector_buckets = get_connector_buckets(createpipeline.type)
-            except ValueError as e:
-                logger.error(f"Failed to create pipeline: {str(e)}")
-                return {
-                    "status": "400",
-                    "message": str(e),
-                    "data": {"error": str(e)},
-                }
+            # try:
+            #     connector_buckets = get_connector_buckets(createpipeline.type)
+            # except ValueError as e:
+            #     logger.error(f"Failed to create pipeline: {str(e)}")
+            #     return {
+            #         "status": "400",
+            #         "message": str(e),
+            #         "data": {"error": str(e)},
+            #     }
 
             global_prefix = os.environ["GLOBAL_PREFIX"]
             # Generate names for resources
@@ -687,9 +693,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 ("iam_lambda_executer_role", lambda_executer_role_arn)
             )
 
-            iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy(
-                connector_buckets
-            )
+            iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy()
             # print(iam_lambda_s3_dynamo_rw_policy)
 
             update_lambda_role_permissions(
@@ -837,4 +841,5 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
+    print(json.dumps(event))
     return app.resolve(event, context)

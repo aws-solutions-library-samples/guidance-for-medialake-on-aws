@@ -11,7 +11,7 @@ from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from medialake_stacks.pipeline_stack import (
     PipelineStack,
-    # PipelineStackProps,
+    PipelineStackProps,
 )
 from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStack,
@@ -26,14 +26,6 @@ base_infrastructure = BaseInfrastructureStack(
     "MediaLakeBaseInfrastructure",
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
-
-pipeline_stack = PipelineStack(
-    app,
-    "MediaLakePipeline",
-    props=None,
-    env=cdk.Environment(region=config.primary_region, account=app.account),
-)
-
 
 pipeline_nodes_stack = PipelineNodesStack(
     app,
@@ -58,9 +50,25 @@ api_gateway_stack = ApiGatewayStack(
         collection_endpoint=base_infrastructure.collection_endpoint,
         collection_arn=base_infrastructure.collection_arn,
         access_log_bucket=base_infrastructure.access_log_bucket,
-        pipeline_table=pipeline_stack.pipeline_table,
+        pipeline_table=base_infrastructure.pipeline_table,
         image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+    ),
+    env=cdk.Environment(region=config.primary_region, account=app.account),
+)
+
+pipeline_stack = PipelineStack(
+    app,
+    "MediaLakePipeline",
+    props=PipelineStackProps(
+        iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+        trigger_node_lambda=pipeline_nodes_stack.trigger_node_lambda,
+        image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+        image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+        video_metadata_extractor_lambda=pipeline_nodes_stack.video_metadata_extractor_lambda,
+        video_proxy_lambda=pipeline_nodes_stack.video_proxy_lambda,
+        video_thumbnail_lambda=pipeline_nodes_stack.video_thumbnail_lambda,
+        post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
@@ -70,7 +78,7 @@ cleanup_stack = CleanupStack(
     "MediaLakeCleanupStack",
     props=CleanupStackProps(
         ingest_event_bus=base_infrastructure.ingest_event_bus,
-        pipeline_table=pipeline_stack.pipeline_table,
+        pipeline_table=base_infrastructure.pipeline_table,
         connector_table=api_gateway_stack.connector_table,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),
