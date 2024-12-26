@@ -62,7 +62,7 @@ from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 class ApiGatewayStackProps:
     """Configuration for API Gateway Stack."""
 
-    asset_table: dynamodb.Table
+    asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
     media_assets_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str

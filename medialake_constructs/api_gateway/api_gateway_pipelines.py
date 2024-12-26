@@ -10,10 +10,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 from config import config
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
-)
+
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -184,7 +181,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # POST /api/pipelines
         post_pipelines_lambda_config = LambdaConfig(
-            name="PostPipelinesHandler",
+            name="pipeline_post",
             timeout_minutes=10,
             entry="lambdas/api/pipelines/post_pipelines",
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
@@ -330,7 +327,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # GET /api/pipelines/{pipelineId}
         get_pipeline_id_lambda_config = LambdaConfig(
-            name="GetPipelineIdHandler",
+            name="pipeline_get",
             entry=("lambdas/api/pipelines/rp_pipelineId/get_pipeline"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
@@ -353,7 +350,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # PUT /api/pipelines/{pipelineId}
         put_pipeline_id_lambda_config = LambdaConfig(
-            name="PutPipelineIdHandler",
+            name="pipeline_put",
             entry=("lambdas/api/pipelines/rp_pipelineId/put_pipeline"),
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
@@ -377,7 +374,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # DELETE /api/pipelines/{pipelineId}
         del_pipeline_id_lambda_config = LambdaConfig(
-            name="DeletePipelineIdHandler",
+            name="pipeline_del",
             entry=("lambdas/api/pipelines/rp_pipelineId/del_pipeline"),
             iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
