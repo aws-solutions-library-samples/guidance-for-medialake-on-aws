@@ -9,7 +9,6 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     custom_resources as cr,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 

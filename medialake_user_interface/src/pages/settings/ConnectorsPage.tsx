@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid, Typography, Button, Box, Snackbar, Alert } from '@mui/material';
+import { Typography, Button, Box, Snackbar, Alert } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
@@ -83,18 +83,26 @@ const ConnectorsPage: React.FC = () => {
                 </Button>
             </Box>
 
-            <Grid container spacing={3}>
+            <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, 1fr)',
+                    md: 'repeat(3, 1fr)'
+                },
+                gap: 3
+            }}>
                 {connectors.map((connector) => (
-                    <Grid item xs={12} sm={6} md={4} key={connector.id}>
+                    <Box key={connector.id}>
                         <ConnectorCard
                             connector={connector}
                             onEdit={handleEditClick}
                             onDelete={handleDelete}
                             onToggleStatus={handleToggleStatus}
                         />
-                    </Grid>
+                    </Box>
                 ))}
-            </Grid>
+            </Box>
 
             <ConnectorModal
                 open={isModalOpen}

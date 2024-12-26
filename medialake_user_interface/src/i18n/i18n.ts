@@ -3,16 +3,13 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
 i18n
-    // detect user language
     .use(LanguageDetector)
-    // pass the i18n instance to react-i18next
     .use(initReactI18next)
-    // init i18next
     .init({
         debug: true,
         fallbackLng: 'en',
         interpolation: {
-            escapeValue: false, // not needed for react as it escapes by default
+            escapeValue: false,
         },
         resources: {
             en: {
@@ -46,7 +43,45 @@ i18n
                         folder: 'Folder',
                         loadMore: 'Load More',
                         darkMode: 'Dark Mode',
-                        lightMode: 'Light Mode'
+                        lightMode: 'Light Mode',
+                        filter: 'Filter',
+                        textFilter: 'Text Filter',
+                        selectFilter: 'Select Filter',
+                        clearFilter: 'Clear Filter',
+                        columns: 'Columns',
+                        noGroups: 'No Groups'
+                    },
+                    users: {
+                        title: 'User Management',
+                        search: 'Search users',
+                        description: 'Manage system users and their access',
+                        columns: {
+                            username: 'Username',
+                            firstName: 'First Name',
+                            lastName: 'Last Name',
+                            email: 'Email',
+                            status: 'Status',
+                            groups: 'Groups',
+                            created: 'Created',
+                            modified: 'Modified',
+                            actions: 'Actions',
+                        },
+                        actions: {
+                            addUser: 'Add User',
+                            edit: 'Edit User',
+                            delete: 'Delete User',
+                            activate: 'Activate User',
+                            deactivate: 'Deactivate User'
+                        },
+                        status: {
+                            active: 'Active',
+                            inactive: 'Inactive'
+                        },
+                        errors: {
+                            loadFailed: 'Failed to load users',
+                            saveFailed: 'Failed to save user',
+                            deleteFailed: 'Failed to delete user'
+                        }
                     },
                     navigation: {
                         home: 'Home',
@@ -145,6 +180,20 @@ i18n
                     metadata: {
                         title: 'Coming Soon',
                         description: "We're working to bring you metadata management capabilities. Stay tuned!"
+                    },
+                    pipelines: {
+                        title: 'Pipelines',
+                        description: 'Manage your media and metadata pipelines',
+                        search: 'Search pipelines',
+                        deploy: 'Deploy Image Pipeline',
+                        addNew: 'Add New Pipeline',
+                        columns: {
+                            name: 'Name',
+                            creationDate: 'Creation Date',
+                            system: 'System',
+                            type: 'Type',
+                            actions: 'Actions'
+                        }
                     }
                 }
             },
@@ -166,7 +215,39 @@ i18n
                         notifications: 'Benachrichtigungen',
                         searchPlaceholder: 'Suchen oder Schlüssel:Wert verwenden...',
                         darkMode: 'Dunkelmodus',
-                        lightMode: 'Hellmodus'
+                        lightMode: 'Hellmodus',
+                        noGroups: 'Keine Gruppen'
+                    },
+                    users: {
+                        title: 'Benutzerverwaltung',
+                        description: 'Verwalten Sie Systembenutzer und deren Zugriff',
+                        columns: {
+                            username: 'Benutzername',
+                            firstName: 'Vorname',
+                            lastName: 'Nachname',
+                            email: 'E-Mail',
+                            status: 'Status',
+                            groups: 'Gruppen',
+                            created: 'Erstellt',
+                            modified: 'Geändert',
+                            actions: 'Aktionen'
+                        },
+                        actions: {
+                            addUser: 'Benutzer hinzufügen',
+                            edit: 'Benutzer bearbeiten',
+                            delete: 'Benutzer löschen',
+                            activate: 'Benutzer aktivieren',
+                            deactivate: 'Benutzer deaktivieren'
+                        },
+                        status: {
+                            active: 'Aktiv',
+                            inactive: 'Inaktiv'
+                        },
+                        errors: {
+                            loadFailed: 'Fehler beim Laden der Benutzer',
+                            saveFailed: 'Fehler beim Speichern des Benutzers',
+                            deleteFailed: 'Fehler beim Löschen des Benutzers'
+                        }
                     },
                     navigation: {
                         home: 'Startseite',

@@ -21,12 +21,15 @@ import {
     Popover,
     CircularProgress,
     Snackbar,
+    Collapse,
 } from '@mui/material';
 import {
     Close as CloseIcon,
     CloudUpload as CloudUploadIcon,
     Info as InfoIcon,
     Refresh as RefreshIcon,
+    ExpandMore as ExpandMoreIcon,
+    ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
@@ -43,6 +46,11 @@ const CONNECTOR_TYPES = [
     { value: 's3', label: 'Amazon S3', icon: CloudUploadIcon, colorHex: '#FF9900' },
     { value: 'fsx', label: 'Amazon FSx', icon: CloudUploadIcon, colorHex: '#FF9900' },
     { value: 'empty', label: '', icon: CloudUploadIcon, colorHex: '#FF9900' },
+];
+
+const S3_BUCKET_TYPES = [
+    { value: 'existing', label: 'Existing S3 Bucket', description: 'Connect to an existing S3 bucket' },
+    { value: 'new', label: 'New S3 Bucket', description: 'Create a new S3 bucket' },
 ];
 
 const S3_CONNECTOR_TYPES = [
@@ -65,10 +73,12 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [type, setType] = useState('');
+    const [bucketType, setBucketType] = useState('');
     const [s3ConnectorType, setS3ConnectorType] = useState('');
     const [configuration, setConfiguration] = useState<Record<string, string>>({});
     const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
         open: false,
         message: '',
@@ -88,6 +98,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         } else {
             setName('');
             setType('');
+            setBucketType('');
             setConfiguration({});
             setActiveStep(0);
         }
@@ -150,6 +161,38 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const handleInfoClose = () => {
         setInfoAnchorEl(null);
     };
+
+    const renderS3BucketTypeSelection = () => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {S3_BUCKET_TYPES.map((bucketType) => (
+                <Box
+                    key={bucketType.value}
+                    onClick={() => {
+                        setBucketType(bucketType.value);
+                        handleNext();
+                    }}
+                    sx={{
+                        p: 3,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                            borderColor: theme.palette.primary.main,
+                            backgroundColor: `${theme.palette.primary.main}08`,
+                        },
+                    }}
+                >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                        {bucketType.label}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {bucketType.description}
+                    </Typography>
+                </Box>
+            ))}
+        </Box>
+    );
 
     const renderS3Configuration = () => (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -273,45 +316,77 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                             ))}
                         </Select>
                     </FormControl>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                        <FormControl fullWidth required>
-                            <InputLabel>S3 Bucket</InputLabel>
-                            <Select
-                                value={configuration.bucket || ''}
-                                label="S3 Bucket"
-                                onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                    {bucketType === 'existing' && (
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                            <FormControl fullWidth required>
+                                <InputLabel>S3 Bucket</InputLabel>
+                                <Select
+                                    value={configuration.bucket || ''}
+                                    label="S3 Bucket"
+                                    onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                                    disabled={isLoadingBuckets}
+                                    startAdornment={
+                                        isLoadingBuckets ? (
+                                            <CircularProgress size={20} sx={{ ml: 1 }} />
+                                        ) : null
+                                    }
+                                >
+                                    {buckets.map((bucket) => (
+                                        <MenuItem key={bucket} value={bucket}>
+                                            {bucket}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <IconButton
+                                onClick={() => refetchBuckets()}
                                 disabled={isLoadingBuckets}
-                                startAdornment={
-                                    isLoadingBuckets ? (
-                                        <CircularProgress size={20} sx={{ ml: 1 }} />
-                                    ) : null
-                                }
+                                sx={{ mt: 1 }}
                             >
-                                {buckets.map((bucket) => (
-                                    <MenuItem key={bucket} value={bucket}>
-                                        {bucket}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <IconButton
-                            onClick={() => refetchBuckets()}
-                            disabled={isLoadingBuckets}
-                            sx={{ mt: 1 }}
-                        >
-                            {isLoadingBuckets ? (
-                                <CircularProgress size={24} />
-                            ) : (
-                                <RefreshIcon />
-                            )}
-                        </IconButton>
-                    </Box>
+                                {isLoadingBuckets ? (
+                                    <CircularProgress size={24} />
+                                ) : (
+                                    <RefreshIcon />
+                                )}
+                            </IconButton>
+                        </Box>
+                    )}
+                    {bucketType === 'new' && (
+                        <TextField
+                            label="New Bucket Name"
+                            value={configuration.bucket || ''}
+                            onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                            fullWidth
+                            required
+                            helperText="Bucket name must be unique across all AWS accounts"
+                        />
+                    )}
                 </>
             )}
+
+            <Button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                startIcon={showAdvanced ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ alignSelf: 'flex-start', mt: 1 }}
+            >
+                Advanced configuration
+            </Button>
+
+            <Collapse in={showAdvanced}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    <TextField
+                        label="Object Prefix"
+                        value={configuration.objectPrefix || ''}
+                        onChange={(e) => setConfiguration({ ...configuration, objectPrefix: e.target.value })}
+                        fullWidth
+                        helperText="Optional prefix to filter objects (e.g., 'folder/')"
+                    />
+                </Box>
+            </Collapse>
         </Box>
     );
 
-    const steps = ['Select Type', 'Configuration'];
+    const steps = ['Select Type', 'Select S3 Type', 'Configuration'];
 
     const renderStepContent = (step: number) => {
         switch (step) {
@@ -359,6 +434,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     </Box>
                 );
             case 1:
+                return type === 's3' ? renderS3BucketTypeSelection() : null;
+            case 2:
                 return type === 's3' ? renderS3Configuration() : null;
             default:
                 return null;
@@ -443,7 +520,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         <Button
                             variant="contained"
                             onClick={handleNext}
-                            disabled={!type || isCreating}
+                            disabled={!type || (activeStep === 1 && !bucketType) || isCreating}
                         >
                             Next
                         </Button>
@@ -492,3 +569,4 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 };
 
 export default ConnectorModal;
+

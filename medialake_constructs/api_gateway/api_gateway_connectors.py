@@ -198,11 +198,11 @@ class ConnectorsConstruct(Construct):
             code_path=["lambdas", "ingest", "s3"],
         )
 
-        self.dynamo_table = DynamoDB(
+        self.connectors_table = DynamoDB(
             self,
             "ConnectorsTable",
             props=DynamoDBProps(
-                name=f"medialake_connector_table_{constructor_id}",
+                name=f"{config.resource_prefix}_connector_table_{constructor_id}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
@@ -218,18 +218,18 @@ class ConnectorsConstruct(Construct):
             self,
             "ConnectorsGetLambda",
             config=LambdaConfig(
-                name="connectors_get_lambda",
+                name=f"{config.resource_prefix}_connectors_get_lambda",
                 entry="lambdas/api/connectors/get_connectors",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                 },
             ),
         )
 
-        self.dynamo_table.table.grant_read_data(connectors_get_lambda.function)
+        self.connectors_table.table.grant_read_data(connectors_get_lambda.function)
 
         connectors_resource.add_method(
             "GET",
@@ -249,12 +249,14 @@ class ConnectorsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                 },
             ),
         )
 
-        self.dynamo_table.table.grant_read_write_data(connectors_del_lambda.function)
+        self.connectors_table.table.grant_read_write_data(
+            connectors_del_lambda.function
+        )
 
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -348,7 +350,7 @@ class ConnectorsConstruct(Construct):
                 # iam_role_boundary_policy=lambda_iam_boundry_policy,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                     "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
                     "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                     "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
@@ -356,11 +358,11 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
                     "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+                    "RESOURCE_PREFIX": config.resource_prefix,
+                    "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
                 },
             ),
         )
-
-        # props.resource_table.grant_read_write_data(connector_s3_post_lambda.function)
 
         if props.iac_assets_bucket.bucket.encryption_key:
             connector_s3_post_lambda.function.add_to_role_policy(
@@ -414,9 +416,14 @@ class ConnectorsConstruct(Construct):
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
                     "s3:PutBucketNotification",
                     "s3:GetBucketNotification",
                     "s3:DeleteBucketNotification",
+                    "s3:GetBucketEncryption",
+                    "s3:GetBucketPolicy",
+                    "s3:GetEncryptionConfiguration",
                 ],
                 resources=["arn:aws:s3:::*"],
             )
@@ -458,31 +465,20 @@ class ConnectorsConstruct(Construct):
                     "dynamodb:DeleteItem",
                     "dynamodb:Scan",
                 ],
-                resources=[self.dynamo_table.table_arn],
+                resources=[self.connectors_table.table_arn],
             )
         )
-
-        # Policy for S3 actions
+        # Policy for SNS actions
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                    "s3:PutBucketNotification",
-                ],
-                resources=["arn:aws:s3:::*"],
-            )
-        )
-
-        # Policy for SQS actions
-        connector_s3_post_lambda.function.role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "sqs:CreateQueue",
                     "sns:CreateTopic",
+                    "sns:DeleteTopic",
+                    "sns:GetTopicAttributes",
+                    "sns:SetTopicAttributes",
+                    "sns:Publish",
                 ],
                 resources=[
-                    f"arn:aws:sqs:*:{account_id}:*",
                     f"arn:aws:sns:*:{account_id}:*",
                 ],
             )
@@ -549,12 +545,12 @@ class ConnectorsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "MEDIALAKE_CONNECTOR_TABLE": self.dynamo_table.table_arn,
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                 },
             ),
         )
 
-        self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
+        self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
         s3_explorer_get_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -563,6 +559,8 @@ class ConnectorsConstruct(Construct):
                     "s3:ListBucketVersions",
                     "s3:GetObject",
                     "s3:ListBucketMultipartUploads",
+                    "s3:GetBucketEncryption",
+                    "s3:GetBucketPolicy",
                 ],
                 resources=[
                     "arn:aws:s3:::*",
@@ -585,9 +583,9 @@ class ConnectorsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        self.dynamo_table.table.grant_read_data(s3_explorer_get_lambda.function)
+        self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
 
     @property
     def connector_table(self) -> dynamodb.TableV2:
 
-        return self.dynamo_table.table
+        return self.connectors_table.table

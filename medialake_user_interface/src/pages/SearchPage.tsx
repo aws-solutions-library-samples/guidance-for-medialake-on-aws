@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, IconButton, Collapse, LinearProgress } from '@mui/material';
+import { Box, Typography, List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, Collapse, LinearProgress, Paper } from '@mui/material';
+import { Button } from '@/components/common';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import VideoResults from '../components/search/VideoResults';
-import ImageResults from '../components/search/ImageResults';
-import AudioResults from '../components/search/AudioResults';
+import SearchOffIcon from '@mui/icons-material/SearchOff';
+import VideoResults from '@/components/search/VideoResults';
+import ImageResults from '@/components/search/ImageResults';
+import AudioResults from '@/components/search/AudioResults';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
-import { useSearch } from '../api/hooks/useSearch';
+import { useSearch } from '@/api/hooks/useSearch';
 import MenuIcon from '@mui/icons-material/Menu';
 
 interface LocationState {
@@ -174,7 +176,7 @@ const SearchPage: React.FC = () => {
                     </List>
                 </Collapse>
             )}
-            <Divider />
+            {filterBarExpanded && <Divider />}
         </>
     );
 
@@ -182,7 +184,7 @@ const SearchPage: React.FC = () => {
         <Box sx={{
             display: 'flex',
             minHeight: '100vh',
-            bgcolor: 'background.paper'
+            bgcolor: '#fff'
         }}>
             {isFetching && (
                 <LinearProgress
@@ -205,6 +207,50 @@ const SearchPage: React.FC = () => {
                 flexDirection: 'column',
                 gap: 6
             }}>
+                {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minHeight: '50vh',
+                            textAlign: 'center',
+                            gap: 2
+                        }}
+                    >
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 4,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                bgcolor: '#fff',
+                                borderRadius: 2
+                            }}
+                        >
+                            <SearchOffIcon
+                                sx={{
+                                    fontSize: 64,
+                                    color: 'text.secondary',
+                                    mb: 2
+                                }}
+                            />
+                            <Typography variant="h5" color="text.primary" gutterBottom>
+                                No results found
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary">
+                                We couldn't find any matches for "{currentQuery}"
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                Try adjusting your search or filters to find what you're looking for
+                            </Typography>
+                        </Paper>
+                    </Box>
+                )}
+
                 {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
                     <ImageResults
                         images={imageResults}
@@ -212,9 +258,6 @@ const SearchPage: React.FC = () => {
                             totalResults: searchResults.data.searchMetadata.totalResults || 0,
                             page: currentPage,
                             pageSize: PAGE_SIZE,
-                            // searchTerm: currentQuery,
-                            // facets: searchResults.data.searchMetadata.facets || {},
-                            // suggestions: searchResults.data.searchMetadata.suggestions || [],
                         }}
                         onPageChange={(newPage) => handleSearch({ page: newPage })}
                     />
@@ -232,7 +275,7 @@ const SearchPage: React.FC = () => {
                     duration: theme.transitions.duration.enteringScreen,
                 }),
                 overflowX: 'hidden',
-                bgcolor: 'background.default',
+                bgcolor: '#fff',
                 position: 'fixed',
                 top: 64,
                 right: 0,
@@ -247,17 +290,21 @@ const SearchPage: React.FC = () => {
                     px: 1,
                     py: 2
                 }}>
-                    <IconButton
+                    <Button
+                        variant="text"
                         onClick={() => setFilterBarExpanded(!filterBarExpanded)}
-                        sx={{
-                            transform: filterBarExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
-                            transition: theme => theme.transitions.create('transform', {
-                                duration: theme.transitions.duration.shortest,
-                            }),
-                        }}
-                    >
-                        <ChevronRightIcon />
-                    </IconButton>
+                        startIcon={
+                            <ChevronRightIcon
+                                sx={{
+                                    transform: filterBarExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
+                                    transition: theme => theme.transitions.create('transform', {
+                                        duration: theme.transitions.duration.shortest,
+                                    }),
+                                }}
+                            />
+                        }
+                        sx={{ minWidth: 'unset', width: '40px', p: 0 }}
+                    />
                 </Box>
 
                 <List component="nav" sx={{ width: '100%' }}>

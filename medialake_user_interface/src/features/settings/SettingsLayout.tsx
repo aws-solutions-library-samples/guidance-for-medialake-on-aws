@@ -8,7 +8,7 @@ import RoleManagement from '../../pages/settings/RoleManagement';
 
 const SettingsComponent: React.FC = () => {
     return (
-        <Box sx={{ maxWidth: 1200, margin: '0 auto' }}>
+        <Box sx={{ width: '100%', maxWidth: 1400, margin: '0 auto', px: 3 }}>
             <Routes>
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="connectors" element={<ConnectorsPage />} />

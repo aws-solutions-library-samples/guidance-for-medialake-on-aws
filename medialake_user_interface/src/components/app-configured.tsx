@@ -258,10 +258,7 @@ const AuthPage = () => {
                                 if (token) {
                                     StorageHelper.setToken(token);
                                     setIsAuthenticated(true);
-
-                                    setTimeout(() => {
-                                        navigate('/');
-                                    }, 100);
+                                    navigate('/');
                                 }
 
                                 return {
@@ -293,7 +290,15 @@ const AppLayout = () => {
         <Box sx={{ display: 'flex' }}>
             <TopBar />
             <Sidebar />
-            <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+            <Box component="main" sx={{
+                flexGrow: 1,
+                mt: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                minWidth: 0, // Important for proper flex behavior
+                height: 'calc(100vh - 64px)', // 64px is the TopBar height
+                overflow: 'hidden'
+            }}>
                 <Outlet />
             </Box>
         </Box>
