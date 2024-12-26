@@ -34,13 +34,22 @@ import {
     getPaginationRowModel,
     flexRender,
     ColumnDef,
+    FilterFn,
 } from '@tanstack/react-table';
 import { usePipelineExecutions } from '../api/hooks/usePipelinesExecutions';
 import type { PipelineExecution } from '../api/types/pipelineExecutions.types';
 
 const PAGE_SIZE = 20;
 
-const ExecutionsPage: React.FC = () => {
+const containsFilter: FilterFn<any> = (row, columnId, value) => {
+    const cellValue = row.getValue(columnId);
+    if (cellValue == null) return false;
+    return String(cellValue)
+        .toLowerCase()
+        .includes(String(value).toLowerCase());
+};
+
+const ExecutionStatusPage: React.FC = () => {
     const theme = useTheme();
     const [filters, setFilters] = useState({
         status: '',
@@ -192,6 +201,9 @@ const ExecutionsPage: React.FC = () => {
     const table = useReactTable({
         data: executions,
         columns,
+        filterFns: {
+            contains: containsFilter,
+        },
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -216,10 +228,10 @@ const ExecutionsPage: React.FC = () => {
                             WebkitBackgroundClip: 'text',
                             color: 'transparent',
                         }}>
-                            Pipeline Executions
+                            Pipeline Execution Status
                         </Typography>
                         <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                            Monitor and manage your pipeline executions
+                            Monitor and manage your pipeline execution status
                         </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -406,4 +418,4 @@ const ExecutionsPage: React.FC = () => {
     );
 };
 
-export default ExecutionsPage;
+export default ExecutionStatusPage;

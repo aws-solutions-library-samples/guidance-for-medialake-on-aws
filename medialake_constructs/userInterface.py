@@ -113,7 +113,6 @@ class UIConstructProps:
 
 
 class UIConstruct(Construct):
-
     def __init__(
         self,
         scope: Construct,
@@ -124,60 +123,7 @@ class UIConstruct(Construct):
         super().__init__(scope, construct_id, **kwargs)
 
         stack = Stack.of(self)
-
-        # Use provided props or create default props
-        # props = props or UIConstructProps()
-
-        # if (
-        #     Token.is_unresolved(props.cognito_user_pool_id)
-        #     or Token.is_unresolved(props.cognito_user_pool_client_id)
-        #     or Token.is_unresolved(props.cognito_identity_pool)
-        # ):
-        #     raise ValueError(
-        #         "Cognito values must be resolved before using in S3 deployment"
-        #     )
-
-        # get_cognito_values = cr.AwsCustomResource(
-        #     self,
-        #     "GetCognitoValues",
-        #     on_create=cr.AwsSdkCall(
-        #         service="SSM",
-        #         action="putParameter",
-        #         parameters={
-        #             "Name": "/medialake/cognito/values",
-        #             "Value": json.dumps(
-        #                 {
-        #                     "userPoolId": props.cognito_user_pool_id,
-        #                     "userPoolClientId": props.cognito_user_pool_client_id,
-        #                     "identityPoolId": props.cognito_identity_pool,
-        #                 }
-        #             ),
-        #             "Type": "String",
-        #         },
-        #         physical_resource_id=cr.PhysicalResourceId.of("CognitoValues"),
-        #     ),
-        #     policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
-        #         resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
-        #     ),
-        # )
-
         build_path = os.path.join(props.app_path, "dist")
-
-        # S3 Bucket for hosting the UI
-        # medialake_ui_s3_bucket = s3.Bucket(
-        #     self,
-        #     "MediaLakeUserInterfaceBucket",
-        #     bucket_name=f"{config.global_prefix}-user-interface-{config.account_id}-{config.environment}",
-        #     removal_policy=props.removal_policy,
-        #     block_public_access=props.block_public_access,
-        #     auto_delete_objects=props.auto_delete_objects,
-        #     website_index_document=props.website_index_document,
-        #     website_error_document=props.website_error_document,
-        #     versioned=True,
-        #     enforce_ssl=True,
-        #     server_access_logs_bucket=props.access_log_bucket,
-        #     server_access_logs_prefix=f"{config.global_prefix}-user-interface-s3-access-logs",
-        # )
 
         medialake_ui_s3_bucket = S3Bucket(
             self,
@@ -186,25 +132,8 @@ class UIConstruct(Construct):
                 bucket_name=f"{config.global_prefix}-user-interface-{config.account_id}-{config.environment}",
                 website_index_document=props.website_index_document,
                 website_error_document=props.website_error_document,
-                # access_logs_bucket=props.access_log_bucket,
             ),
         )
-
-        # props.access_log_bucket.add_to_resource_policy(
-        #     iam.PolicyStatement(
-        #         effect=iam.Effect.ALLOW,
-        #         actions=["s3:PutObject"],
-        #         resources=[
-        #             props.access_log_bucket.bucket_arn,
-        #             f"{props.access_log_bucket.bucket_arn}/*",
-        #         ],
-        #         principals=[iam.ServicePrincipal("logging.s3.amazonaws.com")],
-        #         conditions={
-        #             "StringEquals": {"aws:SourceAccount": stack.account},
-        #             "ArnLike": {"aws:SourceArn": medialake_ui_s3_bucket.bucket_arn},
-        #         },
-        #     )
-        # )
 
         x_origin_verify_secret = secretsmanager.Secret(
             self,
@@ -443,6 +372,21 @@ class UIConstruct(Construct):
             ),
         )
 
+        # Create a custom cache policy for static assets
+        static_assets_cache_policy = cloudfront.CachePolicy(
+            self,
+            "StaticAssetsCachePolicy",
+            comment="Cache policy for static assets (JS, CSS, images)",
+            default_ttl=Duration.days(1),
+            min_ttl=Duration.minutes(1),
+            max_ttl=Duration.days(365),
+            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+            header_behavior=cloudfront.CacheHeaderBehavior.none(),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+            enable_accept_encoding_gzip=True,
+            enable_accept_encoding_brotli=True,
+        )
+
         self.cloudfront_distribution = cloudfront.Distribution(
             self,
             "MediaLakeDistrubtion",
@@ -453,11 +397,37 @@ class UIConstruct(Construct):
                 ),
                 response_headers_policy=ui_response_headers_policy,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
-                cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                cache_policy=static_assets_cache_policy,
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                compress=True,
             ),
             additional_behaviors={
+                "*.js": cloudfront.BehaviorOptions(
+                    origin=origins.S3BucketOrigin.with_origin_access_control(
+                        medialake_ui_s3_bucket.bucket,
+                    ),
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                    cache_policy=static_assets_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                    response_headers_policy=ui_response_headers_policy,
+                    compress=True,
+                ),
+                "*.css": cloudfront.BehaviorOptions(
+                    origin=origins.S3BucketOrigin.with_origin_access_control(
+                        medialake_ui_s3_bucket.bucket,
+                    ),
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                    cache_policy=static_assets_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                    response_headers_policy=ui_response_headers_policy,
+                    compress=True,
+                ),
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
@@ -469,7 +439,6 @@ class UIConstruct(Construct):
                         "APIBehaviorCachePolicy",
                         default_ttl=Duration.seconds(0),
                     ),
-                    # cache_behavior=cloudfront.CachePolicy
                     response_headers_policy=api_response_headers_policy,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
@@ -489,7 +458,13 @@ class UIConstruct(Construct):
                     response_http_status=200,
                     response_page_path="/index.html",
                     ttl=Duration.minutes(0),
-                )
+                ),
+                cloudfront.ErrorResponse(
+                    http_status=404,
+                    response_http_status=200,
+                    response_page_path="/index.html",
+                    ttl=Duration.minutes(0),
+                ),
             ],
         )
 
@@ -532,6 +507,7 @@ class UIConstruct(Construct):
             destination_bucket=medialake_ui_s3_bucket.bucket,
             distribution=self.cloudfront_distribution,
             distribution_paths=["/*"],
+            memory_limit=1024,
         )
 
     @property

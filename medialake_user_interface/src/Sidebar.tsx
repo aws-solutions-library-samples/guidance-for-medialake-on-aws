@@ -217,13 +217,13 @@ function Sidebar() {
                                                     onClick={() => handleNavigation(subItem.path)}
                                                     sx={{
                                                         pl: 6,
-                                                        backgroundColor: isSettingsActive(subItem.text.toLowerCase())
+                                                        backgroundColor: isSettingsActive(subItem.path)
                                                             ? `${theme.palette.primary.main}08`
                                                             : 'transparent',
                                                         '&:hover': {
                                                             backgroundColor: `${theme.palette.primary.main}15`,
                                                         },
-                                                        borderRight: isSettingsActive(subItem.text.toLowerCase())
+                                                        borderRight: isSettingsActive(subItem.path)
                                                             ? `3px solid ${theme.palette.primary.main}`
                                                             : 'none',
                                                         mx: 1,
@@ -231,7 +231,7 @@ function Sidebar() {
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{
-                                                        color: getIconColor(isSettingsActive(subItem.text.toLowerCase())),
+                                                        color: getIconColor(isSettingsActive(subItem.path)),
                                                         minWidth: '40px'
                                                     }}>
                                                         {subItem.icon}
@@ -241,8 +241,8 @@ function Sidebar() {
                                                             <Typography
                                                                 variant="body2"
                                                                 sx={{
-                                                                    fontWeight: isSettingsActive(subItem.text.toLowerCase()) ? 600 : 400,
-                                                                    color: isSettingsActive(subItem.text.toLowerCase())
+                                                                    fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
+                                                                    color: isSettingsActive(subItem.path)
                                                                         ? theme.palette.primary.main
                                                                         : customTheme === 'dark' ? 'white' : theme.palette.text.primary
                                                                 }}

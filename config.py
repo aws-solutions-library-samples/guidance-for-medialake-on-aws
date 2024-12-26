@@ -75,6 +75,7 @@ class CDKConfig(BaseModel):
     environment: str
     global_prefix: str
     resource_prefix: str
+    resource_application_tag: str
     api_path: str
     initial_user_email: str
     initial_user: UserConfig

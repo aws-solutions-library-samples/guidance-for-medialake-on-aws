@@ -12,10 +12,10 @@ import {
     useTheme as useMuiTheme,
     InputBase,
     Chip,
-    Button,
     Theme,
     SxProps,
 } from '@mui/material';
+import { Button } from '@/components/common';
 import {
     Search as SearchIcon,
     Brightness4 as DarkModeIcon,
@@ -276,15 +276,7 @@ function TopBar() {
                     <Button
                         variant="contained"
                         onClick={handleSearchSubmit}
-                        sx={{
-                            minWidth: 'unset',
-                            px: 3,
-                            py: 1,
-                            backgroundColor: muiTheme.palette.primary.main,
-                            '&:hover': {
-                                backgroundColor: muiTheme.palette.primary.dark,
-                            },
-                        }}
+                        sx={{ minWidth: '80px' }}
                     >
                         {t('common.search')}
                     </Button>

@@ -69,21 +69,17 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     };
 
     const getConnectorIcon = (type: string) => {
-        switch (type) {
-            case 's3':
-                return <CloudUploadIcon sx={{ color: '#FF9900' }} />;
-            default:
-                return null;
+        if (type === 's3') {
+            return <CloudUploadIcon sx={{ color: '#FF9900' }} />;
         }
+        return null;
     };
 
     const getConnectorTypeLabel = (type: string) => {
-        switch (type) {
-            case 's3':
-                return 'Amazon S3';
-            default:
-                return type;
+        if (type === 's3') {
+            return 'Amazon S3';
         }
+        return type;
     };
 
     const formatDate = (dateString: string) => {

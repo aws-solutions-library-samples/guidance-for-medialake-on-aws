@@ -68,7 +68,7 @@ cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 
-cdk.Tags.of(app).add("Application", "MediaLake")
+cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
 # Add AWS Solutions checks to the entire app
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())

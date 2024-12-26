@@ -21,7 +21,7 @@ fetch('/aws-exports.json')
       API: awsConfig.API
     });
 
-    ReactDOM.createRoot(document.getElementById('root')!).render(
+    ReactDOM.createRoot(document.getElementById('root')).render(
       <React.StrictMode>
         <Suspense fallback="Loading...">
           <AppConfigured />

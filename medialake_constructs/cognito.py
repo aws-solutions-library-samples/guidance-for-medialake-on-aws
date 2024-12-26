@@ -1,19 +1,12 @@
-import secrets
-import string
 from dataclasses import dataclass
 from constructs import Construct
 from typing import Optional
 from aws_cdk import (
     aws_cognito as cognito,
-    aws_iam as iam,
     aws_dynamodb as dynamodb,
     RemovalPolicy,
-    custom_resources as cr,
     CfnOutput,
-    Duration,
-    Fn,
 )
-from config import config
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
     UserPoolAuthenticationProvider,
@@ -21,6 +14,7 @@ from aws_cdk.aws_cognito_identitypool_alpha import (
 )
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from config import config
 
 
 @dataclass
@@ -34,12 +28,6 @@ class CognitoProps:
     user_password: bool = True
     user_srp: bool = True
     removal_policy: RemovalPolicy = RemovalPolicy.DESTROY
-
-
-def generate_random_password(length=16):
-    alphabet = string.ascii_letters + string.digits + string.punctuation
-    password = "".join(secrets.choice(alphabet) for _ in range(length))
-    return password
 
 
 class CognitoConstruct(Construct):
@@ -72,51 +60,77 @@ class CognitoConstruct(Construct):
             ),
         )
 
-        # Create User Pool
-        self._user_pool = cognito.UserPool(
+        # Create User Pool using L1 construct for more control
+        cfn_user_pool = cognito.CfnUserPool(
             self,
             "MediaLakeUserPool",
-            removal_policy=self.props.removal_policy,
-            self_sign_up_enabled=self.props.self_sign_up_enabled,
-            advanced_security_mode=cognito.AdvancedSecurityMode.ENFORCED,
-            auto_verify=cognito.AutoVerifiedAttrs(
-                email=self.props.auto_verify_email, phone=self.props.auto_verify_phone
+            admin_create_user_config=cognito.CfnUserPool.AdminCreateUserConfigProperty(
+                allow_admin_create_user_only=not self.props.self_sign_up_enabled,
+                invite_message_template=cognito.CfnUserPool.InviteMessageTemplateProperty(
+                    email_message="""
+                    <html>
+                    <body>
+                        <p>Hello,</p>
+                        <p>Welcome to MediaLake! Your account has been created successfully.</p>
+                        <p><strong>Your login credentials:</strong><br/>
+                        Username: {username}<br/>
+                        Temporary Password: {####}</p>
+                        <p><strong>To get started:</strong></p>
+                        <ol>
+                            <li>Sign in at the MediaLake portal</li>
+                            <li>Sign in with your credentials</li>
+                            <li>You'll be prompted to create a new password on your first login</li>
+                        </ol>
+                        <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
+                        <p>If you need assistance, please contact your MediaLake administrator.</p>
+                        <p>Best regards,<br/>
+                        The MediaLake Team</p>
+                    </body>
+                    </html>
+                    """,
+                    email_subject="Welcome to MediaLake",
+                ),
             ),
-            sign_in_aliases=cognito.SignInAliases(email=self.props.sign_in_with_email),
-            lambda_triggers=cognito.UserPoolTriggers(
-                post_confirmation=self._cognito_trigger_lambda.function,
-            ),
-            password_policy=cognito.PasswordPolicy(
-                min_length=8,
-                require_lowercase=True,
-                require_uppercase=True,
-                require_digits=True,
-                require_symbols=True,
-                temp_password_validity=Duration.days(7),
-            ),
-            user_invitation=cognito.UserInvitationConfig(
-                email_subject="Welcome to MediaLake",
-                email_body="""
+            auto_verified_attributes=["email"] if self.props.auto_verify_email else [],
+            username_attributes=["email"] if self.props.sign_in_with_email else None,
+            verification_message_template=cognito.CfnUserPool.VerificationMessageTemplateProperty(
+                default_email_option="CONFIRM_WITH_LINK",
+                email_message_by_link="""
                 <html>
                 <body>
                     <p>Hello,</p>
-                    <p>Welcome to MediaLake! Your account has been created successfully.</p>
-                    <p><strong>Your login credentials:</strong><br/>
-                    Username: {username}<br/>
-                    Temporary Password: {####}</p>
-                    <p><strong>To get started:</strong></p>
-                    <ol>
-                        <li>Sign in with your credentials</li>
-                        <li>You'll be prompted to create a new password on your first login</li>
-                    </ol>
-                    <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
-                    <p>If you need assistance, please contact your MediaLake administrator.</p>
+                    <p>You have requested to reset your MediaLake password.</p>
+                    <p>Click the link below to set a new password:</p>
+                    <p>{##Click here to reset your password##}</p>
+                    <p>If you did not request this password reset, please ignore this email.</p>
                     <p>Best regards,<br/>
                     The MediaLake Team</p>
                 </body>
                 </html>
-            """,
+                """,
+                email_subject_by_link="Reset your MediaLake password",
             ),
+            policies=cognito.CfnUserPool.PoliciesProperty(
+                password_policy=cognito.CfnUserPool.PasswordPolicyProperty(
+                    minimum_length=8,
+                    require_lowercase=True,
+                    require_numbers=True,
+                    require_symbols=True,
+                    require_uppercase=True,
+                    temporary_password_validity_days=7,
+                )
+            ),
+            lambda_config=cognito.CfnUserPool.LambdaConfigProperty(
+                post_confirmation=self._cognito_trigger_lambda.function.function_arn
+            ),
+            user_pool_add_ons=cognito.CfnUserPool.UserPoolAddOnsProperty(
+                advanced_security_mode="ENFORCED"
+            ),
+        )
+
+        # Create L2 construct from L1
+        self._user_pool = cognito.UserPool.from_user_pool_id(
+            self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
         # Create User Pool Client
@@ -143,41 +157,6 @@ class CognitoConstruct(Construct):
                 ],
             ),
         )
-
-        random_password = generate_random_password()
-
-        # Create default admin user
-        create_user_handler = cr.AwsCustomResource(
-            self,
-            "CreateUserHandler",
-            on_create=cr.AwsSdkCall(
-                service="CognitoIdentityServiceProvider",
-                action="adminCreateUser",
-                parameters={
-                    "UserPoolId": self._user_pool.user_pool_id,
-                    "Username": config.initial_user_email,
-                    "TemporaryPassword": random_password,
-                    "UserAttributes": [
-                        {"Name": "email", "Value": config.initial_user.email},
-                        {"Name": "name", "Value": config.initial_user.first_name},
-                        {"Name": "family_name", "Value": config.initial_user.last_name},
-                        {"Name": "email_verified", "Value": "true"},
-                    ],
-                },
-                physical_resource_id=cr.PhysicalResourceId.of("CreateUserHandler"),
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_statements(
-                [
-                    iam.PolicyStatement(
-                        actions=["cognito-idp:AdminCreateUser"],
-                        resources=[self._user_pool.user_pool_arn],
-                    )
-                ]
-            ),
-        )
-
-        # Add dependency
-        create_user_handler.node.add_dependency(self._user_pool)
 
         self.client_id = CfnOutput(
             self,

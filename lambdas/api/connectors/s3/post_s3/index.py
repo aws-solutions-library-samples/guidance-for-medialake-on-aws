@@ -286,6 +286,63 @@ def check_existing_connector(s3_bucket: str) -> dict | None:
         raise
 
 
+def get_bucket_kms_key(s3_client, bucket_name):
+    try:
+        encryption = s3_client.get_bucket_encryption(Bucket=bucket_name)
+        rules = encryption["ServerSideEncryptionConfiguration"]["Rules"]
+        for rule in rules:
+            if rule["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "aws:kms":
+                return rule["ApplyServerSideEncryptionByDefault"]["KMSMasterKeyID"]
+    except s3_client.exceptions.ClientError as e:
+        logger.error(f"Failed to get bucket encryption: {str(e)}")
+        return None
+
+
+def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
+    assume_role_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"Service": "lambda.amazonaws.com"},
+                "Action": "sts:AssumeRole",
+            }
+        ],
+    }
+    role = iam_client.create_role(
+        RoleName=role_name, AssumeRolePolicyDocument=json.dumps(assume_role_policy)
+    )
+    # Attach the basic execution role policy
+    iam_client.attach_role_policy(
+        RoleName=role_name,
+        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    )
+    if kms_key_arn:
+        # Create and attach a policy for the KMS key
+        kms_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "kms:Encrypt",
+                        "kms:Decrypt",
+                        "kms:ReEncrypt*",
+                        "kms:GenerateDataKey*",
+                        "kms:DescribeKey",
+                    ],
+                    "Resource": kms_key_arn,
+                }
+            ],
+        }
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-kms-policy",
+            PolicyDocument=json.dumps(kms_policy),
+        )
+    return role["Role"]["Arn"]
+
+
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
     created_resources = []
@@ -325,8 +382,15 @@ def create_connector(createconnector: S3Connector) -> dict:
         suffix = generate_suffix()
 
         # Create resource specific name prefix
-        resource_name_prefix = f"medialake_connector_{s3_bucket}"
-        target_function_name = f"medialake_connector_{s3_bucket}_{suffix}"
+        resource_name_prefix = (
+            f"{os.environ.get('RESOURCE_PREFIX')}_connector_{s3_bucket}"
+        )
+        # Ensure the total length does not exceed 64 characters
+        max_prefix_length = 64 - len(suffix) - 1
+        if len(resource_name_prefix) > max_prefix_length:
+            resource_name_prefix = resource_name_prefix[:max_prefix_length]
+
+        target_function_name = f"{resource_name_prefix}_{suffix}"
 
         # Validate S3 bucket exists and get its region
         try:
@@ -433,22 +497,10 @@ def create_connector(createconnector: S3Connector) -> dict:
 
             # Create Lambda execution, IAM roles for Lambda
             role_name = f"{resource_name_prefix}-role"
-            assume_role_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"Service": "lambda.amazonaws.com"},
-                        "Action": "sts:AssumeRole",
-                    }
-                ],
-            }
-            create_role_response = iam_client.create_role(
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-                Tags=[{"Key": "medialake", "Value": medialake_tag}],
+            bucket_kms_key = get_bucket_kms_key(s3_client, s3_bucket)
+            lambda_role_arn = create_lambda_iam_role(
+                iam_client, role_name, bucket_kms_key
             )
-            lambda_role_arn = create_role_response["Role"]["Arn"]
             created_resources.append(("iam_role", role_name))
 
             # Wait for role to be available

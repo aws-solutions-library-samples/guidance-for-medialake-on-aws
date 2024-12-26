@@ -37,12 +37,21 @@ import {
     getSortedRowModel,
     flexRender,
     ColumnDef,
+    FilterFn,
 } from '@tanstack/react-table';
 import { usePipelineExecutions } from '../api/hooks/usePipelinesExecutions';
 import type { PipelineExecution } from '../api/types/pipelineExecutions.types';
 import { useTimezone } from '../contexts/TimezoneContext';
 
 const PAGE_SIZE = 20;
+
+const containsFilter: FilterFn<any> = (row, columnId, value) => {
+    const cellValue = row.getValue(columnId);
+    if (cellValue == null) return false;
+    return String(cellValue)
+        .toLowerCase()
+        .includes(String(value).toLowerCase());
+};
 
 const ExecutionsPage: React.FC = () => {
     const { t } = useTranslation();
@@ -241,6 +250,9 @@ const ExecutionsPage: React.FC = () => {
     const table = useReactTable({
         data: executions,
         columns,
+        filterFns: {
+            contains: containsFilter,
+        },
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
