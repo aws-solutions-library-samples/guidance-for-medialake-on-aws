@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
+import { useSidebar } from './contexts/SidebarContext';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 72;
@@ -41,7 +42,7 @@ function Sidebar() {
     const location = useLocation();
     const navigate = useNavigate();
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const { isCollapsed, setIsCollapsed } = useSidebar();
 
     const isActive = (path: string) => location.pathname === path;
     const isSettingsActive = (path: string) => location.pathname.includes(path);

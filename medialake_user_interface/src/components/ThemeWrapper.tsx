@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo } from 'react';
-import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
+// components/ThemeWrapper.tsx
+import React, { useMemo } from 'react';
+import { ThemeProvider as MuiThemeProvider, createTheme, Theme as MuiTheme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { useTheme } from '../hooks/useTheme';
-import '../styles/theme.css';
 
 export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { theme } = useTheme();
@@ -19,6 +20,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                     primary: 'rgba(255, 255, 255, 0.87)',
                     secondary: 'rgba(255, 255, 255, 0.6)',
                 },
+                divider: 'rgba(255, 255, 255, 0.12)',
             } : {
                 background: {
                     default: '#f0f2f5',
@@ -28,29 +30,79 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                     primary: 'rgba(0, 0, 0, 0.87)',
                     secondary: 'rgba(0, 0, 0, 0.6)',
                 },
+                divider: 'rgba(0, 0, 0, 0.12)',
             }),
         },
         components: {
             MuiTableCell: {
                 styleOverrides: {
-                    root: {
-                        color: 'inherit',
+                    root: ({ theme: muiTheme }) => ({
+                        backgroundColor: 'transparent',
+                        borderColor: muiTheme.palette.divider,
+                        color: muiTheme.palette.text.primary,
+                    }),
+                    head: {
+                        backgroundColor: '#ffffff !important',
+                        fontWeight: 600,
                     },
                 },
             },
-            MuiChip: {
+            MuiTableRow: {
+                styleOverrides: {
+                    root: ({ theme: muiTheme }) => ({
+                        backgroundColor: '#ffffff',
+                        '&:hover': {
+                            backgroundColor: alpha(
+                                muiTheme.palette.primary.main,
+                                0.05
+                            ),
+                        },
+                        '& .MuiTableCell-root': {
+                            backgroundColor: '#ffffff',
+                        }
+                    }),
+                },
+            },
+            MuiTableContainer: {
                 styleOverrides: {
                     root: {
-                        color: 'inherit',
+                        backgroundColor: '#ffffff',
                     },
+                },
+            },
+            MuiPaper: {
+                styleOverrides: {
+                    root: {
+                        backgroundImage: 'none',
+                        backgroundColor: '#ffffff',
+                    },
+                },
+            },
+            MuiCssBaseline: {
+                styleOverrides: {
+                    body: ({ theme: muiTheme }) => ({
+                        scrollbarColor: theme === 'dark'
+                            ? '#6b6b6b transparent'
+                            : '#959595 transparent',
+                        '&::-webkit-scrollbar': {
+                            width: '8px',
+                            height: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                            background: 'transparent',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                            background: theme === 'dark' ? '#6b6b6b' : '#959595',
+                            borderRadius: '4px',
+                        },
+                        '&::-webkit-scrollbar-thumb:hover': {
+                            background: theme === 'dark' ? '#7b7b7b' : '#858585',
+                        },
+                    }),
                 },
             },
         },
     }), [theme]);
-
-    useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme);
-    }, [theme]);
 
     return (
         <MuiThemeProvider theme={muiTheme}>

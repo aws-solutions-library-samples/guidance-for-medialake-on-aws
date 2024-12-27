@@ -1,3 +1,4 @@
+// ResizableTable.tsx
 import React from 'react';
 import {
     Table,
@@ -46,12 +47,6 @@ export function ResizableTable<T>({
     onRemoveSort,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
-
-    // Calculate total width of all columns
-    const totalWidth = table.getAllColumns().reduce((acc, column) => {
-        return acc + (column.getSize() || 0);
-    }, 0);
-
     const hasActiveTags = activeFilters.length > 0 || activeSorting.length > 0;
 
     return (
@@ -90,38 +85,6 @@ export function ResizableTable<T>({
                             )}
                         </Box>
                     ))}
-                    {activeSorting.map(({ columnId, desc }) => (
-                        <Box
-                            key={`sort-${columnId}`}
-                            sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                px: 2,
-                                py: 0.5,
-                                borderRadius: '16px',
-                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                color: theme.palette.secondary.main,
-                            }}
-                        >
-                            <Box component="span" sx={{ mr: 1 }}>
-                                {`Sorted by: ${columnId} (${desc ? 'desc' : 'asc'})`}
-                            </Box>
-                            {onRemoveSort && (
-                                <Box
-                                    component="span"
-                                    onClick={() => onRemoveSort(columnId)}
-                                    sx={{
-                                        cursor: 'pointer',
-                                        fontSize: '1.2rem',
-                                        lineHeight: 1,
-                                        '&:hover': { opacity: 0.7 }
-                                    }}
-                                >
-                                    ×
-                                </Box>
-                            )}
-                        </Box>
-                    ))}
                 </Box>
             )}
             <Paper
@@ -130,7 +93,6 @@ export function ResizableTable<T>({
                     borderRadius: '12px',
                     border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                     overflow: 'hidden',
-                    backgroundColor: theme.palette.background.paper,
                     display: 'flex',
                     flexDirection: 'column',
                     width: '100%',
@@ -146,7 +108,7 @@ export function ResizableTable<T>({
                         flex: 1,
                         display: 'flex',
                         flexDirection: 'column',
-                        minWidth: 0, // Important for proper flex behavior
+                        minWidth: 0,
                     }}
                 >
                     <Table
@@ -196,6 +158,14 @@ export function ResizableTable<T>({
                                                 backgroundColor: alpha(theme.palette.primary.main, 0.02),
                                             },
                                             transition: 'background-color 0.2s ease',
+                                            '& .MuiTableCell-root': {
+                                                position: 'relative',
+                                                '& .MuiIconButton-root': {
+                                                    position: 'relative',
+                                                    zIndex: 2,
+                                                    pointerEvents: 'auto'
+                                                }
+                                            }
                                         }}
                                     >
                                         {row.getVisibleCells().map(cell => {

@@ -1,4 +1,5 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { SidebarContext } from '../contexts/SidebarContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -286,22 +287,26 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppLayout = () => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+
     return (
-        <Box sx={{ display: 'flex' }}>
-            <TopBar />
-            <Sidebar />
-            <Box component="main" sx={{
-                flexGrow: 1,
-                mt: 8,
-                display: 'flex',
-                flexDirection: 'column',
-                minWidth: 0, // Important for proper flex behavior
-                height: 'calc(100vh - 64px)', // 64px is the TopBar height
-                overflow: 'hidden'
-            }}>
-                <Outlet />
+        <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
+            <Box sx={{ display: 'flex' }}>
+                <TopBar />
+                <Sidebar />
+                <Box component="main" sx={{
+                    flexGrow: 1,
+                    mt: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minWidth: 0, // Important for proper flex behavior
+                    height: 'calc(100vh - 64px)', // 64px is the TopBar height
+                    overflow: 'hidden'
+                }}>
+                    <Outlet />
+                </Box>
             </Box>
-        </Box>
+        </SidebarContext.Provider>
     );
 };
 

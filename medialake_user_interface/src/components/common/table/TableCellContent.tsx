@@ -1,3 +1,4 @@
+// TableCellContent.tsx
 import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
 
@@ -28,7 +29,8 @@ export const TableCellContent: React.FC<TableCellContentProps> = ({
     return (
         <Box sx={{
             width: '100%',
-            overflow: 'hidden',
+            overflow: 'visible',
+            userSelect: 'text',
         }}>
             <Typography
                 variant="body2"
@@ -37,6 +39,7 @@ export const TableCellContent: React.FC<TableCellContentProps> = ({
                     wordBreak,
                     whiteSpace: 'normal',
                     width: '100%',
+                    userSelect: 'text',
                 }}
             >
                 {children}

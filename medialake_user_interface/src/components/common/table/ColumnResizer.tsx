@@ -1,3 +1,4 @@
+// ColumnResizer.tsx
 import React from 'react';
 import { Box, useTheme, SxProps, Theme, alpha } from '@mui/material';
 import { Header } from '@tanstack/react-table';

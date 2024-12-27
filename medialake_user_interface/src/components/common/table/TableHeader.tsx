@@ -1,8 +1,8 @@
+// TableHeader.tsx
 import React from 'react';
 import {
     TableCell,
     Box,
-    IconButton,
     useTheme,
     alpha,
     Stack,
@@ -31,7 +31,6 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
     return (
         <TableCell
             sx={{
-                backgroundColor: theme.palette.background.paper,
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 p: 1.5,
                 height: 'auto',
@@ -50,7 +49,7 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
                 alignItems: 'flex-start',
                 minHeight: '32px',
                 position: 'relative',
-                pr: header.column.getCanFilter() ? 4 : 0, // Space for filter icon
+                pr: header.column.getCanFilter() ? 4 : 0,
             }}>
                 <Stack
                     direction="row"

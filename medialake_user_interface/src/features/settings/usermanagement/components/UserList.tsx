@@ -123,18 +123,27 @@ const UserList: React.FC<UserListProps> = ({
     const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
     const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString(undefined, {
+    const formatDate = (dateString: string, includeTime: boolean = false) => {
+        const date = new Date(dateString);
+        if (includeTime) {
+            return date.toLocaleString(undefined, {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+        return date.toLocaleDateString(undefined, {
             year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
+            month: '2-digit',
+            day: '2-digit',
         });
     };
 
-    const columns = useMemo<ColumnDef<User>[]>(
-        () => [
+    const columns = useMemo<ColumnDef<User>[]>(() => {
+        console.log('Theme in columns useMemo:', theme);
+        return [
             {
                 header: t('users.columns.username'),
                 accessorKey: 'username',
@@ -143,11 +152,14 @@ const UserList: React.FC<UserListProps> = ({
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
-                cell: ({ getValue }) => (
-                    <TableCellContent variant="primary">
-                        {getValue() as string}
-                    </TableCellContent>
-                ),
+                cell: ({ getValue }) => {
+                    console.log('Cell theme:', theme);
+                    return (
+                        <TableCellContent variant="primary">
+                            {getValue() as string}
+                        </TableCellContent>
+                    );
+                },
             },
             {
                 header: t('users.columns.firstName'),
@@ -274,11 +286,18 @@ const UserList: React.FC<UserListProps> = ({
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
-                cell: ({ getValue }) => (
-                    <TableCellContent variant="secondary">
-                        {formatDate(getValue() as string)}
-                    </TableCellContent>
-                ),
+                cell: ({ getValue }) => {
+                    const dateValue = getValue() as string;
+                    return (
+                        <Tooltip title={formatDate(dateValue, true)} placement="top">
+                            <Box>
+                                <TableCellContent variant="secondary">
+                                    {formatDate(dateValue)}
+                                </TableCellContent>
+                            </Box>
+                        </Tooltip>
+                    );
+                },
             },
             {
                 header: t('users.columns.modified'),
@@ -288,11 +307,18 @@ const UserList: React.FC<UserListProps> = ({
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
-                cell: ({ getValue }) => (
-                    <TableCellContent variant="secondary">
-                        {formatDate(getValue() as string)}
-                    </TableCellContent>
-                ),
+                cell: ({ getValue }) => {
+                    const dateValue = getValue() as string;
+                    return (
+                        <Tooltip title={formatDate(dateValue, true)} placement="top">
+                            <Box>
+                                <TableCellContent variant="secondary">
+                                    {formatDate(dateValue)}
+                                </TableCellContent>
+                            </Box>
+                        </Tooltip>
+                    );
+                },
             },
             {
                 id: 'actions',
@@ -300,12 +326,16 @@ const UserList: React.FC<UserListProps> = ({
                 minSize: 120,
                 size: 160,
                 enableResizing: true,
+                enableSorting: false,
                 cell: ({ row }) => (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <Tooltip title={t('users.actions.edit')}>
                             <IconButton
                                 size="small"
-                                onClick={() => onEditUser(row.original)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditUser(row.original);
+                                }}
                                 sx={{
                                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                     '&:hover': {
@@ -319,7 +349,10 @@ const UserList: React.FC<UserListProps> = ({
                         <Tooltip title={row.original.enabled ? t('users.actions.deactivate') : t('users.actions.activate')}>
                             <IconButton
                                 size="small"
-                                onClick={() => onToggleUserStatus(row.original.username, !row.original.enabled)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleUserStatus(row.original.username, !row.original.enabled);
+                                }}
                                 sx={{
                                     backgroundColor: row.original.enabled
                                         ? alpha(theme.palette.success.main, 0.1)
@@ -337,7 +370,10 @@ const UserList: React.FC<UserListProps> = ({
                         <Tooltip title={t('users.actions.delete')}>
                             <IconButton
                                 size="small"
-                                onClick={() => onDeleteUser(row.original.username)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteUser(row.original.username);
+                                }}
                                 sx={{
                                     backgroundColor: alpha(theme.palette.error.main, 0.1),
                                     '&:hover': {
@@ -351,9 +387,8 @@ const UserList: React.FC<UserListProps> = ({
                     </Box>
                 ),
             },
-        ],
-        [theme, t, onEditUser, onDeleteUser, onToggleUserStatus]
-    );
+        ];
+    }, [theme, t, onEditUser, onDeleteUser, onToggleUserStatus]);
 
     const table = useReactTable({
         data: users,
