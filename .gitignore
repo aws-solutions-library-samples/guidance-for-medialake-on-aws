@@ -48,6 +48,9 @@ cdk.context.json
 *.sublime-workspace
 *.sublime-project
 *.swp
+*.clinerules
+docs/
+cline_docs/
 
 # OS generated files
 .DS_Store

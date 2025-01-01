@@ -1,5 +1,4 @@
-// ResizableTable.tsx
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
     Table,
     TableBody,
@@ -28,11 +27,116 @@ interface ResizableTableProps<T> {
     rows: Row<T>[];
     maxHeight?: string;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
-    activeFilters?: { columnId: string; value: string }[];
-    activeSorting?: { columnId: string; desc: boolean }[];
+    activeFilters?: Array<{ columnId: string; value: string }>;
+    activeSorting?: Array<{ columnId: string; desc: boolean }>;
     onRemoveFilter?: (columnId: string) => void;
     onRemoveSort?: (columnId: string) => void;
 }
+
+const useTableStyles = (theme: any) => {
+    const isDark = theme.palette.mode === 'dark';
+
+    return useMemo(() => ({
+        filterTag: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            px: 2,
+            py: 0.5,
+            borderRadius: '16px',
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            color: theme.palette.primary.main,
+        },
+        closeButton: {
+            cursor: 'pointer',
+            fontSize: '1.2rem',
+            lineHeight: 1,
+            '&:hover': { opacity: 0.7 }
+        },
+        tableContainer: {
+            maxHeight: 'calc(100vh - 300px)',
+            overflowX: 'hidden',
+            '&:hover': {
+                overflowX: 'auto'
+            },
+            width: '100%',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+            '&::-webkit-scrollbar': {
+                height: 10,
+            },
+            '&::-webkit-scrollbar-track': {
+                background: theme.palette.background.default,
+            },
+            '&::-webkit-scrollbar-thumb': {
+                background: theme.palette.divider,
+                borderRadius: 2,
+                '&:hover': {
+                    background: alpha(theme.palette.primary.main, 0.2),
+                },
+            },
+        },
+        table: {
+            width: '100%',
+            minWidth: '100%',
+            tableLayout: 'fixed',
+            backgroundColor: 'inherit',
+            '& .MuiTableCell-root': {
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                py: 1.5,
+                px: 2,
+                height: 'auto',
+                verticalAlign: 'top',
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                color: theme.palette.text.secondary,
+                '& > *': {
+                    wordBreak: 'break-word',
+                    whiteSpace: 'normal',
+                    overflow: 'visible',
+                },
+            },
+            '& .MuiTableHead-root .MuiTableCell-root': {
+                backgroundColor: isDark
+                    ? alpha(theme.palette.background.paper, 0.3)
+                    : alpha(theme.palette.background.paper, 0.04),
+                borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
+                fontWeight: 600,
+                color: theme.palette.text.primary,
+            },
+        },
+        tableRow: {
+            '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.04),
+            },
+            backgroundColor: 'inherit',
+            transition: 'all 0.2s ease',
+            cursor: 'pointer',
+            '& .MuiTableCell-root': {
+                position: 'relative',
+                // pointerEvents: 'none',
+                '& .MuiIconButton-root': {
+                    position: 'relative',
+                    zIndex: 2,
+                    pointerEvents: 'auto'
+                }
+            }
+        },
+        paper: {
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            flex: 1,
+            backgroundColor: isDark
+                ? alpha(theme.palette.background.paper, 0.2)
+                : 'transparent',
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            borderRadius: '12px',
+        }
+    }), [theme.palette.mode, theme.palette.primary.main]);
+};
 
 export function ResizableTable<T>({
     table,
@@ -47,24 +151,31 @@ export function ResizableTable<T>({
     onRemoveSort,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
+    const styles = useTableStyles(theme);
     const hasActiveTags = activeFilters.length > 0 || activeSorting.length > 0;
 
+    const handleRemoveFilter = useCallback((columnId: string) => {
+        onRemoveFilter?.(columnId);
+    }, [onRemoveFilter]);
+
+    const handleRemoveSort = useCallback((columnId: string) => {
+        onRemoveSort?.(columnId);
+    }, [onRemoveSort]);
+
     return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box
+            sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}
+            role="grid"
+            aria-label="Data table"
+        >
             {hasActiveTags && (
                 <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     {activeFilters.map(({ columnId, value }) => (
                         <Box
                             key={`filter-${columnId}`}
-                            sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                px: 2,
-                                py: 0.5,
-                                borderRadius: '16px',
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                color: theme.palette.primary.main,
-                            }}
+                            sx={styles.filterTag}
+                            role="button"
+                            aria-label={`Remove filter for ${columnId}`}
                         >
                             <Box component="span" sx={{ mr: 1 }}>
                                 {`${columnId}: ${value}`}
@@ -72,12 +183,14 @@ export function ResizableTable<T>({
                             {onRemoveFilter && (
                                 <Box
                                     component="span"
-                                    onClick={() => onRemoveFilter(columnId)}
-                                    sx={{
-                                        cursor: 'pointer',
-                                        fontSize: '1.2rem',
-                                        lineHeight: 1,
-                                        '&:hover': { opacity: 0.7 }
+                                    onClick={() => handleRemoveFilter(columnId)}
+                                    sx={styles.closeButton}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            handleRemoveFilter(columnId);
+                                        }
                                     }}
                                 >
                                     ×
@@ -87,56 +200,19 @@ export function ResizableTable<T>({
                     ))}
                 </Box>
             )}
-            <Paper
-                elevation={0}
-                sx={{
-                    borderRadius: '12px',
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    width: '100%',
-                    flex: 1,
-                }}
-            >
+            <Paper elevation={0} sx={styles.paper}>
                 <TableContainer
                     ref={containerRef}
-                    sx={{
-                        maxHeight,
-                        overflowX: 'auto',
-                        width: '100%',
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minWidth: 0,
-                    }}
+                    sx={{ ...styles.tableContainer, maxHeight }}
                 >
                     <Table
                         stickyHeader
-                        sx={{
-                            width: '100%',
-                            minWidth: '100%',
-                            tableLayout: 'fixed',
-                            borderCollapse: 'separate',
-                            borderSpacing: 0,
-                            '& .MuiTableCell-root': {
-                                py: 1,
-                                px: 1.5,
-                                height: 'auto',
-                                verticalAlign: 'top',
-                                whiteSpace: 'normal',
-                                overflow: 'visible',
-                                '& > *': {
-                                    wordBreak: 'break-word',
-                                    whiteSpace: 'normal',
-                                    overflow: 'visible',
-                                },
-                            },
-                        }}
+                        sx={styles.table}
+                        role="grid"
                     >
                         <TableHead>
                             {table.getHeaderGroups().map(headerGroup => (
-                                <TableRow key={headerGroup.id}>
+                                <TableRow key={headerGroup.id} role="row">
                                     {headerGroup.headers.map(header => (
                                         <TableHeader
                                             key={header.id}
@@ -153,20 +229,8 @@ export function ResizableTable<T>({
                                 return (
                                     <TableRow
                                         key={row.id}
-                                        sx={{
-                                            '&:hover': {
-                                                backgroundColor: alpha(theme.palette.primary.main, 0.02),
-                                            },
-                                            transition: 'background-color 0.2s ease',
-                                            '& .MuiTableCell-root': {
-                                                position: 'relative',
-                                                '& .MuiIconButton-root': {
-                                                    position: 'relative',
-                                                    zIndex: 2,
-                                                    pointerEvents: 'auto'
-                                                }
-                                            }
-                                        }}
+                                        sx={styles.tableRow}
+                                        role="row"
                                     >
                                         {row.getVisibleCells().map(cell => {
                                             const content = flexRender(
@@ -178,21 +242,12 @@ export function ResizableTable<T>({
                                                 <TableCell
                                                     key={cell.id}
                                                     sx={{
-                                                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                                                         width: `${cell.column.getSize()}px`,
                                                         maxWidth: `${cell.column.getSize()}px`,
                                                         position: 'relative',
                                                         overflow: 'visible',
-                                                        '&::after': {
-                                                            content: '""',
-                                                            position: 'absolute',
-                                                            right: 0,
-                                                            top: 0,
-                                                            width: 1,
-                                                            height: '100%',
-                                                            backgroundColor: alpha(theme.palette.divider, 0.1),
-                                                        },
                                                     }}
+                                                    role="gridcell"
                                                 >
                                                     {React.isValidElement(content) ? (
                                                         content

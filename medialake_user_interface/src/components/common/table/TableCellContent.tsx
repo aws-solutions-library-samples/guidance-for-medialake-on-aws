@@ -1,45 +1,69 @@
-// TableCellContent.tsx
-import React from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import React, { memo } from 'react';
+import { Box, Typography, useTheme, alpha } from '@mui/material';
+import { Theme } from '@mui/material/styles';
 
 interface TableCellContentProps {
     children: React.ReactNode;
     variant?: 'default' | 'primary' | 'secondary';
     wordBreak?: 'normal' | 'break-all' | 'break-word' | 'keep-all';
+    'aria-label'?: string;
 }
 
-export const TableCellContent: React.FC<TableCellContentProps> = ({
+const getStyles = (theme: Theme, variant: TableCellContentProps['variant'], isDark: boolean) => {
+    switch (variant) {
+        case 'primary':
+            return {
+                color: isDark
+                    ? alpha(theme.palette.text.primary, 0.95)
+                    : theme.palette.text.primary,
+                fontWeight: 500,
+            };
+        case 'secondary':
+            return {
+                color: isDark
+                    ? alpha(theme.palette.text.primary, 0.7)
+                    : theme.palette.text.secondary,
+                opacity: isDark ? 1 : 0.8,
+            };
+        default:
+            return {
+                color: isDark
+                    ? alpha(theme.palette.text.primary, 0.9)
+                    : theme.palette.text.primary,
+            };
+    }
+};
+
+const TableCellContentBase = ({
     children,
     variant = 'default',
     wordBreak = 'break-word',
-}) => {
+    'aria-label': ariaLabel,
+}: TableCellContentProps) => {
     const theme = useTheme();
-
-    const getColor = () => {
-        switch (variant) {
-            case 'primary':
-                return theme.palette.primary.main;
-            case 'secondary':
-                return theme.palette.text.secondary;
-            default:
-                return theme.palette.text.primary;
-        }
-    };
+    const isDark = theme.palette.mode === 'dark';
+    const styles = getStyles(theme, variant, isDark);
 
     return (
-        <Box sx={{
-            width: '100%',
-            overflow: 'visible',
-            userSelect: 'text',
-        }}>
+        <Box
+            sx={{
+                width: '100%',
+                overflow: 'visible',
+                userSelect: 'text',
+            }}
+            role="cell"
+            aria-label={ariaLabel}
+        >
             <Typography
                 variant="body2"
                 sx={{
-                    color: getColor(),
+                    ...styles,
                     wordBreak,
                     whiteSpace: 'normal',
                     width: '100%',
                     userSelect: 'text',
+                    lineHeight: 1.5,
+                    letterSpacing: '0.01em',
                 }}
             >
                 {children}
@@ -47,3 +71,5 @@ export const TableCellContent: React.FC<TableCellContentProps> = ({
         </Box>
     );
 };
+
+export const TableCellContent = memo(TableCellContentBase);

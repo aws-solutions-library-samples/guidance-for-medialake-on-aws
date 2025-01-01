@@ -2,42 +2,29 @@ import React from 'react';
 import {
     Box,
     Typography,
-    Button,
-    Stack,
+    IconButton,
     useTheme,
     alpha,
-    Tooltip,
-    CircularProgress,
-    useMediaQuery,
 } from '@mui/material';
 import {
-    Add as AddIcon,
-    RocketLaunch as RocketLaunchIcon,
     ViewColumn as ViewColumnIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { SearchField } from '@/components/common/SearchField';
+import { SearchField } from '../../../components/common/SearchField';
 
 interface PipelineToolbarProps {
-    isCreatingPipeline: boolean;
     globalFilter: string;
     onGlobalFilterChange: (value: string) => void;
-    onCreatePipeline: () => void;
-    onAddNew: () => void;
     onColumnMenuOpen: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
-    isCreatingPipeline,
     globalFilter,
     onGlobalFilterChange,
-    onCreatePipeline,
-    onAddNew,
     onColumnMenuOpen,
 }) => {
     const { t } = useTranslation();
     const theme = useTheme();
-    const isSmallScreen = useMediaQuery(theme.breakpoints.down('lg'));
 
     return (
         <Box sx={{ mb: 4 }}>
@@ -57,89 +44,6 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
                         {t('pipelines.description')}
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <Stack direction="row" spacing={2}>
-                        <Tooltip title={isCreatingPipeline ? t('pipelines.deploying') : t('pipelines.deploy')}>
-                            {isSmallScreen ? (
-                                <Button
-                                    onClick={onCreatePipeline}
-                                    disabled={isCreatingPipeline}
-                                    sx={{
-                                        minWidth: 0,
-                                        p: 1,
-                                        height: '40px',
-                                        width: '40px',
-                                        borderRadius: '8px',
-                                        color: theme.palette.secondary.contrastText,
-                                        backgroundColor: theme.palette.secondary.main,
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.secondary.dark,
-                                        },
-                                    }}
-                                >
-                                    {isCreatingPipeline ? (
-                                        <CircularProgress size={24} color="inherit" />
-                                    ) : (
-                                        <RocketLaunchIcon />
-                                    )}
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    startIcon={isCreatingPipeline ? <CircularProgress size={24} color="inherit" /> : <RocketLaunchIcon />}
-                                    onClick={onCreatePipeline}
-                                    disabled={isCreatingPipeline}
-                                    sx={{
-                                        height: '40px',
-                                        borderRadius: '8px',
-                                        textTransform: 'none',
-                                        px: 3,
-                                    }}
-                                >
-                                    {isCreatingPipeline ? t('pipelines.deploying') : t('pipelines.deploy')}
-                                </Button>
-                            )}
-                        </Tooltip>
-
-                        <Tooltip title={t('pipelines.addNew')}>
-                            {isSmallScreen ? (
-                                <Button
-                                    onClick={onAddNew}
-                                    sx={{
-                                        minWidth: 0,
-                                        p: 1,
-                                        height: '40px',
-                                        width: '40px',
-                                        borderRadius: '8px',
-                                        color: theme.palette.primary.contrastText,
-                                        backgroundColor: theme.palette.primary.main,
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.primary.dark,
-                                        },
-                                    }}
-                                >
-                                    <AddIcon />
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<AddIcon />}
-                                    onClick={onAddNew}
-                                    sx={{
-                                        height: '40px',
-                                        borderRadius: '8px',
-                                        textTransform: 'none',
-                                        px: 3,
-                                    }}
-                                >
-                                    {t('pipelines.addNew')}
-                                </Button>
-                            )}
-                        </Tooltip>
-                    </Stack>
-                </Box>
             </Box>
 
             <Box sx={{
@@ -155,20 +59,21 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
                     placeholder={t('pipelines.search')}
                 />
                 <Box sx={{ flex: 1 }} />
-                <Button
-                    variant="outlined"
-                    startIcon={<ViewColumnIcon />}
+                <IconButton
                     onClick={onColumnMenuOpen}
                     sx={{
+                        width: '40px',
                         height: '40px',
                         borderRadius: '8px',
-                        textTransform: 'none',
-                        borderColor: alpha(theme.palette.divider, 0.2),
-                        px: 3,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                        color: theme.palette.text.secondary,
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        },
                     }}
                 >
-                    {t('common.columns')}
-                </Button>
+                    <ViewColumnIcon />
+                </IconButton>
             </Box>
         </Box>
     );

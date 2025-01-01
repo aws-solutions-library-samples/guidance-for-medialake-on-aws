@@ -1,5 +1,4 @@
-// TableHeader.tsx
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
     TableCell,
     Box,
@@ -13,95 +12,159 @@ import {
     ArrowDownward as ArrowDownwardIcon,
     UnfoldMore as UnfoldMoreIcon
 } from '@mui/icons-material';
-import { Header, flexRender } from '@tanstack/react-table';
+import { Header } from '@tanstack/react-table';
+import { Theme } from '@mui/material/styles';
 import { ColumnResizer } from './ColumnResizer';
 import { TableCellContent } from './TableCellContent';
 
-interface TableHeaderProps {
-    header: Header<any, unknown>;
+interface TableHeaderProps<T> {
+    header: Header<T, unknown>;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
 }
 
-export const TableHeader: React.FC<TableHeaderProps> = ({
+const useHeaderStyles = (theme: Theme) => {
+    const isDark = theme.palette.mode === 'dark';
+
+    return useMemo(() => ({
+        headerCell: {
+            border: 'none',
+            p: 2,
+            height: 'auto',
+            position: 'relative',
+            verticalAlign: 'top',
+            userSelect: 'none',
+            backgroundColor: 'inherit',
+            '&:hover .column-resizer': {
+                opacity: 1,
+            },
+            '&:hover': {
+                backgroundColor: isDark
+                    ? alpha(theme.palette.background.paper, 0.4)
+                    : alpha(theme.palette.primary.main, 0.02),
+            },
+        },
+        headerContent: {
+            display: 'flex',
+            alignItems: 'flex-start',
+            minHeight: '32px',
+            position: 'relative',
+        },
+        sortIcon: {
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: 18,
+        },
+        iconWrapper: (isActive: boolean) => ({
+            display: 'flex',
+            alignItems: 'center',
+            color: isActive
+                ? theme.palette.primary.main
+                : isDark
+                    ? alpha(theme.palette.text.primary, 0.7)
+                    : alpha(theme.palette.text.secondary, 0.7),
+            opacity: isActive ? 1 : 0.8,
+            '&:hover': {
+                color: theme.palette.primary.main,
+                opacity: 1,
+            }
+        }),
+        columnResizer: {
+            opacity: 0,
+            transition: 'all 0.2s ease',
+            backgroundColor: alpha(theme.palette.text.secondary, 0.3),
+            '&:hover': {
+                backgroundColor: theme.palette.primary.main,
+            }
+        }
+    }), [theme.palette.mode, theme.palette.primary.main]);
+};
+
+export function TableHeader<T>({
     header,
     onFilterClick,
-}) => {
+}: TableHeaderProps<T>) {
     const theme = useTheme();
+    const styles = useHeaderStyles(theme);
+
+    const handleSortClick = useCallback((e: React.MouseEvent) => {
+        header.column.getToggleSortingHandler()?.(e);
+    }, [header.column]);
+
+    const handleFilterClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+        if (onFilterClick) {
+            onFilterClick(e, header.column.id);
+        }
+    }, [header.column.id, onFilterClick]);
+
+    const handleKeyPress = useCallback((e: React.KeyboardEvent, action: () => void) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            action();
+        }
+    }, []);
+
+    const sortDirection = header.column.getIsSorted();
+
+    const sortIcon = useMemo(() => {
+        if (!sortDirection) return <UnfoldMoreIcon sx={styles.sortIcon} />;
+        return sortDirection === 'asc'
+            ? <ArrowUpwardIcon sx={styles.sortIcon} />
+            : <ArrowDownwardIcon sx={styles.sortIcon} />;
+    }, [sortDirection, styles.sortIcon]);
+
+    const ariaSortValue = useMemo(() => {
+        if (!sortDirection) return 'none';
+        return sortDirection === 'asc' ? 'ascending' : 'descending';
+    }, [sortDirection]);
 
     return (
         <TableCell
             sx={{
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                p: 1.5,
-                height: 'auto',
+                ...styles.headerCell,
                 width: header.getSize(),
                 minWidth: header.getSize(),
-                position: 'relative',
-                verticalAlign: 'top',
-                userSelect: 'none',
-                '&:hover .column-resizer': {
-                    opacity: 1,
-                },
             }}
+            role="columnheader"
+            aria-sort={ariaSortValue}
         >
             <Box sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                minHeight: '32px',
-                position: 'relative',
+                ...styles.headerContent,
                 pr: header.column.getCanFilter() ? 4 : 0,
             }}>
                 <Stack
                     direction="row"
                     alignItems="center"
                     spacing={1}
-                    sx={{
-                        flex: 1,
-                        cursor: 'pointer',
-                    }}
+                    sx={{ flex: 1, cursor: 'pointer' }}
                 >
-                    <TableCellContent variant="primary" wordBreak="normal">
-                        {flexRender(header.column.columnDef.header, header.getContext())}
+                    <TableCellContent
+                        variant="primary"
+                        wordBreak="normal"
+                        aria-label={`${header.column.columnDef.header as string} column`}
+                    >
+                        {header.column.columnDef.header as string}
                     </TableCellContent>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Box
-                            onClick={header.column.getToggleSortingHandler()}
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: header.column.getIsSorted()
-                                    ? theme.palette.primary.main
-                                    : theme.palette.text.secondary,
-                                '&:hover': {
-                                    color: theme.palette.primary.main,
-                                }
-                            }}
+                            onClick={handleSortClick}
+                            onKeyPress={(e) => handleKeyPress(e, () => handleSortClick(e as any))}
+                            sx={styles.iconWrapper(Boolean(header.column.getIsSorted()))}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Sort by ${header.column.columnDef.header as string}`}
                         >
-                            {header.column.getIsSorted() ? (
-                                header.column.getIsSorted() === 'asc' ? (
-                                    <ArrowUpwardIcon sx={{ fontSize: 18 }} />
-                                ) : (
-                                    <ArrowDownwardIcon sx={{ fontSize: 18 }} />
-                                )
-                            ) : (
-                                <UnfoldMoreIcon sx={{ fontSize: 18 }} />
-                            )}
+                            {sortIcon}
                         </Box>
                         {header.column.getCanFilter() && onFilterClick && (
                             <Box
-                                onClick={(e) => onFilterClick(e, header.column.id)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    color: header.column.getFilterValue()
-                                        ? theme.palette.primary.main
-                                        : theme.palette.text.secondary,
-                                    '&:hover': {
-                                        color: theme.palette.primary.main,
-                                    }
-                                }}
+                                onClick={handleFilterClick}
+                                onKeyPress={(e) => handleKeyPress(e, () => handleFilterClick(e as any))}
+                                sx={styles.iconWrapper(Boolean(header.column.getFilterValue()))}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Filter ${header.column.columnDef.header as string}`}
                             >
-                                <FilterListIcon sx={{ fontSize: 18 }} />
+                                <FilterListIcon sx={styles.sortIcon} />
                             </Box>
                         )}
                     </Stack>
@@ -110,11 +173,8 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
             <ColumnResizer
                 header={header}
                 className="column-resizer"
-                sx={{
-                    opacity: 0,
-                    transition: 'opacity 0.2s ease',
-                }}
+                sx={styles.columnResizer}
             />
         </TableCell>
     );
-};
+}

@@ -5,19 +5,16 @@ import {
     ColumnFiltersState,
     PaginationState,
 } from '@tanstack/react-table';
-import { PipelineResponse, Pipeline } from '@/api/types/pipeline.types';
-import { useCreatePipeline, usePipeline, useDeletePipeline } from '@/api/hooks/usePipelines';
-import { hardcodedPipelineData } from '@/features/pipelines/data/pipelineData';
+import { PipelineResponse, Pipeline } from '../../../api/types/pipeline.types';
+import { usePipeline, useDeletePipeline } from '../../../api/hooks/usePipelines';
 
 const PAGE_SIZE = 20;
 
 export const usePipelineManager = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const createPipeline = useCreatePipeline();
     const deletePipeline = useDeletePipeline();
     const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-    const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
     const [showDeleteButton, setShowDeleteButton] = useState(false);
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -51,7 +48,7 @@ export const usePipelineManager = () => {
         severity: 'success' as 'success' | 'error',
     });
 
-    const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipeline(PAGE_SIZE, {
+    const { data, isLoading, refetch } = usePipeline(PAGE_SIZE, {
         status: filters.type === "" ? undefined : filters.type,
         system: filters.system === "" ? undefined : filters.system,
         sortBy: filters.sortBy,
@@ -109,51 +106,6 @@ export const usePipelineManager = () => {
 
     const handleEdit = (id: string) => {
         navigate(`/pipelines/${id}`);
-    };
-
-    const handleAddNew = () => {
-        navigate('/pipeline');
-    };
-
-    const handleCreatePipeline = async () => {
-        setIsCreatingPipeline(true);
-        try {
-            const response: PipelineResponse = await createPipeline.mutateAsync(hardcodedPipelineData);
-            if (response.status === "409") {
-                setSnackbar({
-                    open: true,
-                    message: `${response.message}: ${response.data.error || ''}`,
-                    severity: 'error'
-                });
-            } else if (response.status === "200") {
-                setSnackbar({
-                    open: true,
-                    message: t('pipelines.createSuccess'),
-                    severity: 'success'
-                });
-                refetch();
-            } else {
-                setSnackbar({
-                    open: true,
-                    message: response.message || t('common.unknownError'),
-                    severity: 'error'
-                });
-            }
-        } catch (error: any) {
-            let errorMessage = t('pipelines.createFailed');
-            if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-            setSnackbar({
-                open: true,
-                message: errorMessage,
-                severity: 'error'
-            });
-        } finally {
-            setIsCreatingPipeline(false);
-        }
     };
 
     const handleDeletePipeline = async () => {
@@ -228,7 +180,6 @@ export const usePipelineManager = () => {
     return {
         // State
         pipelines,
-        isCreatingPipeline,
         showDeleteButton,
         globalFilter,
         columnFilters,
@@ -240,8 +191,6 @@ export const usePipelineManager = () => {
         deleteDialog,
         snackbar,
         isLoading,
-        hasNextPage,
-        isFetchingNextPage,
         deletePipeline,
 
         // Actions
@@ -251,8 +200,6 @@ export const usePipelineManager = () => {
         setColumnVisibility,
         handleCloseSnackbar,
         handleEdit,
-        handleAddNew,
-        handleCreatePipeline,
         handleDeletePipeline,
         openDeleteDialog,
         closeDeleteDialog,
@@ -261,7 +208,6 @@ export const usePipelineManager = () => {
         handleColumnMenuClose,
         handleFilterMenuOpen,
         handleFilterMenuClose,
-        fetchNextPage,
         refetch,
     };
 };
