@@ -3,28 +3,29 @@ import { SidebarContext } from '../contexts/SidebarContext';
 import { ErrorBoundary } from 'react-error-boundary';
 import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import queryClient from '@/api/queryClient';
-import { AwsConfigProvider } from '@/common/hooks/aws-config-context';
-import { AuthProvider, useAuth } from '@/common/hooks/auth-context';
+import queryClient from '../api/queryClient';
+import { AwsConfigProvider } from '../common/hooks/aws-config-context';
+import { AuthProvider, useAuth } from '../common/hooks/auth-context';
 import { Authenticator, ThemeProvider as AmplifyThemeProvider, Theme } from '@aws-amplify/ui-react';
 import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
 import { Box, CircularProgress } from '@mui/material';
-import TopBar from '@/TopBar';
-import Sidebar from '@/Sidebar';
-import SearchPage from '@/pages/SearchPage';
-import AssetsPage from '@/pages/AssetsPage';
-import { S3Explorer } from '@/features/home/S3Explorer';
-import Home from '@/pages/Home';
-import SettingsComponent from '@/features/settings/SettingsLayout';
-import ExecutionsPage from '@/pages/ExecutionsPage';
-import PipelinesPage from '@/pages/PipelinesPage';
-import { StorageHelper } from '@/common/helpers/storage-helper';
+import TopBar from '../TopBar';
+import Sidebar from '../Sidebar';
+import SearchPage from '../pages/SearchPage';
+import AssetsPage from '../pages/AssetsPage';
+import { S3Explorer } from '../features/home/S3Explorer';
+import Home from '../pages/Home';
+import SettingsComponent from '../features/settings/SettingsLayout';
+import ExecutionsPage from '../pages/ExecutionsPage';
+import PipelinesPage from '../pages/PipelinesPage';
+import { StorageHelper } from '../common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
-import ImageDetailPage from '@/pages/ImageDetailPage';
-import { ModalProvider } from '@/components/common/ModalConnector';
-import { ThemeProvider } from '@/hooks/useTheme';
-import { ThemeWrapper } from '@/components/ThemeWrapper';
-import { TimezoneProvider } from '@/contexts/TimezoneContext';
+import ImageDetailPage from '../pages/ImageDetailPage';
+import { ModalProvider } from '../components/common/ModalConnector';
+import { ThemeProvider } from '../hooks/useTheme';
+import { ThemeWrapper } from '../components/ThemeWrapper';
+import { TimezoneProvider } from '../contexts/TimezoneContext';
+import { TableDensityProvider } from '../contexts/TableDensityContext';
 
 const theme: Theme = {
     name: 'mediaLakeTheme',
@@ -406,11 +407,13 @@ const AppConfigured: React.FC = () => {
                         <AuthProvider>
                             <TimezoneProvider>
                                 <ThemeProvider>
-                                    <ThemeWrapper>
-                                        <ModalProvider>
-                                            <RouterProvider router={router} />
-                                        </ModalProvider>
-                                    </ThemeWrapper>
+                                    <TableDensityProvider>
+                                        <ThemeWrapper>
+                                            <ModalProvider>
+                                                <RouterProvider router={router} />
+                                            </ModalProvider>
+                                        </ThemeWrapper>
+                                    </TableDensityProvider>
                                 </ThemeProvider>
                             </TimezoneProvider>
                         </AuthProvider>

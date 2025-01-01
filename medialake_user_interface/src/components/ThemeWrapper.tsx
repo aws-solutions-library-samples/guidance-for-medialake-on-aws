@@ -42,7 +42,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                         color: muiTheme.palette.text.primary,
                     }),
                     head: {
-                        backgroundColor: '#ffffff !important',
+                        backgroundColor: 'transparent !important',
                         fontWeight: 600,
                     },
                 },
@@ -50,7 +50,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
             MuiTableRow: {
                 styleOverrides: {
                     root: ({ theme: muiTheme }) => ({
-                        backgroundColor: '#ffffff',
+                        backgroundColor: 'transparent',
                         '&:hover': {
                             backgroundColor: alpha(
                                 muiTheme.palette.primary.main,
@@ -58,7 +58,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                             ),
                         },
                         '& .MuiTableCell-root': {
-                            backgroundColor: '#ffffff',
+                            backgroundColor: 'transparent',
                         }
                     }),
                 },
@@ -66,16 +66,18 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
             MuiTableContainer: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: '#ffffff',
+                        backgroundColor: 'transparent',
                     },
                 },
             },
             MuiPaper: {
                 styleOverrides: {
-                    root: {
+                    root: ({ theme: muiTheme }) => ({
                         backgroundImage: 'none',
-                        backgroundColor: '#ffffff',
-                    },
+                        backgroundColor: muiTheme.palette.mode === 'dark'
+                            ? muiTheme.palette.background.paper
+                            : '#ffffff',
+                    }),
                 },
             },
             MuiCssBaseline: {

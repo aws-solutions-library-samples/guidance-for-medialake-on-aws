@@ -104,6 +104,7 @@ export function TableHeader<T>({
     }, []);
 
     const sortDirection = header.column.getIsSorted();
+    const canSort = header.column.getCanSort();
 
     const sortIcon = useMemo(() => {
         if (!sortDirection) return <UnfoldMoreIcon sx={styles.sortIcon} />;
@@ -111,11 +112,6 @@ export function TableHeader<T>({
             ? <ArrowUpwardIcon sx={styles.sortIcon} />
             : <ArrowDownwardIcon sx={styles.sortIcon} />;
     }, [sortDirection, styles.sortIcon]);
-
-    const ariaSortValue = useMemo(() => {
-        if (!sortDirection) return 'none';
-        return sortDirection === 'asc' ? 'ascending' : 'descending';
-    }, [sortDirection]);
 
     return (
         <TableCell
@@ -125,7 +121,7 @@ export function TableHeader<T>({
                 minWidth: header.getSize(),
             }}
             role="columnheader"
-            aria-sort={ariaSortValue}
+            aria-sort={sortDirection ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
         >
             <Box sx={{
                 ...styles.headerContent,
@@ -135,7 +131,7 @@ export function TableHeader<T>({
                     direction="row"
                     alignItems="center"
                     spacing={1}
-                    sx={{ flex: 1, cursor: 'pointer' }}
+                    sx={{ flex: 1, cursor: canSort ? 'pointer' : 'default' }}
                 >
                     <TableCellContent
                         variant="primary"
@@ -145,16 +141,18 @@ export function TableHeader<T>({
                         {header.column.columnDef.header as string}
                     </TableCellContent>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Box
-                            onClick={handleSortClick}
-                            onKeyPress={(e) => handleKeyPress(e, () => handleSortClick(e as any))}
-                            sx={styles.iconWrapper(Boolean(header.column.getIsSorted()))}
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`Sort by ${header.column.columnDef.header as string}`}
-                        >
-                            {sortIcon}
-                        </Box>
+                        {canSort && (
+                            <Box
+                                onClick={handleSortClick}
+                                onKeyPress={(e) => handleKeyPress(e, () => handleSortClick(e as any))}
+                                sx={styles.iconWrapper(Boolean(sortDirection))}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Sort by ${header.column.columnDef.header as string}`}
+                            >
+                                {sortIcon}
+                            </Box>
+                        )}
                         {header.column.getCanFilter() && onFilterClick && (
                             <Box
                                 onClick={handleFilterClick}

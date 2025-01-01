@@ -99,6 +99,7 @@ class UIConstructProps:
             "x-forwarded-user",
             "Access-Control-Request-Headers",
             "Access-Control-Request-Method",
+            "Access-Control-Allow-Origin",
         }
     )
     max_ttl_minutes: int = 30

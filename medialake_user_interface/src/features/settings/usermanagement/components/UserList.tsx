@@ -117,6 +117,7 @@ const UserList: React.FC<UserListProps> = ({
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnVisibility, setColumnVisibility] = useState({
         username: false,
+        modified: false,
     });
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
@@ -164,8 +165,8 @@ const UserList: React.FC<UserListProps> = ({
             {
                 header: t('users.columns.firstName'),
                 accessorKey: 'name',
-                minSize: 120,
-                size: 180,
+                minSize: 100,
+                size: 160,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -179,7 +180,7 @@ const UserList: React.FC<UserListProps> = ({
                 header: t('users.columns.lastName'),
                 accessorKey: 'family_name',
                 minSize: 120,
-                size: 180,
+                size: 160,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -192,8 +193,8 @@ const UserList: React.FC<UserListProps> = ({
             {
                 header: t('users.columns.email'),
                 accessorKey: 'email',
-                minSize: 200,
-                size: 350,
+                minSize: 150,
+                size: 275,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -207,7 +208,7 @@ const UserList: React.FC<UserListProps> = ({
                 header: t('users.columns.status'),
                 accessorKey: 'enabled',
                 minSize: 100,
-                size: 150,
+                size: 100,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -238,8 +239,8 @@ const UserList: React.FC<UserListProps> = ({
             {
                 header: t('users.columns.groups'),
                 accessorKey: 'groups',
-                minSize: 150,
-                size: 250,
+                minSize: 120,
+                size: 160,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -281,8 +282,8 @@ const UserList: React.FC<UserListProps> = ({
             {
                 header: t('users.columns.created'),
                 accessorKey: 'created',
-                minSize: 150,
-                size: 200,
+                minSize: 120,
+                size: 120,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
@@ -322,9 +323,13 @@ const UserList: React.FC<UserListProps> = ({
             },
             {
                 id: 'actions',
-                header: t('users.columns.actions'),
-                minSize: 120,
-                size: 160,
+                header: () => (
+                    <Box sx={{ width: '100%', textAlign: 'center' }}>
+                        {t('users.columns.actions')}
+                    </Box>
+                ),
+                minSize: 100,
+                size: 120,
                 enableResizing: true,
                 enableSorting: false,
                 cell: ({ row }) => (

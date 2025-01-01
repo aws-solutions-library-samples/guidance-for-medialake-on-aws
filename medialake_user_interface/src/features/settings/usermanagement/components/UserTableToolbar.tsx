@@ -6,8 +6,9 @@ import {
     alpha,
 } from '@mui/material';
 import { ViewColumn as ViewColumnIcon } from '@mui/icons-material';
+import { TableDensityToggle } from '../../../../components/common/table/TableDensityToggle';
 import { useTranslation } from 'react-i18next';
-import { SearchField } from '@/components/common/SearchField';
+import { SearchField } from '../../../../components/common/SearchField';
 
 interface UserTableToolbarProps {
     globalFilter: string;
@@ -117,20 +118,23 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
                     </Box>
                 ))}
             </Box>
-            <Button
-                variant="outlined"
-                startIcon={<ViewColumnIcon />}
-                onClick={onColumnMenuOpen}
-                sx={{
-                    height: '40px',
-                    borderRadius: '8px',
-                    textTransform: 'none',
-                    borderColor: alpha(theme.palette.divider, 0.2),
-                    px: 3,
-                }}
-            >
-                {t('common.columns')}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TableDensityToggle />
+                <Button
+                    variant="outlined"
+                    startIcon={<ViewColumnIcon />}
+                    onClick={onColumnMenuOpen}
+                    sx={{
+                        height: '40px',
+                        borderRadius: '8px',
+                        textTransform: 'none',
+                        borderColor: alpha(theme.palette.divider, 0.2),
+                        px: 3,
+                    }}
+                >
+                    {t('common.columns')}
+                </Button>
+            </Box>
         </Box>
     );
 };

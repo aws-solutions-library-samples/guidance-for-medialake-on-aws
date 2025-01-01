@@ -19,6 +19,7 @@ import {
 import { Virtualizer } from '@tanstack/react-virtual';
 import { TableHeader } from './TableHeader';
 import { TableCellContent } from './TableCellContent';
+import { useTableDensity } from '../../../contexts/TableDensityContext';
 
 interface ResizableTableProps<T> {
     table: TanStackTable<T>;
@@ -33,7 +34,7 @@ interface ResizableTableProps<T> {
     onRemoveSort?: (columnId: string) => void;
 }
 
-const useTableStyles = (theme: any) => {
+const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
     const isDark = theme.palette.mode === 'dark';
 
     return useMemo(() => ({
@@ -84,13 +85,14 @@ const useTableStyles = (theme: any) => {
             backgroundColor: 'inherit',
             '& .MuiTableCell-root': {
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                py: 1.5,
-                px: 2,
-                height: 'auto',
+                py: mode === 'compact' ? 0.75 : 1.5,
+                px: mode === 'compact' ? 1.5 : 2,
+                height: mode === 'compact' ? '40px' : '48px',
                 verticalAlign: 'top',
                 whiteSpace: 'normal',
                 overflow: 'visible',
                 color: theme.palette.text.secondary,
+                fontSize: mode === 'compact' ? '0.875rem' : '1rem',
                 '& > *': {
                     wordBreak: 'break-word',
                     whiteSpace: 'normal',
@@ -104,6 +106,7 @@ const useTableStyles = (theme: any) => {
                 borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                 fontWeight: 600,
                 color: theme.palette.text.primary,
+                height: mode === 'compact' ? '32px' : '40px',
             },
         },
         tableRow: {
@@ -115,7 +118,6 @@ const useTableStyles = (theme: any) => {
             cursor: 'pointer',
             '& .MuiTableCell-root': {
                 position: 'relative',
-                // pointerEvents: 'none',
                 '& .MuiIconButton-root': {
                     position: 'relative',
                     zIndex: 2,
@@ -129,13 +131,13 @@ const useTableStyles = (theme: any) => {
             flexDirection: 'column',
             width: '100%',
             flex: 1,
-            backgroundColor: isDark
+            backgroundColor: theme.palette.mode === 'dark'
                 ? alpha(theme.palette.background.paper, 0.2)
-                : 'transparent',
+                : theme.palette.background.paper,
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             borderRadius: '12px',
         }
-    }), [theme.palette.mode, theme.palette.primary.main]);
+    }), [theme.palette.mode, theme.palette.primary.main, mode]);
 };
 
 export function ResizableTable<T>({
@@ -151,7 +153,8 @@ export function ResizableTable<T>({
     onRemoveSort,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
-    const styles = useTableStyles(theme);
+    const { mode } = useTableDensity();
+    const styles = useTableStyles(theme, mode);
     const hasActiveTags = activeFilters.length > 0 || activeSorting.length > 0;
 
     const handleRemoveFilter = useCallback((columnId: string) => {
