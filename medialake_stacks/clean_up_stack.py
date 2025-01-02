@@ -32,6 +32,7 @@ class CleanupStack(Stack):
                 name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
+                # log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
@@ -46,12 +47,21 @@ class CleanupStack(Stack):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "lambda:ListEventSourceMappings",
                     "lambda:DeleteEventSourceMapping",
                 ],
                 resources=[
                     f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*"
                 ],
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "lambda:ListEventSourceMappings",
+                ],
+                resources=["*"],
             )
         )
 
@@ -70,7 +80,7 @@ class CleanupStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["states:DeleteStateMachine"],
                 resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*"
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*"
                 ],  # TODO add resource prefix i.e. medialake
             )
         )
@@ -140,5 +150,5 @@ class CleanupStack(Stack):
             properties={
                 "Version": "1.0.0",
             },
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,  # needed for Delete request type on CDK destroy
         )

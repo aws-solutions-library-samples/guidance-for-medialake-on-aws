@@ -1,11 +1,19 @@
 import os
 import json
 import boto3
+from aws_lambda_powertools import Logger, Tracer, Metrics
+
+logger = Logger()
+tracer = Tracer()
+metrics = Metrics(namespace="PipelineTrigger")
 
 
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+@metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event, context):
+    print(json.dumps(event))
     # Get the Step Function ARN from environment variables
-    step_function_arn = os.environ["STEP_FUNCTION_ARN"]
 
     # Initialize the Step Functions client
     sfn_client = boto3.client("stepfunctions")
@@ -17,8 +25,9 @@ def lambda_handler(event, context):
             message_body = json.loads(record["body"])
 
             # Extract the assets array from the detail
-            asset = message_body["detail"]
-
+            asset = message_body["Asset"]
+            step_function_arn = message_body["StateMachineArn"]
+            format = asset["DigitalSourceAsset"]["MainRepresentation"]["Format"]
             # Start execution of the Step Function for each asset
             # for asset in assets:
             # Prepare the input for the Step Function
@@ -28,8 +37,14 @@ def lambda_handler(event, context):
             }
 
             # Start the Step Function execution
+
             response = sfn_client.start_execution(
-                stateMachineArn=step_function_arn, input=json.dumps(step_function_input)
+                stateMachineArn=step_function_arn,
+                input=json.dumps(step_function_input),
+            )
+
+            logger.info(
+                f"Started execution for asset {asset['InventoryID']}: {response['executionArn']}"
             )
 
             print(

@@ -40,7 +40,7 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 @dataclass
 class ConnectorsProps:
     asset_table: dynamodb.TableV2
-    iac_assets_bucket: s3.Bucket
+    iac_assets_bucket: s3.IBucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     ingest_event_bus: str | None

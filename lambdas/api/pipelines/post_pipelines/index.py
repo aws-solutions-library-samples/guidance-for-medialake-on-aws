@@ -6,8 +6,8 @@ import boto3
 from decimal import Decimal
 from datetime import datetime
 from contextlib import ExitStack
-from botocore.exceptions import ClientError
 
+from botocore.exceptions import ClientError
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -23,11 +23,6 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 
 from pydantic import BaseModel
 
-from image_pipeline_definitions import (
-    get_state_machine_definition,
-    # create_metadata_extractor_lambda,
-    # create_image_proxy_lambda,
-)
 
 tracer = Tracer()
 logger = Logger()
@@ -45,6 +40,7 @@ eventbridge = boto3.client("events")
 
 class S3Pipeline(BaseModel):
     definition: dict
+    event_pattern: dict
     name: str
     type: str
     system: bool
@@ -113,6 +109,77 @@ def handle_validation_error(ex: RequestValidationError):
     )
 
 
+def get_state_machine_definition(
+    pipeline_definition: dict, output_bucket_name: str, pipeline_name: str
+) -> dict:
+    """Returns the state machine definition based on the provided pipeline definition"""
+    logger.info(f"Pipeline definition received: {pipeline_definition}")
+
+    if not isinstance(pipeline_definition, dict):
+        raise ValueError(f"Expected dictionary, got {type(pipeline_definition)}")
+
+    if "nodes" not in pipeline_definition or "edges" not in pipeline_definition:
+        raise ValueError(
+            f"Pipeline definition is missing 'nodes' or 'edges'. Keys present: {pipeline_definition.keys()}"
+        )
+
+    nodes = pipeline_definition["nodes"]
+    edges = pipeline_definition["edges"]
+
+    # Create a mapping of node ids to their data
+    node_map = {node["id"]: node["data"] for node in nodes}
+
+    # Find the start node (node with no incoming edges)
+    start_node = next(
+        node
+        for node in nodes
+        if not any(edge["target"] == node["id"] for edge in edges)
+    )
+
+    # Create the state machine definition
+    state_machine = {
+        "Comment": f"Pipeline {pipeline_name}",
+        "StartAt": node_map[start_node["id"]]["label"].replace(" ", ""),
+        "States": {},
+    }
+
+    # Create states for each node
+    for node in nodes:
+        node_data = node["data"]
+        state_name = node_data["label"].replace(" ", "")
+
+        state = {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "FunctionName": node_data["id"],
+                "Payload": {
+                    "pipeline_id.$": "$.pipeline_id",
+                    "input.$": "$.input",
+                },
+            },
+            "ResultPath": f"$.{state_name}Result",
+        }
+
+        # Add mode and output_bucket for Image Proxy and Image Thumbnail
+        if node_data["type"] in ["imageproxy", "imagethumbnail"]:
+            state["Parameters"]["Payload"]["output_bucket"] = output_bucket_name
+            state["Parameters"]["Payload"]["mode"] = (
+                "proxy" if node_data["type"] == "imageproxy" else "thumbnail"
+            )
+
+        # Find the next node
+        next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
+        if next_edge:
+            state["Next"] = node_map[next_edge["target"]]["label"].replace(" ", "")
+        else:
+            state["End"] = True
+
+        state_machine["States"][state_name] = state
+
+    return state_machine
+
+
 def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
     """Create SQS FIFO queue and return queue URL and ARN"""
     try:
@@ -124,6 +191,7 @@ def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
                 "ContentBasedDeduplication": "true",
                 "DeduplicationScope": "messageGroup",
                 "FifoThroughputLimit": "perMessageGroupId",
+                "VisibilityTimeout": "300",
             },
             tags=tags,
         )
@@ -179,7 +247,12 @@ def create_state_machine(
 
 
 def create_eventbridge_rule(
-    rule_name: str, event_bus_name: str, queue_arn: str, tags: dict
+    rule_name: str,
+    event_bus_name: str,
+    queue_arn: str,
+    event_pattern: dict,
+    state_machine_arn: str,
+    tags: dict,
 ) -> str:
     """Create EventBridge rule to send all events to SQS FIFO queue"""
     try:
@@ -188,12 +261,25 @@ def create_eventbridge_rule(
         response = eventbridge.put_rule(
             Name=rule_name,
             EventBusName=event_bus_name,
-            EventPattern=json.dumps({"detail-type": ["AssetCreated"]}),
+            EventPattern=json.dumps(event_pattern),
             State="ENABLED",
             Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
         )
 
         # Add target (SQS queue)
+        # eventbridge.put_targets(
+        #     Rule=rule_name,
+        #     EventBusName=event_bus_name,
+        #     Targets=[
+        #         {
+        #             "Id": f"{rule_name}-target",
+        #             "Arn": queue_arn,
+        #             "SqsParameters": {
+        #                 "MessageGroupId": "default"  # Required for FIFO queues
+        #             },
+        #         }
+        #     ],
+        # )
         eventbridge.put_targets(
             Rule=rule_name,
             EventBusName=event_bus_name,
@@ -202,7 +288,11 @@ def create_eventbridge_rule(
                     "Id": f"{rule_name}-target",
                     "Arn": queue_arn,
                     "SqsParameters": {
-                        "MessageGroupId": "default"  # Required for FIFO queues
+                        "MessageGroupId": "default",  # Required for FIFO queues
+                    },
+                    "InputTransformer": {
+                        "InputPathsMap": {"detail": "$.detail"},
+                        "InputTemplate": f'{{"Asset": <detail>, "StateMachineArn": "{state_machine_arn}"}}',
                     },
                 }
             ],
@@ -260,88 +350,80 @@ def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
         raise
 
 
-def create_executer_lambda_role(
+def modify_trigger_lambda_role(
     role_name: str, queue_arn: str, state_machine_name: str, tags: dict
 ) -> str:
-    """Create IAM role for executer lambda"""
+    """Modify IAM role for trigger lambda"""
     try:
-        assume_role_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"Service": ["lambda.amazonaws.com"]},
-                    "Action": "sts:AssumeRole",
-                }
-            ],
-        }
-        policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        # Check if the role already exists
+        try:
+            response = iam_client.get_role(RoleName=role_name)
+            role_arn = response["Role"]["Arn"]
+            logger.info(f"Role {role_name} already exists. Modifying...")
+        except iam_client.exceptions.NoSuchEntityException:
+            raise Exception(f"Role {role_name} does not exists")
 
-        response = iam_client.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(assume_role_policy),
-            Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
-        )
+        # Get existing inline policies
+        existing_policies = iam_client.list_role_policies(RoleName=role_name)
 
-        # Attach policies to the role
-        iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
-
-        if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-            raise Exception(
-                f"Policy {policy_arn} did not attach to role {role_name} in time"
+        # If there's an existing policy, get its content
+        existing_policy_doc = {}
+        if existing_policies["PolicyNames"]:
+            existing_policy_name = existing_policies["PolicyNames"][0]
+            existing_policy_response = iam_client.get_role_policy(
+                RoleName=role_name, PolicyName=existing_policy_name
             )
+            existing_policy_doc = existing_policy_response["PolicyDocument"]
 
-        # Create and attach SQS policy
-        sqs_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "sqs:ReceiveMessage",
-                        "sqs:DeleteMessage",
-                        "sqs:GetQueueAttributes",
-                        "sqs:ChangeMessageVisibility",
-                        "sqs:SendMessage",
-                    ],
-                    "Resource": queue_arn,
-                }
+        # Create new policy statements
+        new_sqs_statement = {
+            "Effect": "Allow",
+            "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:ChangeMessageVisibility",
+                "sqs:SendMessage",
+            ],
+            "Resource": queue_arn,
+        }
+
+        new_step_functions_statement = {
+            "Effect": "Allow",
+            "Action": [
+                "states:StartExecution",
+                "states:DescribeExecution",
+                "states:StopExecution",
+            ],
+            "Resource": [
+                f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:stateMachine:{state_machine_name}",
+                f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:execution:{state_machine_name}:*",
             ],
         }
 
+        # Merge existing policy with new statements
+        if "Statement" in existing_policy_doc:
+            existing_policy_doc["Statement"].append(new_sqs_statement)
+            existing_policy_doc["Statement"].append(new_step_functions_statement)
+        else:
+            existing_policy_doc = {
+                "Version": "2012-10-17",
+                "Statement": [new_sqs_statement, new_step_functions_statement],
+            }
+
+        # Put the updated role policy
         iam_client.put_role_policy(
             RoleName=role_name,
-            PolicyName=f"{role_name}-sqs-policy",
-            PolicyDocument=json.dumps(sqs_policy),
+            PolicyName=f"{role_name}-policy",
+            PolicyDocument=json.dumps(existing_policy_doc),
         )
 
-        step_functions_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "states:StartExecution",
-                        "states:DescribeExecution",
-                        "states:StopExecution",
-                    ],
-                    "Resource": [
-                        f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:stateMachine:{state_machine_name}",
-                        f"arn:aws:states:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:execution:{state_machine_name}:*",
-                    ],
-                }
-            ],
-        }
+        logger.info(f"Updated inline policy for role {role_name}")
 
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName=f"{role_name}-stepfunctions-policy",
-            PolicyDocument=json.dumps(step_functions_policy),
-        )
+        return role_arn
 
-        return response["Role"]["Arn"]
     except Exception as e:
-        logger.error(f"Failed to create IAM role: {str(e)}")
+        logger.error(f"Failed to modify IAM role: {str(e)}")
         raise
 
 
@@ -386,9 +468,7 @@ def check_resource_exists(
     rule_name: str,
     sfn_role_name: str,
     lambda_s3_dynamo_rw_role_name: str,
-    lambda_executer_role_name: str,
     state_machine_name: str,
-    lambda_names: list,
 ) -> tuple[bool, str]:
     """Check if any of the resources already exist"""
     try:
@@ -413,11 +493,6 @@ def check_resource_exists(
         except iam_client.exceptions.NoSuchEntityException:
             pass
         try:
-            iam_client.get_role(RoleName=lambda_executer_role_name)
-            return True, f"IAM Role {lambda_executer_role_name} already exists"
-        except iam_client.exceptions.NoSuchEntityException:
-            pass
-        try:
             iam_client.get_role(RoleName=sfn_role_name)
             return True, f"IAM Role {sfn_role_name} already exists"
         except iam_client.exceptions.NoSuchEntityException:
@@ -433,17 +508,17 @@ def check_resource_exists(
             pass
 
         # Check Lambda Functions
-        for lambda_name in lambda_names:
-            try:
-                lambda_client.get_function(FunctionName=lambda_name)
-                if check_event_source_mappings(lambda_name):
-                    return (
-                        True,
-                        f"Lambda Function {lambda_name} with event source mappings already exists",
-                    )
-                return True, f"Lambda Function {lambda_name} already exists"
-            except lambda_client.exceptions.ResourceNotFoundException:
-                pass
+        # for lambda_name in lambda_names:
+        #     try:
+        #         lambda_client.get_function(FunctionName=lambda_name)
+        #         if check_event_source_mappings(lambda_name):
+        #             return (
+        #                 True,
+        #                 f"Lambda Function {lambda_name} with event source mappings already exists",
+        #             )
+        #         return True, f"Lambda Function {lambda_name} already exists"
+        #     except lambda_client.exceptions.ResourceNotFoundException:
+        #         pass
 
         # Check DynamoDB for pipeline name
         pipeline_table_name = os.environ.get("PIPELINES_TABLE_NAME")
@@ -472,44 +547,6 @@ def rollback_resources(resources_to_delete):
                 sqs_client.delete_queue(QueueUrl=resource_id)
             elif resource_type == "eventbridge_rule":
                 eventbridge.delete_rule(Name=resource_id)
-            elif (
-                resource_type == "iam_stepfunction_role"
-                or resource_type == "iam_lambda_executer_role"
-            ):
-
-                # Detach policies and delete role
-                role_name = resource_id.split("/")[-1]
-
-                attached_policies = iam_client.list_attached_role_policies(
-                    RoleName=role_name
-                )
-                for policy in attached_policies.get("AttachedPolicies", []):
-                    try:
-                        iam_client.detach_role_policy(
-                            RoleName=role_name, PolicyArn=policy["PolicyArn"]
-                        )
-                        logger.info(
-                            f"Successfully detached managed policy {policy['PolicyArn']} from role {role_name}"
-                        )
-                    except ClientError as e:
-                        if e.response["Error"]["Code"] != "NoSuchEntity":
-                            raise
-                        logger.warning(f"Policy {policy['PolicyArn']} already detached")
-
-                inline_policies = iam_client.list_role_policies(RoleName=role_name)
-                for policy_name in inline_policies.get("PolicyNames", []):
-                    try:
-                        iam_client.delete_role_policy(
-                            RoleName=role_name, PolicyName=policy_name
-                        )
-                        logger.info(
-                            f"Successfully deleted inline policy {policy_name} from role {role_name}"
-                        )
-                    except ClientError as e:
-                        if e.response["Error"]["Code"] != "NoSuchEntity":
-                            raise
-                        logger.warning(f"Inline policy {policy_name} already deleted")
-
             elif resource_type == "lambda":
                 lambda_client.delete_function(FunctionName=resource_id)
             elif resource_type == "step_function":
@@ -588,14 +625,52 @@ def get_connector_buckets(pipeline_type):
     return buckets
 
 
+def update_lambda_function_role(function_name: str, role_arn: str, max_retries=5):
+    lambda_client = boto3.client("lambda")
+    for attempt in range(max_retries):
+        try:
+            lambda_client.update_function_configuration(
+                FunctionName=function_name, Role=role_arn
+            )
+            logger.info(
+                f"Successfully updated role for Lambda function {function_name}"
+            )
+            return
+        except ClientError as e:
+            if e.response["Error"][
+                "Code"
+            ] == "InvalidParameterValueException" and "cannot be assumed by Lambda" in str(
+                e
+            ):
+                if attempt < max_retries - 1:
+                    wait_time = (2**attempt) * 5  # exponential backoff
+                    logger.warning(
+                        f"Role not ready, retrying in {wait_time} seconds..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"Failed to update role for Lambda function {function_name} after {max_retries} attempts: {str(e)}"
+                    )
+                    raise
+            else:
+                logger.error(
+                    f"Failed to update role for Lambda function {function_name}: {str(e)}"
+                )
+                raise
+
+
 @app.post("/pipelines")
 def create_pipeline(createpipeline: S3Pipeline) -> dict:
+    print("Received pipeline definition:", createpipeline.dict())
     resources_to_delete = []
 
     with ExitStack() as stack:
+        logger.info(f"Received create pipeline request: {createpipeline}")
         stack.callback(rollback_resources, resources_to_delete)
-        connector_buckets = None
+        # connector_buckets = None
         try:
+            logger.info("Starting pipeline creation process")
 
             # try:
             #     connector_buckets = get_connector_buckets(createpipeline.type)
@@ -608,22 +683,24 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             #     }
 
             global_prefix = os.environ["GLOBAL_PREFIX"]
+            logger.info(f"Global prefix: {global_prefix}")
             # Generate names for resources
-            queue_name = f"{global_prefix}-pl-{createpipeline.name}"
-            rule_name = f"{global_prefix}-pl-{createpipeline.name}-rule"
-            sfn_role_name = f"{global_prefix}-pl-sfn-{createpipeline.name}"
+            resource_suffix = createpipeline.name.replace(" ", "-").lower()
+            queue_name = f"{global_prefix}-pl-{resource_suffix}"
+            rule_name = f"{global_prefix}-pl-{resource_suffix}-rule"
+            sfn_role_name = f"{global_prefix}-pl-sfn-{resource_suffix}"
 
             lambda_s3_dynamo_rw_role_name = (
-                f"{global_prefix}-pl-s3_dynamo_rw-lam-{createpipeline.name}"
+                f"{global_prefix}-pl-s3_dynamo_rw-lam-{resource_suffix}"
             )
-            lambda_executer_role_name = (
-                f"{global_prefix}-pl-executer-lam-{createpipeline.name}"
-            )
-            state_machine_name = f"{global_prefix}-pl-{createpipeline.name}"
 
-            pipeline_trigger_lambda_function_name = (
-                f"medialake-pipeline-{createpipeline.name}-executor"
+            state_machine_name = f"{global_prefix}-pl-{resource_suffix}"
+
+            logger.info(
+                f"Generated resource names: queue={queue_name}, rule={rule_name}, sfn_role={sfn_role_name}, lambda_roles={lambda_s3_dynamo_rw_role_name}, state_machine={state_machine_name}"
             )
+
+            event_pattern = createpipeline.event_pattern
 
             # Check if resources exist
             resources_exist, error_message = check_resource_exists(
@@ -632,12 +709,11 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 rule_name,
                 sfn_role_name,
                 lambda_s3_dynamo_rw_role_name,
-                lambda_executer_role_name,
                 state_machine_name,
-                [pipeline_trigger_lambda_function_name],
             )
 
             if resources_exist:
+                logger.error(error_message)
                 return {
                     "status": "409",
                     "message": "Resource conflict",
@@ -647,9 +723,13 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             # Generate unique ID and timestamps
             pipeline_id = str(uuid.uuid4())
             current_time = datetime.utcnow().isoformat(timespec="seconds")
+            logger.info(f"Generated pipeline ID: {pipeline_id}")
             deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
-            pipeline_trigger_deployment_zip = os.environ.get("PIPELINE_TRIGGER_LAMBDA")
+            pipeline_trigger_lambda_arn = os.environ.get("PIPELINE_TRIGGER_LAMBDA_ARN")
             parent_event_bus_name = os.environ.get("INGEST_EVENT_BUS")
+            logger.info(
+                f"Environment variables: deployment_bucket={deployment_bucket}, pipeline_trigger_lambda_arn={pipeline_trigger_lambda_arn}, parent_event_bus_name={parent_event_bus_name}"
+            )
             # connector_table_name = os.environ.get("CONNECTOR_TABLE_NAME")
             # Common tags for all resources
             tags = {
@@ -657,10 +737,12 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 "pipeline_id": pipeline_id,
                 "pipeline_name": createpipeline.name,
             }
+            logger.info(f"Resource tags: {tags}")
 
             # Create SQS FIFO Queue
-            queue_name = f"medialake-pipeline-{createpipeline.name}"
+            queue_name = f"medialake-pipeline-{resource_suffix}"
             try:
+                logger.info(f"Creating SQS FIFO queue: {queue_name}")
                 queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
                 resources_to_delete.append(("sqs", queue_url))
             except sqs_client.exceptions.QueueDeletedRecently as e:
@@ -673,36 +755,49 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                     },
                 }
 
-            # Create EventBridge rule
-            rule_name = f"medialake-pipeline-{createpipeline.name}-rule"
-            rule_arn = create_eventbridge_rule(
-                rule_name, parent_event_bus_name, queue_arn, tags
-            )
-            resources_to_delete.append(("eventbridge_rule", rule_name))
-
             # Create IAM Role for Lambda and Step Functions
-            state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-
+            state_machine_name = f"medialake-pipeline-{resource_suffix}"
+            logger.info(f"Creating IAM role for Step Functions: {sfn_role_name}")
             sfn_role_arn = create_stepfunction_role(sfn_role_name, queue_arn, tags)
             resources_to_delete.append(("iam_stepfunction_role", sfn_role_arn))
+            logger.info(f"Step Functions IAM role created: {sfn_role_arn}")
 
-            lambda_executer_role_arn = create_executer_lambda_role(
-                lambda_executer_role_name, queue_arn, state_machine_name, tags
+            trigger_lambda = lambda_client.get_function(
+                FunctionName=pipeline_trigger_lambda_arn
             )
-            resources_to_delete.append(
-                ("iam_lambda_executer_role", lambda_executer_role_arn)
+            lambda_trigger_role_arn = trigger_lambda["Configuration"]["Role"]
+            lambda_trigger_role_name = lambda_trigger_role_arn.split("/")[-1]
+
+            logger.info(
+                f"Modifying IAM role for Lambda trigger: {lambda_trigger_role_name}"
             )
+            modify_trigger_lambda_role(
+                lambda_trigger_role_name, queue_arn, state_machine_name, tags
+            )
+
+            logger.info(f"Lambda trigger IAM role modified: {lambda_trigger_role_name}")
+            logger.info("Updating Lambda function role")
+
+            update_lambda_function_role(
+                pipeline_trigger_lambda_arn, lambda_trigger_role_arn
+            )
+            logger.info("Creating IAM Lambda S3 DynamoDB read-write policy")
 
             iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy()
             # print(iam_lambda_s3_dynamo_rw_policy)
+            logger.info("Updating Lambda role permissions for image metadata extractor")
 
             update_lambda_role_permissions(
                 os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
                 iam_lambda_s3_dynamo_rw_policy,
             )
+            logger.info("Updating Lambda role permissions for image proxy")
+
             update_lambda_role_permissions(
                 os.environ.get("IMAGE_PROXY_LAMBDA_ARN"), iam_lambda_s3_dynamo_rw_policy
             )
+
+            logger.info("Creating new bucket policy")
 
             new_bucket_policy = {
                 "Sid": "AllowLambdaWriteAccess",
@@ -725,56 +820,65 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             current_policy = json.loads(result["Policy"])
             current_policy["Statement"].append(new_bucket_policy)
             updated_policy = json.dumps(current_policy)
+            logger.info(f"Current bucket policy: {json.dumps(current_policy)}")
+
             # print(updated_policy)
             # Do not JSON dump again, as it's already a JSON string
+            logger.info("Putting updated bucket policy")
+
             s3_client.put_bucket_policy(
                 Bucket=os.environ["MEDIA_ASSETS_BUCKET_NAME"],
                 Policy=updated_policy,
             )
 
-            # Create Step Function
-            state_machine_name = f"medialake-pipeline-{createpipeline.name}"
-
             # Get state machine definition
+            logger.info("Getting state machine definition")
 
+            # state_machine_definition = get_state_machine_definition(
+            #     os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
+            #     os.environ.get("IMAGE_PROXY_LAMBDA_ARN"),
+            #     createpipeline.name,
+            #     os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
+            # )
+
+            output_bucket_name = os.environ.get("MEDIA_ASSETS_BUCKET_NAME")
             state_machine_definition = get_state_machine_definition(
-                os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
-                os.environ.get("IMAGE_PROXY_LAMBDA_ARN"),
-                createpipeline.name,
-                os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
+                createpipeline.definition, output_bucket_name, createpipeline.name
             )
+            logger.info("Creating state machine")
 
             state_machine_arn = create_state_machine(
                 state_machine_name, sfn_role_arn, state_machine_definition, tags
             )
             resources_to_delete.append(("step_function", state_machine_arn))
 
-            # Create Lambda Function
-
-            pipeline_trigger_lambda_response = lambda_client.create_function(
-                FunctionName=pipeline_trigger_lambda_function_name,
-                Runtime="python3.12",
-                Role=lambda_executer_role_arn,
-                Handler="index.lambda_handler",
-                Code={
-                    "S3Bucket": deployment_bucket,
-                    "S3Key": pipeline_trigger_deployment_zip,
-                },
-                Environment={"Variables": {"STEP_FUNCTION_ARN": state_machine_arn}},
-                Tags=tags,
+            # Create EventBridge rule
+            rule_name = f"medialake-pipeline-{resource_suffix}-rule"
+            logger.info(f"Creating EventBridge rule: {rule_name}")
+            rule_arn = create_eventbridge_rule(
+                rule_name,
+                parent_event_bus_name,
+                queue_arn,
+                event_pattern,
+                state_machine_arn,
+                tags,
             )
             resources_to_delete.append(
-                ("lambda", pipeline_trigger_lambda_function_name)
+                (
+                    "eventbridge_rule",
+                    {"rule_name": rule_name, "eventbus_name": parent_event_bus_name},
+                )
             )
+            logger.info(f"EventBridge rule created: {rule_arn}")
 
             if not wait_for_iam_role_propagation(iam_client, sfn_role_name):
-                raise Exception(
-                    f"Role {lambda_executer_role_name} is not ready in time"
-                )
+                raise Exception(f"Role {lambda_trigger_role_name} is not ready in time")
             # Add SQS trigger to Lambda
+            logger.info("Creating event source mapping")
+
             event_source_mapping = lambda_client.create_event_source_mapping(
                 EventSourceArn=queue_arn,
-                FunctionName=pipeline_trigger_lambda_function_name,
+                FunctionName=pipeline_trigger_lambda_arn,
                 Enabled=True,
             )
             resources_to_delete.append(
@@ -784,12 +888,18 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             # Save pipeline details to DynamoDB
             pipeline_table_name = os.environ.get("PIPELINES_TABLE_NAME")
             if not pipeline_table_name:
+                logger.error("PIPELINES_TABLE_NAME environment variable not set")
+
                 raise ValueError("PIPELINES_TABLE_NAME environment variable not set")
 
             # Convert the definition's float values to Decimal
+            logger.info("Converting definition's float values to Decimal")
+
             definition = float_to_decimal(createpipeline.definition)
 
             pipeline_table = dynamodb.Table(pipeline_table_name)
+            logger.debug("Preparing pipeline item for DynamoDB")
+
             pipeline_item = {
                 "id": pipeline_id,
                 "name": createpipeline.name,
@@ -798,19 +908,17 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 "createdAt": current_time,
                 "updatedAt": current_time,
                 "definition": definition,
+                # "eventPattern": event_pattern,
                 "queueUrl": queue_url,
                 "queueArn": queue_arn,
-                # "eventBridgeRuleArn": rule_arn,
-                "eventBridgeDetails": {
-                    "eventBridgeRuleArn": rule_arn,
-                    "parentEventBusName": parent_event_bus_name,
-                },
-                "triggerLambdaArn": pipeline_trigger_lambda_response["FunctionArn"],
+                "triggerLambdaArn": pipeline_trigger_lambda_arn,
                 "stateMachineArn": state_machine_arn,
                 "sfnRoleArn": sfn_role_arn,
-                "executerRoleArn": lambda_executer_role_arn,
                 "dependentResources": resources_to_delete,
             }
+            logger.info(f"Pipeline item: {json.dumps(pipeline_item, default=str)}")
+
+            logger.info("Putting item in DynamoDB")
 
             pipeline_table.put_item(Item=pipeline_item)
 
@@ -818,11 +926,14 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 f"Created pipeline '{createpipeline.name}' with ID {pipeline_id}"
             )
             stack.pop_all()
+            logger.info("Pipeline creation successful")
 
             return {
                 "status": "200",
                 "message": "Pipeline created successfully",
-                "data": pipeline_item,
+                "data": {
+                    "id": pipeline_id,
+                },
             }
 
         except Exception as e:
@@ -842,4 +953,49 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     print(json.dumps(event))
+
+    # Check if DefinitionFile is present in the event
+    if "body" in event:
+        pipeline_definition = json.loads(event["body"])
+    elif "definitionFile" in event:
+        try:
+            # Extract bucket and key from DefinitionFile
+            definition_file = event["definitionFile"]
+            bucket = definition_file["bucket"]
+            key = definition_file["key"]
+
+            # Read the JSON file from S3
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            file_content = response["Body"].read().decode("utf-8")
+
+            # Parse the JSON content
+            pipeline_definition = json.loads(file_content)
+
+            # Update the event with the pipeline definition
+            event["body"] = json.dumps(pipeline_definition)
+
+        except Exception as e:
+            logger.error(f"Failed to read pipeline definition from S3: {str(e)}")
+            return {
+                "statusCode": 400,
+                "body": json.dumps(
+                    {
+                        "status": "400",
+                        "message": "Failed to read pipeline definition from S3",
+                        "data": {"error": str(e)},
+                    }
+                ),
+            }
+    else:
+        return {
+            "statusCode": 400,
+            "body": json.dumps(
+                {
+                    "status": "400",
+                    "message": "Invalid input: missing pipeline definition",
+                    "data": {},
+                }
+            ),
+        }
+
     return app.resolve(event, context)

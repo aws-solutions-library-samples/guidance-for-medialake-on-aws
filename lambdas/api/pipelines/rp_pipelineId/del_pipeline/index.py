@@ -280,9 +280,9 @@ def delete_pipeline(pipeline_id: str):
                 ):
                     deletion_errors.append(f"Failed to delete IAM role: {str(e)}")
 
-        if "executerRoleArn" in pipeline:
+        if "triggerRoleArn" in pipeline:
             try:
-                delete_iam_role(pipeline["executerRoleArn"])
+                delete_iam_role(pipeline["triggerRoleArn"])
             except Exception as e:
                 if (
                     not isinstance(e, ClientError)

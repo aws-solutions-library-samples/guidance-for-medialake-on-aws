@@ -130,9 +130,12 @@ def clean_up_pipeline(item, table):
             if resource_type == "sqs":
                 delete_sqs_queue(resource_identifier)
             elif resource_type == "eventbridge_rule":
-                # We'll handle this when deleting the event bus
-                pass
-            elif resource_type in ["iam_stepfunction_role", "iam_lambda_executer_role"]:
+                delete_eventbridge_rule(
+                    resource_identifier["rule_name"],
+                    resource_identifier["eventbus_name"],
+                )
+
+            elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role"]:
                 delete_iam_role(resource_identifier)
             elif resource_type == "step_function":
                 delete_step_function(resource_identifier)
@@ -140,13 +143,6 @@ def clean_up_pipeline(item, table):
                 delete_lambda_function(resource_identifier)
             elif resource_type == "event_source_mapping":
                 delete_event_source_mapping(resource_identifier)
-
-    # Delete the event bus and all its rules
-    if (
-        "eventBridgeDetails" in item
-        and "parentEventBusName" in item["eventBridgeDetails"]
-    ):
-        delete_event_bus_and_rules(item["eventBridgeDetails"]["parentEventBusName"])
 
     # Delete the pipeline record
     table.delete_item(Key={"id": item["id"]})
@@ -272,11 +268,11 @@ def lambda_handler(event, context):
             connector_table_name = os.environ["CONNECTOR_TABLE"]
             pipeline_table_name = os.environ["PIPELINE_TABLE"]
 
-            # Clean up connector resources
-            clean_up_table_resources(connector_table_name, clean_up_connector)
-
             # Clean up pipeline resources
             clean_up_table_resources(pipeline_table_name, clean_up_pipeline)
+
+            # Clean up connector resources
+            clean_up_table_resources(connector_table_name, clean_up_connector)
 
             logger.info("Cleanup completed successfully")
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
