@@ -114,6 +114,7 @@ class LambdaConfig:
         layers (Optional[List[PythonLayerVersion]]): Lambda layers to attach
         iam_role_name (Optional[str]): Custom IAM role name
         vpc (Optional[ec2.IVpc]): VPC configuration for the Lambda
+        log_removal_policy (Optional[RemovalPolicy]): Removal policy for the CloudWatch log group (default: DESTROY)
     """
 
     name: Optional[str] = None
@@ -129,6 +130,7 @@ class LambdaConfig:
     security_groups: Optional[List[ec2.ISecurityGroup]] = None
     iam_role_boundary_policy: Optional[iam.ManagedPolicy] = None
     lambda_handler: Optional[str] = "lambda_handler"
+    log_removal_policy: Optional[RemovalPolicy] = RemovalPolicy.DESTROY
 
 
 class Lambda(Construct):
@@ -214,7 +216,7 @@ class Lambda(Construct):
             log_group_name=log_group_name,
             retention=LOG_RETENTION,
         )
-        lambda_log_group.apply_removal_policy(RemovalPolicy.DESTROY)
+        lambda_log_group.apply_removal_policy(config.log_removal_policy)
 
         # Create IAM role
         logger.debug("Setting up IAM role")

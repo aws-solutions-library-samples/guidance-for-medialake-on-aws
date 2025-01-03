@@ -525,24 +525,48 @@ class PipelineNodesStack(Stack):
         return self._trigger_node_lambda
 
     @property
+    def trigger_node_function_arn(self) -> str:
+        return self._trigger_node_lambda.function_arn
+
+    @property
     def image_metadata_extractor_lambda(self) -> lambda_.Function:
         return self._image_metadata_extractor_lambda
+
+    @property
+    def image_metadata_extractor_function_arn(self) -> str:
+        return self._image_metadata_extractor_lambda.function_arn
 
     @property
     def image_proxy_lambda(self) -> lambda_.Function:
         return self._image_proxy_lambda
 
     @property
+    def image_proxy_function_arn(self) -> str:
+        return self._image_proxy_lambda.function_arn
+
+    @property
     def video_metadata_extractor_lambda(self) -> lambda_.Function:
         return self._video_metadata_extractor_lambda
+
+    @property
+    def video_metadata_extractor_function_arn(self) -> str:
+        return self._video_metadata_extractor_lambda.function_arn
 
     @property
     def video_proxy_lambda(self) -> lambda_.Function:
         return self._video_proxy_lambda
 
     @property
+    def video_proxy_function_arn(self) -> str:
+        return self._video_proxy_lambda.function_arn
+
+    @property
     def video_thumbnail_lambda(self) -> lambda_.Function:
         return self._video_thumbnail_lambda
+
+    @property
+    def video_thumbnail_function_arn(self) -> str:
+        return self._video_thumbnail_lambda.function_arn
 
     @property
     def pipelne_nodes_table(self) -> dynamodb.TableV2:

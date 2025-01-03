@@ -89,3 +89,10 @@ class S3Bucket(Construct):
         Returns the underlying S3 bucket as an IBucket interface.
         """
         return self._bucket.bucket_arn
+
+    @property
+    def bucket_name(self) -> str:
+        """
+        Returns the underlying S3 bucket as an IBucket interface.
+        """
+        return self._bucket.bucket_name

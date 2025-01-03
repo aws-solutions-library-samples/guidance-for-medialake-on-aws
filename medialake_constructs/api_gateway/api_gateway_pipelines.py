@@ -25,7 +25,7 @@ class ApiGatewayPipelinesProps:
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
-    iac_assets_bucket: s3.Bucket
+    iac_assets_bucket: s3.IBucket
     image_proxy_lambda: lambda_.IFunction
     image_metadata_extractor_lambda: lambda_.IFunction
     get_pipelines_executions_lambda: lambda_.IFunction
@@ -33,6 +33,7 @@ class ApiGatewayPipelinesProps:
 
 
 class ApiGatewayPipelinesConstruct(Construct):
+
     def __init__(
         self,
         scope: Construct,
@@ -40,7 +41,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         api_resource: apigateway.IResource,
         cognito_authorizer: apigateway.IAuthorizer,
         ingest_event_bus: events.EventBus,
-        iac_assets_bucket: s3.Bucket,
+        iac_assets_bucket: s3.IBucket,
         media_assets_bucket: s3.Bucket,
         x_origin_verify_secret: secretsmanager.Secret,
         props: ApiGatewayPipelinesProps,
@@ -142,11 +143,30 @@ class ApiGatewayPipelinesConstruct(Construct):
             ],
         )
 
-        self.pipeline_trigger_lambda_deployment = LambdaDeployment(
+        # self.pipeline_trigger_lambda_deployment = LambdaDeployment(
+        #     self,
+        #     "PipelineTriggerLambdaDeployment",
+        #     destination_bucket=props.iac_assets_bucket.bucket,
+        #     code_path=["lambdas", "pipelines", "pipeline_trigger"],
+        # )
+
+        pipeline_trigger_lambda = Lambda(
             self,
-            "PipelineTriggerLambdaDeployment",
-            destination_bucket=iac_assets_bucket.bucket,
-            code_path=["lambdas", "pipelines", "pipeline_trigger"],
+            "PipelineTriggerLambda",
+            config=LambdaConfig(
+                name="PipelineTrigger",
+                entry="lambdas/pipelines/pipeline_trigger",
+                environment_variables={
+                    # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                    "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
+                },
+            ),
+        )
+        pipeline_trigger_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:Scan"],
+                resources=[props.pipeline_table.table_arn],
+            )
         )
 
         # Create pipelines resource
@@ -195,8 +215,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
-                "PIPELINE_TRIGGER_LAMBDA": self.pipeline_trigger_lambda_deployment.deployment_key,
-                "IAC_ASSETS_BUCKET": iac_assets_bucket.bucket.bucket_name,
+                "PIPELINE_TRIGGER_LAMBDA_ARN": pipeline_trigger_lambda.function_arn,
+                "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "AWS_ACCOUNT_ID": scope.account,
@@ -231,6 +251,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "iam:ListAttachedRolePolicies",
                     "iam:PassRole",
                     "iam:PutRolePolicy",
+                    "iam:GetRolePolicy",
                     "iam:GetRole",
                     "iam:ListRolePolicies",  # for rollback
                     "iam:DetachRolePolicy",  # for rollback
@@ -313,7 +334,9 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        iac_assets_bucket.bucket.grant_read_write(self._post_pipelines_handler.function)
+        props.iac_assets_bucket.bucket.grant_read_write(
+            self._post_pipelines_handler.function
+        )
 
         pipelines_resource.add_method(
             "POST",
