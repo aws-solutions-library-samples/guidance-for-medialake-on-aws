@@ -25,13 +25,7 @@ import { useGetUser } from '../../api/hooks/useUsers';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { useEffect, useState } from 'react';
 
-interface UserAttributes {
-    email: string;
-    email_verified: string;
-    name: string;
-    family_name: string;
-    sub: string;
-}
+import { UserAttributes } from '../../api/types/api.types';
 
 interface UserProfileData {
     username: string;
@@ -91,13 +85,17 @@ const ProfilePage: React.FC = () => {
     }
 
     const email = userProfile.data.attributes?.email || 'Unavailable';
-    const firstName = userProfile.data.attributes?.name || 'Unavailable';
+    const firstName = userProfile.data.attributes?.given_name || 'Unavailable';
     const lastName = userProfile.data.attributes?.family_name || 'Unavailable';
 
     return (
         <Box>
             <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
+                <Typography variant="h4" sx={{
+                    fontWeight: 700,
+                    mb: 1,
+                    color: theme.palette.primary.main,
+                }}>
                     Profile
                 </Typography>
                 <Typography variant="body1" color="text.secondary">

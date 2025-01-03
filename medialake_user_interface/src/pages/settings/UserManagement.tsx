@@ -54,7 +54,7 @@ const UserManagement: React.FC = () => {
                     enabled: userData.enabled,
                     groups: userData.groups,
                     roles: userData.roles,
-                    name: userData.name,
+                    given_name: userData.given_name,
                     family_name: userData.family_name,
                 };
                 const result = await updateUserMutation.mutateAsync({
@@ -121,10 +121,7 @@ const UserManagement: React.FC = () => {
                         <Typography variant="h4" sx={{
                             fontWeight: 700,
                             mb: 1,
-                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                            backgroundClip: 'text',
-                            WebkitBackgroundClip: 'text',
-                            color: 'transparent',
+                            color: theme.palette.primary.main,
                         }}>
                             {t('users.title')}
                         </Typography>

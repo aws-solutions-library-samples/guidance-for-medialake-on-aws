@@ -38,13 +38,15 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                 styleOverrides: {
                     root: ({ theme: muiTheme }) => ({
                         backgroundColor: 'transparent',
-                        borderColor: muiTheme.palette.divider,
+                        borderColor: alpha(muiTheme.palette.divider, 0.1),
                         color: muiTheme.palette.text.primary,
                     }),
-                    head: {
-                        backgroundColor: 'transparent !important',
+                    head: ({ theme: muiTheme }) => ({
+                        backgroundColor: muiTheme.palette.mode === 'dark'
+                            ? alpha(muiTheme.palette.background.default, 0.3)
+                            : alpha(muiTheme.palette.background.paper, 0.04),
                         fontWeight: 600,
-                    },
+                    }),
                 },
             },
             MuiTableRow: {
@@ -65,9 +67,11 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
             },
             MuiTableContainer: {
                 styleOverrides: {
-                    root: {
-                        backgroundColor: 'transparent',
-                    },
+                    root: ({ theme: muiTheme }) => ({
+                        backgroundColor: muiTheme.palette.mode === 'dark'
+                            ? muiTheme.palette.background.default
+                            : muiTheme.palette.background.paper,
+                    }),
                 },
             },
             MuiPaper: {

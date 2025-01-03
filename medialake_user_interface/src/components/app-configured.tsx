@@ -4,11 +4,11 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { RouterProvider, createBrowserRouter, Outlet, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '../api/queryClient';
-import { AwsConfigProvider } from '../common/hooks/aws-config-context';
+import { AwsConfigProvider, useAwsConfig } from '../common/hooks/aws-config-context';
 import { AuthProvider, useAuth } from '../common/hooks/auth-context';
 import { Authenticator, ThemeProvider as AmplifyThemeProvider, Theme } from '@aws-amplify/ui-react';
-import { fetchAuthSession, signIn, confirmSignIn } from 'aws-amplify/auth';
-import { Box, CircularProgress } from '@mui/material';
+import { fetchAuthSession, signIn, confirmSignIn, signInWithRedirect } from 'aws-amplify/auth';
+import { Box, CircularProgress, Button, Typography, Stack, Divider } from '@mui/material';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
 import SearchPage from '../pages/SearchPage';
@@ -86,61 +86,44 @@ const theme: Theme = {
     },
 };
 
-// Custom UI components for Auth
 const components = {
     Header() {
-        return (
-            <Box
-                style={{
-                    textAlign: 'center',
-                    padding: '2rem 2.5rem',
-                    color: 'white',
-                }}
-            >
-                <img
-                    src="/logo.png"
-                    alt="MediaLake Logo"
-                    style={{
-                        height: '40px',
-                        marginBottom: '1rem',
-                    }}
-                />
-                <h1
-                    style={{
-                        fontSize: '1.5rem',
-                        fontWeight: '600',
-                        margin: 0,
-                        color: 'white',
-                    }}
-                >
-                    Welcome to MediaLake
-                </h1>
-                <p
-                    style={{
-                        fontSize: '0.875rem',
-                        color: 'rgba(255, 255, 255, 0.85)',
-                        margin: '0.5rem 0 0',
-                    }}
-                >
-                    A data lake for your media, metadata, and media pipelines.
-                </p>
-            </Box>
-        );
+        return null;
     },
     Footer() {
         return null;
     },
+    SignIn: {
+        Header() {
+            return null;
+        },
+        Footer() {
+            return null;
+        }
+    }
 };
 
 const AuthPage = () => {
     const { setIsAuthenticated, isAuthenticated } = useAuth();
     const navigate = useNavigate();
+    const awsConfig = useAwsConfig();
 
     useEffect(() => {
         if (isAuthenticated) {
             navigate('/');
         }
     }, [isAuthenticated, navigate]);
+
+    if (!awsConfig) {
+        return <CircularProgress />;
+    }
+
+    const hasSamlProvider = awsConfig.Auth.identity_providers.some(
+        provider => provider.identity_provider_method === 'saml'
+    );
+    const hasCognitoProvider = awsConfig.Auth.identity_providers.some(
+        provider => provider.identity_provider_method === 'cognito'
+    );
 
     return (
         <Box sx={{
@@ -152,138 +135,242 @@ const AuthPage = () => {
             bgcolor: '#f0f2f5',
             backgroundImage: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
             padding: '20px',
-            '& .amplify-authenticator': {
-                maxWidth: '400px',
-                width: '100%',
-                marginBottom: '1rem',
-            },
-            '& [data-amplify-authenticator]': {
+            gap: '20px'
+        }}>
+            <Box sx={{
                 background: 'linear-gradient(135deg, #0050b3 0%, #002766 100%)',
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                overflow: 'hidden',
-            },
-            '& [data-amplify-container]': {
-                padding: '0',
-            },
-            '& [data-amplify-form]': {
-                padding: '0 2rem 2rem',
-            },
-            '& .amplify-button': {
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                padding: '2.5rem',
+                textAlign: 'center',
                 color: 'white',
-                '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                },
-            },
-            '& .amplify-field': {
-                '--amplify-components-field-label-color': 'rgba(255, 255, 255, 0.9)',
-            },
-            '& .amplify-input': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-                '&:focus': {
-                    borderColor: 'rgba(255, 255, 255, 0.5)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                },
-                '&::placeholder': {
-                    color: 'rgba(255, 255, 255, 0.5)',
-                },
-            },
-            '& .amplify-text': {
-                color: 'rgba(255, 255, 255, 0.9)',
-            },
-            '& .amplify-label': {
-                color: 'rgba(255, 255, 255, 0.9)',
-            },
-            '& .amplify-heading': {
-                color: 'rgba(255, 255, 255, 0.9)',
-            },
-            '& [data-amplify-footer] .amplify-text': {
-                color: 'white',
-            },
-            '& a': {
-                color: 'rgba(255, 255, 255, 0.9)',
-                '&:hover': {
-                    color: 'white',
-                },
-            },
-        }}>
-            <AmplifyThemeProvider theme={theme}>
-                <Authenticator
-                    loginMechanisms={['email']}
-                    signUpAttributes={['email']}
-                    hideSignUp={true}
-                    components={components}
-                    services={{
-                        async handleSignIn(input) {
-                            try {
-                                const signInResult = await signIn(input);
+                width: '400px',
+            }}>
+                {/* Single header for both auth methods */}
+                <Box sx={{ mb: 4 }}>
+                    <img
+                        src="/logo.png"
+                        alt="MediaLake Logo"
+                        style={{
+                            height: '40px',
+                            marginBottom: '1rem',
+                        }}
+                    />
+                    <h1 style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '600',
+                        margin: '0 0 0.5rem',
+                    }}>
+                        Welcome to MediaLake
+                    </h1>
+                    <p style={{
+                        fontSize: '0.875rem',
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        margin: '0',
+                        lineHeight: '1.5',
+                    }}>
+                        A data lake for your media, metadata, and media pipelines.
+                    </p>
+                </Box>
 
-                                if (signInResult.nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-                                    return {
-                                        isSignedIn: false,
-                                        nextStep: {
-                                            signInStep: 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED'
+                <Stack spacing={2} sx={{ mt: 2 }}>
+                    {/* SAML Provider Buttons */}
+                    {hasSamlProvider && awsConfig.Auth.identity_providers.map(provider => {
+                        if (provider.identity_provider_method === 'saml') {
+                            return (
+                                <Button
+                                    key={provider.identity_provider_name}
+                                    onClick={() => {
+                                        console.log('Initiating SAML login with provider:', provider.identity_provider_name);
+                                        signInWithRedirect({
+                                            provider: { custom: provider.identity_provider_name }
+                                        }).catch(error => {
+                                            console.error('SAML redirect error:', error);
+                                        });
+                                    }}
+                                    sx={{
+                                        padding: '12px 24px',
+                                        fontSize: '1rem',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                        color: 'white',
+                                        height: '40px',
+                                        width: '100%',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255, 255, 255, 0.3)',
                                         }
-                                    };
-                                }
-
-                                const session = await fetchAuthSession();
-                                const token = session.tokens?.idToken?.toString();
-
-                                if (token) {
-                                    StorageHelper.setToken(token);
-                                    setIsAuthenticated(true);
-                                    navigate('/');
-                                }
-
-                                return {
-                                    isSignedIn: true,
-                                    nextStep: {
-                                        signInStep: 'DONE'
-                                    }
-                                };
-                            } catch (error) {
-                                console.error('Error during sign in:', error);
-                                throw error;
-                            }
-                        },
-                        async handleConfirmSignIn(input) {
-                            try {
-                                const confirmResult = await confirmSignIn(input);
-
-                                const session = await fetchAuthSession();
-                                const token = session.tokens?.idToken?.toString();
-
-                                if (token) {
-                                    StorageHelper.setToken(token);
-                                    setIsAuthenticated(true);
-                                    navigate('/');
-                                }
-
-                                return {
-                                    isSignedIn: true,
-                                    nextStep: {
-                                        signInStep: 'DONE'
-                                    }
-                                };
-                            } catch (error) {
-                                console.error('Error during confirm sign in:', error);
-                                throw error;
-                            }
+                                    }}
+                                >
+                                    Sign in with {provider.identity_provider_name}
+                                </Button>
+                            );
                         }
-                    }}
-                />
-            </AmplifyThemeProvider>
+                        return null;
+                    })}
+
+                    {/* Divider between SAML and Cognito */}
+                    {hasSamlProvider && hasCognitoProvider && (
+                        <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.2)' }}>
+                            <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>OR</Typography>
+                        </Divider>
+                    )}
+
+                    {/* Cognito Login Form */}
+                    {hasCognitoProvider && (
+                        <Box sx={{
+                            '& .amplify-authenticator': {
+                                marginBottom: '1rem',
+                                maxWidth: 'none',
+                                width: '100%',
+                            },
+                            '& [data-amplify-authenticator]': {
+                                background: 'transparent',
+                                boxShadow: 'none',
+                                maxWidth: 'none',
+                                width: '100%',
+                            },
+                            '& [data-amplify-container]': {
+                                padding: '0',
+                                maxWidth: 'none',
+                                width: '100%',
+                            },
+                            '& [data-amplify-form]': {
+                                padding: '0',
+                                maxWidth: 'none',
+                                width: '100%',
+                            },
+                            '& .amplify-button[type="submit"]': {
+                                maxWidth: 'none',
+                                width: '100%',
+                            },
+                            '& .amplify-divider, & .amplify-divider--small': {
+                                display: 'none',
+                            },
+                            '& .amplify-tabs': {
+                                width: '100%',
+                            },
+                            '& .amplify-button': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                color: 'white',
+                                height: '40px',
+                                width: '100%',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                },
+                            },
+                            '& .amplify-field': {
+                                '--amplify-components-field-label-color': 'rgba(255, 255, 255, 0.9)',
+                                width: '100%',
+                                '& .amplify-flex': {
+                                    width: '100%',
+                                }
+                            },
+                            '& .amplify-input': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                borderColor: 'rgba(255, 255, 255, 0.2)',
+                                width: '100%',
+                                height: '40px',
+                                textAlign: 'center',
+                                paddingRight: '40px',
+                                '&:focus': {
+                                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                                },
+                                '&::placeholder': {
+                                    color: 'rgba(255, 255, 255, 0.5)',
+                                },
+                                '&[type="password"]': {
+                                    textAlign: 'center',
+                                    letterSpacing: '0.3em',
+                                },
+                            },
+                            '& .amplify-text': {
+                                color: 'rgba(255, 255, 255, 0.9)',
+                            },
+                            '& .amplify-label': {
+                                color: 'rgba(255, 255, 255, 0.9)',
+                            },
+                            '& .amplify-heading': {
+                                color: 'rgba(255, 255, 255, 0.9)',
+                            },
+                        }}>
+                            <AmplifyThemeProvider theme={theme}>
+                                <Authenticator
+                                    loginMechanisms={['email']}
+                                    signUpAttributes={['email']}
+                                    hideSignUp={true}
+                                    components={components}
+                                    services={{
+                                        async handleSignIn(input) {
+                                            try {
+                                                const signInResult = await signIn(input);
+
+                                                if (signInResult.nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+                                                    return {
+                                                        isSignedIn: false,
+                                                        nextStep: {
+                                                            signInStep: 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED'
+                                                        }
+                                                    };
+                                                }
+
+                                                const session = await fetchAuthSession();
+                                                const token = session.tokens?.idToken?.toString();
+
+                                                if (token) {
+                                                    StorageHelper.setToken(token);
+                                                    setIsAuthenticated(true);
+                                                    navigate('/');
+                                                }
+
+                                                return {
+                                                    isSignedIn: true,
+                                                    nextStep: {
+                                                        signInStep: 'DONE'
+                                                    }
+                                                };
+                                            } catch (error) {
+                                                console.error('Error during sign in:', error);
+                                                throw error;
+                                            }
+                                        },
+                                        async handleConfirmSignIn(input) {
+                                            try {
+                                                const confirmResult = await confirmSignIn(input);
+
+                                                const session = await fetchAuthSession();
+                                                const token = session.tokens?.idToken?.toString();
+
+                                                if (token) {
+                                                    StorageHelper.setToken(token);
+                                                    setIsAuthenticated(true);
+                                                    navigate('/');
+                                                }
+
+                                                return {
+                                                    isSignedIn: true,
+                                                    nextStep: {
+                                                        signInStep: 'DONE'
+                                                    }
+                                                };
+                                            } catch (error) {
+                                                console.error('Error during confirm sign in:', error);
+                                                throw error;
+                                            }
+                                        }
+                                    }}
+                                />
+                            </AmplifyThemeProvider>
+                        </Box>
+                    )}
+                </Stack>
+            </Box>
         </Box>
     );
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated } = useAuth();
-
     return isAuthenticated ? <>{children}</> : <Navigate to="/sign-in" replace />;
 };
 
@@ -300,8 +387,8 @@ const AppLayout = () => {
                     mt: 8,
                     display: 'flex',
                     flexDirection: 'column',
-                    minWidth: 0, // Important for proper flex behavior
-                    height: 'calc(100vh - 64px)', // 64px is the TopBar height
+                    minWidth: 0,
+                    height: 'calc(100vh - 64px)',
                     overflow: 'hidden'
                 }}>
                     <Outlet />
@@ -398,7 +485,7 @@ const ErrorFallback = ({ error }: { error: Error }) => (
     </Box>
 );
 
-const AppConfigured: React.FC = () => {
+const AppConfigured = () => {
     return (
         <ErrorBoundary FallbackComponent={ErrorFallback}>
             <Suspense fallback={<LoadingFallback />}>

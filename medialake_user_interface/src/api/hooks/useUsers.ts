@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/api/apiClient';
-import { API_ENDPOINTS } from '@/api/endpoints';
-import { QUERY_KEYS } from '@/api/queryKeys';
-import { User, CreateUserRequest, UpdateUserRequest, CreateUserResponse } from '@/api/types/api.types';
+import { apiClient } from '../apiClient';
+import { API_ENDPOINTS } from '../endpoints';
+import { QUERY_KEYS } from '../queryKeys';
+import { User, CreateUserRequest, UpdateUserRequest, CreateUserResponse, UserAttributes } from '../types/api.types';
 
 interface UsersResponse {
     status: string;
@@ -15,14 +15,6 @@ interface UsersResponse {
             pageSize: number;
         };
     };
-}
-
-interface UserAttributes {
-    email: string;
-    email_verified: string;
-    name: string;
-    family_name: string;
-    sub: string;
 }
 
 interface UserProfileResponse {
@@ -97,7 +89,7 @@ export const useUpdateUser = () => {
 
     return useMutation<User, Error, { username: string; updates: UpdateUserRequest }>({
         mutationFn: async ({ username, updates }) => {
-            const { data } = await apiClient.put<User>(`${API_ENDPOINTS.USERS}/${username}`, updates);
+            const { data } = await apiClient.put<User>(`${API_ENDPOINTS.USER}/${username}`, updates);
             return data;
         },
         onSuccess: () => {

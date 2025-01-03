@@ -223,10 +223,7 @@ const ExecutionStatusPage: React.FC = () => {
                         <Typography variant="h4" sx={{
                             fontWeight: 700,
                             mb: 1,
-                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                            backgroundClip: 'text',
-                            WebkitBackgroundClip: 'text',
-                            color: 'transparent',
+                            color: theme.palette.primary.main,
                         }}>
                             Pipeline Execution Status
                         </Typography>

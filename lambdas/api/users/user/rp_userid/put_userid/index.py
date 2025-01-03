@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.parser import parse
@@ -7,13 +7,14 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from pydantic import BaseModel, Field
 import boto3
+import json
 import os
 from botocore.exceptions import ClientError
 
 # Initialize AWS PowerTools
 logger = Logger(service="user-service", level=os.getenv("LOG_LEVEL", "WARNING"))
 tracer = Tracer(service="user-service")
-metrics = Metrics(namespace="medialake", service="users-userid-get")
+metrics = Metrics(namespace="medialake", service="users-userid-put")
 
 # Initialize Cognito client
 cognito = boto3.client("cognito-idp")
@@ -38,11 +39,17 @@ def lambda_handler(
     event: APIGatewayProxyEventModel, context: LambdaContext
 ) -> Dict[str, Any]:
     """
-    Lambda handler to fetch user details from Cognito User Pool
+    Lambda handler to update user details in Cognito User Pool
     """
     try:
         # Extract user_id from path parameters
         user_id = event.get("pathParameters", {}).get("user_id")
+
+        # Parse request body
+        try:
+            body = json.loads(event.get("body", "{}"))
+        except json.JSONDecodeError:
+            return _create_error_response(400, "Invalid request body")
 
         if not user_id:
             logger.error("Missing user_id in path parameters")
@@ -60,18 +67,18 @@ def lambda_handler(
             )
             return _create_error_response(500, "Internal configuration error")
 
-        # Fetch user details from Cognito
-        user_details = _get_cognito_user(user_pool_id, user_id)
+        # Update user attributes in Cognito
+        updated_user = _update_cognito_user(user_pool_id, user_id, body)
 
         # Create success response
         response = UserResponse(
             status="200",
-            message="User details retrieved successfully",
-            data=user_details,
+            message="User details updated successfully",
+            data=updated_user,
         )
 
-        logger.info("Successfully retrieved user details", extra={"user_id": user_id})
-        metrics.add_metric(name="SuccessfulUserLookup", unit=MetricUnit.Count, value=1)
+        logger.info("Successfully updated user details", extra={"user_id": user_id})
+        metrics.add_metric(name="SuccessfulUserUpdate", unit=MetricUnit.Count, value=1)
 
         return {
             "statusCode": 200,
@@ -82,30 +89,61 @@ def lambda_handler(
     except Exception as e:
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, "Internal server error")
+        return _create_error_response(500, str(e))
 
 
 @tracer.capture_method
-def _get_cognito_user(user_pool_id: str, user_id: str) -> Dict[str, Any]:
+def _update_cognito_user(
+    user_pool_id: str, user_id: str, update_data: Dict[str, Any]
+) -> Dict[str, Any]:
     """
-    Fetch user details from Cognito User Pool
+    Update user attributes in Cognito User Pool
     """
     try:
-        response = cognito.admin_get_user(UserPoolId=user_pool_id, Username=user_id)
+        # Prepare user attributes for update
+        user_attributes = []
 
-        # Transform Cognito response into a cleaner format
-        user_attributes = {
-            attr["Name"]: attr["Value"] for attr in response.get("UserAttributes", [])
+        # Map frontend fields to Cognito attributes
+        attribute_mapping = {
+            "given_name": "given_name",  # Using given_name instead of name
+            "family_name": "family_name",
+            "email": "email",
+            "phone_number": "phone_number",
         }
 
-        return {
-            "username": response.get("Username"),
-            "user_status": response.get("UserStatus"),
-            "enabled": response.get("Enabled", False),
-            "user_created": response.get("UserCreateDate").isoformat(),
-            "last_modified": response.get("UserLastModifiedDate").isoformat(),
-            "attributes": user_attributes,
-        }
+        for frontend_field, cognito_attr in attribute_mapping.items():
+            if frontend_field in update_data:
+                user_attributes.append(
+                    {"Name": cognito_attr, "Value": update_data[frontend_field]}
+                )
+
+        if user_attributes:
+            # Update user attributes
+            cognito.admin_update_user_attributes(
+                UserPoolId=user_pool_id,
+                Username=user_id,
+                UserAttributes=user_attributes,
+            )
+
+            # Get updated user details
+            response = cognito.admin_get_user(UserPoolId=user_pool_id, Username=user_id)
+
+            # Transform Cognito response into a cleaner format
+            updated_attributes = {
+                attr["Name"]: attr["Value"]
+                for attr in response.get("UserAttributes", [])
+            }
+
+            return {
+                "username": response.get("Username"),
+                "user_status": response.get("UserStatus"),
+                "enabled": response.get("Enabled", False),
+                "user_created": response.get("UserCreateDate").isoformat(),
+                "last_modified": response.get("UserLastModifiedDate").isoformat(),
+                "attributes": updated_attributes,
+            }
+        else:
+            raise ValueError("No valid attributes provided for update")
 
     except cognito.exceptions.UserNotFoundException:
         logger.warning(f"User not found", extra={"user_id": user_id})

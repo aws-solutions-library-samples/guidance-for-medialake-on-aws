@@ -54,8 +54,8 @@ function TopBar() {
         const loadUserInitial = async () => {
             try {
                 const attributes = await fetchUserAttributes();
-                if (attributes.name && attributes.name.trim()) {
-                    setUserInitial(attributes.name.trim()[0].toUpperCase());
+                if (attributes.given_name && attributes.given_name.trim()) {
+                    setUserInitial(attributes.given_name.trim()[0].toUpperCase());
                 } else if (attributes.email && attributes.email.trim()) {
                     setUserInitial(attributes.email.trim()[0].toUpperCase());
                 }

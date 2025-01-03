@@ -469,16 +469,46 @@ class UIConstruct(Construct):
             ],
         )
 
+        # Get SAML provider if configured
+        saml_provider = next(
+            (
+                provider
+                for provider in config.authZ.identity_providers
+                if provider.identity_provider_method == "saml"
+            ),
+            None,
+        )
+
         # S3 Deployment
         exports_asset = s3deploy.Source.json_data(
             "aws-exports.json",
             {
                 "region": scope.region,
                 "Auth": {
+                    "identity_providers": [
+                        {
+                            "identity_provider_method": provider.identity_provider_method,
+                            "identity_provider_name": provider.identity_provider_name,
+                            "identity_provider_metadata_url": provider.identity_provider_metadata_url,
+                        }
+                        for provider in config.authZ.identity_providers
+                    ],
                     "Cognito": {
                         "userPoolClientId": props.cognito_user_pool_client_id,
                         "userPoolId": props.cognito_user_pool_id,
                         "identityPoolId": props.cognito_identity_pool,
+                        "domain": f"{config.resource_prefix}-{config.environment}.auth.{scope.region}.amazoncognito.com",
+                        "loginWith": {
+                            "username": True,
+                            "email": True,
+                            "oauth": {
+                                "domain": f"{config.resource_prefix}-{config.environment}.auth.{scope.region}.amazoncognito.com",
+                                "scopes": ["email", "openid", "profile"],
+                                "responseType": "code",
+                                "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}",
+                                "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                            },
+                        },
                     },
                 },
                 "API": {

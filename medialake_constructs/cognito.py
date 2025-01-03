@@ -61,10 +61,8 @@ class CognitoConstruct(Construct):
         )
 
         # Create User Pool using L1 construct for more control
-        cfn_user_pool = cognito.CfnUserPool(
-            self,
-            "MediaLakeUserPool",
-            admin_create_user_config=cognito.CfnUserPool.AdminCreateUserConfigProperty(
+        user_pool_props = {
+            "admin_create_user_config": cognito.CfnUserPool.AdminCreateUserConfigProperty(
                 allow_admin_create_user_only=not self.props.self_sign_up_enabled,
                 invite_message_template=cognito.CfnUserPool.InviteMessageTemplateProperty(
                     email_message="""
@@ -91,9 +89,11 @@ class CognitoConstruct(Construct):
                     email_subject="Welcome to MediaLake",
                 ),
             ),
-            auto_verified_attributes=["email"] if self.props.auto_verify_email else [],
-            username_attributes=["email"] if self.props.sign_in_with_email else None,
-            verification_message_template=cognito.CfnUserPool.VerificationMessageTemplateProperty(
+            "auto_verified_attributes": (
+                ["email"] if self.props.auto_verify_email else []
+            ),
+            "username_attributes": ["email"] if self.props.sign_in_with_email else None,
+            "verification_message_template": cognito.CfnUserPool.VerificationMessageTemplateProperty(
                 default_email_option="CONFIRM_WITH_LINK",
                 email_message_by_link="""
                 <html>
@@ -110,7 +110,7 @@ class CognitoConstruct(Construct):
                 """,
                 email_subject_by_link="Reset your MediaLake password",
             ),
-            policies=cognito.CfnUserPool.PoliciesProperty(
+            "policies": cognito.CfnUserPool.PoliciesProperty(
                 password_policy=cognito.CfnUserPool.PasswordPolicyProperty(
                     minimum_length=8,
                     require_lowercase=True,
@@ -120,12 +120,17 @@ class CognitoConstruct(Construct):
                     temporary_password_validity_days=7,
                 )
             ),
-            lambda_config=cognito.CfnUserPool.LambdaConfigProperty(
+            "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn
             ),
-            user_pool_add_ons=cognito.CfnUserPool.UserPoolAddOnsProperty(
+            "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
             ),
+        }
+
+        # Create the user pool with all properties
+        cfn_user_pool = cognito.CfnUserPool(
+            self, "MediaLakeUserPool", **user_pool_props
         )
 
         # Create L2 construct from L1
@@ -133,16 +138,102 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Create User Pool Client
-        self._user_pool_client = self._user_pool.add_client(
-            "MediaLakeUserPoolClient",
-            generate_secret=self.props.generate_secret,
-            auth_flows=cognito.AuthFlow(
+        # Create domain for the user pool
+        domain_prefix = f"{config.resource_prefix}-{config.environment}"
+        self._domain = self._user_pool.add_domain(
+            "CognitoDomain",
+            cognito_domain=cognito.CognitoDomainOptions(
+                domain_prefix=domain_prefix.lower()
+            ),
+        )
+
+        # Create base client props
+        client_props = {
+            "generate_secret": self.props.generate_secret,
+            "auth_flows": cognito.AuthFlow(
                 admin_user_password=self.props.admin_user_password,
                 user_password=self.props.user_password,
                 user_srp=self.props.user_srp,
             ),
+        }
+
+        # Configure identity providers
+        supported_providers = []
+        saml_providers = []
+
+        # Process each configured identity provider
+        for provider in config.authZ.identity_providers:
+            if provider.identity_provider_method == "saml":
+                # Create SAML provider
+                saml_provider = cognito.CfnUserPoolIdentityProvider(
+                    self,
+                    f"SAMLProvider-{provider.identity_provider_name}",
+                    user_pool_id=cfn_user_pool.ref,
+                    provider_name=provider.identity_provider_name,
+                    provider_type="SAML",
+                    provider_details={
+                        "MetadataURL": provider.identity_provider_metadata_url,
+                        "MetadataFile": provider.identity_provider_metadata_path,
+                    },
+                    attribute_mapping={
+                        "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+                        "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+                        "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+                        "custom:role": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                    },
+                    idp_identifiers=[provider.identity_provider_name],
+                )
+                supported_providers.append(
+                    cognito.UserPoolClientIdentityProvider.custom(
+                        provider.identity_provider_name
+                    )
+                )
+                saml_providers.append(saml_provider)
+            elif provider.identity_provider_method == "cognito":
+                supported_providers.append(
+                    cognito.UserPoolClientIdentityProvider.COGNITO
+                )
+
+        # Update client props with configured providers
+        if supported_providers:
+            client_props.update(
+                {
+                    "supported_identity_providers": supported_providers,
+                    "o_auth": cognito.OAuthSettings(
+                        flows=cognito.OAuthFlows(
+                            authorization_code_grant=True, implicit_code_grant=True
+                        ),
+                        scopes=[
+                            cognito.OAuthScope.EMAIL,
+                            cognito.OAuthScope.OPENID,
+                            cognito.OAuthScope.PROFILE,
+                        ],
+                        callback_urls=[
+                            "http://localhost:3000",  # For local development
+                            "https://d358w0v8eryzhn.cloudfront.net",  # CloudFront URL
+                            "https://d358w0v8eryzhn.cloudfront.net/",  # With trailing slash
+                            "https://d358w0v8eryzhn.cloudfront.net/sign-in",  # Sign-in page
+                            f"https://{domain_prefix.lower()}.auth.{config.primary_region}.amazoncognito.com/oauth2/idpresponse",  # OAuth callback
+                            f"https://{domain_prefix.lower()}.auth.{config.primary_region}.amazoncognito.com/saml2/idpresponse",  # SAML callback
+                        ],
+                        logout_urls=[
+                            "http://localhost:3000",  # For local development
+                            "https://d358w0v8eryzhn.cloudfront.net",  # CloudFront URL
+                            "https://d358w0v8eryzhn.cloudfront.net/",  # With trailing slash
+                            "https://d358w0v8eryzhn.cloudfront.net/sign-in",  # Sign-in page
+                        ],
+                    ),
+                }
+            )
+
+        # Create the client
+        self._user_pool_client = self._user_pool.add_client(
+            "MediaLakeUserPoolClient", **client_props
         )
+
+        # Add dependencies for SAML providers if any
+        for provider in saml_providers:
+            self._user_pool_client.node.add_dependency(provider)
 
         # Create Identity Pool
         self._identity_pool = IdentityPool(

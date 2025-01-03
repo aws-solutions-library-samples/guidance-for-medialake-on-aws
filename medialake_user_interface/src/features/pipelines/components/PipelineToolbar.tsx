@@ -29,23 +29,6 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
 
     return (
         <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                <Box>
-                    <Typography variant="h4" sx={{
-                        fontWeight: 700,
-                        mb: 1,
-                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                        backgroundClip: 'text',
-                        WebkitBackgroundClip: 'text',
-                        color: 'transparent',
-                    }}>
-                        {t('pipelines.title')}
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                        {t('pipelines.description')}
-                    </Typography>
-                </Box>
-            </Box>
 
             <Box sx={{
                 display: 'flex',

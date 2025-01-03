@@ -86,7 +86,7 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
             ),
             "email": attributes.get("email"),
             "email_verified": attributes.get("email_verified"),
-            "name": attributes.get("name"),
+            "name": attributes.get("given_name"),
             "family_name": attributes.get("family_name"),
             "groups": [],
         }
