@@ -466,7 +466,14 @@ const ImageDetailPage: React.FC = () => {
     };
     const proxyUrl = getProxyUrl();
     return (
-        <Box sx={{ flexGrow: 1, p: 3, maxWidth: '1600px', margin: '0 auto' }}>
+        <Box sx={{
+            flexGrow: 1,
+            p: 3,
+            maxWidth: '1600px',
+            margin: '0 auto',
+            overflow: 'auto',
+            height: '100%'
+        }}>
             <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>
                 Back to Search Results
             </Button>

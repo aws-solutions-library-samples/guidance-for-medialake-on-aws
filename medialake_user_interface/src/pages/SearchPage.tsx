@@ -183,8 +183,12 @@ const SearchPage: React.FC = () => {
     return (
         <Box sx={{
             display: 'flex',
-            minHeight: '100vh',
-            bgcolor: '#fff'
+            minHeight: '100%',
+            bgcolor: '#fff',
+            position: 'relative',
+            overflow: 'auto',
+            paddingBottom: '120px', // Increase padding for pagination controls
+            marginBottom: '-56px' // Negative margin to prevent double spacing
         }}>
             {isFetching && (
                 <LinearProgress
@@ -203,9 +207,11 @@ const SearchPage: React.FC = () => {
                 flexGrow: 1,
                 px: 4,
                 py: 4,
+                pb: 12, // Increase bottom padding
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6
+                gap: 6,
+                minHeight: 0 // Allow content to shrink
             }}>
                 {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
                     <Box

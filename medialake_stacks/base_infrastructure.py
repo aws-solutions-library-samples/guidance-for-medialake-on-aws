@@ -229,13 +229,13 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeAssetTable",
             props=DynamoDBProps(
-                name="medialake-asset-table",
+                name=f"{config.global_prefix}-asset-table-{config.environment}",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="DigitalSourceAsset.ID",
+                sort_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
                 ddb_export_bucket=self.ddb_export_bucket,
-                sort_key_name="ID",
-                sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
                 point_in_time_recovery=True,
             ),
@@ -244,7 +244,11 @@ class BaseInfrastructureStack(Stack):
         self._asset_table.table.add_global_secondary_index(
             index_name="AssetIDIndex",
             partition_key=dynamodb.Attribute(
-                name="ID", type=dynamodb.AttributeType.STRING
+                name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="DigitalSourceAsset.IngestedAt",
+                type=dynamodb.AttributeType.STRING,
             ),
             projection_type=dynamodb.ProjectionType.ALL,
         )

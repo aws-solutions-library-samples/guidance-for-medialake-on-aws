@@ -299,6 +299,7 @@ class AssetProcessor:
                 "ID": f"asset:img:{asset_id}",
                 "Type": "Image",
                 "CreateDate": datetime.utcnow().isoformat(),
+                "IngestedAt": datetime.utcnow().isoformat(),
                 "MainRepresentation": {
                     "ID": f"asset:rep:{asset_id}:master",
                     "Type": "Image",
