@@ -16,6 +16,10 @@ lambda_client = boto3.client("lambda")
 iam = boto3.client("iam")
 s3 = boto3.client("s3")
 sqs = boto3.client("sqs")
+cloudwatch_logs = boto3.client("logs")
+
+# Define log groups to clean up
+LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
 
 
 def delete_lambda_function(function_arn: str):
@@ -258,6 +262,18 @@ def remove_s3_bucket_notification(bucket_name):
         logger.warning(f"S3 bucket {bucket_name} not found")
 
 
+def delete_cloudwatch_log_groups(log_group_names):
+    """Delete multiple CloudWatch log groups if they exist"""
+    for log_group_name in log_group_names:
+        try:
+            cloudwatch_logs.delete_log_group(logGroupName=log_group_name)
+            logger.info(f"Deleted CloudWatch log group {log_group_name}")
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ResourceNotFoundException":
+                raise
+            logger.warning(f"CloudWatch log group {log_group_name} not found")
+
+
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     try:
@@ -273,6 +289,9 @@ def lambda_handler(event, context):
 
             # Clean up connector resources
             clean_up_table_resources(connector_table_name, clean_up_connector)
+
+            # Clean up CloudWatch log groups
+            delete_cloudwatch_log_groups(LOG_GROUPS_TO_CLEAN)
 
             logger.info("Cleanup completed successfully")
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})

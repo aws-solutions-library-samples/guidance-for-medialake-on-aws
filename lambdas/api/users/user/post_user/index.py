@@ -82,8 +82,10 @@ def create_user():
         ]
 
         # Add optional attributes if they exist
-        if "name" in request_data:
-            user_attributes.append({"Name": "name", "Value": request_data["name"]})
+        if "given_name" in request_data:
+            user_attributes.append(
+                {"Name": "given_name", "Value": request_data["given_name"]}
+            )
         if "family_name" in request_data:
             user_attributes.append(
                 {"Name": "family_name", "Value": request_data["family_name"]}

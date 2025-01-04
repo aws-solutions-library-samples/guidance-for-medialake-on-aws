@@ -67,6 +67,42 @@ class UserConfig(BaseModel):
     last_name: str
 
 
+class IdentityProviderConfig(BaseModel):
+    identity_provider_method: str
+    identity_provider_name: Optional[str] = None
+    identity_provider_metadata_url: Optional[str] = None
+    identity_provider_metadata_path: Optional[str] = None
+    identity_provider_arn: Optional[str] = None
+
+    @validator("identity_provider_method")
+    def validate_provider_method(cls, v):
+        if v not in ["cognito", "saml"]:
+            raise ValueError(
+                'identity_provider_method must be either "cognito" or "saml"'
+            )
+        return v
+
+    @validator("identity_provider_name", "identity_provider_metadata_url")
+    def validate_saml_fields(cls, v, values):
+        if values.get("identity_provider_method") == "saml" and not v:
+            raise ValueError(
+                "SAML provider requires identity_provider_name and identity_provider_metadata_url"
+            )
+        return v
+
+
+class AuthConfig(BaseModel):
+    identity_providers: List[IdentityProviderConfig] = [
+        IdentityProviderConfig(identity_provider_method="cognito")
+    ]
+
+    @validator("identity_providers")
+    def validate_providers(cls, v):
+        if not v:
+            raise ValueError("At least one identity provider must be configured")
+        return v
+
+
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
@@ -82,6 +118,7 @@ class CDKConfig(BaseModel):
     logging: LoggingConfig = LoggingConfig()
     secondary_region: Optional[str] = None
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
+    authZ: AuthConfig = AuthConfig()
 
     @property
     def regions(self) -> List[str]:

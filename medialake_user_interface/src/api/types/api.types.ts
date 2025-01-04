@@ -1,3 +1,11 @@
+export interface UserAttributes {
+  email: string;
+  email_verified: string;
+  given_name: string;
+  family_name: string;
+  sub: string;
+}
+
 export interface User {
   username: string;
   email: string;
@@ -6,7 +14,7 @@ export interface User {
   created: string;
   modified: string;
   email_verified: string;
-  name: string | null;
+  given_name: string | null;
   family_name: string | null;
   groups: string[];
   roles?: string[];
@@ -18,7 +26,7 @@ export interface CreateUserRequest {
   enabled?: boolean;
   groups?: string[];
   roles?: string[];
-  name?: string;
+  given_name?: string;
   family_name?: string;
 }
 
@@ -37,7 +45,7 @@ export interface UpdateUserRequest {
   enabled?: boolean;
   groups?: string[];
   roles?: string[];
-  name?: string;
+  given_name?: string;
   family_name?: string;
 }
 

@@ -323,7 +323,7 @@ class ApiGatewayStack(Stack):
                     "TemporaryPassword": random_password,
                     "UserAttributes": [
                         {"Name": "email", "Value": config.initial_user.email},
-                        {"Name": "name", "Value": config.initial_user.first_name},
+                        {"Name": "given_name", "Value": config.initial_user.first_name},
                         {"Name": "family_name", "Value": config.initial_user.last_name},
                         {"Name": "email_verified", "Value": "true"},
                     ],

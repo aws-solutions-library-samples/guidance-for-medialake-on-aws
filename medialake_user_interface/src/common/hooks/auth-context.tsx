@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import { StorageHelper } from '../helpers/storage-helper';
 import { authService } from '../../api/authService';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
+import { useAwsConfig } from './aws-config-context';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -16,17 +17,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const awsConfig = useAwsConfig();
+
   const checkAuthStatus = useCallback(async () => {
     try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
+      // Check if this is a SAML redirect first
+      const hasSamlProvider = awsConfig?.Auth?.identity_providers.some(
+        provider => provider.identity_provider_method === 'saml'
+      );
 
-      if (token) {
-        StorageHelper.setToken(token);
-        setIsAuthenticated(true);
+      if (hasSamlProvider &&
+        (window.location.hash.includes('id_token') ||
+          window.location.search.includes('code='))) {
+        console.log('Detected SAML redirect, waiting for session...');
+        // Don't try to get current user yet, just wait for session
+        try {
+          const session = await fetchAuthSession();
+          console.log('Got session after SAML redirect:', session);
+          const token = session.tokens?.idToken?.toString();
+          if (token) {
+            StorageHelper.setToken(token);
+            setIsAuthenticated(true);
+          }
+        } catch (samlError) {
+          console.error('Failed to handle SAML redirect:', samlError);
+          setIsAuthenticated(false);
+          StorageHelper.clearToken();
+        }
       } else {
-        setIsAuthenticated(false);
-        StorageHelper.clearToken();
+        // Not a SAML redirect, proceed with normal auth check
+        try {
+          const session = await fetchAuthSession();
+          console.log('Auth session:', session);
+          const token = session.tokens?.idToken?.toString();
+          if (token) {
+            StorageHelper.setToken(token);
+            setIsAuthenticated(true);
+            // Only try to get user after we have a valid token
+            try {
+              const user = await getCurrentUser();
+              console.log('Current user:', user);
+            } catch (userError) {
+              console.log('Could not get user but have valid token:', userError);
+            }
+          } else {
+            setIsAuthenticated(false);
+            StorageHelper.clearToken();
+          }
+        } catch (error) {
+          console.log('No valid session:', error);
+          setIsAuthenticated(false);
+          StorageHelper.clearToken();
+        }
       }
     } catch (error) {
       console.error('Auth status check failed:', error);
@@ -35,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [awsConfig]);
 
   const refreshSession = useCallback(async () => {
     try {

@@ -139,6 +139,22 @@ class CleanupStack(Stack):
             )
         )
 
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "logs:DescribeLogGroups",
+                    "logs:ListTagsLogGroup",
+                    "logs:DeleteLogGroup",
+                    "logs:PutRetentionPolicy",
+                    "logs:DeleteRetentionPolicy",
+                    "logs:TagLogGroup",
+                    "logs:UntagLogGroup"
+                ],
+                resources=[f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"],
+            )
+        )
+
         self.provider = cr.Provider(
             self, "CleanupProvider", on_event_handler=self._clean_up_lambda.function
         )

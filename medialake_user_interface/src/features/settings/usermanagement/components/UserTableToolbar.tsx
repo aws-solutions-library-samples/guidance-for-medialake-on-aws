@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Box,
-    Button,
+    IconButton,
     useTheme,
     alpha,
 } from '@mui/material';
@@ -120,20 +120,17 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
             </Box>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TableDensityToggle />
-                <Button
-                    variant="outlined"
-                    startIcon={<ViewColumnIcon />}
+                <IconButton
                     onClick={onColumnMenuOpen}
                     sx={{
                         height: '40px',
+                        width: '40px',
                         borderRadius: '8px',
-                        textTransform: 'none',
-                        borderColor: alpha(theme.palette.divider, 0.2),
-                        px: 3,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                     }}
                 >
-                    {t('common.columns')}
-                </Button>
+                    <ViewColumnIcon />
+                </IconButton>
             </Box>
         </Box>
     );

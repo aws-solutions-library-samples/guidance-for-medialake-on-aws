@@ -1,13 +1,42 @@
 import { CognitoRefreshToken, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
+import { signInWithRedirect } from 'aws-amplify/auth';
 import { useUserPool } from './userpool';
 import { StorageHelper } from '../helpers/storage-helper';
-
+import { useAwsConfig } from './aws-config-context';
 
 export const useAuthenticate = () => {
   const { userPool, reinitializeUserPool } = useUserPool();
+  const awsConfig = useAwsConfig();
 
+  const initiateAuth = async (Email: string, Password: string): Promise<any> => {
+    if (!awsConfig) {
+      throw new Error('AWS configuration is not initialized');
+    }
+
+    // Find SAML provider if configured
+    const samlProvider = awsConfig.Auth.identity_providers.find(
+      provider => provider.identity_provider_method === 'saml'
+    );
+
+    // If SAML is configured, redirect to SAML login
+    if (samlProvider) {
+      try {
+        await signInWithRedirect({
+          provider: { custom: samlProvider.identity_provider_name || '' }
+        });
+        return { type: 'SAML_REDIRECT' };
+      } catch (error) {
+        console.error('SAML redirect failed:', error);
+        throw error;
+      }
+    }
+
+    // Otherwise, proceed with Cognito authentication
+    return authenticate(Email, Password);
+  };
 
   const authenticate = async (Email: string, Password: string): Promise<any> => {
+    // This is now an internal method for Cognito authentication
     if (!userPool) {
       reinitializeUserPool();
       throw new Error('User pool is not initialized');
@@ -40,7 +69,6 @@ export const useAuthenticate = () => {
           StorageHelper.clearToken();
           StorageHelper.clearUsername();
           reject({ error: err, user }); // Include the user object in the rejection
-
         },
       });
     });
@@ -65,7 +93,6 @@ export const useAuthenticate = () => {
   };
 
   const refreshSession = async (): Promise<any> => {
-    
     if (!userPool) {
       reinitializeUserPool();
       throw new Error('User pool is not initialized');
@@ -112,5 +139,5 @@ export const useAuthenticate = () => {
     window.location.href = '/';
   };
 
-  return { authenticate, logout, refreshSession, changePassword };
+  return { authenticate: initiateAuth, logout, refreshSession, changePassword };
 };

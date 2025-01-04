@@ -42,7 +42,7 @@ const MenuProps = {
 };
 
 const initialFormData = {
-    name: '',
+    given_name: '',
     family_name: '',
     email: '',
     email_verified: '',
@@ -71,7 +71,7 @@ const UserForm: React.FC<UserFormProps> = ({
     useEffect(() => {
         if (user) {
             setFormData({
-                name: user.name || '',
+                given_name: user.given_name || '',
                 family_name: user.family_name || '',
                 email: user.email || '',
                 email_verified: user.email_verified || '',
@@ -121,7 +121,7 @@ const UserForm: React.FC<UserFormProps> = ({
                 requestData = {
                     username: user.username,
                     email: formData.email,
-                    name: formData.name,
+                    given_name: formData.given_name,
                     family_name: formData.family_name,
                     roles: formData.roles,
                     enabled: true
@@ -131,7 +131,7 @@ const UserForm: React.FC<UserFormProps> = ({
                 requestData = {
                     username: formData.email,
                     email: formData.email,
-                    name: formData.name,
+                    given_name: formData.given_name,
                     family_name: formData.family_name,
                     roles: formData.roles,
                     enabled: true
@@ -176,9 +176,9 @@ const UserForm: React.FC<UserFormProps> = ({
                     <DialogContent>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
                             <TextField
-                                name="name"
+                                name="given_name"
                                 label="First Name"
-                                value={formData.name}
+                                value={formData.given_name}
                                 onChange={handleChange}
                                 required
                                 fullWidth

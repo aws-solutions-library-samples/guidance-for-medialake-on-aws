@@ -93,6 +93,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
                 overflow: 'visible',
                 color: theme.palette.text.secondary,
                 fontSize: mode === 'compact' ? '0.875rem' : '1rem',
+                backgroundColor: 'transparent',
                 '& > *': {
                     wordBreak: 'break-word',
                     whiteSpace: 'normal',
@@ -101,7 +102,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
                 backgroundColor: isDark
-                    ? alpha(theme.palette.background.paper, 0.3)
+                    ? alpha(theme.palette.background.default, 0.3)
                     : alpha(theme.palette.background.paper, 0.04),
                 borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                 fontWeight: 600,
@@ -131,13 +132,13 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             flexDirection: 'column',
             width: '100%',
             flex: 1,
-            backgroundColor: theme.palette.mode === 'dark'
+            backgroundColor: isDark
                 ? alpha(theme.palette.background.paper, 0.2)
                 : theme.palette.background.paper,
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             borderRadius: '12px',
         }
-    }), [theme.palette.mode, theme.palette.primary.main, mode]);
+    }), [theme.palette.mode, theme.palette.primary.main, mode, isDark]);
 };
 
 export function ResizableTable<T>({
