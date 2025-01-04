@@ -9,7 +9,7 @@ for managing assets, including:
 
 from dataclasses import dataclass
 from aws_cdk import (
-    aws_api_gateway as api_gateway,
+    aws_apigateway as api_gateway,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
     Duration,
@@ -22,7 +22,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
-from medialake_constructs.config import config
+from config import config
 
 
 @dataclass
@@ -107,7 +107,7 @@ class AssetsConstruct(Construct):
             self,
             "GetAssetLambda",
             config=LambdaConfig(
-                name="get_asset_lambda",
+                name=f"{config.global_prefix}_get_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -136,7 +136,7 @@ class AssetsConstruct(Construct):
             self,
             "DeleteAssetLambda",
             config=LambdaConfig(
-                name="delete_asset_lambda",
+                name=f"{config.global_prefix}_delete_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -237,7 +237,7 @@ class AssetsConstruct(Construct):
             self,
             "RenameAssetLambda",
             config=LambdaConfig(
-                name="rename_asset_lambda",
+                name=f"{config.global_prefix}_rename_asset_{config.environment}",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/rp_assets_id/rename/post_rename",
                 environment_variables={

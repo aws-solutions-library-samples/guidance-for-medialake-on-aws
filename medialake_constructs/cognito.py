@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     RemovalPolicy,
     CfnOutput,
+    Stack,
 )
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
@@ -15,6 +16,7 @@ from aws_cdk.aws_cognito_identitypool_alpha import (
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from config import config
+from hashlib import md5
 
 
 @dataclass
@@ -138,8 +140,14 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Create domain for the user pool
-        domain_prefix = f"{config.resource_prefix}-{config.environment}"
+        # Generate a stable hash based on account and resource prefix
+        hash_input = (
+            f"{Stack.of(self).account}{config.resource_prefix}{config.environment}"
+        )
+        unique_hash = md5(hash_input.encode()).hexdigest()[:8]
+
+        # Create domain prefix using resource prefix, environment, and hash
+        domain_prefix = f"{config.resource_prefix}-{config.environment}-{unique_hash}"
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
