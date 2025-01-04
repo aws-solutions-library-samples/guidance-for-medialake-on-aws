@@ -20,8 +20,8 @@ table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
 
 
 s3_client = boto3.client("s3")
-dynamodb_client = boto3.client("dynamodb")
-asset_table = dynamodb_client.Table(table_name)
+dynamodb = boto3.resource("dynamodb")
+asset_table = dynamodb.Table(table_name)
 
 
 def run_ffprobe(file_path):
@@ -126,124 +126,145 @@ def clean_asset_id(input_string: str) -> str:
 def lambda_handler(event, context):
     error = False
     steps_messages = {}
+    print(event)
 
-    for record in event["Records"]:
-        if record["eventName"] != "INSERT":
-            continue
+    input_data = event["input"]
+    s3_source_bucket = input_data["DigitalSourceAsset"]["MainRepresentation"][
+        "StorageInfo"
+    ]["PrimaryLocation"]["Bucket"]
+    s3_source_key = input_data["DigitalSourceAsset"]["MainRepresentation"][
+        "StorageInfo"
+    ]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+    inventory_id = input_data.get("InventoryID", "")
+    clean_inventory_id = clean_asset_id(inventory_id)
 
-        new_image = record["dynamodb"]["NewImage"]
-        movie_id = new_image["movie_id"]["N"]
-        s3_source_bucket = new_image["S3_bucket"]["S"]
-        s3_source_key = new_image["S3_object"]["S"]
-        inventory_id = new_image.get("InventoryID", {}).get("S", "")
-        clean_inventory_id = clean_asset_id(inventory_id)
+    # Download file from S3 to /tmp/ for mediainfo
+    local_path = f"/tmp/{os.path.basename(s3_source_key)}"
+    try:
+        s3_client.download_file(s3_source_bucket, s3_source_key, local_path)
+        steps_messages[clean_inventory_id] = {"S3_download": "Success"}
+        logger.info(
+            "File downloaded successfully",
+            extra={"bucket": s3_source_bucket, "key": s3_source_key},
+        )
+    except Exception as e:
+        error_msg = f"Failed to download file: {str(e)}"
+        logger.error(
+            error_msg, extra={"bucket": s3_source_bucket, "key": s3_source_key}
+        )
+        steps_messages[clean_inventory_id] = {"S3_download": f"Failure: {e}"}
+        error = True
+        return {"statusCode": 500, "body": json.dumps(steps_messages)}
 
-        steps_messages[movie_id] = {}
+    ff_data = None
+    mi_data = None
 
-        # Download file from S3 to /tmp/ for mediainfo
-        local_path = f"/tmp/{os.path.basename(s3_source_key)}"
-        try:
-            s3_client.download_file(s3_source_bucket, s3_source_key, local_path)
-            steps_messages[movie_id]["S3_download"] = "Success"
-        except Exception as e:
-            steps_messages[movie_id]["S3_download"] = f"Failure: {e}"
-            error = True
-            continue
+    try:
+        ff_data = run_ffprobe(local_path)
+        steps_messages[clean_inventory_id]["FFProbe_analysis"] = "Success"
+        logger.info("FFProbe analysis completed successfully")
+    except Exception as e:
+        error_msg = f"FFProbe analysis failed: {str(e)}"
+        logger.error(error_msg, extra={"local_path": local_path})
+        steps_messages[clean_inventory_id]["FFProbe_analysis"] = f"Failure: {e}"
+        error = True
 
-        try:
-            ff_data = run_ffprobe(local_path)
-            steps_messages[movie_id]["FFProbe_analysis"] = "Success"
-        except Exception as e:
-            steps_messages[movie_id]["FFProbe_analysis"] = f"Failure: {e}"
-            error = True
-            continue
+    try:
+        mi_data = run_mediainfo(local_path)
+        steps_messages[clean_inventory_id]["Mediainfo_analysis"] = "Success"
+        logger.info("MediaInfo analysis completed successfully")
+    except Exception as e:
+        error_msg = f"MediaInfo analysis failed: {str(e)}"
+        logger.error(error_msg, extra={"local_path": local_path})
+        steps_messages[clean_inventory_id]["Mediainfo_analysis"] = f"Failure: {e}"
+        error = True
 
-        try:
-            mi_data = run_mediainfo(local_path)
-            steps_messages[movie_id]["Mediainfo_analysis"] = "Success"
-        except Exception as e:
-            steps_messages[movie_id]["Mediainfo_analysis"] = f"Failure: {e}"
-            error = True
-            continue
+    if error or ff_data is None or mi_data is None:
+        logger.error(
+            "One or more analysis steps failed",
+            extra={"ff_data": bool(ff_data), "mi_data": bool(mi_data)},
+        )
+        return {"statusCode": 500, "body": json.dumps(steps_messages)}
 
-        # Merge metadata
-        merged_output = merge_metadata(ff_data, mi_data)
+    # Merge metadata
+    merged_output = merge_metadata(ff_data, mi_data)
 
-        # Create new representation for proxy
-        output_bucket = os.environ.get("OUTPUT_BUCKET")
-        output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
-        asset_id = f"{clean_asset_id(movie_id)}:proxy"
+    # Create new representation for proxy
+    output_bucket = os.environ.get("OUTPUT_BUCKET")
+    output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
+    asset_id = f"{clean_inventory_id}:proxy"
 
-        new_representation = {
-            "ID": asset_id,
-            "Type": "Video",
-            "Format": "MP4",
-            "Purpose": "proxy",
-            "StorageInfo": {
-                "PrimaryLocation": {
-                    "StorageType": "s3",
-                    "Provider": "aws",
-                    "Bucket": output_bucket,
-                    "ObjectKey": {
-                        "FullPath": output_key,
-                    },
-                    "Status": "active",
-                    "FileInfo": {
-                        "Size": os.path.getsize(
-                            local_path
-                        ),  # Approximate size, as proxy might be smaller
-                    },
-                }
+    new_representation = {
+        "ID": asset_id,
+        "Type": "Video",
+        "Format": "MP4",
+        "Purpose": "proxy",
+        "StorageInfo": {
+            "PrimaryLocation": {
+                "StorageType": "s3",
+                "Provider": "aws",
+                "Bucket": output_bucket,
+                "ObjectKey": {
+                    "FullPath": output_key,
+                },
+                "Status": "active",
+                "FileInfo": {
+                    "Size": os.path.getsize(
+                        local_path
+                    ),  # Approximate size, as proxy might be smaller
+                },
+            }
+        },
+        "VideoSpec": {
+            "Resolution": {
+                "Width": merged_output["video"][0].get("width"),
+                "Height": merged_output["video"][0].get("height"),
             },
-            "VideoSpec": {
-                "Resolution": {
-                    "Width": merged_output["video"][0].get("width"),
-                    "Height": merged_output["video"][0].get("height"),
-                },
-                "Codec": merged_output["video"][0].get("codec_name"),
-                "BitRate": merged_output["video"][0].get("bit_rate"),
-                "FrameRate": merged_output["video"][0].get("r_frame_rate"),
+            "Codec": merged_output["video"][0].get("codec_name"),
+            "BitRate": merged_output["video"][0].get("bit_rate"),
+            "FrameRate": merged_output["video"][0].get("r_frame_rate"),
+        },
+    }
+
+    # Update DynamoDB
+    # Update DynamoDB
+    try:
+        logger.info(
+            "Attempting DynamoDB update",
+            extra={
+                "inventory_id": clean_inventory_id,
+                "new_representation": new_representation,
             },
-        }
+        )
 
-        # Update DynamoDB
-        try:
-            logger.info(
-                "Attempting DynamoDB update",
-                extra={
-                    "inventory_id": clean_inventory_id,
-                    "new_representation": new_representation,
-                },
-            )
+        response = asset_table.update_item(
+            Key={"InventoryID": clean_inventory_id},
+            UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep), ffprobe_mediainfo_merged = :merged",
+            ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
+            ExpressionAttributeValues={
+                ":new_rep": [new_representation],
+                ":empty_list": [],
+                ":merged": json.dumps(merged_output),
+            },
+            ReturnValues="UPDATED_NEW",
+        )
 
-            response = asset_table.update_item(
-                Key={"InventoryID": clean_inventory_id},
-                UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep), ffprobe_mediainfo_merged = :merged",
-                ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
-                ExpressionAttributeValues={
-                    ":new_rep": [new_representation],
-                    ":empty_list": [],
-                    ":merged": json.dumps(merged_output),
-                },
-                ReturnValues="UPDATED_NEW",
-            )
-
-            logger.info(
-                "DynamoDB update response",
-                extra={"response": response, "inventory_id": clean_inventory_id},
-            )
-            steps_messages[movie_id]["DDB_update"] = "Success"
-        except Exception as e:
-            logger.exception(
-                "Error updating DynamoDB",
-                extra={
-                    "inventory_id": clean_inventory_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
-            )
-            steps_messages[movie_id]["DDB_update"] = f"Failure: {e}"
-            error = True
+        logger.info(
+            "DynamoDB update response",
+            extra={"response": response, "inventory_id": clean_inventory_id},
+        )
+        steps_messages[clean_inventory_id]["DDB_update"] = "Success"
+    except Exception as e:
+        logger.exception(
+            "Error updating DynamoDB",
+            extra={
+                "inventory_id": clean_inventory_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
+        steps_messages[clean_inventory_id]["DDB_update"] = f"Failure: {e}"
+        error = True
 
     if error:
         statusCode = 500
@@ -251,224 +272,3 @@ def lambda_handler(event, context):
         statusCode = 200
 
     return {"statusCode": statusCode, "body": json.dumps(steps_messages)}
-
-
-# @logger.inject_lambda_context
-# @tracer.capture_lambda_handler
-# def lambda_handler(event, context: LambdaContext):
-#     # Get DynamoDB table name from environment variable
-#     table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
-#     dynamodb = boto3.resource("dynamodb")
-#     table = dynamodb.Table(table_name)
-
-#     # Get the s3_uri and mode from query parameters
-#     input = event.get("input", {})
-#     input_data = input.get("DigitalSourceAsset", {})
-#     inventory_id = input.get("InventoryID")
-#     clean_inventory_id = clean_asset_id(inventory_id)
-#     main_representation = input_data.get("MainRepresentation", {})
-#     master_asset_id = input_data.get("ID")
-#     asset_id = clean_asset_id(master_asset_id)
-#     storage_info = main_representation.get("StorageInfo", {})
-#     PrimaryLocation = storage_info.get("PrimaryLocation", {})
-#     object_info = PrimaryLocation.get("ObjectKey", {})
-#     bucket = PrimaryLocation.get("Bucket")
-#     key = object_info.get("FullPath")
-
-#     # Get the output bucket from event
-#     output_bucket = event.get("output_bucket")
-
-#     mode = event.get("mode", "proxy")  # default to proxy mode
-
-#     if not key:
-#         return {"statusCode": 400, "body": "Missing key parameter"}
-#     if not bucket:
-#         return {"statusCode": 400, "body": "Missing bucket parameter"}
-
-#     if not output_bucket:
-#         return {"statusCode": 400, "body": "Missing output_bucket parameter"}
-
-#     # Initialize S3 client
-#     s3 = boto3.client("s3")
-
-#     try:
-#         # Fetch the image from S3
-#         s3_response = s3.get_object(Bucket=bucket, Key=key)
-#         image_data = s3_response["Body"].read()
-#         img = Image.open(io.BytesIO(image_data))
-
-#         if mode == "thumbnail":
-#             # Get thumbnail parameters
-#             # params = event.get("thumbnail")
-#             width = event.get("width")
-#             height = event.get("height")
-#             crop = event.get("crop", False)
-
-#             # Check if both width and height are None
-#             if width is None and height is None:
-#                 return {
-#                     "statusCode": 400,
-#                     "body": "Both width and height cannot be None for thumbnail creation",
-#                 }
-
-#             # If one dimension is None, calculate it based on the aspect ratio
-#             if width is None:
-#                 width = int(height * (img.width / img.height))
-#             elif height is None:
-#                 height = int(width * (img.height / img.width))
-
-#             # Ensure width and height are integers
-#             width = int(width)
-#             height = int(height)
-
-#             # Process image
-#             processed_img = create_thumbnail(img, width, height, crop)
-
-#             # Generate output key
-#             output_key = (
-#                 f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnails_{width}x{height}.webp"
-#             )
-
-#         elif mode == "proxy":
-#             # Process image
-#             processed_img = create_proxy(img)
-#             width, height = img.size
-#             # Generate output key
-#             output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_proxy.webp"
-
-#         else:
-#             return {"statusCode": 400, "body": "Invalid mode parameter"}
-
-#         # Save the processed image
-#         output_buffer = io.BytesIO()
-
-#         # Save as WebP with appropriate quality
-#         if mode == "thumbnail":
-#             processed_img.save(output_buffer, format="WEBP", quality=85)
-#             asset_id = f"{asset_id}:thumbnail"
-#             output_data = output_buffer.getvalue()
-#             new_representation = {
-#                 "ID": asset_id,
-#                 "Type": "Image",
-#                 "Format": "WEBP",
-#                 "Purpose": mode,
-#                 "StorageInfo": {
-#                     "PrimaryLocation": {
-#                         "StorageType": "s3",
-#                         "Provider": "aws",
-#                         "Bucket": output_bucket,
-#                         "ObjectKey": {
-#                             "FullPath": output_key,
-#                         },
-#                         "Status": "active",
-#                         "FileInfo": {
-#                             "Size": len(output_data),
-#                         },
-#                     }
-#                 },
-#                 "ImageSpec": {
-#                     "Resolution": {"Width": width, "Height": height},
-#                 },
-#             }
-#         else:  # proxy mode
-#             processed_img.save(output_buffer, format="WEBP", quality=90)
-#             output_data = output_buffer.getvalue()
-#             asset_id = f"{asset_id}:proxy"
-#             new_representation = {
-#                 "ID": asset_id,
-#                 "Type": "Image",
-#                 "Format": "WEBP",
-#                 "Purpose": mode,
-#                 "StorageInfo": {
-#                     "PrimaryLocation": {
-#                         "StorageType": "s3",
-#                         "Provider": "aws",
-#                         "Bucket": output_bucket,
-#                         "ObjectKey": {
-#                             "FullPath": output_key,
-#                         },
-#                         "Status": "active",
-#                         "FileInfo": {
-#                             "Size": len(output_data),
-#                         },
-#                     }
-#                 },
-#             }
-
-#         # Upload to output bucket
-#         s3.put_object(
-#             Bucket=output_bucket,
-#             Key=output_key,
-#             Body=output_data,
-#             ContentType="image/webp",
-#         )
-
-#         try:
-#             # Add logging before the update
-#             logger.info(
-#                 "Attempting DynamoDB update",
-#                 extra={
-#                     "inventory_id": clean_inventory_id,
-#                     "new_representation": new_representation,
-#                 },
-#             )
-
-#             # Update DynamoDB
-#             response = table.update_item(
-#                 Key={"InventoryID": clean_inventory_id},
-#                 UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
-#                 ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
-#                 ExpressionAttributeValues={
-#                     ":new_rep": [new_representation],
-#                     ":empty_list": [],
-#                 },
-#                 ReturnValues="UPDATED_NEW",
-#             )
-
-#             # Add more detailed success logging
-#             logger.info(
-#                 "DynamoDB update response",
-#                 extra={"response": response, "inventory_id": clean_inventory_id},
-#             )
-
-#         except Exception as e:
-#             # Enhance error logging
-#             logger.exception(
-#                 "Error updating DynamoDB",
-#                 extra={
-#                     "inventory_id": clean_inventory_id,
-#                     "error": str(e),
-#                     "error_type": type(e).__name__,
-#                 },
-#             )
-#             raise  # Re-raise to ensure we catch all errors
-
-#         # Return the processed image information
-#         return {
-#             "statusCode": 200,
-#             "body": {
-#                 "ID": asset_id,
-#                 "type": "image",
-#                 "format": "WEBP",
-#                 "Purpose": mode,
-#                 "StorageInfo": {
-#                     "PrimaryLocation": {
-#                         "StorageType": "s3",
-#                         "Bucket": output_bucket,
-#                         "path": output_key,
-#                         "status": "active",
-#                         "ObjectKey": {
-#                             "FullPath": output_key,
-#                         },
-#                     }
-#                 },
-#                 "location": {
-#                     "bucket": output_bucket,
-#                     "key": output_key,
-#                 },
-#                 "mode": mode,
-#             },
-#         }
-
-#     except Exception as e:
-#         return {"statusCode": 500, "body": f"Error processing image: {str(e)}"}

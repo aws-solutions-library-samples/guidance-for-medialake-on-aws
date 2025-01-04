@@ -1,13 +1,13 @@
 {
-    "name": "Default Image Pipeline",
+    "name": "Default Video Pipeline",
     "type": "Ingest Triggered",
     "system": true,
-    "event_pattern":{
+    "event_pattern": {
         "detail-type": ["AssetCreated"],
         "detail": {
             "DigitalSourceAsset": {
                 "MainRepresentation": {
-                    "Format": ["TIF", "JPG", "JPEG", "PNG"]
+                    "Format": ["MP4", "MOV", "AVI", "MKV"]
                 }
             }
         }
@@ -22,9 +22,9 @@
                     "y": 380
                 },
                 "data": {
-                    "id": "{{ image_metadata_extractor_function_arn }}",
-                    "type": "imagemetadata",
-                    "label": "Image Metadata",
+                    "id": "{{ video_metadata_extractor_function_arn }}",
+                    "type": "videometadata",
+                    "label": "Video Metadata",
                     "icon": {
                         "key": null,
                         "ref": null,
@@ -34,10 +34,10 @@
                         "_owner": null
                     },
                     "inputTypes": [
-                        "image"
+                        "video"
                     ],
                     "outputTypes": [
-                        "image"
+                        "video"
                     ]
                 },
                 "width": 60,
@@ -55,9 +55,9 @@
                     "y": 467
                 },
                 "data": {
-                    "id": "{{ image_proxy_function_arn }}",
-                    "type": "imageproxy",
-                    "label": "Image Proxy",
+                    "id": "{{ video_proxy_function_arn }}",
+                    "type": "videoproxy",
+                    "label": "Video Proxy",
                     "icon": {
                         "key": null,
                         "ref": null,
@@ -67,10 +67,10 @@
                         "_owner": null
                     },
                     "inputTypes": [
-                        "image"
+                        "video"
                     ],
                     "outputTypes": [
-                        "image"
+                        "video"
                     ]
                 },
                 "width": 60,
@@ -90,9 +90,9 @@
                     "y": 582
                 },
                 "data": {
-                    "id": "{{ image_proxy_function_arn }}",
-                    "type": "imagethumbnail",
-                    "label": "Image Thumbnail",
+                    "id": "{{ video_thumbnail_function_arn }}",
+                    "type": "videothumbnail",
+                    "label": "Video Thumbnail",
                     "icon": {
                         "key": null,
                         "ref": null,
@@ -102,13 +102,11 @@
                         "_owner": null
                     },
                     "inputTypes": [
-                        "image"
+                        "video"
                     ],
                     "outputTypes": [
                         "image"
-                    ],
-                    "width": 300,
-                    "height": 300
+                    ]
                 },
                 "width": 60,
                 "height": 55,
@@ -126,7 +124,7 @@
                 "targetHandle": null,
                 "type": "custom",
                 "data": {
-                    "text": "to Image Proxy"
+                    "text": "to Video Proxy"
                 },
                 "id": "reactflow__edge-dndnode_0-dndnode_1"
             },
@@ -137,7 +135,7 @@
                 "targetHandle": null,
                 "type": "custom",
                 "data": {
-                    "text": "to Image Thumbnail"
+                    "text": "to Video Thumbnail"
                 },
                 "id": "reactflow__edge-dndnode_1-dndnode_2"
             }
@@ -149,3 +147,4 @@
         }
     }
 }
+

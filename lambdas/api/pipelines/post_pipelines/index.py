@@ -80,6 +80,16 @@ def wait_for_policy_attachment(
     return False
 
 
+def wait_for_lambda_ready(function_name: str, max_retries=20, delay=5):
+    lambda_client = boto3.client("lambda")
+    for _ in range(max_retries):
+        response = lambda_client.get_function(FunctionName=function_name)
+        if response["Configuration"]["State"] == "Active":
+            return True
+        time.sleep(delay)
+    return False
+
+
 def float_to_decimal(obj):
     """Convert float values to Decimal for DynamoDB compatibility"""
     if isinstance(obj, float):
@@ -167,6 +177,10 @@ def get_state_machine_definition(
             state["Parameters"]["Payload"]["mode"] = (
                 "proxy" if node_data["type"] == "imageproxy" else "thumbnail"
             )
+            # Add width and height for Image Thumbnail
+            if node_data["type"] == "imagethumbnail":
+                state["Parameters"]["Payload"]["width"] = node_data.get("width")
+                state["Parameters"]["Payload"]["height"] = node_data.get("height")
 
         # Find the next node
         next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
@@ -304,7 +318,9 @@ def create_eventbridge_rule(
         raise
 
 
-def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
+def create_stepfunction_role(
+    role_name: str, queue_arn: str, tags: dict, lambda_arns: list
+) -> str:
     """Create IAM role for pipeline execution"""
     try:
         assume_role_policy = {
@@ -330,10 +346,7 @@ def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
                 {
                     "Effect": "Allow",
                     "Action": ["lambda:InvokeFunction"],
-                    "Resource": [
-                        os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
-                        os.environ.get("IMAGE_PROXY_LAMBDA_ARN"),
-                    ],
+                    "Resource": lambda_arns,
                 }
             ],
         }
@@ -346,7 +359,7 @@ def create_stepfunction_role(role_name: str, queue_arn: str, tags: dict) -> str:
 
         return response["Role"]["Arn"]
     except Exception as e:
-        logger.error(f"Failed to create IAM role: {str(e)}")
+        logger.error(f"Failed to create IAM role: {str(e)} {lambda_policy}")
         raise
 
 
@@ -597,6 +610,17 @@ def create_iam_lambda_s3_dynamo_rw_policy():
             },
             {
                 "Effect": "Allow",
+                "Action": [
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                "Resource": ["*"],
+            },
+            {
+                "Effect": "Allow",
                 "Action": ["kms:GenerateDataKey"],
                 "Resource": [
                     os.environ["MEDIA_ASSETS_BUCKET_NAME_KMS_KEY"],
@@ -637,15 +661,11 @@ def update_lambda_function_role(function_name: str, role_arn: str, max_retries=5
             )
             return
         except ClientError as e:
-            if e.response["Error"][
-                "Code"
-            ] == "InvalidParameterValueException" and "cannot be assumed by Lambda" in str(
-                e
-            ):
+            if e.response["Error"]["Code"] == "ResourceConflictException":
                 if attempt < max_retries - 1:
                     wait_time = (2**attempt) * 5  # exponential backoff
                     logger.warning(
-                        f"Role not ready, retrying in {wait_time} seconds..."
+                        f"Update in progress, retrying in {wait_time} seconds..."
                     )
                     time.sleep(wait_time)
                 else:
@@ -685,16 +705,16 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             global_prefix = os.environ["GLOBAL_PREFIX"]
             logger.info(f"Global prefix: {global_prefix}")
             # Generate names for resources
-            resource_suffix = createpipeline.name.replace(" ", "-").lower()
-            queue_name = f"{global_prefix}-pl-{resource_suffix}"
-            rule_name = f"{global_prefix}-pl-{resource_suffix}-rule"
-            sfn_role_name = f"{global_prefix}-pl-sfn-{resource_suffix}"
+            pipeline_suffix = createpipeline.name.replace(" ", "-").lower()
+            queue_name = f"{global_prefix}-pl-{pipeline_suffix}"
+            rule_name = f"{global_prefix}-pl-{pipeline_suffix}-rule"
+            sfn_role_name = f"{global_prefix}-pl-sfn-{pipeline_suffix}"
 
             lambda_s3_dynamo_rw_role_name = (
-                f"{global_prefix}-pl-s3_dynamo_rw-lam-{resource_suffix}"
+                f"{global_prefix}-pl-s3_dynamo_rw-lam-{pipeline_suffix}"
             )
 
-            state_machine_name = f"{global_prefix}-pl-{resource_suffix}"
+            state_machine_name = f"{global_prefix}-pl-{pipeline_suffix}"
 
             logger.info(
                 f"Generated resource names: queue={queue_name}, rule={rule_name}, sfn_role={sfn_role_name}, lambda_roles={lambda_s3_dynamo_rw_role_name}, state_machine={state_machine_name}"
@@ -740,7 +760,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             logger.info(f"Resource tags: {tags}")
 
             # Create SQS FIFO Queue
-            queue_name = f"medialake-pipeline-{resource_suffix}"
+            queue_name = f"medialake-pipeline-{pipeline_suffix}"
             try:
                 logger.info(f"Creating SQS FIFO queue: {queue_name}")
                 queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
@@ -756,9 +776,31 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                 }
 
             # Create IAM Role for Lambda and Step Functions
-            state_machine_name = f"medialake-pipeline-{resource_suffix}"
+            state_machine_name = f"medialake-pipeline-{pipeline_suffix}"
             logger.info(f"Creating IAM role for Step Functions: {sfn_role_name}")
-            sfn_role_arn = create_stepfunction_role(sfn_role_name, queue_arn, tags)
+
+            # Extract Lambda ARNs from the pipeline definition
+            lambda_arns = list(
+                set(
+                    node["data"]["id"]
+                    for node in createpipeline.definition["nodes"]
+                    if "id" in node["data"] and node["data"]["id"]
+                )
+            )
+
+            if not lambda_arns:
+                logger.error("No valid Lambda ARNs found in the pipeline definition")
+                return {
+                    "status": "400",
+                    "message": "Invalid pipeline definition: No valid Lambda ARNs found",
+                    "data": {
+                        "error": "Pipeline must include at least one Lambda function"
+                    },
+                }
+
+            sfn_role_arn = create_stepfunction_role(
+                sfn_role_name, queue_arn, tags, lambda_arns
+            )
             resources_to_delete.append(("iam_stepfunction_role", sfn_role_arn))
             logger.info(f"Step Functions IAM role created: {sfn_role_arn}")
 
@@ -778,24 +820,36 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             logger.info(f"Lambda trigger IAM role modified: {lambda_trigger_role_name}")
             logger.info("Updating Lambda function role")
 
-            update_lambda_function_role(
-                pipeline_trigger_lambda_arn, lambda_trigger_role_arn
-            )
+            if wait_for_lambda_ready(pipeline_trigger_lambda_arn):
+                update_lambda_function_role(
+                    pipeline_trigger_lambda_arn, lambda_trigger_role_arn
+                )
+            else:
+                logger.error(
+                    f"Lambda function {pipeline_trigger_lambda_arn} is not in Active state"
+                )
             logger.info("Creating IAM Lambda S3 DynamoDB read-write policy")
 
             iam_lambda_s3_dynamo_rw_policy = create_iam_lambda_s3_dynamo_rw_policy()
             # print(iam_lambda_s3_dynamo_rw_policy)
-            logger.info("Updating Lambda role permissions for image metadata extractor")
+            # logger.info("Updating Lambda role permissions for image metadata extractor")
 
-            update_lambda_role_permissions(
-                os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
-                iam_lambda_s3_dynamo_rw_policy,
-            )
-            logger.info("Updating Lambda role permissions for image proxy")
+            # update_lambda_role_permissions(
+            #     os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
+            #     iam_lambda_s3_dynamo_rw_policy,
+            # )
+            # logger.info("Updating Lambda role permissions for image proxy")
 
-            update_lambda_role_permissions(
-                os.environ.get("IMAGE_PROXY_LAMBDA_ARN"), iam_lambda_s3_dynamo_rw_policy
-            )
+            # update_lambda_role_permissions(
+            #     os.environ.get("IMAGE_PROXY_LAMBDA_ARN"), iam_lambda_s3_dynamo_rw_policy
+            # )
+
+            for lambda_arn in lambda_arns:
+                update_lambda_role_permissions(
+                    lambda_arn,
+                    iam_lambda_s3_dynamo_rw_policy,
+                )
+                logger.info(f"Updating Lambda role permissions for {lambda_arn}")
 
             logger.info("Creating new bucket policy")
 
@@ -810,9 +864,9 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
                     f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}/*",
                     f"arn:aws:s3:::{os.environ['MEDIA_ASSETS_BUCKET_NAME']}",
                 ],
-                "Condition": {
-                    "ArnLike": {"aws:SourceArn": os.environ["IMAGE_PROXY_LAMBDA_ARN"]}
-                },
+                # "Condition": {
+                #     "ArnLike": {"aws:SourceArn": os.environ["IMAGE_PROXY_LAMBDA_ARN"]}
+                # },
             }
             result = s3_client.get_bucket_policy(
                 Bucket=os.environ["MEDIA_ASSETS_BUCKET_NAME"]
@@ -834,13 +888,6 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             # Get state machine definition
             logger.info("Getting state machine definition")
 
-            # state_machine_definition = get_state_machine_definition(
-            #     os.environ.get("IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN"),
-            #     os.environ.get("IMAGE_PROXY_LAMBDA_ARN"),
-            #     createpipeline.name,
-            #     os.environ.get("MEDIA_ASSETS_BUCKET_NAME"),
-            # )
-
             output_bucket_name = os.environ.get("MEDIA_ASSETS_BUCKET_NAME")
             state_machine_definition = get_state_machine_definition(
                 createpipeline.definition, output_bucket_name, createpipeline.name
@@ -853,7 +900,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             resources_to_delete.append(("step_function", state_machine_arn))
 
             # Create EventBridge rule
-            rule_name = f"medialake-pipeline-{resource_suffix}-rule"
+            rule_name = f"medialake-pipeline-{pipeline_suffix}-rule"
             logger.info(f"Creating EventBridge rule: {rule_name}")
             rule_arn = create_eventbridge_rule(
                 rule_name,

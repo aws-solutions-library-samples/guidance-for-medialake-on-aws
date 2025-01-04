@@ -149,9 +149,11 @@ class CleanupStack(Stack):
                     "logs:PutRetentionPolicy",
                     "logs:DeleteRetentionPolicy",
                     "logs:TagLogGroup",
-                    "logs:UntagLogGroup"
+                    "logs:UntagLogGroup",
                 ],
-                resources=[f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"],
+                resources=[
+                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"
+                ],
             )
         )
 

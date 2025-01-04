@@ -94,27 +94,108 @@ const NestedMetadata: React.FC<{ data: any, isTopLevel?: boolean }> = ({ data, i
     }
 };
 
-const MetadataContent: React.FC<{ data: any, depth?: number }> = ({ data, depth = 0 }) => {
+const categoryMapping = {
+    exif: 'EXIF',
+    ifd1: 'Thumbnail (IFD1)',
+    ifd0: 'Image (IFD0)',
+    gps: 'GPS',
+    iptc: 'IPTC',
+    xmp: 'XMP',
+    icc: 'ICC',
+    jfif: 'JFIF (JPEG only)',
+    ihdr: 'IHDR (PNG only)',
+    makerNote: 'Maker Note',
+    userComment: 'User Comment',
+    xmpRights: 'Rights',
+    Iptc4xmpCore: 'IPTC Core',
+    Iptc4xmpExt: 'IPTC Extension',
+    photoshop: 'Photoshop',
+    plus: 'PLUS',
+    dc: 'Dublin Core',
+    xmpMM: 'XMP Media Management',
+    aux: 'Auxiliary',
+    crs: 'Camera Raw Settings',
+    exifEX: 'EXIF Extended',
+    xmpDM: 'XMP Dynamic Media',
+    interop: 'Interoperability'
+};
+
+const outputFilters = {
+    'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
+    'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
+    'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
+    'Thumbnail (IFD1)': ['ImageWidth', 'ImageHeight', 'ThumbnailLength'],
+    'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
+    'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
+    'XMP': ['Creator', 'Title', 'Description', 'Rights'],
+    'JFIF (JPEG only)': ['JFIFVersion', 'ResolutionUnit', 'XResolution', 'YResolution'],
+    'IHDR (PNG only)': ['Width', 'Height', 'BitDepth', 'ColorType', 'CompressionMethod', 'FilterMethod', 'InterlaceMethod'],
+    'Maker Note': [],
+    'User Comment': [],
+    'Rights': ['UsageTerms', 'CopyrightNotice', 'WebStatement'],
+    'IPTC Core': ['CreatorContactInfo', 'Scene'],
+    'IPTC Extension': ['PersonInImage', 'LocationCreated'],
+    'Photoshop': ['Category', 'SupplementalCategories', 'AuthorsPosition'],
+    'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
+    'Dublin Core': ['Format', 'Type', 'Identifier'],
+    'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
+    'Auxiliary': ['Lens', 'SerialNumber'],
+    'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
+    'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
+    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
+    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
+};
+
+
+interface MetadataContentProps {
+    data: any;
+    depth?: number;
+    showAll: boolean;
+    category?: string;
+}
+
+const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const sortEntries = (entries: [string, any][]): [string, any][] => {
+        if (category && outputFilters[category]) {
+            const preferredOrder = outputFilters[category];
+            return [
+                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
+                ...entries.filter(([key]) => !preferredOrder.includes(key))
+            ];
+        }
+        return entries;
+    };
+
     if (Array.isArray(data)) {
+        const displayData = showAll ? data : data.slice(0, 5);
         return (
             <List dense disablePadding>
-                {data.map((item, index) => (
+                {displayData.map((item, index) => (
                     <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <MetadataContent data={item} depth={depth + 1} />
+                        <MetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
                     </ListItem>
                 ))}
             </List>
         );
     } else if (typeof data === 'object' && data !== null) {
+        const entries = Object.entries(data);
+        const sortedEntries = sortEntries(entries);
+        const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
+
         return (
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
-                {Object.entries(data).map(([key, value]) => (
+                {displayEntries.map(([key, value]) => (
                     <Box key={key}>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                             {formatCamelCase(key)}:
                         </Typography>
                         <Box sx={{ pl: 2 }}>
-                            <MetadataContent data={value} depth={depth + 1} />
+                            <MetadataContent
+                                data={value}
+                                depth={depth + 1}
+                                showAll={showAll}
+                                category={category}
+                            />
                         </Box>
                     </Box>
                 ))}
@@ -124,6 +205,9 @@ const MetadataContent: React.FC<{ data: any, depth?: number }> = ({ data, depth 
         return <TruncatedTextWithTooltip text={String(data)} />;
     }
 };
+
+
+
 
 interface Pipeline {
     id: string;
@@ -268,6 +352,11 @@ const ImageDetailPage: React.FC = () => {
     const commentOpen = Boolean(commentAnchorEl);
     const commentPopperId = commentOpen ? 'comment-popper' : undefined;
 
+    const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
+
+    const toggleMetadataExpansion = (key: string) => {
+        setExpandedMetadata(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const isLargeScreen = useMediaQuery('(min-width:1200px)');
 
@@ -792,7 +881,16 @@ const ImageDetailPage: React.FC = () => {
                                                 </Typography>
                                             </AccordionSummary>
                                             <AccordionDetails>
-                                                <MetadataContent data={subAccordion.data} />
+                                                <MetadataContent
+                                                    data={subAccordion.data}
+                                                    showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
+                                                />
+                                                <Button
+                                                    onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
+                                                </Button>
                                             </AccordionDetails>
                                         </Accordion>
                                     ))}
@@ -801,7 +899,6 @@ const ImageDetailPage: React.FC = () => {
                         ))}
                     </Paper>
                 </Grid>
-
                 <Grid item xs={12}>
                     <Paper elevation={3} sx={{ p: 2 }}>
                         <Typography variant="h6">Activity Log</Typography>
