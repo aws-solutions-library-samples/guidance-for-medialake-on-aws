@@ -32,7 +32,7 @@ class CleanupStack(Stack):
                 name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
-                log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
+                # log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
@@ -149,9 +149,11 @@ class CleanupStack(Stack):
                     "logs:PutRetentionPolicy",
                     "logs:DeleteRetentionPolicy",
                     "logs:TagLogGroup",
-                    "logs:UntagLogGroup"
+                    "logs:UntagLogGroup",
                 ],
-                resources=[f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"],
+                resources=[
+                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"
+                ],
             )
         )
 

@@ -1,2 +1,1 @@
-# pymediainfo==6.1.0
 pymediainfo-lambda==0.0.12
