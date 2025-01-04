@@ -5,13 +5,47 @@ const exifr = require('exifr');
 
 const MEDIALAKE_ASSET_TABLE = process.env.MEDIALAKE_ASSET_TABLE;
 
+// Utility functions
+function clipBytes(uint8arr, limit = 60) {
+    const arr = Array.from(uint8arr);
+    const [values, remaining] = sliceArray(arr, limit);
+    let output = formatBytes(values);
+    if (remaining > 0) output += `\n... and ${remaining} more`;
+    return output;
+}
+
+function clipString(string, limit = 300) {
+    const arr = string.split('');
+    const [values, remaining] = sliceArray(arr, limit);
+    let output = values.join('');
+    if (remaining > 0) output += `\n... and ${remaining} more`;
+    return output;
+}
+
+function sliceArray(arr, limit) {
+    const size = Math.min(arr.length, limit);
+    const values = arr.slice(0, size);
+    if (size < arr.length)
+        return [values, arr.length - size];
+    else
+        return [values, 0];
+}
+
+function formatBytes(arr) {
+    return arr
+        .map(val => val.toString(16).padStart(2, '0'))
+        .join(' ');
+}
+
+function prettyCase(string) {
+    return string.match(/([A-Z]+(?=[A-Z][a-z]))|([A-Z][a-z]+)|([0-9]+)|([a-z]+)|([A-Z]+)/g)
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ');
+}
+
 const convertFloatsToDecimals = (obj) => {
     if (typeof obj !== 'object' || obj === null) return obj;
-
-    if (Array.isArray(obj)) {
-        return obj.map(convertFloatsToDecimals);
-    }
-
+    if (Array.isArray(obj)) return obj.map(convertFloatsToDecimals);
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'number') {
@@ -25,63 +59,101 @@ const convertFloatsToDecimals = (obj) => {
     return result;
 };
 
-const categoryMapping = {
-    xmpRights: 'Rights',
-    Iptc4xmpCore: 'IPTC Core',
-    iptc: 'IPTC',
-    jfif: 'JFIF',
-    Iptc4xmpExt: 'IPTC Extension',
-    ifd0: 'Basic Image Information',
-    photoshop: 'Photoshop',
-    xmp: 'XMP',
-    plus: 'PLUS',
-    dc: 'Dublin Core',
-    exif: 'EXIF'
-};
+// const categoryMapping = {
+//     exif: 'EXIF',
+//     ifd1: 'Thumbnail (IFD1)',
+//     ifd0: 'Image (IFD0)',
+//     gps: 'GPS',
+//     iptc: 'IPTC',
+//     xmp: 'XMP',
+//     icc: 'ICC',
+//     jfif: 'JFIF (JPEG only)',
+//     ihdr: 'IHDR (PNG only)',
+//     makerNote: 'Maker Note',
+//     userComment: 'User Comment',
+//     xmpRights: 'Rights',
+//     Iptc4xmpCore: 'IPTC Core',
+//     Iptc4xmpExt: 'IPTC Extension',
+//     photoshop: 'Photoshop',
+//     plus: 'PLUS',
+//     dc: 'Dublin Core',
+//     xmpMM: 'XMP Media Management',
+//     aux: 'Auxiliary',
+//     crs: 'Camera Raw Settings',
+//     exifEX: 'EXIF Extended',
+//     xmpDM: 'XMP Dynamic Media',
+//     interop: 'Interoperability'
+// };
+
+// function humanReadableCategory(category) {
+//     return categoryMapping[category] || category;
+// }
+
 
 function humanReadableCategory(category) {
-    return categoryMapping[category] || category;
+    return category;
 }
+
 
 async function extractOrganizedMetadata(imageBuffer) {
     const options = {
+        // APP segments
         tiff: true,
-        xmp: true,
-        icc: true,
-        iptc: false, // TODO: breaks index - need investigate 
-        jfif: true,
-        ihdr: true,
+        // TIFF blocks start
         ifd0: true,
-        ifd1: true,
         exif: true,
         gps: true,
-        interop: false,
+        interop: true,
+        ifd1: true,
+        // other data
         makerNote: false,
         userComment: false,
+        // TIFF blocks end
+        xmp: true,
+        icc: true,
+        iptc: true,
+        // JPEG only
+        jfif: true,
+        // PNG only
+        ihdr: true,
+        // output styles
         mergeOutput: false,
-        translateKeys: false,
-        translateValues: false,
-        reviveValues: false
+        sanitize: true,
+        reviveValues: true,
+        translateKeys: true,
+        translateValues: true,
+        // for XMP Extended
+        multiSegment: true,
     };
 
-    const exr = new exifr.Exifr(options);
-    await exr.read(imageBuffer);
-    const rawMetadata = await exr.parse();
-
+    const rawMetadata = await exifr.parse(imageBuffer, options);
     return organizeMetadata(rawMetadata);
 }
+
+
 
 function organizeMetadata(rawMetadata) {
     const organizedMetadata = {};
     const seenKeys = new Set();
 
     for (const [segment, data] of Object.entries(rawMetadata)) {
+        if (segment === 'errors') {
+            console.error('Metadata extraction errors:', data);
+            continue; // Skip adding errors to the organized metadata
+        }
+
         const readableSegment = humanReadableCategory(segment);
         if (typeof data === 'object' && data !== null) {
             organizedMetadata[readableSegment] = {};
             for (const [key, value] of Object.entries(data)) {
                 if (!seenKeys.has(key)) {
-                    organizedMetadata[readableSegment][key] = value;
+                    let processedValue = value;
+                    if (value instanceof Uint8Array) {
+                        processedValue = clipBytes(value);
+                    } else if (typeof value === 'string') {
+                        processedValue = clipString(value);
+                    }
+                    organizedMetadata[readableSegment][prettyCase(key)] = processedValue;
                     seenKeys.add(key);
                 }
             }
@@ -163,14 +235,23 @@ exports.lambda_handler = async (event) => {
 
         return {
             statusCode: 200,
-            body: { inventoryId }
+            body: JSON.stringify({
+                inventoryId,
+                message: 'Metadata extracted and stored successfully',
+                metadata: extractedMetadata
+            })
         };
 
     } catch (error) {
         console.error('Lambda handler error:', error);
         return {
             statusCode: 500,
-            body: `Error extracting image metadata: ${error.message}`
+            body: JSON.stringify({
+                error: 'Error extracting or storing image metadata',
+                message: error.message
+            })
         };
     }
 };
+
+
