@@ -981,7 +981,12 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     mt: 4,
-                    mb: 2
+                    mb: 4,
+                    position: 'sticky',
+                    bottom: 0,
+                    backgroundColor: 'background.paper',
+                    zIndex: 1,
+                    py: 2
                 }}>
                     <Typography variant="body2" color="text.secondary">
                         Showing {((page - 1) * searchMetadata.pageSize) + 1} - {Math.min(page * searchMetadata.pageSize, searchMetadata.totalResults)} of {searchMetadata.totalResults} results

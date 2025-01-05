@@ -279,10 +279,6 @@ const AuthPage = () => {
                                 '&::placeholder': {
                                     color: 'rgba(255, 255, 255, 0.5)',
                                 },
-                                '&[type="password"]': {
-                                    textAlign: 'center',
-                                    letterSpacing: '0.3em',
-                                },
                             },
                             '& .amplify-text': {
                                 color: 'rgba(255, 255, 255, 0.9)',

@@ -9,7 +9,7 @@ for managing assets, including:
 
 from dataclasses import dataclass
 from aws_cdk import (
-    aws_apigateway as apigateway,
+    aws_apigateway as api_gateway,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
     Duration,
@@ -22,6 +22,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+from config import config
 
 
 @dataclass
@@ -29,8 +30,8 @@ class AssetsProps:
     """Configuration for Assets API endpoints."""
 
     asset_table: dynamodb.TableV2
-    api_resource: apigateway.IResource
-    cognito_authorizer: apigateway.IAuthorizer
+    api_resource: api_gateway.IResource
+    cognito_authorizer: api_gateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
 
 
@@ -58,12 +59,55 @@ class AssetsConstruct(Construct):
 
         search_layer = SearchLayer(self, "SearchLayer")
 
-        # GET /assets/{id} Lambda
+        # GET /assets Lambda
+        get_assets_lambda = Lambda(
+            self,
+            "GetAssetsLambda",
+            config=LambdaConfig(
+                name=f"{config.global_prefix}-get-assets-{config.environment}",
+                entry="lambdas/api/assets/get_assets",
+                layers=[search_layer.layer],
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        get_assets_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "kms:Decrypt",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",
+                    "arn:aws:s3:::*",
+                    "arn:aws:kms:*:*:key/*",
+                ],
+            )
+        )
+
+        # Add DynamoDB permissions for GET Lambda
+        get_assets_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        assets_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(get_assets_lambda.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        # /{id} Lambda
         get_asset_lambda = Lambda(
             self,
             "GetAssetLambda",
             config=LambdaConfig(
-                name="get_asset_lambda",
+                name=f"{config.global_prefix}_get_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -92,7 +136,7 @@ class AssetsConstruct(Construct):
             self,
             "DeleteAssetLambda",
             config=LambdaConfig(
-                name="delete_asset_lambda",
+                name=f"{config.global_prefix}_delete_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -136,11 +180,11 @@ class AssetsConstruct(Construct):
         # Add GET method to /assets/{id}
         asset_resource.add_method(
             "GET",
-            apigateway.LambdaIntegration(
+            api_gateway.LambdaIntegration(
                 get_asset_lambda.function,
                 proxy=True,
                 integration_responses=[
-                    apigateway.IntegrationResponse(
+                    api_gateway.IntegrationResponse(
                         status_code="200",
                         response_parameters={
                             "method.response.header.Access-Control-Allow-Origin": "'*'",
@@ -148,10 +192,10 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
             method_responses=[
-                apigateway.MethodResponse(
+                api_gateway.MethodResponse(
                     status_code="200",
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": True,
@@ -163,11 +207,11 @@ class AssetsConstruct(Construct):
         # Add DELETE method to /assets/{id}
         asset_resource.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(
+            api_gateway.LambdaIntegration(
                 delete_asset_lambda.function,
                 proxy=True,
                 integration_responses=[
-                    apigateway.IntegrationResponse(
+                    api_gateway.IntegrationResponse(
                         status_code="200",
                         response_parameters={
                             "method.response.header.Access-Control-Allow-Origin": "'*'",
@@ -175,10 +219,10 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
             method_responses=[
-                apigateway.MethodResponse(
+                api_gateway.MethodResponse(
                     status_code="200",
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": True,
@@ -193,7 +237,7 @@ class AssetsConstruct(Construct):
             self,
             "RenameAssetLambda",
             config=LambdaConfig(
-                name="rename_asset_lambda",
+                name=f"{config.global_prefix}_rename_asset_{config.environment}",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/rp_assets_id/rename/post_rename",
                 environment_variables={
@@ -234,11 +278,11 @@ class AssetsConstruct(Construct):
         # Add POST method to /assets/{id}/rename
         rename_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(
+            api_gateway.LambdaIntegration(
                 rename_asset_lambda.function,
                 proxy=True,
                 integration_responses=[
-                    apigateway.IntegrationResponse(
+                    api_gateway.IntegrationResponse(
                         status_code="200",
                         response_parameters={
                             "method.response.header.Access-Control-Allow-Origin": "'*'",
@@ -246,10 +290,10 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
             method_responses=[
-                apigateway.MethodResponse(
+                api_gateway.MethodResponse(
                     status_code="200",
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": True,
@@ -257,17 +301,3 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
-
-        # Add OPTIONS method for CORS
-        # asset_resource.add_cors_preflight(
-        #     allow_origins=["*"],
-        #     allow_methods=["GET", "DELETE"],
-        #     allow_headers=[
-        #         "Content-Type",
-        #         "X-Amz-Date",
-        #         "Authorization",
-        #         "X-Api-Key",
-        #         "X-Origin-Verify",
-        #     ],
-        #     max_age=Duration.days(1),
-        # )

@@ -91,6 +91,7 @@ cleanup_stack = CleanupStack(
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
+cleanup_stack.add_dependency(pipeline_stack)
 
 cdk.Tags.of(app).add("Application", config.resource_application_tag)
 

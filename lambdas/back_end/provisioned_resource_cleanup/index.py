@@ -1,10 +1,11 @@
-import boto3
-import cfnresponse
 import logging
 import time
+import os
+import boto3
+import cfnresponse
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
-import os
+
 
 # Initialize AWS Lambda Powertools
 logger = Logger()

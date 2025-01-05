@@ -62,19 +62,6 @@ class DynamoDB(Construct):
             dynamo_stream=props.stream,
         )
 
-    # dynamo_db_pipeline_custom_resource_provider = cr.Provider(
-    #         self,
-    #         "DynamoDBPipelineCustomResourceProvider",
-    #         on_event_handler=on_event,
-    #         log_retention=logs.RetentionDays.ONE_DAY,
-    #     )
-
-    # custom_resource = cr.CustomResource(
-    #         self,
-    #         "DynamoDBPipelineCustomResource",
-    #         service_token=dynamo_db_pipeline_custom_resource_provider.service_token,
-    #     )
-
     @property
     def table(self) -> dynamodb.TableV2:
         return self._table
