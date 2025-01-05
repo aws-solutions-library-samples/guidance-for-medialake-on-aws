@@ -30,7 +30,10 @@ base_infrastructure = BaseInfrastructureStack(
 pipeline_nodes_stack = PipelineNodesStack(
     app,
     "MediaLakePipelineNodes",
-    props=PipelineNodesStackProps(asset_table=base_infrastructure.asset_table),
+    props=PipelineNodesStackProps(
+        media_assets_bucket=base_infrastructure.media_assets_bucket,
+        asset_table=base_infrastructure.asset_table,
+    ),
     env=cdk.Environment(region=config.primary_region, account=app.account),
 )
 
@@ -68,6 +71,7 @@ pipeline_stack = PipelineStack(
         video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
         video_proxy_function_arn=pipeline_nodes_stack.video_proxy_function_arn,
         video_thumbnail_function_arn=pipeline_nodes_stack.video_thumbnail_function_arn,
+        check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
         post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
     ),
     env=cdk.Environment(region=config.primary_region, account=app.account),

@@ -30,7 +30,14 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
                 "OutputGroupSettings": {
                     "Type": "FILE_GROUP_SETTINGS",
                     "FileGroupSettings": {
-                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/"
+                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/",
+                        "DestinationSettings": {
+                            "S3Settings": {
+                                "AccessControl": {
+                                    "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                                }
+                            }
+                        },
                     },
                 },
                 "Outputs": [
@@ -41,6 +48,7 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
                                 "H264Settings": {
                                     "RateControlMode": "QVBR",
                                     "SceneChangeDetect": "TRANSITION_DETECTION",
+                                    "MaxBitrate": 2000000,  # Added maxBitrate property
                                 },
                             },
                             "Width": 640,
@@ -69,6 +77,8 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
+    mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
+
     table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(table_name)
@@ -99,7 +109,9 @@ def lambda_handler(event, context: LambdaContext):
         job_settings = create_proxy_job_settings(bucket, key, output_bucket, output_key)
 
         response = mediaconvert.create_job(
-            Role=os.environ["MEDIACONVERT_ROLE_ARN"], Settings=job_settings
+            Role=os.environ["MEDIACONVERT_ROLE_ARN"],
+            Settings=job_settings,
+            Queue=mediaconvert_queue,
         )
 
         job_id = response["Job"]["Id"]

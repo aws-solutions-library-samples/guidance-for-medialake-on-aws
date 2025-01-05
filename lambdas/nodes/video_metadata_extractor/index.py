@@ -44,7 +44,7 @@ def run_ffprobe(file_path):
 
 def run_mediainfo(file_path):
     media_info = MediaInfo.parse(file_path, output="JSON")
-    data = json.loads(media_info.to_json())
+    data = json.loads(media_info)
     return data
 
 
@@ -119,6 +119,49 @@ def clean_asset_id(input_string: str) -> str:
     if uuid == "master":
         uuid = parts[-2]
     return f"asset:uuid:{uuid}"
+
+
+def sanitize_metadata(metadata):
+    def sanitize_key(key):
+        # Remove '@' and capitalize the first letter
+        key = key.replace("@", "")
+
+        # Convert from snake_case or camel_case to CamelCase
+        parts = key.split("_")
+        return "".join(word.capitalize() for word in parts)
+
+    def sanitize_dict(d):
+        new_dict = {}
+        for key, value in d.items():
+            new_key = sanitize_key(key)
+            if isinstance(value, dict):
+                value = sanitize_dict(value)
+            elif isinstance(value, list):
+                value = [
+                    sanitize_dict(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+
+            # If the key already exists, we keep the first occurrence
+            if new_key not in new_dict:
+                new_dict[new_key] = value
+        return new_dict
+
+    # Capitalize the main keys (General, Video, Audio)
+    sanitized = {}
+    for key, value in metadata.items():
+        new_key = key.capitalize()
+        if isinstance(value, dict):
+            sanitized[new_key] = sanitize_dict(value)
+        elif isinstance(value, list):
+            sanitized[new_key] = [
+                sanitize_dict(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            sanitized[new_key] = value
+
+    return sanitized
 
 
 @logger.inject_lambda_context
@@ -237,14 +280,27 @@ def lambda_handler(event, context):
             },
         )
 
+        # get the existing item
+        existing_item = asset_table.get_item(
+            Key={"InventoryID": clean_inventory_id}
+        ).get("Item", {})
+
+        # Get existing metadata
+        existing_metadata = existing_item.get("Metadata", {}).get("CustomMetadata", {})
+
+        # Sanitize the new metadata
+        sanitized_merged_output = sanitize_metadata(merged_output)
+
+        # Merge existing metadata with new metadata
+        merged_metadata = {**existing_metadata, **sanitized_merged_output}
+
+        # Update DynamoDB
         response = asset_table.update_item(
             Key={"InventoryID": clean_inventory_id},
-            UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep), ffprobe_mediainfo_merged = :merged",
-            ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
+            UpdateExpression="SET #md.#cm = :metadata",
+            ExpressionAttributeNames={"#md": "Metadata", "#cm": "CustomMetadata"},
             ExpressionAttributeValues={
-                ":new_rep": [new_representation],
-                ":empty_list": [],
-                ":merged": json.dumps(merged_output),
+                ":metadata": merged_metadata,
             },
             ReturnValues="UPDATED_NEW",
         )

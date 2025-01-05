@@ -39,7 +39,14 @@ def create_thumbnail_job_settings(
                 "OutputGroupSettings": {
                     "Type": "FILE_GROUP_SETTINGS",
                     "FileGroupSettings": {
-                        "Destination": f"s3://{output_bucket}/{output_key}/thumbnail/"
+                        "Destination": f"s3://{output_bucket}/{output_key}/thumbnail/",
+                        "DestinationSettings": {
+                            "S3Settings": {
+                                "AccessControl": {
+                                    "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                                }
+                            }
+                        },
                     },
                 },
                 "Outputs": [
@@ -60,6 +67,8 @@ def create_thumbnail_job_settings(
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
+    mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
+
     table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(table_name)
@@ -82,6 +91,11 @@ def lambda_handler(event, context: LambdaContext):
     if not all([key, bucket, output_bucket]):
         return {"statusCode": 400, "body": "Missing required parameters"}
 
+    # Use percentage if timecode is not provided
+    if timecode is None and percentage is None:
+        logger.info("No percentage or timecode provided. Use default 25 percent.")
+        percentage = 25  # Default to 25% if neither is provided
+
     if timecode is None and percentage is None:
         return {
             "statusCode": 400,
@@ -100,7 +114,9 @@ def lambda_handler(event, context: LambdaContext):
         )
 
         response = mediaconvert.create_job(
-            Role=os.environ["MEDIACONVERT_ROLE_ARN"], Settings=job_settings
+            Role=os.environ["MEDIACONVERT_ROLE_ARN"],
+            Settings=job_settings,
+            Queue=mediaconvert_queue,
         )
 
         job_id = response["Job"]["Id"]

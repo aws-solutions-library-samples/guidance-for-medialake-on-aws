@@ -12,6 +12,7 @@ from aws_cdk import (
     custom_resources as cr,
 )
 
+# from config import config
 from constructs import Construct
 from dataclasses import dataclass
 
@@ -26,6 +27,7 @@ class PipelineStackProps:
     video_metadata_extractor_function_arn: str
     video_proxy_function_arn: str
     video_thumbnail_function_arn: str
+    check_mediaconvert_status_function_arn: str
 
 
 class PipelineStack(Stack):
@@ -37,6 +39,10 @@ class PipelineStack(Stack):
         **kwargs,
     ):
         super().__init__(scope, construct_id, **kwargs)
+
+        ## media convert queues
+
+        ## pipelines deploy
         default_pipelines_template_dir = os.path.join(
             os.path.dirname(__file__), "..", "default_pipelines"
         )
@@ -63,6 +69,14 @@ class PipelineStack(Stack):
             )
             rendered_pipeline = json.loads(rendered_pipeline)
 
+            # Replace check_status: true with the actual function ARN
+            for node in rendered_pipeline["definition"]["nodes"]:
+                if node.get("data", {}).get("check_status") == True:
+                    node["data"][
+                        "lambda_arn"
+                    ] = props.check_mediaconvert_status_function_arn
+                    del node["data"]["check_status"]
+
             pipeline_json = Stack.of(self).to_json_string(rendered_pipeline)
             pipeline_file_name = f"{pipeline_name}.json"
 
@@ -80,6 +94,19 @@ class PipelineStack(Stack):
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
                         f"Create{pipeline_name.capitalize()}Json"
+                    ),
+                ),
+                on_update=cr.AwsSdkCall(
+                    service="S3",
+                    action="putObject",
+                    parameters={
+                        "Bucket": props.iac_assets_bucket.bucket_name,
+                        "Key": pipeline_file_name,
+                        "Body": pipeline_json,
+                        "ContentType": "application/json",
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"Update{pipeline_name.capitalize()}Json"
                     ),
                 ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(
@@ -125,6 +152,17 @@ class PipelineStack(Stack):
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
                         f"InvokeLambda{pipeline_name.capitalize()}"
+                    ),
+                ),
+                on_update=cr.AwsSdkCall(
+                    service="Lambda",
+                    action="invoke",
+                    parameters={
+                        "FunctionName": props.post_pipeline_lambda.function_name,
+                        "Payload": json.dumps(pipeline_data),
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"UpdateLambda{pipeline_name.capitalize()}"
                     ),
                 ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(

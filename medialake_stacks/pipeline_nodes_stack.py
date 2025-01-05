@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_iam as iam,
+    aws_s3 as s3,
     custom_resources as cr,
 )
 
@@ -22,10 +23,16 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PyMediaInfo,
 )
 
+from medialake_constructs.shared_constructs.mediaconvert import (
+    MediaConvert,
+    MediaConvertProps,
+)
+
 
 @dataclass
 class PipelineNodesStackProps:
     asset_table: dynamodb.TableV2
+    media_assets_bucket: s3.IBucket
 
 
 class PipelineNodesStack(Stack):
@@ -38,6 +45,8 @@ class PipelineNodesStack(Stack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
+        self.mediaconvert_role = self.create_mediaconvert_role()
+
         self._pipeline_nodes_table = DynamoDB(
             self,
             "PipelineNodesTable",
@@ -45,6 +54,36 @@ class PipelineNodesStack(Stack):
                 name=f"{config.global_prefix}_pipeline_nodes_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
+            ),
+        )
+
+        proxy_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeProxyMediaConvertQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for proxy MediaConvert jobs",
+                name="MediaLakeProxyQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.global_prefix},
+                ],
+            ),
+        )
+
+        thumbnail_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeThumbnailMediaConvertQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for thumbnail MediaConvert jobs",
+                name="MediaLakeThumbnailQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.global_prefix},
+                ],
             ),
         )
 
@@ -65,6 +104,7 @@ class PipelineNodesStack(Stack):
                 },
             ),
         )
+
         self._video_metadata_extractor_lambda = Lambda(
             self,
             "VideoMetadataExtractorNode",
@@ -72,7 +112,7 @@ class PipelineNodesStack(Stack):
                 name=f"{config.global_prefix}_video_metadata_extractor_node",
                 timeout_minutes=15,
                 memory_size=10240,
-                architecture=lambda_.Architecture.ARM_64,
+                architecture=lambda_.Architecture.X86_64,
                 entry="lambdas/nodes/video_metadata_extractor",
                 layers=layer_objects,
                 environment_variables={
@@ -120,6 +160,8 @@ class PipelineNodesStack(Stack):
                 entry="lambdas/nodes/video_proxy",
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
+                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
                 },
             ),
         )
@@ -133,8 +175,94 @@ class PipelineNodesStack(Stack):
                 entry="lambdas/nodes/video_thumbnail",
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
+                    "MEDIACONVERT_QUEUE": thumbnail_queue.queue_arn,
                 },
             ),
+        )
+
+        self._check_mediaconvert_status = Lambda(
+            self,
+            "CheckMediaconvertStatusNodeExt",
+            config=LambdaConfig(
+                name=f"{config.global_prefix}_check_mediaconvert_status_node_ext",
+                timeout_minutes=15,
+                entry="lambdas/nodes/check_mediaconvert_status",
+                environment_variables={
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
+                    "MEDIACONVERT_QUEUE": thumbnail_queue.queue_arn,
+                },
+            ),
+        )
+
+        self._video_proxy_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:CreateJob",
+                    "mediaconvert:GetJob",
+                    "mediaconvert:ListJobs",
+                ],
+                resources=[proxy_queue.queue_arn],
+            )
+        )
+
+        self._check_mediaconvert_status.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:GetJob",
+                    "mediaconvert:ListJobs",
+                ],
+                resources=[proxy_queue.queue_arn, thumbnail_queue.queue_arn],
+            )
+        )
+
+        self._video_proxy_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:DescribeEndpoints",
+                ],
+                resources=[
+                    f"arn:aws:mediaconvert:{Stack.of(self).region}:{Stack.of(self).account}:endpoints/*",
+                ],
+            )
+        )
+        self._video_proxy_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[self.mediaconvert_role.role_arn],
+            )
+        )
+
+        self._video_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:DescribeEndpoints",
+                ],
+                resources=[
+                    f"arn:aws:mediaconvert:{Stack.of(self).region}:{Stack.of(self).account}:endpoints/*",
+                ],
+            )
+        )
+
+        self._video_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:CreateJob",
+                    "mediaconvert:GetJob",
+                    "mediaconvert:ListJobs",
+                ],
+                resources=[
+                    thumbnail_queue.queue_arn,
+                ],
+            )
+        )
+
+        self._video_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[self.mediaconvert_role.role_arn],
+            )
         )
 
         # Store the Lambda ARNs in the DynamoDB table via a single BatchWriteItem
@@ -520,6 +648,51 @@ class PipelineNodesStack(Stack):
             ),
         )
 
+    def create_mediaconvert_role(self):
+        mediaconvert_role = iam.Role(
+            self,
+            "MediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_MediaConvert_Role",
+            description="IAM role for MediaConvert",
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
+        return mediaconvert_role
+
     @property
     def trigger_node_lambda(self) -> lambda_.Function:
         return self._trigger_node_lambda
@@ -567,6 +740,14 @@ class PipelineNodesStack(Stack):
     @property
     def video_thumbnail_function_arn(self) -> str:
         return self._video_thumbnail_lambda.function_arn
+
+    @property
+    def check_mediaconvert_status_lambda(self) -> lambda_.Function:
+        return self._check_mediaconvert_status
+
+    @property
+    def check_mediaconvert_status_function_arn(self) -> str:
+        return self._check_mediaconvert_status.function_arn
 
     @property
     def pipelne_nodes_table(self) -> dynamodb.TableV2:

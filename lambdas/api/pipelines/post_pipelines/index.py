@@ -80,7 +80,7 @@ def wait_for_policy_attachment(
     return False
 
 
-def wait_for_lambda_ready(function_name: str, max_retries=20, delay=5):
+def wait_for_lambda_ready(function_name: str, max_retries=20, delay=10):
     lambda_client = boto3.client("lambda")
     for _ in range(max_retries):
         response = lambda_client.get_function(FunctionName=function_name)
@@ -171,14 +171,21 @@ def get_state_machine_definition(
             "ResultPath": f"$.{state_name}Result",
         }
 
-        # Add mode and output_bucket for Image Proxy and Image Thumbnail
-        if node_data["type"] in ["imageproxy", "imagethumbnail"]:
+        # Add mode and output_bucket for Image Proxy, Image Thumbnail, Video Proxy, and Video Thumbnail
+        if node_data["type"] in [
+            "imageproxy",
+            "imagethumbnail",
+            "videoproxy",
+            "videothumbnail",
+        ]:
             state["Parameters"]["Payload"]["output_bucket"] = output_bucket_name
             state["Parameters"]["Payload"]["mode"] = (
-                "proxy" if node_data["type"] == "imageproxy" else "thumbnail"
+                "proxy"
+                if node_data["type"] in ["imageproxy", "videoproxy"]
+                else "thumbnail"
             )
-            # Add width and height for Image Thumbnail
-            if node_data["type"] == "imagethumbnail":
+            # Add width and height for Image Thumbnail and Video Thumbnail
+            if node_data["type"] in ["imagethumbnail", "videothumbnail"]:
                 state["Parameters"]["Payload"]["width"] = node_data.get("width")
                 state["Parameters"]["Payload"]["height"] = node_data.get("height")
 
