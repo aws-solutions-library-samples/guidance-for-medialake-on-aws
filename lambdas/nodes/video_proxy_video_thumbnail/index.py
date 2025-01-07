@@ -15,31 +15,30 @@ def clean_asset_id(input_string: str) -> str:
     return f"asset:uuid:{uuid}"
 
 
-def create_thumbnail_job_settings(
-    input_bucket, input_key, output_bucket, output_key, timecode=None, percentage=None
+def create_proxy_job_settings(
+    input_bucket,
+    input_key,
+    output_bucket,
+    output_key,
+    create_thumbnail=True,
+    thumbnail_width=300,
+    thumbnail_height=300,
 ):
-    input_settings = {
-        "FileInput": f"s3://{input_bucket}/{input_key}",
-        "AudioSelectors": {"Audio Selector 1": {"DefaultSelection": "DEFAULT"}},
-        "VideoSelector": {},
-    }
-
-    if timecode:
-        input_settings["InputClippings"] = [{"StartTimecode": timecode}]
-    elif percentage is not None:
-        input_settings["InputClippings"] = [
-            {"StartTimecode": f"00:00:{percentage:.2f}"}
-        ]
-
-    return {
-        "Inputs": [input_settings],
+    job_settings = {
+        "Inputs": [
+            {
+                "FileInput": f"s3://{input_bucket}/{input_key}",
+                "AudioSelectors": {"Audio Selector 1": {"DefaultSelection": "DEFAULT"}},
+                "VideoSelector": {},
+            }
+        ],
         "OutputGroups": [
             {
-                "Name": "Thumbnail",
+                "Name": "Proxy Video",
                 "OutputGroupSettings": {
                     "Type": "FILE_GROUP_SETTINGS",
                     "FileGroupSettings": {
-                        "Destination": f"s3://{output_bucket}/{output_key}/thumbnail/",
+                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/",
                         "DestinationSettings": {
                             "S3Settings": {
                                 "AccessControl": {
@@ -52,16 +51,56 @@ def create_thumbnail_job_settings(
                 "Outputs": [
                     {
                         "VideoDescription": {
-                            "CodecSettings": {"Codec": "JPG"},
+                            "CodecSettings": {
+                                "Codec": "H_264",
+                                "H264Settings": {
+                                    "RateControlMode": "QVBR",
+                                    "SceneChangeDetect": "TRANSITION_DETECTION",
+                                    "MaxBitrate": 2000000,
+                                },
+                            },
                             "Width": 640,
                             "Height": 360,
                         },
-                        "ContainerSettings": {"Container": "RAW"},
-                    }
+                        "AudioDescriptions": [
+                            {
+                                "CodecSettings": {
+                                    "Codec": "AAC",
+                                    "AacSettings": {
+                                        "Bitrate": 96000,
+                                        "CodingMode": "CODING_MODE_2_0",
+                                        "SampleRate": 48000,
+                                    },
+                                }
+                            }
+                        ],
+                        "ContainerSettings": {"Container": "MP4", "Mp4Settings": {}},
+                    },
                 ],
             }
         ],
     }
+
+    if create_thumbnail:
+        thumbnail_output = {
+            "NameModifier": "_thumbnail",
+            "Extension": "jpg",
+            "VideoDescription": {
+                "CodecSettings": {
+                    "Codec": "FRAME_CAPTURE",
+                    "FrameCaptureSettings": {
+                        "FramerateNumerator": 1,
+                        "FramerateDenominator": 5,
+                    },
+                },
+                "Width": thumbnail_width,
+                "Height": thumbnail_height,
+            },
+            "ContainerSettings": {"Container": "RAW"},
+        }
+        job_settings["OutputGroups"][0]["Outputs"].append(thumbnail_output)
+
+    return job_settings
 
 
 @logger.inject_lambda_context
@@ -85,22 +124,12 @@ def lambda_handler(event, context: LambdaContext):
     key = primary_location.get("ObjectKey", {}).get("FullPath")
 
     output_bucket = event.get("output_bucket")
-    timecode = event.get("timecode")
-    percentage = event.get("percentage")
+    create_thumbnail = event.get("create_thumbnail", True)
+    thumbnail_width = event.get("thumbnail_width", 300)
+    thumbnail_height = event.get("thumbnail_height", 400)
 
     if not all([key, bucket, output_bucket]):
         return {"statusCode": 400, "body": "Missing required parameters"}
-
-    # Use percentage if timecode is not provided
-    if timecode is None and percentage is None:
-        logger.info("No percentage or timecode provided. Use default 25 percent.")
-        percentage = 25  # Default to 25% if neither is provided
-
-    if timecode is None and percentage is None:
-        return {
-            "statusCode": 400,
-            "body": "Either timecode or percentage must be provided",
-        }
 
     mediaconvert = boto3.client("mediaconvert", region_name="us-east-1")
     endpoints = mediaconvert.describe_endpoints()
@@ -109,8 +138,14 @@ def lambda_handler(event, context: LambdaContext):
 
     try:
         output_key = f"{bucket}/{key.rsplit('.', 1)[0]}"
-        job_settings = create_thumbnail_job_settings(
-            bucket, key, output_bucket, output_key, timecode, percentage
+        job_settings = create_proxy_job_settings(
+            bucket,
+            key,
+            output_bucket,
+            output_key,
+            create_thumbnail=create_thumbnail,
+            thumbnail_width=thumbnail_width,
+            thumbnail_height=thumbnail_height,
         )
 
         response = mediaconvert.create_job(
@@ -122,18 +157,18 @@ def lambda_handler(event, context: LambdaContext):
         job_id = response["Job"]["Id"]
         logger.info(f"MediaConvert job created with ID: {job_id}")
 
-        thumbnail_representation = {
-            "ID": f"{asset_id}:thumbnail",
-            "Type": "Image",
-            "Format": "JPG",
-            "Purpose": "thumbnail",
+        proxy_representation = {
+            "ID": f"{asset_id}:proxy",
+            "Type": "Video",
+            "Format": "MP4",
+            "Purpose": "proxy",
             "StorageInfo": {
                 "PrimaryLocation": {
                     "StorageType": "s3",
                     "Provider": "aws",
                     "Bucket": output_bucket,
                     "ObjectKey": {
-                        "FullPath": f"{output_key}/thumbnail/output.0000001.jpg",
+                        "FullPath": f"{output_key}/proxy/output.mp4",
                     },
                     "Status": "processing",
                 }
@@ -146,7 +181,7 @@ def lambda_handler(event, context: LambdaContext):
             UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
             ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
             ExpressionAttributeValues={
-                ":new_rep": [thumbnail_representation],
+                ":new_rep": [proxy_representation],
                 ":empty_list": [],
             },
             ReturnValues="UPDATED_NEW",
@@ -161,26 +196,23 @@ def lambda_handler(event, context: LambdaContext):
             "statusCode": 200,
             "body": {
                 "JobId": job_id,
-                "Thumbnail": {
-                    "ID": f"{asset_id}:thumbnail",
-                    "type": "image",
-                    "format": "JPG",
-                    "Purpose": "thumbnail",
-                    "StorageInfo": thumbnail_representation["StorageInfo"],
+                "Proxy": {
+                    "ID": f"{asset_id}:proxy",
+                    "type": "video",
+                    "format": "MP4",
+                    "Purpose": "proxy",
+                    "StorageInfo": proxy_representation["StorageInfo"],
                 },
             },
         }
 
     except Exception as e:
         logger.exception(
-            "Error processing video for thumbnail",
+            "Error processing video",
             extra={
                 "inventory_id": clean_inventory_id,
                 "error": str(e),
                 "error_type": type(e).__name__,
             },
         )
-        return {
-            "statusCode": 500,
-            "body": f"Error processing video for thumbnail: {str(e)}",
-        }
+        return {"statusCode": 500, "body": f"Error processing video: {str(e)}"}

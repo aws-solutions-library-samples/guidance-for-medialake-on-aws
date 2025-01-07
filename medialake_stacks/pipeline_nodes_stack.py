@@ -151,32 +151,17 @@ class PipelineNodesStack(Stack):
             ),
         )
 
-        self._video_proxy_lambda = Lambda(
+        self._video_proxy_thumbnail_lambda = Lambda(
             self,
-            "VideoProxyNode",
+            "VideoProxyThumbnailNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_video_proxy_node",
+                name=f"{config.global_prefix}_video_proxy_thumbnail_node",
                 timeout_minutes=15,
-                entry="lambdas/nodes/video_proxy",
+                entry="lambdas/nodes/video_proxy_video_thumbnail",
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
                     "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
-                },
-            ),
-        )
-
-        self._video_thumbnail_lambda = Lambda(
-            self,
-            "VideoThumbnailNode",
-            config=LambdaConfig(
-                name=f"{config.global_prefix}_video_thumbnail_node",
-                timeout_minutes=15,
-                entry="lambdas/nodes/video_thumbnail",
-                environment_variables={
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                    "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
-                    "MEDIACONVERT_QUEUE": thumbnail_queue.queue_arn,
                 },
             ),
         )
@@ -191,12 +176,12 @@ class PipelineNodesStack(Stack):
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
-                    "MEDIACONVERT_QUEUE": thumbnail_queue.queue_arn,
+                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
                 },
             ),
         )
 
-        self._video_proxy_lambda.function.add_to_role_policy(
+        self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:CreateJob",
@@ -213,11 +198,11 @@ class PipelineNodesStack(Stack):
                     "mediaconvert:GetJob",
                     "mediaconvert:ListJobs",
                 ],
-                resources=[proxy_queue.queue_arn, thumbnail_queue.queue_arn],
+                resources=[proxy_queue.queue_arn],
             )
         )
 
-        self._video_proxy_lambda.function.add_to_role_policy(
+        self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:DescribeEndpoints",
@@ -227,38 +212,7 @@ class PipelineNodesStack(Stack):
                 ],
             )
         )
-        self._video_proxy_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["iam:PassRole"],
-                resources=[self.mediaconvert_role.role_arn],
-            )
-        )
-
-        self._video_thumbnail_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "mediaconvert:DescribeEndpoints",
-                ],
-                resources=[
-                    f"arn:aws:mediaconvert:{Stack.of(self).region}:{Stack.of(self).account}:endpoints/*",
-                ],
-            )
-        )
-
-        self._video_thumbnail_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "mediaconvert:CreateJob",
-                    "mediaconvert:GetJob",
-                    "mediaconvert:ListJobs",
-                ],
-                resources=[
-                    thumbnail_queue.queue_arn,
-                ],
-            )
-        )
-
-        self._video_thumbnail_lambda.function.add_to_role_policy(
+        self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["iam:PassRole"],
                 resources=[self.mediaconvert_role.role_arn],
@@ -423,7 +377,7 @@ class PipelineNodesStack(Stack):
                     "Item": {
                         "id": unique_id(),
                         "name": {"S": "video_proxy"},
-                        "arn": {"S": self._video_proxy_lambda.function_arn},
+                        "arn": {"S": self._video_proxy_thumbnail_lambda.function_arn},
                         "description": {"S": "Generates proxy versions of video files"},
                         "props": {
                             "M": {
@@ -526,92 +480,6 @@ class PipelineNodesStack(Stack):
                                                 },
                                             }
                                         }
-                                    }
-                                }
-                            }
-                        },
-                    }
-                }
-            },
-            {
-                "PutRequest": {
-                    "Item": {
-                        "id": unique_id(),
-                        "name": {"S": "video_thumbnail"},
-                        "arn": {"S": self._video_thumbnail_lambda.function_arn},
-                        "description": {
-                            "S": "Generates thumbnail images from video files"
-                        },
-                        "props": {
-                            "M": {
-                                "derived_representation": {
-                                    "M": {
-                                        "thumbnail": {
-                                            "M": {
-                                                "format": {
-                                                    "M": {
-                                                        "type": {"S": "string"},
-                                                        "default": {"S": "WEBP"},
-                                                        "description": {
-                                                            "S": "Output format for the thumbnail image"
-                                                        },
-                                                    }
-                                                },
-                                                "image_spec": {
-                                                    "M": {
-                                                        "resolution": {
-                                                            "M": {
-                                                                "width": {
-                                                                    "M": {
-                                                                        "type": {
-                                                                            "S": "integer"
-                                                                        },
-                                                                        "default": {
-                                                                            "N": "640"
-                                                                        },
-                                                                        "description": {
-                                                                            "S": "Width of the thumbnail image"
-                                                                        },
-                                                                    }
-                                                                },
-                                                                "height": {
-                                                                    "M": {
-                                                                        "type": {
-                                                                            "S": "integer"
-                                                                        },
-                                                                        "default": {
-                                                                            "N": "360"
-                                                                        },
-                                                                        "description": {
-                                                                            "S": "Height of the thumbnail image"
-                                                                        },
-                                                                    }
-                                                                },
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                            }
-                                        },
-                                        "timecode": {
-                                            "M": {
-                                                "type": {"S": "string"},
-                                                "description": {
-                                                    "S": "Timecode for thumbnail extraction (e.g., '00:00:30:00')"
-                                                },
-                                                "optional": {"BOOL": True},
-                                            }
-                                        },
-                                        "percentage": {
-                                            "M": {
-                                                "type": {"S": "number"},
-                                                "description": {
-                                                    "S": "Percentage of video duration for thumbnail extraction (e.g., 25 for 25%)"
-                                                },
-                                                "default": {"N": "25"},
-                                                "optional": {"BOOL": True},
-                                            }
-                                        },
                                     }
                                 }
                             }
@@ -726,12 +594,12 @@ class PipelineNodesStack(Stack):
         return self._video_metadata_extractor_lambda.function_arn
 
     @property
-    def video_proxy_lambda(self) -> lambda_.Function:
-        return self._video_proxy_lambda
+    def video_proxy_thumbnail_lambda(self) -> lambda_.Function:
+        return self._video_proxy_thumbnail_lambda
 
     @property
-    def video_proxy_function_arn(self) -> str:
-        return self._video_proxy_lambda.function_arn
+    def video_proxy_thumbnail_function_arn(self) -> str:
+        return self._video_proxy_thumbnail_lambda.function_arn
 
     @property
     def video_thumbnail_lambda(self) -> lambda_.Function:

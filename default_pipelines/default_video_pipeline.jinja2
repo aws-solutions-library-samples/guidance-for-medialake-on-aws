@@ -56,8 +56,8 @@
                 },
                 "data": {
                     "id": "{{ video_proxy_function_arn }}",
-                    "type": "videoproxy",
-                    "label": "Video Proxy",
+                    "type": "videoproxyandthumbnail",
+                    "label": "Video Proxy and Thumbnail",
                     "icon": {
                         "key": null,
                         "ref": null,
@@ -81,43 +81,6 @@
                     "y": 467
                 },
                 "dragging": false
-            },
-            {
-                "id": "dndnode_2",
-                "type": "custom",
-                "position": {
-                    "x": 216,
-                    "y": 582
-                },
-                "data": {
-                    "id": "{{ video_thumbnail_function_arn }}",
-                    "type": "videothumbnail",
-                    "label": "Video Thumbnail",
-                    "icon": {
-                        "key": null,
-                        "ref": null,
-                        "props": {
-                            "size": 20
-                        },
-                        "_owner": null
-                    },
-                    "inputTypes": [
-                        "video"
-                    ],
-                    "outputTypes": [
-                        "image"
-                    ],
-                    "percentage":25,
-                    "timecode": null
-
-
-                },
-                "width": 60,
-                "height": 55,
-                "positionAbsolute": {
-                    "x": 216,
-                    "y": 582
-                }
             }
         ],
         "edges": [
@@ -131,17 +94,6 @@
                     "text": "to Video Proxy"
                 },
                 "id": "reactflow__edge-dndnode_0-dndnode_1"
-            },
-            {
-                "source": "dndnode_1",
-                "sourceHandle": null,
-                "target": "dndnode_2",
-                "targetHandle": null,
-                "type": "custom",
-                "data": {
-                    "text": "to Video Thumbnail"
-                },
-                "id": "reactflow__edge-dndnode_1-dndnode_2"
             }
         ],
         "viewport": {

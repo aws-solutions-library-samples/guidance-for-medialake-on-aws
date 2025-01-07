@@ -80,11 +80,12 @@ def wait_for_policy_attachment(
     return False
 
 
-def wait_for_lambda_ready(function_name: str, max_retries=20, delay=10):
+def wait_for_lambda_ready(function_name: str, max_retries=50, delay=10):
     lambda_client = boto3.client("lambda")
     for _ in range(max_retries):
         response = lambda_client.get_function(FunctionName=function_name)
         if response["Configuration"]["State"] == "Active":
+            time.sleep(delay * 2)
             return True
         time.sleep(delay)
     return False
@@ -928,6 +929,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             if not wait_for_iam_role_propagation(iam_client, sfn_role_name):
                 raise Exception(f"Role {lambda_trigger_role_name} is not ready in time")
             # Add SQS trigger to Lambda
+            time.sleep(10)
             logger.info("Creating event source mapping")
 
             event_source_mapping = lambda_client.create_event_source_mapping(
