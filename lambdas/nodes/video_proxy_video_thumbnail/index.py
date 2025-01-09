@@ -15,8 +15,16 @@ def clean_asset_id(input_string: str) -> str:
     return f"asset:uuid:{uuid}"
 
 
-def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key):
-    return {
+def create_proxy_job_settings(
+    input_bucket,
+    input_key,
+    output_bucket,
+    output_key,
+    create_thumbnail=True,
+    thumbnail_width=300,
+    thumbnail_height=300,
+):
+    job_settings = {
         "Inputs": [
             {
                 "FileInput": f"s3://{input_bucket}/{input_key}",
@@ -30,7 +38,14 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
                 "OutputGroupSettings": {
                     "Type": "FILE_GROUP_SETTINGS",
                     "FileGroupSettings": {
-                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/"
+                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/",
+                        "DestinationSettings": {
+                            "S3Settings": {
+                                "AccessControl": {
+                                    "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                                }
+                            }
+                        },
                     },
                 },
                 "Outputs": [
@@ -41,6 +56,7 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
                                 "H264Settings": {
                                     "RateControlMode": "QVBR",
                                     "SceneChangeDetect": "TRANSITION_DETECTION",
+                                    "MaxBitrate": 2000000,
                                 },
                             },
                             "Width": 640,
@@ -59,16 +75,39 @@ def create_proxy_job_settings(input_bucket, input_key, output_bucket, output_key
                             }
                         ],
                         "ContainerSettings": {"Container": "MP4", "Mp4Settings": {}},
-                    }
+                    },
                 ],
             }
         ],
     }
 
+    if create_thumbnail:
+        thumbnail_output = {
+            "NameModifier": "_thumbnail",
+            "Extension": "jpg",
+            "VideoDescription": {
+                "CodecSettings": {
+                    "Codec": "FRAME_CAPTURE",
+                    "FrameCaptureSettings": {
+                        "FramerateNumerator": 1,
+                        "FramerateDenominator": 5,
+                    },
+                },
+                "Width": thumbnail_width,
+                "Height": thumbnail_height,
+            },
+            "ContainerSettings": {"Container": "RAW"},
+        }
+        job_settings["OutputGroups"][0]["Outputs"].append(thumbnail_output)
+
+    return job_settings
+
 
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
+    mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
+
     table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(table_name)
@@ -85,6 +124,9 @@ def lambda_handler(event, context: LambdaContext):
     key = primary_location.get("ObjectKey", {}).get("FullPath")
 
     output_bucket = event.get("output_bucket")
+    create_thumbnail = event.get("create_thumbnail", True)
+    thumbnail_width = event.get("thumbnail_width", 300)
+    thumbnail_height = event.get("thumbnail_height", 400)
 
     if not all([key, bucket, output_bucket]):
         return {"statusCode": 400, "body": "Missing required parameters"}
@@ -96,10 +138,20 @@ def lambda_handler(event, context: LambdaContext):
 
     try:
         output_key = f"{bucket}/{key.rsplit('.', 1)[0]}"
-        job_settings = create_proxy_job_settings(bucket, key, output_bucket, output_key)
+        job_settings = create_proxy_job_settings(
+            bucket,
+            key,
+            output_bucket,
+            output_key,
+            create_thumbnail=create_thumbnail,
+            thumbnail_width=thumbnail_width,
+            thumbnail_height=thumbnail_height,
+        )
 
         response = mediaconvert.create_job(
-            Role=os.environ["MEDIACONVERT_ROLE_ARN"], Settings=job_settings
+            Role=os.environ["MEDIACONVERT_ROLE_ARN"],
+            Settings=job_settings,
+            Queue=mediaconvert_queue,
         )
 
         job_id = response["Job"]["Id"]
