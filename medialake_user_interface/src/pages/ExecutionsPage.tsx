@@ -1,76 +1,79 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Typography,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Chip,
-    IconButton,
-    useTheme,
     Button,
-    CircularProgress,
-    TableSortLabel,
-    Select,
-    MenuItem,
     FormControl,
     InputLabel,
+    Select,
+    MenuItem,
+    useTheme,
     alpha,
-    Tooltip,
+    Chip,
+    Menu,
+    TextField,
 } from '@mui/material';
-import {
-    Refresh as RefreshIcon,
-    Visibility as VisibilityIcon,
-    PlayArrow as PlayArrowIcon,
-    RestartAlt as RestartIcon,
-} from '@mui/icons-material';
+import { Refresh as RefreshIcon } from '@mui/icons-material';
 import {
     useReactTable,
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
-    flexRender,
     ColumnDef,
-    FilterFn,
+    SortingState,
+    ColumnFiltersState,
+    ColumnSizingState,
+    ColumnResizeMode,
 } from '@tanstack/react-table';
+
+import { ExecutionsTable } from '../features/executions/components/ExecutionsTable';
+import { TableCellContent } from '../components/common/table';
 import { usePipelineExecutions } from '../api/hooks/usePipelinesExecutions';
-import type { PipelineExecution } from '../api/types/pipelineExecutions.types';
-import { useTimezone } from '../contexts/TimezoneContext';
+import type { PipelineExecution, PipelineExecutionFilters } from '../api/types/pipelineExecutions.types';
 
 const PAGE_SIZE = 20;
-
-const containsFilter: FilterFn<any> = (row, columnId, value) => {
-    const cellValue = row.getValue(columnId);
-    if (cellValue == null) return false;
-    return String(cellValue)
-        .toLowerCase()
-        .includes(String(value).toLowerCase());
-};
 
 const ExecutionsPage: React.FC = () => {
     const { t } = useTranslation();
     const theme = useTheme();
     const navigate = useNavigate();
-    const { timezone } = useTimezone();
-    const [filters, setFilters] = useState({
-        status: '',
-        sortBy: 'start_time',
-        sortOrder: 'desc' as 'asc' | 'desc'
-    });
 
-    const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipelineExecutions(PAGE_SIZE, {
-        status: filters.status || undefined,
-        sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder
-    });
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [columnVisibility, setColumnVisibility] = useState({});
+    const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+    const [statusFilter, setStatusFilter] = useState('');
+    const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+    const [filterColumn, setFilterColumn] = useState<string | null>(null);
+    const [searchValue, setSearchValue] = useState('');
+    const [dropdownValue, setDropdownValue] = useState('');
 
-    const getStatusColor = (status: string) => {
+    const filters = useMemo<PipelineExecutionFilters>(() => ({
+        status: statusFilter || undefined,
+        sortBy: sorting[0]?.id || 'start_time',
+        sortOrder: sorting[0]?.desc ? 'desc' as const : 'asc' as const
+    }), [statusFilter, sorting]);
+
+    const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipelineExecutions(PAGE_SIZE, filters);
+
+    const handleSortingChange = useCallback((newSorting: SortingState) => {
+        setSorting(newSorting);
+    }, []);
+
+    const handleFilterChange = useCallback((columnId: string, value: string, type: 'search' | 'dropdown') => {
+        if (type === 'search') {
+            setSearchValue(value);
+        } else {
+            setDropdownValue(value);
+            if (columnId === 'status') {
+                setStatusFilter(value);
+            }
+        }
+    }, []);
+
+    const getStatusColor = useCallback((status: string) => {
         switch (status) {
             case 'RUNNING':
                 return theme.palette.info.main;
@@ -84,10 +87,11 @@ const ExecutionsPage: React.FC = () => {
             default:
                 return theme.palette.grey[500];
         }
-    };
+    }, [theme]);
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString(undefined, {
+    const formatDate = useCallback((dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleString(undefined, {
             year: 'numeric',
             month: 'numeric',
             day: 'numeric',
@@ -95,9 +99,9 @@ const ExecutionsPage: React.FC = () => {
             minute: '2-digit',
             second: '2-digit',
         });
-    };
+    }, []);
 
-    const formatDuration = (seconds: string | null | undefined) => {
+    const formatDuration = useCallback((seconds: string | null | undefined) => {
         if (!seconds) return '';
         const duration = parseFloat(seconds);
         if (isNaN(duration)) return '';
@@ -107,36 +111,86 @@ const ExecutionsPage: React.FC = () => {
         const minutes = Math.floor(duration / 60);
         const remainingSeconds = (duration % 60).toFixed(2);
         return `${minutes}m ${remainingSeconds}s`;
-    };
+    }, []);
 
-    const handleRetryFromCurrent = (executionId: string) => {
+    const handleRetryFromCurrent = useCallback((executionId: string) => {
         // TODO: Implement retry from current position
         console.log('Retry from current position:', executionId);
-    };
+    }, []);
 
-    const handleRetryFromStart = (executionId: string) => {
+    const handleRetryFromStart = useCallback((executionId: string) => {
         // TODO: Implement retry from start
         console.log('Retry from start:', executionId);
-    };
+    }, []);
 
-    const handleViewDetails = (executionId: string) => {
+    const handleViewDetails = useCallback((executionId: string) => {
         navigate(`/executions/${executionId}`);
-    };
+    }, [navigate]);
+
+    const handleFilterColumn = useCallback((event: React.MouseEvent<HTMLElement>, columnId: string) => {
+        setFilterColumn(columnId);
+        setFilterMenuAnchor(event.currentTarget);
+    }, []);
+
+    const handleFilterClose = useCallback(() => {
+        setFilterMenuAnchor(null);
+        setFilterColumn(null);
+        setSearchValue('');
+        setDropdownValue('');
+    }, []);
+
+    const handleFilterApply = useCallback(() => {
+        if (filterColumn) {
+            const newFilters = [];
+            if (searchValue) {
+                newFilters.push({ id: filterColumn, value: searchValue });
+            }
+            if (dropdownValue) {
+                if (filterColumn === 'status') {
+                    newFilters.push({ id: filterColumn, value: dropdownValue });
+                } else {
+                    newFilters.push({ id: `${filterColumn}_type`, value: dropdownValue });
+                }
+            }
+            setColumnFilters(prev => [
+                ...prev.filter(f => !f.id.startsWith(filterColumn)),
+                ...newFilters
+            ]);
+        }
+        handleFilterClose();
+    }, [filterColumn, searchValue, dropdownValue, handleFilterClose]);
+
+    const handleRemoveFilter = useCallback((columnId: string) => {
+        setColumnFilters(prev => prev.filter(f => !f.id.startsWith(columnId)));
+        if (columnId === 'status') {
+            setStatusFilter('');
+        }
+    }, []);
 
     const columns = useMemo<ColumnDef<PipelineExecution>[]>(
         () => [
             {
                 header: t('executions.columns.pipelineName'),
                 accessorKey: 'pipeline_name',
+                minSize: 120,
+                size: 180,
+                enableResizing: true,
+                enableSorting: true,
+                enableFiltering: true,
                 cell: ({ getValue }) => (
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.primary.main }}>
+                    <TableCellContent variant="primary">
                         {getValue() as string}
-                    </Typography>
+                    </TableCellContent>
                 ),
             },
             {
                 header: t('executions.columns.status'),
                 accessorKey: 'status',
+                minSize: 100,
+                size: 120,
+                enableResizing: true,
+                enableSorting: true,
+                enableFiltering: true,
                 cell: ({ getValue }) => {
                     const status = getValue() as string;
                     const color = getStatusColor(status);
@@ -161,85 +215,101 @@ const ExecutionsPage: React.FC = () => {
             {
                 header: t('executions.columns.startTime'),
                 accessorKey: 'start_time',
+                minSize: 150,
+                size: 180,
+                enableResizing: true,
+                enableSorting: true,
+                enableFiltering: true,
                 cell: ({ getValue }) => (
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                    <TableCellContent variant="secondary">
                         {formatDate(getValue() as string)}
-                    </Typography>
+                    </TableCellContent>
                 ),
             },
             {
                 header: t('executions.columns.duration'),
                 accessorKey: 'duration_seconds',
-                cell: ({ getValue }) => {
-                    const duration = formatDuration(getValue() as string);
-                    return duration ? (
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                            {duration}
-                        </Typography>
-                    ) : null;
-                },
+                minSize: 100,
+                size: 120,
+                enableResizing: true,
+                enableSorting: true,
+                enableFiltering: true,
+                cell: ({ getValue }) => (
+                    <TableCellContent variant="secondary">
+                        {formatDuration(getValue() as string)}
+                    </TableCellContent>
+                ),
             },
             {
-                header: t('executions.columns.actions'),
                 id: 'actions',
+                header: () => (
+                    <Box sx={{ width: '100%', textAlign: 'center' }}>
+                        {t('executions.columns.actions')}
+                    </Box>
+                ),
+                minSize: 100,
+                size: 120,
+                enableResizing: true,
+                enableSorting: false,
                 cell: ({ row }) => (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, position: 'relative' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         {row.original.status === 'FAILED' && (
                             <>
-                                <Tooltip title={t('executions.actions.retryFromCurrent')}>
-                                    <IconButton
-                                        size="small"
-                                        color="primary"
-                                        onClick={() => handleRetryFromCurrent(row.original.execution_id)}
-                                        sx={{
-                                            position: 'relative',
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                            '&:hover': {
-                                                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                            },
-                                        }}
-                                    >
-                                        <PlayArrowIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('executions.actions.retryFromStart')}>
-                                    <IconButton
-                                        size="small"
-                                        color="primary"
-                                        onClick={() => handleRetryFromStart(row.original.execution_id)}
-                                        sx={{
-                                            position: 'relative',
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                            '&:hover': {
-                                                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                            },
-                                        }}
-                                    >
-                                        <RestartIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleRetryFromCurrent(row.original.execution_id)}
+                                    sx={{
+                                        minWidth: 0,
+                                        p: 1,
+                                        borderRadius: '8px',
+                                        borderColor: alpha(theme.palette.primary.main, 0.1),
+                                        '&:hover': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.2),
+                                        },
+                                    }}
+                                >
+                                    {t('executions.actions.retryFromCurrent')}
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleRetryFromStart(row.original.execution_id)}
+                                    sx={{
+                                        minWidth: 0,
+                                        p: 1,
+                                        borderRadius: '8px',
+                                        borderColor: alpha(theme.palette.primary.main, 0.1),
+                                        '&:hover': {
+                                            borderColor: alpha(theme.palette.primary.main, 0.2),
+                                        },
+                                    }}
+                                >
+                                    {t('executions.actions.retryFromStart')}
+                                </Button>
                             </>
                         )}
-                        <Tooltip title={t('executions.actions.viewDetails')}>
-                            <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleViewDetails(row.original.execution_id)}
-                                sx={{
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                    },
-                                }}
-                            >
-                                <VisibilityIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleViewDetails(row.original.execution_id)}
+                            sx={{
+                                minWidth: 0,
+                                p: 1,
+                                borderRadius: '8px',
+                                borderColor: alpha(theme.palette.primary.main, 0.1),
+                                '&:hover': {
+                                    borderColor: alpha(theme.palette.primary.main, 0.2),
+                                },
+                            }}
+                        >
+                            {t('executions.actions.viewDetails')}
+                        </Button>
                     </Box>
                 ),
             },
         ],
-        [theme, t, navigate]
+        [theme, t, getStatusColor, formatDate, formatDuration, handleRetryFromCurrent, handleRetryFromStart, handleViewDetails]
     );
 
     const executions = useMemo(() => {
@@ -250,12 +320,23 @@ const ExecutionsPage: React.FC = () => {
     const table = useReactTable({
         data: executions,
         columns,
-        filterFns: {
-            contains: containsFilter,
+        state: {
+            sorting,
+            columnFilters,
+            columnVisibility,
+            columnSizing,
         },
+        enableSorting: true,
+        manualSorting: true,
+        manualFiltering: true,
+        onSortingChange: handleSortingChange,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
+        onColumnSizingChange: setColumnSizing,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        columnResizeMode: 'onChange' as ColumnResizeMode,
     });
 
     return (
@@ -284,9 +365,9 @@ const ExecutionsPage: React.FC = () => {
                         }}>
                             <InputLabel>{t('common.status')}</InputLabel>
                             <Select
-                                value={filters.status}
+                                value={statusFilter}
                                 label={t('common.status')}
-                                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                                onChange={(e) => setStatusFilter(e.target.value)}
                             >
                                 <MenuItem value="">{t('common.all')}</MenuItem>
                                 <MenuItem value="SUCCEEDED">{t('executions.status.succeeded')}</MenuItem>
@@ -316,92 +397,32 @@ const ExecutionsPage: React.FC = () => {
                 </Box>
             </Box>
 
-            <Paper elevation={0} sx={{
+            <Box sx={{
                 flex: 1,
-                borderRadius: '12px',
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                display: 'flex',
+                flexDirection: 'column',
                 overflow: 'hidden',
-                backgroundColor: theme.palette.background.paper,
+                minHeight: 0 // Important for proper flex behavior
             }}>
-                <TableContainer sx={{ maxHeight: 'calc(100vh - 300px)' }}>
-                    <Table stickyHeader>
-                        <TableHead>
-                            {table.getHeaderGroups().map(headerGroup => (
-                                <TableRow key={headerGroup.id}>
-                                    {headerGroup.headers.map(header => (
-                                        <TableCell
-                                            key={header.id}
-                                            sx={{
-                                                backgroundColor: theme.palette.background.paper,
-                                                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                                                py: 2,
-                                            }}
-                                        >
-                                            {header.isPlaceholder ? null : (
-                                                <TableSortLabel
-                                                    active={header.column.getIsSorted() !== false}
-                                                    direction={header.column.getIsSorted() === 'desc' ? 'desc' : 'asc'}
-                                                    onClick={header.column.getToggleSortingHandler()}
-                                                    sx={{
-                                                        fontWeight: 600,
-                                                        color: theme.palette.text.primary,
-                                                    }}
-                                                >
-                                                    {flexRender(
-                                                        header.column.columnDef.header,
-                                                        header.getContext()
-                                                    )}
-                                                </TableSortLabel>
-                                            )}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))}
-                        </TableHead>
-                        <TableBody>
-                            {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
-                                        <CircularProgress size={32} />
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                table.getRowModel().rows.map(row => (
-                                    <TableRow
-                                        key={row.id}
-                                        sx={{
-                                            '&:hover': {
-                                                backgroundColor: alpha(theme.palette.primary.main, 0.02),
-                                            },
-                                            transition: 'background-color 0.2s ease',
-                                        }}
-                                    >
-                                        {row.getVisibleCells().map(cell => (
-                                            <TableCell
-                                                key={cell.id}
-                                                sx={{
-                                                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                                                    py: 2,
-                                                }}
-                                            >
-                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <ExecutionsTable
+                    table={table}
+                    isLoading={isLoading}
+                    data={executions}
+                    onViewDetails={handleViewDetails}
+                    onRetryFromCurrent={handleRetryFromCurrent}
+                    onRetryFromStart={handleRetryFromStart}
+                    onFilterColumn={handleFilterColumn}
+                    activeFilters={columnFilters.map(f => ({ columnId: f.id, value: f.value as string }))}
+                    onRemoveFilter={handleRemoveFilter}
+                />
 
-                <Box sx={{
-                    p: 2,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}>
-                    {hasNextPage && (
+                {hasNextPage && (
+                    <Box sx={{
+                        p: 2,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                    }}>
                         <Button
                             onClick={() => fetchNextPage()}
                             disabled={!hasNextPage || isFetchingNextPage}
@@ -418,9 +439,93 @@ const ExecutionsPage: React.FC = () => {
                                 ? t('common.loading')
                                 : t('common.loadMore')}
                         </Button>
+                    </Box>
+                )}
+            </Box>
+
+            <Menu
+                anchorEl={filterMenuAnchor}
+                open={Boolean(filterMenuAnchor)}
+                onClose={handleFilterClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+            >
+                <Box sx={{ p: 2, minWidth: 300 }}>
+                    {filterColumn !== 'status' && (
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label={t('common.searchValue')}
+                            value={searchValue}
+                            onChange={(e) => handleFilterChange(filterColumn!, e.target.value, 'search')}
+                            sx={{ mb: 2 }}
+                        />
                     )}
+                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel>{t('common.filterType')}</InputLabel>
+                        <Select
+                            value={dropdownValue}
+                            label={t('common.filterType')}
+                            onChange={(e) => handleFilterChange(filterColumn!, e.target.value, 'dropdown')}
+                        >
+                            <MenuItem value="">{t('common.all')}</MenuItem>
+                            {filterColumn === 'status' && (
+                                <>
+                                    <MenuItem value="SUCCEEDED">{t('executions.status.succeeded')}</MenuItem>
+                                    <MenuItem value="FAILED">{t('executions.status.failed')}</MenuItem>
+                                    <MenuItem value="RUNNING">{t('executions.status.running')}</MenuItem>
+                                    <MenuItem value="TIMED_OUT">{t('executions.status.timedOut')}</MenuItem>
+                                    <MenuItem value="ABORTED">{t('executions.status.aborted')}</MenuItem>
+                                </>
+                            )}
+                            {filterColumn === 'pipeline_name' && (
+                                <>
+                                    <MenuItem value="image">Image Pipeline</MenuItem>
+                                    <MenuItem value="video">Video Pipeline</MenuItem>
+                                </>
+                            )}
+                            {filterColumn === 'duration_seconds' && (
+                                <>
+                                    <MenuItem value="<60">Less than 1 minute</MenuItem>
+                                    <MenuItem value="60-300">1-5 minutes</MenuItem>
+                                    <MenuItem value=">300">More than 5 minutes</MenuItem>
+                                </>
+                            )}
+                            {filterColumn === 'start_time' && (
+                                <>
+                                    <MenuItem value="today">Today</MenuItem>
+                                    <MenuItem value="yesterday">Yesterday</MenuItem>
+                                    <MenuItem value="last7days">Last 7 days</MenuItem>
+                                    <MenuItem value="last30days">Last 30 days</MenuItem>
+                                </>
+                            )}
+                        </Select>
+                    </FormControl>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        <Button
+                            size="small"
+                            onClick={handleFilterClose}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {t('common.cancel')}
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            onClick={handleFilterApply}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {t('common.apply')}
+                        </Button>
+                    </Box>
                 </Box>
-            </Paper>
+            </Menu>
         </Box>
     );
 };

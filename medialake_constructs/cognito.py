@@ -41,17 +41,6 @@ class CognitoConstruct(Construct):
         # Use provided props or create default props
         self.props = props or CognitoProps()
 
-        # Create DynamoDB table for user settings
-        self._user_settings_table = DynamoDB(
-            self,
-            "UserSettingsTable",
-            props=DynamoDBProps(
-                name="medialake_user_settings_table",
-                partition_key_name="user_id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
-
         # Create Lambda functions
         self._cognito_trigger_lambda = Lambda(
             self,
@@ -140,14 +129,15 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Generate a stable hash based on account and resource prefix
-        hash_input = (
-            f"{Stack.of(self).account}{config.resource_prefix}{config.environment}"
-        )
-        unique_hash = md5(hash_input.encode()).hexdigest()[:8]
+        # # Generate a stable hash based on account and resource prefix
+        # hash_input = (
+        #     f"{Stack.of(self).account}{config.resource_prefix}{config.environment}"
+        # )
+        # unique_hash = md5(hash_input.encode()).hexdigest()[:8]
 
         # Create domain prefix using resource prefix, environment, and hash
-        domain_prefix = f"{config.resource_prefix}-{config.environment}-{unique_hash}"
+        domain_prefix = f"{config.resource_prefix.lower()}-{config.environment.lower()}-{config.primary_region.lower()}-{config.account_id}"
+        print(f"Domain prefix: {domain_prefix}")
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(

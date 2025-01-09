@@ -54,25 +54,26 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             '&:hover': { opacity: 0.7 }
         },
         tableContainer: {
-            maxHeight: 'calc(100vh - 300px)',
-            overflowX: 'hidden',
-            '&:hover': {
-                overflowX: 'auto'
-            },
+            overflow: 'auto',
             width: '100%',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
             minWidth: 0,
+            minHeight: 0,
+            maxHeight: '100%',
+            position: 'relative',
+            willChange: 'transform',
             '&::-webkit-scrollbar': {
-                height: 10,
+                width: 8,
+                height: 8,
             },
             '&::-webkit-scrollbar-track': {
                 background: theme.palette.background.default,
             },
             '&::-webkit-scrollbar-thumb': {
                 background: theme.palette.divider,
-                borderRadius: 2,
+                borderRadius: 4,
                 '&:hover': {
                     background: alpha(theme.palette.primary.main, 0.2),
                 },
@@ -102,12 +103,15 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
                 backgroundColor: isDark
-                    ? alpha(theme.palette.background.default, 0.3)
-                    : alpha(theme.palette.background.paper, 0.04),
+                    ? alpha(theme.palette.background.default, 0.95)
+                    : alpha(theme.palette.background.paper, 0.95),
                 borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                 fontWeight: 600,
                 color: theme.palette.text.primary,
                 height: mode === 'compact' ? '32px' : '40px',
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
             },
         },
         tableRow: {
@@ -204,10 +208,11 @@ export function ResizableTable<T>({
                     ))}
                 </Box>
             )}
-            <Paper elevation={0} sx={styles.paper}>
+            <Paper elevation={0} sx={{ ...styles.paper, minHeight: 0 }}>
                 <TableContainer
                     ref={containerRef}
-                    sx={{ ...styles.tableContainer, maxHeight }}
+                    sx={styles.tableContainer}
+                    component={Box}
                 >
                     <Table
                         stickyHeader
