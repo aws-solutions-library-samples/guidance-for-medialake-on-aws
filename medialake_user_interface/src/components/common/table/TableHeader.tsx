@@ -33,7 +33,9 @@ const useHeaderStyles = (theme: Theme) => {
             position: 'relative',
             verticalAlign: 'top',
             userSelect: 'none',
-            backgroundColor: 'inherit',
+            backgroundColor: isDark
+                ? alpha(theme.palette.background.default, 0.95)
+                : alpha(theme.palette.background.paper, 0.95),
             '&:hover .column-resizer': {
                 opacity: 1,
             },
@@ -53,6 +55,7 @@ const useHeaderStyles = (theme: Theme) => {
             display: 'flex',
             alignItems: 'center',
             fontSize: 18,
+            transition: 'transform 0.2s ease',
         },
         iconWrapper: (isActive: boolean) => ({
             display: 'flex',
@@ -63,9 +66,11 @@ const useHeaderStyles = (theme: Theme) => {
                     ? alpha(theme.palette.text.primary, 0.7)
                     : alpha(theme.palette.text.secondary, 0.7),
             opacity: isActive ? 1 : 0.8,
+            transition: 'all 0.2s ease',
             '&:hover': {
                 color: theme.palette.primary.main,
                 opacity: 1,
+                transform: 'scale(1.1)',
             }
         }),
         columnResizer: {
@@ -87,10 +92,17 @@ export function TableHeader<T>({
     const styles = useHeaderStyles(theme);
 
     const handleSortClick = useCallback((e: React.MouseEvent) => {
-        header.column.getToggleSortingHandler()?.(e);
+        e.stopPropagation();
+        e.preventDefault();
+        const handler = header.column.getToggleSortingHandler();
+        if (handler) {
+            handler(e);
+        }
     }, [header.column]);
 
     const handleFilterClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
         if (onFilterClick) {
             onFilterClick(e, header.column.id);
         }
@@ -99,6 +111,7 @@ export function TableHeader<T>({
     const handleKeyPress = useCallback((e: React.KeyboardEvent, action: () => void) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
+            e.stopPropagation();
             action();
         }
     }, []);
@@ -132,6 +145,7 @@ export function TableHeader<T>({
                     alignItems="center"
                     spacing={1}
                     sx={{ flex: 1, cursor: canSort ? 'pointer' : 'default' }}
+                    onClick={canSort ? handleSortClick : undefined}
                 >
                     <TableCellContent
                         variant="primary"

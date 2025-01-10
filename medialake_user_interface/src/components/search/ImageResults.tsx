@@ -16,23 +16,11 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import SortIcon from '@mui/icons-material/Sort';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { ImageItem, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy } from '@/types/search/searchResults'
+import { formatFileSize } from '../../utils/fileSize';
+import { ImageItem, ImageToRename, CardFieldConfig, ColumnConfig, Order, OrderBy } from '../../types/search/searchResults';
 
 // const ITEMS_PER_PAGE = 12;
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x300';
-
-// Move formatFileSize outside of the component to make it available everywhere
-const formatFileSize = (bytes: number): string => {
-    if (!bytes) return '-';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let size = bytes;
-    let unitIndex = 0;
-    while (size >= 1024 && unitIndex < units.length - 1) {
-        size /= 1024;
-        unitIndex++;
-    }
-    return `${size.toFixed(1)} ${units[unitIndex]}`;
-};
 
 // Move renderCardField before the component as well
 const renderCardField = (fieldId: string, image: ImageItem): string => {
@@ -980,13 +968,9 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    mt: 4,
-                    mb: 4,
-                    position: 'sticky',
-                    bottom: 0,
-                    backgroundColor: 'background.paper',
-                    zIndex: 1,
-                    py: 2
+                    mt: 6,
+                    mb: 2,
+                    backgroundColor: 'background.paper'
                 }}>
                     <Typography variant="body2" color="text.secondary">
                         Showing {((page - 1) * searchMetadata.pageSize) + 1} - {Math.min(page * searchMetadata.pageSize, searchMetadata.totalResults)} of {searchMetadata.totalResults} results
