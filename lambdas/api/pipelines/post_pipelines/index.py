@@ -37,6 +37,9 @@ sqs_client = boto3.client("sqs")
 sfn_client = boto3.client("stepfunctions")
 eventbridge = boto3.client("events")
 
+MAX_RETRIES = 50
+RETRY_DELAY = 30
+
 
 class S3Pipeline(BaseModel):
     definition: dict
@@ -159,25 +162,77 @@ def get_state_machine_definition(
         node_data = node["data"]
         state_name = node_data["label"].replace(" ", "")
 
-        state = {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "Parameters": {
-                "FunctionName": node_data["id"],
-                "Payload": {
-                    "pipeline_id.$": "$.pipeline_id",
-                    "input.$": "$.input",
+        if node_data["type"] in [
+            "videometadata",
+            "imagemetadata",
+            "videoproxyandthumbnail",
+            "imageproxy",
+            "imagethumbnail",
+            "checkmediaconvertstatus",
+        ]:
+            state = {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                    "FunctionName": node_data["id"],
+                    "Payload": {
+                        "pipeline_id.$": "$.pipeline_id",
+                        "input.$": "$.input",
+                        "previous_task_output.$": "$",
+                    },
                 },
-            },
-            "ResultPath": f"$.{state_name}Result",
-        }
+                "ResultPath": f"$.{state_name}Result",
+            }
+        elif node_data["type"] == "choice":
+            state = {"Type": "Choice", "Choices": [], "Default": "FailState"}
+            for edge in edges:
+                if edge["source"] == node["id"]:
+                    condition = edge["data"].get("condition", {})
+                    if condition:
+                        choice = {
+                            "Next": node_map[edge["target"]]["label"].replace(" ", "")
+                        }
+                        if "equals" in condition:
+                            choice["StringEquals"] = condition["equals"]
+                            choice["Variable"] = condition["variable"]
+                        elif "not_equals" in condition:
+                            if isinstance(condition["not_equals"], list):
+                                # Handle multiple not_equals values
+                                choice["And"] = [
+                                    {
+                                        "Not": {
+                                            "Variable": condition["variable"],
+                                            "StringEquals": value,
+                                        }
+                                    }
+                                    for value in condition["not_equals"]
+                                ]
+                            else:
+                                choice["Not"] = {
+                                    "Variable": condition["variable"],
+                                    "StringEquals": condition["not_equals"],
+                                }
+                        state["Choices"].append(choice)
+        elif node_data["type"] == "wait":
+            state = {
+                "Type": "Wait",
+                "Seconds": node_data.get("seconds", 60),
+            }
+        elif node_data["type"] == "succeed":
+            state = {"Type": "Succeed"}
+        elif node_data["type"] == "fail":
+            state = {
+                "Type": "Fail",
+                "Cause": node_data.get("cause", "Pipeline execution failed"),
+            }
+        else:
+            raise ValueError(f"Unsupported node type: {node_data['type']}")
 
         # Add mode and output_bucket for Image Proxy, Image Thumbnail, Video Proxy, and Video Thumbnail
         if node_data["type"] in [
             "imageproxy",
             "imagethumbnail",
-            "videoproxy",
-            "videothumbnail",
+            "videoproxyandthumbnail",
         ]:
             state["Parameters"]["Payload"]["output_bucket"] = output_bucket_name
             state["Parameters"]["Payload"]["mode"] = (
@@ -192,13 +247,21 @@ def get_state_machine_definition(
 
         # Find the next node
         next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
-        if next_edge:
+        # if next_edge:
+        #     state["Next"] = node_map[next_edge["target"]]["label"].replace(" ", "")
+        # else:
+        #     state["End"] = True
+        next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
+        if next_edge and node_data["type"] not in ["choice", "succeed", "fail"]:
             state["Next"] = node_map[next_edge["target"]]["label"].replace(" ", "")
-        else:
-            state["End"] = True
+
+        # Remove 'End' field for Choice, Succeed, and Fail states
+        if node_data["type"] not in ["choice", "succeed", "fail"]:
+            if not next_edge:
+                state["End"] = True
 
         state_machine["States"][state_name] = state
-
+    print(state_machine)
     return state_machine
 
 
@@ -688,6 +751,45 @@ def update_lambda_function_role(function_name: str, role_arn: str, max_retries=5
                 raise
 
 
+def create_event_source_mapping(lambda_client, queue_arn, pipeline_trigger_lambda_arn):
+    for attempt in range(MAX_RETRIES):
+        try:
+            logger.info(
+                f"Creating event source mapping (Attempt {attempt + 1}/{MAX_RETRIES})"
+            )
+            event_source_mapping = lambda_client.create_event_source_mapping(
+                EventSourceArn=queue_arn,
+                FunctionName=pipeline_trigger_lambda_arn,
+                Enabled=True,
+            )
+            logger.info("Event source mapping created successfully")
+            return event_source_mapping
+        except lambda_client.exceptions.InvalidParameterValueException as e:
+            if (
+                "The function execution role does not have permissions to call ReceiveMessage on SQS"
+                in str(e)
+            ):
+                logger.warning(
+                    f"Attempt {attempt + 1}/{MAX_RETRIES}: Lambda function lacks SQS permissions. Retrying..."
+                )
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error(f"Invalid parameter value: {str(e)}")
+                raise
+        except ClientError as e:
+            logger.error(
+                f"AWS API error on attempt {attempt + 1}/{MAX_RETRIES}: {str(e)}"
+            )
+            if attempt == MAX_RETRIES - 1:
+                raise
+            time.sleep(RETRY_DELAY)
+
+    logger.error(f"Failed to create event source mapping after {MAX_RETRIES} attempts")
+    raise Exception(
+        f"Failed to create event source mapping after {MAX_RETRIES} attempts"
+    )
+
+
 @app.post("/pipelines")
 def create_pipeline(createpipeline: S3Pipeline) -> dict:
     print("Received pipeline definition:", createpipeline.dict())
@@ -932,14 +1034,20 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             time.sleep(10)
             logger.info("Creating event source mapping")
 
-            event_source_mapping = lambda_client.create_event_source_mapping(
-                EventSourceArn=queue_arn,
-                FunctionName=pipeline_trigger_lambda_arn,
-                Enabled=True,
-            )
-            resources_to_delete.append(
-                ("event_source_mapping", event_source_mapping["UUID"])
-            )
+            try:
+                event_source_mapping = create_event_source_mapping(
+                    lambda_client, queue_arn, pipeline_trigger_lambda_arn
+                )
+                resources_to_delete.append(
+                    ("event_source_mapping", event_source_mapping["UUID"])
+                )
+            except Exception as e:
+                logger.exception(f"Failed to create event source mapping: {str(e)}")
+                return {
+                    "status": "500",
+                    "message": "Failed to create pipeline: Could not create event source mapping",
+                    "data": {"error": str(e)},
+                }
 
             # Save pipeline details to DynamoDB
             pipeline_table_name = os.environ.get("PIPELINES_TABLE_NAME")

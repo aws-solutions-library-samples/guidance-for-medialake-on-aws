@@ -9,6 +9,7 @@ from aws_cdk import (
     CustomResource,
     custom_resources as cr,
     RemovalPolicy,
+    Fn,
 )
 
 from config import config
@@ -19,6 +20,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 
 import json
+from config import config
 from constructs import Construct
 from typing import Optional, List
 from dataclasses import dataclass, field
@@ -51,6 +53,9 @@ class OpenSearchIngestionPipeline(Construct):
 
         # Get the region and account ID
         self.region = stack.region
+
+        # self.create_service_linked_roles()
+        # self.update_log_delivery_policy()
 
         # Create CloudWatch logs for Ingestion Pipeline
         ingestion_log_group = logs.LogGroup(
@@ -404,6 +409,99 @@ class OpenSearchIngestionPipeline(Construct):
         # Ensure the ingestion pipeline is created after the DynamoDB table is populated
         ingestion_custom_resource.node.add_dependency(props.asset_table)
         ingestion_custom_resource.node.add_dependency(pipeline_role)
+
+    # def update_log_delivery_policy(self):
+    #     new_resource_arn = f"arn:aws:logs:{self.region}:{config.account_id}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}:log-stream:*"
+
+    #     # Construct the policy document using Fn.join and other intrinsic functions
+    #     policy_document = {
+    #         "Fn::Transform": {
+    #             "Name": "String",
+    #             "Parameters": {
+    #                 "InputString": Fn.join(
+    #                     "",
+    #                     [
+    #                         '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"delivery.logs.amazonaws.com"},"Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":',
+    #                         Fn.join(
+    #                             ",",
+    #                             [
+    #                                 Fn.join(
+    #                                     "",
+    #                                     [
+    #                                         "[",
+    #                                         Fn.join(
+    #                                             ",",
+    #                                             cr.JsonPath.parse_json("$.Policy")[
+    #                                                 "Statement"
+    #                                             ][0]["Resource"],
+    #                                         ),
+    #                                         ",",
+    #                                         f'"{new_resource_arn}"',
+    #                                         "]",
+    #                                     ],
+    #                                 )
+    #                             ],
+    #                         ),
+    #                         ',"Condition":{"StringEquals":{"aws:SourceAccount":"',
+    #                         self.account,
+    #                         '"},"ArnLike":{"aws:SourceArn":"arn:aws:logs:',
+    #                         self.region,
+    #                         ":",
+    #                         self.account,
+    #                         ':*"}}}]}',
+    #                     ],
+    #                 ),
+    #                 "Operation": "REPLACE",
+    #             },
+    #         }
+    #     }
+
+    #     cr.AwsCustomResource(
+    #         self,
+    #         "UpdateLogDeliveryPolicy",
+    #         on_create=cr.AwsSdkCall(
+    #             service="CloudWatchLogs",
+    #             action="getResourcePolicy",
+    #             parameters={"policyName": "AWSLogDeliveryWrite20150319"},
+    #             physical_resource_id=cr.PhysicalResourceId.of("GetLogDeliveryPolicy"),
+    #         ),
+    #         on_update=cr.AwsSdkCall(
+    #             service="CloudWatchLogs",
+    #             action="putResourcePolicy",
+    #             parameters={
+    #                 "policyName": "AWSLogDeliveryWrite20150319",
+    #                 "policyDocument": policy_document,
+    #             },
+    #             physical_resource_id=cr.PhysicalResourceId.of(
+    #                 "UpdateLogDeliveryPolicy"
+    #             ),
+    #         ),
+    #         policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+    #             resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
+    #         ),
+    #     )
+
+    def create_service_linked_roles(self):
+        for service in [
+            # "es.amazonaws.com",
+            "opensearchservice.amazonaws.com",
+            "osis.amazonaws.com",
+        ]:
+            cr.AwsCustomResource(
+                self,
+                f'ServiceLinkedRole{service.split(".")[0].capitalize()}',
+                on_create=cr.AwsSdkCall(
+                    service="IAM",
+                    action="createServiceLinkedRole",
+                    parameters={"AWSServiceName": service},
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"ServiceLinkedRole{service}"
+                    ),
+                ),
+                policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                    resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
+                ),
+            )
 
     @property
     def ddb_export_bucket(self) -> s3.IBucket:

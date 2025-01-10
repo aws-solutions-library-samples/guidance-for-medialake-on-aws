@@ -38,7 +38,7 @@ def create_proxy_job_settings(
                 "OutputGroupSettings": {
                     "Type": "FILE_GROUP_SETTINGS",
                     "FileGroupSettings": {
-                        "Destination": f"s3://{output_bucket}/{output_key}/proxy/",
+                        "Destination": f"s3://{output_bucket}/{output_key}_proxy",
                         "DestinationSettings": {
                             "S3Settings": {
                                 "AccessControl": {
@@ -89,8 +89,10 @@ def create_proxy_job_settings(
                 "CodecSettings": {
                     "Codec": "FRAME_CAPTURE",
                     "FrameCaptureSettings": {
-                        "FramerateNumerator": 1,
-                        "FramerateDenominator": 5,
+                        "FramerateNumerator": 8,
+                        "FramerateDenominator": 9,
+                        "MaxCaptures": 1,
+                        "Quality": 80,
                     },
                 },
                 "Width": thumbnail_width,
@@ -137,6 +139,7 @@ def lambda_handler(event, context: LambdaContext):
     mediaconvert = boto3.client("mediaconvert", endpoint_url=mediaconvert_endpoint)
 
     try:
+        # f"{bucket}/{key.rsplit('.', 1)[0]}_proxy.webp"
         output_key = f"{bucket}/{key.rsplit('.', 1)[0]}"
         job_settings = create_proxy_job_settings(
             bucket,
@@ -157,52 +160,52 @@ def lambda_handler(event, context: LambdaContext):
         job_id = response["Job"]["Id"]
         logger.info(f"MediaConvert job created with ID: {job_id}")
 
-        proxy_representation = {
-            "ID": f"{asset_id}:proxy",
-            "Type": "Video",
-            "Format": "MP4",
-            "Purpose": "proxy",
-            "StorageInfo": {
-                "PrimaryLocation": {
-                    "StorageType": "s3",
-                    "Provider": "aws",
-                    "Bucket": output_bucket,
-                    "ObjectKey": {
-                        "FullPath": f"{output_key}/proxy/output.mp4",
-                    },
-                    "Status": "processing",
-                }
-            },
-        }
+        # proxy_representation = {
+        #     "ID": f"{asset_id}:proxy",
+        #     "Type": "Video",
+        #     "Format": "MP4",
+        #     "Purpose": "proxy",
+        #     "StorageInfo": {
+        #         "PrimaryLocation": {
+        #             "StorageType": "s3",
+        #             "Provider": "aws",
+        #             "Bucket": output_bucket,
+        #             "ObjectKey": {
+        #                 "FullPath": f"{output_key}/proxy/output.mp4",
+        #             },
+        #             "Status": "processing",
+        #         }
+        #     },
+        # }
 
-        # Update DynamoDB
-        response = table.update_item(
-            Key={"InventoryID": clean_inventory_id},
-            UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
-            ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
-            ExpressionAttributeValues={
-                ":new_rep": [proxy_representation],
-                ":empty_list": [],
-            },
-            ReturnValues="UPDATED_NEW",
-        )
+        # # Update DynamoDB
+        # response = table.update_item(
+        #     Key={"InventoryID": clean_inventory_id},
+        #     UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
+        #     ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
+        #     ExpressionAttributeValues={
+        #         ":new_rep": [proxy_representation],
+        #         ":empty_list": [],
+        #     },
+        #     ReturnValues="UPDATED_NEW",
+        # )
 
-        logger.info(
-            "DynamoDB update response",
-            extra={"response": response, "inventory_id": clean_inventory_id},
-        )
+        # logger.info(
+        #     "DynamoDB update response",
+        #     extra={"response": response, "inventory_id": clean_inventory_id},
+        # )
 
         return {
             "statusCode": 200,
             "body": {
                 "JobId": job_id,
-                "Proxy": {
-                    "ID": f"{asset_id}:proxy",
-                    "type": "video",
-                    "format": "MP4",
-                    "Purpose": "proxy",
-                    "StorageInfo": proxy_representation["StorageInfo"],
-                },
+                # "Proxy": {
+                #     "ID": f"{asset_id}:proxy",
+                #     "type": "video",
+                #     "format": "MP4",
+                #     "Purpose": "proxy",
+                #     # "StorageInfo": proxy_representation["StorageInfo"],
+                # },
             },
         }
 

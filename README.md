@@ -148,6 +148,8 @@ If issues persist, manually create the required roles using the following AWS CL
 ```bash
 aws iam create-service-linked-role --aws-service-name es.amazonaws.com
 aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
+aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
+
 3. Deploy the stack:
 ```bash
 cdk deploy

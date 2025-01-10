@@ -25,7 +25,7 @@ class PipelineStackProps:
     image_metadata_extractor_function_arn: str
     image_proxy_function_arn: str
     video_metadata_extractor_function_arn: str
-    video_proxy_function_arn: str
+    video_proxy_thumbnail_function_arn: str
     check_mediaconvert_status_function_arn: str
 
 
@@ -63,8 +63,10 @@ class PipelineStack(Stack):
                 image_metadata_extractor_function_arn=props.image_metadata_extractor_function_arn,
                 image_proxy_function_arn=props.image_proxy_function_arn,
                 video_metadata_extractor_function_arn=props.video_metadata_extractor_function_arn,
-                video_proxy_function_arn=props.video_proxy_function_arn,
+                video_proxy_thumbnail_function_arn=props.video_proxy_thumbnail_function_arn,
+                check_mediaconvert_status_function_arn=props.check_mediaconvert_status_function_arn,
             )
+            # print(rendered_pipeline)
             rendered_pipeline = json.loads(rendered_pipeline)
 
             # Replace check_status: true with the actual function ARN
