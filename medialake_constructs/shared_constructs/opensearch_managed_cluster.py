@@ -185,8 +185,27 @@ class OpenSearchCluster(Construct):
             ),
             # VPC configuration
             vpc=props.vpc,
+            # vpc_subnets=[
+            #     ec2.SubnetSelection(
+            #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            #     )
+            # ],
             vpc_subnets=[
-                ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
+                ec2.SubnetSelection(
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    availability_zones=[
+                        props.vpc.select_subnets(
+                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+                        )
+                        .subnets[0]
+                        .availability_zone,
+                        props.vpc.select_subnets(
+                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+                        )
+                        .subnets[1]
+                        .availability_zone,
+                    ],
+                )
             ],
             security_groups=[os_security_group],
             # Access Policy added here

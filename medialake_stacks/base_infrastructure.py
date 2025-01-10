@@ -113,27 +113,27 @@ class BaseInfrastructureStack(Stack):
         )
 
         # VPC used for OpenSearch, Lambda's, and VPC Endpoints
-        self._vpc = CustomVpc(
-            self,
-            "MediaLakeVPC",
-            props=CustomVpcProps(
-                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
-            ),
-        )
-
         # self._vpc = CustomVpc(
         #     self,
         #     "MediaLakeVPC",
         #     props=CustomVpcProps(
-        #         vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}",
-        #         max_azs=config.vpc.max_azs,
-        #         nat_gateways=config.vpc.nat_gateways,
-        #         cidr=config.vpc.cidr,
-        #         enable_dns_hostnames=config.vpc.enable_dns_hostnames,
-        #         enable_dns_support=config.vpc.enable_dns_support,
-        #         # vpc_id=config.vpc.vpc_id,
+        #         vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
         #     ),
         # )
+
+        self._vpc = CustomVpc(
+            self,
+            "MediaLakeVPC",
+            props=CustomVpcProps(
+                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}",
+                max_azs=config.vpc.max_azs,
+                nat_gateways=config.vpc.nat_gateways,
+                cidr=config.vpc.cidr,
+                enable_dns_hostnames=config.vpc.enable_dns_hostnames,
+                enable_dns_support=config.vpc.enable_dns_support,
+                vpc_id=config.vpc.vpc_id,
+            ),
+        )
 
         # Security group for Lambdas
         self._security_group = ec2.SecurityGroup(

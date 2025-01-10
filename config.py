@@ -103,14 +103,14 @@ class AuthConfig(BaseModel):
         return v
 
 
-# class VpcConfig(BaseModel):
-#     # vpc_id: Optional[str] = None
-#     vpc_name: str = "MediaLakeVPC"
-#     max_azs: int = 3
-#     nat_gateways: int = 1
-#     cidr: str = "10.0.0.0/16"
-#     enable_dns_hostnames: bool = True
-#     enable_dns_support: bool = True
+class VpcConfig(BaseModel):
+    vpc_id: Optional[str] = None
+    vpc_name: str = "MediaLakeVPC"
+    max_azs: int = 3
+    nat_gateways: int = 1
+    cidr: str = "10.0.0.0/16"
+    enable_dns_hostnames: bool = True
+    enable_dns_support: bool = True
 
 
 class CDKConfig(BaseModel):
@@ -129,7 +129,7 @@ class CDKConfig(BaseModel):
     secondary_region: Optional[str] = None
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
-    # vpc: VpcConfig = VpcConfig()
+    vpc: VpcConfig = VpcConfig()
 
     @property
     def regions(self) -> List[str]:
