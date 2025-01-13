@@ -5,16 +5,18 @@ import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 import HomeIcon from '@mui/icons-material/Home';
 import LockIcon from '@mui/icons-material/Lock';
 import GetAppIcon from '@mui/icons-material/GetApp';
-
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import _ from 'lodash';
+
 interface ImageViewerProps {
     imageSrc: string;
     maxHeight?: string | number;
     filename?: string;
 }
+
 const ZOOM_FACTOR = 1.1; // Zoom factor per scroll event
-export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh', filename = 'image_download' }) => {
+
+const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh', filename = 'image_download' }) => {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [rotate, setRotate] = useState(0);
@@ -28,23 +30,33 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
     const touch = useRef({ x: 0, y: 0 });
     const MIN_ZOOM = scaleSize * 0.5;
     const MAX_ZOOM = scaleSize * 5;
+
     // Calculate the initial scale to fit the image within the canvas
     const calculateInitialScale = useCallback(
         (imgWidth: number, imgHeight: number) => {
-            if (!canvasRef.current) return 1;
-            const canvasWidth = canvasRef.current.clientWidth;
-            const maxHeightNumber = typeof maxHeight === 'string' ? parseFloat(maxHeight) : maxHeight;
-            const canvasHeight = typeof maxHeightNumber === 'number' ? maxHeightNumber : canvasRef.current.clientHeight;
-            let scale = 1;
-            if (imgWidth > canvasWidth || imgHeight > canvasHeight) {
-                const scaleX = canvasWidth / imgWidth;
-                const scaleY = canvasHeight / imgHeight;
-                scale = Math.min(scaleX, scaleY);
-            }
-            return scale;
+            const canvas = canvasRef.current;
+            if (!canvas) return 1;
+
+            // Wait for next frame to ensure canvas is properly sized
+            return new Promise<number>(resolve => {
+                requestAnimationFrame(() => {
+                    const canvasWidth = canvas.clientWidth;
+                    const maxHeightNumber = typeof maxHeight === 'string' ? parseFloat(maxHeight) : maxHeight;
+                    const canvasHeight = typeof maxHeightNumber === 'number' ? maxHeightNumber : canvas.clientHeight;
+
+                    let scale = 1;
+                    if (imgWidth > canvasWidth || imgHeight > canvasHeight) {
+                        const scaleX = canvasWidth / imgWidth;
+                        const scaleY = canvasHeight / imgHeight;
+                        scale = Math.min(scaleX, scaleY);
+                    }
+                    resolve(scale);
+                });
+            });
         },
         [maxHeight]
     );
+
     // Function to draw the image on the canvas
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
@@ -66,15 +78,21 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         context.drawImage(background, 0, 0);
         context.restore();
     }, [background, zoom, offset, rotate]);
+
     // Load the image and set initial state
     useEffect(() => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
             setBackground(img);
-            const initialScale = calculateInitialScale(img.width, img.height);
-            setScaleSize(initialScale);
-            setZoom(initialScale);
-            setIsImageLoaded(true);
+            try {
+                const initialScale = await calculateInitialScale(img.width, img.height);
+                setScaleSize(initialScale);
+                setZoom(initialScale);
+                setIsImageLoaded(true);
+            } catch (error) {
+                console.error('Error calculating initial scale:', error);
+                setIsImageLoaded(false);
+            }
         };
         img.onerror = () => {
             console.error('Error loading image');
@@ -82,12 +100,19 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         };
         img.src = imageSrc;
     }, [imageSrc, calculateInitialScale]);
+
     // Redraw the canvas whenever dependencies change
     useEffect(() => {
-        if (isImageLoaded && background) {
+        if (!isImageLoaded || !background || !canvasRef.current) return;
+
+        // Use requestAnimationFrame to ensure canvas is ready
+        const animationFrame = requestAnimationFrame(() => {
             draw();
-        }
+        });
+
+        return () => cancelAnimationFrame(animationFrame);
     }, [isImageLoaded, background, draw]);
+
     // Handle zooming with the mouse wheel using multiplicative zoom
     const handleWheel = useCallback(
         (event: WheelEvent) => {
@@ -106,6 +131,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         },
         [MIN_ZOOM, MAX_ZOOM, isCanvasLocked]
     );
+
     const handleCanvasDownload = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -137,10 +163,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
             document.body.removeChild(link);
         } catch (error) {
             console.error('Error downloading image:', error);
-            // You might want to show an error message to the user here
         }
     };
-
 
     // Add and remove the wheel event listener
     useEffect(() => {
@@ -151,6 +175,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         }
         return () => canvas.removeEventListener('wheel', handleWheel);
     }, [handleWheel, isCanvasLocked]);
+
     // Handle panning the image
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (isCanvasLocked || !dragging) return;
@@ -164,22 +189,23 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         touch.current = { x: clientX, y: clientY };
     };
 
-
-
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (isCanvasLocked) return;
         const { clientX, clientY } = event;
         touch.current = { x: clientX, y: clientY };
         setDragging(true);
     };
+
     const handleMouseUp = () => {
         setDragging(false);
     };
+
     // Center and reset the image
     const centerImage = () => {
         setZoom(scaleSize);
         setOffset({ x: 0, y: 0 });
     };
+
     const resetImage = () => {
         centerImage();
         setRotate(0);
@@ -188,11 +214,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
     const toggleCanvasLock = () => {
         setIsCanvasLocked(!isCanvasLocked);
     };
+
     // Resize handler
-    const handleResize = useCallback(() => {
-        if (background) {
+    const handleResize = useCallback(async () => {
+        if (!background || !canvasRef.current) return;
+
+        try {
             // Recalculate the initial scale based on the new size
-            const initialScale = calculateInitialScale(background.width, background.height);
+            const initialScale = await calculateInitialScale(background.width, background.height);
             setScaleSize(initialScale);
             // Optionally adjust zoom to maintain the same relative scale
             setZoom((prevZoom) => {
@@ -200,9 +229,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
                 return prevZoom * scaleRatio;
             });
             // Redraw the image with the new dimensions
-            draw();
+            requestAnimationFrame(() => {
+                draw();
+            });
+        } catch (error) {
+            console.error('Error handling resize:', error);
         }
     }, [background, calculateInitialScale, draw, scaleSize]);
+
     // Observe resize events
     useEffect(() => {
         const observer = new ResizeObserver(() => {
@@ -215,13 +249,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
             observer.disconnect();
         };
     }, [handleResize]);
+
     // Define the tool buttons
     const toolButtons = [
-        // {
-        //     tip: 'Auto scale',
-        //     icon: <ZoomOutMapIcon />,
-        //     onClick: centerImage,
-        // },
         {
             tip: 'Download Canvas',
             icon: <GetAppIcon />,
@@ -246,10 +276,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
             style: {
                 transform: 'rotate(90deg)',
             },
-
         },
-
     ];
+
     // Render the component
     return (
         <Box
@@ -294,7 +323,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
                     <Tooltip key={`image-tool-${i}`} title={item.tip}>
                         <IconButton
                             color="primary"
-
                             onClick={item.onClick}
                         >
                             {item.icon}
@@ -305,4 +333,5 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = 
         </Box>
     );
 };
+
 export default ImageViewer;

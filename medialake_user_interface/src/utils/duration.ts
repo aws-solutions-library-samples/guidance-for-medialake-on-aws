@@ -10,3 +10,6 @@ export function formatDuration(seconds: number): string {
     }
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
+
+// Add a default export as well for flexibility
+export default formatDuration;

@@ -1,8 +1,8 @@
 import React, { ReactNode } from 'react';
 import { Box, Button } from '@mui/material';
-import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import { useRightSidebar } from './SidebarContext';
+import { useLocation } from 'react-router-dom';
 
 interface RightSidebarProps {
     children: ReactNode;
@@ -10,6 +10,14 @@ interface RightSidebarProps {
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
     const { isExpanded, setIsExpanded } = useRightSidebar();
+    const location = useLocation();
+
+    // Auto-close on search page
+    React.useEffect(() => {
+        if (location.pathname === '/search') {
+            setIsExpanded(false);
+        }
+    }, [location.pathname, setIsExpanded]);
 
     return (
         <>
@@ -56,12 +64,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                     onClick={() => setIsExpanded(!isExpanded)}
                     sx={{
                         position: 'absolute',
-                        left: -20,
+                        left: -12,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        minWidth: '40px',
-                        width: '40px',
-                        height: '40px',
+                        minWidth: '24px',
+                        width: '24px',
+                        height: '24px',
                         bgcolor: 'background.paper',
                         borderRadius: '8px',
                         boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
@@ -79,9 +87,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                     }}
                 >
                     {isExpanded ? (
-                        <KeyboardArrowLeftIcon sx={{ fontSize: 20 }} />
+                        <ChevronRight sx={{ fontSize: 16 }} />
                     ) : (
-                        <KeyboardArrowRightIcon sx={{ fontSize: 20 }} />
+                        <ChevronLeft sx={{ fontSize: 16 }} />
                     )}
                 </Button>
             </Box>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper } from '@mui/material';
-import { ImageViewer } from '../common/ImageViewer';
+import ImageViewer from '../common/ImageViewer';
 
 interface AssetImageProps {
     src: string;
