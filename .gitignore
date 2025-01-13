@@ -117,3 +117,5 @@ coverage/
 ## aws-exports.json
 aws-exports.json
 config.json
+config.json.bkp
+*.jinja2-tmp

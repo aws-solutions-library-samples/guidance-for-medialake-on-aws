@@ -1,17 +1,13 @@
-import json
+# import json
 from constructs import Construct
 from aws_cdk import (
     Stack,
     Environment,
     aws_events as events,
     aws_dynamodb as dynamodb,
-    aws_iam as iam,
-    aws_logs as logs,
     aws_s3 as s3,
     aws_ec2 as ec2,
-    custom_resources as cr,
-    CustomResource,
-    RemovalPolicy,
+    # custom_resources as cr,
     Duration,
 )
 from config import config
@@ -117,11 +113,25 @@ class BaseInfrastructureStack(Stack):
         )
 
         # VPC used for OpenSearch, Lambda's, and VPC Endpoints
+        # self._vpc = CustomVpc(
+        #     self,
+        #     "MediaLakeVPC",
+        #     props=CustomVpcProps(
+        #         vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
+        #     ),
+        # )
+
         self._vpc = CustomVpc(
             self,
             "MediaLakeVPC",
             props=CustomVpcProps(
-                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
+                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}",
+                max_azs=config.vpc.max_azs,
+                nat_gateways=config.vpc.nat_gateways,
+                cidr=config.vpc.cidr,
+                enable_dns_hostnames=config.vpc.enable_dns_hostnames,
+                enable_dns_support=config.vpc.enable_dns_support,
+                vpc_id=config.vpc.vpc_id,
             ),
         )
 

@@ -72,20 +72,20 @@ class PipelineNodesStack(Stack):
             ),
         )
 
-        thumbnail_queue = MediaConvert.create_queue(
-            self,
-            "MediaLakeThumbnailMediaConvertQueue",
-            props=MediaConvertProps(
-                description="A MediaLake queue for thumbnail MediaConvert jobs",
-                name="MediaLakeThumbnailQueue",  # If omitted, one is auto-generated
-                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
-                status="ACTIVE",  # Could also be "PAUSED"
-                tags=[
-                    {"Environment": config.environment},
-                    {"Owner": config.global_prefix},
-                ],
-            ),
-        )
+        # thumbnail_queue = MediaConvert.create_queue(
+        #     self,
+        #     "MediaLakeThumbnailMediaConvertQueue",
+        #     props=MediaConvertProps(
+        #         description="A MediaLake queue for thumbnail MediaConvert jobs",
+        #         name="MediaLakeThumbnailQueue",  # If omitted, one is auto-generated
+        #         pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+        #         status="ACTIVE",  # Could also be "PAUSED"
+        #         tags=[
+        #             {"Environment": config.environment},
+        #             {"Owner": config.global_prefix},
+        #         ],
+        #     ),
+        # )
 
         ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
@@ -168,9 +168,9 @@ class PipelineNodesStack(Stack):
 
         self._check_mediaconvert_status = Lambda(
             self,
-            "CheckMediaconvertStatusNodeExt",
+            "CheckMediaconvertStatusNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_check_mediaconvert_status_node_ext",
+                name=f"{config.global_prefix}_check_mediaconvert_status_node",
                 timeout_minutes=15,
                 entry="lambdas/nodes/check_mediaconvert_status",
                 environment_variables={
@@ -179,6 +179,16 @@ class PipelineNodesStack(Stack):
                     "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
                 },
             ),
+        )
+
+        self._check_mediaconvert_status.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:GetJob",
+                    "mediaconvert:ListJobs",
+                ],
+                resources=[proxy_queue.queue_arn],
+            )
         )
 
         self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
@@ -195,10 +205,21 @@ class PipelineNodesStack(Stack):
         self._check_mediaconvert_status.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "mediaconvert:GetJob",
+                    # "mediaconvert:GetJob",
                     "mediaconvert:ListJobs",
                 ],
                 resources=[proxy_queue.queue_arn],
+            )
+        )
+
+        self._check_mediaconvert_status.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:GetJob",
+                ],
+                resources=[
+                    f"arn:aws:mediaconvert:{Stack.of(self).region}:{Stack.of(self).account}:jobs/*",
+                ],
             )
         )
 
@@ -480,6 +501,95 @@ class PipelineNodesStack(Stack):
                                                 },
                                             }
                                         }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "check_mediaconvert_status"},
+                        "arn": {"S": self._check_mediaconvert_status.function_arn},
+                        "description": {"S": "Checks the status of MediaConvert jobs"},
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "choice"},
+                        "description": {"S": "A Choice state"},
+                        "props": {
+                            "M": {
+                                "choices": {
+                                    "M": {
+                                        "type": {"S": "array"},
+                                        "items": {
+                                            "M": {
+                                                "variable": {"S": "string"},
+                                                "condition": {"S": "string"},
+                                                "value": {"S": "string"},
+                                                "next": {"S": "string"},
+                                            }
+                                        },
+                                        "description": {"S": "Array of choice rules"},
+                                    },
+                                    "default": {"S": "string"},
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "wait"},
+                        "description": {"S": "A Wait state"},
+                        "props": {
+                            "M": {
+                                "seconds": {
+                                    "M": {
+                                        "type": {"S": "integer"},
+                                        "description": {
+                                            "S": "Number of seconds to wait"
+                                        },
+                                        "default": {"N": "60"},
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "succeed"},
+                        "description": {"S": "A Succeed state"},
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "fail"},
+                        "description": {"S": "A Fail state"},
+                        "props": {
+                            "M": {
+                                "cause": {
+                                    "M": {
+                                        "type": {"S": "string"},
+                                        "description": {"S": "Reason for the failure"},
+                                        "default": {"S": "Pipeline execution failed"},
                                     }
                                 }
                             }

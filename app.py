@@ -24,7 +24,7 @@ app = cdk.App()
 base_infrastructure = BaseInfrastructureStack(
     app,
     "MediaLakeBaseInfrastructure",
-    env=cdk.Environment(region=config.primary_region, account=app.account),
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
 pipeline_nodes_stack = PipelineNodesStack(
@@ -34,7 +34,7 @@ pipeline_nodes_stack = PipelineNodesStack(
         media_assets_bucket=base_infrastructure.media_assets_bucket,
         asset_table=base_infrastructure.asset_table,
     ),
-    env=cdk.Environment(region=config.primary_region, account=app.account),
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
 # Create API Gateway Stack - includes auth and ui
@@ -57,7 +57,7 @@ api_gateway_stack = ApiGatewayStack(
         image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
     ),
-    env=cdk.Environment(region=config.primary_region, account=app.account),
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
 pipeline_stack = PipelineStack(
@@ -69,11 +69,11 @@ pipeline_stack = PipelineStack(
         image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
         image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
         video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
-        video_proxy_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
+        video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
         check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
         post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
     ),
-    env=cdk.Environment(region=config.primary_region, account=app.account),
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
 cleanup_stack = CleanupStack(
@@ -84,7 +84,7 @@ cleanup_stack = CleanupStack(
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=api_gateway_stack.connector_table,
     ),
-    env=cdk.Environment(region=config.primary_region, account=app.account),
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
 cleanup_stack.add_dependency(api_gateway_stack)
