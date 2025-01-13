@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Box, Button } from '@mui/material';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useRightSidebar } from './SidebarContext';
 
 interface RightSidebarProps {
@@ -12,70 +13,80 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
 
     return (
         <>
-            <Box sx={{
-                width: isExpanded ? 240 : 48,
-                flexShrink: 0,
-                borderLeft: '1px solid',
-                borderColor: 'divider',
-                transition: theme => theme.transitions.create(['width'], {
-                    easing: theme.transitions.easing.sharp,
-                    duration: theme.transitions.duration.enteringScreen,
-                }),
-                overflowX: 'hidden',
-                bgcolor: '#fff',
-                position: 'fixed',
-                top: 64,
-                right: 0,
-                height: 'calc(100vh - 64px)',
-                display: 'flex',
-                flexDirection: 'column',
-                zIndex: 1000
-            }}>
-                <Box sx={{
-                    position: 'absolute',
-                    left: -20,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1001
-                }}>
-                    <Button
-                        variant="text"
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        startIcon={
-                            <ChevronRightIcon
-                                sx={{
-                                    transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
-                                    transition: theme => theme.transitions.create('transform', {
-                                        duration: theme.transitions.duration.shortest,
-                                    }),
-                                }}
-                            />
-                        }
-                        sx={{
-                            minWidth: 'unset',
-                            width: '40px',
-                            p: 0,
+            <Box
+                sx={{
+                    width: isExpanded ? 300 : 8,
+                    flexShrink: 0,
+                    borderLeft: '1px solid',
+                    borderColor: 'divider',
+                    transition: theme => theme.transitions.create(['width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
+                    bgcolor: 'background.paper',
+                    position: 'fixed',
+                    top: 64,
+                    right: 0,
+                    height: 'calc(100vh - 64px)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    zIndex: 1200
+                }}
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        height: '100%',
+                        overflowX: 'hidden',
+                        width: '100%',
+                    }}
+                >
+                    <Box sx={{
+                        width: '100%',
+                        height: '100%',
+                        overflowY: 'auto',
+                        visibility: isExpanded ? 'visible' : 'hidden'
+                    }}>
+                        {children}
+                    </Box>
+                </Box>
+
+                <Button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    sx={{
+                        position: 'absolute',
+                        left: -20,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        minWidth: '40px',
+                        width: '40px',
+                        height: '40px',
+                        bgcolor: 'background.paper',
+                        borderRadius: '8px',
+                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        zIndex: 1201,
+                        padding: 0,
+                        '&:hover': {
                             bgcolor: 'background.paper',
-                            borderRadius: '50%',
-                            boxShadow: 1,
-                            '&:hover': {
-                                bgcolor: 'background.paper',
-                            }
-                        }}
-                    />
-                </Box>
-                <Box sx={{
-                    width: '100%',
-                    height: '100%',
-                    overflowY: 'auto',
-                    visibility: isExpanded ? 'visible' : 'hidden'
-                }}>
-                    {children}
-                </Box>
+                            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
+                        },
+                    }}
+                >
+                    {isExpanded ? (
+                        <KeyboardArrowLeftIcon sx={{ fontSize: 20 }} />
+                    ) : (
+                        <KeyboardArrowRightIcon sx={{ fontSize: 20 }} />
+                    )}
+                </Button>
             </Box>
 
-            {/* Spacer to prevent content from going under the fixed sidebar */}
-            <Box sx={{ width: isExpanded ? 240 : 48, flexShrink: 0 }} />
+            <Box sx={{ width: isExpanded ? 300 : 8, flexShrink: 0 }} />
         </>
     );
 };

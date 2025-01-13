@@ -12,7 +12,7 @@ interface RightSidebarProviderProps {
 }
 
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     return (
         <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded }}>

@@ -104,7 +104,7 @@ const SearchPage: React.FC = () => {
             <Box sx={{
                 display: 'flex',
                 minHeight: '100%',
-                bgcolor: '#fff',
+                bgcolor: 'background.default',
                 position: 'relative',
                 overflow: 'auto'
             }}>
@@ -152,7 +152,7 @@ const SearchPage: React.FC = () => {
                                     flexDirection: 'column',
                                     alignItems: 'center',
                                     gap: 2,
-                                    bgcolor: '#fff',
+                                    bgcolor: 'background.paper',
                                     borderRadius: 2
                                 }}
                             >

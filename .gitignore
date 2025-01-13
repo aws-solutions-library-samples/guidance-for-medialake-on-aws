@@ -49,6 +49,7 @@ cdk.context.json
 *.sublime-project
 *.swp
 *.clinerules
+*.cursorrules
 docs/
 cline_docs/
 

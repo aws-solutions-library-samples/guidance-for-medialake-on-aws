@@ -1,0 +1,56 @@
+import React from 'react';
+import { Menu, MenuItem } from '@mui/material';
+import { type AssetBase } from '../../types/search/searchResults';
+
+interface AssetActionsMenuProps<T extends AssetBase> {
+    anchorEl: HTMLElement | null;
+    selectedAsset: T | null;
+    onClose: () => void;
+    onAction: (action: string) => void;
+    actions?: Array<{
+        id: string;
+        label: string;
+    }>;
+}
+
+const defaultActions = [
+    { id: 'share', label: 'Share' },
+    { id: 'download', label: 'Download' },
+];
+
+function AssetActionsMenu<T extends AssetBase>({
+    anchorEl,
+    selectedAsset,
+    onClose,
+    onAction,
+    actions = defaultActions,
+}: AssetActionsMenuProps<T>) {
+    return (
+        <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={onClose}
+            onClick={(e) => e.stopPropagation()}
+            transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+            }}
+            anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+            }}
+        >
+            {actions.map(action => (
+                <MenuItem
+                    key={action.id}
+                    onClick={() => onAction(action.id)}
+                    disabled={!selectedAsset}
+                >
+                    {action.label}
+                </MenuItem>
+            ))}
+        </Menu>
+    );
+}
+
+export default AssetActionsMenu;
