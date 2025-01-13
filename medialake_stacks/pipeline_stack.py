@@ -45,7 +45,9 @@ class PipelineStack(Stack):
         default_pipelines_template_dir = os.path.join(
             os.path.dirname(__file__), "..", "default_pipelines"
         )
-        jinja_env = Environment(loader=FileSystemLoader(default_pipelines_template_dir))
+        jinja_env = Environment(
+            loader=FileSystemLoader(default_pipelines_template_dir), autoescape=True
+        )
 
         # Find all Jinja2 templates in the default_pipelines directory
         template_files = glob.glob(
