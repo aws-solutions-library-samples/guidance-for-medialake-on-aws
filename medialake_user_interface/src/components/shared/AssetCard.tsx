@@ -31,7 +31,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onImageClick,
     onDeleteClick,
     onMenuClick,
-    placeholderImage = 'https://via.placeholder.com/400x300',
+    placeholderImage = 'https://placehold.co/300x200',
     onImageError,
 }) => {
     const defaultImageErrorHandler = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {

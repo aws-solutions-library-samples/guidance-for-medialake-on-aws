@@ -4,6 +4,8 @@ import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
 import ImageResults from '../components/search/ImageResults';
+import VideoResults from '../components/search/VideoResults';
+import AudioResults from '../components/search/AudioResults';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
 
@@ -26,10 +28,12 @@ const SearchPage: React.FC = () => {
         isFetching
     } = useSearch(currentQuery, {
         page: currentPage,
-        pageSize: PAGE_SIZE
+        pageSize: PAGE_SIZE,
+        // time: searchParams.get('time') || ''
     });
 
-    const imageResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Image') || [];
+
+
 
     const [filters, setFilters] = useState({
         mediaTypes: {
@@ -43,12 +47,23 @@ const SearchPage: React.FC = () => {
             lastMonth: false,
             lastYear: false,
         },
-        status: {
-            favorites: false,
-            archived: false,
-            shared: false,
-        }
+        // status: {
+        //     favorites: false,
+        //     archived: false,
+        //     shared: false,
+        // }
     });
+
+    const filteredResults = searchResults?.data?.results?.filter(item => {
+        const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
+        const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
+        const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+        return isImage || isVideo || isAudio;
+    }) || [];
+
+    const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
+    const videoResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Video');
+    const audioResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Audio');
 
     const [expandedSections, setExpandedSections] = useState({
         mediaTypes: true,
@@ -88,15 +103,25 @@ const SearchPage: React.FC = () => {
     };
 
     const handleSearch = (params: { page: number }) => {
+        let timeFilter = '';
+        if (filters.time.recent) timeFilter = 'recent';
+        if (filters.time.lastWeek) timeFilter = 'lastWeek';
+        if (filters.time.lastMonth) timeFilter = 'lastMonth';
+        if (filters.time.lastYear) timeFilter = 'lastYear';
+
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.set('page', params.page.toString());
             if (currentQuery) {
                 newParams.set('q', currentQuery);
             }
+            if (timeFilter) {
+                newParams.set('time', timeFilter);
+            }
             return newParams;
         });
     };
+
 
 
     return (
@@ -179,6 +204,29 @@ const SearchPage: React.FC = () => {
                     {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
                         <ImageResults
                             images={imageResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                        />
+                    )}
+
+                    {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <VideoResults
+                            videos={videoResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                        />
+                    )}
+                    {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <AudioResults
+                            audios={audioResults}
                             searchMetadata={{
                                 totalResults: searchResults.data.searchMetadata.totalResults || 0,
                                 page: currentPage,

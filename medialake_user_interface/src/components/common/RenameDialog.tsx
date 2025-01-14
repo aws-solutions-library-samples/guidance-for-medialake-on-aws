@@ -32,6 +32,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
     const [newName, setNewName] = useState(currentName);
 
     const handleConfirm = () => {
+
         onConfirm(newName);
         setNewName(currentName);
     };
@@ -75,7 +76,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
                     /> */}
                     <TextField
                         label="New Name"
-                        // value={newName}
+                        value={currentName}
                         onChange={(e) => setNewName(e.target.value)}
                         fullWidth
                         autoFocus

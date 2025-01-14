@@ -26,6 +26,7 @@ import { ThemeProvider } from '../hooks/useTheme';
 import { ThemeWrapper } from '../components/ThemeWrapper';
 import { TimezoneProvider } from '../contexts/TimezoneContext';
 import { TableDensityProvider } from '../contexts/TableDensityContext';
+import VideoDetailPage from '@/pages/VideoDetailPage';
 
 const theme: Theme = {
     name: 'mediaLakeTheme',
@@ -443,6 +444,10 @@ const router = createBrowserRouter([
             {
                 path: 'images/:id',
                 element: <ImageDetailPage />
+            },
+            {
+                path: 'videos/:id',
+                element: <VideoDetailPage />
             },
             {
                 path: '*',

@@ -3,6 +3,17 @@ import { List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, Co
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
+
+const filterLabels = {
+    recent: 'Recent',
+    lastWeek: 'Last Week',
+    lastMonth: 'Last Month',
+    lastYear: 'Last Year',
+    videos: 'Videos',
+    images: 'Images',
+    audio: 'Audio',
+};
+
 interface FiltersState {
     mediaTypes: {
         videos: boolean;
@@ -15,11 +26,11 @@ interface FiltersState {
         lastMonth: boolean;
         lastYear: boolean;
     };
-    status: {
-        favorites: boolean;
-        archived: boolean;
-        shared: boolean;
-    };
+    // status: {
+    //     favorites: boolean;
+    //     archived: boolean;
+    //     shared: boolean;
+    // };
 }
 
 interface ExpandedSections {
@@ -93,7 +104,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 />
                             </ListItemIcon>
                             <ListItemText
-                                primary={key.charAt(0).toUpperCase() + key.slice(1)}
+                                primary={filterLabels[key as keyof typeof filterLabels]}
                                 primaryTypographyProps={{
                                     variant: 'body2',
                                     sx: {
@@ -113,8 +124,8 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     return (
         <List component="nav" sx={{ width: '100%' }}>
             {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
-            {renderFilterSection('Time Period', 'time', filters.time)}
-            {renderFilterSection('Status', 'status', filters.status)}
+            {/* {renderFilterSection('Time Period', 'time', filters.time)} */}
+            {/* {renderFilterSection('Status', 'status', filters.status)} */}
         </List>
     );
 };
