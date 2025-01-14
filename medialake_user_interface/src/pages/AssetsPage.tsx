@@ -24,7 +24,7 @@ const AssetsPage: React.FC = () => {
     const connectors = connectorsResponse?.data.connectors || [];
 
     return (
-        <Box sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h4" sx={{
                 fontWeight: 700,
                 mb: 3,

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Box, Typography, IconButton, TextField } from '@mui/material';
+import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import {
     useReactTable,
     getCoreRowModel,
@@ -36,7 +36,7 @@ export interface AssetTableProps<T> {
     editingId?: string;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (item: T) => void;
+    onEditNameComplete?: (item: T, save: boolean) => void;
 }
 
 function AssetTable<T>({
@@ -81,17 +81,20 @@ function AssetTable<T>({
                 header: 'Preview',
                 size: 100,
                 cell: (info) => (
-                    <Box
-                        component="img"
-                        src={info.getValue()}
-                        alt={getName(info.row.original)}
-                        sx={{
-                            width: 60,
-                            height: 60,
-                            objectFit: 'cover',
-                            borderRadius: 1
-                        }}
-                    />
+                    <Box sx={{ p: 1 }}>
+                        <Box
+                            component="img"
+                            src={info.getValue()}
+                            alt={getName(info.row.original)}
+                            sx={{
+                                width: 60,
+                                height: 60,
+                                objectFit: 'cover',
+                                borderRadius: 1,
+                                display: 'block'
+                            }}
+                        />
+                    </Box>
                 )
             }),
             ...visibleColumns.map(col =>
@@ -105,22 +108,46 @@ function AssetTable<T>({
                             if (col.id === 'name' && onEditClick) {
                                 const isEditing = editingId === getId(info.row.original);
                                 return (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
                                         {isEditing ? (
-                                            <TextField
-                                                value={editedName}
-                                                onChange={onEditNameChange}
-                                                onBlur={() => onEditNameComplete?.(info.row.original)}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        onEditNameComplete?.(info.row.original);
-                                                    }
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                autoFocus
-                                                fullWidth
-                                                size="small"
-                                            />
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                                <TextField
+                                                    value={editedName}
+                                                    onChange={onEditNameChange}
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            onEditNameComplete?.(info.row.original, true);
+                                                        } else if (e.key === 'Escape') {
+                                                            onEditNameComplete?.(info.row.original, false);
+                                                        }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                    size="small"
+                                                    sx={{ flex: 1 }}
+                                                />
+                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Button
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEditNameComplete?.(info.row.original, true);
+                                                        }}
+                                                        variant="contained"
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEditNameComplete?.(info.row.original, false);
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </Box>
+                                            </Box>
                                         ) : (
                                             <>
                                                 <Typography>{info.getValue()}</Typography>
@@ -135,7 +162,11 @@ function AssetTable<T>({
                                     </Box>
                                 );
                             }
-                            return col.format ? col.format(info.getValue()) : info.getValue();
+                            return (
+                                <Box sx={{ p: 1 }}>
+                                    {col.format ? col.format(info.getValue()) : info.getValue()}
+                                </Box>
+                            );
                         }
                     }
                 )
@@ -145,7 +176,7 @@ function AssetTable<T>({
                 header: 'Actions',
                 size: 100,
                 cell: (info) => (
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', p: 1 }}>
                         <IconButton
                             size="small"
                             onClick={handleDeleteClick(info.row.original)}
@@ -178,7 +209,7 @@ function AssetTable<T>({
     const rowVirtualizer = useVirtualizer({
         count: table.getRowModel().rows.length,
         getScrollElement: () => containerRef.current,
-        estimateSize: () => 53,
+        estimateSize: () => 76, // Increased to account for padding
         overscan: 10,
     });
 

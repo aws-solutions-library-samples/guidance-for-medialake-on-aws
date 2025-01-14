@@ -82,10 +82,9 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     return (
         <Box sx={{
             width: '100%',
-            height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            flex: 1,
+            height: 'auto',
         }}>
             <ResizableTable
                 table={table}

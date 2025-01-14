@@ -4,6 +4,7 @@ import { type AssetTableColumn } from '../../types/shared/assetComponents';
 import AssetResults from '../shared/AssetResults';
 import { formatFileSize } from '../../utils/fileSize';
 import { formatDuration } from '../../utils/duration';
+import { formatDate } from '../../utils/dateFormat';
 
 interface VideoResultsProps {
     videos: VideoItem[];
@@ -16,7 +17,7 @@ interface VideoResultsProps {
 }
 
 const defaultCardFields: CardFieldConfig[] = [
-    { id: 'name', label: 'Name', visible: true },
+    { id: 'name', label: 'Object Name', visible: true },
     { id: 'format', label: 'Format', visible: true },
     { id: 'duration', label: 'Duration', visible: true },
     { id: 'createDate', label: 'Created Date', visible: true },
@@ -27,21 +28,24 @@ const defaultCardFields: CardFieldConfig[] = [
 const defaultColumns: AssetTableColumn<VideoItem>[] = [
     {
         id: 'name',
-        label: 'Name',
+        label: 'Object Name',
         visible: true,
-        minWidth: 200,
+        minWidth: 300,
+        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
     },
     {
         id: 'format',
         label: 'Format',
         visible: true,
         minWidth: 100,
+        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.Format,
     },
     {
         id: 'duration',
         label: 'Duration',
         visible: true,
         minWidth: 100,
+        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata.Duration,
         format: (value: number) => formatDuration(value),
     },
     {
@@ -49,26 +53,32 @@ const defaultColumns: AssetTableColumn<VideoItem>[] = [
         label: 'Resolution',
         visible: true,
         minWidth: 120,
+        accessor: (video) => {
+            const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
+            return `${Width}x${Height}`;
+        },
     },
     {
         id: 'createDate',
         label: 'Created',
         visible: true,
-        minWidth: 120,
-        format: (value: string) => new Date(value).toLocaleDateString(),
+        minWidth: 160,
+        accessor: (video) => video.DigitalSourceAsset.CreateDate,
+        format: (value: string) => formatDate(value),
     },
     {
         id: 'fileSize',
         label: 'Size',
         visible: false,
         minWidth: 100,
+        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
         format: (value: number) => formatFileSize(value),
     },
 ];
 
 const sortOptions = [
     { id: 'createDate', label: 'Created Date' },
-    { id: 'name', label: 'Name' },
+    { id: 'name', label: 'Object Name' },
     { id: 'format', label: 'Format' },
     { id: 'duration', label: 'Duration' },
     { id: 'fileSize', label: 'File Size' },
@@ -86,7 +96,7 @@ const renderCardField = (fieldId: string, video: VideoItem): string => {
             const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
             return `${Width}x${Height}`;
         case 'createDate':
-            return new Date(video.DigitalSourceAsset.CreateDate).toLocaleDateString();
+            return formatDate(video.DigitalSourceAsset.CreateDate);
         case 'fileSize':
             return formatFileSize(video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size);
         default:

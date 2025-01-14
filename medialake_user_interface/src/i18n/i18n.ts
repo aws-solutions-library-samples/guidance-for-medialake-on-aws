@@ -23,6 +23,8 @@ i18n
                         edit: 'Edit',
                         search: 'Search',
                         profile: 'Profile',
+                        filterColumn: 'Filter',
+                        searchValue: 'Search',
                         logout: 'Logout',
                         language: 'Language',
                         alerts: 'Alerts',

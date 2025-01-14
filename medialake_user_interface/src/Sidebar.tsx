@@ -13,6 +13,7 @@ import {
     Typography,
     IconButton,
     Tooltip,
+    Button,
 } from '@mui/material';
 import {
     AccountTree as PipelineIcon,
@@ -22,8 +23,8 @@ import {
     Storage as StorageIcon,
     PermMedia as MediaAssetsIcon,
     PlaylistPlay as ExecutionsIcon,
-    ChevronLeft as ChevronLeftIcon,
-    Menu as MenuIcon,
+    ChevronLeft,
+    ChevronRight,
     Group as GroupIcon,
     Security as SecurityIcon,
     Home as HomeIcon,
@@ -103,34 +104,57 @@ function Sidebar() {
             sx={{
                 width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                 flexShrink: 0,
-                transition: theme.transitions.create('width', {
-                    easing: theme.transitions.easing.sharp,
-                    duration: theme.transitions.duration.enteringScreen,
-                }),
+                position: 'relative',
                 '& .MuiDrawer-paper': {
                     width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
                     borderRight: '1px solid rgba(0,0,0,0.08)',
                     backgroundColor: theme.palette.background.paper,
-                    mt: '64px', // Height of TopBar
-                    transition: theme.transitions.create('width', {
-                        easing: theme.transitions.easing.sharp,
-                        duration: theme.transitions.duration.enteringScreen,
-                    }),
-                    overflowX: 'hidden',
+                    mt: '64px',
+                    overflow: 'visible',
+                    position: 'relative',
                 },
             }}
         >
-            <Box sx={{ overflow: 'auto', py: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, mb: 1 }}>
-                    <IconButton onClick={toggleDrawer}>
-                        {isCollapsed ? (
-                            <MenuIcon sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }} />
-                        ) : (
-                            <ChevronLeftIcon sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }} />
-                        )}
-                    </IconButton>
-                </Box>
+            <Box sx={{
+                overflowY: 'auto',
+                overflow: 'visible',
+                py: 2,
+                position: 'relative',
+                height: 'calc(100vh - 64px)',
+            }}>
+                <Button
+                    onClick={toggleDrawer}
+                    sx={{
+                        position: 'absolute',
+                        right: -12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        minWidth: '24px',
+                        width: '24px',
+                        height: '24px',
+                        bgcolor: 'background.paper',
+                        borderRadius: '8px',
+                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        zIndex: 1,
+                        padding: 0,
+                        '&:hover': {
+                            bgcolor: 'background.paper',
+                            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
+                        },
+                    }}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight sx={{ fontSize: 16 }} />
+                    ) : (
+                        <ChevronLeft sx={{ fontSize: 16 }} />
+                    )}
+                </Button>
                 <List>
                     {mainMenuItems.map((item) => (
                         <React.Fragment key={item.text}>

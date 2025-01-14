@@ -62,7 +62,7 @@ const AssetMetadataTabs: React.FC<AssetMetadataTabsProps> = ({
             content: <MetadataContent fields={summary} />
         },
         {
-            label: 'Descriptive Metadata',
+            label: 'Descriptor Metadata',
             content: <MetadataContent fields={descriptive} />
         },
         {

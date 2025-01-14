@@ -340,7 +340,7 @@ const ExecutionsPage: React.FC = () => {
     });
 
     return (
-        <Box sx={{ px: 4, py: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Box>

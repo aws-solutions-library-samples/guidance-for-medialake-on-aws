@@ -1,5 +1,26 @@
 import React from 'react';
-import { Box, Typography, Tabs, Tab, Paper } from '@mui/material';
+import { Box, Tab, Tabs } from '@mui/material';
+import { styled } from '@mui/material/styles';
+
+const StyledTabs = styled(Tabs)({
+    '& .MuiTabs-indicator': {
+        backgroundColor: '#2563eb',
+        height: '2px'
+    }
+});
+
+const StyledTab = styled(Tab)({
+    textTransform: 'none',
+    fontSize: '16px',
+    fontWeight: 400,
+    color: '#6b7280',
+    padding: '12px 0',
+    marginRight: '32px',
+    minWidth: 'unset',
+    '&.Mui-selected': {
+        color: '#2563eb'
+    }
+});
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -17,9 +38,7 @@ const TabPanel = (props: TabPanelProps) => {
             id={`metadata-tabpanel-${index}`}
             aria-labelledby={`metadata-tab-${index}`}
             sx={{
-                flex: 1,
-                overflow: 'auto',
-                p: 3
+                py: 3
             }}
             {...other}
         >
@@ -54,38 +73,22 @@ const MetadataSection: React.FC<MetadataSectionProps> = ({
     };
 
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                bgcolor: 'background.default'
-            }}
-        >
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs
+        <Box>
+            <Box sx={{ borderBottom: 1, borderColor: '#e5e7eb' }}>
+                <StyledTabs
                     value={value}
                     onChange={handleChange}
                     aria-label="metadata tabs"
-                    sx={{
-                        '& .MuiTab-root': {
-                            textTransform: 'none',
-                            fontSize: '1rem',
-                            fontWeight: 'normal',
-                            minWidth: 120,
-                        }
-                    }}
                 >
                     {tabs.map((tab, index) => (
-                        <Tab
+                        <StyledTab
                             key={index}
                             label={tab.label}
                             id={`metadata-tab-${index}`}
                             aria-controls={`metadata-tabpanel-${index}`}
                         />
                     ))}
-                </Tabs>
+                </StyledTabs>
             </Box>
 
             {tabs.map((tab, index) => (
@@ -93,7 +96,7 @@ const MetadataSection: React.FC<MetadataSectionProps> = ({
                     {tab.content}
                 </TabPanel>
             ))}
-        </Paper>
+        </Box>
     );
 };
 

@@ -17,7 +17,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     handleDeleteConfirm: () => Promise<void>;
     handleStartEditing: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
     handleNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    handleNameEditComplete: (asset: T) => void;
+    handleNameEditComplete: (asset: T, save: boolean) => void;
     handleRenameConfirm: (newName: string) => Promise<void>;
     handleDeleteCancel: () => void;
     handleRenameCancel: () => void;
@@ -56,7 +56,6 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
 
         switch (action) {
             case 'rename':
-                console.log("Opening rename dialog for asset:", selectedAsset.InventoryID);
                 setEditingAssetId(selectedAsset.InventoryID);
                 setEditedName(selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 setIsRenameDialogOpen(true);
@@ -92,27 +91,26 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     };
 
     const handleStartEditing = (asset: T, event: React.MouseEvent<HTMLElement>) => {
-        console.log("handleStartEditing")
         event.stopPropagation();
         setEditingAssetId(asset.InventoryID);
         setEditedName(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
     };
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        console.log("handleNameChange")
         setEditedName(event.target.value);
     };
 
-    const handleNameEditComplete = (asset: T) => {
-        console.log("handleNameEditComplete")
-        if (editedName !== asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
+    const handleNameEditComplete = (asset: T, save: boolean) => {
+        if (save && editedName !== asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
             handleRenameConfirm(editedName);
         }
         setEditingAssetId(null);
+        if (!save) {
+            setEditedName(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
+        }
     };
 
     const handleRenameConfirm = async (newName: string) => {
-        console.log("useAssetOperations: handleRenameConfirm called with newName:", selectedAsset, newName, editingAssetId);
         if (editingAssetId) {
             try {
 
