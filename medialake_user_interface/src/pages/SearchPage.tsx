@@ -266,28 +266,6 @@ const SearchPage: React.FC = () => {
                         />
                     )}
 
-                    {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <VideoResults
-                            videos={videoResults}
-                            searchMetadata={{
-                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                page: currentPage,
-                                pageSize: PAGE_SIZE,
-                            }}
-                            onPageChange={(newPage) => handleSearch({ page: newPage })}
-                        />
-                    )}
-                    {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <AudioResults
-                            audios={audioResults}
-                            searchMetadata={{
-                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                page: currentPage,
-                                pageSize: PAGE_SIZE,
-                            }}
-                            onPageChange={(newPage) => handleSearch({ page: newPage })}
-                        />
-                    )}
                 </Box>
 
                 <RightSidebar>

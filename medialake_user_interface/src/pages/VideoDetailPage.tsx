@@ -50,12 +50,16 @@ const VideoDetailContent: React.FC = () => {
                 id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
                 src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
                 type: 'Original',
+                format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+                fileSize: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
                 description: 'Original high resolution version',
             },
             ...assetData.data.asset.DerivedRepresentations.map(rep => ({
                 id: rep.ID,
                 src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
                 type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1),
+                format: rep.Format,
+                fileSize: rep.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
                 description: `${rep.Purpose} version`,
             }))
         ];

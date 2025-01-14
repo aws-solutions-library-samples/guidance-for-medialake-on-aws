@@ -319,7 +319,7 @@ class ApiGatewayStack(Stack):
                 action="adminCreateUser",
                 parameters={
                     "UserPoolId": self._cognito_construct.user_pool.user_pool_id,
-                    "Username": config.initial_user_email,
+                    "Username": config.initial_user.email,
                     "TemporaryPassword": random_password,
                     "UserAttributes": [
                         {"Name": "email", "Value": config.initial_user.email},

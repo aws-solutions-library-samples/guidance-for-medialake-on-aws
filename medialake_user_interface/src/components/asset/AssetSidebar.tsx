@@ -42,6 +42,13 @@ interface Representation {
 
 interface AssetSidebarProps {
     versions: Representation[];
+    comments?: {
+        user: string;
+        avatar: string;
+        content: string;
+        timestamp: string;
+    }[];
+    onAddComment?: (comment: string) => void;
 }
 
 const AssetSidebar: React.FC<AssetSidebarProps> = ({

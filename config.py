@@ -123,7 +123,6 @@ class CDKConfig(BaseModel):
     resource_prefix: str
     resource_application_tag: str
     api_path: str
-    initial_user_email: str
     initial_user: UserConfig
     logging: LoggingConfig = LoggingConfig()
     secondary_region: Optional[str] = None
