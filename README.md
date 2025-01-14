@@ -71,26 +71,23 @@ touch config.json
 
 ```json
 {
-  "environment": "dev", 
-  "account_id": "your-aws-account-id",
-  "resource_prefix": "medialake",
-  "global_prefix": "medialake",
-  "api_path": "prod",
-  "primary_region": "us-east-1",
-  "initial_user_email": "your-email@example.com",
-  "logging": {
-    "retention_days": 90,
-    "s3_retention_days": 90,
-    "cloudwatch_retention_days": 90,
-    "waf_retention_days": 90,
-    "api_gateway_retention_days": 90
-  },
+    "environment": "dev", 
+    "account_id": "your-aws-account-id",
+    "resource_prefix": "medialake",
+    "global_prefix": "medialake",
+    "api_path": "prod",
+    "primary_region": "us-east-1",
+    "initial_user": {
+        "email": "mne-mscdemo+medialake@amazon.com",
+        "first_name": "Medialake",
+        "last_name": "User"
+    },
     "authZ": {
         "identity_providers": [
             {
                 "identity_provider_method": "saml",
-                "identity_provider_name": "Okta",
-                "identity_provider_metadata_url": "https://dev-23568056.okta.com/app/exkm9flp5pxYwe5hf5d7/sso/saml/metadata"
+                "identity_provider_name": "IDENTITY_PROVIDER_NAME", #Okta, Duo, etc.... this will show in the login page
+                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL" #URL to the identity provider metadata
             },
             {
                 "identity_provider_method": "cognito"

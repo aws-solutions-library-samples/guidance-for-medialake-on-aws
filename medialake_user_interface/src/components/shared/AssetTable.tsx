@@ -30,6 +30,7 @@ export interface AssetTableProps<T> {
     onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+    onRowClick?: (item: T) => void;
     getThumbnailUrl: (item: T) => string;
     getName: (item: T) => string;
     getId: (item: T) => string;
@@ -47,6 +48,7 @@ function AssetTable<T>({
     onDeleteClick,
     onMenuClick,
     onEditClick,
+    onRowClick,
     getThumbnailUrl,
     getName,
     getId,
@@ -58,7 +60,6 @@ function AssetTable<T>({
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const cursorPositionRef = useRef<number | null>(null);
-
 
     const handleDeleteClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
@@ -241,6 +242,7 @@ function AssetTable<T>({
             virtualizer={rowVirtualizer}
             rows={table.getRowModel().rows}
             maxHeight="none"
+            onRowClick={onRowClick ? (row) => onRowClick(row.original) : undefined}
         />
     );
 }

@@ -32,9 +32,10 @@ interface ResizableTableProps<T> {
     activeSorting?: Array<{ columnId: string; desc: boolean }>;
     onRemoveFilter?: (columnId: string) => void;
     onRemoveSort?: (columnId: string) => void;
+    onRowClick?: (row: Row<T>) => void;
 }
 
-const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
+const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boolean) => {
     const isDark = theme.palette.mode === 'dark';
 
     return useMemo(() => ({
@@ -115,12 +116,12 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             },
         },
         tableRow: {
-            '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.04),
-            },
             backgroundColor: 'inherit',
             transition: 'all 0.2s ease',
-            cursor: 'pointer',
+            cursor: hasRowClick ? 'pointer' : 'default',
+            '&:hover': hasRowClick ? {
+                bgcolor: 'action.hover',
+            } : {},
             '& .MuiTableCell-root': {
                 position: 'relative',
                 '& .MuiIconButton-root': {
@@ -142,7 +143,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal') => {
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             borderRadius: '12px',
         }
-    }), [theme.palette.mode, theme.palette.primary.main, mode, isDark]);
+    }), [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick]);
 };
 
 export function ResizableTable<T>({
@@ -156,10 +157,11 @@ export function ResizableTable<T>({
     activeSorting = [],
     onRemoveFilter,
     onRemoveSort,
+    onRowClick,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
     const { mode } = useTableDensity();
-    const styles = useTableStyles(theme, mode);
+    const styles = useTableStyles(theme, mode, Boolean(onRowClick));
     const hasActiveTags = activeFilters.length > 0 || activeSorting.length > 0;
 
     const handleRemoveFilter = useCallback((columnId: string) => {
@@ -240,6 +242,7 @@ export function ResizableTable<T>({
                                         key={row.id}
                                         sx={styles.tableRow}
                                         role="row"
+                                        onClick={() => onRowClick?.(row)}
                                     >
                                         {row.getVisibleCells().map(cell => {
                                             const content = flexRender(

@@ -41,14 +41,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
             return new Promise<number>(resolve => {
                 requestAnimationFrame(() => {
                     const canvasWidth = canvas.clientWidth;
-                    const maxHeightNumber = typeof maxHeight === 'string' ? parseFloat(maxHeight) : maxHeight;
-                    const canvasHeight = typeof maxHeightNumber === 'number' ? maxHeightNumber : canvas.clientHeight;
+                    const maxHeightNumber = typeof maxHeight === 'string'
+                        ? maxHeight.endsWith('vh')
+                            ? window.innerHeight * (parseFloat(maxHeight) / 100)
+                            : parseFloat(maxHeight)
+                        : maxHeight;
+                    const canvasHeight = maxHeightNumber;
 
                     let scale = 1;
                     if (imgWidth > canvasWidth || imgHeight > canvasHeight) {
                         const scaleX = canvasWidth / imgWidth;
                         const scaleY = canvasHeight / imgHeight;
                         scale = Math.min(scaleX, scaleY);
+                    } else {
+                        // If image is smaller than canvas, use scale of 1 to show actual size
+                        scale = 1;
                     }
                     resolve(scale);
                 });
@@ -88,15 +95,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                 const initialScale = await calculateInitialScale(img.width, img.height);
                 setScaleSize(initialScale);
                 setZoom(initialScale);
+                setOffset({ x: 0, y: 0 }); // Reset offset when loading new image
+                setRotate(0); // Reset rotation when loading new image
                 setIsImageLoaded(true);
             } catch (error) {
                 console.error('Error calculating initial scale:', error);
                 setIsImageLoaded(false);
             }
-        };
-        img.onerror = () => {
-            console.error('Error loading image');
-            setIsImageLoaded(false);
         };
         img.src = imageSrc;
     }, [imageSrc, calculateInitialScale]);

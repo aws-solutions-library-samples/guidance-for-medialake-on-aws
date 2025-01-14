@@ -51,6 +51,32 @@ const categoryMapping = {
     interop: 'Interoperability'
 };
 
+const outputFilters = {
+    'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
+    'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
+    'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
+    'Thumbnail (IFD1)': ['ImageWidth', 'ImageHeight', 'ThumbnailLength'],
+    'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
+    'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
+    'XMP': ['Creator', 'Title', 'Description', 'Rights'],
+    'JFIF (JPEG only)': ['JFIFVersion', 'ResolutionUnit', 'XResolution', 'YResolution'],
+    'IHDR (PNG only)': ['Width', 'Height', 'BitDepth', 'ColorType', 'CompressionMethod', 'FilterMethod', 'InterlaceMethod'],
+    'Maker Note': [],
+    'User Comment': [],
+    'Rights': ['UsageTerms', 'CopyrightNotice', 'WebStatement'],
+    'IPTC Core': ['CreatorContactInfo', 'Scene'],
+    'IPTC Extension': ['PersonInImage', 'LocationCreated'],
+    'Photoshop': ['Category', 'SupplementalCategories', 'AuthorsPosition'],
+    'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
+    'Dublin Core': ['Format', 'Type', 'Identifier'],
+    'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
+    'Auxiliary': ['Lens', 'SerialNumber'],
+    'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
+    'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
+    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
+    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
+};
+
 interface MetadataContentProps {
     data: any;
     depth?: number;
@@ -110,32 +136,6 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
     }
 };
 
-const outputFilters = {
-    'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
-    'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
-    'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
-    'Thumbnail (IFD1)': ['ImageWidth', 'ImageHeight', 'ThumbnailLength'],
-    'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
-    'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
-    'XMP': ['Creator', 'Title', 'Description', 'Rights'],
-    'JFIF (JPEG only)': ['JFIFVersion', 'ResolutionUnit', 'XResolution', 'YResolution'],
-    'IHDR (PNG only)': ['Width', 'Height', 'BitDepth', 'ColorType', 'CompressionMethod', 'FilterMethod', 'InterlaceMethod'],
-    'Maker Note': [],
-    'User Comment': [],
-    'Rights': ['UsageTerms', 'CopyrightNotice', 'WebStatement'],
-    'IPTC Core': ['CreatorContactInfo', 'Scene'],
-    'IPTC Extension': ['PersonInImage', 'LocationCreated'],
-    'Photoshop': ['Category', 'SupplementalCategories', 'AuthorsPosition'],
-    'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
-    'Dublin Core': ['Format', 'Type', 'Identifier'],
-    'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
-    'Auxiliary': ['Lens', 'SerialNumber'],
-    'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
-    'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
-    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
-    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
-};
-
 const ImageDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { data: assetData, isLoading, error } = useAsset(id || '');
@@ -187,11 +187,6 @@ const ImageDetailContent: React.FC = () => {
         setExpandedMetadata(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const metadataAccordions = useMemo(() => {
-        if (!assetData?.data?.asset?.Metadata) return [];
-        return transformMetadata(assetData.data.asset.Metadata);
-    }, [assetData]);
-
     const transformMetadata = (metadata: any) => {
         if (!metadata) return [];
 
@@ -205,6 +200,11 @@ const ImageDetailContent: React.FC = () => {
             count: Object.keys(parentData as object).length
         }));
     };
+
+    const metadataAccordions = useMemo(() => {
+        if (!assetData?.data?.asset?.Metadata) return [];
+        return transformMetadata(assetData.data.asset.Metadata);
+    }, [assetData]);
 
     useTrackRecentlyViewed(
         assetData ? {
@@ -256,17 +256,24 @@ const ImageDetailContent: React.FC = () => {
                 duration: theme.transitions.duration.enteringScreen,
             }),
         }}>
-            <BreadcrumbNavigation
-                searchTerm={searchTerm}
-                currentResult={48}
-                totalResults={156}
-                onBack={() => navigate(-1)}
-                onPrevious={() => navigate(-1)}
-                onNext={() => navigate(1)}
-            />
-
-            <Box sx={{ px: 3, pt: 2, bgcolor: 'background.default' }}>
-                <AssetHeader />
+            <Box sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 1200,
+                bgcolor: 'background.default',
+                borderBottom: 1,
+                borderColor: 'divider'
+            }}>
+                <Box sx={{ px: 3, py: 2 }}>
+                    <BreadcrumbNavigation
+                        searchTerm={searchTerm}
+                        currentResult={48}
+                        totalResults={156}
+                        onBack={() => navigate(-1)}
+                        onPrevious={() => navigate(-1)}
+                        onNext={() => navigate(1)}
+                    />
+                </Box>
             </Box>
 
             <Box sx={{
@@ -276,73 +283,77 @@ const ImageDetailContent: React.FC = () => {
                 overflow: 'auto',
                 gap: 3,
                 px: 3,
-                pb: 3
+                pb: 3,
+                mt: 2
             }}>
                 <Box sx={{
-                    position: 'sticky',
-                    top: 120,
-                    zIndex: 1100,
-                    bgcolor: 'background.default',
-                    pt: 2
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3
                 }}>
-                    <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
+                    <Box sx={{
+                        position: 'relative',
+                        bgcolor: 'background.default',
+                        pt: 2
+                    }}>
+                        <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
+                    </Box>
+
+                    <Box>
+                        <Paper elevation={3} sx={{ p: 2 }}>
+                            <Typography variant="h6">Metadata</Typography>
+                            <Divider sx={{ my: 1 }} />
+                            {metadataAccordions.map((parentAccordion, parentIndex) => (
+                                <Paper key={parentAccordion.category} elevation={1} sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold' }}>
+                                        {parentAccordion.category} ({parentAccordion.count})
+                                    </Typography>
+                                    {parentAccordion.subCategories.map((subCategory, subIndex) => (
+                                        <Box key={subCategory.category} sx={{ p: 2 }}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                {subCategory.category} ({subCategory.count})
+                                            </Typography>
+                                            <MetadataContent
+                                                data={subCategory.data}
+                                                showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
+                                                category={subCategory.category}
+                                            />
+                                            <Button
+                                                onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
+                                                sx={{ mt: 1 }}
+                                            >
+                                                {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
+                                            </Button>
+                                        </Box>
+                                    ))}
+                                </Paper>
+                            ))}
+                        </Paper>
+                    </Box>
                 </Box>
 
-                <Box sx={{ flex: 1 }}>
-                    <Paper elevation={3} sx={{ p: 2 }}>
-                        <Typography variant="h6">Metadata</Typography>
-                        <Divider sx={{ my: 1 }} />
-                        {metadataAccordions.map((parentAccordion, parentIndex) => (
-                            <Paper key={parentAccordion.category} elevation={1} sx={{ mb: 2 }}>
-                                <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold' }}>
-                                    {parentAccordion.category} ({parentAccordion.count})
-                                </Typography>
-                                {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                                    <Box key={subCategory.category} sx={{ p: 2 }}>
-                                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            {subCategory.category} ({subCategory.count})
-                                        </Typography>
-                                        <MetadataContent
-                                            data={subCategory.data}
-                                            showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
-                                            category={subCategory.category}
-                                        />
-                                        <Button
-                                            onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
-                                            sx={{ mt: 1 }}
-                                        >
-                                            {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
-                                        </Button>
-                                    </Box>
-                                ))}
-                            </Paper>
-                        ))}
-                    </Paper>
-                </Box>
+                <AssetSidebar versions={assetData.data.asset.DerivedRepresentations.map(rep => ({
+                    id: rep.ID,
+                    src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                    type: rep.Purpose,
+                    format: rep.Format,
+                    fileSize: formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size),
+                    description: `${rep.Format} file - ${formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size)}${rep.ImageSpec?.Resolution ? ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}` : ''}`
+                }))} />
+
+                {selectedComment !== null && (
+                    <CommentPopper
+                        id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
+                        open={Boolean(commentAnchorEl)}
+                        anchorEl={commentAnchorEl}
+                        comment={comments[selectedComment]}
+                        onClose={() => {
+                            setCommentAnchorEl(null);
+                            setSelectedComment(null);
+                        }}
+                    />
+                )}
             </Box>
-
-            <AssetSidebar versions={assetData.data.asset.DerivedRepresentations.map(rep => ({
-                id: rep.ID,
-                src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
-                type: rep.Purpose,
-                format: rep.Format,
-                fileSize: formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size),
-                description: `${rep.Format} file - ${formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size)}${rep.ImageSpec?.Resolution ? ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}` : ''
-                    }`
-            }))} />
-
-            {selectedComment !== null && (
-                <CommentPopper
-                    id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
-                    open={Boolean(commentAnchorEl)}
-                    anchorEl={commentAnchorEl}
-                    comment={comments[selectedComment]}
-                    onClose={() => {
-                        setCommentAnchorEl(null);
-                        setSelectedComment(null);
-                    }}
-                />
-            )}
         </Box>
     );
 };

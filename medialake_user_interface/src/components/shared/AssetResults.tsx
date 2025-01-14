@@ -135,6 +135,7 @@ function AssetResults<T extends AssetBase>({
                     onDeleteClick={handleDeleteClick}
                     onMenuClick={handleMenuOpen}
                     onEditClick={handleStartEditing}
+                    onRowClick={(asset) => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`)}
                     getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
                     getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                     getId={(asset) => asset.InventoryID}
