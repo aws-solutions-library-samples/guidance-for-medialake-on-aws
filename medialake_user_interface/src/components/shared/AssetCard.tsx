@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box, Typography, IconButton } from '@mui/material';
+import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
 
 export interface AssetField {
     id: string;
@@ -18,8 +19,13 @@ export interface AssetCardProps {
     onImageClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
+    onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
     placeholderImage?: string;
     onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+    isEditing?: boolean;
+    editedName?: string;
+    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onEditNameComplete?: (save: boolean) => void;
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -31,8 +37,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onImageClick,
     onDeleteClick,
     onMenuClick,
+    onEditClick,
     placeholderImage = 'https://placehold.co/300x200',
     onImageError,
+    isEditing,
+    editedName,
+    onEditNameChange,
+    onEditNameComplete,
 }) => {
     const defaultImageErrorHandler = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
         event.currentTarget.src = placeholderImage;
@@ -94,9 +105,67 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                 >
                                     {field.label}:
                                 </Typography>
-                                <Typography variant="body2">
-                                    {renderField(field.id)}
-                                </Typography>
+                                {field.id === 'name' && onEditClick ? (
+                                    isEditing ? (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <TextField
+                                                value={editedName}
+                                                onChange={onEditNameChange}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        onEditNameComplete?.(true);
+                                                    } else if (e.key === 'Escape') {
+                                                        onEditNameComplete?.(false);
+                                                    }
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                autoFocus
+                                                size="small"
+                                                fullWidth
+                                            />
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Button
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditNameComplete?.(true);
+                                                    }}
+                                                    variant="contained"
+                                                >
+                                                    Save
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditNameComplete?.(false);
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    ) : (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography variant="body2">
+                                                {renderField(field.id)}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onEditClick(e);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </Box>
+                                    )
+                                ) : (
+                                    <Typography variant="body2">
+                                        {renderField(field.id)}
+                                    </Typography>
+                                )}
                             </Box>
                         ))}
                         <Box sx={{

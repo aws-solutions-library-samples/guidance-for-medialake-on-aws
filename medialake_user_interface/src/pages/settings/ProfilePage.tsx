@@ -130,19 +130,12 @@ const ProfilePage: React.FC = () => {
                             size="small"
                             sx={{ mt: 1 }}
                         />
-                        <Button
-                            variant="outlined"
-                            fullWidth
-                            sx={{ mt: 2 }}
-                        >
-                            Edit Profile
-                        </Button>
                     </Paper>
                 </Grid>
 
                 {/* Profile Details */}
                 <Grid item xs={12} md={8}>
-                    <Paper sx={{ p: 3, mb: 3 }}>
+                    <Paper sx={{ p: 3 }}>
                         <Typography variant="h6" gutterBottom>
                             Profile Information
                         </Typography>
@@ -176,39 +169,6 @@ const ProfilePage: React.FC = () => {
                             </ListItem>
                         </List>
                     </Paper>
-
-                    {/* Quick Actions */}
-                    <Box sx={{ mt: 3 }}>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
-                                <Button
-                                    variant="outlined"
-                                    fullWidth
-                                    startIcon={<SecurityIcon />}
-                                >
-                                    Security Settings
-                                </Button>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <Button
-                                    variant="outlined"
-                                    fullWidth
-                                    startIcon={<NotificationsIcon />}
-                                >
-                                    Notification Preferences
-                                </Button>
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <Button
-                                    variant="outlined"
-                                    fullWidth
-                                    startIcon={<LanguageIcon />}
-                                >
-                                    Language & Region
-                                </Button>
-                            </Grid>
-                        </Grid>
-                    </Box>
                 </Grid>
             </Grid>
         </Box>

@@ -41,9 +41,9 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                 position: 'sticky',
                 top: 64, // Below main header
                 zIndex: 1100,
-                bgcolor: 'common.white',
+                bgcolor: 'background.paper',
                 borderBottom: 1,
-                borderColor: 'grey.100',
+                borderColor: 'divider',
                 px: 3,
                 py: 2,
                 display: 'flex',
@@ -60,7 +60,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        color: 'rgb(37, 99, 235)', // text-blue-600
+                        color: 'primary.main',
                         fontSize: '0.875rem', // text-sm
                     }}
                     onClick={(e) => {
@@ -88,7 +88,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                         '&::before': {
                             content: '"/"',
                             mx: 1,
-                            color: 'grey.400'
+                            color: 'text.disabled'
                         }
                     }}
                 >
@@ -102,21 +102,21 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                 <IconButton
                     onClick={onPrevious}
                     size="small"
-                    sx={{ color: 'rgb(37, 99, 235)' }}
+                    sx={{ color: 'primary.main' }}
                 >
                     <ChevronLeft size={16} />
                 </IconButton>
                 <IconButton
                     onClick={onNext}
                     size="small"
-                    sx={{ color: 'rgb(37, 99, 235)' }}
+                    sx={{ color: 'primary.main' }}
                 >
                     <ChevronRight size={16} />
                 </IconButton>
                 <IconButton
                     onClick={handleHistoryClick}
                     size="small"
-                    sx={{ color: 'rgb(37, 99, 235)' }}
+                    sx={{ color: 'primary.main' }}
                 >
                     <History size={16} />
                 </IconButton>

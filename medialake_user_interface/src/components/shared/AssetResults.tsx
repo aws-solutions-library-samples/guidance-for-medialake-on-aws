@@ -121,7 +121,12 @@ function AssetResults<T extends AssetBase>({
                                 onImageClick={() => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`)}
                                 onDeleteClick={(e) => handleDeleteClick(asset, e)}
                                 onMenuClick={(e) => handleMenuOpen(asset, e)}
+                                onEditClick={(e) => handleStartEditing(asset, e)}
                                 onImageError={handleAssetError}
+                                isEditing={editingAssetId === asset.InventoryID}
+                                editedName={editedName}
+                                onEditNameChange={handleNameChange}
+                                onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
                             />
                         </Grid>
                     ))}
