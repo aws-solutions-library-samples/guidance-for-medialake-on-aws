@@ -290,6 +290,17 @@ class AssetProcessor:
         inventory_id = str(uuid.uuid4())
         asset_id = str(uuid.uuid4())
 
+        # Extract and capitalize the first part of the MIME type
+        content_type = (
+            metadata.get("Metadata", {})
+            .get("Embedded", {})
+            .get("S3", {})
+            .get("ContentType", "")
+        )
+        asset_type = (
+            content_type.split("/")[0].capitalize() if content_type else "Image"
+        )
+
         item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
             "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
@@ -297,12 +308,12 @@ class AssetProcessor:
             ],
             "DigitalSourceAsset": {
                 "ID": f"asset:img:{asset_id}",
-                "Type": "Image",
+                "Type": asset_type,
                 "CreateDate": datetime.utcnow().isoformat(),
                 "IngestedAt": datetime.utcnow().isoformat(),
                 "MainRepresentation": {
                     "ID": f"asset:rep:{asset_id}:master",
-                    "Type": "Image",
+                    "Type": asset_type,
                     "Format": metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
                         "Name"
                     ]
@@ -323,6 +334,16 @@ class AssetProcessor:
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
         """Publish event to EventBridge using the same structure"""
         try:
+            content_type = (
+                metadata.get("Metadata", {})
+                .get("Embedded", {})
+                .get("S3", {})
+                .get("ContentType", "")
+            )
+            asset_type = (
+                content_type.split("/")[0].capitalize() if content_type else "Image"
+            )
+
             event_detail: AssetRecord = {
                 "InventoryID": inventory_id,
                 "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
@@ -330,11 +351,11 @@ class AssetProcessor:
                 ]["MD5Hash"],
                 "DigitalSourceAsset": {
                     "ID": asset_id,
-                    "Type": "Image",
+                    "Type": asset_type,
                     "CreateDate": datetime.utcnow().isoformat(),
                     "MainRepresentation": {
                         "ID": f"{asset_id}:master",
-                        "Type": "Image",
+                        "Type": asset_type,
                         "Format": metadata["StorageInfo"]["PrimaryLocation"][
                             "ObjectKey"
                         ]["Name"]

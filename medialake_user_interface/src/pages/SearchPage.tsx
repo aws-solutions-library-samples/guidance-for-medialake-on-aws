@@ -13,6 +13,20 @@ interface LocationState {
     query?: string;
 }
 
+interface Filters {
+    mediaTypes: {
+        videos: boolean;
+        images: boolean;
+        audio: boolean;
+    };
+    time: {
+        recent: boolean;
+        lastWeek: boolean;
+        lastMonth: boolean;
+        lastYear: boolean;
+    };
+}
+
 const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
@@ -28,14 +42,10 @@ const SearchPage: React.FC = () => {
         isFetching
     } = useSearch(currentQuery, {
         page: currentPage,
-        pageSize: PAGE_SIZE
+        pageSize: PAGE_SIZE,
     });
 
-    const imageResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Image') || [];
-    const videoResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Video') || [];
-    const audioResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Audio') || [];
-
-    const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<Filters>({
         mediaTypes: {
             videos: true,
             images: true,
@@ -47,12 +57,35 @@ const SearchPage: React.FC = () => {
             lastMonth: false,
             lastYear: false,
         },
-        status: {
-            favorites: false,
-            archived: false,
-            shared: false,
-        }
+        // status: {
+        //     favorites: false,
+        //     archived: false,
+        //     shared: false,
+        // }
     });
+
+    const filteredResults = searchResults?.data?.results?.filter(item => {
+        const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
+        const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
+        const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+
+        // Time-based filtering
+        const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
+        const now = new Date();
+        const isRecent = filters.time.recent && (now.getTime() - createdAt.getTime() <= 24 * 60 * 60 * 1000);
+        const isLastWeek = filters.time.lastWeek && (now.getTime() - createdAt.getTime() <= 7 * 24 * 60 * 60 * 1000);
+        const isLastMonth = filters.time.lastMonth && (now.getTime() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000);
+        const isLastYear = filters.time.lastYear && (now.getTime() - createdAt.getTime() <= 365 * 24 * 60 * 60 * 1000);
+
+        const passesTimeFilter = !filters.time.recent && !filters.time.lastWeek && !filters.time.lastMonth && !filters.time.lastYear ||
+            isRecent || isLastWeek || isLastMonth || isLastYear;
+
+        return (isImage || isVideo || isAudio) && passesTimeFilter;
+    }) || [];
+
+    const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
+    const videoResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Video');
+    const audioResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Audio');
 
     const [expandedSections, setExpandedSections] = useState({
         mediaTypes: true,
@@ -74,15 +107,21 @@ const SearchPage: React.FC = () => {
         }
     }, [query, searchParams, setSearchParams]);
 
-    const handleFilterChange = (section: string, filter: string) => {
-        setFilters(prev => ({
-            ...prev,
-            [section]: {
-                ...prev[section as keyof typeof prev],
-                [filter]: !prev[section as keyof typeof prev][filter as keyof typeof prev[keyof typeof prev]]
+    const handleFilterChange = (section: keyof Filters, filter: string) => {
+        setFilters(prev => {
+            const newFilters = { ...prev };
+            if (section === 'time') {
+                // Reset all time filters
+                Object.keys(newFilters.time).forEach(key => {
+                    newFilters.time[key as keyof typeof newFilters.time] = false;
+                });
             }
-        }));
+            (newFilters[section] as any)[filter] = !(prev[section] as any)[filter];
+            return newFilters;
+        });
     };
+
+
 
     const handleSectionToggle = (section: string) => {
         setExpandedSections(prev => ({
@@ -92,15 +131,25 @@ const SearchPage: React.FC = () => {
     };
 
     const handleSearch = (params: { page: number }) => {
+        let timeFilter = '';
+        if (filters.time.recent) timeFilter = 'recent';
+        if (filters.time.lastWeek) timeFilter = 'lastWeek';
+        if (filters.time.lastMonth) timeFilter = 'lastMonth';
+        if (filters.time.lastYear) timeFilter = 'lastYear';
+
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.set('page', params.page.toString());
             if (currentQuery) {
                 newParams.set('q', currentQuery);
             }
+            if (timeFilter) {
+                newParams.set('time', timeFilter);
+            }
             return newParams;
         });
     };
+
 
 
     return (
@@ -214,6 +263,29 @@ const SearchPage: React.FC = () => {
                             }}
                             onPageChange={(newPage) => handleSearch({ page: newPage })}
                             searchTerm={currentQuery}
+                        />
+                    )}
+
+                    {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <VideoResults
+                            videos={videoResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                        />
+                    )}
+                    {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <AudioResults
+                            audios={audioResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
                         />
                     )}
                 </Box>

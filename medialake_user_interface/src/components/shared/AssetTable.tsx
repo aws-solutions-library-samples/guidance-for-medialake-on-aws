@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import {
     useReactTable,
@@ -35,7 +35,7 @@ export interface AssetTableProps<T> {
     getId: (item: T) => string;
     editingId?: string;
     editedName?: string;
-    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
     onEditNameComplete?: (item: T, save: boolean) => void;
 }
 
@@ -57,6 +57,8 @@ function AssetTable<T>({
 }: AssetTableProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
+    const cursorPositionRef = useRef<number | null>(null);
+
 
     const handleDeleteClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
@@ -72,6 +74,16 @@ function AssetTable<T>({
         event.stopPropagation();
         onEditClick?.(item, event);
     };
+
+    useEffect(() => {
+        if (cursorPositionRef.current !== null) {
+            const input = document.querySelector(`input[value="${editedName}"]`) as HTMLInputElement;
+            if (input) {
+                input.setSelectionRange(cursorPositionRef.current, cursorPositionRef.current);
+            }
+            cursorPositionRef.current = null;
+        }
+    }, [editedName]);
 
     const tableColumns = React.useMemo(() => {
         const visibleColumns = columns.filter(col => col.visible);
@@ -113,7 +125,10 @@ function AssetTable<T>({
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                                                 <TextField
                                                     value={editedName}
-                                                    onChange={onEditNameChange}
+                                                    onChange={(e) => {
+                                                        cursorPositionRef.current = e.target.selectionStart;
+                                                        onEditNameChange?.(e);
+                                                    }}
                                                     onKeyPress={(e) => {
                                                         if (e.key === 'Enter') {
                                                             onEditNameComplete?.(info.row.original, true);
@@ -125,7 +140,13 @@ function AssetTable<T>({
                                                     autoFocus
                                                     size="small"
                                                     sx={{ flex: 1 }}
+                                                    inputRef={(input) => {
+                                                        if (input && cursorPositionRef.current !== null) {
+                                                            input.setSelectionRange(cursorPositionRef.current, cursorPositionRef.current);
+                                                        }
+                                                    }}
                                                 />
+
                                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                                     <Button
                                                         size="small"

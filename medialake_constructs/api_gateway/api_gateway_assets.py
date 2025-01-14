@@ -257,6 +257,18 @@ class AssetsConstruct(Construct):
                 resources=[props.asset_table.table_arn],
             )
         )
+        rename_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
 
         # Update the policy to allow access to all S3 buckets
         rename_asset_lambda.function.add_to_role_policy(

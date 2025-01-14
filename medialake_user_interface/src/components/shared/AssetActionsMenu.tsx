@@ -14,6 +14,7 @@ interface AssetActionsMenuProps<T extends AssetBase> {
 }
 
 const defaultActions = [
+    { id: 'rename', label: 'Rename' },
     { id: 'share', label: 'Share' },
     { id: 'download', label: 'Download' },
 ];

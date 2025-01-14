@@ -126,7 +126,7 @@ const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onP
                 defaultColumns,
                 sortOptions,
                 renderCardField,
-                placeholderImage: 'https://via.placeholder.com/400x400',
+                placeholderImage: 'https://placehold.co/300x200',
             }}
             searchTerm={searchTerm}
         />

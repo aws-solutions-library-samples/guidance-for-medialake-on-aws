@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRenameAsset, useDeleteAsset } from '../api/hooks/useAssets';
 import { type AssetBase } from '../types/search/searchResults';
 
@@ -39,6 +39,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const renameAsset = useRenameAsset();
     const deleteAsset = useDeleteAsset();
 
+
     const handleMenuOpen = (asset: T, event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
         setMenuAnchorEl(event.currentTarget);
@@ -54,6 +55,11 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         if (!selectedAsset) return;
 
         switch (action) {
+            case 'rename':
+                setEditingAssetId(selectedAsset.InventoryID);
+                setEditedName(selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
+                setIsRenameDialogOpen(true);
+                break;
             case 'share':
                 console.log('Share:', selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
@@ -105,15 +111,18 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     };
 
     const handleRenameConfirm = async (newName: string) => {
-        if (selectedAsset) {
+        if (editingAssetId) {
             try {
+
                 await renameAsset.mutateAsync({
-                    inventoryId: selectedAsset.InventoryID,
+                    inventoryId: editingAssetId,
                     newName
                 });
+                setEditedName(null)
                 setIsRenameDialogOpen(false);
                 setSelectedAsset(null);
-                setEditedName('');
+                setEditingAssetId(null)
+
             } catch (error) {
                 // Error handling is done in the mutation
             }
@@ -128,6 +137,8 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const handleRenameCancel = () => {
         setIsRenameDialogOpen(false);
         setSelectedAsset(null);
+        setEditedName(null);
+        setEditingAssetId(null);
     };
 
     return {

@@ -1,105 +1,224 @@
-import React, { useState } from 'react';
-import { Box, Typography, Button, Grid } from '@mui/material';
-import { useParams } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
+import { useAsset } from '../api/hooks/useAssets';
+import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
+import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
+import AssetSidebar from '../components/asset/AssetSidebar';
+import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
+import AssetHeader from '../components/asset/AssetHeader';
+import AssetVideo from '../components/asset/AssetVideo';
+import AssetMetadataTabs from '../components/asset/AssetMetadataTabs';
 
-// Add interface for video object
-interface Video {
-    src: string;
-    id: number;
-    container: string;
-    codec: string;
-    resolution: string;
-    bitrate: string;
-    duration: string;
-}
-
-const VideoDetailPage: React.FC = () => {
+const VideoDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const [isAssetChatOpen, setIsAssetChatOpen] = useState<boolean>(false);
+    const { data: assetData, isLoading, error } = useAsset(id || '');
+    const navigate = useNavigate();
+    const { isExpanded } = useRightSidebar();
 
-    // Update the videos array with type annotation
-    const videos: Video[] = [
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', id: 1, container: 'MP4', codec: 'H.264', resolution: '1080p', bitrate: '5000 kbps', duration: '00:09:56' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', id: 2, container: 'MP4', codec: 'H.264', resolution: '720p', bitrate: '2500 kbps', duration: '00:10:53' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', id: 3, container: 'MP4', codec: 'H.264', resolution: '1080p', bitrate: '5000 kbps', duration: '00:14:48' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', id: 4, container: 'MP4', codec: 'H.264', resolution: '720p', bitrate: '2500 kbps', duration: '00:12:14' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', id: 5, container: 'MP4', codec: 'H.264', resolution: '1080p', bitrate: '5000 kbps', duration: '00:15:01' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', id: 6, container: 'MP4', codec: 'H.264', resolution: '720p', bitrate: '2500 kbps', duration: '00:15:22' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', id: 7, container: 'MP4', codec: 'H.264', resolution: '1080p', bitrate: '5000 kbps', duration: '00:05:04' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', id: 8, container: 'MP4', codec: 'H.264', resolution: '720p', bitrate: '2500 kbps', duration: '00:15:32' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', id: 9, container: 'MP4', codec: 'H.264', resolution: '1080p', bitrate: '5000 kbps', duration: '00:15:06' },
-        { src: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', id: 10, container: 'MP4', codec: 'H.264', resolution: '720p', bitrate: '2500 kbps', duration: '00:08:43' },
-    ];
+    const [comments, setComments] = useState([
+        { user: "John Doe", avatar: "https://mui.com/static/videos/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
+        { user: "Jane Smith", avatar: "https://mui.com/static/videos/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
+        { user: "Mike Johnson", avatar: "https://mui.com/static/videos/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
+    ]);
 
-    const video = videos.find((v) => v.id === parseInt(id ?? '', 10));
+    const handleAddComment = (comment: string) => {
+        const now = new Date();
+        const formattedTimestamp = now.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
 
-    const handleAssetChatToggle = () => {
-        setIsAssetChatOpen(!isAssetChatOpen);
+        const newComment = {
+            user: "Current User",
+            avatar: "https://mui.com/static/videos/avatar/1.jpg",
+            content: comment,
+            timestamp: formattedTimestamp
+        };
+        setComments([...comments, newComment]);
     };
 
-    if (!video) {
-        return <Typography>Video not found</Typography>;
+    const versions = useMemo(() => {
+        if (!assetData?.data?.asset) return [];
+        return [
+            {
+                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+                src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: 'Original',
+                description: 'Original high resolution version',
+            },
+            ...assetData.data.asset.DerivedRepresentations.map(rep => ({
+                id: rep.ID,
+                src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1),
+                description: `${rep.Purpose} version`,
+            }))
+        ];
+    }, [assetData]);
+
+    const metadataFields = useMemo(() => {
+        if (!assetData?.data?.asset) return {
+            summary: [],
+            descriptive: [],
+            technical: []
+        };
+
+        return {
+            summary: [
+                { label: 'Title', value: 'Winter Expedition Base Camp' },
+                { label: 'Type', value: 'Video' },
+                { label: 'Duration', value: '00:15' }
+            ],
+            descriptive: [
+                { label: 'Description', value: 'Base camp footage from winter expedition' },
+                { label: 'Keywords', value: 'winter, expedition, base camp' },
+                { label: 'Location', value: 'Mount Everest' }
+            ],
+            technical: [
+                { label: 'Format', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format },
+                { label: 'File Size', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size },
+                { label: 'Created Date', value: '2024-01-07' }
+            ]
+        };
+    }, [assetData]);
+
+    const activityLog = [
+        { user: "John Doe", action: "Uploaded video", timestamp: "2024-01-07 09:30:22" },
+        { user: "AI Pipeline", action: "Generated metadata", timestamp: "2024-01-07 09:31:05" },
+        { user: "Jane Smith", action: "Added tags", timestamp: "2024-01-07 10:15:43" }
+    ];
+
+    // Track this asset in recently viewed
+    useTrackRecentlyViewed(
+        assetData ? {
+            id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+            title: 'Winter Expedition Base Camp',
+            type: 'video',
+            path: `/assets/${id}`,
+            metadata: {
+                duration: '00:15',
+                fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
+                dimensions: '1920x1080',
+                creator: 'John Doe'
+            }
+        } : null
+    );
+
+    if (isLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress />
+            </Box>
+        );
     }
 
-    return (
-        <Box sx={{ flexGrow: 1, p: 3 }}>
-            <Grid container spacing={2}>
-                <Grid item xs={12} md={8}>
-                    <Box sx={{ position: 'relative', paddingTop: '56.25%' }}>
-                        <video
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                            src={video.src}
-                            controls
-                        />
-                    </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Typography variant="h6" gutterBottom>
-                        Actions
-                    </Typography>
-                    <Button variant="contained" color="primary" fullWidth sx={{ mb: 2 }}>
-                        Send to MAM
-                    </Button>
-                    <Button variant="contained" color="primary" fullWidth sx={{ mb: 2 }}>
-                        Create Clip
-                    </Button>
-                    <Button variant="contained" color="primary" fullWidth sx={{ mb: 2 }}>
-                        Download
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        onClick={handleAssetChatToggle}
-                    >
-                        {isAssetChatOpen ? 'Close Asset Chat' : 'Open Asset Chat'}
-                    </Button>
-                </Grid>
-            </Grid>
-            <Box sx={{ mt: 4 }}>
-                <Typography variant="h6" gutterBottom>
-                    Technical Details
-                </Typography>
-                <Typography>Container: {video.container}</Typography>
-                <Typography>Codec: {video.codec}</Typography>
-                <Typography>Resolution: {video.resolution}</Typography>
-                <Typography>Bitrate: {video.bitrate}</Typography>
-                <Typography>Duration: {video.duration}</Typography>
+    if (error || !assetData) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <BreadcrumbNavigation
+                    searchTerm="winter expedition"
+                    currentResult={48}
+                    totalResults={156}
+                    onBack={() => navigate(-1)}
+                    onPrevious={() => navigate(-1)}
+                    onNext={() => navigate(1)}
+                />
             </Box>
-            {isAssetChatOpen && (
-                <Box
-                    sx={{
-                        position: 'fixed',
-                        right: 20,
-                        bottom: 20,
-                        width: 300,
-                        height: 400,
-                        zIndex: 9999,
-                    }}
-                >
+        );
+    }
+
+    const proxyUrl = (() => {
+        const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
+        return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
+    })();
+
+    return (
+        <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
+            transition: theme => theme.transitions.create(['max-width'], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+        }}>
+            {/* Fixed header section */}
+            <Box sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 1200,
+                bgcolor: 'background.default'
+            }}>
+                <BreadcrumbNavigation
+                    searchTerm="winter expedition"
+                    currentResult={48}
+                    totalResults={156}
+                    onBack={() => navigate(-1)}
+                    onPrevious={() => navigate(-1)}
+                    onNext={() => navigate(1)}
+                />
+                <Box sx={{ px: 3, pt: 2 }}>
+                    <AssetHeader />
                 </Box>
-            )}
+            </Box>
+
+            {/* Scrollable content */}
+            <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                overflow: 'auto',
+                gap: 3,
+                px: 3,
+                pb: 3
+            }}>
+                {/* Fixed video section */}
+                <Box sx={{
+                    position: 'sticky',
+                    top: 120,
+                    zIndex: 1100,
+                    bgcolor: 'background.default',
+                    pt: 2
+                }}>
+                    <AssetVideo
+                        src={proxyUrl}
+                        alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
+                    />
+                </Box>
+
+                {/* Scrollable metadata section */}
+                <Box sx={{ flex: 1 }}>
+                    <AssetMetadataTabs
+                        summary={metadataFields.summary}
+                        descriptive={metadataFields.descriptive}
+                        technical={metadataFields.technical}
+                        activityLog={activityLog}
+                    />
+                </Box>
+            </Box>
+
+            <AssetSidebar
+                versions={versions}
+                comments={comments}
+                onAddComment={handleAddComment}
+            />
         </Box>
+    );
+};
+
+const VideoDetailPage: React.FC = () => {
+    return (
+        <RecentlyViewedProvider>
+            <RightSidebarProvider>
+                <VideoDetailContent />
+            </RightSidebarProvider>
+        </RecentlyViewedProvider>
     );
 };
 
