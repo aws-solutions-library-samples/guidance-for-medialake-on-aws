@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, ListItemText, ListItemIcon, Checkbox, ListItemButton, Divider, Collapse } from '@mui/material';
+import { List, ListItemText, ListItemIcon, Radio, Checkbox, ListItemButton, Divider, Collapse } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
@@ -89,19 +89,35 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                             }}
                         >
                             <ListItemIcon sx={{ minWidth: 32 }}>
-                                <Checkbox
-                                    edge="start"
-                                    checked={value}
-                                    tabIndex={-1}
-                                    disableRipple
-                                    size="small"
-                                    sx={{
-                                        color: 'primary.main',
-                                        '&.Mui-checked': {
-                                            color: 'primary.main'
-                                        }
-                                    }}
-                                />
+                                {section === 'time' ? (
+                                    <Radio
+                                        edge="start"
+                                        checked={value}
+                                        tabIndex={-1}
+                                        disableRipple
+                                        size="small"
+                                        sx={{
+                                            color: 'primary.main',
+                                            '&.Mui-checked': {
+                                                color: 'primary.main'
+                                            }
+                                        }}
+                                    />
+                                ) : (
+                                    <Checkbox
+                                        edge="start"
+                                        checked={value}
+                                        tabIndex={-1}
+                                        disableRipple
+                                        size="small"
+                                        sx={{
+                                            color: 'primary.main',
+                                            '&.Mui-checked': {
+                                                color: 'primary.main'
+                                            }
+                                        }}
+                                    />
+                                )}
                             </ListItemIcon>
                             <ListItemText
                                 primary={filterLabels[key as keyof typeof filterLabels]}
@@ -121,10 +137,11 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
         </>
     );
 
+
     return (
         <List component="nav" sx={{ width: '100%' }}>
             {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
-            {/* {renderFilterSection('Time Period', 'time', filters.time)} */}
+            {renderFilterSection('Time Period', 'time', filters.time)}
             {/* {renderFilterSection('Status', 'status', filters.status)} */}
         </List>
     );

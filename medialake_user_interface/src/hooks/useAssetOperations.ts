@@ -121,7 +121,8 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                 setEditedName(null)
                 setIsRenameDialogOpen(false);
                 setSelectedAsset(null);
-                setEditedName('');
+                setEditingAssetId(null)
+
             } catch (error) {
                 // Error handling is done in the mutation
             }
@@ -136,6 +137,8 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const handleRenameCancel = () => {
         setIsRenameDialogOpen(false);
         setSelectedAsset(null);
+        setEditedName(null);
+        setEditingAssetId(null);
     };
 
     return {

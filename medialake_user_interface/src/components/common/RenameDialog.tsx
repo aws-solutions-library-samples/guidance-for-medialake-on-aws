@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -30,6 +30,12 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
     isLoading = false,
 }) => {
     const [newName, setNewName] = useState(currentName);
+    console.log("currentName", currentName)
+    useEffect(() => {
+        if (open) {
+            setNewName(currentName);
+        }
+    }, [currentName, open]);
 
     const handleConfirm = () => {
 
@@ -76,7 +82,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
                     /> */}
                     <TextField
                         label="New Name"
-                        value={currentName}
+                        value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         fullWidth
                         autoFocus

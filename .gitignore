@@ -119,3 +119,6 @@ aws-exports.json
 config.json
 config.json.bkp
 *.jinja2-tmp
+
+dev-2.sh
+dev-3.sh

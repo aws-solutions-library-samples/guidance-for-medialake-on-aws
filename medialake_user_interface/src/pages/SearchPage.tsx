@@ -13,6 +13,20 @@ interface LocationState {
     query?: string;
 }
 
+interface Filters {
+    mediaTypes: {
+        videos: boolean;
+        images: boolean;
+        audio: boolean;
+    };
+    time: {
+        recent: boolean;
+        lastWeek: boolean;
+        lastMonth: boolean;
+        lastYear: boolean;
+    };
+}
+
 const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
@@ -29,13 +43,9 @@ const SearchPage: React.FC = () => {
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: PAGE_SIZE,
-        // time: searchParams.get('time') || ''
     });
 
-
-
-
-    const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<Filters>({
         mediaTypes: {
             videos: true,
             images: true,
@@ -58,7 +68,19 @@ const SearchPage: React.FC = () => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
-        return isImage || isVideo || isAudio;
+
+        // Time-based filtering
+        const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
+        const now = new Date();
+        const isRecent = filters.time.recent && (now.getTime() - createdAt.getTime() <= 24 * 60 * 60 * 1000);
+        const isLastWeek = filters.time.lastWeek && (now.getTime() - createdAt.getTime() <= 7 * 24 * 60 * 60 * 1000);
+        const isLastMonth = filters.time.lastMonth && (now.getTime() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000);
+        const isLastYear = filters.time.lastYear && (now.getTime() - createdAt.getTime() <= 365 * 24 * 60 * 60 * 1000);
+
+        const passesTimeFilter = !filters.time.recent && !filters.time.lastWeek && !filters.time.lastMonth && !filters.time.lastYear ||
+            isRecent || isLastWeek || isLastMonth || isLastYear;
+
+        return (isImage || isVideo || isAudio) && passesTimeFilter;
     }) || [];
 
     const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
@@ -85,15 +107,21 @@ const SearchPage: React.FC = () => {
         }
     }, [query, searchParams, setSearchParams]);
 
-    const handleFilterChange = (section: string, filter: string) => {
-        setFilters(prev => ({
-            ...prev,
-            [section]: {
-                ...prev[section as keyof typeof prev],
-                [filter]: !prev[section as keyof typeof prev][filter as keyof typeof prev[keyof typeof prev]]
+    const handleFilterChange = (section: keyof Filters, filter: string) => {
+        setFilters(prev => {
+            const newFilters = { ...prev };
+            if (section === 'time') {
+                // Reset all time filters
+                Object.keys(newFilters.time).forEach(key => {
+                    newFilters.time[key as keyof typeof newFilters.time] = false;
+                });
             }
-        }));
+            (newFilters[section] as any)[filter] = !(prev[section] as any)[filter];
+            return newFilters;
+        });
     };
+
+
 
     const handleSectionToggle = (section: string) => {
         setExpandedSections(prev => ({
