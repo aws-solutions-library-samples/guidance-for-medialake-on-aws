@@ -4,6 +4,8 @@ import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
 import ImageResults from '../components/search/ImageResults';
+import VideoResults from '../components/search/VideoResults';
+import AudioResults from '../components/search/AudioResults';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useSearch } from '../api/hooks/useSearch';
 
@@ -30,6 +32,8 @@ const SearchPage: React.FC = () => {
     });
 
     const imageResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Image') || [];
+    const videoResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Video') || [];
+    const audioResults = searchResults?.data?.results?.filter(item => item.DigitalSourceAsset.Type === 'Audio') || [];
 
     const [filters, setFilters] = useState({
         mediaTypes: {
@@ -185,6 +189,31 @@ const SearchPage: React.FC = () => {
                                 pageSize: PAGE_SIZE,
                             }}
                             onPageChange={(newPage) => handleSearch({ page: newPage })}
+                            searchTerm={currentQuery}
+                        />
+                    )}
+                    {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <VideoResults
+                            videos={videoResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                            searchTerm={currentQuery}
+                        />
+                    )}
+                    {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        <AudioResults
+                            audios={audioResults}
+                            searchMetadata={{
+                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                page: currentPage,
+                                pageSize: PAGE_SIZE,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                            searchTerm={currentQuery}
                         />
                     )}
                 </Box>

@@ -3,15 +3,17 @@ import { Box, Typography, List, ListItem, ListItemIcon, ListItemText, Chip } fro
 import HistoryIcon from '@mui/icons-material/History';
 import { formatFileSize } from '../../utils/imageUtils';
 
-interface Version {
+interface Representation {
     id: string;
     src: string;
     type: string;
+    format: string;
+    fileSize: string;
     description: string;
 }
 
 interface AssetVersionsProps {
-    versions: Version[];
+    versions: Representation[];
 }
 
 const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
@@ -31,21 +33,21 @@ const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
                             p: 2
                         }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1 }}>
-                            <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                            <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
                                 <HistoryIcon />
                             </ListItemIcon>
-                            <ListItemText
-                                primary={version.type}
-                                secondary={version.description}
-                            />
-                        </Box>
-                        <Box sx={{ pl: 5, width: '100%' }}>
-                            <Chip
-                                label={`v${versions.length - index}.0`}
-                                size="small"
-                                sx={{ mr: 1 }}
-                            />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="subtitle1" sx={{ textTransform: 'capitalize' }}>
+                                    {version.type}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {version.format} • {version.fileSize}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {version.description}
+                                </Typography>
+                            </Box>
                         </Box>
                     </ListItem>
                 ))}

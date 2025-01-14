@@ -14,6 +14,7 @@ interface AudioResultsProps {
         pageSize: number;
     };
     onPageChange: (page: number) => void;
+    searchTerm: string;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -113,7 +114,7 @@ const renderCardField = (fieldId: string, audio: AudioItem): string => {
     }
 };
 
-const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onPageChange }) => {
+const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onPageChange, searchTerm }) => {
     return (
         <AssetResults
             assets={audios}
@@ -127,6 +128,7 @@ const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onP
                 renderCardField,
                 placeholderImage: 'https://via.placeholder.com/400x400',
             }}
+            searchTerm={searchTerm}
         />
     );
 };

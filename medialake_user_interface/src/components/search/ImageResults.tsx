@@ -13,6 +13,7 @@ interface ImageResultsProps {
         pageSize: number;
     };
     onPageChange: (page: number) => void;
+    searchTerm: string;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -77,7 +78,7 @@ const renderCardField = (fieldId: string, image: ImageItem): string => {
     }
 };
 
-const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange }) => {
+const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange, searchTerm }) => {
     return (
         <AssetResults
             assets={images}
@@ -91,6 +92,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                 renderCardField,
                 placeholderImage: 'https://via.placeholder.com/400x300',
             }}
+            searchTerm={searchTerm}
         />
     );
 };

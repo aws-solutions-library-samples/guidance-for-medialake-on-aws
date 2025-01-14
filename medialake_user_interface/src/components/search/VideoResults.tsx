@@ -14,6 +14,7 @@ interface VideoResultsProps {
         pageSize: number;
     };
     onPageChange: (page: number) => void;
+    searchTerm: string;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -104,7 +105,7 @@ const renderCardField = (fieldId: string, video: VideoItem): string => {
     }
 };
 
-const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onPageChange }) => {
+const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onPageChange, searchTerm }) => {
     return (
         <AssetResults
             assets={videos}
@@ -118,6 +119,7 @@ const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onP
                 renderCardField,
                 placeholderImage: 'https://via.placeholder.com/400x225',
             }}
+            searchTerm={searchTerm}
         />
     );
 };

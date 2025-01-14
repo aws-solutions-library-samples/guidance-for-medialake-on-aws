@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
@@ -14,51 +14,58 @@ const ImageDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const searchTerm = searchParams.get('searchTerm') || '';
     const { isExpanded } = useRightSidebar();
 
-    const [comments, setComments] = useState([
-        { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
-        { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
-        { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
-    ]);
-
-    const handleAddComment = (comment: string) => {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
-
-        const newComment = {
-            user: "Current User",
-            avatar: "https://mui.com/static/images/avatar/1.jpg",
-            content: comment,
-            timestamp: formattedTimestamp
-        };
-        setComments([...comments, newComment]);
+    const formatFileSize = (size: number) => {
+        if (size < 1024) return `${size} B`;
+        if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
     };
 
-    const versions = useMemo(() => {
+    const representations = useMemo(() => {
         if (!assetData?.data?.asset) return [];
-        return [
+
+        const formatFileSize = (size: number) => {
+            if (size < 1024) return `${size} B`;
+            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+            return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+        };
+
+        const mainRep = assetData.data.asset.DigitalSourceAsset.MainRepresentation;
+        const mainSize = mainRep.StorageInfo.PrimaryLocation.FileInfo.Size;
+
+        const allRepresentations = [
             {
-                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-                src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
-                type: 'Original',
-                description: 'Original high resolution version',
+                id: mainRep.ID,
+                src: mainRep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: mainRep.Purpose,
+                format: mainRep.Format,
+                fileSize: formatFileSize(mainSize),
+                description: `${mainRep.Format} file - ${formatFileSize(mainSize)}`,
             },
-            ...assetData.data.asset.DerivedRepresentations.map(rep => ({
-                id: rep.ID,
-                src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
-                type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1),
-                description: `${rep.Purpose} version`,
-            }))
+            ...assetData.data.asset.DerivedRepresentations.map(rep => {
+                const size = rep.StorageInfo.PrimaryLocation.FileInfo.Size;
+                let description = `${rep.Format} file - ${formatFileSize(size)}`;
+
+                if (rep.ImageSpec?.Resolution) {
+                    description += ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}`;
+                }
+
+                return {
+                    id: rep.ID,
+                    src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                    type: rep.Purpose,
+                    format: rep.Format,
+                    fileSize: formatFileSize(size),
+                    description,
+                };
+            })
         ];
+
+        return allRepresentations;
     }, [assetData]);
 
     const metadataFields = useMemo(() => {
@@ -68,43 +75,118 @@ const ImageDetailContent: React.FC = () => {
             technical: []
         };
 
+        const { asset } = assetData.data;
+        const mainRep = asset.DigitalSourceAsset.MainRepresentation;
+        const customMetadata = asset.Metadata.CustomMetadata as any;
+
+        const formatFileSize = (size: number) => {
+            if (size < 1024) return `${size} B`;
+            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+            return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+        };
+
+        // Get image dimensions from either ihdr or ifd0
+        const dimensions = (() => {
+            if (customMetadata?.ihdr) {
+                return {
+                    width: customMetadata.ihdr['Image Width'],
+                    height: customMetadata.ihdr['Image Height']
+                };
+            } else if (customMetadata?.ifd0) {
+                return {
+                    width: customMetadata.ifd0['Image Width'],
+                    height: customMetadata.ifd0['Image Height']
+                };
+            }
+            return null;
+        })();
+
+        const summary = [
+            { label: 'Type', value: asset.DigitalSourceAsset.Type },
+            { label: 'Format', value: mainRep.Format },
+            { label: 'File Size', value: formatFileSize(mainRep.StorageInfo.PrimaryLocation.FileInfo.Size) }
+        ];
+
+        if (dimensions) {
+            summary.push({ label: 'Dimensions', value: `${dimensions.width} × ${dimensions.height}` });
+        }
+
+        const technical = [
+            { label: 'Content Type', value: (asset.Metadata as any).Embedded?.S3.ContentType },
+            { label: 'Last Modified', value: new Date((asset.Metadata as any).Embedded?.S3.LastModified).toLocaleString() }
+        ];
+
+        // Add IHDR metadata if available
+        if (customMetadata?.ihdr) {
+            technical.push(
+                { label: 'Color Type', value: customMetadata.ihdr['Color Type'] },
+                { label: 'Bit Depth', value: customMetadata.ihdr['Bit Depth'] },
+                { label: 'Compression', value: customMetadata.ihdr['Compression'] },
+                { label: 'Filter', value: customMetadata.ihdr['Filter'] },
+                { label: 'Interlace', value: customMetadata.ihdr['Interlace'] }
+            );
+        }
+
+        // Add IFD0 metadata if available
+        if (customMetadata?.ifd0) {
+            technical.push(
+                { label: 'Compression', value: customMetadata.ifd0['Compression'] },
+                { label: 'Orientation', value: customMetadata.ifd0['Orientation'] },
+                { label: 'Samples Per Pixel', value: customMetadata.ifd0['Samples Per Pixel'] },
+                {
+                    label: 'Bits Per Sample', value: Array.isArray(customMetadata.ifd0['Bits Per Sample'])
+                        ? customMetadata.ifd0['Bits Per Sample'].join(', ')
+                        : typeof customMetadata.ifd0['Bits Per Sample'] === 'object'
+                            ? Object.values(customMetadata.ifd0['Bits Per Sample']).join(', ')
+                            : customMetadata.ifd0['Bits Per Sample']
+                }
+            );
+        }
+
+        // Add storage information
+        technical.push(
+            { label: 'Storage Type', value: mainRep.StorageInfo.PrimaryLocation.StorageType },
+            { label: 'Storage Status', value: mainRep.StorageInfo.PrimaryLocation.Status },
+            { label: 'Storage Bucket', value: mainRep.StorageInfo.PrimaryLocation.Bucket },
+            { label: 'Hash Algorithm', value: mainRep.StorageInfo.PrimaryLocation.FileInfo.Hash?.Algorithm || 'N/A' },
+            { label: 'Hash Value', value: mainRep.StorageInfo.PrimaryLocation.FileInfo.Hash?.Value || 'N/A' }
+        );
+
         return {
-            summary: [
-                { label: 'Title', value: 'Winter Expedition Base Camp' },
-                { label: 'Type', value: 'Video' },
-                { label: 'Duration', value: '00:15' }
-            ],
+            summary,
             descriptive: [
-                { label: 'Description', value: 'Base camp footage from winter expedition' },
-                { label: 'Keywords', value: 'winter, expedition, base camp' },
-                { label: 'Location', value: 'Mount Everest' }
+                { label: 'Created Date', value: new Date(asset.DigitalSourceAsset.CreateDate).toLocaleString() },
+                { label: 'File Path', value: mainRep.StorageInfo.PrimaryLocation.ObjectKey.FullPath }
             ],
-            technical: [
-                { label: 'Format', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format },
-                { label: 'File Size', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size },
-                { label: 'Created Date', value: '2024-01-07' }
-            ]
+            technical
         };
     }, [assetData]);
 
-    const activityLog = [
-        { user: "John Doe", action: "Uploaded image", timestamp: "2024-01-07 09:30:22" },
-        { user: "AI Pipeline", action: "Generated metadata", timestamp: "2024-01-07 09:31:05" },
-        { user: "Jane Smith", action: "Added tags", timestamp: "2024-01-07 10:15:43" }
-    ];
+    const activityLog = useMemo(() => {
+        if (!assetData?.data?.asset) return [];
+
+        const { asset } = assetData.data;
+        return [
+            {
+                user: "System",
+                action: "Asset Created",
+                timestamp: new Date(asset.DigitalSourceAsset.CreateDate).toLocaleString()
+            }
+        ];
+    }, [assetData]);
 
     // Track this asset in recently viewed
     useTrackRecentlyViewed(
         assetData ? {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-            title: 'Winter Expedition Base Camp',
-            type: 'video',
+            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+            type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
             path: `/assets/${id}`,
             metadata: {
-                duration: '00:15',
-                fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
-                dimensions: '1920x1080',
-                creator: 'John Doe'
+                fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
+                dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
+                    ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
+                    : undefined
             }
         } : null
     );
@@ -120,14 +202,7 @@ const ImageDetailContent: React.FC = () => {
     if (error || !assetData) {
         return (
             <Box sx={{ p: 3 }}>
-                <BreadcrumbNavigation
-                    searchTerm="winter expedition"
-                    currentResult={48}
-                    totalResults={156}
-                    onBack={() => navigate(-1)}
-                    onPrevious={() => navigate(-1)}
-                    onNext={() => navigate(1)}
-                />
+                <div>Error loading asset data</div>
             </Box>
         );
     }
@@ -148,24 +223,17 @@ const ImageDetailContent: React.FC = () => {
                 duration: theme.transitions.duration.enteringScreen,
             }),
         }}>
-            {/* Fixed header section */}
-            <Box sx={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 1200,
-                bgcolor: 'background.default'
-            }}>
-                <BreadcrumbNavigation
-                    searchTerm="winter expedition"
-                    currentResult={48}
-                    totalResults={156}
-                    onBack={() => navigate(-1)}
-                    onPrevious={() => navigate(-1)}
-                    onNext={() => navigate(1)}
-                />
-                <Box sx={{ px: 3, pt: 2 }}>
-                    <AssetHeader />
-                </Box>
+            {/* Header section */}
+            <BreadcrumbNavigation
+                searchTerm={searchTerm}
+                currentResult={48}
+                totalResults={156}
+                onBack={() => navigate(-1)}
+                onPrevious={() => navigate(-1)}
+                onNext={() => navigate(1)}
+            />
+            <Box sx={{ px: 3, pt: 2, bgcolor: 'background.default' }}>
+                <AssetHeader />
             </Box>
 
             {/* Scrollable content */}
@@ -203,11 +271,7 @@ const ImageDetailContent: React.FC = () => {
                 </Box>
             </Box>
 
-            <AssetSidebar
-                versions={versions}
-                comments={comments}
-                onAddComment={handleAddComment}
-            />
+            <AssetSidebar versions={representations} />
         </Box>
     );
 };

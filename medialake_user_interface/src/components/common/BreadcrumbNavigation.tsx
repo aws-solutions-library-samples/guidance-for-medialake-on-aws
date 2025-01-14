@@ -95,21 +95,6 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                     Search: "{searchTerm}"
                 </Typography>
 
-                <Typography
-                    sx={{
-                        fontSize: '0.875rem',
-                        color: 'text.secondary',
-                        display: 'flex',
-                        alignItems: 'center',
-                        '&::before': {
-                            content: '"/"',
-                            mx: 1,
-                            color: 'grey.400'
-                        }
-                    }}
-                >
-                    Result {currentResult} of {totalResults}
-                </Typography>
             </Box>
 
             {/* Right Section */}

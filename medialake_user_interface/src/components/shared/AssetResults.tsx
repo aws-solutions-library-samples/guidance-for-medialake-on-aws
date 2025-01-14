@@ -31,6 +31,7 @@ interface AssetResultsProps<T extends AssetBase> {
     };
     onPageChange: (page: number) => void;
     config: AssetResultsConfig<T>;
+    searchTerm: string;
 }
 
 function AssetResults<T extends AssetBase>({
@@ -38,6 +39,7 @@ function AssetResults<T extends AssetBase>({
     searchMetadata,
     onPageChange,
     config,
+    searchTerm,
 }: AssetResultsProps<T>) {
     const navigate = useNavigate();
     const {
@@ -116,7 +118,7 @@ function AssetResults<T extends AssetBase>({
                                 thumbnailUrl={asset.thumbnailUrl}
                                 fields={cardFields}
                                 renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                onImageClick={() => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}`)}
+                                onImageClick={() => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`)}
                                 onDeleteClick={(e) => handleDeleteClick(asset, e)}
                                 onMenuClick={(e) => handleMenuOpen(asset, e)}
                                 onImageError={handleAssetError}

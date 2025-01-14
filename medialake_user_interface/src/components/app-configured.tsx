@@ -195,6 +195,7 @@ const AuthPage = () => {
                                         color: 'white',
                                         height: '40px',
                                         width: '100%',
+                                        textTransform: 'none',
                                         '&:hover': {
                                             backgroundColor: 'rgba(255, 255, 255, 0.3)',
                                         }

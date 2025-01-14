@@ -7,12 +7,12 @@ import {
     Snackbar,
     CircularProgress,
     useTheme,
-    alpha,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
 import UserList from '@/features/settings/usermanagement/components/UserList';
 import UserForm from '@/features/settings/usermanagement/components/UserForm';
+import ApiStatusModal from '@/components/ApiStatusModal';
 import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useDisableUser, useEnableUser } from '@/api/hooks/useUsers';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/api/types/api.types';
 
@@ -26,6 +26,16 @@ const UserManagement: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
     const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
+    const [apiStatus, setApiStatus] = useState<{
+        show: boolean;
+        status: 'loading' | 'success' | 'error';
+        action: string;
+        message?: string;
+    }>({
+        show: false,
+        status: 'loading',
+        action: '',
+    });
 
     // API Hooks
     const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
@@ -46,6 +56,16 @@ const UserManagement: React.FC = () => {
     };
 
     const handleSaveUser = async (userData: CreateUserRequest) => {
+        const isNewUser = !editingUser;
+        const action = isNewUser ? 'Creating user...' : 'Updating user...';
+
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action,
+        });
+        setOpenUserForm(false);
+
         try {
             if (editingUser) {
                 const updateData: UpdateUserRequest = {
@@ -61,46 +81,101 @@ const UserManagement: React.FC = () => {
                     username: editingUser.username,
                     updates: updateData
                 });
-                setOpenUserForm(false);
-                setError(null);
+
+                setApiStatus({
+                    show: true,
+                    status: 'success',
+                    action: 'User Updated',
+                    message: 'User has been successfully updated',
+                });
+
                 return result;
             } else {
                 const result = await createUserMutation.mutateAsync(userData);
-                if (result.status === 201) {
-                    setOpenUserForm(false);
-                    setError(null);
-                }
+
+                setApiStatus({
+                    show: true,
+                    status: 'success',
+                    action: 'User Created',
+                    message: 'New user has been successfully created',
+                });
+
                 return result;
             }
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while saving the user');
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred while saving the user';
+            setApiStatus({
+                show: true,
+                status: 'error',
+                action: isNewUser ? 'User Creation Failed' : 'User Update Failed',
+                message: errorMessage,
+            });
             console.error('Error saving user:', error);
             throw error;
         }
     };
 
     const handleDeleteUser = async (username: string) => {
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action: 'Deleting user...',
+        });
+
         try {
             await deleteUserMutation.mutateAsync(username);
-            setError(null);
+            setApiStatus({
+                show: true,
+                status: 'success',
+                action: 'User Deleted',
+                message: 'User has been successfully deleted',
+            });
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while deleting the user');
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred while deleting the user';
+            setApiStatus({
+                show: true,
+                status: 'error',
+                action: 'User Deletion Failed',
+                message: errorMessage,
+            });
             console.error('Error deleting user:', error);
         }
     };
 
     const handleToggleUserStatus = async (username: string, newEnabled: boolean) => {
+        const action = newEnabled ? 'Enabling user...' : 'Disabling user...';
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action,
+        });
+
         try {
             if (newEnabled) {
                 await enableUserMutation.mutateAsync(username);
             } else {
                 await disableUserMutation.mutateAsync(username);
             }
-            setError(null);
+            setApiStatus({
+                show: true,
+                status: 'success',
+                action: newEnabled ? 'User Enabled' : 'User Disabled',
+                message: `User has been successfully ${newEnabled ? 'enabled' : 'disabled'}`,
+            });
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'An error occurred while updating user status');
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred while updating user status';
+            setApiStatus({
+                show: true,
+                status: 'error',
+                action: 'Status Update Failed',
+                message: errorMessage,
+            });
             console.error('Error toggling user status:', error);
         }
+    };
+
+    const handleCloseApiStatus = () => {
+        setApiStatus(prev => ({ ...prev, show: false }));
     };
 
     return (
@@ -150,9 +225,9 @@ const UserManagement: React.FC = () => {
 
             <Box sx={{
                 flex: 1,
-                minHeight: 0, // Important for proper flex behavior
+                minHeight: 0,
                 width: '100%',
-                overflow: 'hidden', // Let the table container handle scrolling
+                overflow: 'hidden',
                 position: 'relative',
                 maxWidth: '100%',
             }}>
@@ -208,19 +283,13 @@ const UserManagement: React.FC = () => {
                 availableRoles={availableRoles}
             />
 
-            <Snackbar
-                open={!!error}
-                autoHideDuration={6000}
-                onClose={() => setError(null)}
-            >
-                <Alert
-                    severity="error"
-                    onClose={() => setError(null)}
-                    sx={{ width: '100%' }}
-                >
-                    {error}
-                </Alert>
-            </Snackbar>
+            <ApiStatusModal
+                open={apiStatus.show}
+                status={apiStatus.status}
+                action={apiStatus.action}
+                message={apiStatus.message}
+                onClose={handleCloseApiStatus}
+            />
         </Box>
     );
 };
