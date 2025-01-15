@@ -15,9 +15,9 @@ const AssetVideo: React.FC<AssetVideoProps> = ({ src, alt }) => {
                 top: 120, // Below breadcrumb and header
                 zIndex: 900,
                 mb: 3,
-                height: 'calc(50vh - 120px)', // Take half viewport height minus top offset
-                minHeight: 300, // Minimum height
-                maxHeight: 600, // Maximum height
+                height: 'calc(80vh - 120px)', // Take 80% of viewport height minus top offset
+                minHeight: 400, // Increased minimum height
+                maxHeight: 'calc(100vh - 180px)', // Maximum height almost full viewport
             }}
         >
             <Paper
@@ -39,7 +39,6 @@ const AssetVideo: React.FC<AssetVideoProps> = ({ src, alt }) => {
                 <VideoViewer
                     videoSrc={src}
                     maxHeight="100%"
-                    filename={alt || 'asset_preview'}
                 />
             </Paper>
         </Box>
