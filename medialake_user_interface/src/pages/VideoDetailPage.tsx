@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
@@ -14,6 +14,9 @@ const VideoDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
     const { isExpanded } = useRightSidebar();
 
     const [comments, setComments] = useState([
@@ -104,6 +107,7 @@ const VideoDetailContent: React.FC = () => {
             title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video",
             path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
+            searchTerm: searchTerm,
             metadata: {
                 duration: '00:15',
                 fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
@@ -125,10 +129,10 @@ const VideoDetailContent: React.FC = () => {
         return (
             <Box sx={{ p: 3 }}>
                 <BreadcrumbNavigation
-                    searchTerm="winter expedition"
+                    searchTerm={searchTerm}
                     currentResult={48}
                     totalResults={156}
-                    onBack={() => navigate(-1)}
+                    onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
                     onPrevious={() => navigate(-1)}
                     onNext={() => navigate(1)}
                 />
@@ -160,10 +164,10 @@ const VideoDetailContent: React.FC = () => {
                 bgcolor: 'background.default'
             }}>
                 <BreadcrumbNavigation
-                    searchTerm="winter expedition"
+                    searchTerm={searchTerm}
                     currentResult={48}
                     totalResults={156}
-                    onBack={() => navigate(-1)}
+                    onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
                     onPrevious={() => navigate(-1)}
                     onNext={() => navigate(1)}
                     assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}

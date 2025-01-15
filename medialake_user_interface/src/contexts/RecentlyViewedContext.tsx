@@ -6,6 +6,7 @@ export interface RecentlyViewedItem {
     type: 'video' | 'image';
     timestamp: Date;
     path: string;
+    searchTerm: string;
     metadata: {
         duration?: string;
         fileSize?: string;
@@ -22,7 +23,7 @@ interface RecentlyViewedContextType {
 }
 
 const STORAGE_KEY = 'medialake_recently_viewed';
-const STORAGE_VERSION = 2; // Increment when making breaking changes to storage format
+const STORAGE_VERSION = 3; // Increment when making breaking changes to storage format
 const MAX_ITEMS = 10;
 
 const RecentlyViewedContext = createContext<RecentlyViewedContextType | undefined>(undefined);

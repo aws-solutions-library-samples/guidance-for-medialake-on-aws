@@ -41,6 +41,11 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
         setAnchorEl(null);
     };
 
+    // Only show breadcrumb navigation on detail pages
+    if (!assetName || !assetId || !assetType) {
+        return null;
+    }
+
     return (
         <Box
             sx={{
@@ -60,7 +65,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
             {/* Left Section */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Link
-                    to="/search"
+                    to={`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`}
                     style={{
                         textDecoration: 'none',
                         display: 'flex',
@@ -101,27 +106,25 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                     Search: "{searchTerm}"
                 </Typography>
 
-                {assetName && assetId && assetType && (
-                    <Typography
-                        component={Link}
-                        to={`/${assetType.toLowerCase()}s/${assetId}?searchTerm=${encodeURIComponent(searchTerm)}`}
-                        sx={{
-                            fontSize: '0.875rem',
-                            color: 'primary.main',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            '&:hover': { textDecoration: 'underline' },
-                            '&::before': {
-                                content: '"/"',
-                                mx: 1,
-                                color: 'text.disabled'
-                            }
-                        }}
-                    >
-                        {assetName}
-                    </Typography>
-                )}
+                <Typography
+                    component={Link}
+                    to={`/${assetType.toLowerCase()}s/${assetId}?searchTerm=${encodeURIComponent(searchTerm)}`}
+                    sx={{
+                        fontSize: '0.875rem',
+                        color: 'primary.main',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        '&:hover': { textDecoration: 'underline' },
+                        '&::before': {
+                            content: '"/"',
+                            mx: 1,
+                            color: 'text.disabled'
+                        }
+                    }}
+                >
+                    {assetName}
+                </Typography>
             </Box>
 
             {/* Right Section */}
@@ -195,7 +198,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                                 key={item.id}
                                 onClick={() => {
                                     handleHistoryClose();
-                                    navigate(item.path);
+                                    navigate(`${item.path}${item.searchTerm ? `?searchTerm=${encodeURIComponent(item.searchTerm)}` : ''}`);
                                 }}
                                 sx={{
                                     py: 1,

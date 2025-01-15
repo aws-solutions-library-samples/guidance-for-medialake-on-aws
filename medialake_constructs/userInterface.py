@@ -273,6 +273,11 @@ class UIConstruct(Construct):
                         value="camera=(), microphone=(), geolocation=()",
                         override=True,
                     ),
+                    cloudfront.ResponseCustomHeader(
+                        header="Content-Security-Policy",
+                        value="default-src 'self'; media-src 'self' blob: data: https://*.amazonaws.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.amazonaws.com; connect-src 'self' https://*.amazonaws.com",
+                        override=True,
+                    ),
                 ]
             ),
             cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
