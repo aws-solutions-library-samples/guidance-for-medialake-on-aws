@@ -232,16 +232,16 @@ class UIConstruct(Construct):
                 content_security_policy={
                     "content_security_policy": (
                         "default-src 'self'; "
-                        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173; "
+                        f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "style-src 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
                         "font-src 'self' data:; "
-                        "connect-src 'self' http://localhost:5173 https://*.amazonaws.com https://*.amazoncognito.com; "
+                        "media-src 'self' blob: data: https://*.amazonaws.com; "
+                        f"connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "frame-ancestors 'none'; "
                         "base-uri 'self'; "
                         "form-action 'self'; "
-                        "object-src 'none'; "
-                        "upgrade-insecure-requests;"
+                        "object-src 'none'"
                     ),
                     "override": True,
                 },
@@ -271,11 +271,6 @@ class UIConstruct(Construct):
                     cloudfront.ResponseCustomHeader(
                         header="Permissions-Policy",
                         value="camera=(), microphone=(), geolocation=()",
-                        override=True,
-                    ),
-                    cloudfront.ResponseCustomHeader(
-                        header="Content-Security-Policy",
-                        value="default-src 'self'; media-src 'self' blob: data: https://*.amazonaws.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.amazonaws.com; connect-src 'self' https://*.amazonaws.com",
                         override=True,
                     ),
                 ]
