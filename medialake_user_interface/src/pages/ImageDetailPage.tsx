@@ -142,7 +142,7 @@ const ImageDetailContent: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const searchParams = new URLSearchParams(location.search);
-    const searchTerm = searchParams.get('searchTerm') || '';
+    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
     const { isExpanded } = useRightSidebar();
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
@@ -209,9 +209,10 @@ const ImageDetailContent: React.FC = () => {
     useTrackRecentlyViewed(
         assetData ? {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-            path: `/assets/${id}`,
+            path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
+            searchTerm: searchTerm,
             metadata: {
                 fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
                 dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
@@ -269,9 +270,12 @@ const ImageDetailContent: React.FC = () => {
                         searchTerm={searchTerm}
                         currentResult={48}
                         totalResults={156}
-                        onBack={() => navigate(-1)}
+                        onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
                         onPrevious={() => navigate(-1)}
                         onNext={() => navigate(1)}
+                        assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                        assetId={assetData.data.asset.InventoryID}
+                        assetType="Image"
                     />
                 </Box>
             </Box>

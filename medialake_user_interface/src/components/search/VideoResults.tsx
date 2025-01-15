@@ -105,11 +105,16 @@ const renderCardField = (fieldId: string, video: VideoItem): string => {
     }
 };
 
+const actions = [
+    { id: 'download', label: 'Download' },
+];
+
 const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onPageChange, searchTerm }) => {
     return (
         <AssetResults
             assets={videos}
             searchMetadata={searchMetadata}
+            actions={actions}
             onPageChange={onPageChange}
             config={{
                 assetType: 'Video',

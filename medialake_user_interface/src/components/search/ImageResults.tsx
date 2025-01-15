@@ -4,6 +4,7 @@ import { type AssetTableColumn } from '../../types/shared/assetComponents';
 import AssetResults from '../shared/AssetResults';
 import { formatFileSize } from '../../utils/fileSize';
 import { formatDate } from '../../utils/dateFormat';
+import { RecentlyViewedProvider } from '../../contexts/RecentlyViewedContext';
 
 interface ImageResultsProps {
     images: ImageItem[];
@@ -78,22 +79,29 @@ const renderCardField = (fieldId: string, image: ImageItem): string => {
     }
 };
 
+const actions = [
+    { id: 'download', label: 'Download' },
+];
+
 const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange, searchTerm }) => {
     return (
-        <AssetResults
-            assets={images}
-            searchMetadata={searchMetadata}
-            onPageChange={onPageChange}
-            config={{
-                assetType: 'Image',
-                defaultCardFields,
-                defaultColumns,
-                sortOptions,
-                renderCardField,
-                placeholderImage: 'https://placehold.co/300x200',
-            }}
-            searchTerm={searchTerm}
-        />
+        <RecentlyViewedProvider>
+            <AssetResults
+                assets={images}
+                searchMetadata={searchMetadata}
+                onPageChange={onPageChange}
+                config={{
+                    assetType: 'Image',
+                    defaultCardFields,
+                    defaultColumns,
+                    sortOptions,
+                    renderCardField,
+                    placeholderImage: 'https://placehold.co/300x200',
+                }}
+                searchTerm={searchTerm}
+                actions={actions}
+            />
+        </RecentlyViewedProvider>
     );
 };
 
