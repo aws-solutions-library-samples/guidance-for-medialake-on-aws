@@ -12,6 +12,9 @@ interface BreadcrumbNavigationProps {
     onBack: () => void;
     onPrevious: () => void;
     onNext: () => void;
+    assetName?: string;
+    assetId?: string;
+    assetType?: string;
 }
 
 const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
@@ -21,6 +24,9 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
     onBack,
     onPrevious,
     onNext,
+    assetName,
+    assetId,
+    assetType,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
@@ -95,6 +101,27 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                     Search: "{searchTerm}"
                 </Typography>
 
+                {assetName && assetId && assetType && (
+                    <Typography
+                        component={Link}
+                        to={`/${assetType.toLowerCase()}s/${assetId}?searchTerm=${encodeURIComponent(searchTerm)}`}
+                        sx={{
+                            fontSize: '0.875rem',
+                            color: 'primary.main',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            '&:hover': { textDecoration: 'underline' },
+                            '&::before': {
+                                content: '"/"',
+                                mx: 1,
+                                color: 'text.disabled'
+                            }
+                        }}
+                    >
+                        {assetName}
+                    </Typography>
+                )}
             </Box>
 
             {/* Right Section */}

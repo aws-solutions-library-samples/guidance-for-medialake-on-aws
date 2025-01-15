@@ -101,9 +101,9 @@ const VideoDetailContent: React.FC = () => {
     useTrackRecentlyViewed(
         assetData ? {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-            title: 'Winter Expedition Base Camp',
-            type: 'video',
-            path: `/assets/${id}`,
+            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video",
+            path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
             metadata: {
                 duration: '00:15',
                 fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
@@ -166,6 +166,9 @@ const VideoDetailContent: React.FC = () => {
                     onBack={() => navigate(-1)}
                     onPrevious={() => navigate(-1)}
                     onNext={() => navigate(1)}
+                    assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                    assetId={assetData.data.asset.InventoryID}
+                    assetType="Video"
                 />
                 <Box sx={{ px: 3, pt: 2 }}>
                     <AssetHeader />

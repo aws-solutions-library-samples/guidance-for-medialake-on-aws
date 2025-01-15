@@ -209,9 +209,9 @@ const ImageDetailContent: React.FC = () => {
     useTrackRecentlyViewed(
         assetData ? {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-            path: `/assets/${id}`,
+            path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
             metadata: {
                 fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
                 dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
@@ -272,6 +272,9 @@ const ImageDetailContent: React.FC = () => {
                         onBack={() => navigate(-1)}
                         onPrevious={() => navigate(-1)}
                         onNext={() => navigate(1)}
+                        assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                        assetId={assetData.data.asset.InventoryID}
+                        assetType="Image"
                     />
                 </Box>
             </Box>

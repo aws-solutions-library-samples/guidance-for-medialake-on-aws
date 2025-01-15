@@ -114,12 +114,17 @@ const renderCardField = (fieldId: string, audio: AudioItem): string => {
     }
 };
 
+const actions = [
+    { id: 'download', label: 'Download' },
+];
+
 const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onPageChange, searchTerm }) => {
     return (
         <AssetResults
             assets={audios}
             searchMetadata={searchMetadata}
             onPageChange={onPageChange}
+            actions={actions}
             config={{
                 assetType: 'Audio',
                 defaultCardFields,

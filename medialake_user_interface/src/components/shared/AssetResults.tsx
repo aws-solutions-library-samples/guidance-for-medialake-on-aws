@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
@@ -32,6 +32,10 @@ interface AssetResultsProps<T extends AssetBase> {
     onPageChange: (page: number) => void;
     config: AssetResultsConfig<T>;
     searchTerm: string;
+    actions?: Array<{
+        id: string;
+        label: string;
+    }>;
 }
 
 function AssetResults<T extends AssetBase>({
@@ -40,8 +44,11 @@ function AssetResults<T extends AssetBase>({
     onPageChange,
     config,
     searchTerm,
+    actions,
 }: AssetResultsProps<T>) {
     const navigate = useNavigate();
+    const [currentAsset, setCurrentAsset] = useState<T | null>(null);
+
     const {
         assetType,
         defaultCardFields,
@@ -95,6 +102,15 @@ function AssetResults<T extends AssetBase>({
         isLoading,
     } = useAssetOperations<T>();
 
+    const handleNavigationPageChange = (newPage: number) => {
+        handlePageChange({} as React.ChangeEvent<unknown>, newPage);
+    };
+
+    const handleAssetClick = (asset: T) => {
+        setCurrentAsset(asset);
+        navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`);
+    };
+
     return (
         <Box>
             <AssetViewControls
@@ -118,7 +134,7 @@ function AssetResults<T extends AssetBase>({
                                 thumbnailUrl={asset.thumbnailUrl}
                                 fields={cardFields}
                                 renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                onImageClick={() => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`)}
+                                onImageClick={() => handleAssetClick(asset)}
                                 onDeleteClick={(e) => handleDeleteClick(asset, e)}
                                 onMenuClick={(e) => handleMenuOpen(asset, e)}
                                 onEditClick={(e) => handleStartEditing(asset, e)}
@@ -140,7 +156,7 @@ function AssetResults<T extends AssetBase>({
                     onDeleteClick={handleDeleteClick}
                     onMenuClick={handleMenuOpen}
                     onEditClick={handleStartEditing}
-                    onRowClick={(asset) => navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`)}
+                    onRowClick={handleAssetClick}
                     getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
                     getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                     getId={(asset) => asset.InventoryID}
@@ -163,6 +179,7 @@ function AssetResults<T extends AssetBase>({
                 selectedAsset={selectedAsset}
                 onClose={handleMenuClose}
                 onAction={handleAction}
+                actions={actions}
             />
 
             <ConfirmationModal
