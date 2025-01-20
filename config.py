@@ -1,10 +1,44 @@
 import json
 from typing import List, Optional
-from aws_cdk import aws_logs as logs, aws_opensearchservice as opensearch
-from pydantic import BaseModel, validator
-from aws_cdk import aws_iam as iam
-from constructs import Construct
-from config_utils import validate_opensearch_instance_type
+from aws_cdk import aws_logs as logs
+from pydantic import (
+    BaseModel,
+    field_validator,
+    model_validator,
+    validator,
+    root_validator,
+)
+import warnings
+
+
+def validate_opensearch_instance_type(instance_type: str) -> str:
+    valid_prefixes = ["c5", "c6g", "m5", "m6g", "r5", "r6g", "r7g", "t3", "i3", "i3en"]
+    valid_suffixes = [
+        "medium",
+        "large",
+        "xlarge",
+        "2xlarge",
+        "4xlarge",
+        "8xlarge",
+        "12xlarge",
+        "16xlarge",
+        "24xlarge",
+    ]
+
+    parts = instance_type.split(".")
+    if len(parts) != 3 or parts[2] != "search":
+        raise ValueError(f"Invalid instance type format: {instance_type}")
+
+    prefix = parts[0]
+    size = parts[1]
+
+    if prefix not in valid_prefixes:
+        raise ValueError(f"Invalid instance family: {prefix}")
+
+    if size not in valid_suffixes:
+        raise ValueError(f"Invalid instance size: {size}")
+
+    return instance_type
 
 
 class LoggingConfig(BaseModel):
@@ -55,10 +89,36 @@ class OpenSearchClusterSettings(BaseModel):
     data_node_volume_type: str = "gp3"
     data_node_volume_iops: int = 3000
     availability_zone_count: int = 2
+    multi_az_with_standby_enabled: bool = False
 
     _validate_instance_type = validator(
         "master_node_instance_type", "data_node_instance_type", allow_reuse=True
     )(validate_opensearch_instance_type)
+
+    @field_validator("master_node_instance_type", "data_node_instance_type")
+    @classmethod
+    def validate_instance_type(cls, v):
+        return validate_opensearch_instance_type(v)
+
+    @root_validator(pre=True)
+    def validate_master_node_count(cls, values):
+        multi_az = values.get("multi_az_with_standby_enabled", False)
+        master_count = values.get("master_node_count", 2)
+
+        if multi_az and master_count < 3:
+            raise ValueError(
+                "When multi_az_with_standby_enabled is True, you must choose at least three dedicated master nodes"
+            )
+
+        return values
+
+    @model_validator(mode="after")
+    def check_az_count(self):
+        if self.availability_zone_count > 3:  # Assuming a maximum of 3 AZs per region
+            warnings.warn(
+                f"availability_zone_count ({self.availability_zone_count}) may be greater than the number of available AZs in the region. This might cause deployment issues."
+            )
+        return self
 
 
 class UserConfig(BaseModel):
@@ -129,6 +189,21 @@ class CDKConfig(BaseModel):
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = VpcConfig()
+
+    @model_validator(mode="after")
+    def check_az_count_vpc(self):
+        if self.vpc and self.opensearch_cluster_settings:
+            vpc_max_azs = self.vpc.max_azs
+            opensearch_az_count = (
+                self.opensearch_cluster_settings.availability_zone_count
+            )
+
+            if opensearch_az_count > vpc_max_azs:
+                warnings.warn(
+                    f"OpenSearch availability_zone_count ({opensearch_az_count}) is greater than VPC max_azs ({vpc_max_azs}). This might cause deployment issues."
+                )
+
+        return self
 
     @property
     def regions(self) -> List[str]:

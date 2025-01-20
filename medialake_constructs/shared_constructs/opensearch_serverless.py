@@ -141,6 +141,10 @@ class OpenSearchServerlessConstruct(Construct):
             "RequestsLayer",
             entry="lambdas/back_end/create_oss_index",
             compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
         )
 
         create_index_lambda.add_layers(layer)
