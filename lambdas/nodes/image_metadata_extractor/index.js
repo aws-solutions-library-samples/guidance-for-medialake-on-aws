@@ -183,6 +183,23 @@ async function processImageFile(bucket, key) {
     }
 }
 
+function sanitizeMetadata(obj) {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'string') {
+            result[key] = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+        } else if (typeof value === 'object') {
+            result[key] = sanitizeMetadata(value);
+        } else {
+            result[key] = value;
+        }
+    }
+    return result;
+}
+
+
 exports.lambda_handler = async (event) => {
     console.log('Received event:', JSON.stringify(event));
     const { input } = event;
@@ -203,7 +220,8 @@ exports.lambda_handler = async (event) => {
             return { statusCode: 500, body: 'Failed to extract metadata' };
         }
 
-        const newCustomMetadata = { CustomMetadata: extractedMetadata };
+        const sanitizedMetadata = sanitizeMetadata(extractedMetadata);
+        const newCustomMetadata = { CustomMetadata: sanitizedMetadata };
         const convertedNewMetadata = convertFloatsToDecimals(newCustomMetadata);
 
         // Get existing item from DynamoDB
@@ -238,7 +256,12 @@ exports.lambda_handler = async (event) => {
             body: JSON.stringify({
                 inventoryId,
                 message: 'Metadata extracted and stored successfully',
-                metadata: extractedMetadata
+                metadata: sanitizedMetadata
+            }, (key, value) => {
+                if (typeof value === 'bigint') {
+                    return value.toString();
+                }
+                return value;
             })
         };
 

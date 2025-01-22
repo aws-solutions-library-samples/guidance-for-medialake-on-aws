@@ -29,8 +29,7 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
     if len(parts) != 3 or parts[2] != "search":
         raise ValueError(f"Invalid instance type format: {instance_type}")
 
-    prefix = parts[0]
-    size = parts[1]
+    prefix, size, _ = parts
 
     if prefix not in valid_prefixes:
         raise ValueError(f"Invalid instance family: {prefix}")
@@ -91,13 +90,9 @@ class OpenSearchClusterSettings(BaseModel):
     availability_zone_count: int = 2
     multi_az_with_standby_enabled: bool = False
 
-    _validate_instance_type = validator(
-        "master_node_instance_type", "data_node_instance_type", allow_reuse=True
-    )(validate_opensearch_instance_type)
-
     @field_validator("master_node_instance_type", "data_node_instance_type")
     @classmethod
-    def validate_instance_type(cls, v):
+    def validate_instance_types(cls, v):
         return validate_opensearch_instance_type(v)
 
     @root_validator(pre=True)
@@ -109,14 +104,14 @@ class OpenSearchClusterSettings(BaseModel):
             raise ValueError(
                 "When multi_az_with_standby_enabled is True, you must choose at least three dedicated master nodes"
             )
-
         return values
 
     @model_validator(mode="after")
     def check_az_count(self):
         if self.availability_zone_count > 3:  # Assuming a maximum of 3 AZs per region
             warnings.warn(
-                f"availability_zone_count ({self.availability_zone_count}) may be greater than the number of available AZs in the region. This might cause deployment issues."
+                f"availability_zone_count ({self.availability_zone_count}) may be greater than the "
+                "number of available AZs in the region. This might cause deployment issues."
             )
         return self
 
