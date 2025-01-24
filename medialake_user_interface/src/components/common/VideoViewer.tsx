@@ -63,39 +63,26 @@
 
 // export default VideoViewer;
 
-import React, { useRef, useState } from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
-import GetAppIcon from '@mui/icons-material/GetApp';
-import HomeIcon from '@mui/icons-material/Home';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
+import React from 'react';
+
 
 interface VideoViewerProps {
     videoSrc: string;
     maxHeight?: string | number;
 }
 
-export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc, maxHeight = '70vh' }) => {
+export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc }) => {
 
-    console.log("videoSrc", videoSrc)
     return (
-        <Box
-            sx={{
-                height: maxHeight,
-                maxHeight,
-                width: '100%',
-                position: 'relative',
-                overflow: 'hidden',
-            }}
-        >
-            <video
-                src={videoSrc}
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                controls
-                onError={(e) => console.error("Video error:", e)}
-            />
 
-        </Box>
+        <video
+            src={videoSrc}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            controls
+            onError={(e) => console.error("Video error:", e)}
+        />
+
+
     );
 };
 

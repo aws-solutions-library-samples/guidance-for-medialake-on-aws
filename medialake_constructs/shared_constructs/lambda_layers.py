@@ -47,6 +47,10 @@ class JinjaLambdaLayer(Construct):
             "JinjaLayer",
             entry="lambdas/layers/jinja",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer with Jinja2 library",
         )
 
@@ -61,6 +65,10 @@ class OpenSearchPyLayer(Construct):
             "OpenSearchPyLayer",
             entry="lambdas/layers/opensearchpy",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer with open serch py library",
         )
 
@@ -75,6 +83,10 @@ class PynamoDbLambdaLayer(Construct):
             "PynamoDbLambdaLayer",
             entry="lambdas/layers/pynamodb",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer with pynamodb library",
         )
 
@@ -89,6 +101,9 @@ class PyMediaInfo(Construct):
             "PyMediaInfoLayer",
             entry="lambdas/layers/pymediainfo",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer with pymediainfo library",
         )
 
@@ -149,6 +164,10 @@ class GoogleCloudStorageLayer(Construct):
             "GoogleCloudStorageLayer",
             entry="lambdas/layers/googleCloudStorage",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer with google cloud storage and google auth library",
         )
 
@@ -163,6 +182,10 @@ class IngestMediaProcessorLayer(Construct):
             "IngestMediaProcessorLayer",
             entry="lambdas/layers/ingest_media_processor",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer for analyzing media container media info",
         )
 
@@ -177,6 +200,10 @@ class SearchLayer(Construct):
             "SearchLayer",
             entry="lambdas/layers/search",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
             description="A Lambda layer for search",
         )
 

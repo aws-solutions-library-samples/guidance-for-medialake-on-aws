@@ -49,16 +49,16 @@ const defaultColumns: AssetTableColumn<VideoItem>[] = [
     //     accessor: (video) => video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata.Duration,
     //     format: (value: number) => formatDuration(value),
     // },
-    {
-        id: 'resolution',
-        label: 'Resolution',
-        visible: true,
-        minWidth: 120,
-        accessor: (video) => {
-            const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
-            return `${Width}x${Height}`;
-        },
-    },
+    // {
+    //     id: 'resolution',
+    //     label: 'Resolution',
+    //     visible: true,
+    //     minWidth: 120,
+    //     accessor: (video) => {
+    //         const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
+    //         return `${Width}x${Height}`;
+    //     },
+    // },
     {
         id: 'createDate',
         label: 'Created',
@@ -93,9 +93,9 @@ const renderCardField = (fieldId: string, video: VideoItem): string => {
             return video.DigitalSourceAsset.MainRepresentation.Format;
         // case 'duration':
         //     return formatDuration(video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata.Duration);
-        case 'resolution':
-            const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
-            return `${Width}x${Height}`;
+        // case 'resolution':
+        //     const { Width, Height } = video.DigitalSourceAsset.MainRepresentation.TechnicalMetadata;
+        //     return `${Width}x${Height}`;
         case 'createDate':
             return formatDate(video.DigitalSourceAsset.CreateDate);
         case 'fileSize':

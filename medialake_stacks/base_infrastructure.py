@@ -158,12 +158,19 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Create OpenSearch managed cluster
+        private_subnet_ids = self._vpc.get_subnet_ids(
+            ec2.SubnetType.PRIVATE_WITH_EGRESS
+        )
+
         self._opensearch_cluster = OpenSearchCluster(
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
-                vpc=self._vpc.vpc,
+                vpc=self._vpc.vpc,  # Use the vpc property from CustomVpc
+                subnet_ids=private_subnet_ids[
+                    : config.opensearch_cluster_settings.availability_zone_count
+                ],
                 collection_indexes=[opensearch_index_name],
                 security_group=self._security_group,
             ),

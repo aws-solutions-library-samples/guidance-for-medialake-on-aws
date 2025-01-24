@@ -1,7 +1,7 @@
 from aws_cdk import (
     Stack,
     aws_iam as iam,
-    aws_lambda as _lambda,
+    aws_lambda as lambda_,
     aws_opensearchservice as opensearch,
     aws_ec2 as ec2,
     CustomResource,
@@ -12,7 +12,7 @@ from aws_cdk import (
     CfnOutput,
 )
 import hashlib
-import json
+from config import config
 from constructs import Construct
 from typing import Optional, List
 from dataclasses import dataclass, field
@@ -26,24 +26,56 @@ import time
 class OpenSearchClusterProps:
     domain_name: str
     engine_version: str = opensearch.EngineVersion.OPENSEARCH_2_15
-    instance_type: str = (
-        "c5.large.search"  # T3 instance type does not support Multi-AZ with standby feature.
+    master_node_instance_type: str = (
+        config.opensearch_cluster_settings.master_node_instance_type
     )
-    instance_count: int = 2  # high availability
-    volume_size: int = 30
-    availability_zone_count: int = 2  #  2 for cross-zone replication
+    master_node_count: int = config.opensearch_cluster_settings.master_node_count
+    data_node_instance_type: str = (
+        config.opensearch_cluster_settings.data_node_instance_type
+    )
+    data_node_count: int = config.opensearch_cluster_settings.data_node_count
+    volume_size: int = config.opensearch_cluster_settings.data_node_volume_size
+    volume_type: str = config.opensearch_cluster_settings.data_node_volume_type
+    volume_iops: int = config.opensearch_cluster_settings.data_node_volume_iops
+    availability_zone_count: int = (
+        config.opensearch_cluster_settings.availability_zone_count
+    )
     vpc: Optional[ec2.IVpc] = None
+    subnet_ids: Optional[List[str]] = None
     security_group: Optional[ec2.SecurityGroup] = None
     enforce_https: bool = True
     node_to_node_encryption: bool = True
+    multi_az_with_standby_enabled: bool = False
     encryption_at_rest: bool = True
-    master_node_instance_type: str = "c5.large.search"
-    master_node_count: int = 3  # Typically, 3 master nodes for production
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
     off_peak_window_enabled: bool = True
     off_peak_window_start: opensearch.WindowStartTime = field(
         default_factory=lambda: opensearch.WindowStartTime(hours=20, minutes=0)
     )
+
+
+# @dataclass
+# class OpenSearchClusterProps:
+#     domain_name: str
+#     engine_version: str = opensearch.EngineVersion.OPENSEARCH_2_15
+#     instance_type: str = (
+#         "c5.large.search"  # T3 instance type does not support Multi-AZ with standby feature.
+#     )
+#     instance_count: int = 2  # high availability
+#     volume_size: int = 30
+#     availability_zone_count: int = 2  #  2 for cross-zone replication
+#     vpc: Optional[ec2.IVpc] = None
+#     security_group: Optional[ec2.SecurityGroup] = None
+#     enforce_https: bool = True
+#     node_to_node_encryption: bool = True
+#     encryption_at_rest: bool = True
+#     master_node_instance_type: str = "c5.large.search"
+#     master_node_count: int = 3  # Typically, 3 master nodes for production
+#     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
+#     off_peak_window_enabled: bool = True
+#     off_peak_window_start: opensearch.WindowStartTime = field(
+#         default_factory=lambda: opensearch.WindowStartTime(hours=20, minutes=0)
+#     )
 
 
 class OpenSearchCluster(Construct):
@@ -128,6 +160,23 @@ class OpenSearchCluster(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # VPC configuration
+        vpc_subnets = None
+        if props.vpc and props.subnet_ids:
+            # Get the availability zones for the VPC
+            vpc_azs = props.vpc.availability_zones
+
+            # Create subnet references with availability zones
+            vpc_subnets = [
+                ec2.Subnet.from_subnet_attributes(
+                    self,
+                    f"Subnet{i}",
+                    subnet_id=subnet_id,
+                    availability_zone=vpc_azs[i % len(vpc_azs)],
+                )
+                for i, subnet_id in enumerate(props.subnet_ids)
+            ]
+
         # Define OpenSearch Domain
         self.domain = opensearch.Domain(
             self,
@@ -136,16 +185,17 @@ class OpenSearchCluster(Construct):
             version=props.engine_version,
             # Capacity configuration
             capacity=opensearch.CapacityConfig(
-                multi_az_with_standby_enabled=False,
-                data_nodes=props.instance_count,
-                data_node_instance_type=props.instance_type,
+                multi_az_with_standby_enabled=props.multi_az_with_standby_enabled,
+                data_nodes=props.data_node_count,
+                data_node_instance_type=props.data_node_instance_type,
                 master_nodes=props.master_node_count,
                 master_node_instance_type=props.master_node_instance_type,
             ),
             # EBS configuration
             ebs=opensearch.EbsOptions(
                 volume_size=props.volume_size,
-                volume_type=ec2.EbsDeviceVolumeType.GP2,
+                volume_type=ec2.EbsDeviceVolumeType[props.volume_type.upper()],
+                iops=props.volume_iops,
                 # throughput=125, # for GP3
                 # iops=3000,
             ),
@@ -184,30 +234,30 @@ class OpenSearchCluster(Construct):
                 ),
             ),
             # VPC configuration
-            vpc=props.vpc,
+            # vpc=props.vpc,
             # vpc_subnets=[
             #     ec2.SubnetSelection(
-            #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            #         availability_zones=[
+            #             props.vpc.select_subnets(
+            #                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            #             )
+            #             .subnets[0]
+            #             .availability_zone,
+            #             props.vpc.select_subnets(
+            #                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            #             )
+            #             .subnets[1]
+            #             .availability_zone,
+            #         ],
             #     )
             # ],
-            vpc_subnets=[
-                ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    availability_zones=[
-                        props.vpc.select_subnets(
-                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-                        )
-                        .subnets[0]
-                        .availability_zone,
-                        props.vpc.select_subnets(
-                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-                        )
-                        .subnets[1]
-                        .availability_zone,
-                    ],
-                )
-            ],
-            security_groups=[os_security_group],
+            # security_groups=[os_security_group],
+            vpc=props.vpc,
+            vpc_subnets=(
+                [ec2.SubnetSelection(subnets=vpc_subnets)] if vpc_subnets else None
+            ),
+            security_groups=[os_security_group] if props.vpc else None,
             # Access Policy added here
             access_policies=[access_policy],
             # Maintenance window (off-peak)
@@ -233,14 +283,14 @@ class OpenSearchCluster(Construct):
         self.domain.node.add_dependency(slr)
 
         # Create Lambda function for index creation
-        create_index_lambda = _lambda.Function(
+        create_indexlambda_ = lambda_.Function(
             self,
             "IndexCreationFunction",
-            runtime=_lambda.Runtime.PYTHON_3_13,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             vpc=props.vpc,
             security_groups=[props.security_group],
-            code=_lambda.Code.from_asset("lambdas/back_end/create_oss_index/"),
+            code=lambda_.Code.from_asset("lambdas/back_end/create_oss_index/"),
             timeout=Duration.seconds(60),
             environment={
                 "COLLECTION_ENDPOINT": f"https://{self.domain.domain_endpoint}",
@@ -255,13 +305,17 @@ class OpenSearchCluster(Construct):
             self,
             "RequestsLayer",
             entry="lambdas/back_end/create_oss_index",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_13],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
         )
 
-        create_index_lambda.add_layers(layer)
+        create_indexlambda_.add_layers(layer)
 
         # Define IAM permission policy for the Lambda function
-        create_index_lambda.role.add_to_principal_policy(
+        create_indexlambda_.role.add_to_principal_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -276,13 +330,13 @@ class OpenSearchCluster(Construct):
         )
 
         # Allow the Lambda function to access the OpenSearch domain
-        self.domain.grant_read_write(create_index_lambda)
+        self.domain.grant_read_write(create_indexlambda_)
 
         # Create a custom resource that uses the Lambda
         provider = cr.Provider(
             self,
             "IndexCreateResourceProvider",
-            on_event_handler=create_index_lambda,
+            on_event_handler=create_indexlambda_,
             log_retention=logs.RetentionDays.ONE_WEEK,
         )
 
