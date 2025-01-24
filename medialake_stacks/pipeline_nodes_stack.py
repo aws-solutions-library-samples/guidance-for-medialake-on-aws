@@ -72,21 +72,6 @@ class PipelineNodesStack(Stack):
             ),
         )
 
-        # thumbnail_queue = MediaConvert.create_queue(
-        #     self,
-        #     "MediaLakeThumbnailMediaConvertQueue",
-        #     props=MediaConvertProps(
-        #         description="A MediaLake queue for thumbnail MediaConvert jobs",
-        #         name="MediaLakeThumbnailQueue",  # If omitted, one is auto-generated
-        #         pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
-        #         status="ACTIVE",  # Could also be "PAUSED"
-        #         tags=[
-        #             {"Environment": config.environment},
-        #             {"Owner": config.global_prefix},
-        #         ],
-        #     ),
-        # )
-
         ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
         layer_objects = [ffprobe_layer.layer, pymediainfo_layer.layer]
@@ -205,7 +190,6 @@ class PipelineNodesStack(Stack):
         self._check_mediaconvert_status.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    # "mediaconvert:GetJob",
                     "mediaconvert:ListJobs",
                 ],
                 resources=[proxy_queue.queue_arn],
@@ -704,20 +688,8 @@ class PipelineNodesStack(Stack):
         return self._video_metadata_extractor_lambda.function_arn
 
     @property
-    def video_proxy_thumbnail_lambda(self) -> lambda_.Function:
-        return self._video_proxy_thumbnail_lambda
-
-    @property
     def video_proxy_thumbnail_function_arn(self) -> str:
         return self._video_proxy_thumbnail_lambda.function_arn
-
-    @property
-    def video_thumbnail_lambda(self) -> lambda_.Function:
-        return self._video_thumbnail_lambda
-
-    @property
-    def video_thumbnail_function_arn(self) -> str:
-        return self._video_thumbnail_lambda.function_arn
 
     @property
     def check_mediaconvert_status_lambda(self) -> lambda_.Function:
@@ -730,3 +702,14 @@ class PipelineNodesStack(Stack):
     @property
     def pipelne_nodes_table(self) -> dynamodb.TableV2:
         return self._pipeline_nodes_table
+
+    def get_functions(self) -> list[lambda_.Function]:
+        """Return all Lambda functions in this stack that need warming."""
+        return [
+            self._trigger_node_lambda.function,
+            self._video_metadata_extractor_lambda.function,
+            self._image_metadata_extractor_lambda.function,
+            self._image_proxy_lambda.function,
+            self._video_proxy_thumbnail_lambda.function,
+            self._check_mediaconvert_status.function,
+        ]

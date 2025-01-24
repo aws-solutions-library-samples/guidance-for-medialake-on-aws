@@ -116,6 +116,7 @@ class VpcConfig(BaseModel):
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
+    lambda_tail_warming: bool = False  # Enable/disable Lambda tail warming
     primary_region: str
     account_id: str
     environment: str

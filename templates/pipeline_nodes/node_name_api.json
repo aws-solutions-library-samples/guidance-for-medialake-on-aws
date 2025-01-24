@@ -1,0 +1,82 @@
+
+{
+    "nodeId": "string",
+    "name": "string",
+    "description": "string",
+    "nodeType": "aws|api",
+    "nodeCategory": "integration|transformation|trigger",
+    "version": "1.0.0",
+    "configSchema": {
+        "aws": {
+        "service": "lambda|s3|dynamodb|sqs|sns",
+        "action": "string",
+        "parameters": {
+            "type": "object",
+            "properties": {
+            "region": "string",
+            "functionName": "string",
+            "queueUrl": "string",
+            "bucketName": "string",
+            "tableName": "string"
+            }
+        },
+        "inputMapping": {
+            "type": "object",
+            "description": "Maps workflow input to AWS parameters"
+        },
+        "outputMapping": {
+            "type": "object",
+            "description": "Maps AWS response to workflow output"
+        }
+        },
+        "api": {
+        "method": "GET|POST|PUT|DELETE|PATCH",
+        "headers": {
+            "type": "object",
+            "description": "HTTP headers"
+        },
+        "queryParameters": {
+            "type": "object",
+            "description": "URL query parameters"
+        },
+        "bodyTemplate": {
+            "type": "object",
+            "description": "Request body template"
+        },
+        "responseMapping": {
+            "type": "object",
+            "description": "Maps API response to workflow output"
+        }
+        }
+    },
+    "integrationSchema": {
+        "aws": {
+        "required": ["roleArn"],
+        "optional": ["region", "assumeRoleDuration"],
+        "endpoints": {
+            "required": false,
+            "format": "string"
+        },
+        "credentials": {
+            "type": "aws",
+            "required": true,
+            "rotation": "required|optional"
+        }
+        },
+        "api": {
+        "required": ["baseUrl"],
+        "optional": ["timeout", "retryConfig"],
+        "endpoints": {
+            "required": true,
+            "format": "url"
+        },
+        "credentials": {
+            "type": "api",
+            "required": true,
+            "formats": ["basic", "bearer", "apiKey"],
+            "rotation": "optional"
+        }
+        }
+    },
+    "isActive": true
+}

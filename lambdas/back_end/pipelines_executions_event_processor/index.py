@@ -11,11 +11,7 @@ import boto3
 from datetime import datetime
 import json
 from decimal import Decimal
-
-# Initialize PowerTools
-logger = Logger()
-tracer = Tracer()
-metrics = Metrics(namespace="PipelinesExecutions")
+from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
 
 # Initialize AWS clients with X-Ray tracing
 dynamodb = boto3.resource("dynamodb")

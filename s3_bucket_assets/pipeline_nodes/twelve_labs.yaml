@@ -1,0 +1,15 @@
+openapi: 3.0.0,
+x-medialake-nodeId: pa1 
+info:
+    title: Twelve Labs API
+    version: 1.3
+    description": Twelve Labs API for video, image, and audio understanding and multimodal embeddings
+security:
+  - apiKey: []
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key

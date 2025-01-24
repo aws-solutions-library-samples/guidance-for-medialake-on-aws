@@ -1,0 +1,57 @@
+
+{
+    "nodeId": "string",
+    "name": "string",
+    "description": "string",
+    "nodeType": "aws|api",
+    "nodeCategory": "transcoding, image..",
+    "nodeTags": "integration|transformation|trigger",
+    "version": "1.0.0",
+    "configSchema": {
+        "image": {},
+        "video": {},
+        "document": {
+
+            "parameters": {}
+
+        }
+        "aws": {
+        "service": "lambda|s3|dynamodb|sqs|sns",
+        "action": "string",
+        "parameters": {
+            "type": "object",
+            "properties": {
+            "region": "string",
+            "functionName": "string",
+            "queueUrl": "string",
+            "bucketName": "string",
+            "tableName": "string"
+            }
+        },
+        "inputMapping": {
+            "input_mapping_object_name": 
+            "description": "Maps workflow input to AWS parameters"
+        },
+        "outputMapping": {
+            "type": "object",
+            "description": "Maps AWS response to workflow output"
+        }
+        }
+    },
+    "integrationSchema": {
+        "aws": {
+        "required": ["roleArn"],
+        "optional": ["region", "assumeRoleDuration"],
+        "endpoints": {
+            "required": false,
+            "format": "string"
+        },
+        "credentials": {
+            "type": "aws",
+            "required": true,
+            "rotation": "required|optional"
+        }
+    }
+    },
+    "isActive": true
+}

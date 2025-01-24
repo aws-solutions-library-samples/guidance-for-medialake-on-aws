@@ -5,11 +5,8 @@ import boto3
 import cfnresponse
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
+from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
 
-
-# Initialize AWS Lambda Powertools
-logger = Logger()
-tracer = Tracer()
 
 # Initialize AWS clients
 dynamodb = boto3.resource("dynamodb")

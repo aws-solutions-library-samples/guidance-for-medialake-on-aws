@@ -7,6 +7,7 @@ from botocore.config import Config
 
 s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
+
 def replace_decimals(obj):
     if isinstance(obj, list):
         return [replace_decimals(o) for o in obj]
@@ -33,6 +34,7 @@ class CustomEncoder(json.JSONEncoder):
             return None  # Ignore function objects
 
         return super(CustomEncoder, self).default(obj)
+
 
 def generate_presigned_url(
     bucket: str, key: str, expiration: int = 3600

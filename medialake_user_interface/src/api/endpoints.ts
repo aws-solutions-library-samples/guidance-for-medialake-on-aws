@@ -14,5 +14,9 @@ export const API_ENDPOINTS = {
     USER: '/users/user',
     ROLES: '/settings/roles',
     DISABLE_USER: (userId: string) => `/users/user/${userId}/disableuser`,
-    ENABLE_USER: (userId: string) => `/users/user/${userId}/enableuser`
+    ENABLE_USER: (userId: string) => `/users/user/${userId}/enableuser`,
+    ENVIRONMENTS: {
+        ALL: '/environments',
+        DETAIL: (id: string) => `/environments/${id}`,
+    }
 };

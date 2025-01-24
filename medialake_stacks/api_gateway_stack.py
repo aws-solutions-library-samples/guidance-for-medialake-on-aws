@@ -51,9 +51,17 @@ from medialake_constructs.api_gateway.api_gateway_users import (
     UsersApi,
     UsersApiProps,
 )
+from medialake_constructs.api_gateway.api_gateway_environments import (
+    ApiGatewayEnvironmentsConstruct,
+    ApiGatewayEnvironmentsProps,
+)
 from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
+)
+from medialake_constructs.api_gateway.api_gateway_integrations import (
+    ApiGatewayIntegrationsConstruct,
+    ApiGatewayIntegrationsProps,
 )
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
@@ -148,6 +156,15 @@ class ApiGatewayStack(Stack):
             ),
         )
 
+        self._integrations_stack = ApiGatewayIntegrationsConstruct(
+            self,
+            "Integrations",
+            props=ApiGatewayIntegrationsProps(
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                api_resource=self._api_gateway.rest_api,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
+            ),
+        )
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,
             "PipelinesExecutions",
@@ -224,6 +241,17 @@ class ApiGatewayStack(Stack):
                 api_resource=self._api_gateway.rest_api,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
                 cognito_user_pool=self._cognito_construct.user_pool,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+            ),
+        )
+
+        # Create Environments API Gateway construct
+        _ = ApiGatewayEnvironmentsConstruct(
+            self,
+            "EnvironmentsApiGateway",
+            cognito_authorizer=self._api_gateway.cognito_authorizer,
+            props=ApiGatewayEnvironmentsProps(
+                api_resource=self._api_gateway.rest_api,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
             ),
         )
@@ -358,3 +386,14 @@ class ApiGatewayStack(Stack):
     @property
     def pipelines_create_handler(self) -> lambda_.Function:
         return self._pipeline_stack.pipelines_create_handler
+
+    def get_functions(self) -> list[lambda_.Function]:
+        """Return all Lambda functions in this stack that need warming."""
+        return [
+            # self._pipeline_stack.post_pipelines_handler.function,
+            # self._pipeline_stack.get_pipelines_handler.function,
+            # self._pipeline_stack.get_pipeline_id_handler.function,
+            # self._pipeline_stack.put_pipeline_id_handler.function,
+            # self._pipeline_stack.del_pipeline_id_handler.function,
+            # self._pipeline_stack.pipeline_trigger_lambda.function,
+        ]

@@ -488,8 +488,12 @@ class UIConstruct(Construct):
                     "identity_providers": [
                         {
                             "identity_provider_method": provider.identity_provider_method,
-                            "identity_provider_name": provider.identity_provider_name,
-                            "identity_provider_metadata_url": provider.identity_provider_metadata_url,
+                            "identity_provider_name": getattr(
+                                provider, "identity_provider_name", ""
+                            ),
+                            "identity_provider_metadata_url": getattr(
+                                provider, "identity_provider_metadata_url", ""
+                            ),
                         }
                         for provider in config.authZ.identity_providers
                     ],

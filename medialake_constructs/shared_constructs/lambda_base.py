@@ -6,10 +6,12 @@ configuration, logging, IAM roles, and other AWS resources. It implements best p
 Lambda deployment including standardized naming conventions and resource validation.
 """
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from dataclasses import dataclass
 import re
 import os
+import glob
+from pathlib import Path
 
 from aws_cdk import (
     aws_lambda as lambda_,
@@ -221,17 +223,6 @@ class Lambda(Construct):
         # Create IAM role
         logger.debug("Setting up IAM role")
 
-        # Create custom policy for log group access
-        # logs_policy = iam.PolicyStatement(
-        #     effect=iam.Effect.ALLOW,
-        #     actions=[
-        #         "logs:CreateLogGroup",
-        #         "logs:CreateLogStream",
-        #         "logs:PutLogEvents",
-        #     ],
-        #     resources=[f"{lambda_log_group.log_group_arn}:*"],
-        # )
-
         ## Creation of IAM role for Lambda function
         role_id = f"{lambda_function_name}ExecutionRole"
         role_props = {
@@ -247,9 +238,6 @@ class Lambda(Construct):
             role_props["permissions_boundary"] = config.iam_role_boundary_policy
 
         self._lambda_role = iam.Role(self, role_id, **role_props)
-
-        # Add the logs policy to the role
-        # self._lambda_role.add_to_policy(logs_policy)
 
         logger.debug("Adding AWSLambdaBasicExecutionRole to Lambda role")
         self._lambda_role.add_managed_policy(
@@ -277,10 +265,22 @@ class Lambda(Construct):
         if config.environment_variables:
             logger.debug("Adding environment variables")
             lambda_environment_variables = config.environment_variables
-            lambda_environment_variables["external_payload_s3_bucket"] = (
-                f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
+            lambda_environment_variables["RESOURCE_PREFIX"] = env_config.resource_prefix
+            lambda_environment_variables["ENVIRONMENT"] = env_config.environment
+            lambda_environment_variables["METRICS_NAMESPACE"] = (
+                env_config.resource_prefix
             )
+            # lambda_environment_variables["external_payload_s3_bucket"] = (
+            #     f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
+            # )
             common_lambda_props["environment"] = lambda_environment_variables
+        else:
+            lambda_environment_variables = {}
+            lambda_environment_variables["RESOURCE_PREFIX"] = env_config.resource_prefix
+            lambda_environment_variables["ENVIRONMENT"] = env_config.environment
+            lambda_environment_variables["METRICS_NAMESPACE"] = (
+                env_config.resource_prefix
+            )
 
         # Add VPC if provided
         if config.vpc:
@@ -301,6 +301,11 @@ class Lambda(Construct):
         logger.debug(
             f"Creating {config.runtime.family} Lambda function with properties"
         )
+        # Collect common libraries
+        entry_path = Path(common_lambda_props["entry"])
+        common_libs = self._collect_common_libraries(entry_path)
+        logger.debug(f"Found common libraries: {common_libs}")
+
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
                 common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
@@ -317,6 +322,13 @@ class Lambda(Construct):
                 common_lambda_props["deps_lock_file_path"] = os.path.abspath(
                     common_lambda_props["deps_lock_file_path"]
                 )
+
+                # Copy common libraries to entry directory
+                if common_libs:
+                    self._copy_common_libraries(
+                        common_libs, Path(common_lambda_props["project_root"])
+                    )
+
                 self._function = NodejsFunction(
                     self,
                     "StandardNodeJSLambda",
@@ -331,6 +343,11 @@ class Lambda(Construct):
                 )
             else:
                 logger.debug("Creating Python Lambda function")
+
+                # For Python functions, we need to copy common libraries to the entry directory
+                if common_libs:
+                    self._copy_common_libraries(common_libs, entry_path)
+
                 self._function = PythonFunction(
                     self,
                     "StandardPythonLambda",
@@ -340,6 +357,47 @@ class Lambda(Construct):
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
+
+    def _collect_common_libraries(self, entry_path: Path) -> Dict[str, str]:
+        """
+        Collect common libraries from parent directories.
+        Returns a dictionary mapping file names to their full paths,
+        with more specific (closer to lambda) libraries taking precedence.
+        """
+        common_libs = {}
+        current_path = entry_path
+
+        # Walk up the directory tree until we reach the lambdas directory
+        while "lambdas" in str(current_path):
+            common_lib_path = current_path / "common_libraries"
+            if common_lib_path.exists():
+                # Collect all files in the common_libraries directory
+                for file_path in common_lib_path.rglob("*"):
+                    if file_path.is_file():
+                        # Use the relative path from common_libraries as the key
+                        rel_path = file_path.relative_to(common_lib_path)
+                        # Only add if we haven't seen this file before (more specific ones take precedence)
+                        if str(rel_path) not in common_libs:
+                            common_libs[str(rel_path)] = str(file_path)
+            current_path = current_path.parent
+
+        return common_libs
+
+    def _copy_common_libraries(
+        self, common_libs: Dict[str, str], target_dir: Path
+    ) -> None:
+        """
+        Copy common libraries to the target directory, flattening the structure.
+        """
+        import shutil
+
+        # Create the target directory if it doesn't exist
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy each file
+        for rel_path, source_path in common_libs.items():
+            target_path = target_dir / Path(rel_path).name
+            shutil.copy2(source_path, target_path)
 
     @property
     def function(self) -> lambda_.Function:
