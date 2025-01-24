@@ -155,6 +155,31 @@ class AuthConfig(BaseModel):
     def validate_providers(cls, v):
         if not v:
             raise ValueError("At least one identity provider must be configured")
+
+        # Check if at least one provider has valid method
+        valid_methods = ["saml", "cognito"]
+        has_valid_provider = False
+
+        for provider in v:
+            if provider.identity_provider_method in valid_methods:
+                has_valid_provider = True
+
+                # Additional validation for SAML providers
+                if provider.identity_provider_method == "saml":
+                    if not provider.identity_provider_name:
+                        raise ValueError(
+                            "SAML provider requires identity_provider_name"
+                        )
+                    if not provider.identity_provider_metadata_url:
+                        raise ValueError(
+                            "SAML provider requires identity_provider_metadata_url"
+                        )
+
+        if not has_valid_provider:
+            raise ValueError(
+                "At least one provider must have identity_provider_method of 'saml' or 'cognito'"
+            )
+
         return v
 
 
