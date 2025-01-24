@@ -84,9 +84,9 @@ touch config.json
         "last_name": "User"
     },
     "opensearch_cluster_settings": {
-        "master_node_count": 2,
+        "master_node_count": 2, # Must be at least the number of AZ zone count
         "master_node_instance_type": "r7g.medium.search",
-        "data_node_count": 3,
+        "data_node_count": 2, #Must be even numbers if 2 AZ zone count and odd if odd 
         "data_node_instance_type": "r7g.medium.search",
         "data_node_volume_size": 10,
         "data_node_volume_type": "gp3",
