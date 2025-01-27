@@ -1,10 +1,10 @@
-import logging
 import time
 import os
 import boto3
 import cfnresponse
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
+from typing import List, Any
 
 
 # Initialize AWS Lambda Powertools
@@ -18,6 +18,7 @@ iam = boto3.client("iam")
 s3 = boto3.client("s3")
 sqs = boto3.client("sqs")
 cloudwatch_logs = boto3.client("logs")
+eventbridge = boto3.client("events")
 
 # Define log groups to clean up
 LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
@@ -100,30 +101,72 @@ def clean_up_table_resources(table_name, clean_up_function):
 
 
 def clean_up_connector(item, table):
+    errors = []
+
     # Existing connector cleanup logic
     if "lambdaArn" in item:
-        delete_lambda_function(item["lambdaArn"])
+        try:
+            delete_lambda_function(item["lambdaArn"])
+        except Exception as e:
+            errors.append(f"Error deleting Lambda function: {str(e)}")
+
     if "iamRoleArn" in item:
-        delete_iam_role(item["iamRoleArn"])
+        try:
+            delete_iam_role(item["iamRoleArn"])
+        except Exception as e:
+            errors.append(f"Error deleting IAM role: {str(e)}")
+
     if "queueUrl" in item:
-        delete_sqs_queue(item["queueUrl"])
+        try:
+            delete_sqs_queue(item["queueUrl"])
+        except Exception as e:
+            errors.append(f"Error deleting SQS queue: {str(e)}")
+
     if "storageIdentifier" in item:
-        remove_s3_bucket_notification(item["storageIdentifier"])
+        try:
+            remove_s3_bucket_notification(item)
+        except Exception as e:
+            errors.append(f"Error removing S3 bucket notification: {str(e)}")
 
-    # New EventBridge cleanup logic
-    if "eventBridgeDetails" in item:
-        event_bus_name = item["eventBridgeDetails"].get("eventBusName")
-        if event_bus_name:
-            delete_event_bus_and_rules(event_bus_name)
+    # Handle different integration methods
+    integration_method = item.get("integrationMethod")
+    if integration_method == "eventbridge":
+        if "eventBridgeDetails" in item:
+            event_bus_name = item["eventBridgeDetails"].get("eventBusName")
+            if event_bus_name:
+                try:
+                    delete_event_bus_and_rules(event_bus_name)
+                except Exception as e:
+                    errors.append(f"Error deleting event bus and rules: {str(e)}")
 
-        rule_name = item["eventBridgeDetails"].get("ruleName")
-        parent_event_bus_name = item["eventBridgeDetails"].get("parentEventBusName")
-        if rule_name and parent_event_bus_name:
-            delete_eventbridge_rule(rule_name, parent_event_bus_name)
+            rule_name = item["eventBridgeDetails"].get("ruleName")
+            parent_event_bus_name = item["eventBridgeDetails"].get("parentEventBusName")
+            if rule_name and parent_event_bus_name:
+                try:
+                    delete_eventbridge_rule(rule_name, parent_event_bus_name)
+                except Exception as e:
+                    errors.append(f"Error deleting EventBridge rule: {str(e)}")
+    elif integration_method == "s3Notifications":
+        # S3 notifications are already handled by remove_s3_bucket_notification
+        pass
+    else:
+        logger.warning(f"Unknown integration method: {integration_method}")
 
     # Delete the connector record
-    table.delete_item(Key={"id": item["id"]})
-    logger.info(f"Deleted connector record {item['id']}")
+    try:
+        table.delete_item(Key={"id": item["id"]})
+        logger.info(f"Deleted connector record {item['id']}")
+    except Exception as e:
+        errors.append(f"Error deleting connector record: {str(e)}")
+
+    if errors:
+        logger.error(
+            f"Errors occurred while cleaning up connector {item['id']}: {errors}"
+        )
+    else:
+        logger.info(f"Successfully cleaned up connector {item['id']}")
+
+    return errors
 
 
 def clean_up_pipeline(item, table):
@@ -251,11 +294,52 @@ def delete_event_source_mapping(uuid):
     )
 
 
-def remove_s3_bucket_notification(bucket_name):
+def remove_eventbridge_rule(eventbridge: Any, connector_id: str) -> List[str]:
+    errors: List[str] = []
+    rule_name = f"medialake-connector-{connector_id}"
+
     try:
-        s3.put_bucket_notification_configuration(
-            Bucket=bucket_name, NotificationConfiguration={}
+        # List targets for the rule
+        targets = eventbridge.list_targets_by_rule(Rule=rule_name)["Targets"]
+
+        # Remove targets from the rule
+        if targets:
+            target_ids = [target["Id"] for target in targets]
+            eventbridge.remove_targets(Rule=rule_name, Ids=target_ids)
+
+        # Delete the rule
+        eventbridge.delete_rule(Name=rule_name)
+
+        logger.info(
+            f"Successfully removed EventBridge rule and targets for connector: {connector_id}"
         )
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            error_msg = f"Error removing EventBridge rule: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+
+    return errors
+
+
+def remove_s3_bucket_notification(item):
+    bucket_name = item["storageIdentifier"]
+    integration_method = item.get("integrationMethod")
+    try:
+        logger.info(f"Removing notifications of type {integration_method}")
+        if integration_method == "eventbridge":
+            logger.info(f"Removing {integration_method}")
+            remove_eventbridge_rule(eventbridge, item["id"])
+        elif integration_method == "s3Notifications":
+            logger.info(f"Removing {integration_method}")
+
+            s3.put_bucket_notification_configuration(
+                Bucket=bucket_name,
+                NotificationConfiguration={},  # Empty config removes all notifications
+            )
+        else:
+            logger.warning(f"Unknown integration method {integration_method}")
+
         logger.info(f"Removed notifications from bucket {bucket_name}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "NoSuchBucket":

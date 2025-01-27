@@ -289,7 +289,7 @@ const ExecutionsPage: React.FC = () => {
                                 </Button>
                             </>
                         )}
-                        <Button
+                        {/* <Button
                             size="small"
                             variant="outlined"
                             onClick={() => handleViewDetails(row.original.execution_id)}
@@ -304,7 +304,7 @@ const ExecutionsPage: React.FC = () => {
                             }}
                         >
                             {t('executions.actions.viewDetails')}
-                        </Button>
+                        </Button> */}
                     </Box>
                 ),
             },

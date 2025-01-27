@@ -137,6 +137,19 @@ class OpenSearchIngestionPipeline(Construct):
 
         pipeline_role.add_to_policy(
             iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        pipeline_role.add_to_policy(
+            iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "dynamodb:GetRecords",

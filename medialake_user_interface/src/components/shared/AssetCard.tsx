@@ -38,7 +38,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onDeleteClick,
     onMenuClick,
     onEditClick,
-    placeholderImage = 'https://placehold.co/300x200',
+    placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     onImageError,
     isEditing,
     editedName,
@@ -91,8 +91,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     sx={{
                         width: '100%',
                         height: 200,
-                        objectFit: 'cover',
-                        backgroundColor: 'rgba(0,0,0,0.03)'
+                        backgroundColor: 'rgba(0,0,0,0.03)',
+                        objectFit: 'contain'
+
                     }}
                 />
                 <Box sx={{ p: 2 }}>
@@ -147,7 +148,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                         </Box>
                                     ) : (
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <Typography variant="body2">
+                                            <Typography sx={{ wordBreak: "break-word" }} display="inline" variant="body2">
                                                 {renderField(field.id)}
                                             </Typography>
                                             <IconButton

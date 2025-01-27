@@ -174,7 +174,7 @@ const ExecutionStatusPage: React.FC = () => {
                                 <PlayArrowIcon fontSize="small" />
                             </IconButton>
                         )}
-                        <IconButton
+                        {/* <IconButton
                             size="small"
                             color="primary"
                             title="View Details"
@@ -186,7 +186,7 @@ const ExecutionStatusPage: React.FC = () => {
                             }}
                         >
                             <VisibilityIcon fontSize="small" />
-                        </IconButton>
+                        </IconButton> */}
                     </Box>
                 ),
             },

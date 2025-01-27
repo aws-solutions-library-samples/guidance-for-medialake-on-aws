@@ -100,15 +100,28 @@ def setup_eventbridge_notifications(
     sqs = boto3.client("sqs", region_name=bucket_region)
     s3 = boto3.client("s3", region_name=bucket_region)
 
+    # Get existing notification configuration
+    try:
+        existing_config = s3.get_bucket_notification_configuration(Bucket=s3_bucket)
+    except ClientError as e:
+        logger.error(
+            f"Failed to get existing bucket notification configuration: {str(e)}"
+        )
+        raise
+
+    # Remove ResponseMetadata and add EventBridge configuration
+    updated_config = {
+        k: v for k, v in existing_config.items() if k != "ResponseMetadata"
+    }
+    updated_config["EventBridgeConfiguration"] = {}
+
     # Enable EventBridge notifications on the S3 bucket
     try:
-        response = s3.put_bucket_notification_configuration(
+        s3.put_bucket_notification_configuration(
             Bucket=s3_bucket,
-            NotificationConfiguration={"EventBridgeConfiguration": {}},
+            NotificationConfiguration=updated_config,
         )
-        logger.info(
-            f"Enabled EventBridge notifications for bucket {s3_bucket} with response {response}"
-        )
+        logger.info(f"Enabled EventBridge notifications for bucket {s3_bucket}")
         created_resources.append(("eventbridge_config", s3_bucket))
     except ClientError as e:
         logger.error(f"Failed to enable EventBridge notifications: {str(e)}")
@@ -343,6 +356,21 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
     return role["Role"]["Arn"]
 
 
+def check_existing_s3_notifications(s3_client, bucket_name):
+    try:
+        response = s3_client.get_bucket_notification_configuration(Bucket=bucket_name)
+        return any(
+            [
+                response.get("TopicConfigurations"),
+                response.get("QueueConfigurations"),
+                response.get("LambdaFunctionConfigurations"),
+            ]
+        )
+    except s3_client.exceptions.ClientError as e:
+        logger.error(f"Error checking S3 notifications: {str(e)}")
+        return False
+
+
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
     created_resources = []
@@ -394,7 +422,6 @@ def create_connector(createconnector: S3Connector) -> dict:
 
         # Validate S3 bucket exists and get its region
         try:
-
             bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
             bucket_region = bucket_location["LocationConstraint"]
             bucket_region = bucket_region or "us-east-1"
@@ -421,12 +448,31 @@ def create_connector(createconnector: S3Connector) -> dict:
             ),
         )
 
+        # Check for existing S3 notifications
+        existing_notifications = check_existing_s3_notifications(s3, s3_bucket)
+
         # Set up notifications based on integration method
+        queue_url = None
+        queue_arn = None
         if integration_method == "eventbridge":
+            if existing_notifications:
+                logger.info(
+                    f"S3 bucket '{s3_bucket}' has existing notifications. Adding EventBridge configuration."
+                )
             queue_url, queue_arn = setup_eventbridge_notifications(
                 s3_bucket, bucket_region, created_resources
             )
-        else:  # s3-event-notifications
+        elif integration_method in ["s3Notifications", "s3-event-notifications"]:
+            if existing_notifications:
+                return {
+                    "statusCode": 400,
+                    "body": {
+                        "status": "400",
+                        "message": f"S3 bucket '{s3_bucket}' already has existing notifications configured",
+                        "data": {},
+                    },
+                }
+            # Set up S3 event notifications
             # Create SQS queue in the same region as the bucket
             queue_name = f"medialake-connector-{s3_bucket}-notifications"
             response = sqs.create_queue(
@@ -481,6 +527,13 @@ def create_connector(createconnector: S3Connector) -> dict:
                 Bucket=s3_bucket, NotificationConfiguration=notification_config
             )
             created_resources.append(("bucket_notification", s3_bucket))
+        else:
+            raise ValueError(f"Invalid integration method: {integration_method}")
+
+        if queue_url is None or queue_arn is None:
+            raise ValueError(
+                f"Failed to set up notifications: queue_url or queue_arn is None for integration method {integration_method}"
+            )
 
         # Deploy lambda if environment variables are set
         try:
@@ -733,12 +786,14 @@ def create_connector(createconnector: S3Connector) -> dict:
             "createdAt": current_time,
             "updatedAt": current_time,
             "storageIdentifier": s3_bucket,
+            "integrationMethod": integration_method,
             "sqsArn": queue_arn,
             "region": bucket_region,
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
         }
+
         table.put_item(Item=connector_item)
         created_resources.append(("dynamodb_item", (table_name, connector_id)))
 

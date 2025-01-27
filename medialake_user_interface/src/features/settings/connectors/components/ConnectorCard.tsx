@@ -125,7 +125,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             </Box>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Tooltip title="Edit">
+                            {/* <Tooltip title="Edit">
                                 <IconButton
                                     onClick={() => setEditModalOpen(true)}
                                     size="small"
@@ -166,7 +166,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                 >
                                     <PowerIcon fontSize="small" />
                                 </IconButton>
-                            </Tooltip>
+                            </Tooltip> */}
                             <Tooltip title="Delete">
                                 <IconButton
                                     onClick={handleDeleteClick}

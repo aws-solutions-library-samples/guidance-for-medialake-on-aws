@@ -306,6 +306,18 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:ListTargetsByRule",
+                    "events:DeleteRule",
+                ],
+                resources=[
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
+                ],
+            )
+        )
+
         # SQS policy for s3 connectors lambda that builds SQS queues
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -403,6 +415,7 @@ class ConnectorsConstruct(Construct):
                     "lambda:TagResource",
                     "lambda:CreateEventSourceMapping",
                     "lambda:GetLayerVersion",
+                    "lambda:DeleteEventSourceMapping",
                 ],
                 resources=[
                     f"arn:aws:lambda:*:{account_id}:function:*",

@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import Rotate90DegreesCwIcon from '@mui/icons-material/Rotate90DegreesCw';
-import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 import HomeIcon from '@mui/icons-material/Home';
 import LockIcon from '@mui/icons-material/Lock';
 import GetAppIcon from '@mui/icons-material/GetApp';
@@ -14,38 +13,69 @@ interface ImageViewerProps {
     filename?: string;
 }
 
-const ZOOM_FACTOR = 1.1; // Zoom factor per scroll event
+const ZOOM_FACTOR = 1.1;
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh', filename = 'image_download' }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({
+    imageSrc,
+    maxHeight = '70vh',
+    filename = 'image_download',
+}) => {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [rotate, setRotate] = useState(0);
     const [isCanvasLocked, setIsCanvasLocked] = useState(true);
     const [dragging, setDragging] = useState(false);
-    const [isImageLoaded, setIsImageLoaded] = useState(false);
+
+    // The "base" scale that makes the image fully fit in the container
     const [scaleSize, setScaleSize] = useState(1);
+    // Track whether we’ve done the first “real” drawing yet
+    const [isFirstDrawComplete, setIsFirstDrawComplete] = useState(false);
+    // Show a "Loading..." overlay until image is ready + initial draw is done
+    const [isImageReady, setIsImageReady] = useState(false);
+    // Holds the loaded <img> object
     const [background, setBackground] = useState<HTMLImageElement | null>(null);
+    // Whether we have finished measuring + setting up the scale
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    /**
+     * Refs to the DOM elements
+     */
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const divRef = useRef<HTMLDivElement>(null);
     const touch = useRef({ x: 0, y: 0 });
+
+    // We’ll clamp zoom between half and 5x the "base" scale
     const MIN_ZOOM = scaleSize * 0.5;
     const MAX_ZOOM = scaleSize * 5;
 
-    // Calculate the initial scale to fit the image within the canvas
+    /**
+     * Helper to calculate scale so the image fits in the container.
+     */
     const calculateInitialScale = useCallback(
-        (imgWidth: number, imgHeight: number) => {
+        (imgWidth: number, imgHeight: number): Promise<number> => {
             const canvas = canvasRef.current;
-            if (!canvas) return 1;
+            if (!canvas) return Promise.resolve(1);
 
-            // Wait for next frame to ensure canvas is properly sized
-            return new Promise<number>(resolve => {
+            return new Promise<number>((resolve) => {
+                // Use a single requestAnimationFrame to ensure final DOM layout
                 requestAnimationFrame(() => {
                     const canvasWidth = canvas.clientWidth;
-                    const maxHeightNumber = typeof maxHeight === 'string'
-                        ? maxHeight.endsWith('vh')
-                            ? window.innerHeight * (parseFloat(maxHeight) / 100)
-                            : parseFloat(maxHeight)
-                        : maxHeight;
+
+                    // Parse maxHeight string (e.g. "70vh") or number
+                    let maxHeightNumber: number;
+                    if (typeof maxHeight === 'string') {
+                        if (maxHeight.endsWith('vh')) {
+                            const vhValue = parseFloat(maxHeight);
+                            maxHeightNumber = window.innerHeight * (vhValue / 100);
+                        } else {
+                            // e.g. "500px"
+                            maxHeightNumber = parseFloat(maxHeight);
+                        }
+                    } else {
+                        // numeric
+                        maxHeightNumber = maxHeight;
+                    }
+
                     const canvasHeight = maxHeightNumber;
 
                     let scale = 1;
@@ -53,9 +83,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                         const scaleX = canvasWidth / imgWidth;
                         const scaleY = canvasHeight / imgHeight;
                         scale = Math.min(scaleX, scaleY);
-                    } else {
-                        // If image is smaller than canvas, use scale of 1 to show actual size
-                        scale = 1;
                     }
                     resolve(scale);
                 });
@@ -64,65 +91,96 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
         [maxHeight]
     );
 
-    // Function to draw the image on the canvas
+    /**
+     * Draw the image in the canvas with the current scale/offset/rotation.
+     */
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas || !background) return;
+
         const context = canvas.getContext('2d');
         if (!context) return;
+
         const dpr = window.devicePixelRatio || 1;
         const { width: imgWidth, height: imgHeight } = background;
+
+        // Scale the canvas to the device pixel ratio
         canvas.width = canvas.clientWidth * dpr;
         canvas.height = canvas.clientHeight * dpr;
+
         context.resetTransform();
         context.scale(dpr, dpr);
         context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
         context.save();
+        // Center on canvas
         context.translate(canvas.width / (2 * dpr), canvas.height / (2 * dpr));
+        // Apply rotation
         context.rotate((rotate * Math.PI) / 180);
+        // Apply zoom
         context.scale(zoom, zoom);
+        // Apply pan offset
         context.translate(-imgWidth / 2 - offset.x, -imgHeight / 2 - offset.y);
+
         context.drawImage(background, 0, 0);
         context.restore();
     }, [background, zoom, offset, rotate]);
 
-    // Load the image and set initial state
+    /**
+     * 1) Load the image from `imageSrc`.
+     */
     useEffect(() => {
         const img = new Image();
+        setIsImageReady(false);
+        setIsInitialized(false);
+        setIsFirstDrawComplete(false);
+
         img.onload = async () => {
             setBackground(img);
             try {
+                // Compute best-fit scale
                 const initialScale = await calculateInitialScale(img.width, img.height);
                 setScaleSize(initialScale);
                 setZoom(initialScale);
-                setOffset({ x: 0, y: 0 }); // Reset offset when loading new image
-                setRotate(0); // Reset rotation when loading new image
-                setIsImageLoaded(true);
+                setOffset({ x: 0, y: 0 });
+                setRotate(0);
+                setIsInitialized(true);
+                setIsImageReady(true);
             } catch (error) {
                 console.error('Error calculating initial scale:', error);
-                setIsImageLoaded(false);
+                setIsInitialized(true);
+                setIsImageReady(true);
             }
         };
         img.src = imageSrc;
     }, [imageSrc, calculateInitialScale]);
 
-    // Redraw the canvas whenever dependencies change
+    /**
+     * 2) Once `isInitialized` is true, do our first draw at the correct scale,
+     *    then set `isFirstDrawComplete`.
+     */
     useEffect(() => {
-        if (!isImageLoaded || !background || !canvasRef.current) return;
+        if (!isInitialized || !background || !canvasRef.current) return;
 
-        // Use requestAnimationFrame to ensure canvas is ready
-        const animationFrame = requestAnimationFrame(() => {
+        const drawImage = () => {
             draw();
-        });
+            if (!isFirstDrawComplete) {
+                setIsFirstDrawComplete(true);
+            }
+        };
+        const animationFrame = requestAnimationFrame(drawImage);
 
         return () => cancelAnimationFrame(animationFrame);
-    }, [isImageLoaded, background, draw]);
+    }, [isInitialized, background, draw, isFirstDrawComplete]);
 
-    // Handle zooming with the mouse wheel using multiplicative zoom
+    /**
+     * Handle zoom (wheel) - only if unlocked
+     */
     const handleWheel = useCallback(
         (event: WheelEvent) => {
             if (isCanvasLocked) return;
             event.preventDefault();
+
             const { deltaY } = event;
             setZoom((prevZoom) => {
                 const zoomDirection = deltaY > 0 ? -1 : 1;
@@ -134,70 +192,44 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                 return newZoom;
             });
         },
-        [MIN_ZOOM, MAX_ZOOM, isCanvasLocked]
+        [isCanvasLocked, MIN_ZOOM, MAX_ZOOM]
     );
 
-    const handleCanvasDownload = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        // Create a new canvas
-        const newCanvas = document.createElement('canvas');
-        newCanvas.width = canvas.width;
-        newCanvas.height = canvas.height;
-
-        // Get the context of the new canvas
-        const context = newCanvas.getContext('2d');
-        if (!context) return;
-
-        // Draw the original canvas onto the new canvas
-        context.drawImage(canvas, 0, 0);
-
-        try {
-            // Convert the new canvas to a data URL
-            const dataUrl = newCanvas.toDataURL('image/png');
-
-            // Create a temporary link element
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `${filename || 'image'}_modified.png`;
-
-            // Append to the body, click, and remove
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error) {
-            console.error('Error downloading image:', error);
-        }
-    };
-
-    // Add and remove the wheel event listener
+    // Add or remove the wheel listener
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+
         if (!isCanvasLocked) {
             canvas.addEventListener('wheel', handleWheel, { passive: false });
         }
-        return () => canvas.removeEventListener('wheel', handleWheel);
+        return () => {
+            canvas.removeEventListener('wheel', handleWheel);
+        };
     }, [handleWheel, isCanvasLocked]);
 
-    // Handle panning the image
+    /**
+     * Handle panning with mouse
+     */
     const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (isCanvasLocked || !dragging) return;
+
         const { clientX, clientY } = event;
+        // Panning is inversely affected by zoom
         const deltaX = (clientX - touch.current.x) / zoom;
         const deltaY = (clientY - touch.current.y) / zoom;
+
         setOffset((prevOffset) => ({
             x: prevOffset.x - deltaX,
             y: prevOffset.y - deltaY,
         }));
+
         touch.current = { x: clientX, y: clientY };
     };
 
     const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
         if (isCanvasLocked) return;
-        const { clientX, clientY } = event;
-        touch.current = { x: clientX, y: clientY };
+        touch.current = { x: event.clientX, y: event.clientY };
         setDragging(true);
     };
 
@@ -205,7 +237,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
         setDragging(false);
     };
 
-    // Center and reset the image
+    /**
+     * Reset & Center
+     */
     const centerImage = () => {
         setZoom(scaleSize);
         setOffset({ x: 0, y: 0 });
@@ -220,42 +254,77 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
         setIsCanvasLocked(!isCanvasLocked);
     };
 
-    // Resize handler
-    const handleResize = useCallback(async () => {
-        if (!background || !canvasRef.current) return;
+    /**
+     * Download
+     */
+    const handleCanvasDownload = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // Create a new offscreen canvas to avoid forcing user retina scaling
+        const newCanvas = document.createElement('canvas');
+        newCanvas.width = canvas.width;
+        newCanvas.height = canvas.height;
+
+        const context = newCanvas.getContext('2d');
+        if (!context) return;
+
+        // Draw the rendered content
+        context.drawImage(canvas, 0, 0);
 
         try {
-            // Recalculate the initial scale based on the new size
-            const initialScale = await calculateInitialScale(background.width, background.height);
-            setScaleSize(initialScale);
-            // Optionally adjust zoom to maintain the same relative scale
-            setZoom((prevZoom) => {
-                const scaleRatio = initialScale / scaleSize;
-                return prevZoom * scaleRatio;
-            });
-            // Redraw the image with the new dimensions
+            const dataUrl = newCanvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${filename || 'image'}_modified.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading image:', error);
+        }
+    };
+
+    /**
+     * Handle container resize via ResizeObserver
+     */
+    const handleResize = useCallback(async () => {
+        if (!background || !canvasRef.current) return;
+        try {
+            const newScaleSize = await calculateInitialScale(background.width, background.height);
+            setScaleSize(newScaleSize);
+
+            // Re-fit the image fully on container resize:
+            setZoom(newScaleSize);
+            setOffset({ x: 0, y: 0 });
+
+            // Redraw after resizing
             requestAnimationFrame(() => {
                 draw();
             });
-        } catch (error) {
-            console.error('Error handling resize:', error);
+        } catch (err) {
+            console.error('Error handling resize:', err);
         }
-    }, [background, calculateInitialScale, draw, scaleSize]);
+    }, [background, calculateInitialScale, draw]);
 
-    // Observe resize events
+    // Debounce the resize handler so it doesn't fire too often
+    const debouncedHandleResize = useCallback(_.debounce(handleResize, 100), [
+        handleResize,
+    ]);
+
     useEffect(() => {
-        const observer = new ResizeObserver(() => {
-            handleResize();
-        });
+        const observer = new ResizeObserver(debouncedHandleResize);
         if (divRef.current) {
             observer.observe(divRef.current);
         }
         return () => {
             observer.disconnect();
         };
-    }, [handleResize]);
+    }, [debouncedHandleResize]);
 
-    // Define the tool buttons
+    /**
+     * Tool buttons
+     */
     const toolButtons = [
         {
             tip: 'Download Canvas',
@@ -275,16 +344,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
         {
             tip: 'Rotate',
             icon: <Rotate90DegreesCwIcon />,
-            onClick: () => {
-                setRotate((prevRotate) => (prevRotate + 90) % 360);
-            },
-            style: {
-                transform: 'rotate(90deg)',
-            },
+            onClick: () => setRotate((prev) => (prev + 90) % 360),
+            style: { transform: 'rotate(90deg)' },
         },
     ];
 
-    // Render the component
     return (
         <Box
             ref={divRef}
@@ -299,6 +363,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                 overflow: 'hidden',
             }}
         >
+            {/**
+       *  Always render the <canvas>, but hide it until first draw is done.
+       *  That ensures there's no flicker or giant image shown briefly.
+       */}
             <canvas
                 ref={canvasRef}
                 onMouseDown={handleMouseDown}
@@ -308,11 +376,34 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                 style={{
                     width: '100%',
                     height: '100%',
-                    cursor: isCanvasLocked ? 'default' : (dragging ? 'grabbing' : 'grab'),
+                    cursor: isCanvasLocked ? 'default' : dragging ? 'grabbing' : 'grab',
                     gridColumn: '1 / -1',
                     gridRow: '1 / -1',
+                    opacity: isFirstDrawComplete ? 1 : 0,
+                    transition: 'opacity 0.3s ease-in-out',
                 }}
             />
+
+            {/**
+       *  If not ready, show an overlay
+       */}
+            {!isImageReady && (
+                <Box
+                    sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gridColumn: '1 / -1',
+                        gridRow: '1 / -1',
+                    }}
+                >
+                    Loading...
+                </Box>
+            )}
+
+            {/**  Toolbar with buttons */}
             <Box
                 sx={{
                     position: 'absolute',
@@ -321,15 +412,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageSrc, maxHeight = '70vh',
                     display: 'flex',
                     flexDirection: 'row',
                     gap: '8px',
-                    zIndex: 1,
+                    zIndex: 1000,
                 }}
             >
                 {toolButtons.map((item, i) => (
                     <Tooltip key={`image-tool-${i}`} title={item.tip}>
-                        <IconButton
-                            color="primary"
-                            onClick={item.onClick}
-                        >
+                        <IconButton color="primary" onClick={item.onClick} style={item.style}>
                             {item.icon}
                         </IconButton>
                     </Tooltip>

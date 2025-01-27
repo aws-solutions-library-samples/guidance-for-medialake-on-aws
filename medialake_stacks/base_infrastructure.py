@@ -125,13 +125,9 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeVPC",
             props=CustomVpcProps(
-                vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}",
-                max_azs=config.vpc.max_azs,
-                nat_gateways=config.vpc.nat_gateways,
-                cidr=config.vpc.cidr,
-                enable_dns_hostnames=config.vpc.enable_dns_hostnames,
-                enable_dns_support=config.vpc.enable_dns_support,
-                vpc_id=config.vpc.vpc_id,
+                use_existing_vpc=config.vpc.use_existing_vpc,
+                existing_vpc=config.vpc.existing_vpc,
+                new_vpc=config.vpc.new_vpc,
             ),
         )
 
@@ -158,19 +154,30 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Create OpenSearch managed cluster
-        private_subnet_ids = self._vpc.get_subnet_ids(
-            ec2.SubnetType.PRIVATE_WITH_EGRESS
-        )
+        if config.vpc.use_existing_vpc:
+            selected_subnet_ids = config.vpc.existing_vpc.subnet_ids["private"][
+                : config.opensearch_cluster_settings.availability_zone_count
+            ]
+        else:
+            private_subnets = self._vpc.get_subnet_ids(
+                ec2.SubnetType.PRIVATE_WITH_EGRESS
+            )
+            selected_subnet_ids = [
+                subnet["subnet_id"]
+                for subnet in private_subnets[
+                    : config.opensearch_cluster_settings.availability_zone_count
+                ]
+            ]
+
+        print(f"Selected subnet IDs for OpenSearch cluster: {selected_subnet_ids}")
 
         self._opensearch_cluster = OpenSearchCluster(
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
                 domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
-                vpc=self._vpc.vpc,  # Use the vpc property from CustomVpc
-                subnet_ids=private_subnet_ids[
-                    : config.opensearch_cluster_settings.availability_zone_count
-                ],
+                vpc=self._vpc.vpc,
+                subnet_ids=selected_subnet_ids,
                 collection_indexes=[opensearch_index_name],
                 security_group=self._security_group,
             ),

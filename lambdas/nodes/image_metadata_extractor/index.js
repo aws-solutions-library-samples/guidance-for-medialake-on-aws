@@ -189,7 +189,10 @@ function sanitizeMetadata(obj) {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'string') {
-            result[key] = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+            // Remove control characters and escape special characters
+            result[key] = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+                .replace(/[\\"']/g, '\\$&')
+                .replace(/\u0000/g, '\\0');
         } else if (typeof value === 'object') {
             result[key] = sanitizeMetadata(value);
         } else {
@@ -276,5 +279,3 @@ exports.lambda_handler = async (event) => {
         };
     }
 };
-
-
