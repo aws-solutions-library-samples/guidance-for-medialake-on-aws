@@ -28,6 +28,8 @@ import {
     Group as GroupIcon,
     Security as SecurityIcon,
     Home as HomeIcon,
+    Extension as IntegrationIcon,
+    Cloud as EnvironmentIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
@@ -86,6 +88,8 @@ function Sidebar() {
                 { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
                 { text: t('sidebar.submenu.userManagement'), icon: <GroupIcon />, path: '/settings/users' },
                 { text: t('sidebar.submenu.roles'), icon: <SecurityIcon />, path: '/settings/roles' },
+                { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations' },
+                { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
             ]
         }
     ];

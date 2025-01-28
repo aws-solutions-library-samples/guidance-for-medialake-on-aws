@@ -51,4 +51,11 @@ export const QUERY_KEYS = {
         details: () => [...QUERY_KEYS.ROLES.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.ROLES.details(), id] as const,
     },
+    ENVIRONMENTS: {
+        all: ['environments'] as const,
+        lists: () => [...QUERY_KEYS.ENVIRONMENTS.all, 'list'] as const,
+        list: (filters: string) => [...QUERY_KEYS.ENVIRONMENTS.lists(), { filters }] as const,
+        details: () => [...QUERY_KEYS.ENVIRONMENTS.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.ENVIRONMENTS.details(), id] as const,
+    },
 } as const;

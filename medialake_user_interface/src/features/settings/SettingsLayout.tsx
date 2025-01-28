@@ -6,6 +6,8 @@ import ConnectorsPage from '../../pages/settings/ConnectorsPage';
 import ProfilePage from '../../pages/settings/ProfilePage';
 import UserManagement from '../../pages/settings/UserManagement';
 import RoleManagement from '../../pages/settings/RoleManagement';
+import IntegrationsPage from '../../pages/settings/IntegrationsPage';
+import EnvironmentsPage from '../../pages/settings/EnvironmentsPage';
 
 const SettingsComponent: React.FC = () => {
     const { isCollapsed } = useSidebar();
@@ -27,6 +29,8 @@ const SettingsComponent: React.FC = () => {
                 <Route path="connectors" element={<ConnectorsPage />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="roles" element={<RoleManagement />} />
+                <Route path="integrations" element={<IntegrationsPage />} />
+                <Route path="environments" element={<EnvironmentsPage />} />
                 <Route path="/" element={<Navigate to="profile" replace />} />
                 <Route path="*" element={<Navigate to="profile" replace />} />
             </Routes>

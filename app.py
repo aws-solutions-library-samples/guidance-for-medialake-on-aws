@@ -9,6 +9,7 @@ from config import config
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
+from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack
 from medialake_stacks.pipeline_stack import (
     PipelineStack,
     PipelineStackProps,
@@ -17,13 +18,30 @@ from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStack,
     PipelineNodesStackProps,
 )
+from medialake_stacks.nodes_stack import NodesStack
 
 app = cdk.App()
+
+# Create Lambda warmer stack if enabled
+lambda_warmer = None
+if config.lambda_tail_warming:
+    lambda_warmer = LambdaWarmerStack(
+        app,
+        "MediaLakeLambdaWarmer",
+        env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    )
 
 # Create base infrastructure stack first
 base_infrastructure = BaseInfrastructureStack(
     app,
     "MediaLakeBaseInfrastructure",
+    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+)
+
+# Create nodes stack
+nodes_stack = NodesStack(
+    app,
+    "MediaLakeNodes",
     env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
@@ -60,6 +78,11 @@ api_gateway_stack = ApiGatewayStack(
     env=cdk.Environment(region=config.primary_region, account=config.account_id),
 )
 
+# Add Lambda warming to API Gateway functions if enabled
+if lambda_warmer:
+    for function in api_gateway_stack.get_functions():
+        lambda_warmer.add_function_to_warming(function)
+
 pipeline_stack = PipelineStack(
     app,
     "MediaLakePipeline",
@@ -91,6 +114,10 @@ cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
+cleanup_stack.add_dependency(nodes_stack)
+
+if lambda_warmer:
+    cleanup_stack.add_dependency(lambda_warmer)
 
 cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
