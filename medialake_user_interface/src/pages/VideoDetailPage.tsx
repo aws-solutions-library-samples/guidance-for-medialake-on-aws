@@ -99,40 +99,20 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
 
 const VideoDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
     const location = useLocation();
-    const searchParams = new URLSearchParams(location.search);
-    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
     const { isExpanded } = useRightSidebar();
-    const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
+    const { data: assetData, isLoading, error } = useAsset(id || '');
 
+    const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/videos/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
         { user: "Jane Smith", avatar: "https://mui.com/static/videos/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
         { user: "Mike Johnson", avatar: "https://mui.com/static/videos/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
     ]);
 
-    const handleAddComment = (comment: string) => {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
-
-        const newComment = {
-            user: "Current User",
-            avatar: "https://mui.com/static/videos/avatar/1.jpg",
-            content: comment,
-            timestamp: formattedTimestamp
-        };
-        setComments([...comments, newComment]);
-    };
+    const searchParams = new URLSearchParams(location.search);
+    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
 
     const versions = useMemo(() => {
         if (!assetData?.data?.asset) return [];
@@ -181,6 +161,47 @@ const VideoDetailContent: React.FC = () => {
             ]
         };
     }, [assetData]);
+
+    const transformMetadata = (metadata: any) => {
+        if (!metadata) return [];
+
+        return Object.entries(metadata).map(([parentCategory, parentData]) => ({
+            category: parentCategory,
+            subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
+                category: subCategory,
+                data: data,
+                count: typeof data === 'object' ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 1
+            })),
+            count: Object.keys(parentData as object).length
+        }));
+    };
+
+    const metadataAccordions = useMemo(() => {
+        if (!assetData?.data?.asset?.Metadata) return [];
+        return transformMetadata(assetData.data.asset.Metadata);
+    }, [assetData]);
+
+    const handleAddComment = (comment: string) => {
+        const now = new Date();
+        const formattedTimestamp = now.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
+
+        const newComment = {
+            user: "Current User",
+            avatar: "https://mui.com/static/videos/avatar/1.jpg",
+            content: comment,
+            timestamp: formattedTimestamp
+        };
+        setComments([...comments, newComment]);
+    };
+
 
     const toggleMetadataExpansion = (key: string) => {
         setExpandedMetadata(prev => ({ ...prev, [key]: !prev[key] }));
@@ -236,43 +257,21 @@ const VideoDetailContent: React.FC = () => {
         return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
     })();
 
-    const transformMetadata = (metadata: any) => {
-        if (!metadata) return [];
 
-        return Object.entries(metadata).map(([parentCategory, parentData]) => ({
-            category: parentCategory,
-            subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
-                category: subCategory,
-                data: data,
-                count: typeof data === 'object' ? (Array.isArray(data) ? data.length : Object.keys(data).length) : 1
-            })),
-            count: Object.keys(parentData as object).length
-        }));
-    };
-
-    const metadataAccordions = useMemo(() => {
-        if (!assetData?.data?.asset?.Metadata) return [];
-        return transformMetadata(assetData.data.asset.Metadata);
-    }, [assetData]);
 
     return (
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100vh',
             maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
             transition: theme => theme.transitions.create(['max-width'], {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.enteringScreen,
             }),
+            height: '100vh',
+            overflow: 'auto',
         }}>
-            {/* Fixed header section */}
-            <Box sx={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 1200,
-                bgcolor: 'background.default'
-            }}>
+            <Box sx={{ position: 'sticky', top: 0, zIndex: 1200, bgcolor: 'background.default' }}>
                 <BreadcrumbNavigation
                     searchTerm={searchTerm}
                     currentResult={48}
@@ -284,35 +283,21 @@ const VideoDetailContent: React.FC = () => {
                     assetId={assetData.data.asset.InventoryID}
                     assetType="Video"
                 />
-                <Box sx={{ px: 3, pt: 2 }}>
-                    <AssetHeader />
-                </Box>
             </Box>
 
-            {/* Scrollable content */}
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                overflow: 'auto',
-                gap: 3,
-                px: 3,
-                pb: 3
-            }}>
-                {/* Fixed video section */}
-                <Box sx={{
-                    position: 'sticky',
-                    top: 120,
-                    zIndex: 1100,
-                    bgcolor: 'background.default',
-                    pt: 2
-                }}>
-                    <AssetVideo
-                        src={proxyUrl}
-                        alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
-                    />
-                </Box>
-                <Box>
+            <Box sx={{ px: 3, pt: 2 }}>
+                <AssetHeader />
+            </Box>
+
+            <Box sx={{ px: 3, pt: 2 }}>
+                <AssetVideo
+                    src={proxyUrl}
+                    alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
+                />
+            </Box>
+
+            <Box sx={{ px: 3, pb: 3 }}>
+                <Box sx={{ mt: 2 }}>
                     <Paper elevation={3} sx={{ p: 2 }}>
                         <Typography variant="h6">Metadata</Typography>
                         <Divider sx={{ my: 1 }} />
