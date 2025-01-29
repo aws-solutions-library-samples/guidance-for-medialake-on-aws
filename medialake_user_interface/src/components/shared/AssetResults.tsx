@@ -132,6 +132,8 @@ function AssetResults<T extends AssetBase>({
                                 id={asset.InventoryID}
                                 name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                                 thumbnailUrl={asset.thumbnailUrl}
+                                proxyUrl={asset.proxyUrl}
+                                assetType={assetType}
                                 fields={cardFields}
                                 renderField={(fieldId) => renderCardField(fieldId, asset)}
                                 onImageClick={() => handleAssetClick(asset)}

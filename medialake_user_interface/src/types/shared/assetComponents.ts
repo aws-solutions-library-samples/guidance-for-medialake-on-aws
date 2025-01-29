@@ -20,6 +20,7 @@ export interface AssetCardProps {
     id: string;
     name: string;
     thumbnailUrl?: string;
+    proxyUrl?: string;
     fields: AssetField[];
     renderField: (fieldId: string) => string | React.ReactNode;
     onImageClick: () => void;

@@ -138,5 +138,5 @@ export const useTrackRecentlyViewed = (item: Omit<RecentlyViewedItem, 'timestamp
         if (item) {
             addItem(item);
         }
-    }, [item, addItem]);
+    }, [item?.id]); // Only re-run the effect if the item's id changes
 };

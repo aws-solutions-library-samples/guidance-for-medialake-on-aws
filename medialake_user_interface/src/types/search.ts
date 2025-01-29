@@ -62,6 +62,7 @@ export interface SearchResult {
     metadata: any;
     score: number;
     thumbnailUrl: string | null;
+    proxyUrl: string | null;
 }
 
 export interface SearchResponse {

@@ -244,16 +244,24 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
 
     # Generate thumbnail URL if applicable
     thumbnail_url = None
+    proxy_url = None
+
     for representation in derived_representations:
-        if representation.get("Purpose") == "thumbnail":
-            storage_info = representation.get("StorageInfo", {}).get(
-                "PrimaryLocation", {}
+        purpose = representation.get("Purpose")
+        storage_info = representation.get("StorageInfo", {}).get("PrimaryLocation", {})
+
+        if storage_info.get("StorageType") == "s3":
+            presigned_url = generate_presigned_url(
+                bucket=storage_info.get("Bucket", ""),
+                key=storage_info.get("ObjectKey", {}).get("FullPath", ""),
             )
-            if storage_info.get("StorageType") == "s3":
-                thumbnail_url = generate_presigned_url(
-                    bucket=storage_info.get("Bucket", ""),
-                    key=storage_info.get("ObjectKey", {}).get("FullPath", ""),
-                )
+
+            if purpose == "thumbnail":
+                thumbnail_url = presigned_url
+            elif purpose == "proxy":
+                proxy_url = presigned_url
+
+        if thumbnail_url and proxy_url:
             break
 
     return AssetSearchResult(
@@ -264,6 +272,7 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         Metadata=source.get("Metadata", {}),
         score=hit["_score"],
         thumbnailUrl=thumbnail_url,
+        proxyUrl=proxy_url,
     )
 
 

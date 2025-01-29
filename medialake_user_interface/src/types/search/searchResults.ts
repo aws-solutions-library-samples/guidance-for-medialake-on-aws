@@ -7,6 +7,7 @@ export interface CardFieldConfig {
 export interface AssetBase {
     InventoryID: string;
     thumbnailUrl?: string;
+    proxyUrl?: string;
     DigitalSourceAsset: {
         CreateDate: string;
         MainRepresentation: {

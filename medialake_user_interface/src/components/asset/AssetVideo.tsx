@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Paper } from '@mui/material';
+import { Box } from '@mui/material';
 import { VideoViewer } from '../common/VideoViewer';
 
 interface AssetVideoProps {
@@ -9,28 +9,26 @@ interface AssetVideoProps {
 
 const AssetVideo: React.FC<AssetVideoProps> = ({ src, alt }) => {
     return (
-
-        <Paper
-            elevation={1}
-        // sx={{
-        //     height: '100%',
-        //     display: 'flex',
-        //     justifyContent: 'center',
-        //     alignItems: 'center',
-        //     overflow: 'hidden',
-        //     bgcolor: 'background.paper',
-        //     '& img': {
-        //         maxWidth: '100%',
-        //         maxHeight: '100%',
-        //         objectFit: 'contain'
-        //     }
-        // }}
+        <Box
+            width="100%"
+            height="100%"
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            sx={{
+                '& > div': {
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                },
+            }}
         >
             <VideoViewer
                 videoSrc={src}
             />
-        </Paper>
-
+        </Box>
     );
 };
 

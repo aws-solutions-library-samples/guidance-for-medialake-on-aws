@@ -3,6 +3,7 @@ import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
+import VideoViewer from '../common/VideoViewer';
 
 export interface AssetField {
     id: string;
@@ -14,6 +15,8 @@ export interface AssetCardProps {
     id: string;
     name: string;
     thumbnailUrl?: string;
+    proxyUrl?: string;
+    assetType?: string;
     fields: AssetField[];
     renderField: (fieldId: string) => string | React.ReactNode;
     onImageClick: () => void;
@@ -32,6 +35,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
     id,
     name,
     thumbnailUrl,
+    proxyUrl,
+    assetType,
     fields,
     renderField,
     onImageClick,
@@ -82,20 +87,32 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     }
                 }}
             >
-                <Box
-                    component="img"
-                    src={thumbnailUrl || placeholderImage}
-                    alt={name}
-                    onError={onImageError || defaultImageErrorHandler}
-                    data-image-id={id}
-                    sx={{
-                        width: '100%',
-                        height: 200,
-                        backgroundColor: 'rgba(0,0,0,0.03)',
-                        objectFit: 'contain'
 
-                    }}
-                />
+                {assetType === 'Video' ? (
+                    // <VideoViewer videoSrc={proxyUrl} />
+                    <video
+                        style={{
+                            width: '100%',
+                            height: 200,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            objectFit: 'contain'
+                        }}
+                        controls src={proxyUrl}></video>
+                ) : (
+                    <Box
+                        component="img"
+                        src={thumbnailUrl || placeholderImage}
+                        alt={name}
+                        onError={onImageError || defaultImageErrorHandler}
+                        data-image-id={id}
+                        sx={{
+                            width: '100%',
+                            height: 200,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            objectFit: 'contain'
+                        }}
+                    />
+                )}
                 <Box sx={{ p: 2 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {fields.map(field => field.visible && (

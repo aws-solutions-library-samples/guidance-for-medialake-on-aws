@@ -289,7 +289,7 @@ const VideoDetailContent: React.FC = () => {
                 <AssetHeader />
             </Box>
 
-            <Box sx={{ px: 3, pt: 2 }}>
+            <Box sx={{ px: 3, pt: 2, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
                 <AssetVideo
                     src={proxyUrl}
                     alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}

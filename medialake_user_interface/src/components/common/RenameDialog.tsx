@@ -30,7 +30,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
     isLoading = false,
 }) => {
     const [newName, setNewName] = useState(currentName);
-    console.log("currentName", currentName)
+
     useEffect(() => {
         if (open) {
             setNewName(currentName);
