@@ -122,46 +122,36 @@ def clean_asset_id(input_string: str) -> str:
 
 
 def sanitize_metadata(metadata):
+    def sanitize_value(value):
+        if isinstance(value, str):
+            # Remove control characters and escape special characters
+            return (
+                "".join(char for char in value if ord(char) >= 32)
+                .encode("ascii", "ignore")
+                .decode("ascii")
+                .replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("'", "\\'")
+                .replace("\0", "\\0")
+            )
+        elif isinstance(value, dict):
+            return sanitize_dict(value)
+        elif isinstance(value, list):
+            return [sanitize_value(item) for item in value]
+        else:
+            return value
+
+    def sanitize_dict(d):
+        return {sanitize_key(k): sanitize_value(v) for k, v in d.items()}
+
     def sanitize_key(key):
         # Remove '@' and capitalize the first letter
         key = key.replace("@", "")
-
         # Convert from snake_case or camel_case to CamelCase
-        parts = key.split("_")
-        return "".join(word.capitalize() for word in parts)
-
-    def sanitize_dict(d):
-        new_dict = {}
-        for key, value in d.items():
-            new_key = sanitize_key(key)
-            if isinstance(value, dict):
-                value = sanitize_dict(value)
-            elif isinstance(value, list):
-                value = [
-                    sanitize_dict(item) if isinstance(item, dict) else item
-                    for item in value
-                ]
-
-            # If the key already exists, we keep the first occurrence
-            if new_key not in new_dict:
-                new_dict[new_key] = value
-        return new_dict
+        return "".join(word.capitalize() for word in key.split("_"))
 
     # Capitalize the main keys (General, Video, Audio)
-    sanitized = {}
-    for key, value in metadata.items():
-        new_key = key.capitalize()
-        if isinstance(value, dict):
-            sanitized[new_key] = sanitize_dict(value)
-        elif isinstance(value, list):
-            sanitized[new_key] = [
-                sanitize_dict(item) if isinstance(item, dict) else item
-                for item in value
-            ]
-        else:
-            sanitized[new_key] = value
-
-    return sanitized
+    return {k.capitalize(): sanitize_value(v) for k, v in metadata.items()}
 
 
 @logger.inject_lambda_context

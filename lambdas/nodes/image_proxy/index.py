@@ -187,9 +187,9 @@ def lambda_handler(event, context: LambdaContext):
         # Save the processed image
         output_buffer = io.BytesIO()
 
-        # Save as WebP with appropriate quality
+        # Save as WebP with lossless compression for thumbnails
         if mode == "thumbnail":
-            processed_img.save(output_buffer, format="WEBP", quality=85)
+            processed_img.save(output_buffer, format="WEBP", lossless=True)
             asset_id = f"{asset_id}:thumbnail"
             output_data = output_buffer.getvalue()
             new_representation = {
@@ -216,7 +216,7 @@ def lambda_handler(event, context: LambdaContext):
                 },
             }
         else:  # proxy mode
-            processed_img.save(output_buffer, format="WEBP", quality=90)
+            processed_img.save(output_buffer, format="WEBP", lossless=True)
             output_data = output_buffer.getvalue()
             asset_id = f"{asset_id}:proxy"
             new_representation = {

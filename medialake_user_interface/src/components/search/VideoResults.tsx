@@ -122,7 +122,7 @@ const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onP
                 defaultColumns,
                 sortOptions,
                 renderCardField,
-                placeholderImage: 'https://placehold.co/300x200',
+                placeholderImage: 'https://placehold.co/300x200?text=Placeholder',
             }}
             searchTerm={searchTerm}
         />

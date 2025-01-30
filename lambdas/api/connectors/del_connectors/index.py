@@ -2,6 +2,7 @@ import json
 import boto3
 import os
 from botocore.exceptions import ClientError
+from typing import List, Dict, Any
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
@@ -66,8 +67,9 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
         iam = boto3.client("iam", region_name=region)
         s3 = boto3.client("s3", region_name=region)
         sqs = boto3.client("sqs", region_name=region)
+        eventbridge = boto3.client("events", region_name=region)
 
-        errors = []
+        errors: List[str] = []
 
         # Delete Lambda
         try:
@@ -112,17 +114,16 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 logger.error(error_msg)
                 errors.append(error_msg)
 
-        # Remove S3 bucket notification
-        try:
-            s3.put_bucket_notification_configuration(
-                Bucket=bucket_name,
-                NotificationConfiguration={},  # Empty config removes all notifications
+        # Handle different integration methods
+        integration_method = connector.get("integrationMethod")
+        if integration_method == "s3Notifications":
+            errors.extend(remove_s3_notifications(s3, bucket_name))
+        elif integration_method == "eventbridge":
+            errors.extend(remove_eventbridge_rule(eventbridge, connector_id, region))
+        else:
+            logger.info(
+                f"No specific cleanup needed for integration method: {integration_method}"
             )
-        except ClientError as e:
-            if e.response["Error"]["Code"] != "NoSuchBucket":
-                error_msg = f"Error removing S3 bucket notification: {str(e)}"
-                logger.error(error_msg)
-                errors.append(error_msg)
 
         # Delete connector from DynamoDB only if all other resources are cleaned up
         if not errors:
@@ -161,3 +162,49 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             "statusCode": 500,
             "body": json.dumps({"message": "Internal server error", "error": str(e)}),
         }
+
+
+def remove_s3_notifications(s3: Any, bucket_name: str) -> List[str]:
+    errors: List[str] = []
+    try:
+        s3.put_bucket_notification_configuration(
+            Bucket=bucket_name,
+            NotificationConfiguration={},  # Empty config removes all notifications
+        )
+        logger.info(f"Removed S3 bucket notifications for bucket: {bucket_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "NoSuchBucket":
+            error_msg = f"Error removing S3 bucket notification: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+    return errors
+
+
+def remove_eventbridge_rule(
+    eventbridge: Any, connector_id: str, region: str
+) -> List[str]:
+    errors: List[str] = []
+    rule_name = f"medialake-connector-{connector_id}"
+
+    try:
+        # List targets for the rule
+        targets = eventbridge.list_targets_by_rule(Rule=rule_name)["Targets"]
+
+        # Remove targets from the rule
+        if targets:
+            target_ids = [target["Id"] for target in targets]
+            eventbridge.remove_targets(Rule=rule_name, Ids=target_ids)
+
+        # Delete the rule
+        eventbridge.delete_rule(Name=rule_name)
+
+        logger.info(
+            f"Successfully removed EventBridge rule and targets for connector: {connector_id}"
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            error_msg = f"Error removing EventBridge rule: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+
+    return errors

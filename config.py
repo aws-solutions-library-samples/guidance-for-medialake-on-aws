@@ -1,8 +1,9 @@
 import json
-from typing import List, Optional
+from typing import Optional, Dict, List
 from aws_cdk import aws_logs as logs
 from pydantic import (
     BaseModel,
+    Field,
     field_validator,
     model_validator,
     validator,
@@ -183,14 +184,41 @@ class AuthConfig(BaseModel):
         return v
 
 
-class VpcConfig(BaseModel):
-    vpc_id: Optional[str] = None
+class ExistingVpcConfig(BaseModel):
+    vpc_id: str
+    vpc_cidr: str
+    subnet_ids: Dict[str, List[str]]
+
+
+class NewVpcConfig(BaseModel):
     vpc_name: str = "MediaLakeVPC"
     max_azs: int = 3
-    nat_gateways: int = 1
     cidr: str = "10.0.0.0/16"
     enable_dns_hostnames: bool = True
     enable_dns_support: bool = True
+
+
+class VpcConfig(BaseModel):
+    use_existing_vpc: bool = False
+    existing_vpc: Optional[ExistingVpcConfig] = None
+    new_vpc: Optional[NewVpcConfig] = NewVpcConfig()  # Provide a default NewVpcConfig
+
+    @model_validator(mode="after")
+    def check_vpc_config(self, values):
+        if self.use_existing_vpc and not self.existing_vpc:
+            raise ValueError(
+                "When use_existing_vpc is True, existing_vpc must be provided"
+            )
+        if not self.use_existing_vpc and not self.new_vpc:
+            raise ValueError("When use_existing_vpc is False, new_vpc must be provided")
+
+        if self.use_existing_vpc:
+            if not self.existing_vpc.subnet_ids.get("private"):
+                raise ValueError(
+                    "No private subnets found in the existing VPC configuration"
+                )
+
+        return self
 
 
 class CDKConfig(BaseModel):
@@ -209,28 +237,40 @@ class CDKConfig(BaseModel):
     secondary_region: Optional[str] = None
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
-    vpc: VpcConfig = VpcConfig()
+    vpc: VpcConfig = Field(default_factory=VpcConfig)
 
     @model_validator(mode="after")
     def check_az_count_vpc(self):
         if self.vpc and self.opensearch_cluster_settings:
-            vpc_max_azs = self.vpc.max_azs
-            opensearch_az_count = (
-                self.opensearch_cluster_settings.availability_zone_count
-            )
-
-            if opensearch_az_count > vpc_max_azs:
-                warnings.warn(
-                    f"OpenSearch availability_zone_count ({opensearch_az_count}) is greater than VPC max_azs ({vpc_max_azs}). This might cause deployment issues."
+            if self.vpc.use_existing_vpc:
+                required_subnet_count = (
+                    self.opensearch_cluster_settings.availability_zone_count
                 )
+                if (
+                    len(self.vpc.existing_vpc.subnet_ids["private"])
+                    < required_subnet_count
+                ):
+                    raise ValueError(
+                        f"Not enough private subnets in different AZs. Required: {required_subnet_count}, Found: {len(self.vpc.existing_vpc.subnet_ids['private'])}"
+                    )
+            elif self.vpc.new_vpc:
+                vpc_max_azs = self.vpc.new_vpc.max_azs
+                opensearch_az_count = (
+                    self.opensearch_cluster_settings.availability_zone_count
+                )
+
+                if opensearch_az_count > vpc_max_azs:
+                    warnings.warn(
+                        f"OpenSearch availability_zone_count ({opensearch_az_count}) is greater than VPC max_azs ({vpc_max_azs}). This might cause deployment issues."
+                    )
 
         return self
 
     @property
     def regions(self) -> List[str]:
-        regions = [config.primary_region]
-        if config.enable_ha and config.secondary_region:
-            regions.append(config.secondary_region)
+        regions = [self.primary_region]
+        if getattr(self, "enable_ha", False) and self.secondary_region:
+            regions.append(self.secondary_region)
         return regions
 
     @classmethod

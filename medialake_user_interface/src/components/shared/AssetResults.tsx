@@ -55,7 +55,7 @@ function AssetResults<T extends AssetBase>({
         defaultColumns,
         sortOptions,
         renderCardField,
-        placeholderImage = 'https://placehold.co/300x200',
+        placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     } = config;
 
     const {

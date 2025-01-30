@@ -359,6 +359,9 @@ class UIConstruct(Construct):
                     "X-Amz-Date",
                     "X-Amz-Security-Token",
                     "X-Forwarded-User",
+                    "Cache-Control",
+                    "Pragma",
+                    "Expires",
                 ],
                 access_control_allow_methods=[
                     "GET",

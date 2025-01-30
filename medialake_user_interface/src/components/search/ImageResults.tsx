@@ -96,7 +96,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                     defaultColumns,
                     sortOptions,
                     renderCardField,
-                    placeholderImage: 'https://placehold.co/300x200',
+                    placeholderImage: 'https://placehold.co/300x200?text=Placeholder',
                 }}
                 searchTerm={searchTerm}
                 actions={actions}
