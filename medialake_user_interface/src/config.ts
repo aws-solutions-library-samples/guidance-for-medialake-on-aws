@@ -1,9 +1,11 @@
-// API endpoint configuration
-export const apiEndpoint = process.env.REACT_APP_API_ENDPOINT || '/api';
+import { environmentConfig } from '@/features/settings/environments/config';
 
-// Other configuration values can be added here as needed
+// Core application configuration
 export const config = {
-    apiEndpoint,
+    apiEndpoint: process.env.REACT_APP_API_ENDPOINT || '/api',
+    environment: environmentConfig,
 } as const;
+
+export const { apiEndpoint } = config;
 
 export default config;

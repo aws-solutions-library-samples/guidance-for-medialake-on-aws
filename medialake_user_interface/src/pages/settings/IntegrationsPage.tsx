@@ -3,132 +3,78 @@ import {
     Box,
     Typography,
     Button,
-    Alert,
-    CircularProgress,
     useTheme,
+    CircularProgress,
+    Alert,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
 import IntegrationList from '@/features/settings/integrations/components/IntegrationList/index';
-import IntegrationForm from '@/features/settings/integrations/components/IntegrationForm';
-import ApiStatusModal from '@/components/ApiStatusModal';
-import { Integration } from '@/features/settings/integrations/components/IntegrationList/types';
-
-// Sample data - will be replaced by API hooks
-const sampleIntegrations: Integration[] = [
-    {
-        id: '1',
-        nodeName: 'TwelveLabs Video Understanding',
-        environment: 'Development',
-        createdDate: '2023-12-12T10:00:00Z',
-        modifiedDate: '2023-12-12T10:00:00Z',
-    },
-    {
-        id: '2',
-        nodeName: 'AWS Rekognition Analysis',
-        environment: 'Production',
-        createdDate: '2023-12-11T15:30:00Z',
-        modifiedDate: '2023-12-11T15:30:00Z',
-    },
-];
+import IntegrationForm from '@/features/settings/integrations/components/IntegrationForm/IntegrationForm';
+import {
+    IntegrationFilters,
+    IntegrationSorting,
+    Integration,
+    IntegrationsResponse
+} from '@/features/settings/integrations/types/integrations.types';
+import {
+    useGetIntegrations,
+    useCreateIntegration,
+    integrationsController
+} from '@/features/settings/integrations/api/integrations.controller';
 
 const IntegrationsPage = () => {
     const { t } = useTranslation();
     const theme = useTheme();
     const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
-    const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
-    const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
-    const [apiStatus, setApiStatus] = useState<{
-        show: boolean;
-        status: 'loading' | 'success' | 'error';
-        action: string;
-        message?: string;
-    }>({
-        show: false,
-        status: 'loading',
-        action: '',
-    });
+    const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
+    const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
 
-    // In the future, these will be replaced with API hooks
-    const [integrations, setIntegrations] = useState<Integration[]>(sampleIntegrations);
-    const isLoading = false;
-    const error = null;
+    // Fetch integrations using React Query
+    const { data: integrationsData, isLoading, error } = useGetIntegrations();
+    const createIntegration = useCreateIntegration();
 
     const handleAddIntegration = () => {
         setOpenIntegrationForm(true);
     };
 
-    const handleEditIntegration = (integration: Integration) => {
-        // Will be implemented when edit functionality is needed
-        console.log('Edit integration:', integration);
+    const handleCloseIntegrationForm = () => {
+        setOpenIntegrationForm(false);
+    };
+
+    const handleEditIntegration = async (id: string, data: any) => {
+        try {
+            await integrationsController.updateIntegration(id, data);
+        } catch (error) {
+            console.error('Failed to update integration:', error);
+        }
     };
 
     const handleDeleteIntegration = async (id: string) => {
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action: t('integrations.status.deleting'),
-        });
-
         try {
-            // Simulating API call
-            setIntegrations(prev => prev.filter(i => i.id !== id));
-
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: t('integrations.status.deleted'),
-                message: t('integrations.status.deleted'),
-            });
+            await integrationsController.deleteIntegration(id);
         } catch (error) {
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: t('integrations.status.deleteFailed'),
-                message: error instanceof Error ? error.message : t('common.error'),
-            });
+            console.error('Failed to delete integration:', error);
         }
     };
 
-    const handleSaveIntegration = async (data: any) => {
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action: t('integrations.status.creating'),
-        });
+    if (isLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
-        try {
-            // Simulating API call
-            const newIntegration: Integration = {
-                id: Date.now().toString(),
-                nodeName: data.nodeName,
-                environment: data.environment,
-                createdDate: new Date().toISOString(),
-                modifiedDate: new Date().toISOString(),
-            };
-
-            setIntegrations(prev => [...prev, newIntegration]);
-            setOpenIntegrationForm(false);
-
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: t('integrations.status.created'),
-                message: t('integrations.status.created'),
-            });
-        } catch (error) {
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: t('integrations.status.createFailed'),
-                message: error instanceof Error ? error.message : t('common.error'),
-            });
-        }
-    };
-
-    const handleCloseApiStatus = () => {
-        setApiStatus(prev => ({ ...prev, show: false }));
-    };
+    if (error) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Alert severity="error">
+                    {t('integrations.errorLoading')}
+                </Alert>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{
@@ -183,61 +129,42 @@ const IntegrationsPage = () => {
                 position: 'relative',
                 maxWidth: '100%',
             }}>
-                {isLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : error ? (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error instanceof Error ? error.message : t('common.error')}
-                    </Alert>
-                ) : (
-                    <IntegrationList
-                        integrations={integrations}
-                        onEditIntegration={handleEditIntegration}
-                        onDeleteIntegration={handleDeleteIntegration}
-                        activeFilters={activeFilters}
-                        activeSorting={activeSorting}
-                        onFilterChange={(columnId, value) => {
-                            setActiveFilters(filters => {
-                                const newFilters = filters.filter(f => f.columnId !== columnId);
-                                if (value) {
-                                    newFilters.push({ columnId, value });
-                                }
-                                return newFilters;
-                            });
-                        }}
-                        onSortChange={(columnId, desc) => {
-                            setActiveSorting(sorts => {
-                                const newSorts = sorts.filter(s => s.columnId !== columnId);
-                                if (desc !== undefined) {
-                                    newSorts.push({ columnId, desc });
-                                }
-                                return newSorts;
-                            });
-                        }}
-                        onRemoveFilter={(columnId) => {
-                            setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
-                        }}
-                        onRemoveSort={(columnId) => {
-                            setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
-                        }}
-                    />
-                )}
+                <IntegrationList
+                    integrations={(integrationsData as IntegrationsResponse)?.data || []}
+                    onEditIntegration={handleEditIntegration}
+                    onDeleteIntegration={handleDeleteIntegration}
+                    activeFilters={activeFilters}
+                    activeSorting={activeSorting}
+                    onFilterChange={(columnId, value) => {
+                        setActiveFilters(filters => {
+                            const newFilters = filters.filter(f => f.columnId !== columnId);
+                            if (value) {
+                                newFilters.push({ columnId, value });
+                            }
+                            return newFilters;
+                        });
+                    }}
+                    onSortChange={(columnId, desc) => {
+                        setActiveSorting(sorts => {
+                            const newSorts = sorts.filter(s => s.columnId !== columnId);
+                            if (desc !== undefined) {
+                                newSorts.push({ columnId, desc });
+                            }
+                            return newSorts;
+                        });
+                    }}
+                    onRemoveFilter={(columnId) => {
+                        setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
+                    }}
+                    onRemoveSort={(columnId) => {
+                        setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
+                    }}
+                />
             </Box>
 
             <IntegrationForm
                 open={openIntegrationForm}
-                onClose={() => setOpenIntegrationForm(false)}
-                onSave={handleSaveIntegration}
-            />
-
-            <ApiStatusModal
-                open={apiStatus.show}
-                status={apiStatus.status}
-                action={apiStatus.action}
-                message={apiStatus.message}
-                onClose={handleCloseApiStatus}
+                onClose={handleCloseIntegrationForm}
             />
         </Box>
     );

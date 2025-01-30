@@ -78,7 +78,6 @@ export const UserForm: React.FC<UserFormProps> = ({
                         form={form}
                         onSubmit={handleSubmit}
                         submitLabel={user ? t('common.actions.save') : t('common.actions.add')}
-                        showCancelButton
                         onCancel={onClose}
                     >
                         <FormField

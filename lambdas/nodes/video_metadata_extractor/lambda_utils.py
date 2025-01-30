@@ -9,6 +9,7 @@ from functools import wraps
 import time
 import os
 from typing_extensions import Concatenate, ParamSpec
+from logging import getLevelName, WARNING
 
 # Type variables for better type hinting
 P = ParamSpec("P")
@@ -17,7 +18,14 @@ R = TypeVar("R")
 # Initialize core utilities with service name from environment variable
 service_name = os.getenv("SERVICE_NAME", "undefined_service")
 namespace = os.getenv("RESOURCE_PREFIX", "undefined_namespace")
-logger = Logger(service=service_name)
+
+# Validate and set log level
+valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
+if log_level not in valid_log_levels:
+    log_level = "WARNING"
+
+logger = Logger(service=service_name, level=log_level)
 tracer = Tracer(service=service_name)
 metrics = Metrics(namespace="RESOURCE_PREFIX", service=service_name)
 

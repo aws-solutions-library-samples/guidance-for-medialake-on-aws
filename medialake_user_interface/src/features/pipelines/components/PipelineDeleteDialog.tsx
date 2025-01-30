@@ -3,62 +3,64 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogContentText,
     DialogActions,
     Button,
     TextField,
-    CircularProgress,
+    Typography,
+    CircularProgress
 } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 
 interface PipelineDeleteDialogProps {
     open: boolean;
     pipelineName: string;
     userInput: string;
-    isDeleting: boolean;
     onClose: () => void;
     onConfirm: () => void;
-    onUserInputChange: (value: string) => void;
+    onUserInputChange: (input: string) => void;
+    isDeleting: boolean;
 }
 
 export const PipelineDeleteDialog: React.FC<PipelineDeleteDialogProps> = ({
     open,
     pipelineName,
     userInput,
-    isDeleting,
     onClose,
     onConfirm,
     onUserInputChange,
+    isDeleting
 }) => {
-    const { t } = useTranslation();
+    const canDelete = userInput === pipelineName;
 
     return (
         <Dialog open={open} onClose={onClose}>
-            <DialogTitle>{t('pipelines.deleteConfirmTitle')}</DialogTitle>
+            <DialogTitle>Delete Pipeline</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    {t('pipelines.deleteConfirmMessage', { name: pipelineName })}
-                </DialogContentText>
+                <Typography variant="body1" gutterBottom>
+                    Are you sure you want to delete the pipeline "{pipelineName}"? This action cannot be undone.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                    To confirm, please type the pipeline name below:
+                </Typography>
                 <TextField
                     autoFocus
-                    margin="dense"
-                    label={t('pipelines.nameConfirmLabel')}
                     fullWidth
-                    variant="outlined"
                     value={userInput}
                     onChange={(e) => onUserInputChange(e.target.value)}
+                    placeholder={pipelineName}
+                    sx={{ mt: 2 }}
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose} color="primary">
-                    {t('common.cancel')}
+                <Button onClick={onClose} disabled={isDeleting}>
+                    Cancel
                 </Button>
                 <Button
                     onClick={onConfirm}
                     color="error"
-                    disabled={userInput !== pipelineName || isDeleting}
+                    disabled={!canDelete || isDeleting}
+                    startIcon={isDeleting ? <CircularProgress size={20} /> : null}
                 >
-                    {isDeleting ? <CircularProgress size={24} /> : t('common.delete')}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                 </Button>
             </DialogActions>
         </Dialog>

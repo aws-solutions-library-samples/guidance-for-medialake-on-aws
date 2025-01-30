@@ -233,7 +233,8 @@ class UIConstruct(Construct):
                     "content_security_policy": (
                         "default-src 'self'; "
                         f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
-                        "style-src 'self' 'unsafe-inline'; "
+                        "style-src 'self' 'unsafe-inline' chrome: resource:; "
+                        "style-src-attr 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
                         "font-src 'self' data:; "
                         "media-src 'self' blob: data: https://*.amazonaws.com; "

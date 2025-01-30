@@ -1,28 +1,39 @@
 import React from 'react';
 import {
     Popover,
+    Box,
     TextField,
-    useTheme,
+    Button,
+    Stack
 } from '@mui/material';
-import { Column } from '@tanstack/react-table';
-import { Pipeline } from '@/api/types/pipeline.types';
-import { useTranslation } from 'react-i18next';
 
 interface PipelineFilterPopoverProps {
     anchorEl: HTMLElement | null;
-    column: Column<Pipeline> | null;
+    column: string | null;
     onClose: () => void;
+    onFilterChange: (filters: any[]) => void;
 }
 
 export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
     anchorEl,
     column,
     onClose,
+    onFilterChange
 }) => {
-    const theme = useTheme();
-    const { t } = useTranslation();
+    const [filterValue, setFilterValue] = React.useState('');
 
-    if (!column) return null;
+    const handleApplyFilter = () => {
+        if (column) {
+            onFilterChange([{ id: column, value: filterValue }]);
+            onClose();
+        }
+    };
+
+    const handleClearFilter = () => {
+        setFilterValue('');
+        onFilterChange([]);
+        onClose();
+    };
 
     return (
         <Popover
@@ -37,27 +48,30 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
                 vertical: 'top',
                 horizontal: 'left',
             }}
-            PaperProps={{
-                sx: {
-                    p: 2,
-                    width: 300,
-                    borderRadius: '8px',
-                },
-            }}
         >
-            <TextField
-                autoFocus
-                fullWidth
-                size="small"
-                placeholder={t('common.filterColumn', { column: column.columnDef.header })}
-                value={(column.getFilterValue() as string) ?? ''}
-                onChange={e => column.setFilterValue(e.target.value)}
-                sx={{
-                    '& .MuiOutlinedInput-root': {
-                        borderRadius: '8px',
-                    },
-                }}
-            />
+            <Box sx={{ p: 2, width: 300 }}>
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label="Filter value"
+                        value={filterValue}
+                        onChange={(e) => setFilterValue(e.target.value)}
+                    />
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button onClick={handleClearFilter}>
+                            Clear
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleApplyFilter}
+                            disabled={!filterValue}
+                        >
+                            Apply
+                        </Button>
+                    </Stack>
+                </Stack>
+            </Box>
         </Popover>
     );
 };

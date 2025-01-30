@@ -20,6 +20,7 @@ interface UseTableProps<T> {
     onFilterChange?: (columnId: string, value: string) => void;
     onSortChange?: (columnId: string, desc: boolean) => void;
     filterFns?: Record<string, FilterFn<any>>;
+    initialColumnVisibility?: Record<string, boolean>;
 }
 
 interface UseTableReturn<T> {
@@ -49,11 +50,12 @@ export function useTable<T>({
     onFilterChange,
     onSortChange,
     filterFns,
+    initialColumnVisibility = {},
 }: UseTableProps<T>): UseTableReturn<T> {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
-    const [columnVisibility, setColumnVisibility] = useState({});
+    const [columnVisibility, setColumnVisibility] = useState(initialColumnVisibility);
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
     const [filterMenuAnchor, setFilterMenuAnchor] = useState<HTMLElement | null>(null);

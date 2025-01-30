@@ -26,8 +26,8 @@ MediaLake is a serverless media processing platform built on AWS, designed to ha
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/medialake.git
-cd medialake
+git clone https://gitlab.aws.dev/aws-mne-msc/media-lake-v2/
+cd medialakev2
 ```
 
 2. Create and activate a virtual environment:
@@ -76,6 +76,7 @@ touch config.json
     "account_id": "your-aws-account-id",
     "resource_prefix": "medialake",
     "global_prefix": "medialake",
+    "resource_application_tag": "medialake",
     "api_path": "prod",
     "primary_region": "us-east-1",
     "initial_user": {

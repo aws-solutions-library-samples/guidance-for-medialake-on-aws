@@ -1,58 +1,60 @@
 import React from 'react';
-import { FieldValues, UseFormReturn } from 'react-hook-form';
 import { Box, Button, Stack } from '@mui/material';
+import { UseFormReturn } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 
-export type FormProps<T extends FieldValues> = {
-    form: UseFormReturn<T>;
-    onSubmit: (data: T) => void | Promise<void>;
-    children: React.ReactNode;
-    submitLabel?: string;
-    isSubmitting?: boolean;
-    showCancelButton?: boolean;
+interface FormProps {
+    form: UseFormReturn<any>;
+    onSubmit: (data: any) => Promise<void>;
     onCancel?: () => void;
-};
+    submitLabel?: string;
+    children: React.ReactNode;
+}
 
-export const Form = <T extends FieldValues>({
+export const Form: React.FC<FormProps> = ({
     form,
     onSubmit,
-    children,
-    submitLabel = 'Submit',
-    isSubmitting = false,
-    showCancelButton = false,
     onCancel,
-}: FormProps<T>) => {
-    const handleSubmit = form.handleSubmit(async (data) => {
+    submitLabel = 'common.save',
+    children,
+}) => {
+    const { t } = useTranslation();
+
+    const handleSubmit = React.useCallback(async (data: any) => {
+        console.log('[Form] Form submit triggered with data:', data);
         try {
             await onSubmit(data);
+            console.log('[Form] Form submission completed successfully');
         } catch (error) {
-            // Handle error if needed
-            console.error('Form submission error:', error);
+            console.error('[Form] Form submission error:', error);
+            // Handle error (could show error message, etc.)
         }
-    });
+    }, [onSubmit]);
 
     return (
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-            <Stack spacing={2}>
-                {children}
-                <Stack direction="row" spacing={2} justifyContent="flex-end">
-                    {showCancelButton && (
-                        <Button
-                            type="button"
-                            onClick={onCancel}
-                            variant="outlined"
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                    )}
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={isSubmitting || !form.formState.isDirty}
-                    >
-                        {submitLabel}
+        <Box
+            component="form"
+            onSubmit={(e) => {
+                console.log('[Form] Native form submit event triggered');
+                form.handleSubmit(handleSubmit)(e);
+            }}
+            noValidate
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+            }}
+        >
+            {children}
+            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
+                {onCancel && (
+                    <Button onClick={onCancel} variant="outlined">
+                        {t('common.cancel')}
                     </Button>
-                </Stack>
+                )}
+                <Button type="submit" variant="contained" color="primary">
+                    {t(submitLabel)}
+                </Button>
             </Stack>
         </Box>
     );

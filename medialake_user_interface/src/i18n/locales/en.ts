@@ -1,6 +1,80 @@
 export default {
+    integrations: {
+        selectProvider: 'Select Integration',
+        selectIntegration: 'Select Integration',
+        configureIntegration: 'Configure Integration',
+        form: {
+            title: 'Add Integration',
+            fields: {
+                nodeId: {
+                    label: 'Integration',
+                    tooltip: 'Select an integration provider',
+                    errors: {
+                        required: 'Integration selection is required'
+                    }
+                },
+                description: {
+                    label: 'Description',
+                    tooltip: 'Provide a description for this integration',
+                    errors: {
+                        required: 'Description is required'
+                    }
+                },
+                environmentId: {
+                    label: 'Environment',
+                    tooltip: 'Select the environment for this integration',
+                    errors: {
+                        required: 'Environment selection is required'
+                    }
+                },
+                auth: {
+                    type: {
+                        label: 'Authentication Type',
+                        tooltip: 'Select the authentication method',
+                        options: {
+                            awsIam: 'AWS IAM',
+                            apiKey: 'API Key'
+                        },
+                        errors: {
+                            required: 'Authentication type is required'
+                        }
+                    },
+                    credentials: {
+                        apiKey: {
+                            label: 'API Key',
+                            tooltip: 'Enter your API key',
+                            errors: {
+                                required: 'API Key is required'
+                            }
+                        },
+                        iamRole: {
+                            label: 'IAM Role',
+                            tooltip: 'Enter the IAM role ARN',
+                            errors: {
+                                required: 'IAM Role is required'
+                            }
+                        }
+                    }
+                }
+            },
+            errors: {
+                required: 'This field is required',
+                nodeId: {
+                    unrecognized_keys: 'Invalid integration selection'
+                }
+            },
+        },
+    },
+    common: {
+        select: 'Select',
+        back: 'Back',
+        actions: {
+            add: 'Add'
+        }
+    },
     translation: {
         common: {
+            tableDensity: "Table Density",
             loading: 'Loading...',
             error: 'Something went wrong',
             save: 'Save',
@@ -183,6 +257,56 @@ export default {
                 system: 'System',
                 type: 'Type',
                 actions: 'Actions'
+            },
+            editor: {
+                title: 'Pipeline Editor',
+                save: 'Save Pipeline',
+                validate: 'Validate Pipeline',
+                sidebar: {
+                    title: 'Nodes',
+                    dragNodes: 'Drag nodes to the canvas',
+                    loading: 'Loading nodes...',
+                    error: 'Error loading nodes'
+                },
+                node: {
+                    configure: 'Configure {{type}}',
+                    delete: 'Delete Node',
+                    edit: 'Edit Node'
+                },
+                edge: {
+                    title: 'Edit Edge Label',
+                    label: 'Edge Label',
+                    delete: 'Delete Connection'
+                },
+                modals: {
+                    error: {
+                        title: 'Error',
+                        incompatibleNodes: 'The output of the previous node is not compatible with the input of the destination node.',
+                        validation: 'Pipeline validation failed'
+                    },
+                    delete: {
+                        title: 'Delete Pipeline',
+                        message: 'Are you sure you want to delete this pipeline? This action cannot be undone.',
+                        confirm: 'Type the pipeline name to confirm deletion:'
+                    }
+                },
+                controls: {
+                    undo: 'Undo',
+                    redo: 'Redo',
+                    zoomIn: 'Zoom In',
+                    zoomOut: 'Zoom Out',
+                    fitView: 'Fit View',
+                    lockView: 'Lock View'
+                },
+                notifications: {
+                    saved: 'Pipeline saved successfully',
+                    validated: 'Pipeline validation successful',
+                    error: {
+                        save: 'Failed to save pipeline',
+                        validation: 'Pipeline validation failed',
+                        incompatibleNodes: 'Incompatible node connection'
+                    }
+                }
             }
         },
         integrations: {
@@ -199,15 +323,72 @@ export default {
                 actions: 'Actions'
             },
             form: {
-                environment: 'Environment',
-                description: 'Description',
-                selectNode: 'Select an integration to configure'
+                title: 'Add Integration',
+                fields: {
+                    nodeId: {
+                        label: 'Integration',
+                        tooltip: 'Select an integration provider',
+                        errors: {
+                            required: 'Integration selection is required'
+                        }
+                    },
+                    description: {
+                        label: 'Description',
+                        tooltip: 'Provide a description for this integration',
+                        errors: {
+                            required: 'Description is required'
+                        }
+                    },
+                    environmentId: {
+                        label: 'Environment',
+                        tooltip: 'Select the environment for this integration',
+                        errors: {
+                            required: 'Environment selection is required'
+                        }
+                    },
+                    auth: {
+                        type: {
+                            label: 'Authentication Type',
+                            tooltip: 'Select the authentication method',
+                            options: {
+                                awsIam: 'AWS IAM',
+                                apiKey: 'API Key'
+                            },
+                            errors: {
+                                required: 'Authentication type is required'
+                            }
+                        },
+                        credentials: {
+                            apiKey: {
+                                label: 'API Key',
+                                tooltip: 'Enter your API key',
+                                errors: {
+                                    required: 'API Key is required'
+                                }
+                            },
+                            iamRole: {
+                                label: 'IAM Role',
+                                tooltip: 'Enter the IAM role ARN',
+                                errors: {
+                                    required: 'IAM Role is required'
+                                }
+                            }
+                        }
+                    }
+                },
+                errors: {
+                    required: 'This field is required',
+                    nodeId: {
+                        unrecognized_keys: 'Invalid integration selection'
+                    }
+                }
             },
             actions: {
                 edit: 'Edit Integration',
                 delete: 'Delete Integration'
             },
             search: 'Search integrations...',
+            selectProvider: 'Select Provider',
             status: {
                 creating: 'Creating integration...',
                 created: 'Integration Created',
@@ -254,6 +435,7 @@ export default {
                     costCenter: 'Cost Center',
                     team: 'Team',
                     status: {
+                        name: "Status",
                         active: "Active",
                         disabled: "Disabled"
                     }

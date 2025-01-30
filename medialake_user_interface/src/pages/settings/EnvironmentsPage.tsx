@@ -12,8 +12,8 @@ import { useTranslation } from 'react-i18next';
 import EnvironmentList from '@/features/settings/environments/components/EnvironmentList';
 import { EnvironmentForm } from '@/features/settings/environments/components/EnvironmentForm';
 import ApiStatusModal from '@/components/ApiStatusModal';
-import { useEnvironments, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment } from '@/api/hooks/useEnvironments';
-import { Environment, EnvironmentCreate, EnvironmentUpdate } from '@/types/environment';
+import { useEnvironments, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment } from '@/features/settings/environments/api/environmentsController';
+import { Environment, EnvironmentCreate, EnvironmentUpdate } from '@/features/settings/environments/types/environments.types';
 
 const EnvironmentsPage: React.FC = () => {
     const { t } = useTranslation();
