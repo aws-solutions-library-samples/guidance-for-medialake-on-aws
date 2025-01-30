@@ -1,5 +1,9 @@
-export { PipelineTable } from './PipelineTable';
-export { PipelineToolbar } from './PipelineToolbar';
-export { PipelineDeleteDialog } from './PipelineDeleteDialog';
-export { PipelineColumnMenu } from './PipelineColumnMenu';
-export { PipelineFilterPopover } from './PipelineFilterPopover';
+export * from './PipelineTable';
+export * from './PipelineToolbar';
+export * from './PipelineDeleteDialog';
+export * from './PipelineColumnMenu';
+export * from './PipelineFilterPopover';
+export { default as CustomNode } from './PipelineEditor/CustomNode';
+export { default as CustomEdge } from './PipelineEditor/CustomEdge';
+export { default as Sidebar } from './PipelineEditor/Sidebar';
+export { default as NodeConfigurationForm } from './PipelineEditor/NodeConfigurationForm';

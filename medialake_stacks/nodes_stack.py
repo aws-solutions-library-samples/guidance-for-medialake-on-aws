@@ -41,11 +41,48 @@ class NodesStack(Stack):
         self._pipelines_nodes_table = DynamoDB(
             self,
             "PipelineNodesTable",
-            DynamoDBProps(
+            props=DynamoDBProps(
                 name=f"{config.global_prefix}-pipeline-nodes-{config.environment}",
-                partition_key_name="nodeId",
+                partition_key_name="pk",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="sk",
+                sort_key_type=dynamodb.AttributeType.STRING,
                 point_in_time_recovery=True,
+                global_secondary_indexes=[
+                    # GSI for Node Type Index
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="TypeIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="pk", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="sk", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                    # GSI for Category Index
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="CategoryIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="pk", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="sk", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                    # GSI for Tag Index
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="TagIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="pk", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="sk", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                ],
             ),
         )
 

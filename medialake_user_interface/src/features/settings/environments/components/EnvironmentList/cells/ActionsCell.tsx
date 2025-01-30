@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { IconButton, Menu, MenuItem } from '@mui/material';
 import { MoreVert as MoreVertIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { Environment } from '@/types/environment';
-import { useDeleteEnvironment } from '@/api/hooks/useEnvironments';
+import { Environment } from '@/features/settings/environments/types/environments.types';
+import { useDeleteEnvironment } from '@/features/settings/environments/api/environmentsController';
 import { useSnackbar } from 'notistack';
 
 interface ActionsCellProps {

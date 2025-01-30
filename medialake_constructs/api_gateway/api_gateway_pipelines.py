@@ -351,7 +351,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # GET /api/pipelines/{pipelineId}
         get_pipeline_id_lambda_config = LambdaConfig(
             name="pipeline_get",
-            entry=("lambdas/api/pipelines/rp_pipelineId/get_pipeline"),
+            entry=("lambdas/api/pipelines/rp_pipelinesId/get_pipelinesId"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
@@ -374,7 +374,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # PUT /api/pipelines/{pipelineId}
         put_pipeline_id_lambda_config = LambdaConfig(
             name="pipeline_put",
-            entry=("lambdas/api/pipelines/rp_pipelineId/put_pipeline"),
+            entry=("lambdas/api/pipelines/rp_pipelinesId/put_pipelinesId"),
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
@@ -398,7 +398,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # DELETE /pipelines/{pipelineId}
         del_pipeline_id_lambda_config = LambdaConfig(
             name="pipeline_del",
-            entry=("lambdas/api/pipelines/rp_pipelineId/del_pipeline"),
+            entry=("lambdas/api/pipelines/rp_pipelinesId/del_pipelinesId"),
             iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,

@@ -18,6 +18,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from config import config
 
 
 @dataclass
@@ -66,7 +67,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PipelinesExecutionsTable",
             props=DynamoDBProps(
-                name="medialake_pipelines_executions_table",
+                name=f"{config.resource_prefix}pipelines_executions_{config.environment}",
                 partition_key_name="execution_id",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="event_start_time",
@@ -78,7 +79,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PipelinesExecutionsEventProcessor",
             config=LambdaConfig(
-                name="pipelines-executions",
+                name=f"{config.resource_prefix}_pipelines_executions_{config.environment}",
                 timeout_minutes=15,
                 entry="lambdas/back_end/pipelines_executions_event_processor",
                 environment_variables={
@@ -95,7 +96,7 @@ class PipelinesExecutionsStack(Stack):
         pipelines_executions_lambda_rule = events.Rule(
             self,
             "PipelinesExecutionsLambdaRule",
-            rule_name="pipelines-executions-lambda-rule",
+            rule_name=f"{config.resource_prefix}-pipelines-executions-lambda-trigger-{config.environment}",
             event_pattern=events.EventPattern(
                 source=["aws.states"],
                 detail_type=[
@@ -116,7 +117,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsHandler",
             config=LambdaConfig(
-                name="get_executions",
+                name=f"{config.resource_prefix}_get_executions_{config.environment}",
                 entry="lambdas/api/pipelines/executions/get_executions",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
@@ -134,7 +135,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsExecutionIdHandler",
             config=LambdaConfig(
-                name="executions_executionid",
+                name=f"{config.resource_prefix}_get_executions_executionid_{config.environment}",
                 entry="lambdas/api/pipelines/executions/rp_executionId/get_execution",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,

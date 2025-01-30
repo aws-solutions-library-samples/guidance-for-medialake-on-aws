@@ -25,6 +25,7 @@ class ApiGatewayIntegrationsProps:
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
     cognito_authorizer: apigateway.IAuthorizer
+    pipelines_nodes_table: dynamodb.TableV2
 
 
 class ApiGatewayIntegrationsConstruct(Construct):
@@ -37,7 +38,7 @@ class ApiGatewayIntegrationsConstruct(Construct):
         super().__init__(scope, id)
 
         # Create DynamoDB table for integrations
-        self.integrations_table = DynamoDB(
+        self._integrations_table = DynamoDB(
             self,
             "integrationsTable",
             props=DynamoDBProps(
@@ -47,6 +48,28 @@ class ApiGatewayIntegrationsConstruct(Construct):
                 sort_key_name="SK",
                 sort_key_type=dynamodb.AttributeType.STRING,
                 point_in_time_recovery=True,
+                global_secondary_indexes=[
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="NodeEnvironmentIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="Node", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="Environment", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="TypeStatusIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="Type", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="Status", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                ],
             ),
         )
 
@@ -58,21 +81,17 @@ class ApiGatewayIntegrationsConstruct(Construct):
             self,
             "GetintegrationsHandler",
             config=LambdaConfig(
-                name="get_integrations",
+                name=f"{config.resource_prefix}_get_integrations_{config.environment}",
                 entry="lambdas/api/integrations/get_integrations",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "integrations_TABLE": self.integrations_table.table_name,
-                    "METRICS_NAMESPACE": config.global_prefix,
+                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
+                    "PIPELINES_NODES_TABLE": props.pipelines_nodes_table.table_name,
                 },
             ),
         )
-
-        self._get_integrations_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:Scan"],
-                resources=[self.integrations_table.table_arn],
-            )
+        self._integrations_table.table.grant_read_data(
+            self._get_integrations_handler.function
         )
 
         integrations_resource.add_method(
@@ -87,11 +106,11 @@ class ApiGatewayIntegrationsConstruct(Construct):
             self,
             "PostintegrationsHandler",
             config=LambdaConfig(
-                name="post_integrations",
+                name=f"{config.resource_prefix}_post_integrations_{config.environment}",
                 entry="lambdas/api/integrations/post_integrations",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self.integrations_table.table_name,
+                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
                 },
             ),
         )
@@ -99,7 +118,19 @@ class ApiGatewayIntegrationsConstruct(Construct):
         self._post_integrations_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:PutItem"],
-                resources=[self.integrations_table.table_arn],
+                resources=[self._integrations_table.table_arn],
+            )
+        )
+
+        # Add Secrets Manager permissions
+        self._post_integrations_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:PutSecretValue",
+                    "secretsmanager:TagResource",
+                ],
+                resources=["arn:aws:secretsmanager:*"],
             )
         )
 
@@ -118,20 +149,24 @@ class ApiGatewayIntegrationsConstruct(Construct):
             self,
             "PutintegrationHandler",
             config=LambdaConfig(
-                name="put_integrations",
-                entry="lambdas/api/integrations/put_integrations",
+                name=f"{config.resource_prefix}_put_integrationsId_{config.environment}",
+                entry="lambdas/api/integrations/rp_integrationsId/put_integrationsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self.integrations_table.table_name,
+                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
                 },
             ),
         )
 
-        self._put_integration_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
-                resources=[self.integrations_table.table_arn],
-            )
+        # self._put_integration_handler.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+        #         resources=[self._integrations_table.table_arn],
+        #     )
+        # )
+
+        self._integrations_table.table.grant_write_data(
+            self._put_integration_handler.function
         )
 
         integration_id_resource.add_method(
@@ -144,23 +179,26 @@ class ApiGatewayIntegrationsConstruct(Construct):
         # DELETE /integrations/{id}
         self._delete_integration_handler = Lambda(
             self,
-            "DeleteintegrationHandler",
+            "DeleteIntegrationsHandler",
             config=LambdaConfig(
-                name="delete_integrations",
-                entry="lambdas/api/integrations/del_integrations",
+                name=f"{config.resource_prefix}_del_integrationsId_{config.environment}",
+                entry="lambdas/api/integrations/rp_integrationsId/del_integrationsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self.integrations_table.table_name,
+                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
                 },
             ),
         )
 
-        self._delete_integration_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem"],
-                resources=[self.integrations_table.table_arn],
-            )
+        self._integrations_table.table.grant_write_data(
+            self._delete_integration_handler.function
         )
+        # self._delete_integration_handler.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["dynamodb:DeleteItem"],
+        #         resources=[self._integrations_table.table_arn],
+        #     )
+        # )
 
         integration_id_resource.add_method(
             "DELETE",
@@ -170,12 +208,12 @@ class ApiGatewayIntegrationsConstruct(Construct):
         )
 
     @property
-    def integrations_table_name(self) -> str:
-        return self.integrations_table.table_name
+    def integrations_table(self) -> dynamodb.TableV2:
+        return self._integrations_table.table
 
     @property
     def integrations_table_arn(self) -> str:
-        return self.integrations_table.table_arn
+        return self._integrations_table.table_arn
 
     @property
     def get_integrations_handler(self) -> Lambda:

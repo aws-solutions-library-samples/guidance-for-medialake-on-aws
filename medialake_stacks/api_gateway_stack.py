@@ -63,6 +63,12 @@ from medialake_constructs.api_gateway.api_gateway_integrations import (
     ApiGatewayIntegrationsConstruct,
     ApiGatewayIntegrationsProps,
 )
+
+from medialake_constructs.api_gateway.api_gateway_nodes import (
+    ApiGatewayNodesConstruct,
+    ApiGatewayNodesProps,
+)
+
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
 
@@ -84,6 +90,7 @@ class ApiGatewayStackProps:
     pipeline_table: dynamodb.TableV2
     image_metadata_extractor_lambda: lambda_.Function
     image_proxy_lambda: lambda_.Function
+    pipelines_nodes_table: dynamodb.TableV2
 
 
 def generate_random_password(length=16):
@@ -160,9 +167,10 @@ class ApiGatewayStack(Stack):
             self,
             "Integrations",
             props=ApiGatewayIntegrationsProps(
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 api_resource=self._api_gateway.rest_api,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
+                pipelines_nodes_table=props.pipelines_nodes_table,
             ),
         )
         self._pipelines_executions_stack = PipelinesExecutionsStack(
@@ -249,10 +257,22 @@ class ApiGatewayStack(Stack):
         _ = ApiGatewayEnvironmentsConstruct(
             self,
             "EnvironmentsApiGateway",
-            cognito_authorizer=self._api_gateway.cognito_authorizer,
             props=ApiGatewayEnvironmentsProps(
                 api_resource=self._api_gateway.rest_api,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                integrations_table=self._integrations_stack.integrations_table,
+            ),
+        )
+
+        _ = ApiGatewayNodesConstruct(
+            self,
+            "NodesApiGateway",
+            props=ApiGatewayNodesProps(
+                api_resource=self._api_gateway.rest_api,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
+                pipelines_nodes_table=props.pipelines_nodes_table,
             ),
         )
 

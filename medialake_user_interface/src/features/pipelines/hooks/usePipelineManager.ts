@@ -5,16 +5,14 @@ import {
     ColumnFiltersState,
     PaginationState,
 } from '@tanstack/react-table';
-import { PipelineResponse, Pipeline } from '../../../api/types/pipeline.types';
-import { usePipeline, useDeletePipeline } from '../../../api/hooks/usePipelines';
+import { useGetPipelines, useDeletePipeline, useStartPipeline, useStopPipeline } from '../api/pipelinesController';
+import type { Pipeline, PipelinesResponse } from '../types/pipelines.types';
 
 const PAGE_SIZE = 20;
 
 export const usePipelineManager = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const deletePipeline = useDeletePipeline();
-    const [pipelines, setPipelines] = useState<Pipeline[]>([]);
     const [showDeleteButton, setShowDeleteButton] = useState(false);
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -48,19 +46,16 @@ export const usePipelineManager = () => {
         severity: 'success' as 'success' | 'error',
     });
 
-    const { data, isLoading, refetch } = usePipeline(PAGE_SIZE, {
-        status: filters.type === "" ? undefined : filters.type,
-        system: filters.system === "" ? undefined : filters.system,
-        sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder
-    });
+    const {
+        data: pipelinesResponse,
+        isLoading,
+        error,
+        refetch
+    } = useGetPipelines();
 
-    useEffect(() => {
-        if (data?.pages) {
-            const allPipelines = data.pages.flatMap(page => page.data.s);
-            setPipelines(allPipelines);
-        }
-    }, [data]);
+    const deletePipelineMutation = useDeletePipeline();
+    const startPipelineMutation = useStartPipeline();
+    const stopPipelineMutation = useStopPipeline();
 
     // Keyboard shortcut effect for delete button
     useEffect(() => {
@@ -119,7 +114,7 @@ export const usePipelineManager = () => {
         }
 
         try {
-            await deletePipeline.mutateAsync(deleteDialog.pipelineId);
+            await deletePipelineMutation.mutateAsync(deleteDialog.pipelineId);
             setSnackbar({
                 open: true,
                 message: t('pipelines.deleteSuccess'),
@@ -177,9 +172,17 @@ export const usePipelineManager = () => {
         setActiveFilterColumn(null);
     };
 
+    const pipelines = pipelinesResponse?.data?.s || [];
+    const searchMetadata = pipelinesResponse?.data?.searchMetadata || {
+        totalResults: 0,
+        pageSize: PAGE_SIZE,
+        nextToken: null
+    };
+
     return {
         // State
         pipelines,
+        searchMetadata,
         showDeleteButton,
         globalFilter,
         columnFilters,
@@ -191,7 +194,12 @@ export const usePipelineManager = () => {
         deleteDialog,
         snackbar,
         isLoading,
-        deletePipeline,
+        error,
+        isDeleting: deletePipelineMutation.isPending,
+        deletePipeline: deletePipelineMutation.mutate,
+        startPipeline: startPipelineMutation.mutate,
+        stopPipeline: stopPipelineMutation.mutate,
+        refetch,
 
         // Actions
         setPagination,
@@ -208,6 +216,5 @@ export const usePipelineManager = () => {
         handleColumnMenuClose,
         handleFilterMenuOpen,
         handleFilterMenuClose,
-        refetch,
     };
 };

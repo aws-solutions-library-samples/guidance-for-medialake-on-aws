@@ -8,6 +8,7 @@ import UserManagement from '../../pages/settings/UserManagement';
 import RoleManagement from '../../pages/settings/RoleManagement';
 import IntegrationsPage from '../../pages/settings/IntegrationsPage';
 import EnvironmentsPage from '../../pages/settings/EnvironmentsPage';
+import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
 
 const SettingsComponent: React.FC = () => {
     const { isCollapsed } = useSidebar();
@@ -31,6 +32,9 @@ const SettingsComponent: React.FC = () => {
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="integrations" element={<IntegrationsPage />} />
                 <Route path="environments" element={<EnvironmentsPage />} />
+                <Route path="pipelines" element={<PipelinesPage />} />
+                <Route path="pipelines/new" element={<PipelineEditorPage />} />
+                <Route path="pipelines/edit/:id" element={<PipelineEditorPage />} />
                 <Route path="/" element={<Navigate to="profile" replace />} />
                 <Route path="*" element={<Navigate to="profile" replace />} />
             </Routes>

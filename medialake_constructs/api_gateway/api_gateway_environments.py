@@ -24,6 +24,8 @@ class ApiGatewayEnvironmentsProps:
 
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
+    cognito_authorizer: apigateway.IAuthorizer
+    integrations_table: dynamodb.TableV2
 
 
 class ApiGatewayEnvironmentsConstruct(Construct):
@@ -31,7 +33,6 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         self,
         scope: Construct,
         id: str,
-        cognito_authorizer: apigateway.IAuthorizer,
         props: ApiGatewayEnvironmentsProps,
     ) -> None:
         super().__init__(scope, id)
@@ -69,18 +70,15 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             ),
         )
 
-        self._get_environments_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:Scan"],
-                resources=[self.environments_table.table_arn],
-            )
+        self.environments_table.table.grant_read_data(
+            self._get_environments_handler.function
         )
 
         environments_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_environments_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # POST /environments
@@ -93,23 +91,19 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self.environments_table.table_name,
-                    "METRICS_NAMESPACE": config.global_prefix,
                 },
             ),
         )
 
-        self._post_environments_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:PutItem"],
-                resources=[self.environments_table.table_arn],
-            )
+        self.environments_table.table.grant_write_data(
+            self._post_environments_handler.function
         )
 
         environments_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_environments_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # Environment ID specific endpoints
@@ -121,7 +115,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             "PutEnvironmentHandler",
             config=LambdaConfig(
                 name="put_environments",
-                entry="lambdas/api/environments/put_environments",
+                entry="lambdas/api/environments/rp_environmentsId/put_environmentsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self.environments_table.table_name,
@@ -130,47 +124,43 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             ),
         )
 
-        self._put_environment_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
-                resources=[self.environments_table.table_arn],
-            )
+        self.environments_table.table.grant_write_data(
+            self._put_environment_handler.function
         )
 
         environment_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_environment_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # DELETE /environments/{id}
-        self._delete_environment_handler = Lambda(
+        self._del_environment_handler = Lambda(
             self,
             "DeleteEnvironmentHandler",
             config=LambdaConfig(
-                name="delete_environments",
-                entry="lambdas/api/environments/delete_environments",
+                name=f"{config.resource_prefix}_del_environments_{config.environment}",
+                entry="lambdas/api/environments/rp_environmentsId/del_environmentsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self.environments_table.table_name,
-                    "METRICS_NAMESPACE": config.global_prefix,
+                    "INTEGRATIONS_TABLE": props.integrations_table.table_name,
                 },
             ),
         )
 
-        self._delete_environment_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem"],
-                resources=[self.environments_table.table_arn],
-            )
+        self.environments_table.table.grant_write_data(
+            self._del_environment_handler.function
         )
+        props.integrations_table.grant_read_data(self._del_environment_handler.function)
+        props.integrations_table.grant_read_data(self._del_environment_handler.function)
 
         environment_id_resource.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(self._delete_environment_handler.function),
+            apigateway.LambdaIntegration(self._del_environment_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
     @property
@@ -194,5 +184,5 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         return self._put_environment_handler
 
     @property
-    def delete_environment_handler(self) -> Lambda:
-        return self._delete_environment_handler
+    def del_environment_handler(self) -> Lambda:
+        return self._del_environment_handler

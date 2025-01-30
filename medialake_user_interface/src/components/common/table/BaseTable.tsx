@@ -21,6 +21,7 @@ export interface BaseTableProps<T> {
     formatValue?: (columnId: string, value: string) => string;
     filterFns?: Record<string, FilterFn<any>>;
     searchPlaceholder?: string;
+    initialColumnVisibility?: Record<string, boolean>;
 }
 
 export function BaseTable<T>({
@@ -36,6 +37,7 @@ export function BaseTable<T>({
     formatValue,
     filterFns,
     searchPlaceholder,
+    initialColumnVisibility,
 }: BaseTableProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +60,7 @@ export function BaseTable<T>({
         onFilterChange,
         onSortChange,
         filterFns,
+        initialColumnVisibility,
     });
 
     const { rows } = table.getRowModel();

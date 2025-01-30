@@ -19,6 +19,13 @@
             "bucketName": "string",
             "tableName": "string"
             }
+        {
+            method/request
+                inputMapping
+                    twelvelabs/
+                outputMapping
+                fields
+        }
         },
         "inputMapping": {
             "type": "object",

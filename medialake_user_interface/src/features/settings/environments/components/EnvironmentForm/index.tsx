@@ -65,7 +65,6 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
                     form={form}
                     onSubmit={handleSubmit}
                     onCancel={onClose}
-                    showCancelButton={true}
                     submitLabel={t('common.save')}
                 >
                     <FormField
@@ -77,7 +76,7 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
                     <FormSelect
                         name="status"
                         control={form.control}
-                        label={t('settings.environments.form.status')}
+                        label={t('settings.environments.form.status.name')}
                         options={[
                             { label: t('settings.environments.form.status.active'), value: EnvironmentStatus.Active },
                             { label: t('settings.environments.form.status.disabled'), value: EnvironmentStatus.Disabled }

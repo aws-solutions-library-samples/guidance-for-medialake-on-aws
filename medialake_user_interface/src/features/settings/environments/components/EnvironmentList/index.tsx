@@ -80,6 +80,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 size: 160,
                 enableResizing: true,
                 enableSorting: true,
+                show: false,
                 cell: ({ getValue }) => (
                     <TableCellContent variant="secondary">
                         {getValue() as string || '-'}
@@ -94,6 +95,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 size: 160,
                 enableResizing: true,
                 enableSorting: true,
+                show: false,
                 cell: ({ getValue }) => (
                     <TableCellContent variant="secondary">
                         {getValue() as string || '-'}
@@ -107,6 +109,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 size: 200,
                 enableResizing: true,
                 enableSorting: true,
+                show: false,
                 cell: ({ getValue }) => {
                     const dateValue = getValue() as string;
                     return (
@@ -127,6 +130,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 size: 200,
                 enableResizing: true,
                 enableSorting: true,
+                show: false,
                 cell: ({ getValue }) => {
                     const dateValue = getValue() as string;
                     return (
