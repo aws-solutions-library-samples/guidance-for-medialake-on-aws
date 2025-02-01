@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
-import {
-    Box,
-    Typography,
-    Button,
-    CircularProgress,
-    useTheme,
-    Alert,
-} from '@mui/material';
+import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
+import { PageHeader, PageContent } from '@/components/common/layout';
 import EnvironmentList from '@/features/settings/environments/components/EnvironmentList';
 import { EnvironmentForm } from '@/features/settings/environments/components/EnvironmentForm';
 import ApiStatusModal from '@/components/ApiStatusModal';
@@ -22,7 +16,6 @@ import { Environment, EnvironmentCreate, EnvironmentUpdate } from '@/types/envir
 
 const EnvironmentsPage: React.FC = () => {
     const { t } = useTranslation();
-    const theme = useTheme();
     const [openEnvironmentForm, setOpenEnvironmentForm] = useState(false);
     const [editingEnvironment, setEditingEnvironment] = useState<Environment | undefined>();
     const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
@@ -123,17 +116,10 @@ const EnvironmentsPage: React.FC = () => {
             maxWidth: '100%',
             p: 3,
         }}>
-            <Box sx={{ mb: 4, flex: 'none', width: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h4" sx={{
-                            fontWeight: 700,
-                            mb: 1,
-                            color: theme.palette.primary.main,
-                        }}>
-                            {t('settings.environments.title')}
-                        </Typography>
-                    </Box>
+            <PageHeader
+                title={t('settings.environments.title')}
+                description={t('settings.environments.description')}
+                action={
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
@@ -142,92 +128,75 @@ const EnvironmentsPage: React.FC = () => {
                             borderRadius: '8px',
                             textTransform: 'none',
                             px: 3,
-                            backgroundColor: theme.palette.primary.main,
-                            '&:hover': {
-                                backgroundColor: theme.palette.primary.dark,
-                            },
+                            height: 40
                         }}
                     >
                         {t('settings.environments.addButton')}
                     </Button>
-                </Box>
-            </Box>
+                }
+            />
 
-            <Box sx={{
-                flex: 1,
-                minHeight: 0,
-                width: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-                maxWidth: '100%',
-            }}>
-                {isLoadingEnvironments ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : environmentsError ? (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {environmentsError instanceof Error ? environmentsError.message : t('common.error')}
-                    </Alert>
-                ) : (
-                    <EnvironmentList
-                        environments={(environments?.data?.environments || []).map(env => ({
-                            ...env,
-                            status: env.status || 'active', // Ensure status is always present
-                            tags: {
-                                'cost-center': env.tags?.['cost-center'] || '',
-                                team: env.tags?.team || '',
-                                ...env.tags
-                            }
-                        }))}
-                        onEditEnvironment={handleEditEnvironment}
-                        onDeleteEnvironment={async (id) => {
-                            try {
-                                await deleteEnvironmentMutation.mutateAsync(id);
-                                setApiStatus({
-                                    show: true,
-                                    status: 'success',
-                                    action: 'Environment Deleted',
-                                    message: t('settings.environments.deleteSuccess'),
-                                });
-                            } catch (error) {
-                                setApiStatus({
-                                    show: true,
-                                    status: 'error',
-                                    action: 'Environment Deletion Failed',
-                                    message: error instanceof Error ? error.message : t('settings.environments.deleteError'),
-                                });
-                            }
-                        }}
-                        activeFilters={activeFilters}
-                        activeSorting={activeSorting}
-                        onFilterChange={(columnId, value) => {
-                            setActiveFilters(filters => {
-                                const newFilters = filters.filter(f => f.columnId !== columnId);
-                                if (value) {
-                                    newFilters.push({ columnId, value });
-                                }
-                                return newFilters;
+            <PageContent
+                isLoading={isLoadingEnvironments}
+                error={environmentsError as Error}
+            >
+                <EnvironmentList
+                    environments={(environments?.data?.environments || []).map(env => ({
+                        ...env,
+                        status: env.status || 'active',
+                        tags: {
+                            'cost-center': env.tags?.['cost-center'] || '',
+                            team: env.tags?.team || '',
+                            ...env.tags
+                        }
+                    }))}
+                    onEditEnvironment={handleEditEnvironment}
+                    onDeleteEnvironment={async (id) => {
+                        try {
+                            await deleteEnvironmentMutation.mutateAsync(id);
+                            setApiStatus({
+                                show: true,
+                                status: 'success',
+                                action: 'Environment Deleted',
+                                message: t('settings.environments.deleteSuccess'),
                             });
-                        }}
-                        onSortChange={(columnId, desc) => {
-                            setActiveSorting(sorts => {
-                                const newSorts = sorts.filter(s => s.columnId !== columnId);
-                                if (desc !== undefined) {
-                                    newSorts.push({ columnId, desc });
-                                }
-                                return newSorts;
+                        } catch (error) {
+                            setApiStatus({
+                                show: true,
+                                status: 'error',
+                                action: 'Environment Deletion Failed',
+                                message: error instanceof Error ? error.message : t('settings.environments.deleteError'),
                             });
-                        }}
-                        onRemoveFilter={(columnId) => {
-                            setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
-                        }}
-                        onRemoveSort={(columnId) => {
-                            setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
-                        }}
-                    />
-                )}
-            </Box>
+                        }
+                    }}
+                    activeFilters={activeFilters}
+                    activeSorting={activeSorting}
+                    onFilterChange={(columnId, value) => {
+                        setActiveFilters(filters => {
+                            const newFilters = filters.filter(f => f.columnId !== columnId);
+                            if (value) {
+                                newFilters.push({ columnId, value });
+                            }
+                            return newFilters;
+                        });
+                    }}
+                    onSortChange={(columnId, desc) => {
+                        setActiveSorting(sorts => {
+                            const newSorts = sorts.filter(s => s.columnId !== columnId);
+                            if (desc !== undefined) {
+                                newSorts.push({ columnId, desc });
+                            }
+                            return newSorts;
+                        });
+                    }}
+                    onRemoveFilter={(columnId) => {
+                        setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
+                    }}
+                    onRemoveSort={(columnId) => {
+                        setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
+                    }}
+                />
+            </PageContent>
 
             <EnvironmentForm
                 open={openEnvironmentForm}

@@ -16,7 +16,7 @@ import AssetsPage from '../pages/AssetsPage';
 import { S3Explorer } from '../features/home/S3Explorer';
 import Home from '../pages/Home';
 import SettingsComponent from '../features/settings/SettingsLayout';
-import ExecutionsPage from '../pages/ExecutionsPage';
+import { ExecutionsPage } from '@/features/executions';
 import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
 import { StorageHelper } from '../common/helpers/storage-helper';
 import '@aws-amplify/ui-react/styles.css';
@@ -518,3 +518,4 @@ const AppConfigured = () => {
 };
 
 export default AppConfigured;
+

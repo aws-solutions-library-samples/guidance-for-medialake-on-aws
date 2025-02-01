@@ -1,8 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
     Box,
     IconButton,
-    Paper,
     CircularProgress,
     Tooltip,
     Typography,
@@ -20,11 +19,12 @@ import {
     getSortedRowModel,
     getFilteredRowModel,
     getPaginationRowModel,
-    flexRender,
     createColumnHelper,
     ColumnDef
 } from '@tanstack/react-table';
-import { BaseTable } from '@/components/common/table/BaseTable';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
+import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
@@ -48,6 +48,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     onStartPipeline,
     onStopPipeline
 }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+
     const columns = useMemo<ColumnDef<Pipeline, any>[]>(() => [
         columnHelper.accessor('name', {
             header: 'Name',
@@ -151,6 +153,30 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         })
     ], [tableActions, onStartPipeline, onStopPipeline]);
 
+    const table = useReactTable({
+        data,
+        columns,
+        state: {
+            sorting: [],
+            columnFilters: tableState.columnFilters,
+            columnVisibility: tableState.columnVisibility,
+            globalFilter: tableState.globalFilter,
+        },
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+    });
+
+    const { rows } = table.getRowModel();
+
+    const rowVirtualizer = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => containerRef.current,
+        estimateSize: () => 53,
+        overscan: 20,
+    });
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -170,44 +196,26 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     }
 
     return (
-        <BaseTable
-            data={data}
-            columns={columns}
-            activeFilters={tableState.columnFilters}
-            activeSorting={[]}
-            onFilterChange={(columnId, value) => {
-                tableActions.setColumnFilters([...tableState.columnFilters, { id: columnId, value }]);
-            }}
-            onRemoveFilter={(columnId) => {
-                tableActions.setColumnFilters(
-                    tableState.columnFilters.filter(filter => filter.id !== columnId)
-                );
-            }}
-            getUniqueValues={(columnId, data) => {
-                const values = new Set<string>();
-                data.forEach(item => {
-                    const value = item[columnId as keyof Pipeline];
-                    if (value != null) {
-                        values.add(String(value));
-                    }
-                });
-                return Array.from(values).sort();
-            }}
-            formatValue={(columnId, value) => {
-                if (columnId === 'system') {
-                    return value === 'true' ? 'Yes' : 'No';
-                }
-                return value;
-            }}
-            searchPlaceholder="Search pipelines..."
-            initialColumnVisibility={{
-                name: true,
-                type: true,
-                system: true,
-                createdAt: true,
-                updatedAt: true,
-                actions: true
-            }}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <BaseTableToolbar
+                globalFilter={tableState.globalFilter}
+                onGlobalFilterChange={tableActions.setGlobalFilter}
+                onColumnMenuOpen={tableActions.handleColumnMenuOpen}
+                activeFilters={tableState.columnFilters.map(f => ({ columnId: f.id, value: f.value as string }))}
+                onRemoveFilter={(columnId) => {
+                    tableActions.setColumnFilters(
+                        tableState.columnFilters.filter(f => f.id !== columnId)
+                    );
+                }}
+                searchPlaceholder="Search pipelines..."
+            />
+            <ResizableTable
+                table={table}
+                containerRef={containerRef}
+                virtualizer={rowVirtualizer}
+                rows={rows}
+                onFilterClick={tableActions.handleFilterMenuOpen}
+            />
+        </Box>
     );
 };

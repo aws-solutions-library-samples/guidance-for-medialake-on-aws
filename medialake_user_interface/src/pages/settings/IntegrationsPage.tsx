@@ -1,20 +1,13 @@
 import React, { useState } from 'react';
-import {
-    Box,
-    Typography,
-    Button,
-    useTheme,
-    CircularProgress,
-    Alert,
-} from '@mui/material';
+import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
+import { PageHeader, PageContent } from '@/components/common/layout';
 import IntegrationList from '@/features/settings/integrations/components/IntegrationList/index';
 import IntegrationForm from '@/features/settings/integrations/components/IntegrationForm/IntegrationForm';
 import {
     IntegrationFilters,
     IntegrationSorting,
-    Integration,
     IntegrationsResponse
 } from '@/features/settings/integrations/types/integrations.types';
 import {
@@ -25,7 +18,6 @@ import {
 
 const IntegrationsPage = () => {
     const { t } = useTranslation();
-    const theme = useTheme();
     const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
     const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
     const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
@@ -58,24 +50,6 @@ const IntegrationsPage = () => {
         }
     };
 
-    if (isLoading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (error) {
-        return (
-            <Box sx={{ p: 3 }}>
-                <Alert severity="error">
-                    {t('integrations.errorLoading')}
-                </Alert>
-            </Box>
-        );
-    }
-
     return (
         <Box sx={{
             height: '100%',
@@ -88,20 +62,10 @@ const IntegrationsPage = () => {
             maxWidth: '100%',
             p: 3,
         }}>
-            <Box sx={{ mb: 4, flex: 'none', width: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h4" sx={{
-                            fontWeight: 700,
-                            mb: 1,
-                            color: theme.palette.primary.main,
-                        }}>
-                            {t('integrations.title')}
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                            {t('integrations.description')}
-                        </Typography>
-                    </Box>
+            <PageHeader
+                title={t('integrations.title')}
+                description={t('integrations.description')}
+                action={
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
@@ -110,25 +74,18 @@ const IntegrationsPage = () => {
                             borderRadius: '8px',
                             textTransform: 'none',
                             px: 3,
-                            backgroundColor: theme.palette.primary.main,
-                            '&:hover': {
-                                backgroundColor: theme.palette.primary.dark,
-                            },
+                            height: 40
                         }}
                     >
                         {t('integrations.addIntegration')}
                     </Button>
-                </Box>
-            </Box>
+                }
+            />
 
-            <Box sx={{
-                flex: 1,
-                minHeight: 0,
-                width: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-                maxWidth: '100%',
-            }}>
+            <PageContent
+                isLoading={isLoading}
+                error={error as Error}
+            >
                 <IntegrationList
                     integrations={(integrationsData as IntegrationsResponse)?.data || []}
                     onEditIntegration={handleEditIntegration}
@@ -160,7 +117,7 @@ const IntegrationsPage = () => {
                         setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
                     }}
                 />
-            </Box>
+            </PageContent>
 
             <IntegrationForm
                 open={openIntegrationForm}

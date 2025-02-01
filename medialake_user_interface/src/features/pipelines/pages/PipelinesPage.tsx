@@ -1,12 +1,12 @@
 import React from 'react';
-import { Box, Button, Snackbar, Alert, useTheme, Paper, Container, Typography } from '@mui/material';
+import { Box, Button, Snackbar, Alert, useTheme } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { PageHeader, PageContent } from '@/components/common/layout';
 import {
     PipelineTable,
-    PipelineToolbar,
     PipelineDeleteDialog,
     PipelineColumnMenu,
     PipelineFilterPopover,
@@ -126,39 +126,32 @@ const PipelinesPage: React.FC = () => {
         }
     };
 
-    if (error) {
-        return (
-            <Container maxWidth="xl">
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {t('pipelines.messages.loadError')}
-                </Alert>
-            </Container>
-        );
-    }
-
     return (
-        <Container maxWidth="xl">
-            <Paper elevation={0} sx={{ p: 3 }}>
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h4" component="h1">
-                        {t('pipelines.title')}
-                    </Typography>
+        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <PageHeader
+                title={t('pipelines.title')}
+                description={t('pipelines.description')}
+                action={
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/settings/pipelines/new')}
+                        sx={{
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            px: 3,
+                            height: 40
+                        }}
                     >
                         {t('pipelines.actions.create')}
                     </Button>
-                </Box>
+                }
+            />
 
-                <Box sx={{ mb: 2 }}>
-                    <PipelineToolbar
-                        onFilterChange={tableActions.setGlobalFilter}
-                        onColumnMenuOpen={tableActions.handleColumnMenuOpen}
-                    />
-                </Box>
-
+            <PageContent
+                isLoading={isLoading}
+                error={error as Error}
+            >
                 <PipelineTable
                     data={pipelines}
                     isLoading={isLoading}
@@ -167,47 +160,47 @@ const PipelinesPage: React.FC = () => {
                     onStartPipeline={startPipeline}
                     onStopPipeline={stopPipeline}
                 />
+            </PageContent>
 
-                <PipelineDeleteDialog
-                    open={tableState.deleteDialog.open}
-                    pipelineName={tableState.deleteDialog.pipelineName}
-                    userInput={tableState.deleteDialog.userInput}
-                    onClose={tableActions.closeDeleteDialog}
-                    onConfirm={() => handleDeletePipeline(tableState.deleteDialog.pipelineId)}
-                    onUserInputChange={tableActions.setDeleteDialogInput}
-                    isDeleting={isDeleting}
-                />
+            <PipelineDeleteDialog
+                open={tableState.deleteDialog.open}
+                pipelineName={tableState.deleteDialog.pipelineName}
+                userInput={tableState.deleteDialog.userInput}
+                onClose={tableActions.closeDeleteDialog}
+                onConfirm={() => handleDeletePipeline(tableState.deleteDialog.pipelineId)}
+                onUserInputChange={tableActions.setDeleteDialogInput}
+                isDeleting={isDeleting}
+            />
 
-                <PipelineColumnMenu
-                    anchorEl={tableState.columnMenuAnchor}
-                    onClose={tableActions.handleColumnMenuClose}
-                    visibility={tableState.columnVisibility}
-                    onVisibilityChange={tableActions.setColumnVisibility}
-                />
+            <PipelineColumnMenu
+                anchorEl={tableState.columnMenuAnchor}
+                onClose={tableActions.handleColumnMenuClose}
+                visibility={tableState.columnVisibility}
+                onVisibilityChange={tableActions.setColumnVisibility}
+            />
 
-                <PipelineFilterPopover
-                    anchorEl={tableState.filterMenuAnchor}
-                    column={tableState.activeFilterColumn}
-                    onClose={tableActions.handleFilterMenuClose}
-                    onFilterChange={tableActions.setColumnFilters}
-                />
+            <PipelineFilterPopover
+                anchorEl={tableState.filterMenuAnchor}
+                column={tableState.activeFilterColumn}
+                onClose={tableActions.handleFilterMenuClose}
+                onFilterChange={tableActions.setColumnFilters}
+            />
 
-                <Snackbar
-                    open={tableState.snackbar.open}
-                    autoHideDuration={6000}
+            <Snackbar
+                open={tableState.snackbar.open}
+                autoHideDuration={6000}
+                onClose={tableActions.handleCloseSnackbar}
+            >
+                <Alert
                     onClose={tableActions.handleCloseSnackbar}
+                    severity={tableState.snackbar.severity}
+                    sx={{ width: '100%' }}
                 >
-                    <Alert
-                        onClose={tableActions.handleCloseSnackbar}
-                        severity={tableState.snackbar.severity}
-                        sx={{ width: '100%' }}
-                    >
-                        {tableState.snackbar.message}
-                    </Alert>
-                </Snackbar>
-            </Paper>
-        </Container>
+                    {tableState.snackbar.message}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
 };
 
-export default PipelinesPage; 
+export default PipelinesPage;

@@ -255,6 +255,11 @@ export default {
         },
         pipelines: {
             title: 'Pipelines',
+            actions: {
+                create: 'Add New Pipeline',
+                deploy: 'Deploy Image Pipeline',
+                addNew: 'Add New Pipeline',
+            },
             description: 'Manage your media and metadata pipelines',
             search: 'Search pipelines',
             deploy: 'Deploy Image Pipeline',

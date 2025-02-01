@@ -1,24 +1,9 @@
 import React, { useRef } from 'react';
-import {
-    Box,
-    IconButton,
-    Chip,
-    alpha,
-    useTheme,
-    CircularProgress,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import {
-    Visibility as VisibilityIcon,
-    PlayArrow as PlayArrowIcon,
-    RestartAlt as RestartIcon,
-} from '@mui/icons-material';
+import { Box, CircularProgress } from '@mui/material';
 import { type Table as TanStackTable } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { PipelineExecution } from '../../../api/types/pipelineExecutions.types';
-import { useTranslation } from 'react-i18next';
-import { ResizableTable, TableCellContent } from '../../../components/common/table';
+import type { PipelineExecution } from '../types/pipelineExecutions.types';
+import { ResizableTable } from '@/components/common/table';
 
 interface ExecutionsTableProps {
     table: TanStackTable<PipelineExecution>;
@@ -38,17 +23,12 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
     table,
     isLoading,
     data,
-    onViewDetails,
-    onRetryFromCurrent,
-    onRetryFromStart,
     onFilterColumn,
     activeFilters = [],
     activeSorting = [],
     onRemoveFilter,
     onRemoveSort,
 }) => {
-    const theme = useTheme();
-    const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
 
     const { rows } = table.getRowModel();
