@@ -1,29 +1,19 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useMediaQuery, Theme } from '@mui/material';
-import { Box, CircularProgress, Typography, Grid, List, ListItem, ListItemText, ListItemAvatar, Chip, Avatar, Paper, Button, Divider, IconButton, Stack, TextField } from '@mui/material';
-import { styled, alpha } from '@mui/material/styles';
+import { Box, CircularProgress, Typography, List, ListItem, Paper, Button, Divider } from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
-import { handleImageDownload, formatFileSize } from '../utils/imageUtils';
+import { formatFileSize } from '../utils/imageUtils';
 import ImageViewer from '../components/common/ImageViewer';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
-import AssetHeader from '../components/asset/AssetHeader';
 import AssetSidebar from '../components/asset/AssetSidebar';
 import CommentPopper from '../components/common/CommentPopper';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import ColorLensIcon from '@mui/icons-material/ColorLens';
-import BackupIcon from '@mui/icons-material/Backup';
-import DescriptionIcon from '@mui/icons-material/Description';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 const categoryMapping = {
     exif: 'EXIF',
@@ -154,12 +144,12 @@ const ImageDetailContent: React.FC = () => {
         { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
     ]);
 
-    const handleCommentClick = (event: React.MouseEvent<HTMLElement>, index: number) => {
+    const handleCommentClick = useCallback((event: React.MouseEvent<HTMLElement>, index: number) => {
         setCommentAnchorEl(commentAnchorEl && selectedComment === index ? null : event.currentTarget);
         setSelectedComment(selectedComment === index ? null : index);
-    };
+    }, [commentAnchorEl, selectedComment]);
 
-    const handleCommentSubmit = () => {
+    const handleCommentSubmit = useCallback(() => {
         if (newComment.trim()) {
             const now = new Date();
             const formattedTimestamp = now.toLocaleString('en-US', {
@@ -178,16 +168,16 @@ const ImageDetailContent: React.FC = () => {
                 content: newComment,
                 timestamp: formattedTimestamp
             };
-            setComments([...comments, newCommentObj]);
+            setComments(prevComments => [...prevComments, newCommentObj]);
             setNewComment('');
         }
-    };
+    }, [newComment]);
 
-    const toggleMetadataExpansion = (key: string) => {
+    const toggleMetadataExpansion = useCallback((key: string) => {
         setExpandedMetadata(prev => ({ ...prev, [key]: !prev[key] }));
-    };
+    }, []);
 
-    const transformMetadata = (metadata: any) => {
+    const transformMetadata = useCallback((metadata: any) => {
         if (!metadata) return [];
 
         return Object.entries(metadata).map(([parentCategory, parentData]) => ({
@@ -199,27 +189,29 @@ const ImageDetailContent: React.FC = () => {
             })),
             count: Object.keys(parentData as object).length
         }));
-    };
+    }, []);
 
     const metadataAccordions = useMemo(() => {
         if (!assetData?.data?.asset?.Metadata) return [];
         return transformMetadata(assetData.data.asset.Metadata);
-    }, [assetData]);
+    }, [assetData, transformMetadata]);
 
     useTrackRecentlyViewed(
-        assetData ? {
-            id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-            title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-            path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
-            searchTerm: searchTerm,
-            metadata: {
-                fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
-                dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
-                    ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
-                    : undefined
-            }
-        } : null
+        useMemo(() =>
+            assetData ? {
+                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+                title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+                type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
+                path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
+                searchTerm: searchTerm,
+                metadata: {
+                    fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
+                    dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
+                        ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
+                        : undefined
+                }
+            } : null,
+            [assetData, searchTerm])
     );
 
     if (isLoading) {
@@ -245,6 +237,31 @@ const ImageDetailContent: React.FC = () => {
         const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
         return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
     })();
+
+    const versions = useMemo(() => {
+        if (!assetData?.data?.asset) return [];
+        return [
+            {
+                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+                src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: 'Original',
+                format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+                fileSize: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
+                description: 'Original high resolution version',
+            },
+            ...assetData.data.asset.DerivedRepresentations.map(rep => ({
+                id: rep.ID,
+                src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+                type: rep.Purpose,
+                format: rep.Format,
+                fileSize: formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size),
+                description: `${rep.Format} file - ${formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size)}${rep.ImageSpec?.Resolution ? ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}` : ''}`
+
+            }))
+        ];
+    }, [assetData]);
+
+
 
     return (
         <Box sx={{
@@ -336,14 +353,12 @@ const ImageDetailContent: React.FC = () => {
                     </Box>
                 </Box>
 
-                <AssetSidebar versions={assetData.data.asset.DerivedRepresentations.map(rep => ({
-                    id: rep.ID,
-                    src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
-                    type: rep.Purpose,
-                    format: rep.Format,
-                    fileSize: formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size),
-                    description: `${rep.Format} file - ${formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size)}${rep.ImageSpec?.Resolution ? ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}` : ''}`
-                }))} />
+
+                <AssetSidebar
+                    versions={versions}
+                // comments={comments}
+                // onAddComment={handleAddComment}
+                />
 
                 {selectedComment !== null && (
                     <CommentPopper

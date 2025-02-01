@@ -59,7 +59,7 @@ const AssetSidebar: React.FC<AssetSidebarProps> = ({
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
-
+    console.log(versions)
     return (
         <RightSidebar>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

@@ -171,6 +171,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # Create pipelines resource
         pipelines_resource = api_resource.root.add_resource("pipelines")
+        pipelines_v2_resource = api_resource.root.add_resource("pipelinesv2")
 
         self._get_pipelines_handler = Lambda(
             self,
@@ -195,6 +196,152 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_pipelines_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # POST /api/pipelines V2
+        post_pipelines_v2_lambda_config = LambdaConfig(
+            name="pipeline_post_v2",
+            timeout_minutes=10,
+            entry="lambdas/api/pipelines/post_pipelines_v2",
+            iam_role_boundary_policy=post_lambda_iam_boundary_policy,
+            environment_variables={
+                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
+                "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
+                # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
+                # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
+                "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
+                "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+                "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                "CONNECTOR_TABLE": props.connector_table.table_arn,
+                "AWS_ACCOUNT_ID": scope.account,
+                "GLOBAL_PREFIX": config.global_prefix,
+            },
+        )
+        self._post_pipelines_v2_handler = Lambda(
+            self,
+            "PostPipelinesHandlerV2",
+            config=post_pipelines_v2_lambda_config,
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:CreateQueue",
+                    "sqs:GetQueueAttributes",
+                    "sqs:TagQueue",
+                    "sqs:setqueueattributes",
+                    "sqs:DeleteQueue",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:TagRole",
+                    "iam:CreateRole",
+                    "iam:AttachRolePolicy",
+                    "iam:ListAttachedRolePolicies",
+                    "iam:PassRole",
+                    "iam:PutRolePolicy",
+                    "iam:GetRolePolicy",
+                    "iam:GetRole",
+                    "iam:ListRolePolicies",  # for rollback
+                    "iam:DetachRolePolicy",  # for rollback
+                    "iam:DeleteRolePolicy",  # for rollback
+                    "iam:DeleteRole",  # for rollback
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "lambda:CreateFunction",
+                    "lambda:TagResource",
+                    "lambda:GetLayerVersion",
+                    "lambda:GetFunction",
+                    "lambda:CreateEventSourceMapping",
+                    "lambda:UpdateFunctionConfiguration",
+                    "lambda:DeleteFunction",  # For rollback
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:CreateStateMachine",
+                    "states:TagResource",
+                    "states:DescribeStateMachine",
+                    "states:DeleteStateMachine",  # For rollback
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:PutItem", "dynamodb:Scan"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:Scan"],
+                resources=[props.connector_table.table_arn],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:TagResource",
+                    "events:PutRule",
+                    "events:PutTargets",
+                    "events:DescribeRule",
+                    "events:DeleteRule",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    # "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["*"],
+            )
+        )
+
+        props.iac_assets_bucket.bucket.grant_read_write(
+            self._post_pipelines_v2_handler.function
+        )
+
+        pipelines_v2_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(self._post_pipelines_v2_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
