@@ -26,27 +26,48 @@ components:
   headers:
     Content-Type:
       description: content type 
-      schema: string
+      schema:
+        type: string
     accept:
       description: content type 
-      schema: string
+      schema:
+        type: string
       
 paths:
   /embed/tasks:
     post:
-      summary: Generate embeddings for videos
+      summary: Generate video embeddings
+      description: Generate embeddings for videos
       operationId: generateVideoEmbeddings
+      parameters:
+        - in: query
+          name: nodeId
+          required: true
+          schema:
+            type: string
       x-inputMapping: twelve_labs/embed/tasks/post/input
       x-outputMapping: twelve_labs/embed/tasks/post/output
-  /embed/tasks/task_id/status:
+  /embed/tasks/{task_id}/status:
     get:
       summary: Get the status of a video embedding task
       operationId: getEmbeddingTaskStatus
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
       x-inputMapping: twelve_labs/embed/tasks/task_id/status/get/input
       x-outputMapping: twelve_labs/embed/tasks/task_id/status/get/output
-  /embed/tasks/task_id:
+  /embed/tasks/{task_id}:
     get:
       summary: Get the results of a video embedding task
       operationId: getEmbeddingTaskResults
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
       x-inputMapping: twelve_labs/embed/tasks/task_id/get/input
       x-outputMapping: twelve_labs/embed/tasks/task_id/get/output

@@ -1,118 +1,116 @@
-import React, { useMemo, useState } from 'react';
-import { Node } from 'reactflow';
-import { Box, Button, Stack } from '@mui/material';
-import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
-import { DynamicForm } from '@/forms/components/DynamicForm';
-import { FormDefinition, FormFieldDefinition } from '@/forms/types';
+import React, { useEffect, useMemo } from 'react';
+import { DynamicForm } from '../../../../forms/components/DynamicForm';
+import { FormDefinition, FormFieldDefinition } from '../../../../forms/types';
+import { NodeConfiguration, Node as NodeType, NodeParameter } from '@/features/pipelines/types';
+import { Box, Typography } from '@mui/material';
 
 interface NodeConfigurationFormProps {
-    node: Node;
-    nodeDetails: NodeType;
-    onSave: (configuration: any) => void;
-    onCancel: () => void;
+    node: NodeType;
+    configuration?: NodeConfiguration;
+    onSubmit: (configuration: NodeConfiguration) => Promise<void>;
+    onCancel?: () => void;
 }
 
-const mapNodeTypeToFormType = (type: string): FormFieldDefinition['type'] => {
+const mapParameterTypeToFormType = (type: string): FormFieldDefinition['type'] => {
     switch (type) {
-        case 'number':
-            return 'number';
         case 'boolean':
             return 'switch';
-        case 'array':
-            return 'multiselect';
+        case 'number':
+            return 'number';
+        case 'select':
+            return 'select';
         default:
             return 'text';
     }
 };
 
-const mapNodeTypeToValidationType = (type: string): "string" | "number" | "boolean" | "array" => {
-    switch (type) {
-        case 'number':
-            return 'number';
-        case 'boolean':
-            return 'boolean';
-        case 'array':
-            return 'array';
-        default:
-            return 'string';
-    }
-};
-
 export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
     node,
-    nodeDetails,
-    onSave,
+    configuration,
+    onSubmit,
     onCancel,
 }) => {
-    const [selectedMethod, setSelectedMethod] = useState<string>(node.data.configuration?.method || '');
+    // Get the first method
+    const methodName = Object.keys(node.methods)[0];
+    const methodInfo = node.methods[methodName];
+    const hasParameters = Object.keys(methodInfo?.parameters || {}).length > 0;
 
-    const formDefinition: FormDefinition = useMemo(() => {
-        const selectedMethodDetails = nodeDetails.methods?.find(m => m.name === selectedMethod);
+    // Auto-submit when there are no parameters
+    useEffect(() => {
+        if (!hasParameters) {
+            const config: NodeConfiguration = {
+                method: methodName,
+                parameters: {},
+                path: configuration?.path,
+                operationId: configuration?.operationId,
+            };
+            onSubmit(config);
+        }
+    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, onSubmit]);
+
+    // Create form definition based on node info
+    const formDefinition = useMemo<FormDefinition>(() => {
+        const fields: FormFieldDefinition[] = [];
+
+        if (methodInfo?.parameters) {
+            Object.entries(methodInfo.parameters).forEach(([key, param]: [string, NodeParameter]) => {
+                const field: FormFieldDefinition = {
+                    name: `parameters.${key}`,
+                    type: mapParameterTypeToFormType(param.type),
+                    label: param.name,
+                    required: param.required,
+                    tooltip: param.description,
+                };
+
+                if (param.type === 'select' && 'options' in param) {
+                    field.options = (param as any).options?.map((opt: any) => ({
+                        label: opt.label || opt,
+                        value: opt.value || opt,
+                    }));
+                }
+
+                fields.push(field);
+            });
+        }
 
         return {
-            id: `node-config-${node.id}`,
-            name: `Configure ${nodeDetails.info.title}`,
-            description: nodeDetails.info.description,
-            translationPrefix: 'nodes.configuration',
-            fields: [
-                {
-                    id: `method-${node.id}`,
-                    name: 'method',
-                    type: 'select' as const,
-                    label: 'Method',
-                    tooltip: 'Select the method to use for this node',
-                    required: true,
-                    options: nodeDetails.methods?.map(method => ({
-                        label: `${method.name} - ${method.description}`,
-                        value: method.name
-                    })) || [],
-                    defaultValue: selectedMethod,
-                    onChange: (value: string) => {
-                        setSelectedMethod(value);
-                    }
-                },
-                // Add fields based on the selected method's parameters
-                ...(selectedMethodDetails?.parameters || []).map(param => ({
-                    id: `${node.id}-${param.name}`,
-                    name: `params.${param.name}`,
-                    type: mapNodeTypeToFormType(param.type),
-                    label: param.name,
-                    tooltip: param.description,
-                    required: param.required,
-                    validation: {
-                        type: mapNodeTypeToValidationType(param.type),
-                        rules: []
-                    },
-                    defaultValue: node.data.configuration?.params?.[param.name]
-                }))
-            ]
+            id: `node-config-${node.nodeId}`,
+            name: `Configure ${node.info.title}`,
+            description: node.info.description,
+            fields,
+            translationPrefix: 'nodeConfiguration',
         };
-    }, [node, nodeDetails, selectedMethod]);
+    }, [node, methodInfo]);
 
-    const handleSubmit = async (data: any) => {
-        const configuration = {
-            method: data.method,
-            params: Object.entries(data.params || {}).reduce((acc, [key, value]) => ({
-                ...acc,
-                [key]: value
-            }), {})
+    // Handle form submission
+    const handleFormSubmit = async (data: any) => {
+        const config: NodeConfiguration = {
+            method: methodName,
+            parameters: data.parameters || {},
+            path: configuration?.path,
+            operationId: configuration?.operationId,
         };
-        onSave(configuration);
+        await onSubmit(config);
     };
 
+    if (!hasParameters) {
+        return (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="body1" color="text.secondary">
+                    No configuration or mapping needed
+                </Typography>
+            </Box>
+        );
+    }
+
     return (
-        <Box sx={{ p: 2 }}>
-            <DynamicForm
-                definition={formDefinition}
-                onSubmit={handleSubmit}
-                onCancel={onCancel}
-                defaultValues={node.data.configuration ? {
-                    method: node.data.configuration.method,
-                    params: node.data.configuration.params
-                } : undefined}
-            />
-        </Box>
+        <DynamicForm
+            definition={formDefinition}
+            defaultValues={{ parameters: configuration?.parameters || {} }}
+            onSubmit={handleFormSubmit}
+            onCancel={onCancel}
+        />
     );
 };
 
-export default NodeConfigurationForm; 
+export default NodeConfigurationForm;

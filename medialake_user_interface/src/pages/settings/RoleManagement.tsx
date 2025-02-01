@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
-import {
-    Box,
-    Button,
-    Typography,
-    CircularProgress,
-    Alert,
-} from '@mui/material';
+import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
+import { PageHeader, PageContent } from '@/components/common/layout';
 import { Role, CreateRoleRequest } from '../../api/types/api.types';
 import { useGetRoles, useCreateRole, useUpdateRole, useDeleteRole } from '../../api/hooks/useRoles';
 import RoleList from '../../features/settings/roles/components/RoleList';
 import RoleForm from '../../features/settings/roles/components/RoleForm';
 
 const RoleManagement: React.FC = () => {
+    const { t } = useTranslation();
     const [openRoleForm, setOpenRoleForm] = useState(false);
     const [editingRole, setEditingRole] = useState<Role | undefined>();
     const [error, setError] = useState<string | null>(null);
@@ -59,52 +56,48 @@ const RoleManagement: React.FC = () => {
         }
     };
 
-    if (rolesError) {
-        return (
-            <Alert severity="error" sx={{ mt: 2 }}>
-                {rolesError instanceof Error ? rolesError.message : 'An error occurred while loading roles'}
-            </Alert>
-        );
-    }
-
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ mb: 3 }}>
-                <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-                    Role Management
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                    Create and manage roles to control user permissions
-                </Typography>
-            </Box>
+        <Box sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flex: 1,
+            width: '100%',
+            position: 'relative',
+            maxWidth: '100%',
+            p: 3,
+        }}>
+            <PageHeader
+                title={t('roles.title')}
+                description={t('roles.description')}
+                action={
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleAddRole}
+                        sx={{
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            px: 3,
+                            height: 40
+                        }}
+                    >
+                        {t('roles.actions.addRole')}
+                    </Button>
+                }
+            />
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                    {error}
-                </Alert>
-            )}
-
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleAddRole}
-                >
-                    Add Role
-                </Button>
-            </Box>
-
-            {isLoadingRoles ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress />
-                </Box>
-            ) : (
+            <PageContent
+                isLoading={isLoadingRoles}
+                error={rolesError as Error}
+            >
                 <RoleList
                     roles={roles || []}
                     onEditRole={handleEditRole}
                     onDeleteRole={handleDeleteRole}
                 />
-            )}
+            </PageContent>
 
             <RoleForm
                 open={openRoleForm}

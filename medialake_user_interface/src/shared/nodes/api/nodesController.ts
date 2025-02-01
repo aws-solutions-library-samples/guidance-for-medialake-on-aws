@@ -1,38 +1,112 @@
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
-import { NodesService } from './nodesService';
-import { NodesResponse, NodesError } from '../types/nodes.types';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/api/apiClient';
+import { logger } from '@/common/helpers/logger';
+import { useErrorModal } from '@/hooks/useErrorModal';
+import { NodesResponse } from '../types/nodes.types';
+import { NODES_API } from './nodes.endpoints';
 
-export const NODES_QUERY_KEYS = {
-    all: ['nodes'] as const,
-    list: () => [...NODES_QUERY_KEYS.all, 'list'] as const,
-    detail: (nodeId: string) => [...NODES_QUERY_KEYS.all, 'detail', nodeId] as const,
-};
+export const useGetNodes = () => {
+    const { showError } = useErrorModal();
 
-export const useGetNodes = (options?: Omit<UseQueryOptions<NodesResponse, NodesError, NodesResponse>, 'queryKey' | 'queryFn'>) => {
-    return useQuery({
-        queryKey: NODES_QUERY_KEYS.list(),
-        queryFn: () => NodesService.getNodes(),
-        retry: (failureCount, error: NodesError) => {
-            // Don't retry on 4xx errors
-            if (error.status?.toString().startsWith('4')) {
-                return false;
+    return useQuery<NodesResponse>({
+        queryKey: ['nodes'],
+        queryFn: async ({ signal }) => {
+            try {
+                const response = await apiClient.get<NodesResponse>(
+                    NODES_API.endpoints.GET_NODES,
+                    { signal }
+                );
+
+                if (!response.data?.data) {
+                    throw new Error('Invalid nodes response structure');
+                }
+
+                return response.data;
+            } catch (error) {
+                logger.error('Nodes fetch error:', error);
+                showError('Failed to fetch nodes');
+                throw error;
             }
-            return failureCount < 3;
         },
-        ...options
     });
 };
 
 export const useGetNode = (nodeId: string) => {
-    return useQuery({
-        queryKey: NODES_QUERY_KEYS.detail(nodeId),
-        queryFn: () => NodesService.getNode(nodeId),
-        enabled: !!nodeId,
-        retry: (failureCount, error: NodesError) => {
-            if (error.status?.toString().startsWith('4')) {
-                return false;
+    const { showError } = useErrorModal();
+
+    return useQuery<NodesResponse>({
+        queryKey: ['nodes', nodeId],
+        queryFn: async ({ signal }) => {
+            try {
+                const response = await apiClient.get<NodesResponse>(
+                    NODES_API.endpoints.GET_NODE(nodeId),
+                    { signal }
+                );
+
+                if (!response.data?.data) {
+                    throw new Error('Invalid node response structure');
+                }
+
+                return response.data;
+            } catch (error) {
+                logger.error('Node fetch error:', error);
+                showError('Failed to fetch node');
+                throw error;
             }
-            return failureCount < 3;
+        },
+        enabled: !!nodeId,
+    });
+};
+
+export const useGetUnconfiguredNodeMethods = () => {
+    const { showError } = useErrorModal();
+
+    return useQuery<NodesResponse>({
+        queryKey: ['nodes', 'unconfigured'],
+        queryFn: async ({ signal }) => {
+            try {
+                const response = await apiClient.get<NodesResponse>(
+                    NODES_API.endpoints.GET_UNCONFIGURED_METHODS,
+                    { signal }
+                );
+
+                if (!response.data?.data) {
+                    throw new Error('Invalid unconfigured methods response structure');
+                }
+
+                return response.data;
+            } catch (error) {
+                logger.error('Unconfigured methods fetch error:', error);
+                showError('Failed to fetch unconfigured methods');
+                throw error;
+            }
         },
     });
-}; 
+};
+
+export const useGetNodeMethods = (nodeId: string) => {
+    const { showError } = useErrorModal();
+
+    return useQuery<NodesResponse>({
+        queryKey: ['nodes', nodeId, 'methods'],
+        queryFn: async ({ signal }) => {
+            try {
+                const response = await apiClient.get<NodesResponse>(
+                    NODES_API.endpoints.GET_NODE_METHODS(nodeId),
+                    { signal }
+                );
+
+                if (!response.data?.data) {
+                    throw new Error('Invalid node methods response structure');
+                }
+
+                return response.data;
+            } catch (error) {
+                logger.error('Node methods fetch error:', error);
+                showError('Failed to fetch node methods');
+                throw error;
+            }
+        },
+        enabled: !!nodeId,
+    });
+};

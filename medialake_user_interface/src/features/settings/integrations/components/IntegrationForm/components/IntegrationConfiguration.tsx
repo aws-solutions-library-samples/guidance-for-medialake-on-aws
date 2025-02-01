@@ -110,15 +110,8 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
             };
             console.log('[IntegrationConfiguration] Cleaned submission data:', submissionData);
 
-            if (createIntegrationMutation) {
-                console.log('[IntegrationConfiguration] Calling mutation');
-                await createIntegrationMutation.mutateAsync(submissionData);
-                console.log('[IntegrationConfiguration] Mutation completed');
-            }
-
-            console.log('[IntegrationConfiguration] Calling parent onSubmit');
-            await onSubmit(submissionData);
-            console.log('[IntegrationConfiguration] Parent onSubmit completed');
+            await createIntegrationMutation.mutateAsync(submissionData);
+            console.log('[IntegrationConfiguration] Mutation completed');
 
             if (onClose) {
                 console.log('[IntegrationConfiguration] Closing form');
@@ -127,7 +120,7 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         } catch (error) {
             console.error('[IntegrationConfiguration] Error during submission:', error);
         }
-    }, [createIntegrationMutation, onSubmit, onClose, enabled]);
+    }, [createIntegrationMutation, onClose, enabled]);
 
     const authMethod = formData.auth.type;
 
@@ -135,6 +128,7 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         <Form
             form={form}
             onSubmit={handleSubmit}
+            showButtons={false}
         >
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <FormControlLabel
@@ -204,20 +198,25 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                     />
                 )}
             </Box>
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button onClick={onBack}>
-                    {t('common.back')}
-                </Button>
-                <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    onClick={() => {
-                        console.log('[IntegrationConfiguration] Submit button clicked');
-                    }}
-                >
-                    {t('common.create')}
-                </Button>
+            <Box sx={{
+                mt: 3,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}>
+                <Box>
+                    <Button onClick={onBack} variant="outlined">
+                        {t('common.back')}
+                    </Button>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button onClick={onClose} variant="outlined">
+                        {t('common.cancel')}
+                    </Button>
+                    <Button type="submit" variant="contained" color="primary">
+                        {t('common.create')}
+                    </Button>
+                </Box>
             </Box>
         </Form>
     );

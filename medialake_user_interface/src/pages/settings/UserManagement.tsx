@@ -1,15 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import {
-    Box,
-    Typography,
-    Button,
-    Alert,
-    Snackbar,
-    CircularProgress,
-    useTheme,
-} from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
+import { PageHeader, PageContent } from '@/components/common/layout';
 import UserList from '@/features/settings/usermanagement/components/UserList';
 import UserForm from '@/features/settings/usermanagement/components/UserForm';
 import ApiStatusModal from '@/components/ApiStatusModal';
@@ -20,7 +13,6 @@ const availableRoles = ['Admin', 'Editor', 'Viewer'];
 
 const UserManagement: React.FC = () => {
     const { t } = useTranslation();
-    const theme = useTheme();
     const [openUserForm, setOpenUserForm] = useState(false);
     const [editingUser, setEditingUser] = useState<User | undefined>();
     const [error, setError] = useState<string | null>(null);
@@ -190,20 +182,10 @@ const UserManagement: React.FC = () => {
             maxWidth: '100%',
             p: 3,
         }}>
-            <Box sx={{ mb: 4, flex: 'none', width: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h4" sx={{
-                            fontWeight: 700,
-                            mb: 1,
-                            color: theme.palette.primary.main,
-                        }}>
-                            {t('users.title')}
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                            {t('users.description')}
-                        </Typography>
-                    </Box>
+            <PageHeader
+                title={t('users.title')}
+                description={t('users.description')}
+                action={
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
@@ -212,68 +194,51 @@ const UserManagement: React.FC = () => {
                             borderRadius: '8px',
                             textTransform: 'none',
                             px: 3,
-                            backgroundColor: theme.palette.primary.main,
-                            '&:hover': {
-                                backgroundColor: theme.palette.primary.dark,
-                            },
+                            height: 40
                         }}
                     >
                         {t('users.actions.addUser')}
                     </Button>
-                </Box>
-            </Box>
+                }
+            />
 
-            <Box sx={{
-                flex: 1,
-                minHeight: 0,
-                width: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-                maxWidth: '100%',
-            }}>
-                {isLoadingUsers ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : usersError ? (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {t('users.errors.loadFailed')}: {usersError instanceof Error ? usersError.message : t('common.unknownError')}
-                    </Alert>
-                ) : (
-                    <UserList
-                        users={users || []}
-                        onEditUser={handleEditUser}
-                        onDeleteUser={handleDeleteUser}
-                        onToggleUserStatus={handleToggleUserStatus}
-                        activeFilters={activeFilters}
-                        activeSorting={activeSorting}
-                        onRemoveFilter={(columnId) => {
-                            setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
-                        }}
-                        onRemoveSort={(columnId) => {
-                            setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
-                        }}
-                        onFilterChange={(columnId, value) => {
-                            setActiveFilters(filters => {
-                                const newFilters = filters.filter(f => f.columnId !== columnId);
-                                if (value) {
-                                    newFilters.push({ columnId, value });
-                                }
-                                return newFilters;
-                            });
-                        }}
-                        onSortChange={(columnId, desc) => {
-                            setActiveSorting(sorts => {
-                                const newSorts = sorts.filter(s => s.columnId !== columnId);
-                                if (desc !== undefined) {
-                                    newSorts.push({ columnId, desc });
-                                }
-                                return newSorts;
-                            });
-                        }}
-                    />
-                )}
-            </Box>
+            <PageContent
+                isLoading={isLoadingUsers}
+                error={usersError as Error}
+            >
+                <UserList
+                    users={users || []}
+                    onEditUser={handleEditUser}
+                    onDeleteUser={handleDeleteUser}
+                    onToggleUserStatus={handleToggleUserStatus}
+                    activeFilters={activeFilters}
+                    activeSorting={activeSorting}
+                    onRemoveFilter={(columnId) => {
+                        setActiveFilters(filters => filters.filter(f => f.columnId !== columnId));
+                    }}
+                    onRemoveSort={(columnId) => {
+                        setActiveSorting(sorts => sorts.filter(s => s.columnId !== columnId));
+                    }}
+                    onFilterChange={(columnId, value) => {
+                        setActiveFilters(filters => {
+                            const newFilters = filters.filter(f => f.columnId !== columnId);
+                            if (value) {
+                                newFilters.push({ columnId, value });
+                            }
+                            return newFilters;
+                        });
+                    }}
+                    onSortChange={(columnId, desc) => {
+                        setActiveSorting(sorts => {
+                            const newSorts = sorts.filter(s => s.columnId !== columnId);
+                            if (desc !== undefined) {
+                                newSorts.push({ columnId, desc });
+                            }
+                            return newSorts;
+                        });
+                    }}
+                />
+            </PageContent>
 
             <UserForm
                 open={openUserForm}

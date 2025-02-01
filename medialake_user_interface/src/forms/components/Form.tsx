@@ -9,6 +9,7 @@ interface FormProps {
     onCancel?: () => void;
     submitLabel?: string;
     children: React.ReactNode;
+    showButtons?: boolean;
 }
 
 export const Form: React.FC<FormProps> = ({
@@ -17,6 +18,7 @@ export const Form: React.FC<FormProps> = ({
     onCancel,
     submitLabel = 'common.save',
     children,
+    showButtons = true,
 }) => {
     const { t } = useTranslation();
 
@@ -46,16 +48,18 @@ export const Form: React.FC<FormProps> = ({
             }}
         >
             {children}
-            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
-                {onCancel && (
-                    <Button onClick={onCancel} variant="outlined">
-                        {t('common.cancel')}
+            {showButtons && (
+                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
+                    {onCancel && (
+                        <Button onClick={onCancel} variant="outlined">
+                            {t('common.cancel')}
+                        </Button>
+                    )}
+                    <Button type="submit" variant="contained" color="primary">
+                        {t(submitLabel)}
                     </Button>
-                )}
-                <Button type="submit" variant="contained" color="primary">
-                    {t(submitLabel)}
-                </Button>
-            </Stack>
+                </Stack>
+            )}
         </Box>
     );
 };

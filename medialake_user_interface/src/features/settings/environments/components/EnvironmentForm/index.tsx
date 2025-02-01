@@ -32,9 +32,11 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
         validationSchema: environmentFormSchema,
         defaultValues: environment ? {
             name: environment.name,
+            region: environment.region,
             status: environment.status,
             tags: {
                 'cost-center': environment.tags?.['cost-center'] || '',
+                team: environment.tags?.team || 'default',
             },
         } : defaultEnvironmentFormData,
         translationPrefix: 'settings.environments.form',
@@ -44,10 +46,10 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
         const environmentData: EnvironmentCreate & { status: EnvironmentStatus } = {
             name: data.name,
             status: data.status,
-            region: '', // Required by API but being removed from form
+            region: data.region,
             tags: {
                 'cost-center': data.tags['cost-center'],
-                team: '', // Required by API but being removed from form
+                team: data.tags.team,
             },
         };
         await onSave(environmentData);
@@ -73,6 +75,12 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
                         label={t('settings.environments.form.name')}
                         required
                     />
+                    <FormField
+                        name="region"
+                        control={form.control}
+                        label={t('settings.environments.form.region')}
+                        required
+                    />
                     <FormSelect
                         name="status"
                         control={form.control}
@@ -87,6 +95,12 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
                         name="tags.cost-center"
                         control={form.control}
                         label={t('settings.environments.form.costCenter')}
+                        required
+                    />
+                    <FormField
+                        name="tags.team"
+                        control={form.control}
+                        label={t('settings.environments.form.team')}
                         required
                     />
                 </Form>

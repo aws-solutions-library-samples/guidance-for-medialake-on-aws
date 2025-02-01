@@ -256,8 +256,6 @@ class BaseInfrastructureStack(Stack):
                 name=f"{config.global_prefix}-asset-table-{config.environment}",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="DigitalSourceAsset.ID",
-                sort_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
                 ddb_export_bucket=self.ddb_export_bucket,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,

@@ -36,6 +36,33 @@ class ApiGatewayNodesConstruct(Construct):
         # Create nodes resource
         nodes_resource = props.api_resource.root.add_resource("nodes")
 
+        # Create the Lambda handler first
+        self._get_nodeId_handler = Lambda(
+            self,
+            "GetNodeIdHandler",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}-get_nodeId-{config.environment}",
+                entry="lambdas/api/nodes/rp_nodeId/get_nodeId",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "PIPELINES_NODES_TABLE": props.pipelines_nodes_table.table_name,
+                },
+            ),
+        )
+
+        props.pipelines_nodes_table.grant_read_data(self._get_nodeId_handler.function)
+
+        # GET /nodes/methods/unconfigured
+        methods_resource = nodes_resource.add_resource("methods")
+        unconfigured_resource = methods_resource.add_resource("unconfigured")
+
+        unconfigured_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._get_nodeId_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
         # GET /nodes
         self._get_nodes_handler = Lambda(
             self,
@@ -63,22 +90,17 @@ class ApiGatewayNodesConstruct(Construct):
         node_id_resource = nodes_resource.add_resource("{id}")
 
         # GET /nodes/{id}
-        self._get_nodeId_handler = Lambda(
-            self,
-            "GetNodeIdHandler",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}-get_nodeId-{config.environment}",
-                entry="lambdas/api/nodes/rp_nodeId/get_nodeId",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "PIPELINES_NODES_TABLE": props.pipelines_nodes_table.table_name,
-                },
-            ),
-        )
-
-        props.pipelines_nodes_table.grant_read_data(self._get_nodeId_handler.function)
 
         node_id_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._get_nodeId_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # GET /nodes/{id}/methods
+        methods_resource = node_id_resource.add_resource("methods")
+        methods_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,

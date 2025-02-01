@@ -49,36 +49,58 @@ class NodesStack(Stack):
                 sort_key_type=dynamodb.AttributeType.STRING,
                 point_in_time_recovery=True,
                 global_secondary_indexes=[
-                    # GSI for Node Type Index
+                    # GSI-1: Nodes List Index
                     dynamodb.GlobalSecondaryIndexPropsV2(
-                        index_name="TypeIndex",
+                        index_name="NodesListIndex",
                         partition_key=dynamodb.Attribute(
-                            name="pk", type=dynamodb.AttributeType.STRING
+                            name="gsi1pk", type=dynamodb.AttributeType.STRING
                         ),
                         sort_key=dynamodb.Attribute(
-                            name="sk", type=dynamodb.AttributeType.STRING
+                            name="gsi1sk", type=dynamodb.AttributeType.STRING
                         ),
                         projection_type=dynamodb.ProjectionType.ALL,
                     ),
-                    # GSI for Category Index
+                    # GSI-2: Methods Index
                     dynamodb.GlobalSecondaryIndexPropsV2(
-                        index_name="CategoryIndex",
+                        index_name="MethodsIndex",
                         partition_key=dynamodb.Attribute(
-                            name="pk", type=dynamodb.AttributeType.STRING
+                            name="gsi2pk", type=dynamodb.AttributeType.STRING
                         ),
                         sort_key=dynamodb.Attribute(
-                            name="sk", type=dynamodb.AttributeType.STRING
+                            name="gsi2sk", type=dynamodb.AttributeType.STRING
                         ),
                         projection_type=dynamodb.ProjectionType.ALL,
                     ),
-                    # GSI for Tag Index
+                    # GSI-3: Entity Type Index (for unconfigured methods)
                     dynamodb.GlobalSecondaryIndexPropsV2(
-                        index_name="TagIndex",
+                        index_name="GSI3",
                         partition_key=dynamodb.Attribute(
-                            name="pk", type=dynamodb.AttributeType.STRING
+                            name="entityType", type=dynamodb.AttributeType.STRING
                         ),
                         sort_key=dynamodb.Attribute(
-                            name="sk", type=dynamodb.AttributeType.STRING
+                            name="nodeId", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                    # GSI-4: Categories Index
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="CategoriesIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="gsi3pk", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="gsi3sk", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                    # GSI-5: Tags Index
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="TagsIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="gsi4pk", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="gsi4sk", type=dynamodb.AttributeType.STRING
                         ),
                         projection_type=dynamodb.ProjectionType.ALL,
                     ),

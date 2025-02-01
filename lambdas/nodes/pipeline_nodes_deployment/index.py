@@ -3,6 +3,7 @@ import json
 import boto3
 import yaml
 import datetime
+from decimal import Decimal
 import traceback
 from typing import Dict, Any
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -41,7 +42,7 @@ def process_node_file(bucket: str, key: str) -> Dict[str, list]:
 
         # Parse YAML content
         node_data = yaml.safe_load(content)
-        logger.info(f"Parsed YAML data: {json.dumps(node_data, default=str)}")
+        logger.info(f"Node data structure: {list(node_data.keys())}")
 
         # Validate YAML structure
         validate_node_yaml(node_data, key)
@@ -51,48 +52,63 @@ def process_node_file(bucket: str, key: str) -> Dict[str, list]:
         node_id = node_data["x-medialake-nodeId"]
         node_type = node_data.get("x-node-type", "API").upper()
         info = node_data.get("info", {})
-        tags = [tag["name"] for tag in node_data.get("tags", [])]
-        categories = set()
-        timestamp = int(datetime.datetime.now().timestamp())
 
-        logger.info(f"Extracted fields - node_id: {node_id}, node_type: {node_type}")
-        logger.info(f"Info: {info}")
-        logger.info(f"Tags: {tags}")
+        logger.info(
+            f"Creating INFO item for node",
+            extra={
+                "node_id": node_id,
+                "node_type": node_type,
+                "info_keys": list(info.keys()),
+            },
+        )
 
-        # Create items for DynamoDB
-        items = []
+        # Convert timestamp to Decimal for DynamoDB compatibility
+        timestamp = Decimal(str(int(datetime.datetime.now().timestamp())))
 
         # Basic Info Item
         info_item = {
-            "pk": "NODES",
-            "sk": f"NODE#{node_id}#INFO",
+            "pk": f"NODE#{node_id}",
+            "sk": "INFO",
             "title": info.get("title"),
             "description": info.get("description"),
             "iconUrl": "",
             "nodeType": node_type,
-            "categories": list(categories) if categories else [],  # Convert set to list
-            "tags": list(tags) if tags else [],  # Ensure tags is a list
+            "categories": ["Video Understanding", "Embeddings"],
+            "tags": [tag.get("name") for tag in node_data.get("tags", [])],
             "enabled": True,
             "createdAt": timestamp,
             "updatedAt": timestamp,
+            "gsi1pk": "NODES",
+            "gsi1sk": f"NODE#{node_id}",
+            "entityType": "NODE",
+            "nodeId": f"NODE#{node_id}",
+            "methodInfo": True,
+            "version": info.get("version"),
+            "servers": node_data.get("servers", []),
         }
-        logger.info(f"Created info_item: {json.dumps(info_item, default=str)}")
-        items.append(info_item)
 
-        # Auth Item - Add if security schemes exist
+        logger.info(
+            "Created info_item",
+            extra={
+                "pk": info_item["pk"],
+                "sk": info_item["sk"],
+                "title": info_item["title"],
+                "timestamp_type": type(timestamp).__name__,
+            },
+        )
+
+        items = [info_item]
+
+        # Auth Item
         security_schemes = node_data.get("components", {}).get("securitySchemes", {})
         if security_schemes:
             auth_method = next(iter(security_schemes.keys()))
             auth_item = {
-                "pk": "NODES",
-                "sk": f"NODE#{node_id}#AUTH",
+                "pk": f"NODE#{node_id}",
+                "sk": "AUTH",
                 "authMethod": auth_method,
-                "authConfig": {
-                    "type": security_schemes[auth_method]["type"],
-                    "parameters": security_schemes[auth_method],
-                },
+                "authConfig": security_schemes[auth_method],
             }
-            logger.info(f"Created auth_item: {json.dumps(auth_item, default=str)}")
             items.append(auth_item)
 
         # Method Items
@@ -100,9 +116,7 @@ def process_node_file(bucket: str, key: str) -> Dict[str, list]:
         for path, methods in paths.items():
             for method_name, method_details in methods.items():
                 if isinstance(method_details, dict):
-                    method_id = method_details.get(
-                        "operationId", f"{method_name}_{path}"
-                    )
+                    method_id = f"{path}/{method_name}".replace("/", "_").strip("_")
                     method_item = {
                         "pk": f"NODE#{node_id}",
                         "sk": f"METHOD#{method_id}",
@@ -110,34 +124,42 @@ def process_node_file(bucket: str, key: str) -> Dict[str, list]:
                         "methodDescription": method_details.get("summary", ""),
                         "methodConfig": {
                             "path": path,
+                            "operationId": method_details.get("operationId"),
+                            "parameters": method_details.get("parameters", {}),
                             "inputMapping": method_details.get("x-inputMapping"),
                             "outputMapping": method_details.get("x-outputMapping"),
                         },
+                        "gsi2pk": f"METHOD#{node_id}",
+                        "gsi2sk": f"METHOD#{method_id}",
+                        "entityType": "NODE",  # For GSI3 partition key
+                        "nodeId": f"NODE#{node_id}",  # For GSI3 sort key
+                        "methodInfo": True,  # For GSI3 filtering
                     }
-                    logger.info(
-                        f"Created method_item: {json.dumps(method_item, default=str)}"
-                    )
                     items.append(method_item)
 
-        # GSI entries
-        items.append(
-            {
-                "pk": f"TYPE#{node_type}",
-                "sk": f"NODE#{node_id}",
-            }
-        )
-
-        for tag in tags:
+        # Category and Tag GSI entries
+        categories = set()
+        for category in categories:
             items.append(
                 {
-                    "pk": f"TAG#{tag}",
-                    "sk": f"NODE#{node_id}",
+                    "pk": f"NODE#{node_id}",
+                    "sk": f"CAT#{category}",
+                    "gsi3pk": f"CAT#{category}",
+                    "gsi3sk": f"NODE#{node_id}",
+                }
+            )
+
+        for tag in items[0]["tags"]:
+            items.append(
+                {
+                    "pk": f"NODE#{node_id}",
+                    "sk": f"TAG#{tag}",
+                    "gsi4pk": f"TAG#{tag}",
+                    "gsi4sk": f"NODE#{node_id}",
                 }
             )
 
         logger.info(f"Total items generated: {len(items)}")
-        logger.info(f"Items to be stored: {json.dumps(items, default=str)}")
-
         return {"items": items}
     except Exception as e:
         logger.error(f"Error processing file {key}: {str(e)}")
@@ -149,38 +171,61 @@ def store_node_in_dynamodb(node_data: Dict[str, list]) -> None:
     """Store node data in DynamoDB using individual writes for debugging."""
     try:
         table = dynamodb.Table(NODES_TABLE)
-        logger.info(f"Starting individual writes to DynamoDB table: {NODES_TABLE}")
-
-        # Check if there are any items to process
-        if not node_data.get("items"):
-            logger.warning("No items to store in DynamoDB")
-            return
-
-        # Extract node_id from the first INFO item
-        node_id = None
-        for item in node_data["items"]:
-            if item.get("sk", "").endswith("#INFO"):
-                node_id = item["sk"].split("#")[1]
-                break
+        logger.info(
+            f"Starting DynamoDB writes",
+            extra={
+                "table": NODES_TABLE,
+                "item_count": len(node_data.get("items", [])),
+            },
+        )
 
         # Process all items
-        for item in node_data["items"]:
-            logger.info(f"Writing item to DynamoDB: {item}")
-            try:
-                response = table.put_item(Item=item)
-                logger.info(f"PutItem response: {response}")
-            except Exception as e:
-                logger.error(f"Error writing item to DynamoDB: {str(e)}")
-
-        if node_id:
+        for item in node_data.get("items", []):
             logger.info(
-                f"Successfully attempted to store node {node_id} items in DynamoDB"
+                "Writing DynamoDB item",
+                extra={
+                    "pk": item.get("pk"),
+                    "sk": item.get("sk"),
+                    "item_keys": list(item.keys()),
+                },
             )
-        else:
-            logger.warning("Processed items but could not determine node ID")
+
+            try:
+                # Convert any float values to Decimal without using json serialization
+                def convert_floats_to_decimal(obj):
+                    if isinstance(obj, float):
+                        return Decimal(str(obj))
+                    elif isinstance(obj, dict):
+                        return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_floats_to_decimal(v) for v in obj]
+                    return obj
+
+                # Convert the item
+                converted_item = convert_floats_to_decimal(item)
+
+                response = table.put_item(Item=converted_item)
+                logger.info(
+                    "Successfully wrote item",
+                    extra={"pk": item.get("pk"), "sk": item.get("sk")},
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to write item",
+                    extra={
+                        "pk": item.get("pk"),
+                        "sk": item.get("sk"),
+                        "error": str(e),
+                        "item_type": str(type(item)),
+                    },
+                )
+                raise
 
     except Exception as e:
-        logger.error(f"Error storing node items: {str(e)}")
+        logger.error(
+            f"Error in store_node_in_dynamodb",
+            extra={"error": str(e), "traceback": traceback.format_exc()},
+        )
         raise
 
 

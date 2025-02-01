@@ -133,24 +133,28 @@ class OpenSearchCluster(Construct):
         )
 
         # Create IAM Role for OpenSearch to publish audit logs to CloudWatch
-        audit_log_role = iam.Role(
-            self,
-            "OpenSearchAuditLogRole",
-            assumed_by=iam.ServicePrincipal("es.amazonaws.com"),
-        )
-
-        audit_log_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                ],
-                resources=[
-                    f"arn:aws:logs:{stack.region}:{stack.account}:log-group:/aws/opensearch/{props.domain_name}:*"
-                ],
+        try:
+            audit_log_role = iam.Role.from_role_arn(
+                self,
+                "OpenSearchAuditLogRole",
+                f"arn:aws:iam::{stack.account}:role/OpenSearchAuditLogRole",
             )
-        )
+            
+            audit_log_role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                    ],
+                    resources=[
+                        f"arn:aws:logs:{stack.region}:{stack.account}:log-group:/aws/opensearch/{props.domain_name}:*"
+                    ],
+                )
+            )
+        except Exception:
+            #Role already exists
+            pass
 
         # Define Audit Log Group
         audit_log_group = logs.LogGroup(
@@ -275,12 +279,16 @@ class OpenSearchCluster(Construct):
         )
 
         # Create a service-linked role if it doesn't exist
-        slr = iam.CfnServiceLinkedRole(
-            self, "ServiceLinkedRole", aws_service_name="es.amazonaws.com"
-        )
+        # try:
+        #     slr = iam.CfnServiceLinkedRole(
+        #         self, "ServiceLinkedRole", aws_service_name="es.amazonaws.com"
+        #     )
+        # except Exception:
+        #     #Role already exists
+        #     pass
 
         # Ensure the service-linked role is created before the domain
-        self.domain.node.add_dependency(slr)
+        # self.domain.node.add_dependency(slr)
 
         # Create Lambda function for index creation
         create_indexlambda_ = lambda_.Function(

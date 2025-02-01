@@ -55,6 +55,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = ({
                 size: 160,
                 enableResizing: true,
                 enableSorting: true,
+                show: false,
                 cell: ({ getValue }) => (
                     <TableCellContent variant="secondary">
                         {getValue() as string}
