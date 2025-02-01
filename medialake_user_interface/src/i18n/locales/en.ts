@@ -27,6 +27,13 @@ export default {
                         required: 'Environment selection is required'
                     }
                 },
+                enabled: {
+                    label: 'Enabled',
+                    tooltip: 'Enable or disable this integration',
+                    errors: {
+                        required: 'Enabled is required'
+                    }
+                },
                 auth: {
                     type: {
                         label: 'Authentication Type',
@@ -75,6 +82,7 @@ export default {
     translation: {
         common: {
             tableDensity: "Table Density",
+            back: 'Back',
             loading: 'Loading...',
             error: 'Something went wrong',
             save: 'Save',
@@ -325,6 +333,13 @@ export default {
             form: {
                 title: 'Add Integration',
                 fields: {
+                    enabled: {
+                        label: 'Enabled',
+                        tooltip: 'Enable or disable this integration',
+                        errors: {
+                            required: 'Enabled is required'
+                        }
+                    },
                     nodeId: {
                         label: 'Integration',
                         tooltip: 'Select an integration provider',
@@ -375,6 +390,9 @@ export default {
                             }
                         }
                     }
+                },
+                search: {
+                    placeholder: 'Search integrations...'
                 },
                 errors: {
                     required: 'This field is required',

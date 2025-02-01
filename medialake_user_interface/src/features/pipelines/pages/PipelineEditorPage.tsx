@@ -19,7 +19,7 @@ import { FaFileVideo } from 'react-icons/fa';
 import { useGetPipeline, useCreatePipeline, useUpdatePipeline } from '../api/pipelinesController';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
 import type { Pipeline, CreatePipelineDto, PipelineEdge, PipelineNode } from '../types/pipelines.types';
-import type { NodesResponse, Node as ApiNode, NodeInfo, NodeAuth, NodeMethod } from '@/shared/nodes/types/nodes.types';
+import type { NodesResponse } from '@/shared/nodes/types/nodes.types';
 import {
     CustomNode,
     CustomEdge,
@@ -28,6 +28,8 @@ import {
     PipelineToolbar,
 } from '../components/PipelineEditor';
 import type { PipelineToolbarProps } from '../components/PipelineEditor/PipelineToolbar';
+import { Node as NodeType, NodeConfiguration, NodeMethod } from '../types';
+import { RightSidebarProvider, useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -36,6 +38,7 @@ interface CustomNodeData {
     inputTypes: string[];
     outputTypes: string[];
     nodeId: string;
+    description: string;
     configuration?: any;
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
@@ -81,7 +84,7 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
     dragging: node.dragging
 });
 
-const convertApiResponseToNode = (response: NodesResponse): ApiNode | null => {
+const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
     if (!response || !response.data || !response.data[0]) {
         return null;
     }
@@ -102,18 +105,41 @@ const convertApiResponseToNode = (response: NodesResponse): ApiNode | null => {
             outputTypes: nodeData.info?.outputTypes || [],
             createdAt: nodeData.info?.createdAt || new Date().toISOString(),
         },
-        auth: {
-            authMethod: nodeData.auth?.authMethod || 'none',
-            authConfig: nodeData.auth?.authConfig || {
-                type: '',
-                parameters: {
-                    type: '',
-                    name: '',
-                    in: '',
+        methods: nodeData.methods?.reduce((acc, method) => {
+            // Convert parameters to Record format
+            const parameters = Array.isArray(method.parameters)
+                ? method.parameters.reduce((paramAcc, param) => ({
+                    ...paramAcc,
+                    [param.name]: {
+                        name: param.name,
+                        type: param.type === 'string' ? 'text' : param.type as 'number' | 'boolean' | 'select',
+                        required: param.required || false,
+                        description: param.description
+                    }
+                }), {})
+                : {};
+
+            // If method already exists, merge parameters
+            if (acc[method.name]) {
+                return {
+                    ...acc,
+                    [method.name]: {
+                        ...acc[method.name],
+                        parameters: { ...acc[method.name].parameters, ...parameters }
+                    }
+                };
+            }
+
+            // Add new method
+            return {
+                ...acc,
+                [method.name]: {
+                    name: method.name,
+                    description: method.description || '',
+                    parameters
                 }
-            },
-        },
-        methods: nodeData.methods || [],
+            };
+        }, {} as Record<string, NodeMethod>),
     };
 };
 
@@ -127,6 +153,7 @@ const PipelineEditorContent = () => {
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
     const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
+    const { isExpanded } = useRightSidebar();
 
     const [formData, setFormData] = React.useState<CreatePipelineDto>({
         name: '',
@@ -269,9 +296,10 @@ const PipelineEditorContent = () => {
                 return;
             }
 
+            const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
             const position = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
+                x: event.clientX - reactFlowBounds.left,
+                y: event.clientY - reactFlowBounds.top,
             });
 
             const newReactFlowNode: Node<CustomNodeData> = {
@@ -281,10 +309,16 @@ const PipelineEditorContent = () => {
                 data: {
                     nodeId: nodeData.id,
                     label: nodeData.label || 'New Node',
+                    description: nodeData.description || '',
                     icon: nodeData.icon || <FaFileVideo size={20} />,
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
-                    configuration: null,
+                    configuration: {
+                        method: '',  // Will be set to first available method by NodeConfigurationForm
+                        parameters: {},
+                        inputMapping: '',
+                        outputMapping: ''
+                    },
                 }
             };
 
@@ -358,31 +392,90 @@ const PipelineEditorContent = () => {
         handleNodeConfigClose();
     }, [selectedNode, setNodes]);
 
-    const convertNodeToReactFlowNode = (apiNode: ApiNode): Node<CustomNodeData> => ({
-        id: apiNode.nodeId || getId(),
+    const convertNodeToReactFlowNode = (node: NodeType): Node<CustomNodeData> => ({
+        id: node.nodeId || getId(),
         type: 'custom',
         position: { x: 0, y: 0 },
         data: {
-            nodeId: apiNode.nodeId || '',
-            label: apiNode.info.title,
+            nodeId: node.nodeId || '',
+            label: node.info.title,
+            description: node.info.description || '',
             icon: <FaFileVideo size={20} />,
-            inputTypes: apiNode.info.inputTypes || [],
-            outputTypes: apiNode.info.outputTypes || [],
+            inputTypes: node.info.inputTypes || [],
+            outputTypes: node.info.outputTypes || [],
             configuration: null,
         },
     });
 
     return (
-        <Box sx={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            margin: 0,
+            padding: 0
+        }}>
             <PipelineToolbar
                 onSave={handleSave}
                 isLoading={createPipeline.isPending || updatePipeline.isPending}
                 pipelineName={formData.name}
                 onPipelineNameChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
             />
-            <Box sx={{ flex: 1, display: 'flex' }}>
-                <Box ref={reactFlowWrapper} sx={{ flex: 1, height: '100%' }}>
+            <Box sx={{
+                position: 'fixed',
+                overflow: 'hidden',
+                height: 'calc(100vh - 64px)',
+                width: '100%',
+                left: 0,
+                top: 64,
+                right: 0,
+                bottom: 0
+            }}>
+                <Box sx={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: isExpanded ? '300px' : '0px',
+                    transition: theme => theme.transitions.create(['width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
+                    zIndex: 2
+                }}>
+                    <Sidebar />
+                </Box>
+                <Box ref={reactFlowWrapper} sx={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    right: isExpanded ? '300px' : 0,
+                    bottom: 0,
+                    transition: theme => theme.transitions.create(['right'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
+                    zIndex: 1
+                }}>
                     <ReactFlow
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            margin: 0,
+                            padding: 0,
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            right: 0,
+                            bottom: 0
+                        }}
+                        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+                        minZoom={0.1}
+                        maxZoom={4}
+                        snapToGrid={true}
+                        snapGrid={[16, 16]}
                         nodes={nodes}
                         edges={edges}
                         onNodesChange={onNodesChange}
@@ -393,13 +486,14 @@ const PipelineEditorContent = () => {
                         onDrop={onDrop}
                         onDragOver={(event) => event.preventDefault()}
                         fitView
+                        connectionRadius={100}
+                        connectOnClick={true}
                     >
                         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
                         <Controls />
                         <MiniMap />
                     </ReactFlow>
                 </Box>
-                <Sidebar />
             </Box>
 
             <Dialog open={isNodeConfigOpen} onClose={() => setIsNodeConfigOpen(false)} maxWidth="md" fullWidth>
@@ -407,15 +501,22 @@ const PipelineEditorContent = () => {
                 <DialogContent>
                     {selectedNode && !isNodeDetailsLoading && nodeDetails && (
                         <NodeConfigurationForm
-                            node={selectedNode}
-                            nodeDetails={convertApiResponseToNode(nodeDetails) as ApiNode}
-                            onCancel={() => setIsNodeConfigOpen(false)}
-                            onSave={(updatedNode) => {
+                            node={convertApiResponseToNode(nodeDetails) as NodeType}
+                            configuration={selectedNode.data.configuration}
+                            onSubmit={async (configuration) => {
+                                const updatedNode = {
+                                    ...selectedNode,
+                                    data: {
+                                        ...selectedNode.data,
+                                        configuration
+                                    }
+                                };
                                 setNodes((nds) =>
                                     nds.map((n) => (n.id === updatedNode.id ? updatedNode : n))
                                 );
                                 setIsNodeConfigOpen(false);
                             }}
+                            onCancel={() => setIsNodeConfigOpen(false)}
                         />
                     )}
                 </DialogContent>
@@ -450,9 +551,11 @@ const PipelineEditorContent = () => {
 };
 
 const PipelineEditorPage = () => (
-    <ReactFlowProvider>
-        <PipelineEditorContent />
-    </ReactFlowProvider>
+    <RightSidebarProvider>
+        <ReactFlowProvider>
+            <PipelineEditorContent />
+        </ReactFlowProvider>
+    </RightSidebarProvider>
 );
 
-export default PipelineEditorPage; 
+export default PipelineEditorPage;

@@ -12,8 +12,13 @@ import { useTranslation } from 'react-i18next';
 import EnvironmentList from '@/features/settings/environments/components/EnvironmentList';
 import { EnvironmentForm } from '@/features/settings/environments/components/EnvironmentForm';
 import ApiStatusModal from '@/components/ApiStatusModal';
-import { useEnvironments, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment } from '@/features/settings/environments/api/environmentsController';
-import { Environment, EnvironmentCreate, EnvironmentUpdate } from '@/features/settings/environments/types/environments.types';
+import {
+    useEnvironmentsQuery,
+    useCreateEnvironmentMutation,
+    useUpdateEnvironmentMutation,
+    useDeleteEnvironmentMutation
+} from '@/features/settings/environments/hooks/useEnvironmentsQuery';
+import { Environment, EnvironmentCreate, EnvironmentUpdate } from '@/types/environment';
 
 const EnvironmentsPage: React.FC = () => {
     const { t } = useTranslation();
@@ -34,10 +39,10 @@ const EnvironmentsPage: React.FC = () => {
     });
 
     // API Hooks
-    const { data: environments, isLoading: isLoadingEnvironments, error: environmentsError } = useEnvironments();
-    const createEnvironmentMutation = useCreateEnvironment();
-    const updateEnvironmentMutation = useUpdateEnvironment();
-    const deleteEnvironmentMutation = useDeleteEnvironment();
+    const { data: environments, isLoading: isLoadingEnvironments, error: environmentsError } = useEnvironmentsQuery();
+    const createEnvironmentMutation = useCreateEnvironmentMutation();
+    const updateEnvironmentMutation = useUpdateEnvironmentMutation();
+    const deleteEnvironmentMutation = useDeleteEnvironmentMutation();
 
     const handleAddEnvironment = () => {
         setEditingEnvironment(undefined);
@@ -65,11 +70,12 @@ const EnvironmentsPage: React.FC = () => {
                 const updateData: EnvironmentUpdate = {
                     name: environmentData.name,
                     region: environmentData.region,
+                    status: environmentData.status,
                     tags: environmentData.tags,
                 };
                 await updateEnvironmentMutation.mutateAsync({
                     id: editingEnvironment.environment_id,
-                    environment: updateData
+                    data: updateData
                 });
 
                 setApiStatus({
@@ -165,7 +171,15 @@ const EnvironmentsPage: React.FC = () => {
                     </Alert>
                 ) : (
                     <EnvironmentList
-                        environments={environments?.data?.environments || []}
+                        environments={(environments?.data?.environments || []).map(env => ({
+                            ...env,
+                            status: env.status || 'active', // Ensure status is always present
+                            tags: {
+                                'cost-center': env.tags?.['cost-center'] || '',
+                                team: env.tags?.team || '',
+                                ...env.tags
+                            }
+                        }))}
                         onEditEnvironment={handleEditEnvironment}
                         onDeleteEnvironment={async (id) => {
                             try {

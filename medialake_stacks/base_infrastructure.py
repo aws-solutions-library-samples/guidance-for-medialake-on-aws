@@ -256,7 +256,7 @@ class BaseInfrastructureStack(Stack):
                 name=f"{config.global_prefix}-asset-table-{config.environment}",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="DigitalSourceAsset.ID",
+                sort_key_name="ID",
                 sort_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
                 ddb_export_bucket=self.ddb_export_bucket,
@@ -268,11 +268,7 @@ class BaseInfrastructureStack(Stack):
         self._asset_table.table.add_global_secondary_index(
             index_name="AssetIDIndex",
             partition_key=dynamodb.Attribute(
-                name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="DigitalSourceAsset.IngestedAt",
-                type=dynamodb.AttributeType.STRING,
+                name="ID", type=dynamodb.AttributeType.STRING
             ),
             projection_type=dynamodb.ProjectionType.ALL,
         )

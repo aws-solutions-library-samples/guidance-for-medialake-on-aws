@@ -12,8 +12,8 @@ security:
 paths:
   /foundation-models:
     get:
-      summary: List foundation models
-      operationId: list_foundation_models
+      summary: Put vectors into S3
+      operationId: put_vectors_into_s3
       tags: [Foundation Models]
       x-medialake-formData: aws_bedrock_data_automation/foundation_models
       parameters:

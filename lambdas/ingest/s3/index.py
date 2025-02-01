@@ -301,13 +301,21 @@ class AssetProcessor:
             content_type.split("/")[0].capitalize() if content_type else "Image"
         )
 
+        # Map asset types to their abbreviations
+        type_abbreviations = {
+            "Image": "img",
+            "Video": "vid",
+            "Audio": "aud"
+        }
+        type_abbrev = type_abbreviations.get(asset_type, "img")  # Default to "img" if type not found
+
         item: AssetRecord = {
             "InventoryID": f"asset:uuid:{inventory_id}",
             "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
                 "MD5Hash"
             ],
             "DigitalSourceAsset": {
-                "ID": f"asset:img:{asset_id}",
+                "ID": f"asset:{type_abbrev}:{asset_id}",
                 "Type": asset_type,
                 "CreateDate": datetime.utcnow().isoformat(),
                 "IngestedAt": datetime.utcnow().isoformat(),

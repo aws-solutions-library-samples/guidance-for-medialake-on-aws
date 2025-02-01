@@ -1,20 +1,25 @@
-import React from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import React, { useCallback } from 'react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Box, Typography, IconButton } from '@mui/material';
 import { FaCog, FaTrash } from 'react-icons/fa';
 
-interface CustomNodeData {
+const HANDLE_CONNECT_RADIUS = 50;
+
+export interface CustomNodeData {
     label: string;
     icon: React.ReactNode;
     inputTypes: string[];
     outputTypes: string[];
     nodeId: string; // Original node ID from the API
+    description: string; // Node description
     configuration?: any; // Node configuration
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
 }
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
+    const { project } = useReactFlow();
+
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
         data.onDelete?.(id);
@@ -25,8 +30,36 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         data.onConfigure?.(id);
     };
 
+    const handleNodeClick = useCallback((event: React.MouseEvent) => {
+        const rect = (event.target as HTMLElement).getBoundingClientRect();
+        const sourceHandleX = rect.right;
+        const sourceHandleY = rect.top + rect.height / 2;
+
+        const clickX = event.clientX;
+        const clickY = event.clientY;
+
+        // Calculate distance from click to source handle
+        const distance = Math.sqrt(
+            Math.pow(clickX - sourceHandleX, 2) +
+            Math.pow(clickY - sourceHandleY, 2)
+        );
+
+        // If click is within radius of source handle, start connection
+        if (distance <= HANDLE_CONNECT_RADIUS) {
+            const { x, y } = project({ x: clickX, y: clickY });
+            const event = new MouseEvent('mousedown', {
+                clientX: sourceHandleX,
+                clientY: sourceHandleY,
+                bubbles: true
+            });
+            const sourceHandle = document.querySelector(`[data-nodeid="${id}"] .react-flow__handle-source`);
+            sourceHandle?.dispatchEvent(event);
+        }
+    }, [id, project]);
+
     return (
         <Box
+            onClick={handleNodeClick}
             sx={{
                 padding: '10px',
                 borderRadius: '8px',
@@ -36,28 +69,34 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 minWidth: 150,
                 position: 'relative',
                 boxShadow: 2,
+                cursor: 'pointer',
+                '&:hover': {
+                    boxShadow: 3
+                }
             }}
         >
-            {data.inputTypes.length > 0 && (
-                <Handle
-                    type="target"
-                    position={Position.Left}
-                    isConnectable={isConnectable}
-                    style={{ background: '#555' }}
-                />
-            )}
+            <Handle
+                type="target"
+                position={Position.Left}
+                isConnectable={isConnectable}
+                style={{
+                    background: '#555',
+                    width: '12px',
+                    height: '12px',
+                    border: '2px solid #fff',
+                    borderRadius: '6px'
+                }}
+            />
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'relative' }}>
                 {data.icon}
                 <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>
+                    <Typography variant="subtitle1" sx={{ lineHeight: 1.2, fontWeight: 'medium' }}>
                         {data.label}
                     </Typography>
-                    {data.configuration?.method && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            Method: {data.configuration.method}
-                        </Typography>
-                    )}
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                        {data.description}
+                    </Typography>
                 </Box>
                 <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
                     <IconButton
@@ -77,14 +116,18 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 </Box>
             </Box>
 
-            {data.outputTypes.length > 0 && (
-                <Handle
-                    type="source"
-                    position={Position.Right}
-                    isConnectable={isConnectable}
-                    style={{ background: '#555' }}
-                />
-            )}
+            <Handle
+                type="source"
+                position={Position.Right}
+                isConnectable={isConnectable}
+                style={{
+                    background: '#555',
+                    width: '12px',
+                    height: '12px',
+                    border: '2px solid #fff',
+                    borderRadius: '6px'
+                }}
+            />
         </Box>
     );
 };

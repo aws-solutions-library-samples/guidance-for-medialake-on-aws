@@ -15,7 +15,10 @@ import {
     ListItemText,
     Avatar,
     Button,
+    TextField,
+    InputAdornment,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import { useTranslation } from 'react-i18next';
 import { Form } from '@/forms/components/Form';
 import { FormField } from '@/forms/components/FormField';
@@ -38,6 +41,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     const { t } = useTranslation();
     const [activeStep, setActiveStep] = React.useState(0);
     const [selectedNodeId, setSelectedNodeId] = React.useState<string>('');
+    const [searchTerm, setSearchTerm] = React.useState('');
     const createIntegration = useCreateIntegration();
     const { nodes: rawNodes = [], isLoading: isLoadingNodes } = IntegrationsNodesService.useNodes();
     const { environments = [], isLoading: isLoadingEnvironments } = IntegrationsEnvironmentsService.useEnvironments();
@@ -97,13 +101,8 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
 
     const handleBack = React.useCallback(() => {
         setActiveStep(0);
+        setSelectedNodeId(''); // Reset the selected node when going back
     }, []);
-
-    const handleNext = React.useCallback(() => {
-        if (selectedNodeId) {
-            setActiveStep(prev => prev + 1);
-        }
-    }, [selectedNodeId]);
 
     const handleReset = React.useCallback(() => {
         setActiveStep(0);
@@ -129,6 +128,9 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
                 credentials: {},
             }
         });
+
+        // Automatically go to next step when node is selected
+        setActiveStep(1);
     }, [form]);
 
     // Reset form when modal closes
@@ -148,8 +150,31 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
         }
 
         if (activeStep === 0) {
+            // Filter nodes based on search term
+            const filteredNodes = nodes.filter(node => {
+                const searchTermLower = searchTerm.toLowerCase();
+                return (
+                    node.info.title.toLowerCase().includes(searchTermLower) ||
+                    (node.info.description || '').toLowerCase().includes(searchTermLower)
+                );
+            });
+
             return (
                 <Box>
+                    <TextField
+                        fullWidth
+                        placeholder={t('integrations.form.search.placeholder')}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ mb: 2 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
                     <List sx={{
                         maxHeight: 400,
                         overflow: 'auto',
@@ -159,7 +184,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
                         p: 0,
                         mb: 3,
                     }}>
-                        {nodes.map((node) => {
+                        {filteredNodes.map((node) => {
                             return (
                                 <ListItem key={node.nodeId} disablePadding>
                                     <ListItemButton
@@ -216,17 +241,9 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
                             );
                         })}
                     </List>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <Button onClick={onClose} variant="outlined">
                             {t('common.cancel')}
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={handleNext}
-                            disabled={!selectedNodeId}
-                            color="primary"
-                        >
-                            {t('common.next')}
                         </Button>
                     </Box>
                 </Box>

@@ -1,43 +1,13 @@
-export interface Environment {
-    environment_id: string;
-    name: string;
-    status: 'active' | 'disabled';
-    region: string;
-    tags: {
-        'cost-center': string;
-        team: string;
-        [key: string]: string;
-    };
-    created_at: string;
-    updated_at: string;
-}
+import { Environment as BaseEnvironment, EnvironmentCreate as BaseEnvironmentCreate, EnvironmentUpdate as BaseEnvironmentUpdate } from '@/types/environment';
 
-export interface EnvironmentCreate {
-    name: string;
-    region: string;
-    status?: 'active' | 'disabled';
-    tags: {
-        'cost-center': string;
-        team: string;
-        [key: string]: string;
-    };
-}
-
-export interface EnvironmentUpdate {
-    name?: string;
-    status?: 'active' | 'disabled';
-    region?: string;
-    tags?: {
-        'cost-center': string;
-        team: string;
-        [key: string]: string;
-    };
-}
+export type Environment = BaseEnvironment;
+export type EnvironmentCreate = BaseEnvironmentCreate;
+export type EnvironmentUpdate = BaseEnvironmentUpdate;
 
 export interface EnvironmentsResponse {
     status: string;
     message: string;
-    data?: {
+    data: {
         environments: Environment[];
     };
 }
@@ -45,10 +15,10 @@ export interface EnvironmentsResponse {
 export interface EnvironmentResponse {
     status: string;
     message: string;
-    data?: Environment;
+    data: Environment;
 }
 
 export interface EnvironmentError {
-    status: string;
+    status?: number;
     message: string;
 }

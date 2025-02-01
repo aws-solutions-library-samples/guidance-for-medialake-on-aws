@@ -35,6 +35,7 @@ from constructs import Construct
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
     PowertoolsLayerConfig,
+    PynamoDbLambdaLayer,
 )
 from aws_lambda_powertools import Logger
 
@@ -53,13 +54,15 @@ MAX_LOG_GROUP_NAME_LENGTH = 512
 
 def validate_lambda_resources_names(base_name: str) -> str:
     """
-    Validates and constructs Lambda resource names ensuring they meet AWS requirements.
+    Validates and constructs Lambda resource names.
     """
     logger = Logger()
     logger.debug(f"Validating lambda resource names - base_name: {base_name}")
 
     # Combine base_name and id
-    lambda_full_name = f"{base_name}-{env_config.environment}"
+    lambda_full_name = (
+        f"{env_config.resource_prefix}_{base_name}_{env_config.environment}"
+    )
     logger.debug(f"Generated lambda_full_name: {lambda_full_name}")
 
     # Check if the base_name is empty
