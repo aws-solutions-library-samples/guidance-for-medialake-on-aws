@@ -18,8 +18,6 @@ import {
 import { Button } from '@/components/common';
 import {
     Search as SearchIcon,
-    Brightness4 as DarkModeIcon,
-    Brightness7 as LightModeIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
@@ -40,7 +38,7 @@ const languages = {
 
 function TopBar() {
     const muiTheme = useMuiTheme();
-    const { theme, toggleTheme } = useTheme();
+    const { theme } = useTheme();
     const navigate = useNavigate();
     const { setIsAuthenticated } = useAuth();
     const { t, i18n } = useTranslation();
@@ -284,16 +282,6 @@ function TopBar() {
 
                 {/* Right section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {/* Theme Toggle Button */}
-                    <Tooltip title={theme === 'light' ? t('common.darkMode') : t('common.lightMode')}>
-                        <IconButton onClick={toggleTheme}>
-                            {theme === 'light' ?
-                                <DarkModeIcon sx={{ color: 'action.active' }} /> :
-                                <LightModeIcon sx={{ color: 'white' }} />
-                            }
-                        </IconButton>
-                    </Tooltip>
-
                     <Tooltip title={t('common.profile')}>
                         <IconButton onClick={handleProfileClick} sx={{ padding: 0.5 }}>
                             <Avatar

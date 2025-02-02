@@ -31,9 +31,10 @@ import {
     Extension as IntegrationIcon,
     Cloud as EnvironmentIcon,
 } from '@mui/icons-material';
-import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
+import { ThemeToggle } from './components/ThemeToggle';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 72;
@@ -126,6 +127,8 @@ function Sidebar() {
                 py: 2,
                 position: 'relative',
                 height: 'calc(100vh - 64px)',
+                display: 'flex',
+                flexDirection: 'column',
             }}>
                 <Button
                     onClick={toggleDrawer}
@@ -159,7 +162,7 @@ function Sidebar() {
                         <ChevronLeft sx={{ fontSize: 16 }} />
                     )}
                 </Button>
-                <List>
+                <List sx={{ flex: 1 }}>
                     {mainMenuItems.map((item) => (
                         <React.Fragment key={item.text}>
                             <ListItem disablePadding>
@@ -289,6 +292,7 @@ function Sidebar() {
                         </React.Fragment>
                     ))}
                 </List>
+                <ThemeToggle isCollapsed={isCollapsed} />
             </Box>
         </Drawer>
     );
