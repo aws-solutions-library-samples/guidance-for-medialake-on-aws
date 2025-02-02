@@ -48,12 +48,21 @@ export function BaseFilterPopover<T>({
         }
     };
 
+    const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+        }
+    };
+
     const handleSelectFilterChange = (value: string) => {
         if (value) {
             column.setFilterValue(value);
         } else {
             column.setFilterValue('');
         }
+        onClose();
     };
 
     const handleClearFilter = () => {
@@ -115,6 +124,7 @@ export function BaseFilterPopover<T>({
                         placeholder={`${t('common.filter')} ${column.columnDef.header as string}`}
                         value={currentValue ?? ''}
                         onChange={e => handleTextFilterChange(e.target.value)}
+                        onKeyDown={handleTextFilterSubmit}
                         sx={{
                             '& .MuiOutlinedInput-root': {
                                 borderRadius: '8px',
