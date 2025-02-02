@@ -57,7 +57,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
         tableContainer: {
             overflow: 'auto',
             width: '100%',
-            flex: rowCount > 0 ? 1 : 'none',
+            flex: 'none',
             display: 'flex',
             flexDirection: 'column',
             minWidth: 0,
@@ -103,7 +103,11 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
                     whiteSpace: 'normal',
                     overflow: 'visible',
                     lineHeight: 'inherit',
+                    cursor: 'text',
                 },
+                '& .MuiIconButton-root, & .MuiChip-root': {
+                    cursor: 'pointer',
+                }
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
                 backgroundColor: isDark
@@ -181,7 +185,7 @@ export function ResizableTable<T>({
                     minHeight: rows.length > 0
                         ? `${(rows.length * (mode === 'compact' ? 40 : 48)) + (mode === 'compact' ? 32 : 40)}px`
                         : 0,
-                    flex: rows.length <= 3 ? 'none' : 1,
+                    flex: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                 }}
@@ -198,6 +202,7 @@ export function ResizableTable<T>({
                         overflow: rows.length <= 3 ? 'visible' : 'auto',
                         display: 'flex',
                         flexDirection: 'column',
+                        flex: 'none'
                     }}
                     component={Box}
                 >
