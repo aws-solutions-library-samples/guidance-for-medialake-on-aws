@@ -35,7 +35,7 @@ interface ResizableTableProps<T> {
     onRowClick?: (row: Row<T>) => void;
 }
 
-const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boolean) => {
+const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boolean, rowCount: number) => {
     const isDark = theme.palette.mode === 'dark';
 
     return useMemo(() => ({
@@ -57,12 +57,12 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
         tableContainer: {
             overflow: 'auto',
             width: '100%',
-            flex: 1,
+            flex: rowCount > 0 ? 1 : 'none',
             display: 'flex',
             flexDirection: 'column',
             minWidth: 0,
-            minHeight: 0,
-            maxHeight: '100%',
+            minHeight: rowCount > 0 ? 0 : 'auto',
+            maxHeight: rowCount > 0 ? '100%' : 'auto',
             position: 'relative',
             willChange: 'transform',
             '&::-webkit-scrollbar': {
@@ -85,12 +85,14 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
             minWidth: '100%',
             tableLayout: 'fixed',
             backgroundColor: 'inherit',
+            borderSpacing: 0,
             '& .MuiTableCell-root': {
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                py: mode === 'compact' ? 0.75 : 1.5,
+                py: mode === 'compact' ? 0.5 : 1.5,  // Add padding for the table cells/rows
                 px: mode === 'compact' ? 1.5 : 2,
                 height: mode === 'compact' ? '40px' : '48px',
-                verticalAlign: 'top',
+                lineHeight: mode === 'compact' ? '38px' : '46px',
+                verticalAlign: 'middle',
                 whiteSpace: 'normal',
                 overflow: 'visible',
                 color: theme.palette.text.secondary,
@@ -100,6 +102,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
                     wordBreak: 'break-word',
                     whiteSpace: 'normal',
                     overflow: 'visible',
+                    lineHeight: 'inherit',
                 },
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
@@ -124,6 +127,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
             } : {},
             '& .MuiTableCell-root': {
                 position: 'relative',
+                userSelect: 'text',
                 '& .MuiIconButton-root': {
                     position: 'relative',
                     zIndex: 2,
@@ -143,7 +147,7 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             borderRadius: '12px',
         }
-    }), [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick]);
+    }), [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick, rowCount]);
 };
 
 export function ResizableTable<T>({
@@ -151,7 +155,7 @@ export function ResizableTable<T>({
     containerRef,
     virtualizer,
     rows,
-    maxHeight = 'calc(100vh - 300px)',
+    maxHeight,
     onFilterClick,
     activeFilters = [],
     activeSorting = [],
@@ -161,16 +165,7 @@ export function ResizableTable<T>({
 }: ResizableTableProps<T>) {
     const theme = useTheme();
     const { mode } = useTableDensity();
-    const styles = useTableStyles(theme, mode, Boolean(onRowClick));
-    const hasActiveTags = activeFilters.length > 0 || activeSorting.length > 0;
-
-    const handleRemoveFilter = useCallback((columnId: string) => {
-        onRemoveFilter?.(columnId);
-    }, [onRemoveFilter]);
-
-    const handleRemoveSort = useCallback((columnId: string) => {
-        onRemoveSort?.(columnId);
-    }, [onRemoveSort]);
+    const styles = useTableStyles(theme, mode, Boolean(onRowClick), rows.length);
 
     return (
         <Box
@@ -178,42 +173,32 @@ export function ResizableTable<T>({
             role="grid"
             aria-label="Data table"
         >
-            {hasActiveTags && (
-                <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {activeFilters.map(({ columnId, value }) => (
-                        <Box
-                            key={`filter-${columnId}`}
-                            sx={styles.filterTag}
-                            role="button"
-                            aria-label={`Remove filter for ${columnId}`}
-                        >
-                            <Box component="span" sx={{ mr: 1 }}>
-                                {`${columnId}: ${value}`}
-                            </Box>
-                            {onRemoveFilter && (
-                                <Box
-                                    component="span"
-                                    onClick={() => handleRemoveFilter(columnId)}
-                                    sx={styles.closeButton}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            handleRemoveFilter(columnId);
-                                        }
-                                    }}
-                                >
-                                    ×
-                                </Box>
-                            )}
-                        </Box>
-                    ))}
-                </Box>
-            )}
-            <Paper elevation={0} sx={{ ...styles.paper, minHeight: 0 }}>
+            <Paper
+                elevation={0}
+                sx={{
+                    ...styles.paper,
+                    height: 'auto',
+                    minHeight: rows.length > 0
+                        ? `${(rows.length * (mode === 'compact' ? 40 : 48)) + (mode === 'compact' ? 32 : 40)}px`
+                        : 0,
+                    flex: rows.length <= 3 ? 'none' : 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
                 <TableContainer
                     ref={containerRef}
-                    sx={styles.tableContainer}
+                    sx={{
+                        ...styles.tableContainer,
+                        height: 'auto',
+                        maxHeight: rows.length <= 3 ? undefined : '100%',
+                        minHeight: rows.length > 0
+                            ? `${(rows.length * (mode === 'compact' ? 40 : 48)) + (mode === 'compact' ? 32 : 40)}px`
+                            : 'auto',
+                        overflow: rows.length <= 3 ? 'visible' : 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
                     component={Box}
                 >
                     <Table
@@ -242,7 +227,12 @@ export function ResizableTable<T>({
                                         key={row.id}
                                         sx={styles.tableRow}
                                         role="row"
-                                        onClick={() => onRowClick?.(row)}
+                                        onClick={(e) => {
+                                            const selection = window.getSelection();
+                                            if (!selection || selection.toString().length === 0) {
+                                                onRowClick?.(row);
+                                            }
+                                        }}
                                     >
                                         {row.getVisibleCells().map(cell => {
                                             const content = flexRender(

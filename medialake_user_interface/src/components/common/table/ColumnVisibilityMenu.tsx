@@ -30,11 +30,14 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
             open={Boolean(anchorEl)}
             onClose={onClose}
             PaperProps={{
+                elevation: 3,
                 sx: {
                     maxHeight: 300,
-                    width: 200,
+                    width: 180,
                     borderRadius: '8px',
-                    boxShadow: theme.shadows[3],
+                    '& .MuiList-root': {
+                        p: 0.5,
+                    },
                 },
             }}
         >
@@ -43,22 +46,46 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
                 return (
                     <MenuItem
                         key={column.id}
-                        sx={{ py: 1 }}
+                        dense
+                        sx={{
+                            py: 0.25,
+                            px: 1,
+                            minHeight: 32,
+                            borderRadius: '4px',
+                        }}
                     >
                         <FormControlLabel
                             control={
                                 <Checkbox
                                     checked={column.getIsVisible()}
                                     onChange={column.getToggleVisibilityHandler()}
-                                    sx={{ mr: 1 }}
+                                    size="small"
+                                    sx={{
+                                        p: 0.5,
+                                        mr: 1,
+                                        '& .MuiSvgIcon-root': {
+                                            fontSize: '1.2rem',
+                                        },
+                                    }}
                                 />
                             }
                             label={
-                                <Typography variant="body2">
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        fontSize: '0.875rem',
+                                        lineHeight: 1.2,
+                                    }}
+                                >
                                     {column.columnDef.header as string}
                                 </Typography>
                             }
-                            sx={{ m: 0 }}
+                            sx={{
+                                m: 0,
+                                '& .MuiFormControlLabel-label': {
+                                    userSelect: 'none',
+                                },
+                            }}
                         />
                     </MenuItem>
                 );

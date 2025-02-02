@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { ColumnDef, FilterFn } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTable } from '@/hooks/useTable';
+import { useTableDensity } from '@/contexts/TableDensityContext';
 import { ResizableTable } from './ResizableTable';
 import { ColumnVisibilityMenu } from './ColumnVisibilityMenu';
 import { BaseTableToolbar } from './BaseTableToolbar';
@@ -64,20 +65,23 @@ export function BaseTable<T>({
     });
 
     const { rows } = table.getRowModel();
+    const { mode } = useTableDensity();
+    const rowHeight = mode === 'compact' ? 40 : 48;
+
     const rowVirtualizer = useVirtualizer({
         count: rows.length,
         getScrollElement: () => containerRef.current,
-        estimateSize: () => 48,
-        overscan: 10,
+        estimateSize: () => rowHeight + 2, // Add padding for borders
+        overscan: 5,
+        measureElement: undefined, // Disable dynamic measurement
     });
 
     return (
         <Box sx={{
             width: '100%',
-            height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            flex: 1,
+            flex: rows.length > 0 ? 1 : 'none',
         }}>
             <BaseTableToolbar
                 globalFilter={globalFilter}
@@ -91,12 +95,17 @@ export function BaseTable<T>({
             />
 
             <Box sx={{
-                flex: 1,
-                minHeight: 0,
                 width: '100%',
                 overflow: 'hidden',
                 position: 'relative',
                 maxWidth: '100%',
+                height: rows.length > 0 ? (
+                    rows.length <= 3
+                        ? `${(rows.length * (rowHeight + 2)) + 48}px` // Rows + header + borders
+                        : '100%'
+                ) : 'auto',
+                minHeight: rows.length > 0 ? `${(rows.length * (rowHeight + 2)) + 48}px` : 'auto',
+                flex: rows.length > 1 ? 1 : 'none',
             }}>
                 <ResizableTable
                     table={table}

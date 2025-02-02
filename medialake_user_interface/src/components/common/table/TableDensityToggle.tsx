@@ -15,8 +15,18 @@ export const TableDensityToggle: React.FC = () => {
                 onClick={toggleMode}
                 size="small"
                 aria-label={t('common.tableDensity', 'Table Density')}
+                sx={{
+                    height: '32px',
+                    width: '32px',
+                    borderRadius: '6px',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '& .MuiSvgIcon-root': {
+                        fontSize: '1.2rem',
+                    },
+                }}
             >
-                {mode === 'compact' ? <DensitySmallIcon /> : <DensityLargeIcon />}
+                {mode === 'compact' ? <DensitySmallIcon fontSize="small" /> : <DensityLargeIcon fontSize="small" />}
             </IconButton>
         </Tooltip>
     );

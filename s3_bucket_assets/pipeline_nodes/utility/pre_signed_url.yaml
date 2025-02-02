@@ -19,3 +19,22 @@ paths:
     get:
       summary: Generate Pre-Signed URL
       operationId: generate_pre_signed_url
+
+
+spec: v1.0.0
+node:
+  id: pre_signed_url
+  title: string
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/pre_signed_url.zip
+        runtime: Python3.12
+  description: Generate an AWS S3 pre-signed URL
+  connections:
+    incoming:
+      type: [video, image, audio]
+    outgoing: 
+      type: [presigned_url]

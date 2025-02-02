@@ -83,11 +83,13 @@ export function useTable<T>({
     // Handle internal state changes
     const handleSortingChange = (newSorting: SortingState) => {
         setSorting(newSorting);
-        if (onSortChange && newSorting.length > 0) {
-            const sort = newSorting[0];
-            onSortChange(sort.id, sort.desc);
-        } else if (onSortChange) {
-            onSortChange('', false);
+        if (onSortChange) {
+            if (newSorting.length > 0) {
+                const sort = newSorting[0];
+                onSortChange(sort.id, sort.desc ?? false);
+            } else {
+                onSortChange('', false);
+            }
         }
     };
 

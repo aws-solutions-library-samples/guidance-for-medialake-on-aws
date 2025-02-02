@@ -1,10 +1,10 @@
 import React from 'react';
-import { ImageItem, CardFieldConfig } from '../../types/search/searchResults';
-import { type AssetTableColumn } from '../../types/shared/assetComponents';
-import AssetResults from '../shared/AssetResults';
-import { formatFileSize } from '../../utils/fileSize';
-import { formatDate } from '../../utils/dateFormat';
-import { RecentlyViewedProvider } from '../../contexts/RecentlyViewedContext';
+import { ImageItem, CardFieldConfig } from '@/types/search/searchResults';
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
+import AssetResults from '@/components/shared/AssetResults';
+import { formatFileSize } from '@/utils/fileSize';
+import { formatDate } from '@/utils/dateFormat';
+import { RecentlyViewedProvider } from '@/contexts/RecentlyViewedContext';
 
 interface ImageResultsProps {
     images: ImageItem[];
@@ -80,7 +80,9 @@ const renderCardField = (fieldId: string, image: ImageItem): string => {
 };
 
 const actions = [
+    { id: 'rename', label: 'Rename' },
     { id: 'download', label: 'Download' },
+    { id: 'share', label: 'Share' },
 ];
 
 const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange, searchTerm }) => {
