@@ -281,23 +281,9 @@ function TopBar() {
                 </Box>
 
                 {/* Right section */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Tooltip title={t('common.profile')}>
-                        <IconButton onClick={handleProfileClick} sx={{ padding: 0.5 }}>
-                            <Avatar
-                                sx={{
-                                    width: 32,
-                                    height: 32,
-                                    backgroundColor: muiTheme.palette.primary.main,
-                                }}
-                            >
-                                {userInitial}
-                            </Avatar>
-                        </IconButton>
-                    </Tooltip>
-                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }} />
 
-                {/* Menus */}
+                {/* Language Menu */}
                 <Menu
                     anchorEl={languageAnchor}
                     open={Boolean(languageAnchor)}
@@ -319,27 +305,6 @@ function TopBar() {
                             {languages[lng as keyof typeof languages].nativeName}
                         </MenuItem>
                     ))}
-                </Menu>
-
-                <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleClose}
-                    slotProps={{
-                        paper: {
-                            sx: profileMenuPaperStyles
-                        }
-                    }}
-                >
-                    <MenuItem onClick={() => {
-                        handleClose();
-                        navigate('/settings/profile');
-                    }}>
-                        {t('common.profile')}
-                    </MenuItem>
-                    <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                        {t('common.logout')}
-                    </MenuItem>
                 </Menu>
             </Toolbar>
         </AppBar>

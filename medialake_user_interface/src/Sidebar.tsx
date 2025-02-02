@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
+import { useAuth } from './common/hooks/auth-context';
 import {
     Drawer,
     List,
@@ -14,6 +16,9 @@ import {
     IconButton,
     Tooltip,
     Button,
+    Menu,
+    MenuItem,
+    Avatar,
 } from '@mui/material';
 import {
     AccountTree as PipelineIcon,
@@ -45,8 +50,49 @@ function Sidebar() {
     const { theme: customTheme } = useCustomTheme();
     const location = useLocation();
     const navigate = useNavigate();
+    const { setIsAuthenticated } = useAuth();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { isCollapsed, setIsCollapsed } = useSidebar();
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [userInitial, setUserInitial] = useState('U');
+    const [userName, setUserName] = useState('');
+
+    useEffect(() => {
+        const loadUserInfo = async () => {
+            try {
+                const attributes = await fetchUserAttributes();
+                if (attributes.given_name && attributes.given_name.trim()) {
+                    setUserInitial(attributes.given_name.trim()[0].toUpperCase());
+                    setUserName(attributes.given_name.trim());
+                } else if (attributes.email && attributes.email.trim()) {
+                    setUserInitial(attributes.email.trim()[0].toUpperCase());
+                    setUserName(attributes.email.trim());
+                }
+            } catch (error) {
+                console.error('Error loading user attributes:', error);
+            }
+        };
+        loadUserInfo();
+    }, []);
+
+    const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            setIsAuthenticated(false);
+            navigate('/sign-in');
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+        handleClose();
+    };
 
     const isActive = (path: string) => location.pathname === path;
     const isSettingsActive = (path: string) => location.pathname.includes(path);
@@ -292,6 +338,113 @@ function Sidebar() {
                         </React.Fragment>
                     ))}
                 </List>
+                
+                {/* Profile Section */}
+                <Box sx={{
+                    mt: 'auto',
+                    mb: 1,
+                    mx: isCollapsed ? 1 : 2,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    pt: 1
+                }}>
+                    {isCollapsed ? (
+                        <Tooltip title={userName || t('common.profile')} placement="right">
+                            <IconButton
+                                onClick={handleProfileClick}
+                                sx={{
+                                    width: '100%',
+                                    height: 40,
+                                    borderRadius: '8px',
+                                    '&:hover': {
+                                        backgroundColor: `${theme.palette.primary.main}15`,
+                                    },
+                                }}
+                            >
+                                <Avatar
+                                    sx={{
+                                        width: 32,
+                                        height: 32,
+                                        backgroundColor: theme.palette.primary.main,
+                                        fontSize: '0.9rem',
+                                    }}
+                                >
+                                    {userInitial}
+                                </Avatar>
+                            </IconButton>
+                        </Tooltip>
+                    ) : (
+                        <Button
+                            onClick={handleProfileClick}
+                            sx={{
+                                width: '100%',
+                                height: 40,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-start',
+                                gap: 1.5,
+                                borderRadius: '8px',
+                                px: 1.5,
+                                '&:hover': {
+                                    backgroundColor: `${theme.palette.primary.main}15`,
+                                },
+                            }}
+                        >
+                            <Avatar
+                                sx={{
+                                    width: 32,
+                                    height: 32,
+                                    backgroundColor: theme.palette.primary.main,
+                                    fontSize: '0.9rem',
+                                }}
+                            >
+                                {userInitial}
+                            </Avatar>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {userName}
+                            </Typography>
+                        </Button>
+                    )}
+
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={handleClose}
+                        anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                        }}
+                        slotProps={{
+                            paper: {
+                                sx: {
+                                    width: '200px',
+                                    mt: -1,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                }
+                            }
+                        }}
+                    >
+                        <MenuItem onClick={() => {
+                            handleClose();
+                            navigate('/settings/profile');
+                        }}>
+                            {t('common.profile')}
+                        </MenuItem>
+                        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                            {t('common.logout')}
+                        </MenuItem>
+                    </Menu>
+                </Box>
                 <ThemeToggle isCollapsed={isCollapsed} />
             </Box>
         </Drawer>
