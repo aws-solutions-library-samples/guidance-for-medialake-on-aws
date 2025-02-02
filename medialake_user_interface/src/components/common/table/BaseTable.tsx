@@ -8,132 +8,97 @@ import { ResizableTable } from './ResizableTable';
 import { ColumnVisibilityMenu } from './ColumnVisibilityMenu';
 import { BaseTableToolbar } from './BaseTableToolbar';
 import { BaseFilterPopover } from './BaseFilterPopover';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    LinearProgress,
+} from '@mui/material';
+import { type Table as TanStackTable, type ColumnSort, type ColumnFilter } from '@tanstack/react-table';
 
 export interface BaseTableProps<T> {
-    data: T[];
-    columns: ColumnDef<T, any>[];
-    activeFilters?: { columnId: string; value: string }[];
-    activeSorting?: { columnId: string; desc: boolean }[];
-    onFilterChange?: (columnId: string, value: string) => void;
-    onSortChange?: (columnId: string, desc: boolean) => void;
-    onRemoveFilter?: (columnId: string) => void;
-    onRemoveSort?: (columnId: string) => void;
-    getUniqueValues: (columnId: string, data: T[]) => string[];
-    formatValue?: (columnId: string, value: string) => string;
-    filterFns?: Record<string, FilterFn<any>>;
+    table: TanStackTable<T>;
+    virtualizer: Virtualizer<HTMLDivElement, Element>;
+    isLoading?: boolean;
+    activeFilters: ColumnFilter[];
+    activeSorting: ColumnSort[];
+    onRemoveFilter: (id: string) => void;
+    onRemoveSort: (id: string) => void;
     searchPlaceholder?: string;
-    initialColumnVisibility?: Record<string, boolean>;
 }
 
-export function BaseTable<T>({
-    data,
-    columns,
-    activeFilters = [],
-    activeSorting = [],
-    onFilterChange,
-    onSortChange,
+export const BaseTable = <T extends object>({
+    table,
+    virtualizer,
+    isLoading,
+    activeFilters,
+    activeSorting,
     onRemoveFilter,
     onRemoveSort,
-    getUniqueValues,
-    formatValue,
-    filterFns,
     searchPlaceholder,
-    initialColumnVisibility,
-}: BaseTableProps<T>) {
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    const {
-        table,
-        globalFilter,
-        columnMenuAnchor,
-        filterMenuAnchor,
-        activeFilterColumn,
-        setGlobalFilter,
-        handleColumnMenuOpen,
-        handleColumnMenuClose,
-        handleFilterMenuOpen,
-        handleFilterMenuClose,
-    } = useTable({
-        data,
-        columns,
-        activeFilters,
-        activeSorting,
-        onFilterChange,
-        onSortChange,
-        filterFns,
-        initialColumnVisibility,
-    });
-
+}: BaseTableProps<T>) => {
     const { rows } = table.getRowModel();
-    const { mode } = useTableDensity();
-    const rowHeight = mode === 'compact' ? 40 : 48;
-
-    const rowVirtualizer = useVirtualizer({
-        count: rows.length,
-        getScrollElement: () => containerRef.current,
-        estimateSize: () => rowHeight + 2, // Add padding for borders
-        overscan: 5,
-        measureElement: undefined, // Disable dynamic measurement
-    });
+    const paddingTop = virtualizer.getVirtualItems()[0]?.start || 0;
+    const paddingBottom =
+        virtualizer.getTotalSize() -
+        (virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1]?.end || 0);
 
     return (
-        <Box sx={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            flex: rows.length > 0 ? 1 : 'none',
-        }}>
-            <BaseTableToolbar
-                globalFilter={globalFilter}
-                onGlobalFilterChange={setGlobalFilter}
-                onColumnMenuOpen={handleColumnMenuOpen}
-                activeFilters={activeFilters}
-                activeSorting={activeSorting}
-                onRemoveFilter={onRemoveFilter}
-                onRemoveSort={onRemoveSort}
-                searchPlaceholder={searchPlaceholder}
-            />
-
-            <Box sx={{
-                width: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-                maxWidth: '100%',
-                height: rows.length > 0 ? (
-                    rows.length <= 3
-                        ? `${(rows.length * (rowHeight + 2)) + 48}px` // Rows + header + borders
-                        : '100%'
-                ) : 'auto',
-                minHeight: rows.length > 0 ? `${(rows.length * (rowHeight + 2)) + 48}px` : 'auto',
-                flex: rows.length > 1 ? 1 : 'none',
-            }}>
-                <ResizableTable
-                    table={table}
-                    containerRef={containerRef}
-                    virtualizer={rowVirtualizer}
-                    rows={rows}
-                    onFilterClick={handleFilterMenuOpen}
-                    activeFilters={activeFilters}
-                    activeSorting={activeSorting}
-                    onRemoveFilter={onRemoveFilter}
-                    onRemoveSort={onRemoveSort}
-                />
-            </Box>
-
-            <ColumnVisibilityMenu
-                anchorEl={columnMenuAnchor}
-                columns={table.getAllLeafColumns()}
-                onClose={handleColumnMenuClose}
-            />
-
-            <BaseFilterPopover
-                anchorEl={filterMenuAnchor}
-                column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
-                onClose={handleFilterMenuClose}
-                data={data}
-                getUniqueValues={getUniqueValues}
-                formatValue={formatValue}
-            />
-        </Box>
+        <TableContainer component={Paper}>
+            {isLoading && (
+                <Box sx={{ width: '100%' }}>
+                    <LinearProgress />
+                </Box>
+            )}
+            <Table>
+                <TableHead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => (
+                                <TableCell
+                                    key={header.id}
+                                    onClick={header.column.getToggleSortingHandler()}
+                                    sx={{ cursor: header.column.getCanSort() ? 'pointer' : 'default' }}
+                                >
+                                    {header.isPlaceholder
+                                        ? null
+                                        : header.column.columnDef.header?.toString()}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableHead>
+                <TableBody>
+                    {paddingTop > 0 && (
+                        <TableRow>
+                            <TableCell style={{ height: `${paddingTop}px` }} />
+                        </TableRow>
+                    )}
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                        const row = rows[virtualRow.index];
+                        return (
+                            <TableRow key={row.id}>
+                                {row.getVisibleCells().map((cell) => (
+                                    <TableCell key={cell.id}>
+                                        {cell.column.columnDef.cell?.(cell.getContext())}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        );
+                    })}
+                    {paddingBottom > 0 && (
+                        <TableRow>
+                            <TableCell style={{ height: `${paddingBottom}px` }} />
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </TableContainer>
     );
-}
+};
+
+export default BaseTable;
