@@ -1,30 +1,8 @@
-openapi: 3.0.0
-x-medialake-nodeId: pre_signed_url
-x-node-type: utility
-info:
-    title: AWS S3 Pre-Signed URL
-    version: .1
-    description: AWS S3 Pre-Signed URL
-
-security:
-  - awsIam: []
-
-
-externalDocumentation:
-  url: nodes/utility/pre_signed_url.zip
-  description: AWS S3 Pre-Signed URL ZIP location
-
-paths:
-  /pre_signed_url:
-    get:
-      summary: Generate Pre-Signed URL
-      operationId: generate_pre_signed_url
-
-
 spec: v1.0.0
 node:
   id: pre_signed_url
-  title: string
+  title: Presigned URL Generator
+  description: Generate an AWS S3 pre-signed URL
   version: 1.0.0
   type: utility
   integration:
@@ -32,9 +10,21 @@ node:
       lambda:
         handler: utility/pre_signed_url.zip
         runtime: Python3.12
-  description: Generate an AWS S3 pre-signed URL
-  connections:
-    incoming:
-      type: [video, image, audio]
-    outgoing: 
-      type: [presigned_url]
+actions:
+  generate:
+    summary: Generate pre-signed URL
+    description: Generate a pre-signed URL for S3 object access
+    operationId: generatePresignedUrl
+    parameters:
+      - in: body
+        name: URL Validity Duration
+        required: true
+        schema:
+          type: number
+    x-inputMapping: utility/pre_signed_url/generate/
+    x-outputMapping: utility/pre_signed_url/generate/
+    connections:
+      incoming:
+        type: [video, image, audio]
+      outgoing: 
+        type: [presigned_url]

@@ -1,28 +1,27 @@
-openapi: 3.0.0
-x-medialake-nodeId: flow_wait
-x-node-type: utility
-x-node-deployment-type: step_function_step
-x-node-integration-type: step_function
-x-node-input-type: [any]
-x-node-output-type: [any]
-
-info:
-    title: Wait
-    version: 1.0
-    description: Wait for a certain amount of time
-
-security:
-  - awsIam: []
-
-tags:
-  - name: Flow
-
-externalDocumentation:
-  url: wait
-  description: AWS Step Function Wait step
-
-paths:
-  /wait:
-    post:
-      summary: Wait for a certain amount of time
-      operationId: wait_for_time
+spec: v1.0.0
+node:
+  id: wait
+  title: Wait
+  description: Wait for a specific duration
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: wait
+actions:
+  wait:
+    summary: Wait for a specific duration
+    description: This step will wait for a specific duration before moving to the next step
+    operationId: wait
+    parameters:
+      - in: body
+        name: Duration
+        required: true
+        schema:
+          type: number
+    connections:
+      incoming:
+        type: [any]
+      outgoing: 
+        type: [any]

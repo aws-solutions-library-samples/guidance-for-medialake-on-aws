@@ -167,6 +167,321 @@ const useColumns = <T>() => {
 };
 ```
 
+### BaseFilterPopover
+Provides standardized filter popover functionality:
+```typescript
+interface BaseFilterPopoverProps<T> {
+    anchorEl: HTMLElement | null;                    // Anchor element for popover
+    column: Column<T, unknown> | null;               // Current column being filtered
+    onClose: () => void;                            // Close handler
+    data: T[];                                      // Data for generating unique values
+    getUniqueValues: (                              // Function to get unique values
+        columnId: string, 
+        data: T[]
+    ) => string[];
+    formatValue?: (                                 // Optional value formatter
+        columnId: string, 
+        value: string
+    ) => string;
+}
+```
+
+## Filter Modal Behavior
+
+### 1. Modal Interaction Patterns
+```typescript
+// Implementation in BaseFilterPopover
+const BaseFilterPopover = <T,>({ 
+    anchorEl, 
+    column, 
+    onClose,
+    data,
+    getUniqueValues,
+    formatValue 
+}: BaseFilterPopoverProps<T>) => {
+    // Close handlers
+    const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+        }
+    };
+
+    const handleSelectFilterChange = (value: string) => {
+        if (value) {
+            column.setFilterValue(value);
+        } else {
+            column.setFilterValue('');
+        }
+        onClose();  // Auto-close on select
+    };
+
+    return (
+        <Popover
+            open={Boolean(anchorEl)}
+            anchorEl={anchorEl}
+            onClose={onClose}
+            // ... other Popover props
+        >
+            <IconButton
+                onClick={onClose}
+                size="small"
+                sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: 8,
+                }}
+            >
+                <CloseIcon fontSize="small" />
+            </IconButton>
+            {/* Filter content */}
+        </Popover>
+    );
+};
+```
+
+### 2. Filter Tags Implementation
+```typescript
+// In BaseTableToolbar
+interface FilterTag {
+    columnId: string;
+    value: string;
+}
+
+const FilterTags: React.FC<{
+    activeFilters: FilterTag[];
+    onRemoveFilter: (columnId: string) => void;
+}> = ({ activeFilters, onRemoveFilter }) => {
+    return (
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            {activeFilters.map(({ columnId, value }) => (
+                <Chip
+                    key={columnId}
+                    label={`${columnId}: ${value}`}
+                    onDelete={() => onRemoveFilter(columnId)}
+                    size="small"
+                />
+            ))}
+        </Stack>
+    );
+};
+```
+
+### 3. Required Behaviors
+The following behaviors must be implemented in any table filter implementation:
+
+1. **Modal Closing**:
+   - Close on 'X' button click
+   - Close on 'Enter' key in text input
+   - Close on selection from dropdown
+   - Close on click outside (handled by Popover)
+
+2. **Filter Application**:
+   - Text filters should apply immediately on input
+   - Dropdown selection should apply and close modal
+   - Clear filter button should clear and remain open
+
+3. **Filter Tags**:
+   - Display above or below toolbar
+   - Show column name and filter value
+   - Include delete functionality
+   - Update in real-time
+
+4. **Sort Tag Behavior**:
+   - Tags appear when columns are sorted
+   - Each tag shows column name and sort direction
+   - Clicking × removes the sort
+   - Tags use secondary theme color with alpha transparency
+   - Tags appear after filter tags in the flow
+
+5. **State Management**:
+   - Filter state managed through TableFiltersContext
+   - Sort state managed through TableFiltersContext
+   - State updates trigger re-renders of tags
+   - State persists during table operations
+
+6. **Accessibility**:
+   - Tags should be keyboard navigable
+   - Delete buttons should have proper ARIA labels
+   - Color contrast should meet WCAG standards
+   - Screen reader support for tag actions
+
+### 4. Example Implementation
+```typescript
+const FeatureFilterPopover: React.FC<FilterPopoverProps> = ({
+    anchorEl,
+    column,
+    onClose,
+    data,
+}) => {
+    const getUniqueValues = (columnId: string, data: T[]) => {
+        const values = new Set<string>();
+        data.forEach(item => {
+            const value = item[columnId as keyof T];
+            if (value != null) {
+                values.add(String(value));
+            }
+        });
+        return Array.from(values).sort();
+    };
+
+    const formatValue = (columnId: string, value: string) => {
+        // Custom value formatting logic
+        return value;
+    };
+
+    return (
+        <BaseFilterPopover<T>
+            anchorEl={anchorEl}
+            column={column}
+            onClose={onClose}
+            data={data}
+            getUniqueValues={getUniqueValues}
+            formatValue={formatValue}
+        />
+    );
+};
+```
+
+### 5. Filter State Management
+```typescript
+// In TableFiltersContext
+interface TableFiltersState {
+    activeFilters: FilterTag[];
+    activeSorting: SortTag[];
+}
+
+const TableFiltersProvider: React.FC = ({ children }) => {
+    const [state, setState] = useState<TableFiltersState>({
+        activeFilters: [],
+        activeSorting: [],
+    });
+
+    const onRemoveFilter = (columnId: string) => {
+        setState(prev => ({
+            ...prev,
+            activeFilters: prev.activeFilters.filter(
+                filter => filter.columnId !== columnId
+            ),
+        }));
+    };
+
+    // ... other state management logic
+
+    return (
+        <TableFiltersContext.Provider value={{
+            ...state,
+            onRemoveFilter,
+            // ... other handlers
+        }}>
+            {children}
+        </TableFiltersContext.Provider>
+    );
+};
+```
+
+## Table State Management Pattern
+
+### 1. State Management Layers
+
+#### Internal Table State (`useTable` hook)
+- Manages the TanStack table's internal state
+- Handles immediate UI updates
+- Manages column visibility and sizing
+- Handles global filter
+
+#### External Filter/Sort State (`TableFiltersContext`)
+- Manages persistent filter/sort state
+- Handles filter/sort tag display
+- Manages filter/sort synchronization across components
+
+### 2. Implementation Steps
+
+1. **Setup Table State**
+```typescript
+const {
+    table,
+    sorting,
+    columnFilters,
+    setGlobalFilter,
+    handleColumnMenuOpen
+} = useTable({
+    data,
+    columns,
+    activeFilters,    // From TableFiltersContext
+    activeSorting,    // From TableFiltersContext
+    onFilterChange,   // Callback to update TableFiltersContext
+    onSortChange     // Callback to update TableFiltersContext
+});
+```
+
+2. **Setup Filter Context State**
+```typescript
+const tableFiltersValue = useMemo(() => ({
+    activeFilters: columnFilters.map(f => ({ 
+        columnId: f.id, 
+        value: f.value as string 
+    })),
+    activeSorting: sorting.map(s => ({ 
+        columnId: s.id, 
+        desc: s.desc 
+    })),
+    onRemoveFilter,
+    onRemoveSort,
+    onFilterChange,
+    onSortChange
+}), [columnFilters, sorting]);
+```
+
+3. **Component Integration**
+```typescript
+return (
+    <TableFiltersProvider {...tableFiltersValue}>
+        <BaseTableToolbar
+            globalFilter={globalFilter}
+            onGlobalFilterChange={setGlobalFilter}
+            activeFilters={tableFiltersValue.activeFilters}
+            activeSorting={tableFiltersValue.activeSorting}
+            onRemoveFilter={tableFiltersValue.onRemoveFilter}
+            onRemoveSort={tableFiltersValue.onRemoveSort}
+        />
+        <ResizableTable
+            table={table}
+            containerRef={containerRef}
+            virtualizer={virtualizer}
+            rows={rows}
+            activeFilters={tableFiltersValue.activeFilters}
+            activeSorting={tableFiltersValue.activeSorting}
+            onRemoveFilter={tableFiltersValue.onRemoveFilter}
+            onRemoveSort={tableFiltersValue.onRemoveSort}
+        />
+    </TableFiltersProvider>
+);
+```
+
+### 3. State Flow
+
+1. **Filter/Sort Application**
+   - User clicks filter/sort icon
+   - Internal table state updates via `useTable`
+   - `useTable` callbacks trigger context updates
+   - Context updates trigger tag renders
+
+2. **Tag Removal**
+   - User clicks tag remove button
+   - Context state updates
+   - Context changes sync back to table via `useTable` props
+   - Table re-renders with updated state
+
+### 4. Required Implementation Checks
+
+- [ ] `useTable` hook properly configured with callbacks
+- [ ] TableFiltersProvider wrapped around table components
+- [ ] Filter/sort state properly mapped between formats
+- [ ] All removal handlers properly connected
+- [ ] Tag rendering tied to context state
+
 ## Implementation Example
 
 ### 1. Feature Table Component
@@ -317,3 +632,4 @@ describe('FeatureTable', () => {
 ## Conclusion
 
 This pattern provides a robust, performant, and maintainable approach to implementing tables and lists. The component hierarchy (BaseTable → ResizableTable) with supporting contexts (TableFilters, TableDensity) provides flexibility while maintaining consistency across the application. 
+

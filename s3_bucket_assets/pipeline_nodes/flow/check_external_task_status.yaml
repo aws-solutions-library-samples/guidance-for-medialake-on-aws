@@ -1,21 +1,21 @@
-openapi: 3.0.0
-x-medialake-nodeId: pre_signed_url
-x-node-type: utility
-info:
-    title: AWS S3 Pre-Signed URL
-    version: .1
-    description: AWS S3 Pre-Signed URL
-
-security:
-  - awsIam: []
-
-
-externalDocumentation:
-  url: nodes/utility/pre_signed_url.zip
-  description: AWS S3 Pre-Signed URL ZIP location
-
-paths:
-  /pre_signed_url:
-    get:
-      summary: Generate Pre-Signed URL
-      operationId: generate_pre_signed_url
+spec: v1.0.0
+node:
+  id: check_external_task_status
+  title: Check external task status
+  description: Check the status of an external task
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: choice
+actions:
+  check_status:
+    summary: Check the status of an external task
+    description: This step will check the status of an external task
+    operationId: checkExternalTaskStatus
+    connections:
+      incoming:
+        type: [external_task]
+      outgoing: 
+        type: [any]
