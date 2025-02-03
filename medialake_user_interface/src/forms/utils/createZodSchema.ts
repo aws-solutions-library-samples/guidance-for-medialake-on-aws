@@ -1,9 +1,16 @@
 import { z } from 'zod';
 import { FormFieldDefinition } from '../types';
 
+// Create a WeakMap to store schemas using the fields array reference itself as the key
+const schemaCache = new WeakMap<FormFieldDefinition[], z.ZodType>();
+
 export const createZodSchema = (fields: FormFieldDefinition[]) => {
-    console.log('[createZodSchema] Creating schema for fields:', fields);
-    
+    // Check if we have a cached schema using the fields reference
+    if (schemaCache.has(fields)) {
+        return schemaCache.get(fields)!;
+    }
+
+    // If not in cache, create new schema
     const parametersShape: Record<string, any> = {};
 
     fields.forEach((field) => {
@@ -37,7 +44,12 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
         }
     });
 
-    return z.object({
+    const schema = z.object({
         parameters: z.object(parametersShape).passthrough()
     }).passthrough();
+
+    // Cache the schema using the fields reference
+    schemaCache.set(fields, schema);
+    
+    return schema;
 };
