@@ -371,7 +371,7 @@ const PipelineEditorContent = () => {
         setSelectedNode(null);
     }, []);
 
-    const handleNodeConfigSave = useCallback((configuration: any) => {
+    const handleNodeConfigSave = useCallback(async (configuration: any) => {
         if (selectedNode) {
             const updatedNode = {
                 ...selectedNode,
@@ -510,9 +510,9 @@ const PipelineEditorContent = () => {
                 </Box>
             </Box>
 
-            <Dialog 
-                open={isNodeConfigOpen} 
-                onClose={() => setIsNodeConfigOpen(false)} 
+            <Dialog
+                open={isNodeConfigOpen}
+                onClose={() => setIsNodeConfigOpen(false)}
                 maxWidth="sm"
                 PaperProps={{
                     sx: {
@@ -526,19 +526,7 @@ const PipelineEditorContent = () => {
                         <NodeConfigurationForm
                             node={convertApiResponseToNode(nodeDetails) as NodeType}
                             configuration={selectedNode.data.configuration}
-                            onSubmit={async (configuration) => {
-                                const updatedNode = {
-                                    ...selectedNode,
-                                    data: {
-                                        ...selectedNode.data,
-                                        configuration
-                                    }
-                                };
-                                setNodes((nds) =>
-                                    nds.map((n) => (n.id === updatedNode.id ? updatedNode : n))
-                                );
-                                setIsNodeConfigOpen(false);
-                            }}
+                            onSubmit={handleNodeConfigSave}
                             onCancel={() => setIsNodeConfigOpen(false)}
                         />
                     )}

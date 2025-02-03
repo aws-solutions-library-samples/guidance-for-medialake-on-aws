@@ -15,6 +15,7 @@ interface DynamicFormProps {
     onSubmit: (data: any) => Promise<void>;
     onCancel?: () => void;
     onBack?: () => void;
+    showButtons?: boolean;
 }
 
 export const DynamicForm: React.FC<DynamicFormProps> = ({
@@ -23,6 +24,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
     onSubmit,
     onCancel,
     onBack,
+    showButtons = true,
 }) => {
     const { t } = useTranslation();
     const schema = React.useMemo(
@@ -104,28 +106,9 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
     };
 
     return (
-        <Form form={form} onSubmit={onSubmit}>
+        <Form form={form} onSubmit={onSubmit} onCancel={onCancel} showButtons={showButtons}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {definition.fields.map(renderField)}
-            </Box>
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                {onCancel && (
-                    <Button onClick={onCancel}>
-                        {t('common.cancel')}
-                    </Button>
-                )}
-                {onBack && (
-                    <Button onClick={onBack}>
-                        {t('common.back')}
-                    </Button>
-                )}
-                <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                >
-                    {t('common.save')}
-                </Button>
             </Box>
         </Form>
     );

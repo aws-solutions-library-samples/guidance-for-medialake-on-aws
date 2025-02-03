@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo } from 'react';
+import { Box, Button, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { DynamicForm } from '../../../../forms/components/DynamicForm';
 import { FormDefinition, FormFieldDefinition } from '../../../../forms/types';
 import { NodeConfiguration, Node as NodeType, NodeParameter } from '@/features/pipelines/types';
-import { Box, Typography } from '@mui/material';
 
 interface NodeConfigurationFormProps {
     node: NodeType;
@@ -30,6 +31,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
     onSubmit,
     onCancel,
 }) => {
+    const { t } = useTranslation();
     // Get the first method
     const methodName = Object.keys(node.methods)[0];
     const methodInfo = node.methods[methodName];
@@ -74,7 +76,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
         }
 
         return {
-            id: `node-config-${node.nodeId}`,
+            id: `node-config-${node.nodeId}-form`,
             name: `Configure ${node.info.title}`,
             description: node.info.description,
             fields,
@@ -104,12 +106,15 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
     }
 
     return (
-        <DynamicForm
-            definition={formDefinition}
-            defaultValues={{ parameters: configuration?.parameters || {} }}
-            onSubmit={handleFormSubmit}
-            onCancel={onCancel}
-        />
+        <Box>
+            <DynamicForm
+                definition={formDefinition}
+                defaultValues={{ parameters: configuration?.parameters || {} }}
+                onSubmit={handleFormSubmit}
+                onCancel={onCancel}
+                showButtons={true}
+            />
+        </Box>
     );
 };
 
