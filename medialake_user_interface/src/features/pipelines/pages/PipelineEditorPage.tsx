@@ -245,6 +245,8 @@ const PipelineEditorContent = () => {
 
     const onConnect = useCallback(
         (connection: Connection) => {
+            // DO NOT DELETE - Input/Output validation will be enabled later
+            /*
             const sourceNode = nodes.find((node) => node.id === connection.source);
             const targetNode = nodes.find((node) => node.id === connection.target);
 
@@ -256,30 +258,32 @@ const PipelineEditorContent = () => {
                         targetNode.data.inputTypes.includes(outputType)
                     );
 
-                if (isCompatible) {
-                    const newEdge = {
-                        ...connection,
-                        id: `${connection.source}-${connection.target}`,
-                        type: 'custom',
-                        data: {
-                            text: `${sourceNode.data.label} to ${targetNode.data.label}`
-                        }
-                    } as PipelineEdge;
-
-                    setEdges((eds) => addEdge(newEdge, eds));
-
-                    // Update pipeline configuration
-                    setFormData(prev => ({
-                        ...prev,
-                        configuration: {
-                            ...prev.configuration,
-                            edges: [...prev.configuration.edges, newEdge]
-                        }
-                    }));
-                } else {
+                if (!isCompatible) {
                     setIsErrorModalOpen(true);
+                    return;
                 }
             }
+            */
+
+            const newEdge = {
+                ...connection,
+                id: `${connection.source}-${connection.target}`,
+                type: 'custom',
+                data: {
+                    text: 'Connected'
+                }
+            } as PipelineEdge;
+
+            setEdges((eds) => addEdge(newEdge, eds));
+
+            // Update pipeline configuration
+            setFormData(prev => ({
+                ...prev,
+                configuration: {
+                    ...prev.configuration,
+                    edges: [...prev.configuration.edges, newEdge]
+                }
+            }));
         },
         [nodes, setEdges]
     );
@@ -496,7 +500,16 @@ const PipelineEditorContent = () => {
                 </Box>
             </Box>
 
-            <Dialog open={isNodeConfigOpen} onClose={() => setIsNodeConfigOpen(false)} maxWidth="md" fullWidth>
+            <Dialog 
+                open={isNodeConfigOpen} 
+                onClose={() => setIsNodeConfigOpen(false)} 
+                maxWidth="sm"
+                PaperProps={{
+                    sx: {
+                        width: '400px'
+                    }
+                }}
+            >
                 <DialogTitle>Configure Node</DialogTitle>
                 <DialogContent>
                     {selectedNode && !isNodeDetailsLoading && nodeDetails && (
