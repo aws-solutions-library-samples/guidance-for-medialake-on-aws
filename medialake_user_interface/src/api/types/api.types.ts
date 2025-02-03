@@ -115,6 +115,7 @@ export interface CreateConnectorRequest {
     connectorType?: string;
     bucket?: string;
     s3IntegrationMethod?: 's3-event-notifications' | 'eventbridge';
+    region?: string;
     [key: string]: string | undefined;
   };
 }
@@ -135,23 +136,74 @@ export interface ConnectorResponse {
   id: string;
   name: string;
   type: string;
-  description?: string;
   createdAt: string;
   updatedAt: string;
   storageIdentifier: string;
   sqsArn: string;
   region: string;
-  configuration?: Record<string, any>;
+  status?: string;
+  integrationMethod?: string;
   usage?: {
     total: number;
+  };
+  description?: string;
+  iamRoleArn?: string;
+  lambdaArn?: string;
+  queueUrl?: string;
+  configuration?: {
+    queueUrl?: string;
+    lambdaArn?: string;
+    iamRoleArn?: string;
   };
   settings?: {
     bucket: string;
     region?: string;
-    path?: string;
   };
-  status?: string;
 }
+
+export interface ConnectorsListResponse {
+  status: string;
+  message: string;
+  data: {
+    connectors: ConnectorResponse[];
+  };
+}
+
+export interface SingleConnectorResponse {
+  status: string;
+  message: string;
+  data: ConnectorResponse;
+}
+
+// export interface ConnectorResponse {
+//   id: string;
+//   name: string;
+//   type: string;
+//   description?: string;
+//   createdAt: string;
+//   updatedAt: string;
+//   storageIdentifier: string;
+//   sqsArn: string;
+//   region: string;
+//   integrationMethod?: string;
+//   iamRoleArn?: string;
+//   lambdaArn?: string;
+//   queueUrl?: string;
+//   configuration?: {
+//     queueUrl?: string;
+//     lambdaArn?: string;
+//     iamRoleArn?: string;
+//   } & Record<string, any>;
+//   usage?: {
+//     total: number;
+//   };
+//   settings?: {
+//     bucket: string;
+//     region?: string;
+//     path?: string;
+//   };
+//   status?: string;
+// }
 export interface S3ListResponse {
   buckets: string[];
   count: number;

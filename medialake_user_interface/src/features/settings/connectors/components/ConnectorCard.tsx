@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import {
     Card,
+    CardHeader,
     CardContent,
+    CardActions,
+    Stack,
     Typography,
     Box,
     IconButton,
@@ -111,104 +114,21 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 }}
                 elevation={0}
             >
-                <CardContent sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {getConnectorIcon(connector.type)}
-                            <Box>
-                                <Typography variant="h6" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
-                                    {connector.name}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                    {getConnectorTypeLabel(connector.type)}
-                                </Typography>
-                            </Box>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            {/* <Tooltip title="Edit">
-                                <IconButton
-                                    onClick={() => setEditModalOpen(true)}
-                                    size="small"
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        width: 40,
-                                        height: 40,
-                                        '&:hover': {
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                        },
-                                    }}
-                                >
-                                    <EditIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                            <Tooltip title={connector.status === 'disabled' ? 'Enable' : 'Disable'}>
-                                <IconButton
-                                    onClick={handleToggleStatus}
-                                    size="small"
-                                    sx={{
-                                        backgroundColor: alpha(
-                                            connector.status === 'disabled'
-                                                ? theme.palette.success.main
-                                                : theme.palette.warning.main,
-                                            0.1
-                                        ),
-                                        width: 40,
-                                        height: 40,
-                                        '&:hover': {
-                                            backgroundColor: alpha(
-                                                connector.status === 'disabled'
-                                                    ? theme.palette.success.main
-                                                    : theme.palette.warning.main,
-                                                0.2
-                                            ),
-                                        },
-                                    }}
-                                >
-                                    <PowerIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip> */}
-                            <Tooltip title="Delete">
-                                <IconButton
-                                    onClick={handleDeleteClick}
-                                    size="small"
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.error.main, 0.1),
-                                        width: 40,
-                                        height: 40,
-                                        '&:hover': {
-                                            backgroundColor: alpha(theme.palette.error.main, 0.2),
-                                        },
-                                    }}
-                                >
-                                    <DeleteIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        </Box>
-                    </Box>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
-                        Bucket: {connector.storageIdentifier}
-                    </Typography>
-                    {connector.region && (
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
-                            Region: {connector.region}
-                        </Typography>
-                    )}
-                    {connector.description && (
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 1 }}>
-                            {connector.description}
-                        </Typography>
-                    )}
 
-                    <Box sx={{ mt: 2 }}>
-                        {connector.usage?.total !== undefined && (
-                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                                Storage: {formatBytes(connector.usage.total)}
-                            </Typography>
-                        )}
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                            Last Updated: {formatDate(connector.updatedAt)}
-                        </Typography>
-                        <Box sx={{ mt: 1 }}>
+                <CardHeader
+
+                    title={
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            {getConnectorIcon(connector.type)}
+                            <Typography variant="h5">{connector.name}</Typography>
+                        </Stack>
+                    }
+                    subheader={
+                        <Stack direction="row" sx={{
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                        }} spacing={1}>
+                            {getConnectorTypeLabel(connector.type)}
                             <Chip
                                 size="small"
                                 label={connector.status || 'active'}
@@ -234,9 +154,162 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                     },
                                 }}
                             />
-                        </Box>
+                        </Stack>
+                    }
+                    titleTypographyProps={{ marginBottom: 1 }}
+                    subheaderTypographyProps={{ marginTop: 1 }}
+                />
+                {/* <CardHeader
+
+                    action={
+                        <Stack direction="row" spacing={2}>
+                            <IconButton
+                                onClick={() => setEditModalOpen(true)}
+                                size="small"
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    width: 40,
+                                    height: 40,
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+
+                            > <EditIcon fontSize="small" /></IconButton>
+                            <IconButton
+                                onClick={handleToggleStatus}
+                                size="small"
+                                sx={{
+                                    backgroundColor: alpha(
+                                        connector.status === 'disabled'
+                                            ? theme.palette.success.main
+                                            : theme.palette.warning.main,
+                                        0.1
+                                    ),
+                                    width: 40,
+                                    height: 40,
+                                    '&:hover': {
+                                        backgroundColor: alpha(
+                                            connector.status === 'disabled'
+                                                ? theme.palette.success.main
+                                                : theme.palette.warning.main,
+                                            0.2
+                                        ),
+                                    },
+                                }}
+                            >
+                                <PowerIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                                onClick={handleDeleteClick}
+                                size="small"
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                    width: 40,
+                                    height: 40,
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                    }
+
+                /> */}
+                <CardContent sx={{ flexGrow: 1 }}>
+
+                    <Typography variant="body2" >
+                        <strong>Bucket:</strong> {connector.storageIdentifier}
+                    </Typography>
+                    {connector.region && (
+                        <Typography variant="body2">
+                            <strong>Region:</strong> {connector.region}
+                        </Typography>
+                    )}
+                    {connector.description && (
+                        <Typography variant="body2" >
+                            <strong>Description:</strong> {connector.description}
+                        </Typography>
+                    )}
+
+                    <Box sx={{ mt: 2 }}>
+                        {connector.usage?.total !== undefined && (
+                            <Typography variant="body2" >
+                                <strong>Storage:</strong> {formatBytes(connector.usage.total)}
+                            </Typography>
+                        )}
+                        <Typography variant="body2" >
+                            <strong>Last Updated:</strong> {formatDate(connector.updatedAt)}
+                        </Typography>
+
                     </Box>
                 </CardContent>
+
+                <CardActions
+                    sx={{
+                        justifyContent: "flex-end",
+                        alignItems: "flex-end",
+                        borderTop: `1px solid ${theme.palette.divider}`,
+                        pt: 2
+                    }} >
+                    <Stack direction="row"
+                        spacing={2}
+                    >
+                        {/* <IconButton
+                            onClick={() => setEditModalOpen(true)}
+                            size="small"
+                            sx={{
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                width: 40,
+                                height: 40,
+                                '&:hover': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                },
+                            }}
+
+                        > <EditIcon fontSize="small" /></IconButton>
+                        <IconButton
+                            onClick={handleToggleStatus}
+                            size="small"
+                            sx={{
+                                backgroundColor: alpha(
+                                    connector.status === 'disabled'
+                                        ? theme.palette.success.main
+                                        : theme.palette.warning.main,
+                                    0.1
+                                ),
+                                width: 40,
+                                height: 40,
+                                '&:hover': {
+                                    backgroundColor: alpha(
+                                        connector.status === 'disabled'
+                                            ? theme.palette.success.main
+                                            : theme.palette.warning.main,
+                                        0.2
+                                    ),
+                                },
+                            }}
+                        >
+                            <PowerIcon fontSize="small" />
+                        </IconButton> */}
+                        <IconButton
+                            onClick={handleDeleteClick}
+                            size="small"
+                            sx={{
+                                backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                width: 40,
+                                height: 40,
+                                '&:hover': {
+                                    backgroundColor: alpha(theme.palette.error.main, 0.2),
+                                },
+                            }}
+                        >
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    </Stack>
+                </CardActions>
             </Card>
 
             <ConnectorEditModal

@@ -20,7 +20,6 @@ import {
     useTheme,
     Popover,
     CircularProgress,
-    Snackbar,
     Collapse,
 } from '@mui/material';
 import {
@@ -32,14 +31,15 @@ import {
     ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
-import { useGetS3Buckets, useCreateS3Connector } from '@/api/hooks/useConnectors';
-import queryClient from '@/api/queryClient';
+import { useGetS3Buckets } from '@/api/hooks/useConnectors';
+
 
 interface ConnectorModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (connectorData: CreateConnectorRequest) => Promise<void>;
     editingConnector?: ConnectorResponse;
+    onSave: (connectorData: CreateConnectorRequest) => Promise<void>;
+    isCreating: boolean;
 }
 
 const CONNECTOR_TYPES = [
@@ -65,8 +65,9 @@ const S3_INTEGRATION_METHODS = [
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
     open,
     onClose,
-    onSave,
     editingConnector,
+    onSave,
+    isCreating,
 }) => {
     const theme = useTheme();
     const [activeStep, setActiveStep] = useState(0);
@@ -79,14 +80,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-        open: false,
-        message: '',
-        severity: 'success'
-    });
-
     const { data: s3BucketsResponse, isLoading: isLoadingBuckets, refetch: refetchBuckets } = useGetS3Buckets();
-    const { mutateAsync: createS3Connector, isPending: isCreating } = useCreateS3Connector();
     const buckets = s3BucketsResponse?.data?.buckets || [];
 
     useEffect(() => {
@@ -112,11 +106,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         setActiveStep((prev) => prev - 1);
     };
 
-    const handleSnackbarClose = () => {
-        setSnackbar({ ...snackbar, open: false });
-    };
-
-    const handleSave = async () => {
+    const handleSaveInternal = async () => {
         if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket || !configuration.integrationMethod))) {
             setError('Please fill in all required fields');
             return;
@@ -134,23 +124,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         };
 
         try {
-            if (type === 's3') {
-                await createS3Connector(connectorData);
-                await queryClient.invalidateQueries({ queryKey: ['connectors'] });
-                await queryClient.refetchQueries({ queryKey: ['connectors'] });
-                onClose();
-                setSnackbar({
-                    open: true,
-                    message: 'Connector created successfully',
-                    severity: 'success'
-                });
-            }
+            await onSave(connectorData);
+            onClose();
         } catch (err) {
-            setSnackbar({
-                open: true,
-                message: 'Failed to create connector',
-                severity: 'error'
-            });
+            setError('Failed to create connector');
         }
     };
 
@@ -504,7 +481,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     {(activeStep === steps.length - 1 || editingConnector) ? (
                         <Button
                             variant="contained"
-                            onClick={handleSave}
+                            onClick={handleSaveInternal}
                             disabled={isCreating}
                             startIcon={isCreating ? <CircularProgress size={20} /> : null}
                             sx={{
@@ -554,19 +531,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 </Popover>
             </Dialog>
 
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={handleSnackbarClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-                <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
         </>
     );
 };
 
 export default ConnectorModal;
-

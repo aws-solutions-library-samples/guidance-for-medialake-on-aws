@@ -12,6 +12,7 @@ import type {
     CreateConnectorRequest,
     UpdateConnectorRequest,
     ConnectorListResponse,
+    SingleConnectorResponse,
     ApiResponse
 } from '@/api/types/api.types';
 
@@ -250,22 +251,10 @@ export const useDeleteConnector = () => {
 export const useCreateS3Connector = () => {
     const { showError } = useErrorModal();
 
-    useEffect(() => {
-        queryClient.prefetchQuery({
-            queryKey: [QUERY_KEYS.CONNECTORS, 's3'],
-            queryFn: async () => {
-                const response = await apiClient.get<S3BucketResponse>(
-                    `${API_ENDPOINTS.CONNECTORS}/s3`
-                );
-                return response.data;
-            },
-        });
-    }, [queryClient]);
-
-    return useMutation<ConnectorResponse, Error, CreateConnectorRequest>({
+    return useMutation<SingleConnectorResponse, Error, CreateConnectorRequest>({
         mutationFn: async (data) => {
             validateS3ConnectorRequest(data);
-            const response = await apiClient.post<ConnectorResponse>(
+            const response = await apiClient.post<SingleConnectorResponse>(
                 `${API_ENDPOINTS.CONNECTORS}/s3`,
                 data
             );
@@ -279,7 +268,8 @@ export const useCreateS3Connector = () => {
                 showError(`Failed to create S3 connector: ${error.message}`);
             }
         },
-        onSuccess: (newConnector) => {
+        onSuccess: (response) => {
+            const newConnector = response.data;
             queryClient.setQueryData<ConnectorListResponse>(
                 [QUERY_KEYS.CONNECTORS],
                 (old) => {
@@ -289,8 +279,7 @@ export const useCreateS3Connector = () => {
                         data: { connectors: [newConnector] }
                     };
                     return {
-                        status: old.status,
-                        message: old.message,
+                        ...old,
                         data: {
                             ...old.data,
                             connectors: [...old.data.connectors, newConnector]

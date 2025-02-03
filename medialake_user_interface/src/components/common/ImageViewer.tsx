@@ -108,23 +108,66 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         canvas.width = canvas.clientWidth * dpr;
         canvas.height = canvas.clientHeight * dpr;
 
+        // Reset transform & adjust for dpr
         context.resetTransform();
         context.scale(dpr, dpr);
-        context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+        context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+        // Set image smoothing properties for clarity
+        context.imageSmoothingEnabled = true;  // Try false if you need a sharper (non-blurred) image
+        context.imageSmoothingQuality = 'high';
 
         context.save();
         // Center on canvas
-        context.translate(canvas.width / (2 * dpr), canvas.height / (2 * dpr));
+        context.translate(canvas.clientWidth / 2, canvas.clientHeight / 2);
         // Apply rotation
         context.rotate((rotate * Math.PI) / 180);
         // Apply zoom
         context.scale(zoom, zoom);
-        // Apply pan offset
+        // Apply pan offset (note the negative to center the image)
         context.translate(-imgWidth / 2 - offset.x, -imgHeight / 2 - offset.y);
 
         context.drawImage(background, 0, 0);
         context.restore();
     }, [background, zoom, offset, rotate]);
+
+    // const draw = useCallback(() => {
+    //     const canvas = canvasRef.current;
+    //     if (!canvas || !background) return;
+
+    //     const context = canvas.getContext('2d');
+    //     if (!context) return;
+
+    //     // Disable smoothing for crisp pixels (especially useful for pixel art)
+    //     context.imageSmoothingEnabled = true;
+    //     context.imageSmoothingQuality = 'high';
+
+    //     const dpr = window.devicePixelRatio || 1;
+
+
+    //     const { width: imgWidth, height: imgHeight } = background;
+
+    //     // Scale the canvas to the device pixel ratio
+    //     canvas.width = canvas.clientWidth * dpr;
+    //     canvas.height = canvas.clientHeight * dpr;
+
+    //     context.resetTransform();
+    //     context.scale(dpr, dpr);
+    //     context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+    //     context.save();
+    //     // Center on canvas
+    //     context.translate(canvas.width / (2 * dpr), canvas.height / (2 * dpr));
+    //     // Apply rotation
+    //     context.rotate((rotate * Math.PI) / 180);
+    //     // Apply zoom
+    //     context.scale(zoom, zoom);
+    //     // Apply pan offset
+    //     context.translate(-imgWidth / 2 - offset.x, -imgHeight / 2 - offset.y);
+
+    //     context.drawImage(background, 0, 0);
+    //     context.restore();
+    // }, [background, zoom, offset, rotate]);
 
     /**
      * 1) Load the image from `imageSrc`.

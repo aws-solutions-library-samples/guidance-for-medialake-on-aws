@@ -3,7 +3,7 @@ import { Typography, Button, Box, Snackbar, Alert } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
-import { useGetConnectors, useDeleteConnector, useToggleConnector } from '@/api/hooks/useConnectors';
+import { useGetConnectors, useDeleteConnector, useToggleConnector, useCreateS3Connector } from '@/api/hooks/useConnectors';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import queryClient from '@/api/queryClient';
 
@@ -15,6 +15,7 @@ const ConnectorsPage: React.FC = () => {
     const { data: connectorsResponse, isLoading } = useGetConnectors();
     const { mutateAsync: deleteConnector } = useDeleteConnector();
     const { mutateAsync: toggleConnector } = useToggleConnector();
+    const { mutateAsync: createS3Connector, isPending: isCreatingConnector } = useCreateS3Connector();
 
     const handleAddClick = () => {
         setEditingConnector(undefined);
@@ -57,7 +58,27 @@ const ConnectorsPage: React.FC = () => {
     };
 
     const handleSave = async (connectorData: CreateConnectorRequest): Promise<void> => {
-        // Implementation for saving connector
+        try {
+            if (connectorData.type === 's3') {
+                const response = await createS3Connector(connectorData);
+                console.log('API Response:', response);
+                if (response && response.data) {
+                    handleModalClose();
+                    setAlert({
+                        message: 'Connector created successfully',
+                        severity: 'success'
+                    });
+                } else {
+                    throw new Error('Invalid response from server');
+                }
+            }
+        } catch (error) {
+            console.error('Error creating connector:', error);
+            setAlert({
+                message: 'Failed to create connector',
+                severity: 'error'
+            });
+        }
     };
 
     const handleAlertClose = () => {
@@ -87,35 +108,39 @@ const ConnectorsPage: React.FC = () => {
                 display: 'grid',
                 gridTemplateColumns: {
                     xs: '1fr',
-                    sm: 'repeat(2, 1fr)',
-                    md: 'repeat(3, 1fr)'
+                    sm: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    md: 'repeat(auto-fill, minmax(350px, 1fr))'
                 },
                 gap: 3
             }}>
-                {connectors.map((connector) => (
-                    <Box key={connector.id}>
-                        <ConnectorCard
-                            connector={connector}
-                            onEdit={handleEditClick}
-                            onDelete={handleDelete}
-                            onToggleStatus={handleToggleStatus}
-                        />
-                    </Box>
-                ))}
+                {connectors.map((connector) => {
+                    console.log('Connector data:', JSON.stringify(connector, null, 2));
+                    return (
+                        <Box key={connector.id}>
+                            <ConnectorCard
+                                connector={connector}
+                                onEdit={handleEditClick}
+                                onDelete={handleDelete}
+                                onToggleStatus={handleToggleStatus}
+                            />
+                        </Box>
+                    );
+                })}
             </Box>
 
             <ConnectorModal
                 open={isModalOpen}
                 onClose={handleModalClose}
-                onSave={handleSave}
                 editingConnector={editingConnector}
+                onSave={handleSave}
+                isCreating={isCreatingConnector}
             />
 
             <Snackbar
                 open={!!alert}
                 autoHideDuration={6000}
                 onClose={handleAlertClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             >
                 <Alert
                     onClose={handleAlertClose}
