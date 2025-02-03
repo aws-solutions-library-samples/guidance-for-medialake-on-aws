@@ -17,7 +17,7 @@ import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
 
 interface NodeSection {
     title: string;
-    type: string;
+    types: string[];
     nodes: Array<{node: NodeType; methodName: string; method: any}>;
 }
 
@@ -26,12 +26,12 @@ const SidebarContent: React.FC = () => {
     const [expandedSections, setExpandedSections] = useState<string[]>(['TRIGGER']);
     const { data: nodesResponse, isLoading, error } = useGetUnconfiguredNodeMethods();
 
-    const handleSectionToggle = (sectionType: string) => {
+    const handleSectionToggle = (sectionId: string) => {
         setExpandedSections(prev => {
-            if (prev.includes(sectionType)) {
-                return prev.filter(type => type !== sectionType);
+            if (prev.includes(sectionId)) {
+                return prev.filter(type => type !== sectionId);
             }
-            return [...prev, sectionType];
+            return [...prev, sectionId];
         });
     };
 
@@ -65,9 +65,9 @@ const SidebarContent: React.FC = () => {
         if (!nodesResponse?.data) return [];
 
         const groupedNodes: NodeSection[] = [
-            { title: 'Triggers', type: 'TRIGGER', nodes: [] },
-            { title: 'Partner Integrations', type: 'API', nodes: [] },
-            { title: 'Flow', type: 'FLOW', nodes: [] }
+            { title: 'Triggers', types: ['TRIGGER'], nodes: [] },
+            { title: 'Integrations', types: ['API', 'INTEGRATION'], nodes: [] },
+            { title: 'Flow', types: ['FLOW'], nodes: [] }
         ];
 
         nodesResponse.data.forEach((node) => {
@@ -75,7 +75,7 @@ const SidebarContent: React.FC = () => {
                 Object.entries(node.methods).forEach(([methodName, method]) => {
                     const nodeType = node.info.nodeType;
                     const section = groupedNodes.find(s => 
-                        nodeType.includes(s.type)
+                        s.types.some(type => nodeType.includes(type))
                     );
                     if (section) {
                         section.nodes.push({ node, methodName, method });
@@ -147,9 +147,9 @@ const SidebarContent: React.FC = () => {
             }}>
                 {filteredSections.map((section) => (
                     <Accordion
-                        key={section.type}
-                        expanded={expandedSections.includes(section.type)}
-                        onChange={() => handleSectionToggle(section.type)}
+                        key={section.types[0]}
+                        expanded={expandedSections.includes(section.types[0])}
+                        onChange={() => handleSectionToggle(section.types[0])}
                         disableGutters
                         sx={{
                             '&.MuiAccordion-root': {
