@@ -75,7 +75,8 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
             }
         },
         inputTypes: node.data.inputTypes,
-        outputTypes: node.data.outputTypes
+        outputTypes: node.data.outputTypes,
+        configuration: node.data.configuration
     },
     positionAbsolute: node.positionAbsolute ? {
         x: node.positionAbsolute.x.toString(),
@@ -218,7 +219,12 @@ const PipelineEditorContent = () => {
             configuration: {
                 ...prev.configuration,
                 nodes: prev.configuration.nodes.filter((node) => node.id !== nodeId),
-                edges: prev.configuration.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+                edges: prev.configuration.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+                settings: prev.configuration.settings || {
+                    autoStart: false,
+                    retryAttempts: 3,
+                    timeout: 3600
+                }
             }
         }));
     }, [setNodes, setEdges]);
@@ -328,7 +334,7 @@ const PipelineEditorContent = () => {
                     outputTypes: nodeData.outputTypes || [],
                     type: nodeData.type,
                     configuration: {
-                        method: '',  // Will be set to first available method by NodeConfigurationForm
+                        method: '',
                         parameters: {},
                         inputMapping: '',
                         outputMapping: ''
@@ -355,7 +361,12 @@ const PipelineEditorContent = () => {
                 ...prev,
                 configuration: {
                     ...prev.configuration,
-                    nodes: [...prev.configuration.nodes, newPipelineNode]
+                    nodes: [...prev.configuration.nodes, newPipelineNode],
+                    settings: prev.configuration.settings || {
+                        autoStart: false,
+                        retryAttempts: 3,
+                        timeout: 3600
+                    }
                 }
             }));
 
@@ -372,39 +383,56 @@ const PipelineEditorContent = () => {
     }, []);
 
     const handleNodeConfigSave = useCallback(async (configuration: any) => {
-        if (selectedNode) {
-            const updatedNode = {
-                ...selectedNode,
-                data: {
-                    ...selectedNode.data,
-                    configuration,
-                    label: configuration.method
-                        ? `${selectedNode.data.label} (${configuration.method})`
-                        : selectedNode.data.label
-                }
-            };
+        try {
+            if (selectedNode) {
+                // Update node in ReactFlow
+                const updatedNode = {
+                    ...selectedNode,
+                    data: {
+                        ...selectedNode.data,
+                        configuration,
+                        label: configuration.method
+                            ? `${selectedNode.data.label} (${configuration.method})`
+                            : selectedNode.data.label
+                    }
+                };
 
-            setNodes((nds) =>
-                nds.map((node) =>
-                    node.id === selectedNode.id ? updatedNode : node
-                )
-            );
-
-            // Update pipeline configuration
-            setFormData(prev => ({
-                ...prev,
-                configuration: {
-                    ...prev.configuration,
-                    nodes: prev.configuration.nodes.map(node =>
-                        node.id === selectedNode.id
-                            ? convertToPipelineNode(updatedNode)
-                            : node
+                // Update ReactFlow state
+                setNodes((nds) =>
+                    nds.map((node) =>
+                        node.id === selectedNode.id ? updatedNode : node
                     )
-                }
-            }));
+                );
+
+                // Convert to pipeline node format and update form data
+                const updatedPipelineNode = convertToPipelineNode(updatedNode);
+
+                // Update pipeline configuration in form data
+                setFormData(prev => {
+                    const updatedNodes = prev.configuration.nodes.map(node =>
+                        node.id === selectedNode.id ? updatedPipelineNode : node
+                    );
+
+                    return {
+                        ...prev,
+                        configuration: {
+                            ...prev.configuration,
+                            nodes: updatedNodes,
+                            settings: prev.configuration.settings || {
+                                autoStart: false,
+                                retryAttempts: 3,
+                                timeout: 3600
+                            }
+                        }
+                    };
+                });
+            }
+            handleNodeConfigClose();
+        } catch (error) {
+            console.error('Error saving node configuration:', error);
+            // You might want to show an error message to the user here
         }
-        handleNodeConfigClose();
-    }, [selectedNode, setNodes]);
+    }, [selectedNode, setNodes, handleNodeConfigClose]);
 
     const convertNodeToReactFlowNode = (node: NodeType): Node<CustomNodeData> => ({
         id: node.nodeId || getId(),

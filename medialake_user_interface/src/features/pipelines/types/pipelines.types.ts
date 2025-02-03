@@ -52,6 +52,7 @@ export interface PipelineNode {
         cause?: string;
         width?: string;
         height?: string;
+        configuration?: any;
     };
     width: string;
     height: string;

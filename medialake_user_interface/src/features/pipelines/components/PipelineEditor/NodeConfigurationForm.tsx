@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import React, { useEffect, useMemo, useCallback } from 'react';
+import { Box, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { DynamicForm } from '../../../../forms/components/DynamicForm';
 import { FormDefinition, FormFieldDefinition } from '../../../../forms/types';
@@ -25,32 +25,21 @@ const mapParameterTypeToFormType = (type: string): FormFieldDefinition['type'] =
     }
 };
 
-export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
+export const NodeConfigurationForm = React.memo(({
     node,
     configuration,
     onSubmit,
     onCancel,
 }) => {
     const { t } = useTranslation();
-    // Get the first method
-    const methodName = Object.keys(node.methods)[0];
-    const methodInfo = node.methods[methodName];
-    const hasParameters = Object.keys(methodInfo?.parameters || {}).length > 0;
 
-    // Auto-submit when there are no parameters
-    useEffect(() => {
-        if (!hasParameters) {
-            const config: NodeConfiguration = {
-                method: methodName,
-                parameters: {},
-                path: configuration?.path,
-                operationId: configuration?.operationId,
-            };
-            onSubmit(config);
-        }
-    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, onSubmit]);
+    const methodName = useMemo(() => Object.keys(node.methods)[0], [node.methods]);
+    const methodInfo = useMemo(() => node.methods[methodName], [node.methods, methodName]);
+    const hasParameters = useMemo(
+        () => Object.keys(methodInfo?.parameters || {}).length > 0,
+        [methodInfo]
+    );
 
-    // Create form definition based on node info
     const formDefinition = useMemo<FormDefinition>(() => {
         const fields: FormFieldDefinition[] = [];
 
@@ -59,9 +48,10 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
                 const field: FormFieldDefinition = {
                     name: `parameters.${key}`,
                     type: mapParameterTypeToFormType(param.type),
-                    label: param.name,
+                    label: param.name || key,
                     required: param.required,
                     tooltip: param.description,
+                    useDirectLabels: true,
                 };
 
                 if (param.type === 'select' && 'options' in param) {
@@ -77,23 +67,40 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
 
         return {
             id: `node-config-${node.nodeId}-form`,
-            name: `Configure ${node.info.title}`,
+            name: node.info.title,
             description: node.info.description,
             fields,
-            translationPrefix: 'nodeConfiguration',
+            useDirectLabels: true,
         };
-    }, [node, methodInfo]);
+    }, [node.nodeId, node.info.title, node.info.description, methodInfo]);
 
-    // Handle form submission
-    const handleFormSubmit = async (data: any) => {
-        const config: NodeConfiguration = {
-            method: methodName,
-            parameters: data.parameters || {},
-            path: configuration?.path,
-            operationId: configuration?.operationId,
-        };
-        await onSubmit(config);
-    };
+    const handleFormSubmit = useCallback(async (data: any) => {
+        try {
+            const config: NodeConfiguration = {
+                method: methodName,
+                parameters: data.parameters || {},
+                path: configuration?.path,
+                operationId: configuration?.operationId,
+            };
+            await onSubmit(config);
+        } catch (error) {
+            console.error('[NodeConfigurationForm] Submit failed:', error);
+            throw error;
+        }
+    }, [methodName, configuration?.path, configuration?.operationId, onSubmit]);
+
+    // Auto-submit when there are no parameters
+    useEffect(() => {
+        if (!hasParameters) {
+            const config: NodeConfiguration = {
+                method: methodName,
+                parameters: {},
+                path: configuration?.path,
+                operationId: configuration?.operationId,
+            };
+            onSubmit(config).catch(console.error);
+        }
+    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, onSubmit]);
 
     if (!hasParameters) {
         return (
@@ -109,13 +116,17 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
         <Box>
             <DynamicForm
                 definition={formDefinition}
-                defaultValues={{ parameters: configuration?.parameters || {} }}
+                defaultValues={{ 
+                    parameters: configuration?.parameters || {} 
+                }}
                 onSubmit={handleFormSubmit}
                 onCancel={onCancel}
                 showButtons={true}
             />
         </Box>
     );
-};
+});
+
+NodeConfigurationForm.displayName = 'NodeConfigurationForm';
 
 export default NodeConfigurationForm;
