@@ -41,6 +41,7 @@ export const NodeConfigurationForm = React.memo(({
     );
 
     const formDefinition = useMemo<FormDefinition>(() => {
+        console.log('[NodeConfigurationForm] Creating form definition');
         const fields: FormFieldDefinition[] = [];
 
         if (methodInfo?.parameters) {
@@ -81,13 +82,15 @@ export const NodeConfigurationForm = React.memo(({
                 parameters: data.parameters || {},
                 path: configuration?.path,
                 operationId: configuration?.operationId,
+                inputMapping: configuration?.inputMapping,
+                outputMapping: configuration?.outputMapping
             };
             await onSubmit(config);
         } catch (error) {
             console.error('[NodeConfigurationForm] Submit failed:', error);
             throw error;
         }
-    }, [methodName, configuration?.path, configuration?.operationId, onSubmit]);
+    }, [methodName, configuration?.path, configuration?.operationId, configuration?.inputMapping, configuration?.outputMapping, onSubmit]);
 
     // Auto-submit when there are no parameters
     useEffect(() => {
@@ -97,10 +100,12 @@ export const NodeConfigurationForm = React.memo(({
                 parameters: {},
                 path: configuration?.path,
                 operationId: configuration?.operationId,
+                inputMapping: configuration?.inputMapping,
+                outputMapping: configuration?.outputMapping
             };
             onSubmit(config).catch(console.error);
         }
-    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, onSubmit]);
+    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, configuration?.inputMapping, configuration?.outputMapping, onSubmit]);
 
     if (!hasParameters) {
         return (

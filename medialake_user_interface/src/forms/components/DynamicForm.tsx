@@ -37,9 +37,17 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
         });
     }, []);
 
+    // Create a stable reference for fields
+    const fields = React.useMemo(
+        () => definition.fields,
+        // Use JSON.stringify to compare deep equality
+        [JSON.stringify(definition.fields)]
+    );
+    
+    // Create schema using cached version
     const schema = React.useMemo(
-        () => createZodSchema(definition.fields),
-        [definition.fields]
+        () => createZodSchema(fields),
+        [fields]
     );
 
     const form = useFormWithValidation({
