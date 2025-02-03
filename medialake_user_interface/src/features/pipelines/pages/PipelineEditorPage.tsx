@@ -42,6 +42,7 @@ interface CustomNodeData {
     configuration?: any;
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
+    type?: string; // Node type (e.g., 'TRIGGER', 'API', 'FLOW')
 }
 
 const nodeTypes = {
@@ -151,6 +152,7 @@ const PipelineEditorContent = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const { screenToFlowPosition } = useReactFlow();
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+    const [errorType, setErrorType] = useState<'trigger' | 'compatibility'>('compatibility');
     const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
     const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
     const { isExpanded } = useRightSidebar();
@@ -245,11 +247,18 @@ const PipelineEditorContent = () => {
 
     const onConnect = useCallback(
         (connection: Connection) => {
+            const targetNode = nodes.find((node) => node.id === connection.target);
+            
+            // Prevent connections to trigger nodes
+            if (targetNode?.data.type?.includes('TRIGGER')) {
+                setErrorType('trigger');
+                setIsErrorModalOpen(true);
+                return;
+            }
+
             // DO NOT DELETE - Input/Output validation will be enabled later
             /*
             const sourceNode = nodes.find((node) => node.id === connection.source);
-            const targetNode = nodes.find((node) => node.id === connection.target);
-
             if (sourceNode && targetNode) {
                 const isCompatible =
                     sourceNode.data.outputTypes &&
@@ -317,6 +326,7 @@ const PipelineEditorContent = () => {
                     icon: nodeData.icon || <FaFileVideo size={20} />,
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
+                    type: nodeData.type,
                     configuration: {
                         method: '',  // Will be set to first available method by NodeConfigurationForm
                         parameters: {},
@@ -555,7 +565,9 @@ const PipelineEditorContent = () => {
                         Connection Error
                     </Typography>
                     <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-                        The nodes cannot be connected because their input/output types are not compatible.
+                        {errorType === 'trigger'
+                            ? "Trigger nodes cannot have incoming connections. They can only trigger other nodes."
+                            : "The nodes cannot be connected because their input/output types are not compatible."}
                     </Typography>
                 </Box>
             </Modal>

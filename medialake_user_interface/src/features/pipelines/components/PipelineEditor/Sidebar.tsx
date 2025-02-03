@@ -39,7 +39,7 @@ const SidebarContent: React.FC = () => {
         const method = node.methods?.[methodName];
         const nodeData = {
             id: node.nodeId,
-            type: node.info.nodeType.toLowerCase(),
+            type: node.info.nodeType,
             label: node.info.title,
             description: method?.description || node.info.description,
             inputTypes: node.info.inputTypes || [],

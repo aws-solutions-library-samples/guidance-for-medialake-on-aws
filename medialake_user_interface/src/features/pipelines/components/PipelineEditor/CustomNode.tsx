@@ -15,6 +15,7 @@ export interface CustomNodeData {
     configuration?: any; // Node configuration
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
+    type?: string; // Node type (e.g., 'TRIGGER', 'API', 'FLOW')
 }
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
@@ -57,6 +58,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         }
     }, [id, project]);
 
+    const isTriggerNode = data.type?.includes('TRIGGER');
+
     return (
         <Box
             onClick={handleNodeClick}
@@ -76,18 +79,20 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 }
             }}
         >
-            <Handle
-                type="target"
-                position={Position.Left}
-                isConnectable={isConnectable}
-                style={{
-                    background: '#555',
-                    width: '12px',
-                    height: '12px',
-                    border: '2px solid #fff',
-                    borderRadius: '6px'
-                }}
-            />
+            {!isTriggerNode && (
+                <Handle
+                    type="target"
+                    position={Position.Left}
+                    isConnectable={isConnectable}
+                    style={{
+                        background: '#555',
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid #fff',
+                        borderRadius: '6px'
+                    }}
+                />
+            )}
 
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, position: 'relative' }}>
                 {data.icon}
