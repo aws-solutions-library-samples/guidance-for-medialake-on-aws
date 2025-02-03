@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 import { UserFilterPopover } from './UserFilterPopover';
 import { ResizableTable, ColumnVisibilityMenu, TableCellContent } from '@/components/common/table';
 import { UserTableToolbar } from './UserTableToolbar';
+import { TableFiltersProvider, TableFilter, TableSort } from '@/components/common/table/context/TableFiltersContext';
 
 interface UserListProps {
     users: User[];
@@ -100,8 +101,9 @@ const UserList: React.FC<UserListProps> = ({
     const handleSortingChange = (newSorting: SortingState) => {
         setSorting(newSorting);
         if (onSortChange && newSorting.length > 0) {
-            const sort = newSorting[0];
-            onSortChange(sort.id, sort.desc);
+            newSorting.forEach(sort => {
+                onSortChange(sort.id, sort.desc);
+            });
         } else if (onSortChange) {
             onSortChange('', false);
         }
@@ -110,8 +112,9 @@ const UserList: React.FC<UserListProps> = ({
     const handleFilterChange = (newFilters: ColumnFiltersState) => {
         setColumnFilters(newFilters);
         if (onFilterChange && newFilters.length > 0) {
-            const filter = newFilters[0];
-            onFilterChange(filter.id, filter.value as string);
+            newFilters.forEach(filter => {
+                onFilterChange(filter.id, filter.value as string);
+            });
         }
     };
     const [globalFilter, setGlobalFilter] = useState('');
@@ -447,49 +450,76 @@ const UserList: React.FC<UserListProps> = ({
         setActiveFilterColumn(null);
     };
 
+    const tableFiltersValue = useMemo(() => ({
+        activeFilters: columnFilters.map(f => ({
+            columnId: f.id,
+            value: f.value as string
+        })) as TableFilter[],
+        activeSorting: sorting.map(s => ({
+            columnId: s.id,
+            desc: s.desc
+        })) as TableSort[],
+        onRemoveFilter,
+        onRemoveSort,
+        onFilterChange: (columnId: string, value: string) => {
+            const newFilters = columnFilters.map(f => 
+                f.id === columnId ? { ...f, value } : f
+            );
+            handleFilterChange(newFilters);
+        },
+        onSortChange: (columnId: string, desc: boolean) => {
+            const newSorting = sorting.map(s => 
+                s.id === columnId ? { ...s, desc } : s
+            );
+            handleSortingChange(newSorting);
+        }
+    }), [columnFilters, sorting, onRemoveFilter, onRemoveSort, handleFilterChange, handleSortingChange]);
+
     return (
-        <Box sx={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-        }}>
-            <UserTableToolbar
-                globalFilter={globalFilter}
-                onGlobalFilterChange={setGlobalFilter}
-                onColumnMenuOpen={handleColumnMenuOpen}
-                activeFilters={activeFilters}
-                activeSorting={activeSorting}
-                onRemoveFilter={onRemoveFilter}
-                onRemoveSort={onRemoveSort}
-            />
+        <TableFiltersProvider {...tableFiltersValue}>
+            <Box sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+            }}>
+                <UserTableToolbar
+                    globalFilter={globalFilter}
+                    onGlobalFilterChange={setGlobalFilter}
+                    onColumnMenuOpen={handleColumnMenuOpen}
+                    activeFilters={activeFilters}
+                    activeSorting={activeSorting}
+                    onRemoveFilter={onRemoveFilter}
+                    onRemoveSort={onRemoveSort}
+                />
 
-            <ResizableTable
-                table={table}
-                containerRef={containerRef}
-                virtualizer={rowVirtualizer}
-                rows={rows}
-                onFilterClick={handleFilterMenuOpen}
-                activeFilters={activeFilters}
-                activeSorting={activeSorting}
-                onRemoveFilter={onRemoveFilter}
-                onRemoveSort={onRemoveSort}
-            />
+                <ResizableTable
+                    table={table}
+                    containerRef={containerRef}
+                    virtualizer={rowVirtualizer}
+                    rows={rows}
+                    onFilterClick={handleFilterMenuOpen}
+                    activeFilters={activeFilters}
+                    activeSorting={activeSorting}
+                    onRemoveFilter={onRemoveFilter}
+                    onRemoveSort={onRemoveSort}
+                />
 
-            <ColumnVisibilityMenu
-                anchorEl={columnMenuAnchor}
-                columns={table.getAllLeafColumns()}
-                onClose={handleColumnMenuClose}
-            />
+                <ColumnVisibilityMenu
+                    anchorEl={columnMenuAnchor}
+                    columns={table.getAllLeafColumns()}
+                    onClose={handleColumnMenuClose}
+                />
 
-            <UserFilterPopover
-                anchorEl={filterMenuAnchor}
-                column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
-                onClose={handleFilterMenuClose}
-                users={users}
-            />
-        </Box>
+                <UserFilterPopover
+                    anchorEl={filterMenuAnchor}
+                    column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
+                    onClose={handleFilterMenuClose}
+                    users={users}
+                />
+            </Box>
+        </TableFiltersProvider>
     );
 };
 

@@ -1,6 +1,4 @@
 openapi: 3.0.0
-x-medialake-nodeId: aws_bedrock_data_automation
-x-node-type: aws
 info:
     title: AWS Bedrock Data Automation
     version: 1.0

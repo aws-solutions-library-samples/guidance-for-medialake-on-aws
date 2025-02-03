@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
+import { useSidebar } from './contexts/SidebarContext';
+import { drawerWidth, collapsedDrawerWidth } from './constants';
 
 interface SearchTag {
     key: string;
@@ -14,7 +16,8 @@ interface SearchTag {
 
 function TopBar() {
     const muiTheme = useMuiTheme();
-    const { theme, isCollapsed, collapsedDrawerWidth, drawerWidth } = useTheme();
+    const { theme } = useTheme();
+    const { isCollapsed } = useSidebar();
     const navigate = useNavigate();
     const { t } = useTranslation();
     const [searchInput, setSearchInput] = useState('');

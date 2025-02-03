@@ -1,6 +1,4 @@
 openapi: 3.0.0
-x-medialake-nodeId: pa1
-x-node-type: api
 info:
     title: Twelve Labs API
     version: 1.3

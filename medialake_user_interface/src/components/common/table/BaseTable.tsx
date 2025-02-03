@@ -18,7 +18,16 @@ import {
     Paper,
     LinearProgress,
 } from '@mui/material';
-import { type Table as TanStackTable, type ColumnSort, type ColumnFilter } from '@tanstack/react-table';
+import {
+    type Table as TanStackTable,
+    type ColumnSort,
+    type ColumnFilter,
+    type ColumnDefTemplate,
+    type CellContext,
+    type HeaderContext,
+    flexRender
+} from '@tanstack/react-table';
+import { Virtualizer } from '@tanstack/react-virtual';
 
 export interface BaseTableProps<T> {
     table: TanStackTable<T>;
@@ -66,7 +75,10 @@ export const BaseTable = <T extends object>({
                                 >
                                     {header.isPlaceholder
                                         ? null
-                                        : header.column.columnDef.header?.toString()}
+                                        : flexRender(
+                                            header.column.columnDef.header as ColumnDefTemplate<HeaderContext<T, unknown>>,
+                                            header.getContext()
+                                        )}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -84,7 +96,10 @@ export const BaseTable = <T extends object>({
                             <TableRow key={row.id}>
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
-                                        {cell.column.columnDef.cell?.(cell.getContext())}
+                                        {flexRender(
+                                            cell.column.columnDef.cell as ColumnDefTemplate<CellContext<T, unknown>>,
+                                            cell.getContext()
+                                        )}
                                     </TableCell>
                                 ))}
                             </TableRow>
