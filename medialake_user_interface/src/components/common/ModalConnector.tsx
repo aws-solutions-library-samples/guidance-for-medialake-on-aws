@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box } from '@mui/material';
 
 interface ModalContextType {
     showModal: (content: ReactNode, options?: ModalOptions) => void;
@@ -41,49 +42,60 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
     return (
         <ModalContext.Provider value={{ showModal, hideModal }}>
             {children}
-            {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="fixed inset-0 bg-black opacity-50" onClick={hideModal}></div>
-                    <div className="relative bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-                        {modalOptions.title && (
-                            <h2 className="text-xl font-semibold mb-4">{modalOptions.title}</h2>
-                        )}
-                        <div className="mb-6">{modalContent}</div>
-                        <div className="flex justify-end space-x-2">
-                            {modalOptions.onCancel && (
-                                <button
-                                    onClick={() => {
-                                        modalOptions.onCancel?.();
-                                        hideModal();
-                                    }}
-                                    className="px-4 py-2 border rounded-md hover:bg-gray-100"
-                                >
-                                    {modalOptions.cancelText || t('common.cancel')}
-                                </button>
-                            )}
-                            {modalOptions.onConfirm && (
-                                <button
-                                    onClick={() => {
-                                        modalOptions.onConfirm?.();
-                                        hideModal();
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                                >
-                                    {modalOptions.confirmText || t('common.save')}
-                                </button>
-                            )}
-                            {!modalOptions.onConfirm && !modalOptions.onCancel && (
-                                <button
-                                    onClick={hideModal}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                                >
-                                    {t('common.close')}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Dialog 
+                open={isOpen} 
+                onClose={hideModal}
+                maxWidth="sm"
+                PaperProps={{
+                    sx: {
+                        width: '400px', // Set fixed width for configuration modal
+                        margin: 2
+                    }
+                }}
+            >
+                {modalOptions.title && (
+                    <DialogTitle>{modalOptions.title}</DialogTitle>
+                )}
+                <DialogContent>
+                    <Box sx={{ py: 1 }}>
+                        {modalContent}
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    {modalOptions.onCancel && (
+                        <Button
+                            onClick={() => {
+                                modalOptions.onCancel?.();
+                                hideModal();
+                            }}
+                            variant="outlined"
+                        >
+                            {modalOptions.cancelText || t('common.cancel')}
+                        </Button>
+                    )}
+                    {modalOptions.onConfirm && (
+                        <Button
+                            onClick={() => {
+                                modalOptions.onConfirm?.();
+                                hideModal();
+                            }}
+                            variant="contained"
+                            color="primary"
+                        >
+                            {modalOptions.confirmText || t('common.save')}
+                        </Button>
+                    )}
+                    {!modalOptions.onConfirm && !modalOptions.onCancel && (
+                        <Button
+                            onClick={hideModal}
+                            variant="contained"
+                            color="primary"
+                        >
+                            {t('common.close')}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
         </ModalContext.Provider>
     );
 };

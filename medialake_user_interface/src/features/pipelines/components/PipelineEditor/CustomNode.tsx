@@ -66,7 +66,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 backgroundColor: 'background.paper',
                 border: 1,
                 borderColor: data.configuration ? 'primary.main' : 'divider',
-                minWidth: 150,
+                width: '200px', // Set fixed width to half of original
+                maxWidth: '200px',
                 position: 'relative',
                 boxShadow: 2,
                 cursor: 'pointer',
@@ -88,17 +89,37 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 }}
             />
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'relative' }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, position: 'relative' }}>
                 {data.icon}
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ lineHeight: 1.2, fontWeight: 'medium' }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}> {/* Add minWidth: 0 to enable text wrapping */}
+                    <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                            lineHeight: 1.2, 
+                            fontWeight: 'medium',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
                         {data.label}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                    <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                            lineHeight: 1.2,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            display: '-webkit-box'
+                        }}
+                    >
                         {data.description}
                     </Typography>
                 </Box>
-                <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 0.5, ml: 0.5 }}>
                     <IconButton
                         size="small"
                         onClick={handleConfigure}
@@ -132,4 +153,4 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
     );
 };
 
-export default CustomNode; 
+export default CustomNode;
