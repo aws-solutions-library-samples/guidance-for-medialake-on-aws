@@ -552,7 +552,7 @@ const PipelineEditorContent = () => {
                 <DialogContent>
                     {selectedNode && !isNodeDetailsLoading && nodeDetails && (
                         <NodeConfigurationForm
-                            node={convertApiResponseToNode(nodeDetails) as NodeType}
+                            node={convertApiResponseToNode(nodeDetails) || {} as NodeType}
                             configuration={selectedNode.data.configuration}
                             onSubmit={handleNodeConfigSave}
                             onCancel={() => setIsNodeConfigOpen(false)}

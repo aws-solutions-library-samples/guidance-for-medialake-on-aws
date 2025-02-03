@@ -11,42 +11,55 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
     }
 
     // If not in cache, create new schema
-    const parametersShape: Record<string, any> = {};
+    const shape: Record<string, z.ZodTypeAny> = {};
 
     fields.forEach((field) => {
         const fieldName = field.name;
+        let fieldSchema: z.ZodTypeAny;
+
+        switch (field.type) {
+            case 'number':
+                fieldSchema = z.coerce.number();
+                break;
+            case 'switch':
+                fieldSchema = z.boolean();
+                break;
+            case 'select':
+            case 'multiselect':
+                if (field.options) {
+                    const values = field.options.map(opt => opt.value);
+                    fieldSchema = field.type === 'multiselect'
+                        ? z.array(z.string())
+                        : z.string().refine(val => values.includes(val));
+                } else {
+                    fieldSchema = field.type === 'multiselect'
+                        ? z.array(z.string())
+                        : z.string();
+                }
+                break;
+            case 'password':
+            case 'email':
+            case 'text':
+            default:
+                fieldSchema = z.string();
+        }
+
+        if (!field.required) {
+            fieldSchema = fieldSchema.optional();
+        }
+
         if (fieldName.startsWith('parameters.')) {
             const paramName = fieldName.replace('parameters.', '');
-            let fieldSchema = z.string();
-
-            switch (field.type) {
-                case 'number':
-                    fieldSchema = z.coerce.number();
-                    break;
-                case 'boolean':
-                case 'switch':
-                    fieldSchema = z.boolean();
-                    break;
-                case 'select':
-                    if (field.options) {
-                        fieldSchema = z.string();
-                    }
-                    break;
-                default:
-                    fieldSchema = z.string();
+            if (!shape.parameters) {
+                shape.parameters = z.object({}).passthrough();
             }
-
-            if (!field.required) {
-                fieldSchema = fieldSchema.optional();
-            }
-
-            parametersShape[paramName] = fieldSchema;
+            (shape.parameters as z.ZodObject<any>).shape[paramName] = fieldSchema;
+        } else {
+            shape[fieldName] = fieldSchema;
         }
     });
 
-    const schema = z.object({
-        parameters: z.object(parametersShape).passthrough()
-    }).passthrough();
+    const schema = z.object(shape).passthrough();
 
     // Cache the schema using the fields reference
     schemaCache.set(fields, schema);

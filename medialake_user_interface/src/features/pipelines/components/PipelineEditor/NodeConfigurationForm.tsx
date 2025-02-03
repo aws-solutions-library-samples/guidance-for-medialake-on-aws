@@ -26,7 +26,7 @@ const mapParameterTypeToFormType = (type: string): FormFieldDefinition['type'] =
     }
 };
 
-export const NodeConfigurationForm = React.memo(({
+export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React.memo(({
     node,
     configuration,
     onSubmit,
@@ -145,6 +145,11 @@ export const NodeConfigurationForm = React.memo(({
 
     return (
         <Box>
+            {node.info.title && (
+                <Typography variant="h6" sx={{ mb: 3 }}>
+                    {node.info.title}
+                </Typography>
+            )}
             <DynamicForm
                 definition={formDefinition}
                 defaultValues={{ 
