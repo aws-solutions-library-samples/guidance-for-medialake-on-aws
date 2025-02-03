@@ -1,11 +1,39 @@
-import React from 'react';
-import { Box, Typography, Paper, CircularProgress } from '@mui/material';
+import React, { useState, useMemo } from 'react';
+import { 
+    Box, 
+    Typography, 
+    Paper, 
+    CircularProgress, 
+    TextField,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Divider
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useGetUnconfiguredNodeMethods } from '@/shared/nodes/api/nodesController';
 import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
 import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
 
+interface NodeSection {
+    title: string;
+    type: string;
+    nodes: Array<{node: NodeType; methodName: string; method: any}>;
+}
+
 const SidebarContent: React.FC = () => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [expandedSections, setExpandedSections] = useState<string[]>(['TRIGGER']);
     const { data: nodesResponse, isLoading, error } = useGetUnconfiguredNodeMethods();
+
+    const handleSectionToggle = (sectionType: string) => {
+        setExpandedSections(prev => {
+            if (prev.includes(sectionType)) {
+                return prev.filter(type => type !== sectionType);
+            }
+            return [...prev, sectionType];
+        });
+    };
 
     const onDragStart = (event: React.DragEvent, node: NodeType, methodName: string) => {
         const method = node.methods?.[methodName];
@@ -33,6 +61,45 @@ const SidebarContent: React.FC = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
+    const sections = useMemo(() => {
+        if (!nodesResponse?.data) return [];
+
+        const groupedNodes: NodeSection[] = [
+            { title: 'Triggers', type: 'TRIGGER', nodes: [] },
+            { title: 'Partner Integrations', type: 'API', nodes: [] },
+            { title: 'Flow', type: 'FLOW', nodes: [] }
+        ];
+
+        nodesResponse.data.forEach((node) => {
+            if (node.methods) {
+                Object.entries(node.methods).forEach(([methodName, method]) => {
+                    const nodeType = node.info.nodeType;
+                    const section = groupedNodes.find(s => 
+                        nodeType.includes(s.type)
+                    );
+                    if (section) {
+                        section.nodes.push({ node, methodName, method });
+                    }
+                });
+            }
+        });
+
+        return groupedNodes;
+    }, [nodesResponse?.data]);
+
+    const filteredSections = useMemo(() => {
+        return sections.map(section => ({
+            ...section,
+            nodes: section.nodes.filter(({ node, method }) => {
+                const searchLower = searchQuery.toLowerCase();
+                return (
+                    node.info.title.toLowerCase().includes(searchLower) ||
+                    (method.description || node.info.description).toLowerCase().includes(searchLower)
+                );
+            })
+        }));
+    }, [sections, searchQuery]);
+
     if (isLoading) {
         return (
             <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -52,46 +119,109 @@ const SidebarContent: React.FC = () => {
     }
 
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-                Available Methods
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {nodesResponse.data.map((node) => (
-                    node.methods && Object.entries(node.methods).map(([methodName, method]) => (
-                        <Paper
-                            key={`${node.nodeId}-${methodName}`}
-                            elevation={2}
-                            onDragStart={(event) => onDragStart(event, node, methodName)}
-                            draggable
-                            sx={{
-                                p: 2,
-                                cursor: 'grab',
-                                '&:hover': {
-                                    backgroundColor: 'action.hover',
+        <Box sx={{ pt: 2 }}>
+            <Box sx={{ px: 2, mb: 2 }}>
+                <Typography 
+                    variant="h6" 
+                    gutterBottom 
+                    sx={{ textAlign: 'center', mb: 2 }}
+                >
+                    Available Nodes
+                </Typography>
+                
+                <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Search nodes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </Box>
+
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                '& .MuiAccordion-root + .MuiAccordion-root': {
+                    mt: -1
+                }
+            }}>
+                {filteredSections.map((section) => (
+                    <Accordion
+                        key={section.type}
+                        expanded={expandedSections.includes(section.type)}
+                        onChange={() => handleSectionToggle(section.type)}
+                        disableGutters
+                        sx={{
+                            '&.MuiAccordion-root': {
+                                boxShadow: 'none',
+                                '&:before': {
+                                    display: 'none',
                                 },
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 1,
+                                width: '100%',
+                                margin: 0
+                            }
+                        }}
+                    >
+                        <AccordionSummary 
+                            expandIcon={<ExpandMoreIcon sx={{ fontSize: '0.9rem' }} />}
+                            sx={{
+                                minHeight: '36px',
+                                py: 0,
+                                px: 2,
+                                backgroundColor: 'background.default',
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                                width: '100%',
+                                margin: 0,
+                                '& .MuiAccordionSummary-content': {
+                                    margin: '6px 0',
+                                }
                             }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="subtitle1">
-                                    {node.info.title}
-                                </Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary">
-                                {method.description || node.info.description}
+                            <Typography 
+                                sx={{ 
+                                    fontWeight: 500,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.1em',
+                                    fontSize: '0.75rem',
+                                    color: 'text.secondary'
+                                }}
+                            >
+                                {section.title}
                             </Typography>
-                            {node.info.tags && node.info.tags.length > 0 && (
-                                <Box sx={{ mt: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Tags: {node.info.tags.join(', ')}
-                                    </Typography>
-                                </Box>
-                            )}
-                        </Paper>
-                    ))
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ p: 2 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                {section.nodes.map(({ node, methodName, method }) => (
+                                    <Paper
+                                        key={`${node.nodeId}-${methodName}`}
+                                        elevation={2}
+                                        onDragStart={(event) => onDragStart(event, node, methodName)}
+                                        draggable
+                                        sx={{
+                                            p: 2,
+                                            cursor: 'grab',
+                                            '&:hover': {
+                                                backgroundColor: 'action.hover',
+                                            },
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography variant="subtitle1">
+                                                {node.info.title}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {method.description || node.info.description}
+                                        </Typography>
+                                    </Paper>
+                                ))}
+                            </Box>
+                        </AccordionDetails>
+                    </Accordion>
                 ))}
             </Box>
         </Box>
