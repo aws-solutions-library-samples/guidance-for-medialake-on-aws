@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
+import { useAuth } from './common/hooks/auth-context';
 import {
     Drawer,
     List,
@@ -14,6 +16,9 @@ import {
     IconButton,
     Tooltip,
     Button,
+    Menu,
+    MenuItem,
+    Avatar,
 } from '@mui/material';
 import {
     AccountTree as PipelineIcon,
@@ -31,12 +36,12 @@ import {
     Extension as IntegrationIcon,
     Cloud as EnvironmentIcon,
 } from '@mui/icons-material';
-import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
+import { ThemeToggle } from './components/ThemeToggle';
 
-const drawerWidth = 260;
-const collapsedDrawerWidth = 72;
+import { drawerWidth, collapsedDrawerWidth } from '@/constants';
 
 function Sidebar() {
     const { t } = useTranslation();
@@ -44,8 +49,49 @@ function Sidebar() {
     const { theme: customTheme } = useCustomTheme();
     const location = useLocation();
     const navigate = useNavigate();
+    const { setIsAuthenticated } = useAuth();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { isCollapsed, setIsCollapsed } = useSidebar();
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [userInitial, setUserInitial] = useState('U');
+    const [userName, setUserName] = useState('');
+
+    useEffect(() => {
+        const loadUserInfo = async () => {
+            try {
+                const attributes = await fetchUserAttributes();
+                if (attributes.given_name && attributes.given_name.trim()) {
+                    setUserInitial(attributes.given_name.trim()[0].toUpperCase());
+                    setUserName(attributes.given_name.trim());
+                } else if (attributes.email && attributes.email.trim()) {
+                    setUserInitial(attributes.email.trim()[0].toUpperCase());
+                    setUserName(attributes.email.trim());
+                }
+            } catch (error) {
+                console.error('Error loading user attributes:', error);
+            }
+        };
+        loadUserInfo();
+    }, []);
+
+    const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            setIsAuthenticated(false);
+            navigate('/sign-in');
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+        handleClose();
+    };
 
     const isActive = (path: string) => location.pathname === path;
     const isSettingsActive = (path: string) => location.pathname.includes(path);
@@ -108,58 +154,97 @@ function Sidebar() {
             sx={{
                 width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                 flexShrink: 0,
-                position: 'relative',
+                position: 'fixed',
+                zIndex: theme.zIndex.drawer + 1,
+                height: '100vh',
                 '& .MuiDrawer-paper': {
                     width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
                     borderRight: '1px solid rgba(0,0,0,0.08)',
                     backgroundColor: theme.palette.background.paper,
-                    mt: '64px',
+                    position: 'fixed',
+                    height: '100vh',
+                    top: 0,
+                    left: 0,
                     overflow: 'visible',
-                    position: 'relative',
                 },
             }}
         >
             <Box sx={{
-                overflowY: 'auto',
-                overflow: 'visible',
-                py: 2,
-                position: 'relative',
-                height: 'calc(100vh - 64px)',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
             }}>
+                {/* Logo Section */}
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: isCollapsed ? 'center' : 'flex-start',
+                    height: 64,
+                    px: isCollapsed ? 1 : 2,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                }}>
+                    <img
+                        src="/logo.png"
+                        alt="MediaLake"
+                        style={{
+                            height: '32px',
+                            marginRight: isCollapsed ? 0 : theme.spacing(1)
+                        }}
+                    />
+                    {!isCollapsed && (
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                fontWeight: 600,
+                                color: theme.palette.primary.main,
+                            }}
+                        >
+                            MediaLake
+                        </Typography>
+                    )}
+                </Box>
+
                 <Button
                     onClick={toggleDrawer}
                     sx={{
                         position: 'absolute',
-                        right: -12,
+                        right: -16,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        minWidth: '24px',
-                        width: '24px',
-                        height: '24px',
+                        minWidth: '32px',
+                        width: '32px',
+                        height: '32px',
                         bgcolor: 'background.paper',
                         borderRadius: '8px',
-                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+                        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '1px solid',
                         borderColor: 'divider',
-                        zIndex: 1,
+                        zIndex: 9999,
                         padding: 0,
                         '&:hover': {
                             bgcolor: 'background.paper',
-                            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
+                            boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.2)',
                         },
                     }}
                 >
                     {isCollapsed ? (
-                        <ChevronRight sx={{ fontSize: 16 }} />
+                        <ChevronRight sx={{ fontSize: 20 }} />
                     ) : (
-                        <ChevronLeft sx={{ fontSize: 16 }} />
+                        <ChevronLeft sx={{ fontSize: 20 }} />
                     )}
                 </Button>
-                <List>
+                <List sx={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    py: 2
+                }}>
                     {mainMenuItems.map((item) => (
                         <React.Fragment key={item.text}>
                             <ListItem disablePadding>
@@ -289,6 +374,121 @@ function Sidebar() {
                         </React.Fragment>
                     ))}
                 </List>
+                
+                {/* Bottom Section */}
+                <Box sx={{
+                    mt: 'auto',
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    backgroundColor: theme.palette.background.paper,
+                }}>
+                    {/* Profile Section */}
+                    <Box sx={{
+                        px: isCollapsed ? 1 : 2,
+                        pt: 2,
+                        pb: 1,
+                    }}>
+                    {isCollapsed ? (
+                        <Tooltip title={userName || t('common.profile')} placement="right">
+                            <IconButton
+                                onClick={handleProfileClick}
+                                sx={{
+                                    width: '100%',
+                                    height: 40,
+                                    borderRadius: '8px',
+                                    '&:hover': {
+                                        backgroundColor: `${theme.palette.primary.main}15`,
+                                    },
+                                }}
+                            >
+                                <Avatar
+                                    sx={{
+                                        width: 32,
+                                        height: 32,
+                                        backgroundColor: theme.palette.primary.main,
+                                        fontSize: '0.9rem',
+                                    }}
+                                >
+                                    {userInitial}
+                                </Avatar>
+                            </IconButton>
+                        </Tooltip>
+                    ) : (
+                        <Button
+                            onClick={handleProfileClick}
+                            sx={{
+                                width: '100%',
+                                height: 40,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-start',
+                                gap: 1.5,
+                                borderRadius: '8px',
+                                px: 1.5,
+                                '&:hover': {
+                                    backgroundColor: `${theme.palette.primary.main}15`,
+                                },
+                            }}
+                        >
+                            <Avatar
+                                sx={{
+                                    width: 32,
+                                    height: 32,
+                                    backgroundColor: theme.palette.primary.main,
+                                    fontSize: '0.9rem',
+                                }}
+                            >
+                                {userInitial}
+                            </Avatar>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {userName}
+                            </Typography>
+                        </Button>
+                    )}
+
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={handleClose}
+                        anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                        }}
+                        slotProps={{
+                            paper: {
+                                sx: {
+                                    width: '200px',
+                                    mt: -1,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                }
+                            }
+                        }}
+                    >
+                        <MenuItem onClick={() => {
+                            handleClose();
+                            navigate('/settings/profile');
+                        }}>
+                            {t('common.profile')}
+                        </MenuItem>
+                        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                            {t('common.logout')}
+                        </MenuItem>
+                    </Menu>
+                    </Box>
+                    <Box sx={{ px: isCollapsed ? 1 : 2, pb: 2 }}>
+                        <ThemeToggle isCollapsed={isCollapsed} />
+                    </Box>
+                </Box>
             </Box>
         </Drawer>
     );

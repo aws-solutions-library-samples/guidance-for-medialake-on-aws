@@ -62,11 +62,13 @@ export interface IntegrationFormData {
 }
 
 export interface IntegrationFilters {
+    id: string;
     columnId: string;
     value: string;
 }
 
 export interface IntegrationSorting {
+    id: string;
     columnId: string;
     desc: boolean;
 }

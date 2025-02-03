@@ -9,7 +9,9 @@ import {
     useTheme,
     Typography,
     Stack,
+    IconButton,
 } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
 import { Column } from '@tanstack/react-table';
 import { useTranslation } from 'react-i18next';
 
@@ -46,12 +48,21 @@ export function BaseFilterPopover<T>({
         }
     };
 
+    const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+        }
+    };
+
     const handleSelectFilterChange = (value: string) => {
         if (value) {
             column.setFilterValue(value);
         } else {
             column.setFilterValue('');
         }
+        onClose();
     };
 
     const handleClearFilter = () => {
@@ -83,9 +94,25 @@ export function BaseFilterPopover<T>({
                     p: 2,
                     width: 300,
                     borderRadius: '8px',
+                    position: 'relative',
                 },
             }}
         >
+            <IconButton
+                onClick={onClose}
+                size="small"
+                sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: 8,
+                    color: theme.palette.text.secondary,
+                    '&:hover': {
+                        color: theme.palette.text.primary,
+                    },
+                }}
+            >
+                <CloseIcon fontSize="small" />
+            </IconButton>
             <Stack spacing={2}>
                 <Box>
                     <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
@@ -97,6 +124,7 @@ export function BaseFilterPopover<T>({
                         placeholder={`${t('common.filter')} ${column.columnDef.header as string}`}
                         value={currentValue ?? ''}
                         onChange={e => handleTextFilterChange(e.target.value)}
+                        onKeyDown={handleTextFilterSubmit}
                         sx={{
                             '& .MuiOutlinedInput-root': {
                                 borderRadius: '8px',

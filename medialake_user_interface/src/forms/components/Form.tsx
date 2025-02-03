@@ -10,36 +10,54 @@ interface FormProps {
     submitLabel?: string;
     children: React.ReactNode;
     showButtons?: boolean;
+    id?: string;
 }
 
-export const Form: React.FC<FormProps> = ({
+export const Form: React.FC<FormProps> = React.memo(({
     form,
     onSubmit,
     onCancel,
     submitLabel = 'common.save',
     children,
     showButtons = true,
+    id,
 }) => {
     const { t } = useTranslation();
 
+    // Only log initial mount
+    React.useEffect(() => {
+        console.log('[Form] Mounted:', {
+            formId: id,
+            isValid: form.formState.isValid
+        });
+    }, []);
+
     const handleSubmit = React.useCallback(async (data: any) => {
-        console.log('[Form] Form submit triggered with data:', data);
+        console.log('[Form] Submitting form:', { formId: id });
         try {
             await onSubmit(data);
-            console.log('[Form] Form submission completed successfully');
+            console.log('[Form] Submit successful');
         } catch (error) {
-            console.error('[Form] Form submission error:', error);
-            // Handle error (could show error message, etc.)
+            console.error('[Form] Submit failed:', error);
+            throw error;
         }
-    }, [onSubmit]);
+    }, [onSubmit, id]);
+
+    const handleFormSubmit = React.useCallback((e: React.FormEvent) => {
+        e.preventDefault();
+        return form.handleSubmit(handleSubmit)(e);
+    }, [form, handleSubmit]);
+
+    const handleCancel = React.useCallback(() => {
+        console.log('[Form] Cancelled');
+        onCancel?.();
+    }, [onCancel]);
 
     return (
         <Box
             component="form"
-            onSubmit={(e) => {
-                console.log('[Form] Native form submit event triggered');
-                form.handleSubmit(handleSubmit)(e);
-            }}
+            id={id}
+            onSubmit={handleFormSubmit}
             noValidate
             sx={{
                 display: 'flex',
@@ -51,15 +69,24 @@ export const Form: React.FC<FormProps> = ({
             {showButtons && (
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
                     {onCancel && (
-                        <Button onClick={onCancel} variant="outlined">
+                        <Button 
+                            onClick={handleCancel}
+                            variant="outlined"
+                        >
                             {t('common.cancel')}
                         </Button>
                     )}
-                    <Button type="submit" variant="contained" color="primary">
+                    <Button 
+                        type="submit" 
+                        variant="contained" 
+                        color="primary"
+                    >
                         {t(submitLabel)}
                     </Button>
                 </Stack>
             )}
         </Box>
     );
-};
+});
+
+Form.displayName = 'Form';

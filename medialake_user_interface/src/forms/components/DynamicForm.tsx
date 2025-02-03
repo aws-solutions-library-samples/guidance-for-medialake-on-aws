@@ -8,6 +8,7 @@ import { FormSwitch } from './FormSwitch';
 import { useFormWithValidation } from '../hooks/useFormWithValidation';
 import { FormDefinition, FormFieldDefinition } from '../types';
 import { createZodSchema } from '../utils/createZodSchema';
+import { z } from 'zod';
 
 interface DynamicFormProps {
     definition: FormDefinition;
@@ -15,118 +16,146 @@ interface DynamicFormProps {
     onSubmit: (data: any) => Promise<void>;
     onCancel?: () => void;
     onBack?: () => void;
+    showButtons?: boolean;
 }
 
-export const DynamicForm: React.FC<DynamicFormProps> = ({
+export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
     definition,
     defaultValues,
     onSubmit,
     onCancel,
     onBack,
+    showButtons = true,
 }) => {
     const { t } = useTranslation();
+    
+    // Only log initial mount
+    React.useEffect(() => {
+        console.log('[DynamicForm] Mounted:', {
+            formId: definition.id,
+            hasDefaultValues: !!defaultValues,
+        });
+    }, []);
+
+    // Create a stable reference for fields
+    const fields = React.useMemo(
+        () => definition.fields,
+        // Use JSON.stringify to compare deep equality
+        [JSON.stringify(definition.fields)]
+    );
+    
+    // Create schema using cached version
     const schema = React.useMemo(
-        () => createZodSchema(definition.fields),
-        [definition.fields]
+        () => createZodSchema(fields),
+        [fields]
     );
 
     const form = useFormWithValidation({
         validationSchema: schema,
-        defaultValues,
-        translationPrefix: definition.translationPrefix,
+        defaultValues: defaultValues || { parameters: {} },
+        mode: 'onBlur',
+        reValidateMode: 'onBlur',
     });
 
-    const renderField = (field: FormFieldDefinition) => {
-        // Skip fields that should be hidden based on conditions
-        if (field.showWhen) {
-            const dependentValue = form.watch(field.showWhen.field);
-            if (dependentValue !== field.showWhen.value) {
-                return null;
+    const renderField = React.useMemo(() => {
+        return definition.fields.map((field: FormFieldDefinition) => {
+            if (field.showWhen) {
+                const dependentValue = form.watch(field.showWhen.field);
+                if (dependentValue !== field.showWhen.value) {
+                    return null;
+                }
             }
+
+            // Common props for all field types
+            const commonProps = {
+                key: field.name,
+                name: field.name,
+                control: form.control,
+                label: field.label, // Use direct label
+                tooltip: field.tooltip,
+                required: field.required,
+                useDirectLabels: true, // New prop to bypass i18n
+            };
+
+            switch (field.type) {
+                case 'select':
+                    return (
+                        <FormSelect
+                            {...commonProps}
+                            options={field.options || []}
+                        />
+                    );
+
+                case 'multiselect':
+                    return (
+                        <FormSelect
+                            {...commonProps}
+                            options={field.options || []}
+                            multiple
+                        />
+                    );
+
+                case 'switch':
+                    return (
+                        <FormSwitch
+                            {...commonProps}
+                        />
+                    );
+
+                default:
+                    return (
+                        <FormField
+                            {...commonProps}
+                            type={field.type}
+                        />
+                    );
+            }
+        });
+    }, [definition.fields, form.control, form.watch]);
+
+    const handleSubmit = React.useCallback(async (data: any) => {
+        console.log('[DynamicForm] Submitting form with data:', data);
+        try {
+            // Ensure we have a parameters object
+            const formData = {
+                parameters: data.parameters || {}
+            };
+            
+            // Parse and validate
+            const validatedData = schema.safeParse(formData);
+            
+            if (!validatedData.success) {
+                console.error('[DynamicForm] Validation failed:', validatedData.error);
+                throw validatedData.error;
+            }
+            
+            await onSubmit(validatedData.data);
+        } catch (error) {
+            console.error('[DynamicForm] Submit error:', error);
+            throw error;
         }
+    }, [onSubmit, schema]);
 
-        switch (field.type) {
-            case 'select':
-                return (
-                    <FormSelect
-                        key={field.name}
-                        name={field.name}
-                        control={form.control}
-                        label={field.label}
-                        tooltip={field.tooltip}
-                        options={field.options || []}
-                        required={field.required}
-                        translationPrefix={definition.translationPrefix}
-                    />
-                );
-
-            case 'multiselect':
-                return (
-                    <FormSelect
-                        key={field.name}
-                        name={field.name}
-                        control={form.control}
-                        label={field.label}
-                        tooltip={field.tooltip}
-                        options={field.options || []}
-                        multiple
-                        required={field.required}
-                        translationPrefix={definition.translationPrefix}
-                    />
-                );
-
-            case 'switch':
-                return (
-                    <FormSwitch
-                        key={field.name}
-                        name={field.name}
-                        control={form.control}
-                        label={field.label}
-                        tooltip={field.tooltip}
-                        translationPrefix={definition.translationPrefix}
-                    />
-                );
-
-            default:
-                return (
-                    <FormField
-                        key={field.name}
-                        name={field.name}
-                        control={form.control}
-                        label={field.label}
-                        tooltip={field.tooltip}
-                        type={field.type}
-                        required={field.required}
-                        translationPrefix={definition.translationPrefix}
-                    />
-                );
+    // Only log errors and submission state
+    React.useEffect(() => {
+        if (form.formState.errors && Object.keys(form.formState.errors).length > 0) {
+            console.log('[DynamicForm] Form errors:', form.formState.errors);
         }
-    };
+    }, [form.formState.errors]);
 
     return (
-        <Form form={form} onSubmit={onSubmit}>
+        <Form
+            form={form}
+            onSubmit={handleSubmit}
+            onCancel={onCancel}
+            showButtons={showButtons}
+            id={definition.id}
+        >
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {definition.fields.map(renderField)}
-            </Box>
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                {onCancel && (
-                    <Button onClick={onCancel}>
-                        {t('common.cancel')}
-                    </Button>
-                )}
-                {onBack && (
-                    <Button onClick={onBack}>
-                        {t('common.back')}
-                    </Button>
-                )}
-                <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                >
-                    {t('common.save')}
-                </Button>
+                {renderField}
             </Box>
         </Form>
     );
-};
+});
+
+DynamicForm.displayName = 'DynamicForm';

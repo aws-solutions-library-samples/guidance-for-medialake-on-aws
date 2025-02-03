@@ -75,9 +75,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             }}
         >
             <Box
-                onClick={onImageClick}
                 sx={{
-                    cursor: 'pointer',
                     borderRadius: 2,
                     overflow: 'hidden',
                     bgcolor: 'background.paper',
@@ -89,7 +87,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
             >
 
                 {assetType === 'Video' ? (
-                    // <VideoViewer videoSrc={proxyUrl} />
                     <video
                         style={{
                             width: '100%',
@@ -97,15 +94,19 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             backgroundColor: 'rgba(0,0,0,0.03)',
                             objectFit: 'contain'
                         }}
-                        controls src={proxyUrl}></video>
+                        controls
+                        src={proxyUrl}
+                    ></video>
                 ) : (
                     <Box
+                        onClick={onImageClick}
                         component="img"
                         src={thumbnailUrl || placeholderImage}
                         alt={name}
                         onError={onImageError || defaultImageErrorHandler}
                         data-image-id={id}
                         sx={{
+                            cursor: 'pointer',
                             width: '100%',
                             height: 200,
                             backgroundColor: 'rgba(0,0,0,0.03)',
@@ -113,6 +114,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         }}
                     />
                 )}
+
+                {/* Non-clickable text content area */}
+
                 <Box sx={{ p: 2 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {fields.map(field => field.visible && (
@@ -165,7 +169,14 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                         </Box>
                                     ) : (
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <Typography sx={{ wordBreak: "break-word" }} display="inline" variant="body2">
+                                            <Typography
+                                                sx={{
+                                                    wordBreak: "break-word",
+                                                    userSelect: "text" // Allow text selection
+                                                }}
+                                                display="inline"
+                                                variant="body2"
+                                            >
                                                 {renderField(field.id)}
                                             </Typography>
                                             <IconButton
@@ -180,7 +191,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                         </Box>
                                     )
                                 ) : (
-                                    <Typography variant="body2">
+                                    <Typography
+                                        variant="body2"
+                                        sx={{ userSelect: "text" }} // Allow text selection
+                                    >
                                         {renderField(field.id)}
                                     </Typography>
                                 )}

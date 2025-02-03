@@ -1,0 +1,30 @@
+spec: v1.0.0
+node:
+  id: pre_signed_url
+  title: Presigned URL Generator
+  description: Generate an AWS S3 pre-signed URL
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/pre_signed_url.zip
+        runtime: Python3.12
+actions:
+  generate:
+    summary: Generate pre-signed URL
+    description: Generate a pre-signed URL for S3 object access
+    operationId: generatePresignedUrl
+    parameters:
+      - in: body
+        name: URL Validity Duration
+        required: true
+        schema:
+          type: number
+    x-inputMapping: utility/pre_signed_url/generate/
+    x-outputMapping: utility/pre_signed_url/generate/
+    connections:
+      incoming:
+        type: [video, image, audio]
+      outgoing: 
+        type: [presigned_url]

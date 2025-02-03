@@ -42,6 +42,7 @@ interface CustomNodeData {
     configuration?: any;
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
+    type?: string; // Node type (e.g., 'TRIGGER', 'API', 'FLOW')
 }
 
 const nodeTypes = {
@@ -74,7 +75,8 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
             }
         },
         inputTypes: node.data.inputTypes,
-        outputTypes: node.data.outputTypes
+        outputTypes: node.data.outputTypes,
+        configuration: node.data.configuration
     },
     positionAbsolute: node.positionAbsolute ? {
         x: node.positionAbsolute.x.toString(),
@@ -151,6 +153,7 @@ const PipelineEditorContent = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const { screenToFlowPosition } = useReactFlow();
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+    const [errorType, setErrorType] = useState<'trigger' | 'compatibility'>('compatibility');
     const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
     const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
     const { isExpanded } = useRightSidebar();
@@ -216,7 +219,12 @@ const PipelineEditorContent = () => {
             configuration: {
                 ...prev.configuration,
                 nodes: prev.configuration.nodes.filter((node) => node.id !== nodeId),
-                edges: prev.configuration.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+                edges: prev.configuration.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+                settings: prev.configuration.settings || {
+                    autoStart: false,
+                    retryAttempts: 3,
+                    timeout: 3600
+                }
             }
         }));
     }, [setNodes, setEdges]);
@@ -245,9 +253,18 @@ const PipelineEditorContent = () => {
 
     const onConnect = useCallback(
         (connection: Connection) => {
-            const sourceNode = nodes.find((node) => node.id === connection.source);
             const targetNode = nodes.find((node) => node.id === connection.target);
+            
+            // Prevent connections to trigger nodes
+            if (targetNode?.data.type?.includes('TRIGGER')) {
+                setErrorType('trigger');
+                setIsErrorModalOpen(true);
+                return;
+            }
 
+            // DO NOT DELETE - Input/Output validation will be enabled later
+            /*
+            const sourceNode = nodes.find((node) => node.id === connection.source);
             if (sourceNode && targetNode) {
                 const isCompatible =
                     sourceNode.data.outputTypes &&
@@ -256,30 +273,32 @@ const PipelineEditorContent = () => {
                         targetNode.data.inputTypes.includes(outputType)
                     );
 
-                if (isCompatible) {
-                    const newEdge = {
-                        ...connection,
-                        id: `${connection.source}-${connection.target}`,
-                        type: 'custom',
-                        data: {
-                            text: `${sourceNode.data.label} to ${targetNode.data.label}`
-                        }
-                    } as PipelineEdge;
-
-                    setEdges((eds) => addEdge(newEdge, eds));
-
-                    // Update pipeline configuration
-                    setFormData(prev => ({
-                        ...prev,
-                        configuration: {
-                            ...prev.configuration,
-                            edges: [...prev.configuration.edges, newEdge]
-                        }
-                    }));
-                } else {
+                if (!isCompatible) {
                     setIsErrorModalOpen(true);
+                    return;
                 }
             }
+            */
+
+            const newEdge = {
+                ...connection,
+                id: `${connection.source}-${connection.target}`,
+                type: 'custom',
+                data: {
+                    text: 'Connected'
+                }
+            } as PipelineEdge;
+
+            setEdges((eds) => addEdge(newEdge, eds));
+
+            // Update pipeline configuration
+            setFormData(prev => ({
+                ...prev,
+                configuration: {
+                    ...prev.configuration,
+                    edges: [...prev.configuration.edges, newEdge]
+                }
+            }));
         },
         [nodes, setEdges]
     );
@@ -313,8 +332,9 @@ const PipelineEditorContent = () => {
                     icon: nodeData.icon || <FaFileVideo size={20} />,
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
+                    type: nodeData.type,
                     configuration: {
-                        method: '',  // Will be set to first available method by NodeConfigurationForm
+                        method: '',
                         parameters: {},
                         inputMapping: '',
                         outputMapping: ''
@@ -341,7 +361,12 @@ const PipelineEditorContent = () => {
                 ...prev,
                 configuration: {
                     ...prev.configuration,
-                    nodes: [...prev.configuration.nodes, newPipelineNode]
+                    nodes: [...prev.configuration.nodes, newPipelineNode],
+                    settings: prev.configuration.settings || {
+                        autoStart: false,
+                        retryAttempts: 3,
+                        timeout: 3600
+                    }
                 }
             }));
 
@@ -357,40 +382,57 @@ const PipelineEditorContent = () => {
         setSelectedNode(null);
     }, []);
 
-    const handleNodeConfigSave = useCallback((configuration: any) => {
-        if (selectedNode) {
-            const updatedNode = {
-                ...selectedNode,
-                data: {
-                    ...selectedNode.data,
-                    configuration,
-                    label: configuration.method
-                        ? `${selectedNode.data.label} (${configuration.method})`
-                        : selectedNode.data.label
-                }
-            };
+    const handleNodeConfigSave = useCallback(async (configuration: any) => {
+        try {
+            if (selectedNode) {
+                // Update node in ReactFlow
+                const updatedNode = {
+                    ...selectedNode,
+                    data: {
+                        ...selectedNode.data,
+                        configuration,
+                        label: configuration.method
+                            ? `${selectedNode.data.label} (${configuration.method})`
+                            : selectedNode.data.label
+                    }
+                };
 
-            setNodes((nds) =>
-                nds.map((node) =>
-                    node.id === selectedNode.id ? updatedNode : node
-                )
-            );
-
-            // Update pipeline configuration
-            setFormData(prev => ({
-                ...prev,
-                configuration: {
-                    ...prev.configuration,
-                    nodes: prev.configuration.nodes.map(node =>
-                        node.id === selectedNode.id
-                            ? convertToPipelineNode(updatedNode)
-                            : node
+                // Update ReactFlow state
+                setNodes((nds) =>
+                    nds.map((node) =>
+                        node.id === selectedNode.id ? updatedNode : node
                     )
-                }
-            }));
+                );
+
+                // Convert to pipeline node format and update form data
+                const updatedPipelineNode = convertToPipelineNode(updatedNode);
+
+                // Update pipeline configuration in form data
+                setFormData(prev => {
+                    const updatedNodes = prev.configuration.nodes.map(node =>
+                        node.id === selectedNode.id ? updatedPipelineNode : node
+                    );
+
+                    return {
+                        ...prev,
+                        configuration: {
+                            ...prev.configuration,
+                            nodes: updatedNodes,
+                            settings: prev.configuration.settings || {
+                                autoStart: false,
+                                retryAttempts: 3,
+                                timeout: 3600
+                            }
+                        }
+                    };
+                });
+            }
+            handleNodeConfigClose();
+        } catch (error) {
+            console.error('Error saving node configuration:', error);
+            // You might want to show an error message to the user here
         }
-        handleNodeConfigClose();
-    }, [selectedNode, setNodes]);
+    }, [selectedNode, setNodes, handleNodeConfigClose]);
 
     const convertNodeToReactFlowNode = (node: NodeType): Node<CustomNodeData> => ({
         id: node.nodeId || getId(),
@@ -496,26 +538,23 @@ const PipelineEditorContent = () => {
                 </Box>
             </Box>
 
-            <Dialog open={isNodeConfigOpen} onClose={() => setIsNodeConfigOpen(false)} maxWidth="md" fullWidth>
+            <Dialog
+                open={isNodeConfigOpen}
+                onClose={() => setIsNodeConfigOpen(false)}
+                maxWidth="sm"
+                PaperProps={{
+                    sx: {
+                        width: '400px'
+                    }
+                }}
+            >
                 <DialogTitle>Configure Node</DialogTitle>
                 <DialogContent>
                     {selectedNode && !isNodeDetailsLoading && nodeDetails && (
                         <NodeConfigurationForm
-                            node={convertApiResponseToNode(nodeDetails) as NodeType}
+                            node={convertApiResponseToNode(nodeDetails) || {} as NodeType}
                             configuration={selectedNode.data.configuration}
-                            onSubmit={async (configuration) => {
-                                const updatedNode = {
-                                    ...selectedNode,
-                                    data: {
-                                        ...selectedNode.data,
-                                        configuration
-                                    }
-                                };
-                                setNodes((nds) =>
-                                    nds.map((n) => (n.id === updatedNode.id ? updatedNode : n))
-                                );
-                                setIsNodeConfigOpen(false);
-                            }}
+                            onSubmit={handleNodeConfigSave}
                             onCancel={() => setIsNodeConfigOpen(false)}
                         />
                     )}
@@ -542,7 +581,9 @@ const PipelineEditorContent = () => {
                         Connection Error
                     </Typography>
                     <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-                        The nodes cannot be connected because their input/output types are not compatible.
+                        {errorType === 'trigger'
+                            ? "Trigger nodes cannot have incoming connections. They can only trigger other nodes."
+                            : "The nodes cannot be connected because their input/output types are not compatible."}
                     </Typography>
                 </Box>
             </Modal>

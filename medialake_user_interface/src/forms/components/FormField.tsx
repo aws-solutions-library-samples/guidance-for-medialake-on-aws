@@ -20,6 +20,7 @@ export type FormFieldProps<T extends FieldValues> = {
     fullWidth?: boolean;
     tooltip?: string;
     translationPrefix?: string;
+    useDirectLabels?: boolean;
     showHelper?: boolean;
 } & Omit<TextFieldProps, 'name'>;
 
@@ -32,37 +33,24 @@ export const FormField = <T extends FieldValues>({
     fullWidth = true,
     tooltip,
     translationPrefix,
+    useDirectLabels = false,
     showHelper = false,
     ...rest
 }: FormFieldProps<T>) => {
     const { t } = useTranslation();
 
-    // If translationPrefix is provided, use it to look up translations
-    const translatedLabel = translationPrefix
-        ? t(`${translationPrefix}.fields.${name}.label`, label || name)
-        : label || name;
+    // Use direct label if useDirectLabels is true, otherwise use translation
+    const fieldLabel = useDirectLabels 
+        ? label 
+        : translationPrefix 
+            ? t(`${translationPrefix}.fields.${name}.label`, label || '')
+            : label;
 
-    const translatedTooltip = translationPrefix && tooltip
-        ? t(`${translationPrefix}.fields.${name}.tooltip`, tooltip)
-        : tooltip;
-
-    const translatedHelperText = translationPrefix && showHelper
-        ? t(`${translationPrefix}.fields.${name}.helper`, '')
-        : rest.helperText;
-
-    const tooltipIcon = translatedTooltip && (
-        <InputAdornment position="end">
-            <Tooltip title={translatedTooltip} arrow>
-                <IconButton
-                    size="small"
-                    aria-label={t('common.moreInfo', 'More information')}
-                    tabIndex={-1} // Prevent tab focus as it's just informational
-                >
-                    <HelpOutlineIcon fontSize="small" />
-                </IconButton>
-            </Tooltip>
-        </InputAdornment>
-    );
+    const helperText = useDirectLabels
+        ? undefined
+        : translationPrefix
+            ? t(`${translationPrefix}.fields.${name}.helper`, '')
+            : undefined;
 
     return (
         <Controller
@@ -72,27 +60,31 @@ export const FormField = <T extends FieldValues>({
                 <TextField
                     {...field}
                     {...rest}
-                    label={translatedLabel}
                     type={type}
+                    label={fieldLabel}
                     required={required}
                     fullWidth={fullWidth}
                     error={!!error}
-                    helperText={error ? (
-                        translationPrefix
-                            ? t(`${translationPrefix}.errors.${error.type}`, error.message || '')
-                            : error.message
-                    ) : translatedHelperText}
+                    helperText={error 
+                        ? (useDirectLabels ? error.message : t(`${translationPrefix}.errors.${error.type}`, error.message || ''))
+                        : helperText
+                    }
                     InputProps={{
                         ...rest.InputProps,
-                        endAdornment: (
-                            <>
-                                {rest.InputProps?.endAdornment}
-                                {tooltipIcon}
-                            </>
-                        ),
+                        endAdornment: tooltip ? (
+                            <InputAdornment position="end">
+                                <Tooltip title={tooltip}>
+                                    <IconButton edge="end" size="small">
+                                        <HelpOutlineIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </InputAdornment>
+                        ) : rest.InputProps?.endAdornment
                     }}
                 />
             )}
         />
     );
 };
+
+FormField.displayName = 'FormField';

@@ -70,7 +70,7 @@ class PipelinesExecutionsStack(Stack):
                 name=f"{config.resource_prefix}pipelines_executions_{config.environment}",
                 partition_key_name="execution_id",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="event_start_time",
+                sort_key_name="start_time",
                 sort_key_type=dynamodb.AttributeType.NUMBER,
             ),
         )

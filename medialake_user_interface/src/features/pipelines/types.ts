@@ -32,6 +32,7 @@ export interface NodeConfiguration {
     outputMapping?: string;
     path?: string;
     operationId?: string;
+    integrationId?: string;
 }
 
 export interface CustomNodeData {

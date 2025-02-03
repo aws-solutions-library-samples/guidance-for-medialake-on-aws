@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
+import { Box, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { DynamicForm } from '../../../../forms/components/DynamicForm';
 import { FormDefinition, FormFieldDefinition } from '../../../../forms/types';
 import { NodeConfiguration, Node as NodeType, NodeParameter } from '@/features/pipelines/types';
-import { Box, Typography } from '@mui/material';
+import { useGetIntegrations } from '@/features/settings/integrations/api/integrations.controller';
 
 interface NodeConfigurationFormProps {
     node: NodeType;
@@ -24,42 +26,59 @@ const mapParameterTypeToFormType = (type: string): FormFieldDefinition['type'] =
     }
 };
 
-export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
+export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React.memo(({
     node,
     configuration,
     onSubmit,
     onCancel,
 }) => {
-    // Get the first method
-    const methodName = Object.keys(node.methods)[0];
-    const methodInfo = node.methods[methodName];
-    const hasParameters = Object.keys(methodInfo?.parameters || {}).length > 0;
+    const { t } = useTranslation();
+    const { data: integrationsData } = useGetIntegrations();
 
-    // Auto-submit when there are no parameters
-    useEffect(() => {
-        if (!hasParameters) {
-            const config: NodeConfiguration = {
-                method: methodName,
-                parameters: {},
-                path: configuration?.path,
-                operationId: configuration?.operationId,
-            };
-            onSubmit(config);
-        }
-    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, onSubmit]);
+    const methodName = useMemo(() => Object.keys(node.methods)[0], [node.methods]);
+    const methodInfo = useMemo(() => node.methods[methodName], [node.methods, methodName]);
+    const hasParameters = useMemo(
+        () => Object.keys(methodInfo?.parameters || {}).length > 0,
+        [methodInfo]
+    );
 
-    // Create form definition based on node info
+    const isIntegrationNode = useMemo(() => 
+        node.info.nodeType === 'INTEGRATION',
+        [node.info.nodeType]
+    );
+
+    const integrationOptions = useMemo(() => {
+        if (!integrationsData?.data) return [];
+        return integrationsData.data.map(integration => ({
+            label: integration.name,
+            value: integration.id
+        }));
+    }, [integrationsData]);
+
     const formDefinition = useMemo<FormDefinition>(() => {
+        console.log('[NodeConfigurationForm] Creating form definition');
         const fields: FormFieldDefinition[] = [];
+
+        // Add integration selection field for INTEGRATION nodes
+        if (isIntegrationNode) {
+            fields.push({
+                name: 'integrationId',
+                type: 'select',
+                label: t('nodes.integration.select'),
+                tooltip: t('nodes.integration.selectTooltip'),
+                required: true,
+                options: integrationOptions
+            });
+        }
 
         if (methodInfo?.parameters) {
             Object.entries(methodInfo.parameters).forEach(([key, param]: [string, NodeParameter]) => {
                 const field: FormFieldDefinition = {
                     name: `parameters.${key}`,
                     type: mapParameterTypeToFormType(param.type),
-                    label: param.name,
+                    label: param.name || key,
                     required: param.required,
-                    tooltip: param.description,
+                    tooltip: param.description
                 };
 
                 if (param.type === 'select' && 'options' in param) {
@@ -74,43 +93,77 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = ({
         }
 
         return {
-            id: `node-config-${node.nodeId}`,
-            name: `Configure ${node.info.title}`,
+            id: `node-config-${node.nodeId}-form`,
+            name: node.info.title,
             description: node.info.description,
             fields,
-            translationPrefix: 'nodeConfiguration',
         };
-    }, [node, methodInfo]);
+    }, [node.nodeId, node.info.title, node.info.description, methodInfo, isIntegrationNode, integrationOptions, t]);
 
-    // Handle form submission
-    const handleFormSubmit = async (data: any) => {
-        const config: NodeConfiguration = {
-            method: methodName,
-            parameters: data.parameters || {},
-            path: configuration?.path,
-            operationId: configuration?.operationId,
-        };
-        await onSubmit(config);
-    };
+    const handleFormSubmit = useCallback(async (data: any) => {
+        try {
+            const config: NodeConfiguration = {
+                method: methodName,
+                parameters: data.parameters || {},
+                integrationId: isIntegrationNode ? data.integrationId : undefined,
+                path: configuration?.path,
+                operationId: configuration?.operationId,
+                inputMapping: configuration?.inputMapping,
+                outputMapping: configuration?.outputMapping
+            };
+            await onSubmit(config);
+        } catch (error) {
+            console.error('[NodeConfigurationForm] Submit failed:', error);
+            throw error;
+        }
+    }, [methodName, configuration?.path, configuration?.operationId, configuration?.inputMapping, configuration?.outputMapping, onSubmit, isIntegrationNode]);
 
-    if (!hasParameters) {
+    // Auto-submit when there are no parameters and it's not an integration node
+    useEffect(() => {
+        if (!hasParameters && !isIntegrationNode) {
+            const config: NodeConfiguration = {
+                method: methodName,
+                parameters: {},
+                path: configuration?.path,
+                operationId: configuration?.operationId,
+                inputMapping: configuration?.inputMapping,
+                outputMapping: configuration?.outputMapping
+            };
+            onSubmit(config).catch(console.error);
+        }
+    }, [hasParameters, methodName, configuration?.path, configuration?.operationId, configuration?.inputMapping, configuration?.outputMapping, onSubmit, isIntegrationNode]);
+
+    if (!hasParameters && !isIntegrationNode) {
         return (
             <Box sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="body1" color="text.secondary">
-                    No configuration or mapping needed
+                    {t('nodes.noConfiguration')}
                 </Typography>
             </Box>
         );
     }
 
     return (
-        <DynamicForm
-            definition={formDefinition}
-            defaultValues={{ parameters: configuration?.parameters || {} }}
-            onSubmit={handleFormSubmit}
-            onCancel={onCancel}
-        />
+        <Box>
+            {node.info.title && (
+                <Typography variant="h6" sx={{ mb: 3 }}>
+                    {node.info.title}
+                </Typography>
+            )}
+            <DynamicForm
+                definition={formDefinition}
+                defaultValues={{ 
+                    parameters: configuration?.parameters || {},
+                    integrationId: configuration?.integrationId
+                }}
+                onSubmit={handleFormSubmit}
+                onCancel={onCancel}
+                showButtons={true}
+            />
+        </Box>
     );
-};
+});
+
+NodeConfigurationForm.displayName = 'NodeConfigurationForm';
 
 export default NodeConfigurationForm;

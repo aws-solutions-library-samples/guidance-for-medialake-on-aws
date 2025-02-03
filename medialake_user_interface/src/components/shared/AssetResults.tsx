@@ -3,15 +3,15 @@ import { Box, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
-import { type AssetBase, type CardFieldConfig } from '../../types/search/searchResults';
-import { type AssetTableColumn } from '../../types/shared/assetComponents';
+import { type AssetBase, type CardFieldConfig } from '@/types/search/searchResults';
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetCard from './AssetCard';
 import AssetTable from './AssetTable';
 import AssetViewControls from './AssetViewControls';
 import AssetPagination from './AssetPagination';
 import AssetActionsMenu from './AssetActionsMenu';
-import { useAssetResults } from '../../hooks/useAssetResults';
-import { useAssetOperations } from '../../hooks/useAssetOperations';
+import { useAssetResults } from '@/hooks/useAssetResults';
+import { useAssetOperations } from '@/hooks/useAssetOperations';
 
 export interface AssetResultsConfig<T extends AssetBase> {
     assetType: string;
@@ -48,6 +48,7 @@ function AssetResults<T extends AssetBase>({
 }: AssetResultsProps<T>) {
     const navigate = useNavigate();
     const [currentAsset, setCurrentAsset] = useState<T | null>(null);
+    const [columnFilters, setColumnFilters] = useState<Array<{ columnId: string; value: string }>>([]);
 
     const {
         assetType,
@@ -111,6 +112,17 @@ function AssetResults<T extends AssetBase>({
         navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`);
     };
 
+    const handleFilterClick = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
+        const value = window.prompt(`Enter filter value for ${columnId}`);
+        if (value) {
+            setColumnFilters(prev => [...prev.filter(f => f.columnId !== columnId), { columnId, value }]);
+        }
+    };
+
+    const handleRemoveFilter = (columnId: string) => {
+        setColumnFilters(prev => prev.filter(f => f.columnId !== columnId));
+    };
+
     return (
         <Box>
             <AssetViewControls
@@ -166,6 +178,9 @@ function AssetResults<T extends AssetBase>({
                     editedName={editedName}
                     onEditNameChange={handleNameChange}
                     onEditNameComplete={handleNameEditComplete}
+                    onFilterClick={handleFilterClick}
+                    activeFilters={columnFilters}
+                    onRemoveFilter={handleRemoveFilter}
                 />
             )}
 

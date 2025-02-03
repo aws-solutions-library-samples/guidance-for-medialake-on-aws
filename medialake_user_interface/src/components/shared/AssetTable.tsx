@@ -4,8 +4,10 @@ import {
     useReactTable,
     getCoreRowModel,
     getSortedRowModel,
+    getFilteredRowModel,
     createColumnHelper,
     type SortingState,
+    type ColumnFiltersState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ResizableTable } from '../common/table';
@@ -38,6 +40,9 @@ export interface AssetTableProps<T> {
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
     onEditNameComplete?: (item: T, save: boolean) => void;
+    onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+    activeFilters?: Array<{ columnId: string; value: string }>;
+    onRemoveFilter?: (columnId: string) => void;
 }
 
 function AssetTable<T>({
@@ -56,10 +61,14 @@ function AssetTable<T>({
     editedName,
     onEditNameChange,
     onEditNameComplete,
+    onFilterClick,
+    activeFilters = [],
+    onRemoveFilter,
 }: AssetTableProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const cursorPositionRef = useRef<number | null>(null);
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
     const handleDeleteClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
@@ -93,6 +102,7 @@ function AssetTable<T>({
                 id: 'preview',
                 header: 'Preview',
                 size: 100,
+                enableSorting: false,
                 cell: (info) => (
                     <Box sx={{ p: 1 }}>
                         <Box
@@ -117,6 +127,8 @@ function AssetTable<T>({
                         id: col.id,
                         header: col.label,
                         size: col.minWidth,
+                        enableSorting: true,
+                        filterFn: 'includesString',
                         cell: (info) => {
                             if (col.id === 'name' && onEditClick) {
                                 const isEditing = editingId === getId(info.row.original);
@@ -147,7 +159,6 @@ function AssetTable<T>({
                                                         }
                                                     }}
                                                 />
-
                                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                                     <Button
                                                         size="small"
@@ -221,17 +232,26 @@ function AssetTable<T>({
         data,
         columns: tableColumns,
         state: {
-            sorting
+            sorting,
+            columnFilters,
         },
         onSortingChange,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel()
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        filterFns: {
+            includesString: (row, columnId, filterValue) => {
+                const value = String(row.getValue(columnId) || '').toLowerCase();
+                return value.includes(String(filterValue).toLowerCase());
+            }
+        },
     });
 
     const rowVirtualizer = useVirtualizer({
         count: table.getRowModel().rows.length,
         getScrollElement: () => containerRef.current,
-        estimateSize: () => 76, // Increased to account for padding
+        estimateSize: () => 76,
         overscan: 10,
     });
 
@@ -242,7 +262,14 @@ function AssetTable<T>({
             virtualizer={rowVirtualizer}
             rows={table.getRowModel().rows}
             maxHeight="none"
-            onRowClick={onRowClick ? (row) => onRowClick(row.original) : undefined}
+            onRowClick={onRowClick ? (row) => {
+                if (!editingId) {
+                    onRowClick(row.original);
+                }
+            } : undefined}
+            onFilterClick={onFilterClick}
+            activeFilters={activeFilters}
+            onRemoveFilter={onRemoveFilter}
         />
     );
 }

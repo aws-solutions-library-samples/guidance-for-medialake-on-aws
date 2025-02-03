@@ -7,11 +7,12 @@ export type FormConfig<T extends FieldValues> = {
     defaultValues?: DefaultValues<T>;
     validationSchema?: z.Schema<T>;
     mode?: UseFormProps['mode'];
+    reValidateMode?: UseFormProps['reValidateMode'];
     translationPrefix?: string;
 };
 
 export const useFormWithValidation = <T extends FieldValues>(config: FormConfig<T>) => {
-    const { defaultValues, validationSchema, mode = 'onBlur', translationPrefix } = config;
+    const { defaultValues, validationSchema, mode = 'onBlur', reValidateMode = 'onChange', translationPrefix } = config;
     const { t } = useTranslation();
 
     // Create a custom resolver that translates error messages
@@ -37,6 +38,7 @@ export const useFormWithValidation = <T extends FieldValues>(config: FormConfig<
         defaultValues,
         resolver,
         mode,
+        reValidateMode,
     });
 
     return {

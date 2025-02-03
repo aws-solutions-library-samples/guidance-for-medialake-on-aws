@@ -312,3 +312,77 @@ Licensed under the Apache License, Version 2.0 (the "License"). You may not use 
 <http://www.apache.org/licenses/LICENSE-2.0>
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+
+
+Create a node: 
+
+node:
+  id: string
+  name: string
+  type: enum [transform, decision, api, event]
+  description: string
+  interface:
+    inputs:
+      - name: string
+        type: string
+        required: boolean
+    outputs:
+      - name: string
+        type: string
+    api:
+      type: enum [rest, graphql, grpc]
+      spec: string # URL to API spec
+  connections:
+    incoming:
+      - nodeId: string
+        type: string
+    outgoing:
+      - nodeId: string
+        type: string
+  configuration:
+    timeout: number
+    retries: number
+    errorHandling: string
+
+
+
+
+
+spec: v1.0.0
+node:
+ id: string
+ title: string
+ version: string
+ type: [enum]
+ integration:
+   type: enum [lambda, api, step_function, container] 
+   config:
+     # Lambda specific
+     lambda:
+       arn: string
+       handler: string
+       runtime: string
+     
+     # API specific  
+     api:
+       spec_url: string
+       method: string
+       path: string
+       
+     # Step function specific
+     step_function:
+       state_name: string
+       arn: string
+       
+     # Container specific
+     container:
+       image: string
+       command: string[]
+       
+ description: string
+ connections:
+   incoming:
+     type: [enum]
+   outgoing: 
+     type: [enum]

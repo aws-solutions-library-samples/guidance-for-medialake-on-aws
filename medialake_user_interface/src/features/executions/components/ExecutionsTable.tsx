@@ -68,6 +68,7 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
                 virtualizer={rowVirtualizer}
                 rows={rows}
                 onFilterClick={onFilterColumn}
+                // Comment out these props to remove the tags
                 activeFilters={activeFilters}
                 activeSorting={activeSorting}
                 onRemoveFilter={onRemoveFilter}

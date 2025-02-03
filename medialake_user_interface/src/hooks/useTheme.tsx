@@ -1,47 +1,54 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+type ThemeMode = 'light' | 'dark' | 'system';
 type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
     theme: Theme;
-    toggleTheme: () => void;
+    mode: ThemeMode;
+    setMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
     theme: 'light',
-    toggleTheme: () => { }
+    mode: 'system',
+    setMode: () => { }
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [mode, setMode] = useState<ThemeMode>(() => {
+        const savedMode = localStorage.getItem('theme-mode');
+        return (savedMode as ThemeMode) || 'system';
+    });
     const [theme, setTheme] = useState<Theme>('light');
 
     useEffect(() => {
-        // Check if the user's OS is set to dark mode
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        // Set initial theme based on OS preference
-        setTheme(mediaQuery.matches ? 'dark' : 'light');
-
-        // Update theme when OS preference changes
-        const handleChange = (e: MediaQueryListEvent) => {
-            setTheme(e.matches ? 'dark' : 'light');
+        
+        const updateTheme = () => {
+            if (mode === 'system') {
+                setTheme(mediaQuery.matches ? 'dark' : 'light');
+            } else {
+                setTheme(mode as Theme);
+            }
         };
 
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, []);
+        updateTheme();
+        mediaQuery.addEventListener('change', updateTheme);
+        return () => mediaQuery.removeEventListener('change', updateTheme);
+    }, [mode]);
 
-    // Apply theme to document
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
     }, [theme]);
 
-    const toggleTheme = () => {
-        setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    const handleSetMode = (newMode: ThemeMode) => {
+        setMode(newMode);
+        localStorage.setItem('theme-mode', newMode);
     };
 
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+        <ThemeContext.Provider value={{ theme, mode, setMode: handleSetMode }}>
             {children}
         </ThemeContext.Provider>
     );

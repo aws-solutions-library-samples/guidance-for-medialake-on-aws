@@ -1,0 +1,21 @@
+spec: v1.0.0
+node:
+  id: check_external_task_status
+  title: Check external task status
+  description: Check the status of an external task
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: choice
+actions:
+  check_status:
+    summary: Check the status of an external task
+    description: This step will check the status of an external task
+    operationId: checkExternalTaskStatus
+    connections:
+      incoming:
+        type: [external_task]
+      outgoing: 
+        type: [any]

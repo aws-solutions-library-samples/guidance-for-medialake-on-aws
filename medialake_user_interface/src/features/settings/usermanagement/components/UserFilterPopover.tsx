@@ -73,19 +73,15 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
     };
 
     const handleSelectFilterChange = (value: string) => {
-        if (value) {
-            // Clear text filter when selecting
-            if (column.id === 'created' || column.id === 'modified') {
-                // For date columns, set a custom filter function
-                column.setFilterValue((prev: any) => ({
-                    value,
-                    filterDate: true
-                }));
-            } else {
-                column.setFilterValue(value);
-            }
-        } else {
-            column.setFilterValue('');
+        if (column) {
+            column.setFilterValue(value);
+            onClose(); // Close popover after selection
+        }
+    };
+
+    const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            onClose(); // Close popover on Enter
         }
     };
 
@@ -125,6 +121,7 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
                         placeholder={`${t('common.filter')} ${column.columnDef.header as string}`}
                         value={currentValue ?? ''}
                         onChange={e => handleTextFilterChange(e.target.value)}
+                        onKeyDown={handleTextFilterSubmit}
                         sx={{
                             '& .MuiOutlinedInput-root': {
                                 borderRadius: '8px',

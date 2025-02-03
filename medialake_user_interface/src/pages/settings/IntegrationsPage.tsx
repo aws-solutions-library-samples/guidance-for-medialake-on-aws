@@ -96,7 +96,7 @@ const IntegrationsPage = () => {
                         setActiveFilters(filters => {
                             const newFilters = filters.filter(f => f.columnId !== columnId);
                             if (value) {
-                                newFilters.push({ columnId, value });
+                                newFilters.push({ id: columnId, columnId, value });
                             }
                             return newFilters;
                         });
@@ -105,7 +105,7 @@ const IntegrationsPage = () => {
                         setActiveSorting(sorts => {
                             const newSorts = sorts.filter(s => s.columnId !== columnId);
                             if (desc !== undefined) {
-                                newSorts.push({ columnId, desc });
+                                newSorts.push({ id: columnId, columnId, desc });
                             }
                             return newSorts;
                         });
