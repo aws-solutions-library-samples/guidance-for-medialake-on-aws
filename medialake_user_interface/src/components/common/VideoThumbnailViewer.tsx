@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { OmakasePlayer } from '@byomakase/omakase-player';
-import "./VideoViewer.css"
+import "./VideoThumbnailViewer.css"
 
-interface VideoViewerProps {
+interface VideoThumbnailViewerProps {
     videoSrc: string;
     onClickEvent?: () => void;
 }
 
-export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc, onClickEvent }) => {
+export const VideoThumbnailViewer: React.FC<VideoThumbnailViewerProps> = ({ videoSrc, onClickEvent }) => {
     const [player, setPlayer] = useState<OmakasePlayer | null>(null);
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +73,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc, onClickEvent
     return (
 
         <div
+
             onClick={onClickEvent}
             ref={playerContainerRef}
             id="omakase-player"
@@ -83,6 +84,4 @@ export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc, onClickEvent
 
 //  omakase-player-wrapper
 
-export default VideoViewer;
-
-
+export default VideoThumbnailViewer;

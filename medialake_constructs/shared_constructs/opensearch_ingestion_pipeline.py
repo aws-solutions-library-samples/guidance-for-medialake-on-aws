@@ -11,7 +11,7 @@ from aws_cdk import (
     RemovalPolicy,
     Fn,
 )
-
+from datetime import datetime
 from config import config
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.lambda_base import (
@@ -417,6 +417,7 @@ class OpenSearchIngestionPipeline(Construct):
                 "SecurityGroupIds": json.dumps(
                     [props.security_group.security_group_id]
                 ),
+                "Timestamp": datetime.now().isoformat(),
             },
         )
         # Ensure the ingestion pipeline is created after the DynamoDB table is populated
