@@ -3,7 +3,7 @@ import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
-import VideoViewer from '../common/VideoViewer';
+// import VideoViewer from '../common/VideoViewer';
 
 export interface AssetField {
     id: string;
