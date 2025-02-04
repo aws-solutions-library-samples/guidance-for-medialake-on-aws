@@ -417,7 +417,7 @@ class OpenSearchIngestionPipeline(Construct):
                 "SecurityGroupIds": json.dumps(
                     [props.security_group.security_group_id]
                 ),
-                # "Timestamp": datetime.now().isoformat(),
+                "Timestamp": datetime.now().isoformat(),
             },
         )
         # Ensure the ingestion pipeline is created after the DynamoDB table is populated
