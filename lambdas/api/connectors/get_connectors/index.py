@@ -30,16 +30,31 @@ dynamodb = boto3.resource("dynamodb")
 
 
 def format_connector(item: dict) -> dict:
-    """Format a DynamoDB item into the required connector model."""
     return {
         "id": item.get("id", ""),
         "name": item.get("name", ""),
+        "description": item.get("description", ""),
+        "usage": {"total": item.get("usage", {}).get("total", 0)},
         "type": item.get("type", ""),
         "createdAt": item.get("createdAt", ""),
         "updatedAt": item.get("updatedAt", ""),
         "storageIdentifier": item.get("storageIdentifier", ""),
         "sqsArn": item.get("sqsArn", ""),
         "region": item.get("region", ""),
+        "status": item.get("status", ""),
+        "integrationMethod": item.get("integrationMethod", ""),
+        "iamRoleArn": item.get("iamRoleArn", ""),
+        "lambdaArn": item.get("lambdaArn", ""),
+        "queueUrl": item.get("queueUrl", ""),
+        "configuration": {
+            "queueUrl": item.get("queueUrl", ""),
+            "lambdaArn": item.get("lambdaArn", ""),
+            "iamRoleArn": item.get("iamRoleArn", ""),
+        },
+        "settings": {
+            "bucket": item.get("storageIdentifier", ""),
+            "region": item.get("region", ""),
+        },
     }
 
 

@@ -120,6 +120,7 @@ class AssetSearchResult(BaseModelWithConfig):
     Metadata: Dict[str, Any]
     score: float
     thumbnailUrl: Optional[str] = None
+    proxyUrl: Optional[str] = None
 
 
 class SearchMetadata(BaseModelWithConfig):

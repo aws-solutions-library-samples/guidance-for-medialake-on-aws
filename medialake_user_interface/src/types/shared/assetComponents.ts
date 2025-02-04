@@ -23,7 +23,7 @@ export interface AssetCardProps {
     proxyUrl?: string;
     fields: AssetField[];
     renderField: (fieldId: string) => string | React.ReactNode;
-    onImageClick: () => void;
+    onAssetClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
     placeholderImage?: string;

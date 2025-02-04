@@ -37,7 +37,7 @@
 .omakase-player .omakase-player-wrapper {
     display: block;
     position: relative;
-    width: 700px
+    /* width: 700px */
 }
 
 .omakase-player .omakase-player-wrapper .omakase-video {
