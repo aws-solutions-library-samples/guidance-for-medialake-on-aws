@@ -4,9 +4,10 @@ import "./VideoViewer.css"
 
 interface VideoViewerProps {
     videoSrc: string;
+    onClickEvent?: () => void;
 }
 
-export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc }) => {
+export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc, onClickEvent }) => {
     const [player, setPlayer] = useState<OmakasePlayer | null>(null);
     const playerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -72,12 +73,16 @@ export const VideoViewer: React.FC<VideoViewerProps> = ({ videoSrc }) => {
     return (
 
         <div
+            style={{ width: "700px" }}
+            onClick={onClickEvent}
             ref={playerContainerRef}
             id="omakase-player"
             className="video-viewer-container"
         />
     );
 };
+
+//  omakase-player-wrapper
 
 export default VideoViewer;
 

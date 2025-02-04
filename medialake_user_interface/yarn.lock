@@ -902,10 +902,10 @@
     "@babel/helper-string-parser" "^7.25.9"
     "@babel/helper-validator-identifier" "^7.25.9"
 
-"@byomakase/omakase-player@^0.13.0":
-  version "0.13.0"
-  resolved "https://registry.npmjs.org/@byomakase/omakase-player/-/omakase-player-0.13.0.tgz"
-  integrity sha512-jGI4tQvM3B12ErsK4OKb6BUbPdr2Q5IUsETAkyw/yUKNcCl/4JjJ26MZbLR8Ef4C4A6SUvY+PQ1WK4y5E3rmyg==
+"@byomakase/omakase-player@^0.14.0":
+  version "0.14.0"
+  resolved "https://registry.npmjs.org/@byomakase/omakase-player/-/omakase-player-0.14.0.tgz"
+  integrity sha512-yzW7+twlEyN8nKAiTz+f8CVmDTRafaXyqLcbE14dSzMIGqFqWi/LI4HzPlp2WHUb+qts5ro68TQSYcChvHIYDQ==
   dependencies:
     axios "1.7.4"
     decimal.js "10.4.3"

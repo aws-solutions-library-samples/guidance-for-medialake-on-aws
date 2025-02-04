@@ -19,7 +19,7 @@ export interface AssetCardProps {
     assetType?: string;
     fields: AssetField[];
     renderField: (fieldId: string) => string | React.ReactNode;
-    onImageClick: () => void;
+    onAssetClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
@@ -39,7 +39,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     assetType,
     fields,
     renderField,
-    onImageClick,
+    onAssetClick,
     onDeleteClick,
     onMenuClick,
     onEditClick,
@@ -87,19 +87,24 @@ const AssetCard: React.FC<AssetCardProps> = ({
             >
 
                 {assetType === 'Video' ? (
-                    <video
-                        style={{
-                            width: '100%',
-                            height: 200,
-                            backgroundColor: 'rgba(0,0,0,0.03)',
-                            objectFit: 'contain'
-                        }}
-                        controls
-                        src={proxyUrl}
-                    ></video>
+                    // <video
+                    //     onClick={onAssetClick}
+                    //     style={{
+                    //         width: '100%',
+                    //         height: 200,
+                    //         backgroundColor: 'rgba(0,0,0,0.03)',
+                    //         objectFit: 'contain'
+                    //     }}
+                    //     controls
+                    //     src={proxyUrl}
+                    // ></video>
+                    <VideoViewer
+                        onClickEvent={null}
+                        videoSrc={proxyUrl}
+                    />
                 ) : (
                     <Box
-                        onClick={onImageClick}
+                        onClick={onAssetClick}
                         component="img"
                         src={thumbnailUrl || placeholderImage}
                         alt={name}

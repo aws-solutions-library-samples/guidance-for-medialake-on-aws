@@ -148,7 +148,7 @@ function AssetResults<T extends AssetBase>({
                                 assetType={assetType}
                                 fields={cardFields}
                                 renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                onImageClick={() => handleAssetClick(asset)}
+                                onAssetClick={() => handleAssetClick(asset)}
                                 onDeleteClick={(e) => handleDeleteClick(asset, e)}
                                 onMenuClick={(e) => handleMenuOpen(asset, e)}
                                 onEditClick={(e) => handleStartEditing(asset, e)}

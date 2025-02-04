@@ -40,6 +40,7 @@ class S3Connector(BaseModel):
     configuration: S3ConnectorConfig
     name: str
     type: str
+    description: str | None = None
 
 
 def wait_for_iam_role_propagation(iam_client, role_name, max_retries=5, base_delay=5):
@@ -405,6 +406,7 @@ def create_connector(createconnector: S3Connector) -> dict:
 
         # Get request variables from request body
         connector_name = createconnector.name
+        connector_description = createconnector.description
         integration_method = createconnector.configuration.s3IntegrationMethod
 
         suffix = generate_suffix()
@@ -782,6 +784,8 @@ def create_connector(createconnector: S3Connector) -> dict:
         connector_item = {
             "id": connector_id,
             "name": connector_name,
+            "status": "active",
+            "description": connector_description,
             "type": createconnector.type,
             "createdAt": current_time,
             "updatedAt": current_time,
