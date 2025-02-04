@@ -131,8 +131,6 @@ const ImageDetailContent: React.FC = () => {
     const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
     const location = useLocation();
-    const searchParams = new URLSearchParams(location.search);
-    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
     const { isExpanded } = useRightSidebar();
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
@@ -143,6 +141,9 @@ const ImageDetailContent: React.FC = () => {
         { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
         { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
     ]);
+
+    const searchParams = new URLSearchParams(location.search);
+    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
 
     const handleCommentClick = useCallback((event: React.MouseEvent<HTMLElement>, index: number) => {
         setCommentAnchorEl(commentAnchorEl && selectedComment === index ? null : event.currentTarget);
@@ -196,48 +197,6 @@ const ImageDetailContent: React.FC = () => {
         return transformMetadata(assetData.data.asset.Metadata);
     }, [assetData, transformMetadata]);
 
-    useTrackRecentlyViewed(
-        useMemo(() =>
-            assetData ? {
-                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-                title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-                type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-                path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
-                searchTerm: searchTerm,
-                metadata: {
-                    fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
-                    dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
-                        ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
-                        : undefined
-                }
-            } : null,
-            [assetData, searchTerm])
-    );
-
-    if (isLoading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (error || !assetData) {
-        return (
-            <Box sx={{ p: 3 }}>
-                <Typography variant="h5" color="error">Error loading asset data</Typography>
-                <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>
-                    Go Back
-                </Button>
-            </Box>
-        );
-    }
-
-    const proxyUrl = (() => {
-        const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
-        return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
-    })();
-
     const versions = useMemo(() => {
         if (!assetData?.data?.asset) return [];
         return [
@@ -261,7 +220,49 @@ const ImageDetailContent: React.FC = () => {
         ];
     }, [assetData]);
 
+    const proxyUrl = useMemo(() => {
+        if (!assetData?.data?.asset) return '';
+        const proxyRep = assetData.data.asset.DerivedRepresentations.find(rep => rep.Purpose === 'proxy');
+        return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
+    }, [assetData]);
 
+    useTrackRecentlyViewed(
+        useMemo(() => {
+            if (!assetData?.data?.asset) return null;
+            return {
+                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
+                title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+                type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
+                path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
+                searchTerm: searchTerm,
+                metadata: {
+                    fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
+                    dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
+                        ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
+                        : undefined
+                }
+            };
+        }, [assetData, searchTerm])
+    );
+
+    if (isLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error || !assetData) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h5" color="error">Error loading asset data</Typography>
+                <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>
+                    Go Back
+                </Button>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{

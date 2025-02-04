@@ -23,9 +23,11 @@ import {
     Delete as DeleteIcon,
     CloudUpload as CloudUploadIcon,
     PowerSettingsNew as PowerIcon,
+    AccessTime as AccessTimeIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse } from '@/api/types/api.types';
 import ConnectorEditModal from '@/features/settings/connectors/components/ConnectorEditModal';
+import { useDateFormat } from '@/shared/hooks/useDateFormat';
 
 const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -40,6 +42,8 @@ interface ConnectorCardProps {
     onEdit: (connector: ConnectorResponse) => void;
     onDelete: (id: string) => Promise<void>;
     onToggleStatus: (id: string, enabled: boolean) => Promise<void>;
+    showSeconds?: boolean;
+    allowSecondsToggle?: boolean;
 }
 
 const ConnectorCard: React.FC<ConnectorCardProps> = ({
@@ -47,11 +51,26 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     onEdit,
     onDelete,
     onToggleStatus,
+    showSeconds: initialShowSeconds = false,
+    allowSecondsToggle = true,
 }) => {
     const theme = useTheme();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    
+    const { 
+        formattedDate, 
+        absoluteDate,
+        showSeconds,
+        toggleSeconds,
+        canToggleSeconds
+    } = useDateFormat(connector.updatedAt, {
+        showRelative: false,
+        showSeconds: initialShowSeconds,
+        allowSecondsToggle,
+        updateInterval: 60000,
+    });
 
     const handleDeleteClick = () => {
         setDeleteDialogOpen(true);
@@ -83,17 +102,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             return 'Amazon S3';
         }
         return type;
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString(undefined, {
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
     };
 
     return (
@@ -240,10 +248,39 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                                 <strong>Storage:</strong> {formatBytes(connector.usage.total)}
                             </Typography>
                         )}
-                        <Typography variant="body2" >
-                            <strong>Last Updated:</strong> {formatDate(connector.updatedAt)}
+                        <Typography 
+                            variant="body2" 
+                            onClick={canToggleSeconds ? toggleSeconds : undefined}
+                            sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 0.5,
+                                cursor: canToggleSeconds ? 'pointer' : 'default',
+                                ...(canToggleSeconds && {
+                                    '&:hover': {
+                                        color: theme.palette.primary.main,
+                                    },
+                                }),
+                            }}
+                        >
+                            <Tooltip 
+                                title={canToggleSeconds ? `Click to ${showSeconds ? 'hide' : 'show'} seconds` : absoluteDate}
+                                arrow 
+                                placement="top"
+                                enterDelay={200}
+                                leaveDelay={200}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <AccessTimeIcon 
+                                        sx={{ 
+                                            fontSize: 16, 
+                                            color: showSeconds ? theme.palette.primary.main : theme.palette.text.secondary 
+                                        }} 
+                                    />
+                                    <strong>Last Updated:</strong> {formattedDate}
+                                </Box>
+                            </Tooltip>
                         </Typography>
-
                     </Box>
                 </CardContent>
 

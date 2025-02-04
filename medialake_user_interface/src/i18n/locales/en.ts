@@ -81,7 +81,15 @@ export default {
     },
     translation: {
         common: {
+            actions: {
+                add: 'Add',
+                edit: 'Edit',
+                delete: 'Delete',
+                activate: 'Activate',
+                deactivate: 'Deactivate'
+            },
             tableDensity: "Table Density",
+            theme: "Theme",
             back: 'Back',
             loading: 'Loading...',
             error: 'Something went wrong',
@@ -107,7 +115,6 @@ export default {
             show: 'Show',
             all: 'All',
             status: 'Status',
-            actions: 'Actions',
             rename: 'Rename',
             root: 'Root',
             folder: 'Folder',
@@ -126,6 +133,46 @@ export default {
             title: 'User Management',
             search: 'Search users',
             description: 'Manage system users and their access',
+            form: {
+                fields: {
+                    given_name: {
+                        label: 'First Name',
+                        tooltip: 'Enter the user\'s first name',
+                        errors: {
+                            required: 'First name is required'
+                        }
+                    },
+                    family_name: {
+                        label: 'Last Name',
+                        tooltip: 'Enter the user\'s last name',
+                        errors: {
+                            required: 'Last name is required'
+                        }
+                    },
+                    email: {
+                        label: 'Email',
+                        tooltip: 'Enter the user\'s email address',
+                        errors: {
+                            required: 'Email is required',
+                            invalid: 'Invalid email address'
+                        },
+                    email_verified: {
+                        label: 'Email Verified',
+                        tooltip: 'Indicate if the user\'s email has been verified',
+                        errors: {
+                            required: 'Email verification is required'
+                        }
+                    },
+                    enabled: {
+                        label: 'Enabled',
+                        tooltip: 'Enable or disable the user',
+                        errors: {
+                            required: 'Enabled is required'
+                        }
+                    }
+                }
+            }
+            },
             columns: {
                 username: 'Username',
                 firstName: 'First Name',
@@ -426,6 +473,7 @@ export default {
                 title: 'Environments',
                 description: 'Manage system environments and their configurations',
                 search: 'Search environments',
+                searchPlaceholder: 'Search environments...',
                 addButton: 'Add Environment',
                 createTitle: 'Create Environment',
                 editTitle: 'Edit Environment',
