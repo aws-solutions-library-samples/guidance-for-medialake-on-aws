@@ -18,6 +18,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_iam as iam,
     aws_ec2 as ec2,
+    AssetHashType,
     Stack,
     RemovalPolicy,
     Duration,
@@ -25,6 +26,7 @@ from aws_cdk import (
 from aws_cdk.aws_lambda_python_alpha import (
     PythonFunction,
     PythonLayerVersion,
+    BundlingOptions,
 )
 from aws_cdk.aws_lambda_nodejs import (
     NodejsFunction,
@@ -394,7 +396,7 @@ class Lambda(Construct):
         """
         import shutil
 
-        # Create the target directory if it doesn't exist
+        # Create the  directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy each file

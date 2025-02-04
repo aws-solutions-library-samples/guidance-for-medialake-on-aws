@@ -88,6 +88,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
                 {assetType === 'Video' ? (
                     <video
+                        onClick={onAssetClick}
                         style={{
                             width: '100%',
                             height: 200,
@@ -97,6 +98,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         controls
                         src={proxyUrl}
                     ></video>
+                    // <VideoViewer
+                    //     onClickEvent={null}
+                    //     videoSrc={proxyUrl}
+                    // />
                 ) : (
                     <Box
                         onClick={onImageClick}

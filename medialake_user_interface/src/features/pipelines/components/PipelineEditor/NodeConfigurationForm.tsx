@@ -64,8 +64,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
             fields.push({
                 name: 'integrationId',
                 type: 'select',
-                label: t('nodes.integration.select'),
-                tooltip: t('nodes.integration.selectTooltip'),
+                label: 'Select Integration',
+                tooltip: 'Select an integration for this node',
                 required: true,
                 options: integrationOptions
             });
@@ -98,10 +98,11 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
             description: node.info.description,
             fields,
         };
-    }, [node.nodeId, node.info.title, node.info.description, methodInfo, isIntegrationNode, integrationOptions, t]);
+    }, [node.nodeId, node.info.title, node.info.description, methodInfo, isIntegrationNode, integrationOptions]);
 
     const handleFormSubmit = useCallback(async (data: any) => {
         try {
+            console.log('[NodeConfigurationForm] Form data:', data);
             const config: NodeConfiguration = {
                 method: methodName,
                 parameters: data.parameters || {},
@@ -111,6 +112,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
                 inputMapping: configuration?.inputMapping,
                 outputMapping: configuration?.outputMapping
             };
+            console.log('[NodeConfigurationForm] Submitting config:', config);
             await onSubmit(config);
         } catch (error) {
             console.error('[NodeConfigurationForm] Submit failed:', error);
@@ -143,6 +145,13 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         );
     }
 
+    const formDefaultValues = useMemo(() => ({
+        parameters: configuration?.parameters || {},
+        integrationId: isIntegrationNode ? configuration?.integrationId : undefined
+    }), [configuration?.parameters, configuration?.integrationId, isIntegrationNode]);
+
+    console.log('[NodeConfigurationForm] Default values:', formDefaultValues);
+
     return (
         <Box>
             {node.info.title && (
@@ -152,10 +161,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
             )}
             <DynamicForm
                 definition={formDefinition}
-                defaultValues={{ 
-                    parameters: configuration?.parameters || {},
-                    integrationId: configuration?.integrationId
-                }}
+                defaultValues={formDefaultValues}
                 onSubmit={handleFormSubmit}
                 onCancel={onCancel}
                 showButtons={true}

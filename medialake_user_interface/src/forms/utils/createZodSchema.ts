@@ -12,6 +12,7 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
 
     // If not in cache, create new schema
     const shape: Record<string, z.ZodTypeAny> = {};
+    const parametersShape: Record<string, z.ZodTypeAny> = {};
 
     fields.forEach((field) => {
         const fieldName = field.name;
@@ -30,7 +31,9 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
                     const values = field.options.map(opt => opt.value);
                     fieldSchema = field.type === 'multiselect'
                         ? z.array(z.string())
-                        : z.string().refine(val => values.includes(val));
+                        : z.string().refine(val => values.includes(val), {
+                            message: `Value must be one of: ${values.join(', ')}`
+                        });
                 } else {
                     fieldSchema = field.type === 'multiselect'
                         ? z.array(z.string())
@@ -44,22 +47,28 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
                 fieldSchema = z.string();
         }
 
+        // Handle required/optional fields
         if (!field.required) {
-            fieldSchema = fieldSchema.optional();
+            fieldSchema = z.union([fieldSchema, z.undefined()]).optional();
         }
 
         if (fieldName.startsWith('parameters.')) {
             const paramName = fieldName.replace('parameters.', '');
-            if (!shape.parameters) {
-                shape.parameters = z.object({}).passthrough();
-            }
-            (shape.parameters as z.ZodObject<any>).shape[paramName] = fieldSchema;
+            parametersShape[paramName] = fieldSchema;
         } else {
             shape[fieldName] = fieldSchema;
         }
     });
 
-    const schema = z.object(shape).passthrough();
+    // Create the final schema
+    const finalShape = {
+        ...shape,
+        parameters: Object.keys(parametersShape).length > 0
+            ? z.object(parametersShape).passthrough()
+            : z.record(z.any()).optional()
+    };
+
+    const schema = z.object(finalShape).passthrough();
 
     // Cache the schema using the fields reference
     schemaCache.set(fields, schema);

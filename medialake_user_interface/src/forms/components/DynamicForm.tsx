@@ -116,13 +116,8 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
     const handleSubmit = React.useCallback(async (data: any) => {
         console.log('[DynamicForm] Submitting form with data:', data);
         try {
-            // Ensure we have a parameters object
-            const formData = {
-                parameters: data.parameters || {}
-            };
-            
             // Parse and validate
-            const validatedData = schema.safeParse(formData);
+            const validatedData = schema.safeParse(data);
             
             if (!validatedData.success) {
                 console.error('[DynamicForm] Validation failed:', validatedData.error);

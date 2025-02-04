@@ -158,6 +158,7 @@ export interface ConnectorResponse {
   settings?: {
     bucket: string;
     region?: string;
+    path?: string;
   };
 }
 
