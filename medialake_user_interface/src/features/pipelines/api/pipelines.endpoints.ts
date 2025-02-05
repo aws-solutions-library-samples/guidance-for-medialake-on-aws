@@ -3,7 +3,7 @@ export const PIPELINES_API = {
     endpoints: {
         GET_PIPELINES: '/pipelines',
         GET_PIPELINE: (id: string) => `/pipelines/${id}`,
-        CREATE_PIPELINE: '/pipelines',
+        CREATE_PIPELINE: '/pipelinesv2',
         UPDATE_PIPELINE: (id: string) => `/pipelines/${id}`,
         DELETE_PIPELINE: (id: string) => `/pipelines/${id}`,
         UPDATE_STATUS: (id: string) => `/pipelines/${id}/status`,

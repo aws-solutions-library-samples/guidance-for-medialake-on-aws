@@ -19,6 +19,7 @@ export const QUERY_KEYS = {
         details: () => [...QUERY_KEYS.PIPELINES.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.PIPELINES.details(), id] as const,
     },
+
     PIPELINE_EXECUTIONS: {
         all: ['pipeline-executions'] as const,
         lists: () => [...QUERY_KEYS.PIPELINE_EXECUTIONS.all, 'list'] as const,

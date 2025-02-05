@@ -24,6 +24,7 @@ class ApiGatewayPipelinesProps:
 
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
+    node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
     image_proxy_lambda: lambda_.IFunction
@@ -207,21 +208,22 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry="lambdas/api/pipelines/post_pipelines_v2",
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
-                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
-                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
-                "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
+                # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                # "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
+                # "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
+                "PIPELINES_TABLE": props.pipeline_table.table_arn,
+                # "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                # "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
+                # "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
-                "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
-                "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
-                "CONNECTOR_TABLE": props.connector_table.table_arn,
-                "AWS_ACCOUNT_ID": scope.account,
-                "GLOBAL_PREFIX": config.global_prefix,
+                # "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
+                # "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+                # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                # "CONNECTOR_TABLE": props.connector_table.table_arn,
+                "NODE_TABLE": props.node_table.table_arn,
+                "ACCOUNT_ID": scope.account,
+                # "GLOBAL_PREFIX": config.global_prefix,
             },
         )
         self._post_pipelines_v2_handler = Lambda(
@@ -287,6 +289,13 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "states:DeleteStateMachine",  # For rollback
                 ],
                 resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.node_table.table_arn],
             )
         )
 

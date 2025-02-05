@@ -1,5 +1,4 @@
 import boto3
-import base64
 from PIL import Image, ExifTags
 import io
 import os
@@ -168,30 +167,31 @@ def lambda_handler(event, context: LambdaContext):
 
             # Process image
             processed_img = create_thumbnail(img, width, height, crop)
-
-            # Generate output key
-            output_key = (
-                f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnails_{width}x{height}.webp"
-            )
+            output_format = "WEBP"
+            output_extension = "webp"
 
         elif mode == "proxy":
             # Process image
             processed_img = create_proxy(img)
             width, height = img.size
-            # Generate output key
-            output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_proxy.webp"
+            output_format = "PNG"
+            output_extension = "png"
 
         else:
             return {"statusCode": 400, "body": "Invalid mode parameter"}
 
+        # Generate output key
+        output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{output_extension}"
         # Save the processed image
         output_buffer = io.BytesIO()
+        processed_img.save(output_buffer, format=output_format, lossless=True)
+        output_data = output_buffer.getvalue()
 
         # Save as WebP with lossless compression for thumbnails
         if mode == "thumbnail":
-            processed_img.save(output_buffer, format="WEBP", lossless=True)
+            content_type = "image/webp"
             asset_id = f"{asset_id}:thumbnail"
-            output_data = output_buffer.getvalue()
+
             new_representation = {
                 "ID": asset_id,
                 "Type": "Image",
@@ -216,13 +216,12 @@ def lambda_handler(event, context: LambdaContext):
                 },
             }
         else:  # proxy mode
-            processed_img.save(output_buffer, format="WEBP", lossless=True)
-            output_data = output_buffer.getvalue()
+            content_type = "image/png"
             asset_id = f"{asset_id}:proxy"
             new_representation = {
                 "ID": asset_id,
                 "Type": "Image",
-                "Format": "WEBP",
+                "Format": "PNG",
                 "Purpose": mode,
                 "StorageInfo": {
                     "PrimaryLocation": {
@@ -240,12 +239,14 @@ def lambda_handler(event, context: LambdaContext):
                 },
             }
 
+        # Determine the correct MIME type
+
         # Upload to output bucket
         s3.put_object(
             Bucket=output_bucket,
             Key=output_key,
             Body=output_data,
-            ContentType="image/webp",
+            ContentType=content_type,
         )
 
         try:

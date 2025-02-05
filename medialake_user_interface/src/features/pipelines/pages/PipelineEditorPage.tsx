@@ -254,7 +254,7 @@ const PipelineEditorContent = () => {
     const onConnect = useCallback(
         (connection: Connection) => {
             const targetNode = nodes.find((node) => node.id === connection.target);
-            
+
             // Prevent connections to trigger nodes
             if (targetNode?.data.type?.includes('TRIGGER')) {
                 setErrorType('trigger');

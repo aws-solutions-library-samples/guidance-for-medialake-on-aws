@@ -91,6 +91,7 @@ class ApiGatewayStackProps:
     image_metadata_extractor_lambda: lambda_.Function
     image_proxy_lambda: lambda_.Function
     pipelines_nodes_table: dynamodb.TableV2
+    node_table: dynamodb.TableV2
 
 
 def generate_random_password(length=16):
@@ -193,6 +194,7 @@ class ApiGatewayStack(Stack):
             props=ApiGatewayPipelinesProps(
                 asset_table=props.asset_table,
                 connector_table=self._connectors_api_gateway.connector_table,
+                node_table=props.node_table,
                 pipeline_table=props.pipeline_table,
                 image_proxy_lambda=props.image_proxy_lambda,
                 image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
