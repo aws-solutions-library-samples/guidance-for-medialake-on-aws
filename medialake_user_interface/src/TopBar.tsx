@@ -1,7 +1,27 @@
 import React, { useState, useCallback } from 'react';
-import { Box, useTheme as useMuiTheme, InputBase, Chip } from '@mui/material';
+import { 
+    Box, 
+    useTheme as useMuiTheme, 
+    InputBase, 
+    Chip,
+    IconButton,
+    Menu,
+    MenuItem,
+    FormControlLabel,
+    Switch,
+    Divider,
+    Typography,
+    Popover,
+    Paper
+} from '@mui/material';
 import { Button } from '@/components/common';
-import { Search as SearchIcon } from '@mui/icons-material';
+import { 
+    Search as SearchIcon,
+    FilterList as FilterListIcon,
+    DateRange as DateRangeIcon,
+    Category as CategoryIcon,
+    Storage as StorageIcon 
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +42,8 @@ function TopBar() {
     const { t } = useTranslation();
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
+    const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+    const [isSemanticSearch, setIsSemanticSearch] = useState(false);
 
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
@@ -31,11 +53,19 @@ function TopBar() {
     const debouncedSearch = useCallback(
         debounce((query: string) => {
             if (query.trim()) {
-                navigate('/search', { state: { query } });
+                navigate('/search', { state: { query, isSemantic: isSemanticSearch } });
             }
         }, 500),
-        [navigate]
+        [navigate, isSemanticSearch]
     );
+
+    const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
+        setFilterAnchorEl(event.currentTarget);
+    };
+
+    const handleFilterClose = () => {
+        setFilterAnchorEl(null);
+    };
 
     const createTagFromInput = (input: string): boolean => {
         if (input.includes(':')) {
@@ -52,7 +82,7 @@ function TopBar() {
                 setSearchInput('');
 
                 const searchQuery = getSearchQuery();
-                navigate('/search', { state: { query: searchQuery } });
+                navigate('/search', { state: { query: searchQuery, isSemantic: isSemanticSearch } });
                 return true;
             }
         }
@@ -90,7 +120,7 @@ function TopBar() {
             createTagFromInput(searchInput);
         } else if (searchInput.trim() || searchTags.length > 0) {
             const searchQuery = getSearchQuery();
-            navigate('/search', { state: { query: searchQuery } });
+            navigate('/search', { state: { query: searchQuery, isSemantic: isSemanticSearch } });
         }
     };
 
@@ -100,9 +130,13 @@ function TopBar() {
                 !(tag.key === tagToDelete.key && tag.value === tagToDelete.value)
             );
             const searchQuery = newTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
-            navigate('/search', { state: { query: searchQuery } });
+            navigate('/search', { state: { query: searchQuery, isSemantic: isSemanticSearch } });
             return newTags;
         });
+    };
+
+    const handleSemanticSearchToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setIsSemanticSearch(event.target.checked);
     };
 
     return (
@@ -136,7 +170,7 @@ function TopBar() {
                     />
                 ))}
 
-                {/* Search Input */}
+                {/* Search Input with Filter Icon */}
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
@@ -167,7 +201,50 @@ function TopBar() {
                             },
                         }}
                     />
+                    <IconButton 
+                        size="small" 
+                        onClick={handleFilterClick}
+                        sx={{ 
+                            ml: 1,
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                        }}
+                    >
+                        <FilterListIcon />
+                    </IconButton>
                 </Box>
+
+                {/* Filter Menu */}
+                <Menu
+                    anchorEl={filterAnchorEl}
+                    open={Boolean(filterAnchorEl)}
+                    onClose={handleFilterClose}
+                    PaperProps={{
+                        sx: {
+                            mt: 1,
+                            width: 280,
+                            maxHeight: 400,
+                        }
+                    }}
+                >
+                    <MenuItem>
+                        <DateRangeIcon sx={{ mr: 2 }} />
+                        <Typography>Date Range</Typography>
+                    </MenuItem>
+                    <MenuItem>
+                        <CategoryIcon sx={{ mr: 2 }} />
+                        <Typography>Content Type</Typography>
+                    </MenuItem>
+                    <MenuItem>
+                        <StorageIcon sx={{ mr: 2 }} />
+                        <Typography>Storage Location</Typography>
+                    </MenuItem>
+                    <Divider />
+                    <Box sx={{ p: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+                            More filters coming soon...
+                        </Typography>
+                    </Box>
+                </Menu>
 
                 {/* Search Button */}
                 <Button
@@ -177,6 +254,36 @@ function TopBar() {
                 >
                     {t('common.search')}
                 </Button>
+
+                {/* Semantic Search Toggle */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    ml: 2,
+                }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                size="small"
+                                checked={isSemanticSearch}
+                                onChange={handleSemanticSearchToggle}
+                                sx={{ ml: 1 }}
+                            />
+                        }
+                        label={
+                            <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                Semantic Search
+                            </Typography>
+                        }
+                        sx={{
+                            margin: 0,
+                            '& .MuiTypography-root': {
+                                fontSize: '14px',
+                                color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            }
+                        }}
+                    />
+                </Box>
             </Box>
         </Box>
     );

@@ -1,3 +1,4 @@
+from xmlrpc import client
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
@@ -67,6 +68,7 @@ class SearchParams(BaseModelWithConfig):
     min_score: float = Field(default=0.1)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
+    semantic: bool = Field(default=False)
 
     @property
     def from_(self) -> int:
@@ -162,8 +164,51 @@ def get_opensearch_client() -> OpenSearch:
     )
 
 
+def build_semantic_query(params: SearchParams) -> Dict:
+    from twelvelabs import TwelveLabs
+    from twelvelabs.models.embed import SegmentEmbedding
+    
+    twelve_labs_client = TwelveLabs(api_key="tlk_15G4M1P19ECJF522H79N51AA6WQ1")
+    res = twelve_labs_client.embed.create(
+        model_name="Marengo-retrieval-2.7",
+        text=params.q,
+    )
+    
+    if res.text_embedding is not None and res.text_embedding.segments is not None:
+        # Extract the embedding as a flat list of floats
+        embedding = list(res.text_embedding.segments[0].embeddings_float)
+        
+        # Verify it's a flat list of numbers
+        if not all(isinstance(x, (int, float)) for x in embedding):
+            raise SearchException("Invalid embedding format")
+            
+        return {
+            "size": params.pageSize,
+            "query": {
+                "knn": {
+                    "embedding": {
+                        "vector": embedding,
+                        "k": params.pageSize
+                    }
+                }
+            },
+            "_source": {
+                "excludes": ["embedding"]
+            }
+        }
+    else:
+        raise SearchException("Failed to generate embedding for search term")
+
+
+
+
+
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
+    print(f"parames are {params}")
+    if params.semantic:
+        return build_semantic_query(params)
+
     search_fields = params.search_fields or [
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2",
         "DigitalSourceAsset.Type",
