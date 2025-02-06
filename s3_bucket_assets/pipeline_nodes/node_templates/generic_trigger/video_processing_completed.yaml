@@ -4,7 +4,7 @@ node:
   title: Video Processing Completed
   description: Wait for a specific duration
   version: 1.0.0
-  type: flow
+  type: trigger
   integration:
     config:
       aws_eventbridge:

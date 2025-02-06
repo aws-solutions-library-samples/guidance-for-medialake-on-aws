@@ -11,6 +11,7 @@ import { useSearch } from '../api/hooks/useSearch';
 
 interface LocationState {
     query?: string;
+    isSemantic?: boolean;
 }
 
 interface Filters {
@@ -31,10 +32,11 @@ const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
-    const { query } = (location.state as LocationState) || {};
+    const { query, isSemantic } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
+    const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
 
     const {
         data: searchResults,
@@ -43,6 +45,7 @@ const SearchPage: React.FC = () => {
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: PAGE_SIZE,
+        isSemantic: currentSemantic
     });
 
     const [filters, setFilters] = useState<Filters>({
@@ -95,17 +98,22 @@ const SearchPage: React.FC = () => {
 
 
     useEffect(() => {
-        if (query && !searchParams.has('q')) {
+        if ((query && !searchParams.has('q')) || (isSemantic !== undefined && !searchParams.has('semantic'))) {
             setSearchParams(prev => {
                 const newParams = new URLSearchParams(prev);
-                newParams.set('q', query);
+                if (query && !prev.has('q')) {
+                    newParams.set('q', query);
+                }
+                if (isSemantic !== undefined && !prev.has('semantic')) {
+                    newParams.set('semantic', isSemantic.toString());
+                }
                 if (!prev.has('page')) {
                     newParams.set('page', '1');
                 }
                 return newParams;
             });
         }
-    }, [query, searchParams, setSearchParams]);
+    }, [query, isSemantic, searchParams, setSearchParams]);
 
     const handleFilterChange = (section: keyof Filters, filter: string) => {
         setFilters(prev => {
@@ -145,6 +153,9 @@ const SearchPage: React.FC = () => {
             }
             if (timeFilter) {
                 newParams.set('time', timeFilter);
+            }
+            if (currentSemantic) {
+                newParams.set('semantic', 'true');
             }
             return newParams;
         });
