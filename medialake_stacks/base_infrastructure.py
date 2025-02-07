@@ -16,6 +16,10 @@ from medialake_constructs.shared_constructs.s3_logging import (
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import ( 
+    S3ExpressOneZoneBucket,
+    S3ExpressOneZoneBucketProps
+)
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
@@ -169,7 +173,7 @@ class BaseInfrastructureStack(Stack):
                 ]
             ]
 
-        print(f"Selected subnet IDs for OpenSearch cluster: {selected_subnet_ids}")
+        # print(f"Selected subnet IDs for OpenSearch cluster: {selected_subnet_ids}")
 
         self._opensearch_cluster = OpenSearchCluster(
             self,
@@ -217,7 +221,18 @@ class BaseInfrastructureStack(Stack):
             access_logs_bucket=self.access_logs_bucket.bucket,
             source_bucket=self.media_assets_s3_bucket.bucket,
         )
+        
+        # self.internal_s3_bucket = S3ExpressOneZoneBucket(
+        #     self,
+        #     "InternalS3Bucket",
+        #     props=S3ExpressOneZoneBucketProps(
+        #         bucket_name=f"{config.global_prefix}-internal-s3-bucket".lower(),
+        #         access_logs=True,
+        #         access_logs_bucket=self.access_logs_bucket.bucket,
+        #     ),
+        # )
 
+        
         # Create IAC assets bucket with explicit name including region
         self.iac_assets_bucket = S3Bucket(
             self,
@@ -228,6 +243,7 @@ class BaseInfrastructureStack(Stack):
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
         )
+        
 
         self._ingest_event_bus = EventBus(
             self,
