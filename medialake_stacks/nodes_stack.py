@@ -29,7 +29,7 @@ class NodesStack(Stack):
             ),
         )
 
-        s3deploy.BucketDeployment(
+        bucket_deployment = s3deploy.BucketDeployment(
             self,
             "DeployAssets",
             sources=[s3deploy.Source.asset("s3_bucket_assets/pipeline_nodes")],
@@ -148,6 +148,8 @@ class NodesStack(Stack):
             },
             removal_policy=RemovalPolicy.DESTROY,
         )
+
+        self.resource.node.add_dependency(bucket_deployment)
 
     @property
     def pipelines_nodes_table(self) -> dynamodb.TableV2:

@@ -33,7 +33,9 @@ def validate_node_yaml(node_data: dict, key: str) -> None:
         raise ValueError(f"Missing required field 'info.title' in file {key}")
 
 
-def process_node_file(bucket: str, key: str, node_data: Dict[str, Any] = None) -> Dict[str, list]:
+def process_node_file(
+    bucket: str, key: str, node_data: Dict[str, Any] = None
+) -> Dict[str, list]:
     """Process a single node definition file from S3 and return items for DynamoDB."""
     try:
         if node_data is None:
@@ -42,7 +44,7 @@ def process_node_file(bucket: str, key: str, node_data: Dict[str, Any] = None) -
             content = response["Body"].read().decode("utf-8")
             logger.info(f"Processing file content from {key}")
             node_data = yaml.safe_load(content)
-            
+
         logger.info(f"Node data structure: {list(node_data.keys())}")
 
         # Validate YAML structure
@@ -232,26 +234,28 @@ def store_node_in_dynamodb(node_data: Dict[str, list]) -> None:
 def list_node_template_files(bucket: str) -> list:
     """Recursively list all YAML files under node_templates directory."""
     files = []
-    paginator = s3_client.get_paginator('list_objects_v2')
-    
+    paginator = s3_client.get_paginator("list_objects_v2")
+
     try:
         # The trailing slash in the prefix is optional since S3 uses prefix matching
-        for page in paginator.paginate(Bucket=bucket, Prefix='node_templates'):
-            if 'Contents' in page:
-                for obj in page['Contents']:
-                    key = obj['Key']
+        for page in paginator.paginate(Bucket=bucket, Prefix="node_templates"):
+            if "Contents" in page:
+                for obj in page["Contents"]:
+                    key = obj["Key"]
                     # Log all files we're looking at for debugging
                     logger.debug(f"Examining file: {key}")
-                    
+
                     # Check if it's a YAML file (case insensitive)
-                    if key.lower().endswith(('.yaml', '.yml')):
+                    if key.lower().endswith((".yaml", ".yml")):
                         files.append(key)
                         logger.info(f"Found template file: {key}")
     except Exception as e:
-        logger.error(f"Error listing template files: {str(e)}", 
-                    extra={"error": str(e), "traceback": traceback.format_exc()})
+        logger.error(
+            f"Error listing template files: {str(e)}",
+            extra={"error": str(e), "traceback": traceback.format_exc()},
+        )
         raise  # Re-raise the exception to ensure errors are properly handled
-    
+
     logger.info(f"Total template files found: {len(files)}")
     return files
 
@@ -260,85 +264,138 @@ def process_node_template(bucket: str, key: str) -> Dict[str, list]:
     """Process a node template file and determine its integration."""
     try:
         response = s3_client.get_object(Bucket=bucket, Key=key)
-        content = response['Body'].read().decode('utf-8')
+        content = response["Body"].read().decode("utf-8")
         node_data = yaml.safe_load(content)
-        
-        logger.info(f"Processing node template: {key}", extra={
-            "node_id": node_data.get('node', {}).get('id'),
-            "node_type": node_data.get('node', {}).get('type'),
-            "integration": node_data.get('node', {}).get('integration')
-        })
-        
-        if not node_data.get('node'):
+
+        logger.info(
+            f"Processing node template: {key}",
+            extra={
+                "node_id": node_data.get("node", {}).get("id"),
+                "node_type": node_data.get("node", {}).get("type"),
+                "integration": node_data.get("node", {}).get("integration"),
+            },
+        )
+
+        if not node_data.get("node"):
             raise ValueError(f"Invalid node template format in {key}")
-            
-        node_type = node_data['node'].get('type')
-        integration = node_data['node'].get('integration', {})
-        
-        if node_type == 'api':
+
+        node_type = node_data["node"].get("type")
+        integration = node_data["node"].get("integration", {})
+
+        if node_type == "api":
             return process_api_node(bucket, node_data, integration)
+        elif node_type == "integration":
+            return process_integration_node(bucket, node_data, integration)
         else:
             return process_standard_node(node_data)
-            
+
     except Exception as e:
-        logger.error(f"Error processing template {key}: {str(e)}", 
-                    extra={"error": str(e), "traceback": traceback.format_exc()})
+        logger.error(
+            f"Error processing template {key}: {str(e)}",
+            extra={"error": str(e), "traceback": traceback.format_exc()},
+        )
         return None
 
 
-def process_api_node(bucket: str, node_data: dict, integration: dict) -> Dict[str, list]:
-    """Process an API node by fetching and processing its OpenAPI spec."""
+def process_integration_node(
+    bucket: str, node_data: dict, integration: dict
+) -> Dict[str, list]:
+    """Process an INTEGRATION node by fetching and processing its OpenINTEGRATION spec."""
     try:
-        spec_path = integration.get('api', {}).get('open_api_spec_path')
+        spec_path = integration.get("api", {}).get("open_api_spec_path")
         if not spec_path:
-            raise ValueError("Missing open_api_spec_path in API integration config")
-            
-        logger.info(f"Fetching OpenAPI spec from: {spec_path}")
-        
-        # Fetch and process OpenAPI spec
+            raise ValueError("Missing open_api_spec_path in INTEGRATION api config")
+
+        logger.info(f"Fetching OpenINTEGRATION spec from: {spec_path}")
+
+        # Fetch and process OpenINTEGRATION spec
         spec_response = s3_client.get_object(Bucket=bucket, Key=spec_path)
-        spec_content = spec_response['Body'].read().decode('utf-8')
+        spec_content = spec_response["Body"].read().decode("utf-8")
         spec_data = yaml.safe_load(spec_content)
-        
-        # Combine node metadata with OpenAPI spec
+
+        # Combine node metadata with OpenINTEGRATION spec
         combined_data = {
-            "x-medialake-nodeId": node_data['node']['id'],
-            "x-node-type": "API",
+            "x-medialake-nodeId": node_data["node"]["id"],
+            "x-node-type": "INTEGRATION",
             "info": {
-                "title": node_data['node']['title'],
-                "description": node_data['node']['description'],
-                "version": node_data['node']['version']
+                "title": node_data["node"]["title"],
+                "description": node_data["node"]["description"],
+                "version": node_data["node"]["version"],
             },
-            "paths": spec_data.get('paths', {}),
-            "components": spec_data.get('components', {}),
-            "servers": spec_data.get('servers', []),
-            "tags": spec_data.get('tags', [])
+            "paths": spec_data.get("paths", {}),
+            "components": spec_data.get("components", {}),
+            "servers": spec_data.get("servers", []),
+            "tags": spec_data.get("tags", []),
         }
-        
+
         # Process the combined data using process_node_file
         return process_node_file(bucket, spec_path, combined_data)
-        
+
     except Exception as e:
-        logger.error(f"Error processing API node: {str(e)}", 
-                    extra={"traceback": traceback.format_exc()})
+        logger.error(
+            f"Error processing INTEGRATION node: {str(e)}",
+            extra={"traceback": traceback.format_exc()},
+        )
+        raise
+
+
+def process_api_node(
+    bucket: str, node_data: dict, integration: dict
+) -> Dict[str, list]:
+    """Process an API node by fetching and processing its OpenAPI spec."""
+    try:
+        spec_path = integration.get("api", {}).get("open_api_spec_path")
+        if not spec_path:
+            raise ValueError("Missing open_api_spec_path in API integration config")
+
+        logger.info(f"Fetching OpenAPI spec from: {spec_path}")
+
+        # Fetch and process OpenAPI spec
+        spec_response = s3_client.get_object(Bucket=bucket, Key=spec_path)
+        spec_content = spec_response["Body"].read().decode("utf-8")
+        spec_data = yaml.safe_load(spec_content)
+
+        # Combine node metadata with OpenAPI spec
+        combined_data = {
+            "x-medialake-nodeId": node_data["node"]["id"],
+            "x-node-type": "API",
+            "info": {
+                "title": node_data["node"]["title"],
+                "description": node_data["node"]["description"],
+                "version": node_data["node"]["version"],
+            },
+            "paths": spec_data.get("paths", {}),
+            "components": spec_data.get("components", {}),
+            "servers": spec_data.get("servers", []),
+            "tags": spec_data.get("tags", []),
+        }
+
+        # Process the combined data using process_node_file
+        return process_node_file(bucket, spec_path, combined_data)
+
+    except Exception as e:
+        logger.error(
+            f"Error processing API node: {str(e)}",
+            extra={"traceback": traceback.format_exc()},
+        )
         raise
 
 
 def process_standard_node(node_data: dict) -> Dict[str, list]:
     """Process a non-API node (trigger, utility, etc.) using standard schema."""
     try:
-        node_id = node_data['node']['id']
+        node_id = node_data["node"]["id"]
         timestamp = Decimal(str(int(datetime.datetime.now().timestamp())))
-        
+
         items = []
-        
+
         # Create base node info item
         info_item = {
             "pk": f"NODE#{node_id}",
             "sk": "INFO",
-            "title": node_data['node']['title'],
-            "description": node_data['node']['description'],
-            "nodeType": node_data['node']['type'].upper(),
+            "title": node_data["node"]["title"],
+            "description": node_data["node"]["description"],
+            "nodeType": node_data["node"]["type"].upper(),
             "categories": ["Integration"],
             "tags": [],
             "enabled": True,
@@ -349,66 +406,76 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
             "entityType": "NODE",
             "nodeId": f"NODE#{node_id}",
             "methodInfo": True,
-            "version": node_data['node']['version']
+            "version": node_data["node"]["version"],
         }
         items.append(info_item)
-        
+
         # Process actions as methods if they exist
-        actions = node_data.get('actions', {})
+        actions = node_data.get("actions", {})
         for action_name, action_details in actions.items():
             method_id = action_name
             method_item = {
                 "pk": f"NODE#{node_id}",
                 "sk": f"METHOD#{method_id}",
                 "methodName": action_name,
-                "methodDescription": action_details.get('description', ''),
+                "methodDescription": action_details.get("description", ""),
                 "methodConfig": {
-                    "summary": action_details.get('summary', ''),
-                    "parameters": action_details.get('parameters', {})
+                    "summary": action_details.get("summary", ""),
+                    "parameters": action_details.get("parameters", {}),
                 },
                 "gsi2pk": f"METHOD#{node_id}",
                 "gsi2sk": f"METHOD#{method_id}",
                 "entityType": "NODE",
                 "nodeId": f"NODE#{node_id}",
-                "methodInfo": True
+                "methodInfo": True,
             }
             items.append(method_item)
-            
+
         return {"items": items}
-        
+
     except Exception as e:
-        logger.error(f"Error processing standard node: {str(e)}", 
-                    extra={"traceback": traceback.format_exc()})
+        logger.error(
+            f"Error processing standard node: {str(e)}",
+            extra={"traceback": traceback.format_exc()},
+        )
         raise
 
 
 @helper.create
 @helper.update
-def handle_create_update(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
+def handle_create_update(
+    event: CloudFormationCustomResourceEvent, context: LambdaContext
+) -> None:
     """Handle Create and Update events from CloudFormation"""
     logger.info("Processing nodes for Create/Update event")
-    
+
     try:
         template_files = list_node_template_files(NODES_BUCKET)
         logger.info(f"Found {len(template_files)} template files to process")
-        
+
         for template_file in template_files:
             try:
                 logger.info(f"Starting to process template: {template_file}")
                 node_items = process_node_template(NODES_BUCKET, template_file)
                 if node_items:
-                    logger.info(f"Successfully processed template {template_file}, storing in DynamoDB")
+                    logger.info(
+                        f"Successfully processed template {template_file}, storing in DynamoDB"
+                    )
                     store_node_in_dynamodb(node_items)
                 else:
                     logger.warning(f"No items generated for template {template_file}")
             except Exception as e:
-                logger.error(f"Failed to process template {template_file}: {str(e)}", 
-                           extra={"traceback": traceback.format_exc()})
+                logger.error(
+                    f"Failed to process template {template_file}: {str(e)}",
+                    extra={"traceback": traceback.format_exc()},
+                )
                 continue
-                
+
     except Exception as e:
-        logger.error(f"Error in create/update handler: {str(e)}", 
-                    extra={"traceback": traceback.format_exc()})
+        logger.error(
+            f"Error in create/update handler: {str(e)}",
+            extra={"traceback": traceback.format_exc()},
+        )
         raise
 
 

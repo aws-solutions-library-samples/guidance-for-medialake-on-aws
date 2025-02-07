@@ -171,9 +171,12 @@ export interface ConnectorsListResponse {
 }
 
 export interface SingleConnectorResponse {
-  status: string;
-  message: string;
-  data: ConnectorResponse;
+  statusCode: number;
+  body: {
+    status: string;
+    message: string;
+    data: ConnectorResponse;
+  };
 }
 
 // export interface ConnectorResponse {

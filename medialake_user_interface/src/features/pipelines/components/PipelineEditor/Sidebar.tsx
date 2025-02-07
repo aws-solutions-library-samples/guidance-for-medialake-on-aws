@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { 
-    Box, 
-    Typography, 
-    Paper, 
-    CircularProgress, 
+import {
+    Box,
+    Typography,
+    Paper,
+    CircularProgress,
     TextField,
     Accordion,
     AccordionSummary,
@@ -18,7 +18,7 @@ import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
 interface NodeSection {
     title: string;
     types: string[];
-    nodes: Array<{node: NodeType; methodName: string; method: any}>;
+    nodes: Array<{ node: NodeType; methodName: string; method: any }>;
 }
 
 const SidebarContent: React.FC = () => {
@@ -66,7 +66,7 @@ const SidebarContent: React.FC = () => {
 
         const groupedNodes: NodeSection[] = [
             { title: 'Triggers', types: ['TRIGGER'], nodes: [] },
-            { title: 'Integrations', types: ['API', 'INTEGRATION'], nodes: [] },
+            { title: 'Integrations', types: ['INTEGRATION'], nodes: [] },
             { title: 'Flow', types: ['FLOW'], nodes: [] }
         ];
 
@@ -74,7 +74,7 @@ const SidebarContent: React.FC = () => {
             if (node.methods) {
                 Object.entries(node.methods).forEach(([methodName, method]) => {
                     const nodeType = node.info.nodeType;
-                    const section = groupedNodes.find(s => 
+                    const section = groupedNodes.find(s =>
                         s.types.some(type => nodeType.includes(type))
                     );
                     if (section) {
@@ -121,14 +121,14 @@ const SidebarContent: React.FC = () => {
     return (
         <Box sx={{ pt: 2 }}>
             <Box sx={{ px: 2, mb: 2 }}>
-                <Typography 
-                    variant="h6" 
-                    gutterBottom 
+                <Typography
+                    variant="h6"
+                    gutterBottom
                     sx={{ textAlign: 'center', mb: 2 }}
                 >
                     Available Nodes
                 </Typography>
-                
+
                 <TextField
                     fullWidth
                     size="small"
@@ -138,8 +138,8 @@ const SidebarContent: React.FC = () => {
                 />
             </Box>
 
-            <Box sx={{ 
-                display: 'flex', 
+            <Box sx={{
+                display: 'flex',
                 flexDirection: 'column',
                 '& .MuiAccordion-root + .MuiAccordion-root': {
                     mt: -1
@@ -162,7 +162,7 @@ const SidebarContent: React.FC = () => {
                             }
                         }}
                     >
-                        <AccordionSummary 
+                        <AccordionSummary
                             expandIcon={<ExpandMoreIcon sx={{ fontSize: '0.9rem' }} />}
                             sx={{
                                 minHeight: '36px',
@@ -178,8 +178,8 @@ const SidebarContent: React.FC = () => {
                                 }
                             }}
                         >
-                            <Typography 
-                                sx={{ 
+                            <Typography
+                                sx={{
                                     fontWeight: 500,
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.1em',

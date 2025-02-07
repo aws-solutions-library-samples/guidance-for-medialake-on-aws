@@ -42,7 +42,7 @@ interface CustomNodeData {
     configuration?: any;
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
-    type?: string; // Node type (e.g., 'TRIGGER', 'API', 'FLOW')
+    type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
 }
 
 const nodeTypes = {
@@ -67,7 +67,7 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
     height: node.height?.toString() || '40',
     data: {
         id: node.data.nodeId,
-        type: 'default',
+        type: node.data.type,
         label: node.data.label,
         icon: {
             props: {

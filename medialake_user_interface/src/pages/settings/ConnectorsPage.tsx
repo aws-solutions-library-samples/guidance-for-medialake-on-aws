@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
-import { Typography, Button, Box, Snackbar, Alert } from '@mui/material';
+import {
+    Typography,
+    Button,
+    Box,
+    Snackbar,
+    Alert
+} from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import ConnectorCard from '@/features/settings/connectors/components/ConnectorCard';
 import ConnectorModal from '@/features/settings/connectors/components/ConnectorModal';
-import { useGetConnectors, useDeleteConnector, useToggleConnector, useCreateS3Connector } from '@/api/hooks/useConnectors';
-import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
+import {
+    useGetConnectors,
+    useDeleteConnector,
+    useToggleConnector,
+    useCreateS3Connector
+} from '@/api/hooks/useConnectors';
+import {
+    ConnectorResponse,
+    CreateConnectorRequest
+} from '@/api/types/api.types';
 import queryClient from '@/api/queryClient';
 
 const ConnectorsPage: React.FC = () => {
@@ -12,10 +26,23 @@ const ConnectorsPage: React.FC = () => {
     const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
     const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
-    const { data: connectorsResponse, isLoading } = useGetConnectors();
+    const {
+        data: connectorsResponse,
+        isLoading,
+        isError,
+        error
+    } = useGetConnectors();
+
     const { mutateAsync: deleteConnector } = useDeleteConnector();
     const { mutateAsync: toggleConnector } = useToggleConnector();
-    const { mutateAsync: createS3Connector, isPending: isCreatingConnector } = useCreateS3Connector();
+    const {
+        mutateAsync: createS3Connector,
+        isPending: isCreatingConnector
+    } = useCreateS3Connector();
+
+    // Safely pull out the connectors array
+    const rawConnectors = connectorsResponse?.data?.connectors;
+    const connectors = Array.isArray(rawConnectors) ? rawConnectors.filter(Boolean) : [];
 
     const handleAddClick = () => {
         setEditingConnector(undefined);
@@ -45,6 +72,7 @@ const ConnectorsPage: React.FC = () => {
     const handleToggleStatus = async (id: string, enabled: boolean) => {
         try {
             await toggleConnector({ id, enabled });
+            await queryClient.invalidateQueries({ queryKey: ['connectors'] });
             setAlert({
                 message: `Connector ${enabled ? 'enabled' : 'disabled'} successfully`,
                 severity: 'success'
@@ -61,21 +89,35 @@ const ConnectorsPage: React.FC = () => {
         try {
             if (connectorData.type === 's3') {
                 const response = await createS3Connector(connectorData);
+
                 console.log('API Response:', response);
-                if (response && response.data) {
-                    handleModalClose();
-                    setAlert({
-                        message: 'Connector created successfully',
-                        severity: 'success'
-                    });
-                } else {
-                    throw new Error('Invalid response from server');
+
+                if (response.statusCode >= 400) {
+                    throw new Error(response.body.message || 'Failed to create connector');
                 }
+
+                handleModalClose();
+                setAlert({
+                    message: 'Connector created successfully',
+                    severity: 'success'
+                });
+
+                // Re-fetch connectors so new one appears immediately
+                await queryClient.invalidateQueries({ queryKey: ['connectors'] });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating connector:', error);
+
+            let errorMessage = 'Failed to create connector';
+
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.response?.data?.body?.message) {
+                errorMessage = error.response.data.body.message;
+            }
+
             setAlert({
-                message: 'Failed to create connector',
+                message: errorMessage,
                 severity: 'error'
             });
         }
@@ -89,7 +131,15 @@ const ConnectorsPage: React.FC = () => {
         return <div>Loading...</div>;
     }
 
-    const connectors = connectorsResponse?.data?.connectors || [];
+    if (isError) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography color="error" variant="h6">
+                    Error loading connectors: {String(error)}
+                </Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: 3 }}>
@@ -104,19 +154,24 @@ const ConnectorsPage: React.FC = () => {
                 </Button>
             </Box>
 
-            <Box sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(auto-fill, minmax(300px, 1fr))',
-                    md: 'repeat(auto-fill, minmax(350px, 1fr))'
-                },
-                gap: 3
-            }}>
-                {connectors.map((connector) => {
-                    console.log('Connector data:', JSON.stringify(connector, null, 2));
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(auto-fill, minmax(300px, 1fr))',
+                        md: 'repeat(auto-fill, minmax(350px, 1fr))'
+                    },
+                    gap: 3
+                }}
+            >
+                {connectors.map((connector, index) => {
+                    // If connector is null/undefined for some reason, skip it
+                    if (!connector) return null;
+                    console.log('Connector data:', connector);
+
                     return (
-                        <Box key={connector.id}>
+                        <Box key={connector.id ?? index}>
                             <ConnectorCard
                                 connector={connector}
                                 onEdit={handleEditClick}
@@ -140,7 +195,7 @@ const ConnectorsPage: React.FC = () => {
                 open={!!alert}
                 autoHideDuration={6000}
                 onClose={handleAlertClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
                 <Alert
                     onClose={handleAlertClose}

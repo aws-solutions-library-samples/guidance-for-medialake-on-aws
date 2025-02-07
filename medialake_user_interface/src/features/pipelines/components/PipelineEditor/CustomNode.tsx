@@ -15,7 +15,7 @@ export interface CustomNodeData {
     configuration?: any; // Node configuration
     onDelete?: (id: string) => void;
     onConfigure?: (id: string) => void;
-    type?: string; // Node type (e.g., 'TRIGGER', 'API', 'FLOW')
+    type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
 }
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
@@ -97,10 +97,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, position: 'relative' }}>
                 {data.icon}
                 <Box sx={{ flex: 1, minWidth: 0 }}> {/* Add minWidth: 0 to enable text wrapping */}
-                    <Typography 
-                        variant="subtitle1" 
-                        sx={{ 
-                            lineHeight: 1.2, 
+                    <Typography
+                        variant="subtitle1"
+                        sx={{
+                            lineHeight: 1.2,
                             fontWeight: 'medium',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -109,10 +109,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                     >
                         {data.label}
                     </Typography>
-                    <Typography 
-                        variant="body2" 
-                        color="text.secondary" 
-                        sx={{ 
+                    <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
                             lineHeight: 1.2,
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',

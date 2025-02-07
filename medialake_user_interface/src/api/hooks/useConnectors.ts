@@ -251,39 +251,56 @@ export const useDeleteConnector = () => {
 export const useCreateS3Connector = () => {
     const { showError } = useErrorModal();
 
-    return useMutation<SingleConnectorResponse, Error, CreateConnectorRequest>({
+    return useMutation<SingleConnectorResponse, any, CreateConnectorRequest>({
         mutationFn: async (data) => {
             validateS3ConnectorRequest(data);
+            // This will throw an error automatically if the response is 4xx or 5xx (Axios default).
+            // So success path is only if status < 400.
             const response = await apiClient.post<SingleConnectorResponse>(
                 `${API_ENDPOINTS.CONNECTORS}/s3`,
                 data
             );
             return response.data;
         },
-        onError: (error) => {
+        onError: (error: any) => {
             logger.error('Create S3 connector error:', error);
+
+            // 1) If 400 error from your backend, read 'error.response.data.body.message'
+            if (error.response?.status === 400) {
+                const serverMsg = error.response?.data?.body?.message;
+                if (serverMsg) {
+                    showError(serverMsg); // show that exact message from your server
+                    return;
+                }
+            }
+
+            // 2) Otherwise handle network or fallback error
             if (error.message === 'Network Error') {
                 showError('Unable to save connector - API is not available');
             } else {
+                // fallback to generic message
                 showError(`Failed to create S3 connector: ${error.message}`);
             }
         },
         onSuccess: (response) => {
-            const newConnector = response.data;
+            const newConnector = response.body.data;
+            // Merges the new connector into our existing connectors
             queryClient.setQueryData<ConnectorListResponse>(
                 [QUERY_KEYS.CONNECTORS],
                 (old) => {
-                    if (!old) return {
-                        status: 'success',
-                        message: 'Connectors retrieved successfully',
-                        data: { connectors: [newConnector] }
-                    };
+                    if (!old) {
+                        return {
+                            status: 'success',
+                            message: 'Connectors retrieved successfully',
+                            data: { connectors: [newConnector] },
+                        };
+                    }
                     return {
                         ...old,
                         data: {
                             ...old.data,
-                            connectors: [...old.data.connectors, newConnector]
-                        }
+                            connectors: [...old.data.connectors, newConnector],
+                        },
                     };
                 }
             );

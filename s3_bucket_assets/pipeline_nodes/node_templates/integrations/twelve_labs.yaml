@@ -4,7 +4,7 @@ node:
   title: Twelve Labs
   description: Twelve Labs API for video, image, and audio understanding and multimodal embeddings
   version: 1.0.0
-  type: api
+  type: integration
   integration:
     api:
-          open_api_spec_path: open_api_specs/twelve_labs.yaml
+      open_api_spec_path: open_api_specs/twelve_labs.yaml
