@@ -241,40 +241,64 @@ const SearchPage: React.FC = () => {
                     )}
 
                     {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <ImageResults
-                            images={imageResults}
-                            searchMetadata={{
-                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                page: currentPage,
-                                pageSize: PAGE_SIZE,
-                            }}
-                            onPageChange={(newPage) => handleSearch({ page: newPage })}
-                            searchTerm={currentQuery}
-                        />
+                        <Box sx={{ 
+                            '& .MuiPaper-root': {
+                                bgcolor: 'transparent',
+                                boxShadow: 'none',
+                                p: 0
+                            }
+                        }}>
+                            <ImageResults
+                                images={imageResults}
+                                searchMetadata={{
+                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                    page: currentPage,
+                                    pageSize: PAGE_SIZE,
+                                }}
+                                onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                searchTerm={currentQuery}
+                            />
+                        </Box>
                     )}
                     {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <VideoResults
-                            videos={videoResults}
-                            searchMetadata={{
-                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                page: currentPage,
-                                pageSize: PAGE_SIZE,
-                            }}
-                            onPageChange={(newPage) => handleSearch({ page: newPage })}
-                            searchTerm={currentQuery}
-                        />
+                        <Box sx={{ 
+                            '& .MuiPaper-root': {
+                                bgcolor: 'transparent',
+                                boxShadow: 'none',
+                                p: 0
+                            }
+                        }}>
+                            <VideoResults
+                                videos={videoResults}
+                                searchMetadata={{
+                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                    page: currentPage,
+                                    pageSize: PAGE_SIZE,
+                                }}
+                                onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                searchTerm={currentQuery}
+                            />
+                        </Box>
                     )}
                     {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <AudioResults
-                            audios={audioResults}
-                            searchMetadata={{
-                                totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                page: currentPage,
-                                pageSize: PAGE_SIZE,
-                            }}
-                            onPageChange={(newPage) => handleSearch({ page: newPage })}
-                            searchTerm={currentQuery}
-                        />
+                        <Box sx={{ 
+                            '& .MuiPaper-root': {
+                                bgcolor: 'transparent',
+                                boxShadow: 'none',
+                                p: 0
+                            }
+                        }}>
+                            <AudioResults
+                                audios={audioResults}
+                                searchMetadata={{
+                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                    page: currentPage,
+                                    pageSize: PAGE_SIZE,
+                                }}
+                                onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                searchTerm={currentQuery}
+                            />
+                        </Box>
                     )}
 
                 </Box>
