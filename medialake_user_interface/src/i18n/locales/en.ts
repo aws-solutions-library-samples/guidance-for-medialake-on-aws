@@ -232,6 +232,7 @@ export default {
         },
         executions: {
             title: 'Pipeline Executions',
+            searchPlaceholder: 'Search pipeline executions...',
             description: 'Monitor and manage your pipeline executions',
             columns: {
                 pipelineName: 'Pipeline Name',

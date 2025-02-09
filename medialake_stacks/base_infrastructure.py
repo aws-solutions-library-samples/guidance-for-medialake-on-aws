@@ -299,6 +299,101 @@ class BaseInfrastructureStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
+        self._assetv2_table = DynamoDB(
+            self,
+            "MediaLakeAssetTableV2",
+            props=DynamoDBProps(
+                name=f"{config.global_prefix}-asset-table-v2-{config.environment}",
+                partition_key_name="PK",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                # pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
+                # ddb_export_bucket=self.ddb_export_bucket,
+                # stream=dynamodb.StreamViewType.NEW_IMAGE,
+                point_in_time_recovery=True,
+                sort_key_name="SK",
+                sort_key_type=dynamodb.AttributeType.STRING,
+            ),
+        )
+
+
+        # Add GSI1 - 
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI1",
+            partition_key=dynamodb.Attribute(
+                name="GSI1PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI1SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        )
+
+        # Add GSI2 - Hash Index
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI2",
+            partition_key=dynamodb.Attribute(
+                name="GSI2PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI2SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        )
+
+        # Add GSI3 - Recent Assets Index
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI3",
+            partition_key=dynamodb.Attribute(
+                name="GSI3PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI3SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        )
+
+        # Add GSI4 - TBD
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI4",
+            partition_key=dynamodb.Attribute(
+                name="GSI4PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI4SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        ) 
+
+        # Add GSI4 - TBD
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI5",
+            partition_key=dynamodb.Attribute(
+                name="GSI5PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI5SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        ) 
+
+        # Add GSI4 - TBD
+        self._assetv2_table.table.add_global_secondary_index(
+            index_name="GSI6",
+            partition_key=dynamodb.Attribute(
+                name="GSI6PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI6SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        ) 
+
         self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
             self,
             "MediaLakeOSIngestionPipeline",
@@ -401,6 +496,8 @@ class BaseInfrastructureStack(Stack):
 
         return "AssetIDIndex"
 
+
+
     @property
     def asset_table_asset_id_index_arn(self) -> str:
         """
@@ -412,6 +509,9 @@ class BaseInfrastructureStack(Stack):
 
         return f"{self._asset_table.table.table_arn}/index/AssetIDIndex"
 
+
+    
+    
     @property
     def collection_dashboards_url(self) -> str:
         """

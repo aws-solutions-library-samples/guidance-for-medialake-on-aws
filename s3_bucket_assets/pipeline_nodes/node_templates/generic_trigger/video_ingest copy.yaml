@@ -1,6 +1,6 @@
 spec: v1.0.0
 node:
-  id: trigger_video_processing_completed
+  id: trigger_video_ingested
   title: Video Processing Completed
   description: Wait for a specific duration
   version: 1.0.0
@@ -8,7 +8,7 @@ node:
   integration:
     config:
       aws_eventbridge:
-        aws_eventbridge_rule: video_processing_completed
+        aws_eventbridge_rule: video_ingested
 actions:
   trigger:
     summary: Trigger after video processing is completed
@@ -24,4 +24,4 @@ actions:
       incoming:
         type: [any]
       outgoing: 
-        type: [any]
+        type: [video]

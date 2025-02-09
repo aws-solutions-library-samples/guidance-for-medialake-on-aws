@@ -122,6 +122,8 @@ class LambdaConfig:
         iam_role_name (Optional[str]): Custom IAM role name
         vpc (Optional[ec2.IVpc]): VPC configuration for the Lambda
         log_removal_policy (Optional[RemovalPolicy]): Removal policy for the CloudWatch log group (default: DESTROY)
+        python_bundling (Optional[BundlingOptions]): Bundling options for Python functions
+        nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
     """
 
     name: Optional[str] = None
@@ -138,6 +140,8 @@ class LambdaConfig:
     iam_role_boundary_policy: Optional[iam.ManagedPolicy] = None
     lambda_handler: Optional[str] = "lambda_handler"
     log_removal_policy: Optional[RemovalPolicy] = RemovalPolicy.DESTROY
+    python_bundling: Optional[BundlingOptions] = None
+    nodejs_bundling: Optional[NodeJSBundlingOptions] = None
 
 
 class Lambda(Construct):
@@ -313,19 +317,14 @@ class Lambda(Construct):
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
+                # Corrected Node.js specific paths
                 common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
                 common_lambda_props["project_root"] = common_lambda_props["entry"]
-                common_lambda_props["deps_lock_file_path"] = (
-                    f"{common_lambda_props['entry']}/lock.json"
+                common_lambda_props["deps_lock_file_path"] = os.path.join(
+                    common_lambda_props["entry"], "package-lock.json"
                 )
-                common_lambda_props["entry"] = (
-                    f"{common_lambda_props['entry']}/index.js"
-                )
-                common_lambda_props["entry"] = os.path.abspath(
-                    common_lambda_props["entry"]
-                )
-                common_lambda_props["deps_lock_file_path"] = os.path.abspath(
-                    common_lambda_props["deps_lock_file_path"]
+                common_lambda_props["entry"] = os.path.join(
+                    common_lambda_props["entry"], "index.js"
                 )
 
                 # Copy common libraries to entry directory
@@ -338,27 +337,16 @@ class Lambda(Construct):
                     self,
                     "StandardNodeJSLambda",
                     bundling=NodeJSBundlingOptions(
-                        node_modules=[
-                            "exifr",
-                            "aws-sdk",
-                        ],
+                        node_modules=["exifr", "aws-sdk"],
                         force_docker_bundling=True,
                     ),
                     **common_lambda_props,
                 )
+                logger.info(f"Created Node.js Lambda: {self.function_name}")
             else:
-                logger.debug("Creating Python Lambda function")
-
-                # For Python functions, we need to copy common libraries to the entry directory
-                if common_libs:
-                    self._copy_common_libraries(common_libs, entry_path)
-
-                self._function = PythonFunction(
-                    self,
-                    "StandardPythonLambda",
-                    **common_lambda_props,
-                )
-            logger.info(f"Successfully created Lambda function: {lambda_function_name}")
+                # Python specific bundling with hash-based asset tracking
+                self._create_python_function(common_lambda_props, config, entry_path, common_libs)
+            
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
@@ -403,6 +391,78 @@ class Lambda(Construct):
         for rel_path, source_path in common_libs.items():
             target_path = target_dir / Path(rel_path).name
             shutil.copy2(source_path, target_path)
+
+    def _create_nodejs_function(self, props: dict, config: LambdaConfig, common_libs: dict):
+        """Handle Node.js specific function creation"""
+        logger = Logger()
+        
+        # Set up Node.js specific paths
+        props["project_root"] = props["entry"]
+        props["deps_lock_file_path"] = str(Path(props["entry"]) / "package-lock.json")
+        props["entry"] = str(Path(props["entry"]) / "index.js")
+
+        # Merge user-provided bundling options with defaults
+        bundling_options = config.nodejs_bundling or NodeJSBundlingOptions(
+            node_modules=["exifr", "aws-sdk"],
+            force_docker_bundling=True
+        )
+        
+        # Handle common libraries
+        if common_libs:
+            self._copy_common_libraries(common_libs, Path(props['project_root']))
+
+        self._function = NodejsFunction(
+            self,
+            "StandardNodeJSLambda",
+            bundling=bundling_options,
+            **props,
+        )
+        logger.info(f"Created Node.js Lambda: {self.function_name}")
+
+    def _create_python_function(self, props: dict, config: LambdaConfig, entry_path: Path, common_libs: dict):
+        """Handle Python specific function creation with asset hashing"""
+        logger = Logger()
+        
+        # Generate hash of source files for deterministic builds
+        source_hash = self._generate_source_hash(entry_path, common_libs)
+        
+        # Merge user-provided bundling options with hash
+        bundling_options = config.python_bundling or BundlingOptions(
+            # asset_hash=source_hash,
+            asset_hash_type=AssetHashType.SOURCE
+        )
+
+        # Copy common libraries
+        if common_libs:
+            self._copy_common_libraries(common_libs, entry_path)
+
+        self._function = PythonFunction(
+            self,
+            "StandardPythonLambda",
+            bundling=bundling_options,
+            **props,
+        )
+        logger.info(f"Created Python Lambda: {self.function_name}")
+
+    def _generate_source_hash(self, entry_path: Path, common_libs: dict) -> str:
+        """Generate MD5 hash of all source files in the entry directory"""
+        import hashlib
+        hash_md5 = hashlib.md5()
+        
+        # Hash application code
+        for file_path in entry_path.glob('**/*'):
+            if file_path.is_file():
+                with open(file_path, 'rb') as f:
+                    while chunk := f.read(4096):
+                        hash_md5.update(chunk)
+        
+        # Hash common libraries
+        for lib_path in common_libs.values():
+            with open(lib_path, 'rb') as f:
+                while chunk := f.read(4096):
+                    hash_md5.update(chunk)
+        
+        return hash_md5.hexdigest()
 
     @property
     def function(self) -> lambda_.Function:
