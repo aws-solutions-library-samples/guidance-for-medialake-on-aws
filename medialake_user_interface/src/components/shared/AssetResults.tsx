@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Grid } from '@mui/material';
+import { Box, Grid, Paper } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
@@ -124,100 +124,109 @@ function AssetResults<T extends AssetBase>({
     };
 
     return (
-        <Box>
-            <AssetViewControls
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-                title={assetType}
-                sorting={sorting}
-                sortOptions={sortOptions}
-                onSortChange={handleRequestSort}
-                fields={viewMode === 'card' ? cardFields : columns}
-                onFieldToggle={viewMode === 'card' ? handleCardFieldToggle : handleColumnToggle}
-            />
-
-            {viewMode === 'card' ? (
-                <Grid container spacing={3}>
-                    {assets.map((asset) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
-                            <AssetCard
-                                id={asset.InventoryID}
-                                name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                                thumbnailUrl={asset.thumbnailUrl}
-                                proxyUrl={asset.proxyUrl}
-                                assetType={assetType}
-                                fields={cardFields}
-                                renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                onAssetClick={() => handleAssetClick(asset)}
-                                onDeleteClick={(e) => handleDeleteClick(asset, e)}
-                                onMenuClick={(e) => handleMenuOpen(asset, e)}
-                                onEditClick={(e) => handleStartEditing(asset, e)}
-                                onImageError={handleAssetError}
-                                isEditing={editingAssetId === asset.InventoryID}
-                                editedName={editedName}
-                                onEditNameChange={handleNameChange}
-                                onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
-                            />
-                        </Grid>
-                    ))}
-                </Grid>
-            ) : (
-                <AssetTable
-                    data={assets}
-                    columns={columns}
+        <Paper 
+            elevation={0} 
+            sx={{ 
+                bgcolor: 'transparent',  // Make background transparent
+                // Remove any padding if present
+                p: 0
+            }}
+        >
+            <Box>
+                <AssetViewControls
+                    viewMode={viewMode}
+                    onViewModeChange={handleViewModeChange}
+                    title={assetType}
                     sorting={sorting}
-                    onSortingChange={setSorting}
-                    onDeleteClick={handleDeleteClick}
-                    onMenuClick={handleMenuOpen}
-                    onEditClick={handleStartEditing}
-                    onRowClick={handleAssetClick}
-                    getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
-                    getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                    getId={(asset) => asset.InventoryID}
-                    editingId={editingAssetId}
-                    editedName={editedName}
-                    onEditNameChange={handleNameChange}
-                    onEditNameComplete={handleNameEditComplete}
-                    onFilterClick={handleFilterClick}
-                    activeFilters={columnFilters}
-                    onRemoveFilter={handleRemoveFilter}
+                    sortOptions={sortOptions}
+                    onSortChange={handleRequestSort}
+                    fields={viewMode === 'card' ? cardFields : columns}
+                    onFieldToggle={viewMode === 'card' ? handleCardFieldToggle : handleColumnToggle}
                 />
-            )}
 
-            <AssetPagination
-                page={page}
-                pageSize={searchMetadata.pageSize}
-                totalResults={searchMetadata.totalResults}
-                onPageChange={handlePageChange}
-            />
+                {viewMode === 'card' ? (
+                    <Grid container spacing={3}>
+                        {assets.map((asset) => (
+                            <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
+                                <AssetCard
+                                    id={asset.InventoryID}
+                                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                    thumbnailUrl={asset.thumbnailUrl}
+                                    proxyUrl={asset.proxyUrl}
+                                    assetType={assetType}
+                                    fields={cardFields}
+                                    renderField={(fieldId) => renderCardField(fieldId, asset)}
+                                    onAssetClick={() => handleAssetClick(asset)}
+                                    onDeleteClick={(e) => handleDeleteClick(asset, e)}
+                                    onMenuClick={(e) => handleMenuOpen(asset, e)}
+                                    onEditClick={(e) => handleStartEditing(asset, e)}
+                                    onImageError={handleAssetError}
+                                    isEditing={editingAssetId === asset.InventoryID}
+                                    editedName={editedName}
+                                    onEditNameChange={handleNameChange}
+                                    onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
+                                />
+                            </Grid>
+                        ))}
+                    </Grid>
+                ) : (
+                    <AssetTable
+                        data={assets}
+                        columns={columns}
+                        sorting={sorting}
+                        onSortingChange={setSorting}
+                        onDeleteClick={handleDeleteClick}
+                        onMenuClick={handleMenuOpen}
+                        onEditClick={handleStartEditing}
+                        onRowClick={handleAssetClick}
+                        getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
+                        getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                        getId={(asset) => asset.InventoryID}
+                        editingId={editingAssetId}
+                        editedName={editedName}
+                        onEditNameChange={handleNameChange}
+                        onEditNameComplete={handleNameEditComplete}
+                        onFilterClick={handleFilterClick}
+                        activeFilters={columnFilters}
+                        onRemoveFilter={handleRemoveFilter}
+                    />
+                )}
 
-            <AssetActionsMenu
-                anchorEl={menuAnchorEl}
-                selectedAsset={selectedAsset}
-                onClose={handleMenuClose}
-                onAction={handleAction}
-                actions={actions}
-            />
+                <AssetPagination
+                    page={page}
+                    pageSize={searchMetadata.pageSize}
+                    totalResults={searchMetadata.totalResults}
+                    onPageChange={handlePageChange}
+                />
 
-            <ConfirmationModal
-                open={isDeleteModalOpen}
-                title={`Delete ${assetType}`}
-                message={`Are you sure you want to delete "${assetToDelete?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}"? This action cannot be undone.`}
-                onConfirm={handleDeleteConfirm}
-                onCancel={handleDeleteCancel}
-                confirmText={`Delete ${assetType}`}
-                isLoading={isLoading.delete}
-            />
+                <AssetActionsMenu
+                    anchorEl={menuAnchorEl}
+                    selectedAsset={selectedAsset}
+                    onClose={handleMenuClose}
+                    onAction={handleAction}
+                    actions={actions}
+                />
 
-            <RenameDialog
-                open={isRenameDialogOpen}
-                title="Rename Asset"
-                currentName={selectedAsset?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name || ''}
-                onConfirm={handleRenameConfirm}
-                onCancel={handleRenameCancel}
-                isLoading={isLoading.rename}
-            />
-        </Box>
+                <ConfirmationModal
+                    open={isDeleteModalOpen}
+                    title={`Delete ${assetType}`}
+                    message={`Are you sure you want to delete "${assetToDelete?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}"? This action cannot be undone.`}
+                    onConfirm={handleDeleteConfirm}
+                    onCancel={handleDeleteCancel}
+                    confirmText={`Delete ${assetType}`}
+                    isLoading={isLoading.delete}
+                />
+
+                <RenameDialog
+                    open={isRenameDialogOpen}
+                    title="Rename Asset"
+                    currentName={selectedAsset?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name || ''}
+                    onConfirm={handleRenameConfirm}
+                    onCancel={handleRenameCancel}
+                    isLoading={isLoading.rename}
+                />
+            </Box>
+        </Paper>
     );
 }
 
