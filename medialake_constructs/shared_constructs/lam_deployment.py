@@ -19,10 +19,12 @@ class LambdaDeployment(Construct):
         destination_bucket: s3.IBucket,
         code_path: list,
         runtime: str = "python3.12",
+        parent_folder: str = "",
         **kwargs,
     ):
         super().__init__(scope, id, **kwargs)
         self.id = id
+        self.parent_folder = parent_folder
 
         lambda_source_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..", *code_path)
@@ -42,12 +44,18 @@ class LambdaDeployment(Construct):
             else:
                 raise ValueError(f"Unsupported runtime: {runtime}")
 
+            # Construct the destination_key_prefix
+            if parent_folder:
+                destination_key_prefix = f"lambda-code/{parent_folder}/{self.id}"
+            else:
+                destination_key_prefix = f"lambda-code/{self.id}"
+
             self.deployment = s3deploy.BucketDeployment(
                 self,
                 f"{self.id}-LambdaCodeDeployment",
                 sources=[s3deploy.Source.asset(zip_path)],
                 destination_bucket=destination_bucket,
-                destination_key_prefix=f"lambda-code/{self.id}",
+                destination_key_prefix=destination_key_prefix,
                 extract=False,
             )
 
@@ -87,4 +95,7 @@ class LambdaDeployment(Construct):
 
     @property
     def deployment_key(self) -> str:
-        return f"lambda-code/{self.id}/{Fn.select(0, self.deployment.object_keys)}"
+        if self.parent_folder:
+            return f"lambda-code/{self.parent_folder}/{self.id}/{Fn.select(0, self.deployment.object_keys)}"
+        else:
+            return f"lambda-code/{self.id}/{Fn.select(0, self.deployment.object_keys)}"

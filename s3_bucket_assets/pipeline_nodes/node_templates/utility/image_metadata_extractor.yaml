@@ -1,0 +1,40 @@
+spec: v1.0.0
+node:
+  id: image_metadata_extractor
+  title: Image Metadata Extractor
+  description: Extract metadata from image files stored in S3
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/image_metadata_extractor.zip
+        runtime: python3.12
+actions:
+  extract:
+    summary: Extract image metadata
+    description: Extract metadata from an image file stored in S3
+    operationId: extractImageMetadata
+    parameters:
+      - in: body
+        name: S3 File Location
+        required: true
+        schema:
+          type: object
+          properties:
+            bucket:
+              type: string
+              description: S3 bucket name
+            key:
+              type: string
+              description: S3 object key
+          required:
+            - bucket
+            - key
+    x-inputMapping: processor/image_metadata_extractor/extract/
+    x-outputMapping: processor/image_metadata_extractor/extract/
+    connections:
+      incoming:
+        type: [image]
+      outgoing:
+        type: [metadata]

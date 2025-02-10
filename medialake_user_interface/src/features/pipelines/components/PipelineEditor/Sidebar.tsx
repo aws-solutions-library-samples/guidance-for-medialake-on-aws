@@ -67,7 +67,8 @@ const SidebarContent: React.FC = () => {
         const groupedNodes: NodeSection[] = [
             { title: 'Triggers', types: ['TRIGGER'], nodes: [] },
             { title: 'Integrations', types: ['INTEGRATION'], nodes: [] },
-            { title: 'Flow', types: ['FLOW'], nodes: [] }
+            { title: 'Flow', types: ['FLOW'], nodes: [] },
+            { title: 'Utilities', types: ['UTILITY'], nodes: [] }
         ];
 
         nodesResponse.data.forEach((node) => {

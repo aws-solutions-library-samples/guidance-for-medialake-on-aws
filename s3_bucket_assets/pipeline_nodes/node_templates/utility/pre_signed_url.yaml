@@ -9,7 +9,7 @@ node:
     config:
       lambda:
         handler: utility/pre_signed_url.zip
-        runtime: Python3.12
+        runtime: python3.12
 actions:
   generate:
     summary: Generate pre-signed URL
@@ -26,5 +26,5 @@ actions:
     connections:
       incoming:
         type: [video, image, audio]
-      outgoing: 
+      outgoing:
         type: [presigned_url]
