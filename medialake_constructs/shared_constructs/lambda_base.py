@@ -321,7 +321,7 @@ class Lambda(Construct):
                 common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
                 common_lambda_props["project_root"] = common_lambda_props["entry"]
                 common_lambda_props["deps_lock_file_path"] = os.path.join(
-                    common_lambda_props["entry"], "package-lock.json"
+                    common_lambda_props["entry"], "lock.json"
                 )
                 common_lambda_props["entry"] = os.path.join(
                     common_lambda_props["entry"], "index.js"
@@ -398,7 +398,7 @@ class Lambda(Construct):
         
         # Set up Node.js specific paths
         props["project_root"] = props["entry"]
-        props["deps_lock_file_path"] = str(Path(props["entry"]) / "package-lock.json")
+        props["deps_lock_file_path"] = str(Path(props["entry"]) / "lock.json")
         props["entry"] = str(Path(props["entry"]) / "index.js")
 
         # Merge user-provided bundling options with defaults
