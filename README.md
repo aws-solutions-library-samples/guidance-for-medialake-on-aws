@@ -72,12 +72,6 @@ touch config.json
 
 ```json
 {
-    
-    
-    
-}
-
-{
     "environment": "dev",
     "resource_prefix": "medialake",
     "account_id": "your-aws-account-id",
