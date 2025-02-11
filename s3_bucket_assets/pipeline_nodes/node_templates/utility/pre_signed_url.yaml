@@ -21,8 +21,8 @@ actions:
         required: true
         schema:
           type: number
-    x-inputMapping: utility/pre_signed_url/generate/
-    x-outputMapping: utility/pre_signed_url/generate/
+    x-requestMapping: utility/pre_signed_url/generate/
+    x-responseMapping: utility/pre_signed_url/generate/
     connections:
       incoming:
         type: [video, image, audio]

@@ -37,6 +37,7 @@ const SidebarContent: React.FC = () => {
 
     const onDragStart = (event: React.DragEvent, node: NodeType, methodName: string) => {
         const method = node.methods?.[methodName];
+        console.log(method)
         const nodeData = {
             id: node.nodeId,
             type: node.info.nodeType,
@@ -49,9 +50,9 @@ const SidebarContent: React.FC = () => {
             selectedMethod: methodName,
             methodConfig: {
                 method: methodName,
-                parameters: method?.parameters || {},
-                inputMapping: method?.inputMapping,
-                outputMapping: method?.outputMapping,
+                parameters: method?.config?.parameters || {},
+                requestMapping: method?.requestMapping,
+                responseMapping: method?.responseMapping,
                 path: method?.path,
                 operationId: method?.operationId,
             },
@@ -78,6 +79,7 @@ const SidebarContent: React.FC = () => {
                     const section = groupedNodes.find(s =>
                         s.types.some(type => nodeType.includes(type))
                     );
+
                     if (section) {
                         section.nodes.push({ node, methodName, method });
                     }
@@ -87,6 +89,7 @@ const SidebarContent: React.FC = () => {
 
         return groupedNodes;
     }, [nodesResponse?.data]);
+
 
     const filteredSections = useMemo(() => {
         return sections.map(section => ({

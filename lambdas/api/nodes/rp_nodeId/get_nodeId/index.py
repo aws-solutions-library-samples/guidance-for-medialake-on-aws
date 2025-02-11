@@ -239,8 +239,8 @@ def get_node_by_id(node_id: str):
         {
             "name": method.get("methodName"),
             "description": method.get("methodDescription"),
-            "inputMapping": method.get("methodConfig", {}).get("inputMapping"),
-            "outputMapping": method.get("methodConfig", {}).get("outputMapping"),
+            "requestMapping": method.get("methodConfig", {}).get("requestMapping"),
+            "responseMapping": method.get("methodConfig", {}).get("responseMapping"),
             "parameters": method.get("methodConfig", {}).get("parameters", []),
         }
         for method in methods_response.get("Items", [])

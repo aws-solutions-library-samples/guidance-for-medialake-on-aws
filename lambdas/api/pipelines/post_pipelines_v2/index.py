@@ -1013,6 +1013,7 @@ def create_pipeline() -> Dict[str, Any]:
         lambda_arns = {}
         for node in pipeline.configuration.nodes:
             logger.info(f"Processing node with id: {node.id}")
+            logger.info(node.id)
             lambda_arn = create_lambda_function(pipeline_name, node)
             lambda_arns[node.data.id] = lambda_arn
 

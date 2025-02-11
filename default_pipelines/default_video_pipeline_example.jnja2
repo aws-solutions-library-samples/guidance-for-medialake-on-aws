@@ -25,8 +25,8 @@
                 "integrationId": "arn:XXXXXXXXXXX"
                 "data": {
                     "method": "sadfsadfsadf",
-                    "inputMapping": "twelvelabs/createembeddings.jnja",
-                    "outputMapping": "twelvelabs/createembeddings.jnja",
+                    "requestMapping": "twelvelabs/createembeddings.jnja",
+                    "responseMapping": "twelvelabs/createembeddings.jnja",
                     "parameters": {
                         "format": "mp4",
                         "offset": 10

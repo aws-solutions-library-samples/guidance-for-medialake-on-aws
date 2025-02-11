@@ -1,5 +1,6 @@
 export interface NodeParameter {
     name: string;
+    label: string;
     type: 'text' | 'number' | 'boolean' | 'select';
     required: boolean;
     description?: string;
@@ -28,8 +29,8 @@ export interface NodeInfo {
 export interface NodeConfiguration {
     method: string;
     parameters: Record<string, any>;
-    inputMapping?: string;
-    outputMapping?: string;
+    requestMapping?: string;
+    responseMapping?: string;
     path?: string;
     operationId?: string;
     integrationId?: string;

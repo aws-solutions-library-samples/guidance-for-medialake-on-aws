@@ -31,8 +31,8 @@ actions:
           required:
             - bucket
             - key
-    x-inputMapping: processor/image_metadata_extractor/extract/
-    x-outputMapping: processor/image_metadata_extractor/extract/
+    x-requestMapping: processor/image_metadata_extractor/extract/
+    x-responseMapping: processor/image_metadata_extractor/extract/
     connections:
       incoming:
         type: [image]
