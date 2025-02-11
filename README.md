@@ -26,7 +26,7 @@ MediaLake is a serverless media processing platform built on AWS, designed to ha
 1. Clone the repository:
 
 ```bash
-git clone https://gitlab.aws.dev/aws-mne-msc/media-lake-v2/
+git clone git@ssh.gitlab.aws.dev:aws-mne-msc/media-lake-v2.git
 cd medialakev2
 ```
 
@@ -72,9 +72,15 @@ touch config.json
 
 ```json
 {
-    "environment": "dev", 
-    "account_id": "your-aws-account-id",
+    
+    
+    
+}
+
+{
+    "environment": "dev",
     "resource_prefix": "medialake",
+    "account_id": "your-aws-account-id",
     "global_prefix": "medialake",
     "resource_application_tag": "medialake",
     "api_path": "prod",
@@ -84,15 +90,12 @@ touch config.json
         "first_name": "Medialake",
         "last_name": "User"
     },
-    "opensearch_cluster_settings": {
-        "master_node_count": 2, # Must be at least the number of AZ zone count
-        "master_node_instance_type": "r7g.medium.search",
-        "data_node_count": 2, #Must be even numbers if 2 AZ zone count and odd if odd 
-        "data_node_instance_type": "r7g.medium.search",
-        "data_node_volume_size": 10,
-        "data_node_volume_type": "gp3",
-        "data_node_volume_iops": 3000,
-        "availability_zone_count": 2
+    "logging": {
+        "retention_days": 90,
+        "s3_retention_days": 90,
+        "cloudwatch_retention_days": 90,
+        "waf_retention_days": 90,
+        "api_gateway_retention_days": 90
     },
     "authZ": {
         "identity_providers": [
@@ -105,8 +108,46 @@ touch config.json
                 "identity_provider_method": "cognito"
             }
         ]
+    },
+    "vpc": {
+        "use_existing_vpc": <boolean>,
+        "existing_vpc": {
+            "vpc_id": "VPC-ID",
+            "vpc_cidr": "VPC-CIDR",
+            "subnet_ids": {
+                "public": [
+                    "subnet-xxx",
+                    "subnet-xxx",
+                    "subnet-xxx"
+                ],
+                "private": [
+                    "subnet-xxx",
+                    "subnet-xxx",
+                    "subnet-xxx"
+                ]
+            }
+        },
+        "new_vpc": {
+            "vpc_name": "MediaLakeVPC",
+            "max_azs": 3,
+            "cidr": "VPC-CIDR",
+            "enable_dns_hostnames": <boolean>,
+            "enable_dns_support": <boolean>
+        }
+    },
+    "opensearch_cluster_settings": {
+        "master_node_count": 3, # Must be at least the number of AZ zone count
+        "master_node_instance_type": "r7g.medium.search",
+        "data_node_count": 2, #Must be even numbers if 2 AZ zone count and odd if odd 
+        "data_node_instance_type": "r7g.medium.search",
+        "data_node_volume_size": 10,
+        "data_node_volume_type": "gp3",
+        "data_node_volume_iops": 3000,
+        "multi_az_with_standby_enabled": false,
+        "availability_zone_count": 2
     }
 }
+
 ```
 
 ## 📚 Configuration Parameters
@@ -211,7 +252,7 @@ aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 3. Deploy the stack:
 
 ```bash
-cdk deploy
+cdk deploy --all
 ```
 
 ## 🏗️ Project Structure
