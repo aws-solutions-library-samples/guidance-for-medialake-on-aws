@@ -16,7 +16,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button } from '@mui/material';
 import { FaFileVideo } from 'react-icons/fa';
-import { useGetPipeline, useCreatePipeline, useUpdatePipeline } from '../api/pipelinesController';
+import { useGetPipelines, useGetPipeline, useCreatePipeline, useUpdatePipeline } from '../api/pipelinesController';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
 import type { Pipeline, CreatePipelineDto, PipelineEdge, PipelineNode } from '../types/pipelines.types';
 import type { NodesResponse } from '@/shared/nodes/types/nodes.types';
@@ -171,6 +171,9 @@ const PipelineEditorContent = () => {
             }
         }
     });
+
+    // Fetch all pipelines when the component mounts
+    const { data: pipelinesData } = useGetPipelines();
 
     const { data: pipeline } = useGetPipeline(pipelineId || '', {
         enabled: !!pipelineId && pipelineId !== 'new'
