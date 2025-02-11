@@ -455,7 +455,7 @@ class UIConstruct(Construct):
             log_file_prefix="medialake-cloudfront-logs",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_root_object=props.distribution_default_root_object,
-            geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
+            # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
             error_responses=[
                 cloudfront.ErrorResponse(
                     http_status=403,
