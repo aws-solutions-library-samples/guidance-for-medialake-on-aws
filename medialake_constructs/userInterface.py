@@ -392,14 +392,17 @@ class UIConstruct(Construct):
             enable_accept_encoding_brotli=True,
         )
 
+        # Create a shared CF Origin for static assets (S3)
+        s3_orig = origins.S3BucketOrigin.with_origin_access_control(
+            medialake_ui_s3_bucket.bucket,
+        )
+
         self.cloudfront_distribution = cloudfront.Distribution(
             self,
             "MediaLakeDistrubtion",
             web_acl_id=self.user_interface_waf_acl.attr_arn,
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3BucketOrigin.with_origin_access_control(
-                    medialake_ui_s3_bucket.bucket,
-                ),
+                origin=s3_orig,
                 response_headers_policy=ui_response_headers_policy,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
@@ -410,9 +413,7 @@ class UIConstruct(Construct):
             ),
             additional_behaviors={
                 "*.js": cloudfront.BehaviorOptions(
-                    origin=origins.S3BucketOrigin.with_origin_access_control(
-                        medialake_ui_s3_bucket.bucket,
-                    ),
+                    origin=s3_orig,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
                     cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
@@ -422,9 +423,7 @@ class UIConstruct(Construct):
                     compress=True,
                 ),
                 "*.css": cloudfront.BehaviorOptions(
-                    origin=origins.S3BucketOrigin.with_origin_access_control(
-                        medialake_ui_s3_bucket.bucket,
-                    ),
+                    origin=s3_orig,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
                     cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
