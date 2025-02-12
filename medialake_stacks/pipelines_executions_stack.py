@@ -46,7 +46,7 @@ class PipelinesExecutionsStack(Stack):
             ),
         )
 
-        step_functions_rule = events.Rule(
+        _ = events.Rule(
             self,
             "StepFunctionsRule",
             rule_name="step-functions-events-rule",
@@ -71,7 +71,7 @@ class PipelinesExecutionsStack(Stack):
                 partition_key_name="execution_id",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="start_time",
-                sort_key_type=dynamodb.AttributeType.NUMBER,
+                sort_key_type=dynamodb.AttributeType.STRING,
             ),
         )
 
@@ -79,8 +79,8 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PipelinesExecutionsEventProcessor",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_pipelines_executions_{config.environment}",
-                timeout_minutes=15,
+                name="pipelines_executions_event_processor",
+                timeout_minutes=5,
                 entry="lambdas/back_end/pipelines_executions_event_processor",
                 environment_variables={
                     "PIPELINES_EXECUTIONS_TABLE_NAME": self._pipelnes_executions_table.table_arn,
@@ -92,8 +92,7 @@ class PipelinesExecutionsStack(Stack):
             self._pipeline_executions_event_processor.function
         )
 
-        # Create a rule to trigger the pipeline executions event processor lambda
-        pipelines_executions_lambda_rule = events.Rule(
+        _ = events.Rule(
             self,
             "PipelinesExecutionsLambdaRule",
             rule_name=f"{config.resource_prefix}-pipelines-executions-lambda-trigger-{config.environment}",
@@ -117,7 +116,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsHandler",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_get_executions_{config.environment}",
+                name=f"get_executions",
                 entry="lambdas/api/pipelines/executions/get_executions",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
@@ -135,7 +134,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsExecutionIdHandler",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_get_executions_executionid_{config.environment}",
+                name="get_executions_executionid",
                 entry="lambdas/api/pipelines/executions/rp_executionId/get_execution",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
@@ -152,7 +151,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PostPipelinesExecutionsRetryHandler",
             config=LambdaConfig(
-                name="executionretry",
+                name="post_executionId_retry",
                 entry="lambdas/api/pipelines/executions/rp_executionId/retry/post_retry",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,

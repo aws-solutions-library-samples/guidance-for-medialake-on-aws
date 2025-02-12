@@ -60,6 +60,7 @@ class DynamoDB(Construct):
             "point_in_time_recovery": props.point_in_time_recovery,
             "removal_policy": RemovalPolicy.DESTROY,
             "dynamo_stream": props.stream,
+            "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
         }
 
         # Add sort key if provided

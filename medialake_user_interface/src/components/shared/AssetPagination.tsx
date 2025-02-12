@@ -25,7 +25,7 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
             alignItems: 'center',
             mt: 6,
             mb: 2,
-            backgroundColor: 'background.paper'
+            backgroundColor: 'transparent' // the background color of the pagination container/box
         }}>
             <Typography variant="body2" color="text.secondary">
                 Showing {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, totalResults)} of {totalResults} results
@@ -47,7 +47,7 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
                         '&.Mui-selected': {
                             fontWeight: 'bold',
                             backgroundColor: 'primary.main',
-                            color: 'white',
+                            color: 'white', //the color of the text for selected pagination item
                             '&:hover': {
                                 backgroundColor: 'primary.dark',
                             }

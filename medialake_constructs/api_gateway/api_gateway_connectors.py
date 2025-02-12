@@ -541,6 +541,24 @@ class ConnectorsConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
+        
+        s3_connector_id = connector_s3_resource.add_resource("{connector_id}")
+        # s3_sync_connector_resource = s3_connector_id.add_resource("sync")
+
+        # s3_sync_lambda = Lambda(
+        #     self,
+        #     "S3SyncLambda",
+        #     config=LambdaConfig(
+        #         name="post_connector_s3_sync",
+        #         entry="lambdas/api/connectors/s3/connector_id/post_sync",
+        #         environment_variables={
+        #             "X_ORIGIN_VERIFY_SECRET_ARN": (
+        #                 props.x_origin_verify_secret.secret_arn
+        #             ),
+        #         },
+        #     ),
+        # )        
+        
 
         # Create s3 explorer resource with path parameter
         s3_explorer_resource = connector_s3_resource.add_resource("explorer")
