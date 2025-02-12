@@ -5,6 +5,7 @@ import time
 import string
 import random
 import boto3
+import traceback
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -382,12 +383,9 @@ def create_connector(createconnector: S3Connector) -> dict:
         existing_connector = check_existing_connector(s3_bucket)
         if existing_connector:
             return {
-                "status": "200",
-                "message": "ok",
-                "data": {
-                    "message": f"Connector already exists for bucket {s3_bucket}",
-                    "connector": existing_connector,
-                },
+                "status": "400",
+                "message": f"Connector already exists for bucket {s3_bucket}",
+                "data": {},
             }
 
         # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
@@ -429,7 +427,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             bucket_region = bucket_region or "us-east-1"
         except s3_client.exceptions.ClientError:
             return {
-                "statusCode": 400,
+                "status": 400,
                 "body": {
                     "status": "400",
                     "message": (
@@ -466,13 +464,11 @@ def create_connector(createconnector: S3Connector) -> dict:
             )
         elif integration_method in ["s3Notifications", "s3-event-notifications"]:
             if existing_notifications:
+
                 return {
-                    "statusCode": 400,
-                    "body": {
-                        "status": "400",
-                        "message": f"S3 bucket '{s3_bucket}' already has existing notifications configured",
-                        "data": {},
-                    },
+                    "status": "400",
+                    "message": f"S3 bucket '{s3_bucket}' already has existing notifications configured",
+                    "data": {},
                 }
             # Set up S3 event notifications
             # Create SQS queue in the same region as the bucket
@@ -770,14 +766,9 @@ def create_connector(createconnector: S3Connector) -> dict:
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
         if not table_name:
             return {
-                "statusCode": 500,
-                "body": {
-                    "status": "500",
-                    "message": (
-                        "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
-                    ),
-                    "data": {},
-                },
+                "status": "400",
+                "message": "MEDIALAKE_CONNECTOR_TABLE environment variable is not set",
+                "data": {},
             }
 
         table = dynamodb.Table(table_name)
@@ -808,6 +799,8 @@ def create_connector(createconnector: S3Connector) -> dict:
     except Exception as e:
         eventbridge = boto3.client("events")
         logger.exception(f"Unexpected error: {str(e)}")
+        error_traceback = traceback.format_exc()
+
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
             try:
@@ -859,8 +852,12 @@ def create_connector(createconnector: S3Connector) -> dict:
                 )
 
         return {
-            "statusCode": 500,
-            "body": {"status": "500", "message": "Internal server error", "data": {}},
+            "status": "400",
+            "message": str(e),
+            "data": {
+                "traceback": error_traceback,
+                "created_resources": created_resources,
+            },
         }
 
 
