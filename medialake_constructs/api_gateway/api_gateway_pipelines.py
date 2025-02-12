@@ -17,6 +17,11 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PyamlLayer,
+    ShortuuidLayer,
+)
+
 
 @dataclass
 class ApiGatewayPipelinesProps:
@@ -27,6 +32,7 @@ class ApiGatewayPipelinesProps:
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
+    pipelines_nodes_templates_bucket: s3.IBucket
     image_proxy_lambda: lambda_.IFunction
     image_metadata_extractor_lambda: lambda_.IFunction
     get_pipelines_executions_lambda: lambda_.IFunction
@@ -201,24 +207,28 @@ class ApiGatewayPipelinesConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
+        pyaml_layer = PyamlLayer(self, "PyamlLayer")
+        shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
         # POST /api/pipelines V2
         post_pipelines_v2_lambda_config = LambdaConfig(
             name="pipeline_post_v2",
             timeout_minutes=10,
             entry="lambdas/api/pipelines/post_pipelines_v2",
+            layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                # "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
-                # "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
+                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.kms_key.key_arn,
                 "PIPELINES_TABLE": props.pipeline_table.table_arn,
-                # "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 # "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
                 # "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
-                # "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+                "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+                "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
                 # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 # "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "NODE_TABLE": props.node_table.table_arn,
@@ -274,6 +284,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "lambda:GetFunction",
                     "lambda:CreateEventSourceMapping",
                     "lambda:UpdateFunctionConfiguration",
+                    "lambda:GetFunctionConfiguration",
+                    # "lambda:UpdateFunctionCode",
                     "lambda:DeleteFunction",  # For rollback
                 ],
                 resources=["*"],
@@ -285,7 +297,9 @@ class ApiGatewayPipelinesConstruct(Construct):
                 actions=[
                     "states:CreateStateMachine",
                     "states:TagResource",
+                    "states:UpdateStateMachine",
                     "states:DescribeStateMachine",
+                    "states:ListStateMachines",  # For check if exists
                     "states:DeleteStateMachine",  # For rollback
                 ],
                 resources=["*"],
@@ -301,7 +315,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["dynamodb:PutItem", "dynamodb:Scan"],
+                actions=["dynamodb:PutItem", "dynamodb:Scan", "dynamodb:UpdateItem"],
                 resources=[props.pipeline_table.table_arn],
             )
         )
@@ -329,6 +343,24 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                resources=["*"],
+            )
+        )
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetObject"],
+                resources=[
+                    props.pipelines_nodes_templates_bucket.bucket_arn,
+                    f"{props.pipelines_nodes_templates_bucket.bucket_arn}/*",
+                ],
+            )
+        )
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "kms:Decrypt",
+                ],
                 resources=["*"],
             )
         )

@@ -27,11 +27,11 @@
                     "bucketName"
                 ]
             },
-            "inputMapping": {
+            "requestMapping": {
                 "type": "object",
                 "description": "Maps workflow input to S3 parameters"
             },
-            "outputMapping": {
+            "responseMapping": {
                 "type": "object",
                 "description": "Maps S3 response to workflow output"
             }

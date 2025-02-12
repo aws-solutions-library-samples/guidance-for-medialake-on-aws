@@ -259,7 +259,7 @@ exports.lambda_handler = async (event) => {
             body: JSON.stringify({
                 inventoryId,
                 message: 'Metadata extracted and stored successfully',
-                metadata: sanitizedMetadata
+                // metadata: sanitizedMetadata
             }, (key, value) => {
                 if (typeof value === 'bigint') {
                     return value.toString();

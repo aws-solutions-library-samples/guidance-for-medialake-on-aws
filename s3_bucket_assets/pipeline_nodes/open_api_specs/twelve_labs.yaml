@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
-    title: Twelve Labs API
-    version: 1.3
-    description: Twelve Labs API for video, image, and audio understanding and multimodal embeddings
+  title: Twelve Labs API
+  version: 1.3
+  description: Twelve Labs API for video, image, and audio understanding and multimodal embeddings
 security:
   - apiKey: []
 
@@ -23,14 +23,14 @@ components:
       name: x-api-key
   headers:
     Content-Type:
-      description: content type 
+      description: content type
       schema:
         type: string
     accept:
-      description: content type 
+      description: content type
       schema:
         type: string
-      
+
 paths:
   /embed/tasks:
     post:
@@ -43,8 +43,8 @@ paths:
           required: true
           schema:
             type: string
-      x-inputMapping: twelve_labs/embed/tasks/post/input
-      x-outputMapping: twelve_labs/embed/tasks/post/output
+      x-requestMapping: twelve_labs/embed/tasks/post/input
+      x-responseMapping: twelve_labs/embed/tasks/post/output
   /embed/tasks/{task_id}/status:
     get:
       summary: Get the status of a video embedding task
@@ -55,8 +55,8 @@ paths:
           required: true
           schema:
             type: string
-      x-inputMapping: twelve_labs/embed/tasks/task_id/status/get/input
-      x-outputMapping: twelve_labs/embed/tasks/task_id/status/get/output
+      x-requestMapping: twelve_labs/embed/tasks/task_id/status/get/input
+      x-responseMapping: twelve_labs/embed/tasks/task_id/status/get/output
   /embed/tasks/{task_id}:
     get:
       summary: Get the results of a video embedding task
@@ -67,5 +67,5 @@ paths:
           required: true
           schema:
             type: string
-      x-inputMapping: twelve_labs/embed/tasks/task_id/get/input
-      x-outputMapping: twelve_labs/embed/tasks/task_id/get/output
+      x-requestMapping: twelve_labs/embed/tasks/task_id/get/input
+      x-responseMapping: twelve_labs/embed/tasks/task_id/get/output

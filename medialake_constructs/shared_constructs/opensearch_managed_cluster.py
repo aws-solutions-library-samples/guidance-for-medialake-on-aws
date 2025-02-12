@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_lambda as lambda_,
     aws_opensearchservice as opensearch,
+    aws_opensearchservice as opensearchservice,
     aws_ec2 as ec2,
     CustomResource,
     custom_resources as cr,
@@ -11,6 +12,8 @@ from aws_cdk import (
     RemovalPolicy,
     CfnOutput,
 )
+import json
+from datetime import datetime
 import hashlib
 from config import config
 from constructs import Construct
@@ -25,7 +28,8 @@ import time
 @dataclass
 class OpenSearchClusterProps:
     domain_name: str
-    engine_version: str = opensearch.EngineVersion.OPENSEARCH_2_15
+    # engine_version: str = opensearch.EngineVersion.OPENSEARCH_2_15
+    engine_version: str = "OpenSearch_2.15"
     master_node_instance_type: str = (
         config.opensearch_cluster_settings.master_node_instance_type
     )
@@ -48,9 +52,25 @@ class OpenSearchClusterProps:
     multi_az_with_standby_enabled: bool = False
     encryption_at_rest: bool = True
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
-    off_peak_window_enabled: bool = True
+    # off_peak_window_enabled: bool = True
+    # off_peak_window_start: opensearch.WindowStartTime = field(
+    #     default_factory=lambda: opensearch.WindowStartTime(hours=20, minutes=0)
+    # )
+    off_peak_window_enabled: bool = field(
+        default=config.opensearch_cluster_settings.off_peak_window_enabled
+    )
     off_peak_window_start: opensearch.WindowStartTime = field(
-        default_factory=lambda: opensearch.WindowStartTime(hours=20, minutes=0)
+        default_factory=lambda: opensearch.WindowStartTime(
+            hours=int(
+                config.opensearch_cluster_settings.off_peak_window_start.split(":")[0]
+            ),
+            minutes=int(
+                config.opensearch_cluster_settings.off_peak_window_start.split(":")[1]
+            ),
+        )
+    )
+    automated_snapshot_start_hour: int = field(
+        default=config.opensearch_cluster_settings.automated_snapshot_start_hour
     )
 
 
@@ -78,7 +98,18 @@ class OpenSearchClusterProps:
 #     )
 
 
+def grant_opensearch_access(log_group: logs.LogGroup):
+    log_group.add_to_resource_policy(
+        iam.PolicyStatement(
+            actions=["logs:PutLogEvents", "logs:CreateLogStream"],
+            principals=[iam.ServicePrincipal("es.amazonaws.com")],
+            resources=[log_group.log_group_arn],
+        )
+    )
+
+
 class OpenSearchCluster(Construct):
+
     def __init__(
         self,
         scope: Construct,
@@ -98,24 +129,36 @@ class OpenSearchCluster(Construct):
         if not props.vpc:
             raise ValueError("A VPC must be provided for the OpenSearch domain.")
 
+        access_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": f"arn:aws:iam::{self.account_id}:root"},
+                    "Action": "es:*",
+                    "Resource": f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*",
+                }
+            ],
+        }
         # Define Access Policy
-        access_policy = iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            principals=[
-                iam.ServicePrincipal("es.amazonaws.com"),
-            ],
-            actions=[
-                "es:ESHttpPut",
-                "es:ESHttpPost",
-                "es:ESHttpGet",
-                "es:ESHttpDelete",
-                "es:ESHttpHead",
-            ],
-            resources=[
-                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}",
-                f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*",  # Include if specific resources are not feasible
-            ],
-        )
+        # access_policy = iam.PolicyStatement(
+        #     effect=iam.Effect.ALLOW,
+        #     principals=[
+        #         iam.ArnPrincipal(f"arn:aws:iam::{self.account_id}:root"),
+        #         iam.ServicePrincipal("es.amazonaws.com"),
+        #     ],
+        #     actions=[
+        #         "es:ESHttpPut",
+        #         "es:ESHttpPost",
+        #         "es:ESHttpGet",
+        #         "es:ESHttpDelete",
+        #         "es:ESHttpHead",
+        #     ],
+        #     resources=[
+        #         f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}",
+        #         f"arn:aws:es:{stack.region}:{stack.account}:domain/{props.domain_name}/*",
+        #     ],
+        # )
 
         # Create a Security Group with restricted access
         os_security_group = ec2.SecurityGroup(
@@ -139,7 +182,7 @@ class OpenSearchCluster(Construct):
                 "OpenSearchAuditLogRole",
                 f"arn:aws:iam::{stack.account}:role/OpenSearchAuditLogRole",
             )
-            
+
             audit_log_role.add_to_policy(
                 iam.PolicyStatement(
                     actions=[
@@ -153,17 +196,40 @@ class OpenSearchCluster(Construct):
                 )
             )
         except Exception:
-            #Role already exists
+            # Role already exists
             pass
 
         # Define Audit Log Group
-        audit_log_group = logs.LogGroup(
+        # audit_log_group = logs.LogGroup(
+        #     self,
+        #     "AuditLogGroup",
+        #     retention=logs.RetentionDays.ONE_WEEK,
+        #     removal_policy=RemovalPolicy.DESTROY,
+        # )
+
+        app_log_group = logs.LogGroup(
             self,
-            "AuditLogGroup",
+            "AppLogGroup",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
+        grant_opensearch_access(app_log_group)
 
+        slow_search_log_group = logs.LogGroup(
+            self,
+            "SlowSearchLogGroup",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        grant_opensearch_access(slow_search_log_group)
+
+        slow_index_log_group = logs.LogGroup(
+            self,
+            "SlowIndexLogGroup",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        grant_opensearch_access(slow_index_log_group)
         # VPC configuration
         vpc_subnets = None
         if props.vpc and props.subnet_ids:
@@ -182,100 +248,153 @@ class OpenSearchCluster(Construct):
             ]
 
         # Define OpenSearch Domain
-        self.domain = opensearch.Domain(
+        # self.domain = opensearch.Domain(
+        #     self,
+        #     "OpenSearchDomain",
+        #     domain_name=props.domain_name,
+        #     version=props.engine_version,
+        #     # Capacity configuration
+        #     capacity=opensearch.CapacityConfig(
+        #         multi_az_with_standby_enabled=props.multi_az_with_standby_enabled,
+        #         data_nodes=props.data_node_count,
+        #         data_node_instance_type=props.data_node_instance_type,
+        #         master_nodes=props.master_node_count,
+        #         master_node_instance_type=props.master_node_instance_type,
+        #     ),
+        #     # EBS configuration
+        #     ebs=opensearch.EbsOptions(
+        #         volume_size=props.volume_size,
+        #         volume_type=ec2.EbsDeviceVolumeType[props.volume_type.upper()],
+        #         iops=props.volume_iops,
+        #         # throughput=125, # for GP3
+        #         # iops=3000,
+        #     ),
+        #     # Zone awareness configuration for cross-zone replication
+        #     zone_awareness=opensearch.ZoneAwarenessConfig(
+        #         enabled=True, availability_zone_count=props.availability_zone_count
+        #     ),
+        #     # Security configuration
+        #     enforce_https=props.enforce_https,
+        #     node_to_node_encryption=props.node_to_node_encryption,
+        #     encryption_at_rest=opensearch.EncryptionAtRestOptions(
+        #         enabled=props.encryption_at_rest,
+        #     ),
+        #     # Logging configuration
+        #     logging=opensearch.LoggingOptions(
+        #         slow_search_log_enabled=True,
+        #         app_log_enabled=True,
+        #         slow_index_log_enabled=True,
+        #         app_log_group=logs.LogGroup(
+        #             self,
+        #             "AppLogGroup",
+        #             retention=logs.RetentionDays.ONE_WEEK,
+        #             removal_policy=RemovalPolicy.DESTROY,
+        #         ),
+        #         slow_search_log_group=logs.LogGroup(
+        #             self,
+        #             "SlowSearchLogGroup",
+        #             retention=logs.RetentionDays.ONE_WEEK,
+        #             removal_policy=RemovalPolicy.DESTROY,
+        #         ),
+        #         slow_index_log_group=logs.LogGroup(
+        #             self,
+        #             "SlowIndexLogGroup",
+        #             retention=logs.RetentionDays.ONE_WEEK,
+        #             removal_policy=RemovalPolicy.DESTROY,
+        #         ),
+        #     ),
+        #     vpc=props.vpc,
+        #     vpc_subnets=(
+        #         [ec2.SubnetSelection(subnets=vpc_subnets)] if vpc_subnets else None
+        #     ),
+        #     security_groups=[os_security_group] if props.vpc else None,
+        #     # Access Policy added here
+        #     access_policies=[access_policy],
+        #     # Maintenance window (off-peak)
+        #     off_peak_window_enabled=props.off_peak_window_enabled,
+        #     off_peak_window_start=props.off_peak_window_start,
+        #     # snapshot_options=opensearch.CfnDomain.SnapshotOptionsProperty(
+        #     #     automated_snapshot_start_hour=props.automated_snapshot_start_hour
+        #     # ),
+        #     # Advanced options
+        #     advanced_options={
+        #         "rest.action.multi.allow_explicit_index": "true",
+        #         "indices.fielddata.cache.size": "25",
+        #         "indices.query.bool.max_clause_count": "2048",
+        #     },
+        #     removal_policy=RemovalPolicy.DESTROY,
+        #     # Automatic upgrades
+        #     enable_auto_software_update=True,
+        # )
+
+        # CfnDomain:
+        self.domain = opensearchservice.CfnDomain(
             self,
             "OpenSearchDomain",
             domain_name=props.domain_name,
-            version=props.engine_version,
-            # Capacity configuration
-            capacity=opensearch.CapacityConfig(
+            engine_version=props.engine_version,
+            cluster_config=opensearchservice.CfnDomain.ClusterConfigProperty(
+                instance_type=props.data_node_instance_type,
+                instance_count=props.data_node_count,
+                dedicated_master_enabled=True,
+                dedicated_master_type=props.master_node_instance_type,
+                dedicated_master_count=props.master_node_count,
+                zone_awareness_enabled=True,
+                zone_awareness_config=opensearchservice.CfnDomain.ZoneAwarenessConfigProperty(
+                    availability_zone_count=props.availability_zone_count
+                ),
                 multi_az_with_standby_enabled=props.multi_az_with_standby_enabled,
-                data_nodes=props.data_node_count,
-                data_node_instance_type=props.data_node_instance_type,
-                master_nodes=props.master_node_count,
-                master_node_instance_type=props.master_node_instance_type,
             ),
-            # EBS configuration
-            ebs=opensearch.EbsOptions(
+            ebs_options=opensearchservice.CfnDomain.EBSOptionsProperty(
+                ebs_enabled=True,
                 volume_size=props.volume_size,
-                volume_type=ec2.EbsDeviceVolumeType[props.volume_type.upper()],
+                volume_type=props.volume_type,
                 iops=props.volume_iops,
-                # throughput=125, # for GP3
-                # iops=3000,
             ),
-            # Zone awareness configuration for cross-zone replication
-            zone_awareness=opensearch.ZoneAwarenessConfig(
-                enabled=True, availability_zone_count=props.availability_zone_count
-            ),
-            # Security configuration
-            enforce_https=props.enforce_https,
-            node_to_node_encryption=props.node_to_node_encryption,
-            encryption_at_rest=opensearch.EncryptionAtRestOptions(
-                enabled=props.encryption_at_rest,
-            ),
-            # Logging configuration
-            logging=opensearch.LoggingOptions(
-                slow_search_log_enabled=True,
-                app_log_enabled=True,
-                slow_index_log_enabled=True,
-                app_log_group=logs.LogGroup(
-                    self,
-                    "AppLogGroup",
-                    retention=logs.RetentionDays.ONE_WEEK,
-                    removal_policy=RemovalPolicy.DESTROY,
+            vpc_options=opensearchservice.CfnDomain.VPCOptionsProperty(
+                subnet_ids=(
+                    [subnet.subnet_id for subnet in vpc_subnets]
+                    if vpc_subnets
+                    else None
                 ),
-                slow_search_log_group=logs.LogGroup(
-                    self,
-                    "SlowSearchLogGroup",
-                    retention=logs.RetentionDays.ONE_WEEK,
-                    removal_policy=RemovalPolicy.DESTROY,
-                ),
-                slow_index_log_group=logs.LogGroup(
-                    self,
-                    "SlowIndexLogGroup",
-                    retention=logs.RetentionDays.ONE_WEEK,
-                    removal_policy=RemovalPolicy.DESTROY,
-                ),
+                security_group_ids=[os_security_group.security_group_id],
             ),
-            # VPC configuration
-            # vpc=props.vpc,
-            # vpc_subnets=[
-            #     ec2.SubnetSelection(
-            #         subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-            #         availability_zones=[
-            #             props.vpc.select_subnets(
-            #                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            #             )
-            #             .subnets[0]
-            #             .availability_zone,
-            #             props.vpc.select_subnets(
-            #                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            #             )
-            #             .subnets[1]
-            #             .availability_zone,
-            #         ],
-            #     )
-            # ],
-            # security_groups=[os_security_group],
-            vpc=props.vpc,
-            vpc_subnets=(
-                [ec2.SubnetSelection(subnets=vpc_subnets)] if vpc_subnets else None
+            encryption_at_rest_options=opensearchservice.CfnDomain.EncryptionAtRestOptionsProperty(
+                enabled=props.encryption_at_rest
             ),
-            security_groups=[os_security_group] if props.vpc else None,
-            # Access Policy added here
-            access_policies=[access_policy],
-            # Maintenance window (off-peak)
-            off_peak_window_enabled=props.off_peak_window_enabled,
-            off_peak_window_start=props.off_peak_window_start,
-            # Advanced options
-            advanced_options={
-                "rest.action.multi.allow_explicit_index": "true",
-                "indices.fielddata.cache.size": "25",
-                "indices.query.bool.max_clause_count": "2048",
+            node_to_node_encryption_options=opensearchservice.CfnDomain.NodeToNodeEncryptionOptionsProperty(
+                enabled=props.node_to_node_encryption
+            ),
+            domain_endpoint_options=opensearchservice.CfnDomain.DomainEndpointOptionsProperty(
+                enforce_https=props.enforce_https
+            ),
+            log_publishing_options={
+                "ES_APPLICATION_LOGS": {
+                    "cloudWatchLogsLogGroupArn": app_log_group.log_group_arn,
+                    "enabled": True,
+                },
+                "SEARCH_SLOW_LOGS": {
+                    "cloudWatchLogsLogGroupArn": slow_search_log_group.log_group_arn,
+                    "enabled": True,
+                },
+                "INDEX_SLOW_LOGS": {
+                    "cloudWatchLogsLogGroupArn": slow_index_log_group.log_group_arn,
+                    "enabled": True,
+                },
             },
-            removal_policy=RemovalPolicy.DESTROY,
-            # Automatic upgrades
-            enable_auto_software_update=True,
+            snapshot_options=opensearchservice.CfnDomain.SnapshotOptionsProperty(
+                automated_snapshot_start_hour=props.automated_snapshot_start_hour
+            ),
+            off_peak_window_options=opensearchservice.CfnDomain.OffPeakWindowOptionsProperty(
+                enabled=props.off_peak_window_enabled,
+                off_peak_window=opensearchservice.CfnDomain.OffPeakWindowProperty(
+                    window_start_time=opensearchservice.CfnDomain.WindowStartTimeProperty(
+                        hours=props.off_peak_window_start.hours,
+                        minutes=props.off_peak_window_start.minutes,
+                    )
+                ),
+            ),
+            access_policies=access_policy,
         )
 
         # Create a service-linked role if it doesn't exist
@@ -301,7 +420,8 @@ class OpenSearchCluster(Construct):
             code=lambda_.Code.from_asset("lambdas/back_end/create_oss_index/"),
             timeout=Duration.seconds(60),
             environment={
-                "COLLECTION_ENDPOINT": f"https://{self.domain.domain_endpoint}",
+                # "COLLECTION_ENDPOINT": f"https://{self.domain.domain_endpoint}",
+                "COLLECTION_ENDPOINT": f"https://{self.domain.attr_domain_endpoint}",
                 "INDEX_NAMES": ",".join(props.collection_indexes),
                 "REGION": self.region,
                 "SCOPE": "es",
@@ -333,12 +453,12 @@ class OpenSearchCluster(Construct):
                     "es:ESHttpDelete",
                     "es:ESHttpHead",
                 ],
-                resources=[f"{self.domain.domain_arn}/*"],
+                resources=[f"{self.domain.attr_arn}/*"],
             )
         )
 
         # Allow the Lambda function to access the OpenSearch domain
-        self.domain.grant_read_write(create_indexlambda_)
+        # self.domain.grant_read_write(create_indexlambda_)
 
         # Create a custom resource that uses the Lambda
         provider = cr.Provider(
@@ -371,18 +491,31 @@ class OpenSearchCluster(Construct):
         CfnOutput(
             self,
             "OpenSearchDomainEndpoint",
-            value=self.domain.domain_endpoint,
+            # value=self.domain.domain_endpoint,
+            value=f"https://{self.domain.attr_domain_endpoint}",
             description="Endpoint of the OpenSearch Domain",
         )
 
+    # @property
+    # def domain_endpoint(self) -> str:
+    #     return f"https://{self.domain.domain_endpoint}"
+
+    # @property
+    # def domain_arn(self) -> str:
+    #     return self.domain.domain_arn
+
+    # @property
+    # def opensearch_instance(self) -> opensearch.Domain:
+    #     return self.domain
+
     @property
     def domain_endpoint(self) -> str:
-        return f"https://{self.domain.domain_endpoint}"
+        return f"https://{self.domain.attr_domain_endpoint}"
 
     @property
     def domain_arn(self) -> str:
-        return self.domain.domain_arn
+        return self.domain.attr_arn
 
     @property
-    def opensearch_instance(self) -> opensearch.Domain:
+    def opensearch_instance(self) -> opensearchservice.CfnDomain:
         return self.domain

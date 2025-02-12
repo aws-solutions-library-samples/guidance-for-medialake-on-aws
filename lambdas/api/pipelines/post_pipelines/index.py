@@ -154,7 +154,27 @@ def get_state_machine_definition(
     state_machine = {
         "Comment": f"Pipeline {pipeline_name}",
         "StartAt": node_map[start_node["id"]]["label"].replace(" ", ""),
-        "States": {},
+        "States": {
+            "PublishCompletion": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::events:putEvents",
+                "Parameters": {
+                    "Entries": [
+                        {
+                            "DetailType": "Pipeline Execution Completed",
+                            "Source": "medialake.pipeline",
+                            "EventBusName": os.environ["INGEST_EVENT_BUS"],
+                            "Detail": {
+                                "pipelineName": pipeline_name,
+                                "status": "SUCCESS",
+                                "outputs.$": "$",
+                            },
+                        }
+                    ]
+                },
+                "Next": "FinishState",
+            }
+        },
     }
 
     # Create states for each node
@@ -189,9 +209,13 @@ def get_state_machine_definition(
                 if edge["source"] == node["id"]:
                     condition = edge["data"].get("condition", {})
                     if condition:
-                        choice = {
-                            "Next": node_map[edge["target"]]["label"].replace(" ", "")
-                        }
+                        target_type = node_map[edge["target"]]["type"]
+                        next_state = (
+                            "PublishCompletion"
+                            if target_type == "succeed"
+                            else node_map[edge["target"]]["label"].replace(" ", "")
+                        )
+                        choice = {"Next": next_state}
                         if "equals" in condition:
                             choice["StringEquals"] = condition["equals"]
                             choice["Variable"] = condition["variable"]
@@ -247,20 +271,22 @@ def get_state_machine_definition(
 
         # Find the next node
         next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
-        # if next_edge:
-        #     state["Next"] = node_map[next_edge["target"]]["label"].replace(" ", "")
-        # else:
-        #     state["End"] = True
-        next_edge = next((edge for edge in edges if edge["source"] == node["id"]), None)
         if next_edge and node_data["type"] not in ["choice", "succeed", "fail"]:
-            state["Next"] = node_map[next_edge["target"]]["label"].replace(" ", "")
-
-        # Remove 'End' field for Choice, Succeed, and Fail states
-        if node_data["type"] not in ["choice", "succeed", "fail"]:
+            target_type = node_map[next_edge["target"]]["type"]
+            state["Next"] = (
+                "PublishCompletion"
+                if target_type == "succeed"
+                else node_map[next_edge["target"]]["label"].replace(" ", "")
+            )
+        elif node_data["type"] not in ["choice", "succeed", "fail"]:
             if not next_edge:
-                state["End"] = True
+                state["Next"] = "PublishCompletion"
 
         state_machine["States"][state_name] = state
+
+    # Add FinishState as a terminal state
+    state_machine["States"]["FinishState"] = {"Type": "Succeed"}
+
     print(state_machine)
     return state_machine
 
@@ -422,10 +448,29 @@ def create_stepfunction_role(
             ],
         }
 
+        eventbridge_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": ["events:PutEvents"],
+                    "Resource": [
+                        f"arn:aws:events:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:event-bus/{os.environ['INGEST_EVENT_BUS']}"
+                    ],
+                }
+            ],
+        }
+
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-lambda-policy",
             PolicyDocument=json.dumps(lambda_policy),
+        )
+
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=f"{role_name}-eventbridge-policy",
+            PolicyDocument=json.dumps(eventbridge_policy),
         )
 
         return response["Role"]["Arn"]

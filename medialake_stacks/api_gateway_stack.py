@@ -79,6 +79,7 @@ class ApiGatewayStackProps:
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
     media_assets_bucket: s3.Bucket
+    pipelines_nodes_templates_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     ingest_event_bus: events.EventBus
@@ -199,6 +200,7 @@ class ApiGatewayStack(Stack):
                 image_proxy_lambda=props.image_proxy_lambda,
                 image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
                 iac_assets_bucket=props.iac_assets_bucket,
+                pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
             ),

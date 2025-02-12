@@ -92,6 +92,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
     }
 
     const nodeData = response.data[0];
+
     return {
         nodeId: nodeData.nodeId,
         info: {
@@ -110,15 +111,25 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         methods: nodeData.methods?.reduce((acc, method) => {
             // Convert parameters to Record format
             const parameters = Array.isArray(method.parameters)
-                ? method.parameters.reduce((paramAcc, param) => ({
-                    ...paramAcc,
-                    [param.name]: {
+                ? method.parameters.reduce((paramAcc, param) => {
+                    const parameterData: any = {
                         name: param.name,
-                        type: param.type === 'string' ? 'text' : param.type as 'number' | 'boolean' | 'select',
+                        label: param.label,
+                        type: param.schema.type === 'string' ? 'text' : param.schema.type as 'number' | 'boolean' | 'select',
                         required: param.required || false,
                         description: param.description
+                    };
+
+                    // Add options if they exist in the schema
+                    if (param.schema.options) {
+                        parameterData.options = param.schema.options;
                     }
-                }), {})
+
+                    return {
+                        ...paramAcc,
+                        [param.name]: parameterData
+                    };
+                }, {})
                 : {};
 
             // If method already exists, merge parameters
@@ -171,6 +182,9 @@ const PipelineEditorContent = () => {
             }
         }
     });
+
+    // Fetch all pipelines when the component mounts
+
 
     const { data: pipeline } = useGetPipeline(pipelineId || '', {
         enabled: !!pipelineId && pipelineId !== 'new'
@@ -336,8 +350,8 @@ const PipelineEditorContent = () => {
                     configuration: {
                         method: '',
                         parameters: {},
-                        inputMapping: '',
-                        outputMapping: ''
+                        requestMapping: '',
+                        responseMapping: ''
                     },
                 }
             };
@@ -527,7 +541,7 @@ const PipelineEditorContent = () => {
                         edgeTypes={edgeTypes}
                         onDrop={onDrop}
                         onDragOver={(event) => event.preventDefault()}
-                        fitView
+                        fitView={false}
                         connectionRadius={100}
                         connectOnClick={true}
                     >

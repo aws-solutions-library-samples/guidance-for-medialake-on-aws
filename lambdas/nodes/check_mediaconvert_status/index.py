@@ -149,4 +149,30 @@ def lambda_handler(event, context):
             )
             raise
 
+        return {
+            "status": status,
+            "proxy": {
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "StorageType": "s3",
+                        "Bucket": output_bucket,
+                        "path": proxy_path,
+                        "status": "active",
+                        "ObjectKey": {"FullPath": proxy_path},
+                    }
+                }
+            },
+            "thumbnail": {
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "StorageType": "s3",
+                        "Bucket": output_bucket,
+                        "path": thumbnail_path,
+                        "status": "active",
+                        "ObjectKey": {"FullPath": thumbnail_path},
+                    }
+                }
+            },
+        }
+
     return {"status": status}
