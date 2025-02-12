@@ -16,12 +16,20 @@ actions:
     operationId: triggerWorkflowCompleted
     parameters:
       - in: body
-        name: Workflow Name
+        name: pipeline_name
+        label: Pipeline Name
         required: true
         schema:
-          type: string
+          type: select
+      - in: body
+        name: asset_representation
+        label: Representation
+        required: true
+        schema:
+          type: select
+          options: ["Source", "Proxy", "Thumbnail"]
     connections:
       incoming:
         type: [any]
-      outgoing: 
+      outgoing:
         type: [any]

@@ -118,13 +118,13 @@ def build_environment_dict(config):
     """
     env_vars = {}
     possible_vars = [
-        "api_service_name",
-        "api_service_path",
-        "api_service_resource",
-        "api_service_method",
-        "api_service_url",
-        "api_template_bucket",
-        "api_auth_type",
+        "API_SERVICE_NAME",
+        "API_SERVICE_PATH",
+        "API_SERVICE_RESOURCE",
+        "API_SERVICE_METHOD",
+        "API_SERVICE_URL",
+        "API_TEMPLATE_BUCKET",
+        "API_AUTH_TYPE",
     ]
 
     for var in possible_vars:
@@ -446,17 +446,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Main Lambda handler function."""
     start_time = time.time()
 
-    workflow_step_name = os.environ.get("workflow_step_name")
-    api_service_url = os.environ.get("api_service_url")
-    api_service_resource = os.environ.get("api_service_resource")
-    api_service_path = os.environ.get("api_service_path")
-    api_service_method = os.environ.get("api_service_method")
-    api_auth_type = os.environ.get("api_auth_type")
-    api_service_name = os.environ.get("api_service_name")
-    api_template_bucket = os.environ.get("api_template_bucket")
-    api_custom_url = os.environ.get("api_custom_url", "false").lower() == "true"
-    api_custom_code = os.environ.get("api_custom_code", "false").lower() == "true"
-    is_last_step = os.environ.get("is_last_step", "false").lower() == "true"
+    workflow_step_name = os.environ.get("WORKFLOW_STEP_NAME")
+    api_service_url = os.environ.get("API_SERVICE_URL")
+    api_service_resource = os.environ.get("API_SERVICE_RESOURCE")
+    api_service_path = os.environ.get("API_SERVICE_PATH")
+    api_service_method = os.environ.get("API_SERVICE_METHOD")
+    api_auth_type = os.environ.get("API_AUTH_TYPE")
+    api_service_name = os.environ.get("API_SERVICE_NAME")
+    api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET")
+    api_custom_url = os.environ.get("API_CUSTOM_URL", "false").lower() == "true"
+    api_custom_code = os.environ.get("API_CUSTOM_CODE", "false").lower() == "true"
+    is_last_step = os.environ.get("IS_LAST_STEP", "false").lower() == "true"
 
     # Extract metadata from the event
     metadata = event.get("metadata", {})
@@ -578,7 +578,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if output_size > 240 * 1024:  # 240KB in bytes
             # Get the S3 bucket name from environment variable
-            external_payload_s3_bucket = os.environ.get("external_payload_s3_bucket")
+            external_payload_s3_bucket = os.environ.get("EXTERNAL_PAYLOAD_S3_BUCKET")
 
             # Generate a unique key for the S3 object
             workflow_id = event["metadata"].get("workflowId", "unknown")

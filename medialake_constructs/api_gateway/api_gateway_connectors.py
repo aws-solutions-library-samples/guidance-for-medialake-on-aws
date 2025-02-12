@@ -330,6 +330,25 @@ class ConnectorsConstruct(Construct):
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
         )
+        
+        # Add EventBridge Pipes permissions
+        connectors_del_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "pipes:CreatePipe",
+                    "pipes:DeletePipe",
+                    "pipes:DescribePipe",
+                    "pipes:ListPipes",
+                    "pipes:StartPipe",
+                    "pipes:StopPipe",
+                    "pipes:UpdatePipe",
+                    "pipes:TagResource",
+                    "pipes:UntagResource",
+                    "pipes:ListTagsForResource"
+                ],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
+            )
+        )
 
         # Move the DELETE method to the connector_id_resource and add path parameter mapping
         connector_id_resource.add_method(
@@ -500,10 +519,34 @@ class ConnectorsConstruct(Construct):
         # Policy for EventBridge actions
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
-                actions=["events:PutRule", "events:PutTargets", "events:DeleteRule"],
+                actions=[
+                    "events:PutRule",
+                    "events:PutTargets",
+                    "events:DeleteRule",
+                    "events:RemoveTargets"
+                ],
                 resources=[
                     f"arn:aws:events:{scope.region}:{account_id}:rule/*",
                 ],
+            )
+        )
+
+        # Add EventBridge Pipes permissions
+        connector_s3_post_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "pipes:CreatePipe",
+                    "pipes:DeletePipe",
+                    "pipes:DescribePipe",
+                    "pipes:ListPipes",
+                    "pipes:StartPipe",
+                    "pipes:StopPipe",
+                    "pipes:UpdatePipe",
+                    "pipes:TagResource",
+                    "pipes:UntagResource",
+                    "pipes:ListTagsForResource"
+                ],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
             )
         )
 

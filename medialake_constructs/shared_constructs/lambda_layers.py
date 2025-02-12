@@ -207,6 +207,42 @@ class SearchLayer(Construct):
             description="A Lambda layer for search",
         )
 
+
+class PyamlLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        # Define the Lambda layer
+        self.layer = PythonLayerVersion(
+            self,
+            "PyamlLayer",
+            entry="lambdas/layers/pyaml",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
+            description="A Lambda layer for pyaml",
+        )
+
+
+class ShortuuidLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        # Define the Lambda layer
+        self.layer = PythonLayerVersion(
+            self,
+            "PyamlLayer",
+            entry="lambdas/layers/shortuuid",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.ARM_64,
+                lambda_.Architecture.X86_64,
+            ],
+            description="A Lambda layer for shortuuid",
+        )
+
     @property
     def layer_version(self) -> lambda_.LayerVersion:
         return self.layer

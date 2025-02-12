@@ -2,21 +2,36 @@ from datetime import datetime
 from aws_cdk import (
     Stack,
     aws_dynamodb as dynamodb,
+    aws_s3 as s3,
     aws_s3_deployment as s3deploy,
     custom_resources as cr,
+    aws_iam as iam,
     RemovalPolicy,
     CustomResource,
 )
+import time
+import os
+import zipfile
+import tempfile
+import base64
 from constructs import Construct
+from dataclasses import dataclass
+from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from config import config
-import aws_cdk
+
+
+@dataclass
+class NodesStackProps:
+    iac_bucket: s3.IBucket
 
 
 class NodesStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, props: NodesStackProps, **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Create S3 bucket for node definitions and templates
@@ -35,6 +50,37 @@ class NodesStack(Stack):
             sources=[s3deploy.Source.asset("s3_bucket_assets/pipeline_nodes")],
             destination_bucket=self._pipelines_nodes_bucket.bucket,
             retain_on_delete=False,
+        )
+
+        # Node Lambda Deployments
+        # self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
+        #     self,
+        #     "ImageMetadataExtractorLambdaDeployment",
+        #     destination_bucket=props.iac_bucket.bucket,
+        #     parent_folder="nodes",
+        #     code_path=["lambdas", "nodes", "image_metadata_extractor"],
+        # )
+        self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
+            self,
+            "ImageMetadataExtractorLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "image_metadata_extractor"],
+        )
+        self.video_metadata_extractor_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoMetadataExtractorLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_metadata_extractor"],
+        )
+
+        self.api_lambda_deployment = LambdaDeployment(
+            self,
+            "ApiLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/integrations",
+            code_path=["lambdas", "nodes", "api_handler"],
         )
 
         # Create DynamoDB table for nodes
