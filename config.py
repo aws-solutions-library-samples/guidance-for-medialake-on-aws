@@ -245,11 +245,10 @@ class VpcConfig(BaseModel):
 
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
-
-    lambda_tail_warming: bool = False  # Enable/disable Lambda tail warming
+    lambda_tail_warming: bool = False
     primary_region: str
     account_id: str
-    environment: str
+    environment: str  # We'll only use this for DynamoDB decisions
     global_prefix: str
     resource_prefix: str
     resource_application_tag: str
@@ -260,6 +259,10 @@ class CDKConfig(BaseModel):
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
+
+    @property
+    def should_retain_tables(self) -> bool:
+        return self.environment == "prod"
 
     @model_validator(mode="after")
     def check_az_count_vpc(self):
@@ -294,6 +297,10 @@ class CDKConfig(BaseModel):
         if getattr(self, "enable_ha", False) and self.secondary_region:
             regions.append(self.secondary_region)
         return regions
+
+    @property
+    def should_use_existing_tables(self) -> bool:
+        return self.environment == "prod"
 
     @classmethod
     def load_from_file(cls, filename="config.json"):

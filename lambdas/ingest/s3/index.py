@@ -467,12 +467,12 @@ class AssetProcessor:
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def handler(event: Dict, context: LambdaContext) -> Dict:
-    """Handle S3 events via SQS"""
+    """Handle S3 events via SQS from either direct S3 notifications or EventBridge Pipes"""
     processor = AssetProcessor()
 
     try:
-        # Process each record from SQS
-        for record in event.get("Records", []):
+        # Process each record directly since event is already a list
+        for record in event:
             try:
                 # Log the raw message for debugging
                 logger.debug(f"Processing SQS record: {json.dumps(record)}")
@@ -489,9 +489,9 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                     logger.info("Received S3 test event - skipping processing")
                     continue
 
-                # Handle S3 event directly from SQS message
+                # Handle both direct S3 events and EventBridge events
                 if "Records" in body:
-                    # Existing logic for handling S3 events
+                    # Direct S3 event format
                     for s3_record in body["Records"]:
                         if "s3" not in s3_record:
                             logger.warning("No S3 data in record")
@@ -501,51 +501,34 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                         key = s3_record["s3"]["object"]["key"]
                         event_name = s3_record.get("eventName", "")
 
-                        logger.info(f"Processing {event_name} event for asset: {key}")
+                        process_s3_event(processor, bucket, key, event_name)
 
-                        if event_name.startswith("ObjectRemoved:"):
-                            # Handle deletion
-                            processor.delete_asset(bucket, key)
-                            metrics.add_metric(
-                                name="DeletedAssets", unit=MetricUnit.Count, value=1
-                            )
-                            logger.info(f"Asset deletion processed: {key}")
-                        else:
-                            # Handle creation/modification
-                            result = processor.process_asset(bucket, key)
-                            if result:
-                                metrics.add_metric(
-                                    name="ProcessedAssets",
-                                    unit=MetricUnit.Count,
-                                    value=1,
-                                )
-                                logger.info(
-                                    f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}"
-                                )
-                            else:
-                                logger.info(f"Asset already processed: {key}")
                 elif "detail-type" in body:
-                    # New logic for handling EventBridge-style events
-                    if body.get("detail-type") == "Object Created":
-                        bucket = body["detail"]["bucket"]["name"]
-                        key = body["detail"]["object"]["key"]
+                    # EventBridge event format
+                    if body.get("source") != "aws.s3":
+                        logger.warning(f"Unexpected event source: {body.get('source')}")
+                        continue
 
-                        logger.info(f"Processing creation event for asset: {key}")
+                    detail = body.get("detail", {})
+                    bucket = detail.get("bucket", {}).get("name")
+                    key = detail.get("object", {}).get("key")
+                    
+                    # Map EventBridge detail-type to S3 event name
+                    event_type_mapping = {
+                        "Object Created": "ObjectCreated:",
+                        "Object Deleted": "ObjectRemoved:",
+                        "Object Restored": "ObjectRestore:",
+                        "Object Tagged": "ObjectTagging:"
+                    }
+                    
+                    event_name = event_type_mapping.get(body.get("detail-type", ""), "")
+                    
+                    if not all([bucket, key, event_name]):
+                        logger.warning("Missing required fields in EventBridge event")
+                        continue
 
-                        result = processor.process_asset(bucket, key)
-                        if result:
-                            metrics.add_metric(
-                                name="ProcessedAssets", unit=MetricUnit.Count, value=1
-                            )
-                            logger.info(
-                                f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}"
-                            )
-                        else:
-                            logger.info(f"Asset already processed: {key}")
-                    else:
-                        logger.warning(
-                            f"Unexpected event type: {body.get('detail-type')}"
-                        )
+                    process_s3_event(processor, bucket, key, event_name)
+
                 else:
                     logger.warning("Unrecognized event format in message body")
 
@@ -565,3 +548,21 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
         logger.exception("Error in handler")
         metrics.add_metric(name="ProcessingErrors", unit=MetricUnit.Count, value=1)
         raise
+
+def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_name: str):
+    """Process a single S3 event"""
+    logger.info(f"Processing {event_name} event for asset: {key}")
+
+    if event_name.startswith("ObjectRemoved:"):
+        # Handle deletion
+        processor.delete_asset(bucket, key)
+        metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
+        logger.info(f"Asset deletion processed: {key}")
+    else:
+        # Handle creation/modification
+        result = processor.process_asset(bucket, key)
+        if result:
+            metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
+            logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
+        else:
+            logger.info(f"Asset already processed: {key}")
