@@ -240,7 +240,16 @@ class Lambda(Construct):
 
         if config.iam_role_name:
             logger.debug(f"Using custom role name: {config.iam_role_name}")
-            role_props["role_name"] = config.iam_role_name
+            # Truncate role name if it exceeds 64 characters
+            role_name = config.iam_role_name[:MAX_ROLE_NAME_LENGTH] if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH else config.iam_role_name
+            logger.debug(f"Final role name after truncation: {role_name}")
+            role_props["role_name"] = role_name
+        else:
+            # Handle default role name truncation
+            default_role_name = f"role-{lambda_function_name}"
+            role_name = default_role_name[:MAX_ROLE_NAME_LENGTH] if len(default_role_name) > MAX_ROLE_NAME_LENGTH else default_role_name
+            logger.debug(f"Using default role name after truncation: {role_name}")
+            role_props["role_name"] = role_name
 
         if config.iam_role_boundary_policy:
             logger.debug("Adding boundary permissions to role")

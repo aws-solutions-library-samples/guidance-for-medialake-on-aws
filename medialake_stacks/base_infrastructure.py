@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     # custom_resources as cr,
     Duration,
+    RemovalPolicy,
 )
 from config import config
 from medialake_constructs.shared_constructs.s3_logging import (
@@ -255,27 +256,31 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        self._pipelne_table = DynamoDB(
+        # Pipeline table
+        self._pipeline_table = DynamoDB(
             self,
             "PipelinesTable",
             props=DynamoDBProps(
-                name=f"medialake_pipeline_table",
+                name=f"{config.global_prefix}_pipeline_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
             ),
         )
 
+        # Asset table
         self._asset_table = DynamoDB(
             self,
             "MediaLakeAssetTable",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}-asset-table-{config.environment}",
+                name=f"{config.global_prefix}-asset-table",
                 partition_key_name="InventoryID",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
                 ddb_export_bucket=self.ddb_export_bucket,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
                 point_in_time_recovery=True,
+                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
             ),
         )
 
@@ -299,22 +304,20 @@ class BaseInfrastructureStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
+        # Asset V2 table
         self._assetv2_table = DynamoDB(
             self,
             "MediaLakeAssetTableV2",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}-asset-table-v2-{config.environment}",
+                name=f"{config.global_prefix}-asset-table-v2",
                 partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                # pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
-                # ddb_export_bucket=self.ddb_export_bucket,
-                # stream=dynamodb.StreamViewType.NEW_IMAGE,
                 point_in_time_recovery=True,
                 sort_key_name="SK",
                 sort_key_type=dynamodb.AttributeType.STRING,
+                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
             ),
         )
-
 
         # Add GSI1 - 
         self._assetv2_table.table.add_global_secondary_index(
@@ -450,7 +453,7 @@ class BaseInfrastructureStack(Stack):
             dynamodb.TableV2: The configured DynamoDB table
         """
 
-        return self._pipelne_table.table
+        return self._pipeline_table.table
 
     @property
     def asset_table_name(self) -> str:
