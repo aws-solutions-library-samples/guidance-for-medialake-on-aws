@@ -1,5 +1,6 @@
 import json
 from typing import Optional, Dict, List
+from datetime import datetime
 from aws_cdk import aws_logs as logs
 from pydantic import (
     BaseModel,
@@ -90,6 +91,27 @@ class OpenSearchClusterSettings(BaseModel):
     data_node_volume_iops: int = 3000
     availability_zone_count: int = 2
     multi_az_with_standby_enabled: bool = False
+    automated_snapshot_start_hour: int = 20  # Default to 8 PM UTC
+    off_peak_window_enabled: bool = True
+    off_peak_window_start: str = "20:00"
+
+    @field_validator("off_peak_window_start")
+    @classmethod
+    def validate_off_peak_window_start(cls, v):
+        try:
+            time = datetime.strptime(v, "%H:%M")
+            return v
+        except ValueError:
+            raise ValueError(
+                "Off-peak window start time must be in HH:MM format (24-hour)"
+            )
+
+    @field_validator("automated_snapshot_start_hour")
+    @classmethod
+    def validate_snapshot_hour(cls, v):
+        if not 0 <= v <= 23:
+            raise ValueError("Automated snapshot start hour must be between 0 and 23")
+        return v
 
     @field_validator("master_node_instance_type", "data_node_instance_type")
     @classmethod
