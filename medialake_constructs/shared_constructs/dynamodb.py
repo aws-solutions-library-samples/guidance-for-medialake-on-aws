@@ -28,9 +28,8 @@ class DynamoDBProps:
     sort_key_type: Optional[dynamodb.AttributeType] = None
     stream: Optional[dynamodb.StreamViewType] = None
     point_in_time_recovery: Optional[bool] = True
-    global_secondary_indexes: Optional[list[dynamodb.GlobalSecondaryIndexPropsV2]] = (
-        None
-    )
+    removal_policy: Optional[RemovalPolicy] = RemovalPolicy.DESTROY
+    global_secondary_indexes: Optional[list[dynamodb.GlobalSecondaryIndexPropsV2]] = None
 
 
 class DynamoDB(Construct):
@@ -46,7 +45,7 @@ class DynamoDB(Construct):
         self._kms_key = kms.Key(
             self,
             "DynamoDBKMSKey",
-            removal_policy=RemovalPolicy.DESTROY,
+            removal_policy=props.removal_policy,
             enable_key_rotation=True,
             description="KMS key for DynamoDB table encryption",
         )
@@ -58,7 +57,7 @@ class DynamoDB(Construct):
                 name=props.partition_key_name, type=props.partition_key_type
             ),
             "point_in_time_recovery": props.point_in_time_recovery,
-            "removal_policy": RemovalPolicy.DESTROY,
+            "removal_policy": props.removal_policy,
             "dynamo_stream": props.stream,
             "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
         }

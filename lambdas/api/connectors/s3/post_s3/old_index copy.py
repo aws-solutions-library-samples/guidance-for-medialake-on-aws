@@ -29,7 +29,6 @@ app = APIGatewayRestResolver(enable_validation=True)
 s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 iam_client = boto3.client("iam")
-pipes = boto3.client("pipes")
 
 
 class S3ConnectorConfig(BaseModel):
@@ -228,10 +227,7 @@ def create_eventbridge_role(
     """Create IAM role for EventBridge to send events to SQS"""
 
     iam = boto3.client("iam")
-    # Truncate role name if it exceeds 64 characters
     role_name = f"medialake-eb-{rule_name}"
-    if len(role_name) > 64:
-        role_name = role_name[:64]
 
     assume_role_policy = {
         "Version": "2012-10-17",
@@ -315,10 +311,6 @@ def get_bucket_kms_key(s3_client, bucket_name):
 
 
 def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
-    # Truncate role name if it exceeds 64 characters
-    if len(role_name) > 64:
-        role_name = role_name[:64]
-        
     assume_role_policy = {
         "Version": "2012-10-17",
         "Statement": [
@@ -376,107 +368,6 @@ def check_existing_s3_notifications(s3_client, bucket_name):
     except s3_client.exceptions.ClientError as e:
         logger.error(f"Error checking S3 notifications: {str(e)}")
         return False
-
-
-def create_eventbridge_pipe(
-    resource_name_prefix: str,
-    queue_arn: str, 
-    lambda_arn: str,
-    bucket_region: str,
-    created_resources: list
-) -> str:
-    """Create EventBridge Pipe between SQS and Lambda"""
-    
-    # Truncate pipe role name if it exceeds 64 characters
-    pipe_role_name = f"{resource_name_prefix}-pipe-role"
-    if len(pipe_role_name) > 64:
-        pipe_role_name = pipe_role_name[:64]
-    
-    assume_role_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Principal": {"Service": "pipes.amazonaws.com"},
-                "Action": "sts:AssumeRole"
-            }
-        ]
-    }
-    
-    pipe_role = iam_client.create_role(
-        RoleName=pipe_role_name,
-        AssumeRolePolicyDocument=json.dumps(assume_role_policy)
-    )
-    created_resources.append(("iam_role", pipe_role_name))
-    
-    # Create policy for source (SQS) permissions
-    source_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "sqs:ReceiveMessage",
-                    "sqs:DeleteMessage",
-                    "sqs:GetQueueAttributes"
-                ],
-                "Resource": queue_arn
-            }
-        ]
-    }
-    
-    iam_client.put_role_policy(
-        RoleName=pipe_role_name,
-        PolicyName=f"{pipe_role_name}-source-policy",
-        PolicyDocument=json.dumps(source_policy)
-    )
-    created_resources.append(("inline_policy", (pipe_role_name, f"{pipe_role_name}-source-policy")))
-    
-    # Create policy for target (Lambda) permissions
-    target_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": ["lambda:InvokeFunction"],
-                "Resource": lambda_arn
-            }
-        ]
-    }
-    
-    iam_client.put_role_policy(
-        RoleName=pipe_role_name,
-        PolicyName=f"{pipe_role_name}-target-policy",
-        PolicyDocument=json.dumps(target_policy)
-    )
-    created_resources.append(("inline_policy", (pipe_role_name, f"{pipe_role_name}-target-policy")))
-    
-    # Wait for role and policies to propagate
-    if not wait_for_iam_role_propagation(iam_client, pipe_role_name):
-        raise Exception(f"IAM role {pipe_role_name} did not propagate in time")
-    
-    # Create the pipe
-    pipe_name = f"{resource_name_prefix}-pipe"
-    response = pipes.create_pipe(
-        Name=pipe_name,
-        RoleArn=pipe_role["Role"]["Arn"],
-        Source=queue_arn,
-        Target=lambda_arn,
-        SourceParameters={
-            "SqsQueueParameters": {
-                "BatchSize": 10
-                # Removed MaximumBatchingWindowInSeconds for FIFO queue
-            }
-        },
-        TargetParameters={
-            "LambdaFunctionParameters": {
-                "InvocationType": "REQUEST_RESPONSE"
-            }
-        }
-    )
-    created_resources.append(("eventbridge_pipe", pipe_name))
-    
-    return response["Arn"]
 
 
 @app.post("/connectors/s3")
@@ -853,15 +744,16 @@ def create_connector(createconnector: S3Connector) -> dict:
             lambda_arn = create_function_response["FunctionArn"]
             created_resources.append(("lambda_function", target_function_name))
 
-            # Instead of creating event source mapping, create EventBridge Pipe
-            pipe_arn = create_eventbridge_pipe(
-                resource_name_prefix,
-                queue_arn,
-                lambda_arn,
-                bucket_region,
-                created_resources
+            # Add SQS trigger to the deployed lambda
+            event_source_mapping = lambda_client.create_event_source_mapping(
+                EventSourceArn=queue_arn,
+                FunctionName=target_function_name,
+                Enabled=True,
             )
-            logger.info(f"Created EventBridge Pipe: {pipe_arn}")
+            created_resources.append(
+                ("event_source_mapping", event_source_mapping["UUID"])
+            )
+            logger.info(f"Added SQS trigger to lambda: {target_function_name}")
         except Exception as e:
             logger.error(f"Failed to deploy/configure lambda: {str(e)}")
             raise
@@ -896,7 +788,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
-            "pipeArn": pipe_arn,
         }
 
         table.put_item(Item=connector_item)
@@ -953,8 +844,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                     iam_client.delete_role(RoleName=resource_id)
                 elif resource_type == "sqs_queue":
                     sqs.delete_queue(QueueUrl=resource_id)
-                elif resource_type == "eventbridge_pipe":
-                    pipes.delete_pipe(Name=resource_id)
                 logger.info(f"Cleaned up {resource_type}: {resource_id}")
             except Exception as cleanup_error:
                 logger.error(
