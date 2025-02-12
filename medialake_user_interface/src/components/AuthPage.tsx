@@ -119,16 +119,21 @@ const AuthPage = () => {
 
                     {hasCognitoProvider && (
                         <Box sx={{
+                            '& [data-amplify-router]': {
+                                background: 'transparent !important',
+                                boxShadow: 'none !important',
+                                maxWidth: 'none !important',
+                                width: '100% !important',
+                                border: 'none !important'
+                            },
                             '& .amplify-authenticator': {
                                 marginBottom: '1rem',
                                 maxWidth: 'none',
                                 width: '100%',
                             },
                             '& [data-amplify-authenticator]': {
-                                background: 'transparent',
-                                boxShadow: 'none',
-                                maxWidth: 'none',
-                                width: '100%',
+                                backgroundColor: 'transparent !important',
+                                border: 'none !important'
                             },
                             '& [data-amplify-container]': {
                                 padding: '0',
