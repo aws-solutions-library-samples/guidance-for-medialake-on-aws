@@ -5,6 +5,7 @@ import time
 import string
 import random
 import boto3
+import traceback
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -318,7 +319,7 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
     # Truncate role name if it exceeds 64 characters
     if len(role_name) > 64:
         role_name = role_name[:64]
-        
+
     assume_role_policy = {
         "Version": "2012-10-17",
         "Statement": [
@@ -380,35 +381,34 @@ def check_existing_s3_notifications(s3_client, bucket_name):
 
 def create_eventbridge_pipe(
     resource_name_prefix: str,
-    queue_arn: str, 
+    queue_arn: str,
     lambda_arn: str,
     bucket_region: str,
-    created_resources: list
+    created_resources: list,
 ) -> str:
     """Create EventBridge Pipe between SQS and Lambda"""
-    
+
     # Truncate pipe role name if it exceeds 64 characters
     pipe_role_name = f"{resource_name_prefix}-pipe-role"
     if len(pipe_role_name) > 64:
         pipe_role_name = pipe_role_name[:64]
-    
+
     assume_role_policy = {
         "Version": "2012-10-17",
         "Statement": [
             {
                 "Effect": "Allow",
                 "Principal": {"Service": "pipes.amazonaws.com"},
-                "Action": "sts:AssumeRole"
+                "Action": "sts:AssumeRole",
             }
-        ]
+        ],
     }
-    
+
     pipe_role = iam_client.create_role(
-        RoleName=pipe_role_name,
-        AssumeRolePolicyDocument=json.dumps(assume_role_policy)
+        RoleName=pipe_role_name, AssumeRolePolicyDocument=json.dumps(assume_role_policy)
     )
     created_resources.append(("iam_role", pipe_role_name))
-    
+
     # Create policy for source (SQS) permissions
     source_policy = {
         "Version": "2012-10-17",
@@ -418,20 +418,22 @@ def create_eventbridge_pipe(
                 "Action": [
                     "sqs:ReceiveMessage",
                     "sqs:DeleteMessage",
-                    "sqs:GetQueueAttributes"
+                    "sqs:GetQueueAttributes",
                 ],
-                "Resource": queue_arn
+                "Resource": queue_arn,
             }
-        ]
+        ],
     }
-    
+
     iam_client.put_role_policy(
         RoleName=pipe_role_name,
         PolicyName=f"{pipe_role_name}-source-policy",
-        PolicyDocument=json.dumps(source_policy)
+        PolicyDocument=json.dumps(source_policy),
     )
-    created_resources.append(("inline_policy", (pipe_role_name, f"{pipe_role_name}-source-policy")))
-    
+    created_resources.append(
+        ("inline_policy", (pipe_role_name, f"{pipe_role_name}-source-policy"))
+    )
+
     # Create policy for target (Lambda) permissions
     target_policy = {
         "Version": "2012-10-17",
@@ -439,22 +441,24 @@ def create_eventbridge_pipe(
             {
                 "Effect": "Allow",
                 "Action": ["lambda:InvokeFunction"],
-                "Resource": lambda_arn
+                "Resource": lambda_arn,
             }
-        ]
+        ],
     }
-    
+
     iam_client.put_role_policy(
         RoleName=pipe_role_name,
         PolicyName=f"{pipe_role_name}-target-policy",
-        PolicyDocument=json.dumps(target_policy)
+        PolicyDocument=json.dumps(target_policy),
     )
-    created_resources.append(("inline_policy", (pipe_role_name, f"{pipe_role_name}-target-policy")))
-    
+    created_resources.append(
+        ("inline_policy", (pipe_role_name, f"{pipe_role_name}-target-policy"))
+    )
+
     # Wait for role and policies to propagate
     if not wait_for_iam_role_propagation(iam_client, pipe_role_name):
         raise Exception(f"IAM role {pipe_role_name} did not propagate in time")
-    
+
     # Create the pipe
     pipe_name = f"{resource_name_prefix}-pipe"
     response = pipes.create_pipe(
@@ -469,13 +473,11 @@ def create_eventbridge_pipe(
             }
         },
         TargetParameters={
-            "LambdaFunctionParameters": {
-                "InvocationType": "REQUEST_RESPONSE"
-            }
-        }
+            "LambdaFunctionParameters": {"InvocationType": "REQUEST_RESPONSE"}
+        },
     )
     created_resources.append(("eventbridge_pipe", pipe_name))
-    
+
     return response["Arn"]
 
 
@@ -489,12 +491,9 @@ def create_connector(createconnector: S3Connector) -> dict:
         existing_connector = check_existing_connector(s3_bucket)
         if existing_connector:
             return {
-                "status": "200",
-                "message": "ok",
-                "data": {
-                    "message": f"Connector already exists for bucket {s3_bucket}",
-                    "connector": existing_connector,
-                },
+                "status": "400",
+                "message": f"Connector already exists for bucket {s3_bucket}",
+                "data": {},
             }
 
         # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
@@ -517,14 +516,13 @@ def create_connector(createconnector: S3Connector) -> dict:
         integration_method = createconnector.configuration.s3IntegrationMethod
 
         # Check for existing S3 notifications if using EventBridge
-        if integration_method == "eventbridge" and check_existing_s3_notifications(s3_client, s3_bucket):
+        if integration_method == "eventbridge" and check_existing_s3_notifications(
+            s3_client, s3_bucket
+        ):
             return {
-                "statusCode": 400,
-                "body": {
-                    "status": "400",
-                    "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
-                    "data": {},
-                },
+                "status": "400",
+                "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
+                "data": {},
             }
 
         suffix = generate_suffix()
@@ -547,14 +545,11 @@ def create_connector(createconnector: S3Connector) -> dict:
             bucket_region = bucket_region or "us-east-1"
         except s3_client.exceptions.ClientError:
             return {
-                "statusCode": 400,
-                "body": {
-                    "status": "400",
-                    "message": (
-                        f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
-                    ),
-                    "data": {},
-                },
+                "status": "400",
+                "message": (
+                    f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
+                ),
+                "data": {},
             }
 
         # Initialize S3, SQS, and Lambda clients in the bucket's region
@@ -859,7 +854,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                 queue_arn,
                 lambda_arn,
                 bucket_region,
-                created_resources
+                created_resources,
             )
             logger.info(f"Created EventBridge Pipe: {pipe_arn}")
         except Exception as e:
@@ -870,14 +865,11 @@ def create_connector(createconnector: S3Connector) -> dict:
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
         if not table_name:
             return {
-                "statusCode": 500,
-                "body": {
-                    "status": "500",
-                    "message": (
-                        "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
-                    ),
-                    "data": {},
-                },
+                "status": "500",
+                "message": (
+                    "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
+                ),
+                "data": {},
             }
 
         table = dynamodb.Table(table_name)
@@ -896,7 +888,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
-            "pipeArn": pipe_arn,
         }
 
         table.put_item(Item=connector_item)
@@ -909,6 +900,8 @@ def create_connector(createconnector: S3Connector) -> dict:
     except Exception as e:
         eventbridge = boto3.client("events")
         logger.exception(f"Unexpected error: {str(e)}")
+        error_traceback = traceback.format_exc()
+
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
             try:
@@ -953,8 +946,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                     iam_client.delete_role(RoleName=resource_id)
                 elif resource_type == "sqs_queue":
                     sqs.delete_queue(QueueUrl=resource_id)
-                elif resource_type == "eventbridge_pipe":
-                    pipes.delete_pipe(Name=resource_id)
                 logger.info(f"Cleaned up {resource_type}: {resource_id}")
             except Exception as cleanup_error:
                 logger.error(
@@ -962,8 +953,12 @@ def create_connector(createconnector: S3Connector) -> dict:
                 )
 
         return {
-            "statusCode": 500,
-            "body": {"status": "500", "message": "Internal server error", "data": {}},
+            "status": "400",
+            "message": str(e),
+            "data": {
+                "traceback": error_traceback,
+                "created_resources": created_resources,
+            },
         }
 
 

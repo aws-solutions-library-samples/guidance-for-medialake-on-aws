@@ -90,10 +90,10 @@ const ConnectorsPage: React.FC = () => {
             if (connectorData.type === 's3') {
                 const response = await createS3Connector(connectorData);
 
-                console.log('API Response:', response);
+                // console.log('API Response:', response);
 
-                if (response.statusCode >= 400) {
-                    throw new Error(response.body.message || 'Failed to create connector');
+                if (Number(response.status) >= 400) {
+                    throw new Error(response.message || 'Failed to create connector');
                 }
 
                 handleModalClose();
@@ -106,7 +106,7 @@ const ConnectorsPage: React.FC = () => {
                 await queryClient.invalidateQueries({ queryKey: ['connectors'] });
             }
         } catch (error: any) {
-            console.error('Error creating connector:', error);
+            // console.error('Error creating connector:', error);
 
             let errorMessage = 'Failed to create connector';
 
@@ -168,7 +168,7 @@ const ConnectorsPage: React.FC = () => {
                 {connectors.map((connector, index) => {
                     // If connector is null/undefined for some reason, skip it
                     if (!connector) return null;
-                    console.log('Connector data:', connector);
+                    // console.log('Connector data:', connector);
 
                     return (
                         <Box key={connector.id ?? index}>

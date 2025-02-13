@@ -40,6 +40,7 @@ interface ConnectorModalProps {
     editingConnector?: ConnectorResponse;
     onSave: (connectorData: CreateConnectorRequest) => Promise<void>;
     isCreating: boolean;
+
 }
 
 const CONNECTOR_TYPES = [
