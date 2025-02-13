@@ -62,8 +62,13 @@ python3 -m venv .venv
 
 ```bash
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
 npm install
+```
+
+if you are developing locally, you can install the requirements for development
+
+```bash
+pip install -r requirements-dev.txt
 ```
 
 ## 🔧 Configuration
@@ -107,8 +112,8 @@ touch config.json
         "identity_providers": [
             {
                 "identity_provider_method": "saml",
-                "identity_provider_name": "IDENTITY_PROVIDER_NAME", #Okta, Duo, etc.... this will show in the login page
-                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL" #URL to the identity provider metadata
+                "identity_provider_name": "IDENTITY_PROVIDER_NAME",
+                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL"
             },
             {
                 "identity_provider_method": "cognito"
@@ -259,6 +264,10 @@ aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 
 ```bash
 cdk deploy --all
+
+or if you are using a specific profile and/or region
+
+cdk deploy --profile <profile> --region <region> --all
 ```
 
 ## 🏗️ Project Structure
@@ -268,6 +277,9 @@ medialake/
 ├── medialake_constructs/     # CDK construct definitions
 │   ├── shared_constructs/    # Shared AWS constructs
 │   └── api_gateway_connectors.py
+├── medialake_stacks/         # CDK stack definitions
+│   ├── base_infrastructure.py # Base infrastructure stack
+│   └── api_gateway.py         # API Gateway stack
 ├── lambdas/                  # Lambda functions
 │   ├── api/                  # API handlers
 │   │   ├── connectors/      # Storage connector handlers
@@ -276,7 +288,12 @@ medialake/
 ├── tests/                    # Test files
 ├── app.py                    # Main CDK app
 ├── requirements.txt          # Python dependencies
-└── cdk.json                 # CDK configuration
+├── cdk.json                 # CDK configuration
+├── config.py                # Configuration interpertor and validator
+├── config.json              # Configuration file
+├── requirements-dev.txt     # Development dependencies
+├── README.md                # This file
+└── LICENSE                  # License
 ```
 
 ## 🔑 Key Components
