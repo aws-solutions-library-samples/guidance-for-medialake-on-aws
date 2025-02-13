@@ -520,12 +520,9 @@ def create_connector(createconnector: S3Connector) -> dict:
             s3_client, s3_bucket
         ):
             return {
-                "statusCode": 400,
-                "body": {
-                    "status": "400",
-                    "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
-                    "data": {},
-                },
+                "status": "400",
+                "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
+                "data": {},
             }
 
         suffix = generate_suffix()
@@ -548,14 +545,11 @@ def create_connector(createconnector: S3Connector) -> dict:
             bucket_region = bucket_region or "us-east-1"
         except s3_client.exceptions.ClientError:
             return {
-                "status": 400,
-                "body": {
-                    "status": "400",
-                    "message": (
-                        f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
-                    ),
-                    "data": {},
-                },
+                "status": "400",
+                "message": (
+                    f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
+                ),
+                "data": {},
             }
 
         # Initialize S3, SQS, and Lambda clients in the bucket's region
@@ -576,15 +570,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                 s3_bucket, bucket_region, created_resources
             )
         elif integration_method in ["s3Notifications", "s3-event-notifications"]:
-            if existing_notifications:
-                return {
-                    "statusCode": 400,
-                    "body": {
-                        "status": "400",
-                        "message": f"S3 bucket '{s3_bucket}' already has existing notifications configured",
-                        "data": {},
-                    },
-                }
             # Set up S3 event notifications
             # Create SQS queue in the same region as the bucket
             queue_name = f"-connector-{s3_bucket}-notifications"
@@ -880,8 +865,10 @@ def create_connector(createconnector: S3Connector) -> dict:
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
         if not table_name:
             return {
-                "status": "400",
-                "message": "MEDIALAKE_CONNECTOR_TABLE environment variable is not set",
+                "status": "500",
+                "message": (
+                    "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
+                ),
                 "data": {},
             }
 
@@ -901,7 +888,6 @@ def create_connector(createconnector: S3Connector) -> dict:
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
-            "pipeArn": pipe_arn,
         }
 
         table.put_item(Item=connector_item)
@@ -960,8 +946,6 @@ def create_connector(createconnector: S3Connector) -> dict:
                     iam_client.delete_role(RoleName=resource_id)
                 elif resource_type == "sqs_queue":
                     sqs.delete_queue(QueueUrl=resource_id)
-                elif resource_type == "eventbridge_pipe":
-                    pipes.delete_pipe(Name=resource_id)
                 logger.info(f"Cleaned up {resource_type}: {resource_id}")
             except Exception as cleanup_error:
                 logger.error(
