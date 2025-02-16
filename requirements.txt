@@ -7,3 +7,4 @@ cdk_nag
 python-dotenv
 pydantic
 Jinja2==3.1.5
+aws-lambda-powertools

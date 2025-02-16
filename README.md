@@ -15,19 +15,31 @@ MediaLake is a serverless media processing platform built on AWS, designed to ha
 
 ## 📋 Prerequisites
 
-- Node.js (v16.x or later)
+- Node.js (v20.x or later)
 - Python 3.12 or later
 - AWS CLI configured with appropriate credentials
 - AWS CDK CLI (`npm install -g aws-cdk`)
 - Docker (for local development)
+
+## 📋 Account preperation for deployment
+
+```bash
+cdk bootstrap
+
+or if you are using a specific profile and/or region
+
+cdk bootstrap --profile <profile> --region <region>
+```
+
+- Bootstrap the account for CDK deployment, ensure the right region is selected
 
 ## 🛠️ Installation
 
 1. Clone the repository:
 
 ```bash
-git clone git@ssh.gitlab.aws.dev:aws-mne-msc/media-lake-v2.git
-cd medialakev2
+git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake.git
+cd guidance-for-medialake
 ```
 
 2. Create and activate a virtual environment:
@@ -50,8 +62,13 @@ python3 -m venv .venv
 
 ```bash
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
 npm install
+```
+
+if you are developing locally, you can install the requirements for development
+
+```bash
+pip install -r requirements-dev.txt
 ```
 
 ## 🔧 Configuration
@@ -80,9 +97,9 @@ touch config.json
     "api_path": "prod",
     "primary_region": "us-east-1",
     "initial_user": {
-        "email": "mne-mscdemo+medialake@amazon.com",
-        "first_name": "Medialake",
-        "last_name": "User"
+        "email": "email account for initial user",
+        "first_name": "first name of initial user",
+        "last_name": "last name of initial user"
     },
     "logging": {
         "retention_days": 90,
@@ -95,8 +112,8 @@ touch config.json
         "identity_providers": [
             {
                 "identity_provider_method": "saml",
-                "identity_provider_name": "IDENTITY_PROVIDER_NAME", #Okta, Duo, etc.... this will show in the login page
-                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL" #URL to the identity provider metadata
+                "identity_provider_name": "IDENTITY_PROVIDER_NAME",
+                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL"
             },
             {
                 "identity_provider_method": "cognito"
@@ -247,6 +264,10 @@ aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 
 ```bash
 cdk deploy --all
+
+or if you are using a specific profile and/or region
+
+cdk deploy --profile <profile> --region <region> --all
 ```
 
 ## 🏗️ Project Structure
@@ -256,6 +277,9 @@ medialake/
 ├── medialake_constructs/     # CDK construct definitions
 │   ├── shared_constructs/    # Shared AWS constructs
 │   └── api_gateway_connectors.py
+├── medialake_stacks/         # CDK stack definitions
+│   ├── base_infrastructure.py # Base infrastructure stack
+│   └── api_gateway.py         # API Gateway stack
 ├── lambdas/                  # Lambda functions
 │   ├── api/                  # API handlers
 │   │   ├── connectors/      # Storage connector handlers
@@ -264,7 +288,12 @@ medialake/
 ├── tests/                    # Test files
 ├── app.py                    # Main CDK app
 ├── requirements.txt          # Python dependencies
-└── cdk.json                 # CDK configuration
+├── cdk.json                 # CDK configuration
+├── config.py                # Configuration interpertor and validator
+├── config.json              # Configuration file
+├── requirements-dev.txt     # Development dependencies
+├── README.md                # This file
+└── LICENSE                  # License
 ```
 
 ## 🔑 Key Components
@@ -347,77 +376,3 @@ Licensed under the Apache License, Version 2.0 (the "License"). You may not use 
 <http://www.apache.org/licenses/LICENSE-2.0>
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-
-
-Create a node: 
-
-node:
-  id: string
-  name: string
-  type: enum [transform, decision, api, event]
-  description: string
-  interface:
-    inputs:
-      - name: string
-        type: string
-        required: boolean
-    outputs:
-      - name: string
-        type: string
-    api:
-      type: enum [rest, graphql, grpc]
-      spec: string # URL to API spec
-  connections:
-    incoming:
-      - nodeId: string
-        type: string
-    outgoing:
-      - nodeId: string
-        type: string
-  configuration:
-    timeout: number
-    retries: number
-    errorHandling: string
-
-
-
-
-
-spec: v1.0.0
-node:
- id: string
- title: string
- version: string
- type: [enum]
- integration:
-   type: enum [lambda, api, step_function, container] 
-   config:
-     # Lambda specific
-     lambda:
-       arn: string
-       handler: string
-       runtime: string
-     
-     # API specific  
-     api:
-       spec_url: string
-       method: string
-       path: string
-       
-     # Step function specific
-     step_function:
-       state_name: string
-       arn: string
-       
-     # Container specific
-     container:
-       image: string
-       command: string[]
-       
- description: string
- connections:
-   incoming:
-     type: [enum]
-   outgoing: 
-     type: [enum]

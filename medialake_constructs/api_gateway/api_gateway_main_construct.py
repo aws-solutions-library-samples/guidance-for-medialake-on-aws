@@ -163,7 +163,7 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_rest_api = apigateway.RestApi(
             self,
             "MediaLakeApi",
-            endpoint_types=[apigateway.EndpointType.REGIONAL],
+            endpoint_types=[apigateway.EndpointType.EDGE],
             # endpoint_types=[apigateway.EndpointType.PRIVATE],
             # policy=resource_policy,
             cloud_watch_role=True,
