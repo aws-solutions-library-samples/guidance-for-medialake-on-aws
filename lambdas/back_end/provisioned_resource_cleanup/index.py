@@ -82,10 +82,6 @@ def clean_up_table_resources(table_name, clean_up_function):
     response = table.scan()
     items = response["Items"]
 
-    while "LastEvaluatedKey" in response:
-        response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
-        items.extend(response["Items"])
-
     for item in items:
         try:
             logger.info(f"Cleaning up {table_name} item: %s", item["id"])

@@ -10,6 +10,7 @@ from aws_cdk import (
     # custom_resources as cr,
     Duration,
     RemovalPolicy,
+    CfnOutput,
 )
 from config import config
 from medialake_constructs.shared_constructs.s3_logging import (
@@ -17,9 +18,9 @@ from medialake_constructs.shared_constructs.s3_logging import (
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import ( 
+from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import (
     S3ExpressOneZoneBucket,
-    S3ExpressOneZoneBucketProps
+    S3ExpressOneZoneBucketProps,
 )
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
@@ -143,6 +144,9 @@ class BaseInfrastructureStack(Stack):
             description="MediaLake Security Group",
             vpc=self._vpc.vpc,
         )
+        # If the environment is prod, apply a retention policy to the security group
+        if config.environment == "prod":
+            self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
 
         # Allow HTTPS ingress from the VPC CIDR
         self._security_group.add_ingress_rule(
@@ -222,7 +226,7 @@ class BaseInfrastructureStack(Stack):
             access_logs_bucket=self.access_logs_bucket.bucket,
             source_bucket=self.media_assets_s3_bucket.bucket,
         )
-        
+
         # self.internal_s3_bucket = S3ExpressOneZoneBucket(
         #     self,
         #     "InternalS3Bucket",
@@ -233,7 +237,6 @@ class BaseInfrastructureStack(Stack):
         #     ),
         # )
 
-        
         # Create IAC assets bucket with explicit name including region
         self.iac_assets_bucket = S3Bucket(
             self,
@@ -244,7 +247,6 @@ class BaseInfrastructureStack(Stack):
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
         )
-        
 
         self._ingest_event_bus = EventBus(
             self,
@@ -264,7 +266,11 @@ class BaseInfrastructureStack(Stack):
                 name=f"{config.global_prefix}_pipeline_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
+                removal_policy=(
+                    RemovalPolicy.RETAIN
+                    if config.should_retain_tables
+                    else RemovalPolicy.DESTROY
+                ),
             ),
         )
 
@@ -280,7 +286,11 @@ class BaseInfrastructureStack(Stack):
                 ddb_export_bucket=self.ddb_export_bucket,
                 stream=dynamodb.StreamViewType.NEW_IMAGE,
                 point_in_time_recovery=True,
-                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
+                removal_policy=(
+                    RemovalPolicy.RETAIN
+                    if config.should_retain_tables
+                    else RemovalPolicy.DESTROY
+                ),
             ),
         )
 
@@ -315,87 +325,79 @@ class BaseInfrastructureStack(Stack):
                 point_in_time_recovery=True,
                 sort_key_name="SK",
                 sort_key_type=dynamodb.AttributeType.STRING,
-                removal_policy=RemovalPolicy.RETAIN if config.should_retain_tables else RemovalPolicy.DESTROY
+                removal_policy=(
+                    RemovalPolicy.RETAIN
+                    if config.should_retain_tables
+                    else RemovalPolicy.DESTROY
+                ),
             ),
         )
 
-        # Add GSI1 - 
+        # Add GSI1 -
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI1",
             partition_key=dynamodb.Attribute(
-                name="GSI1PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI1PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI1SK",
-                type=dynamodb.AttributeType.STRING
-            )
+                name="GSI1SK", type=dynamodb.AttributeType.STRING
+            ),
         )
 
         # Add GSI2 - Hash Index
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI2",
             partition_key=dynamodb.Attribute(
-                name="GSI2PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI2PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI2SK",
-                type=dynamodb.AttributeType.STRING
-            )
+                name="GSI2SK", type=dynamodb.AttributeType.STRING
+            ),
         )
 
         # Add GSI3 - Recent Assets Index
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI3",
             partition_key=dynamodb.Attribute(
-                name="GSI3PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI3PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI3SK",
-                type=dynamodb.AttributeType.STRING
-            )
+                name="GSI3SK", type=dynamodb.AttributeType.STRING
+            ),
         )
 
         # Add GSI4 - TBD
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI4",
             partition_key=dynamodb.Attribute(
-                name="GSI4PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI4PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI4SK",
-                type=dynamodb.AttributeType.STRING
-            )
-        ) 
+                name="GSI4SK", type=dynamodb.AttributeType.STRING
+            ),
+        )
 
         # Add GSI4 - TBD
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI5",
             partition_key=dynamodb.Attribute(
-                name="GSI5PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI5PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI5SK",
-                type=dynamodb.AttributeType.STRING
-            )
-        ) 
+                name="GSI5SK", type=dynamodb.AttributeType.STRING
+            ),
+        )
 
         # Add GSI4 - TBD
         self._assetv2_table.table.add_global_secondary_index(
             index_name="GSI6",
             partition_key=dynamodb.Attribute(
-                name="GSI6PK",
-                type=dynamodb.AttributeType.STRING
+                name="GSI6PK", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="GSI6SK",
-                type=dynamodb.AttributeType.STRING
-            )
-        ) 
+                name="GSI6SK", type=dynamodb.AttributeType.STRING
+            ),
+        )
 
         self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
             self,
@@ -409,6 +411,103 @@ class BaseInfrastructureStack(Stack):
                 vpc=self._vpc,
                 security_group=self._security_group,
             ),
+        )
+
+        # Add outputs for retained resources in prod environment
+        self.add_retained_resources_outputs()
+
+    def add_retained_resources_outputs(self):
+        """
+        Adds CloudFormation outputs for retained resources in production environment.
+        Only executes when config.environment == "prod".
+        """
+        if config.environment != "prod":
+            return
+
+        # VPC Outputs
+        CfnOutput(
+            self,
+            "RetainedVpcId",
+            value=self._vpc.vpc.vpc_id,
+            description="Retained VPC ID",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedVpcCidr",
+            value=self._vpc.vpc.vpc_cidr_block,
+            description="Retained VPC CIDR Block",
+        )
+
+        # Subnet Outputs
+        for i, subnet in enumerate(self._vpc.vpc.public_subnets):
+            CfnOutput(
+                self,
+                f"RetainedPublicSubnet{i+1}",
+                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
+                description=f"Retained Public Subnet {i+1} (ID|AZ|CIDR)",
+            )
+
+        for i, subnet in enumerate(self._vpc.vpc.private_subnets):
+            CfnOutput(
+                self,
+                f"RetainedPrivateSubnet{i+1}",
+                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
+                description=f"Retained Private Subnet {i+1} (ID|AZ|CIDR)",
+            )
+
+        # Security Group Output
+        CfnOutput(
+            self,
+            "RetainedSecurityGroup",
+            value=self._security_group.security_group_id,
+            description="Retained Security Group ID",
+        )
+
+        # DynamoDB Tables Outputs
+        CfnOutput(
+            self,
+            "RetainedPipelineTable",
+            value=f"{self._pipeline_table.table.table_name}|{self._pipeline_table.table.table_arn}",
+            description="Retained Pipeline Table (Name|ARN)",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedAssetTable",
+            value=f"{self._asset_table.table.table_name}|{self._asset_table.table.table_arn}",
+            description="Retained Asset Table (Name|ARN)",
+        )
+
+        # Asset Table GSIs
+        CfnOutput(
+            self,
+            "RetainedAssetTableGSIs",
+            value="AssetIDIndex,FileHashIndex",
+            description="Retained Asset Table GSIs",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedAssetV2Table",
+            value=f"{self._assetv2_table.table.table_name}|{self._assetv2_table.table.table_arn}",
+            description="Retained Asset V2 Table (Name|ARN)",
+        )
+
+        # Asset V2 Table GSIs
+        CfnOutput(
+            self,
+            "RetainedAssetV2TableGSIs",
+            value="GSI1,GSI2,GSI3,GSI4,GSI5,GSI6",
+            description="Retained Asset V2 Table GSIs",
+        )
+
+        # OpenSearch Cluster Outputs
+        CfnOutput(
+            self,
+            "RetainedOpenSearchCluster",
+            value=f"{self._opensearch_cluster.domain_endpoint}|{self._opensearch_cluster.domain_arn}",
+            description="Retained OpenSearch Cluster (Endpoint|ARN)",
         )
 
     @property
@@ -499,8 +598,6 @@ class BaseInfrastructureStack(Stack):
 
         return "AssetIDIndex"
 
-
-
     @property
     def asset_table_asset_id_index_arn(self) -> str:
         """
@@ -512,9 +609,6 @@ class BaseInfrastructureStack(Stack):
 
         return f"{self._asset_table.table.table_arn}/index/AssetIDIndex"
 
-
-    
-    
     @property
     def collection_dashboards_url(self) -> str:
         """
