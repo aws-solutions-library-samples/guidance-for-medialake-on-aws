@@ -1,9 +1,23 @@
 import React from 'react';
-import { Box, Typography, IconButton, ToggleButtonGroup, ToggleButton, Popover, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Button,
+    ToggleButtonGroup,
+    ToggleButton,
+    Menu,
+    MenuItem,
+    FormGroup,
+    FormControlLabel,
+    Checkbox,
+    Switch,
+} from '@mui/material';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import SortIcon from '@mui/icons-material/Sort';
+import TuneIcon from '@mui/icons-material/Tune';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { type SortingState } from '@tanstack/react-table';
 
 export interface AssetField {
@@ -26,6 +40,8 @@ interface AssetViewControlsProps {
     onSortChange: (columnId: string) => void;
     fields: AssetField[];
     onFieldToggle: (fieldId: string) => void;
+    groupByType: boolean;
+    onGroupByTypeChange: (checked: boolean) => void;
 }
 
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
@@ -37,12 +53,16 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     onSortChange,
     fields,
     onFieldToggle,
+    groupByType,
+    onGroupByTypeChange,
 }) => {
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
+    const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
 
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
+    const handleAppearanceClose = () => setAppearanceAnchor(null);
 
     return (
         <Box sx={{
@@ -76,28 +96,53 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     </ToggleButton>
                 </ToggleButtonGroup>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton
+
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                {/* Sort Button */}
+                <Button
                     size="small"
+                    startIcon={<SortIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
                     onClick={(e) => setSortAnchor(e.currentTarget)}
                     sx={{
                         bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
                     }}
                 >
-                    <SortIcon />
-                </IconButton>
-                <IconButton
+                    Sort
+                </Button>
+
+                {/* Show Fields Button */}
+                <Button
                     size="small"
+                    startIcon={<ViewColumnIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
                     onClick={(e) => setFieldsAnchor(e.currentTarget)}
                     sx={{
                         bgcolor: Boolean(fieldsAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
                     }}
                 >
-                    <ViewColumnIcon />
-                </IconButton>
+                    Fields
+                </Button>
+
+                {/* Appearance Button */}
+                <Button
+                    size="small"
+                    startIcon={<TuneIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
+                    onClick={(e) => setAppearanceAnchor(e.currentTarget)}
+                    sx={{
+                        bgcolor: Boolean(appearanceAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
+                    }}
+                >
+                    Appearance
+                </Button>
             </Box>
 
-            <Popover
+            {/* Sort Menu */}
+            <Menu
                 open={Boolean(sortAnchor)}
                 anchorEl={sortAnchor}
                 onClose={handleSortClose}
@@ -139,9 +184,10 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                         </MenuItem>
                     ))}
                 </Box>
-            </Popover>
+            </Menu>
 
-            <Popover
+            {/* Show Fields Menu */}
+            <Menu
                 open={Boolean(fieldsAnchor)}
                 anchorEl={fieldsAnchor}
                 onClose={handleFieldsClose}
@@ -153,35 +199,23 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     vertical: 'top',
                     horizontal: 'right',
                 }}
-                onClick={(e) => e.stopPropagation()}
-                slotProps={{
-                    paper: {
-                        onClick: (e) => e.stopPropagation(),
-                        sx: { p: 2, minWidth: 200 }
-                    },
-                }}
             >
-                <Box>
+                <Box sx={{ p: 2, minWidth: 200 }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         {viewMode === 'card' ? 'Show Fields' : 'Show Columns'}
                     </Typography>
-                    <FormGroup onClick={(e) => e.stopPropagation()}>
+                    <FormGroup>
                         {fields.map((field) => (
                             <FormControlLabel
                                 key={field.id}
                                 control={
                                     <Checkbox
                                         checked={field.visible}
-                                        onChange={(e) => {
-                                            e.stopPropagation();
-                                            onFieldToggle(field.id);
-                                        }}
+                                        onChange={() => onFieldToggle(field.id)}
                                         size="small"
-                                        onClick={(e) => e.stopPropagation()}
                                     />
                                 }
                                 label={field.label}
-                                onClick={(e) => e.stopPropagation()}
                                 sx={{
                                     '& .MuiFormControlLabel-label': {
                                         fontSize: '0.875rem'
@@ -191,7 +225,48 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                         ))}
                     </FormGroup>
                 </Box>
-            </Popover>
+            </Menu>
+
+            {/* Appearance Menu */}
+            <Menu
+                open={Boolean(appearanceAnchor)}
+                anchorEl={appearanceAnchor}
+                onClose={handleAppearanceClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+            >
+                <Box sx={{ p: 2, minWidth: 200 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Appearance
+                    </Typography>
+                    <FormGroup>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={groupByType}
+                                    onChange={(e) => {
+                                        onGroupByTypeChange(e.target.checked);
+                                        handleAppearanceClose();
+                                    }}
+                                    size="small"
+                                />
+                            }
+                            label="Group by Type"
+                            sx={{
+                                '& .MuiFormControlLabel-label': {
+                                    fontSize: '0.875rem'
+                                }
+                            }}
+                        />
+                    </FormGroup>
+                </Box>
+            </Menu>
         </Box>
     );
 };

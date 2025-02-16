@@ -14,6 +14,8 @@ export interface AssetTableColumn<T> {
     minWidth: number;
     format?: (value: any) => string | React.ReactNode;
     accessor?: (row: T) => any;
+    sortable?: boolean;
+    sortingFn?: (a: T, b: T) => number;
 }
 
 export interface AssetCardProps {

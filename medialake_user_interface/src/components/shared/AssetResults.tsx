@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Grid, Paper } from '@mui/material';
+import { Box, Grid, Paper, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
@@ -39,6 +39,8 @@ interface AssetResultsProps<T extends AssetBase> {
     }>;
 }
 
+type AssetWithHeader<T> = T | { isHeader: true; type: string };
+
 function AssetResults<T extends AssetBase>({
     assets,
     searchMetadata,
@@ -50,6 +52,7 @@ function AssetResults<T extends AssetBase>({
     const navigate = useNavigate();
     const [currentAsset, setCurrentAsset] = useState<T | null>(null);
     const [columnFilters, setColumnFilters] = useState<Array<{ columnId: string; value: string }>>([]);
+    const [groupByType, setGroupByType] = useState(true);
 
     const {
         assetType,
@@ -82,6 +85,53 @@ function AssetResults<T extends AssetBase>({
         defaultCardFields,
         defaultColumns
     });
+
+    // Group and sort assets
+    const displayedAssets = useMemo(() => {
+        let result = [...assets];
+
+        // Apply sorting first
+        result = sortAssets(result, sorting);
+        
+        // Apply grouping if enabled
+        if (groupByType) {
+            // Group by format
+            const groups = result.reduce((acc, asset) => {
+                const format = asset.DigitalSourceAsset.MainRepresentation.Format.toLowerCase();
+                if (!acc[format]) {
+                    acc[format] = [];
+                }
+                acc[format].push(asset);
+                return acc;
+            }, {} as Record<string, T[]>);
+
+            // Convert groups back to array, maintaining format-based ordering
+            result = Object.entries(groups)
+                .sort(([formatA], [formatB]) => formatA.localeCompare(formatB))
+                .flatMap(([_, assets]) => assets);
+        }
+        
+        return result;
+    }, [assets, groupByType, sorting]);
+
+    // Add section headers for grouped view
+    const assetsWithHeaders = useMemo(() => {
+        if (!groupByType) return displayedAssets;
+
+        const result: AssetWithHeader<T>[] = [];
+        let currentFormat = '';
+
+        displayedAssets.forEach(asset => {
+            const format = asset.DigitalSourceAsset.MainRepresentation.Format.toLowerCase();
+            if (format !== currentFormat) {
+                result.push({ isHeader: true, type: format });
+                currentFormat = format;
+            }
+            result.push(asset);
+        });
+
+        return result;
+    }, [displayedAssets, groupByType]);
 
     const {
         selectedAsset,
@@ -125,12 +175,34 @@ function AssetResults<T extends AssetBase>({
         setColumnFilters(prev => prev.filter(f => f.columnId !== columnId));
     };
 
+    const renderAsset = (asset: T) => (
+        <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
+            <AssetCard
+                id={asset.InventoryID}
+                name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                thumbnailUrl={asset.thumbnailUrl}
+                proxyUrl={asset.proxyUrl}
+                assetType={assetType}
+                fields={cardFields}
+                renderField={(fieldId) => renderCardField(fieldId, asset)}
+                onAssetClick={() => handleAssetClick(asset)}
+                onDeleteClick={(e) => handleDeleteClick(asset, e)}
+                onMenuClick={(e) => handleMenuOpen(asset, e)}
+                onEditClick={(e) => handleStartEditing(asset, e)}
+                onImageError={handleAssetError}
+                isEditing={editingAssetId === asset.InventoryID}
+                editedName={editedName}
+                onEditNameChange={handleNameChange}
+                onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
+            />
+        </Grid>
+    );
+
     return (
         <Paper 
             elevation={0} 
             sx={{ 
-                bgcolor: 'transparent',  // Make background transparent
-                // Remove any padding if present
+                bgcolor: 'transparent',
                 p: 0
             }}
         >
@@ -144,36 +216,46 @@ function AssetResults<T extends AssetBase>({
                     onSortChange={handleRequestSort}
                     fields={viewMode === 'card' ? cardFields : columns}
                     onFieldToggle={viewMode === 'card' ? handleCardFieldToggle : handleColumnToggle}
+                    groupByType={groupByType}
+                    onGroupByTypeChange={setGroupByType}
                 />
 
                 {viewMode === 'card' ? (
-                    <Grid container spacing={3}>
-                        {useMemo(() => sortAssets(assets, sorting), [assets, sorting]).map((asset) => (
-                            <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
-                                <AssetCard
-                                    id={asset.InventoryID}
-                                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                                    thumbnailUrl={asset.thumbnailUrl}
-                                    proxyUrl={asset.proxyUrl}
-                                    assetType={assetType}
-                                    fields={cardFields}
-                                    renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                    onAssetClick={() => handleAssetClick(asset)}
-                                    onDeleteClick={(e) => handleDeleteClick(asset, e)}
-                                    onMenuClick={(e) => handleMenuOpen(asset, e)}
-                                    onEditClick={(e) => handleStartEditing(asset, e)}
-                                    onImageError={handleAssetError}
-                                    isEditing={editingAssetId === asset.InventoryID}
-                                    editedName={editedName}
-                                    onEditNameChange={handleNameChange}
-                                    onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
-                                />
+                    <Box>
+                        {groupByType ? (
+                            assetsWithHeaders.map((item, index) => {
+                                if ('isHeader' in item) {
+                                    return (
+                                        <Box
+                                            key={`header-${item.type}`}
+                                            sx={{
+                                                mt: index > 0 ? 4 : 0,
+                                                mb: 2,
+                                                px: 1,
+                                                typography: 'h6',
+                                                color: 'text.secondary',
+                                                textTransform: 'capitalize'
+                                            }}
+                                        >
+                                            {item.type}
+                                        </Box>
+                                    );
+                                }
+                                return (
+                                    <Grid container spacing={3} key={item.InventoryID}>
+                                        {renderAsset(item)}
+                                    </Grid>
+                                );
+                            })
+                        ) : (
+                            <Grid container spacing={3}>
+                                {displayedAssets.map(asset => renderAsset(asset))}
                             </Grid>
-                        ))}
-                    </Grid>
+                        )}
+                    </Box>
                 ) : (
                     <AssetTable
-                        data={useMemo(() => sortAssets(assets, sorting), [assets, sorting])}
+                        data={displayedAssets}
                         columns={columns}
                         sorting={sorting}
                         onSortingChange={setSorting}

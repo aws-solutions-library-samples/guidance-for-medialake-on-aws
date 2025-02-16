@@ -72,8 +72,8 @@ class SearchParams(BaseModelWithConfig):
 
     q: str = Field(..., min_length=1)
     page: conint(gt=0) = Field(default=1)  # type: ignore
-    pageSize: conint(gt=0, le=100) = Field(default=20)  # type: ignore
-    min_score: float = Field(default=0.1)
+    pageSize: conint(gt=0, le=100) = Field(default=50)  # type: ignore
+    min_score: float = Field(default=0.01)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
     semantic: bool = Field(default=False)
@@ -153,7 +153,7 @@ class SearchResponse(BaseModelWithConfig):
 
 
 def get_opensearch_client() -> OpenSearch:
-    """Create and return an OpenSearch client."""
+    """Create and return an OpenSearch client with optimized settings."""
     host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
     region = os.environ["AWS_REGION"]
     service_scope = os.environ["SCOPE"]
@@ -169,6 +169,10 @@ def get_opensearch_client() -> OpenSearch:
         verify_certs=True,
         connection_class=RequestsHttpConnection,
         region=region,
+        timeout=30,
+        max_retries=2,
+        retry_on_timeout=True,
+        maxsize=10,
     )
 
 
@@ -222,30 +226,76 @@ def build_search_query(params: SearchParams) -> Dict:
     clean_query, parsed_filters = parse_search_query(params.q)
     logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
 
-    search_fields = params.search_fields or [
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2",
-        "DigitalSourceAsset.Type",
-        "Metadata.Embedded.S3.ContentType",
-        "*",
+    # Define core search fields with boosts
+    name_fields = [
+        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name^3",
+        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2"
+    ]
+    
+    type_fields = [
+        "DigitalSourceAsset.Type^2",
+        "DigitalSourceAsset.MainRepresentation.Format^2",
+        "Metadata.Embedded.S3.ContentType"
     ]
 
     # Build the main query
-    query = {
-        "bool": {
-            "must": [
-                {
-                    "multi_match": {
-                        "query": clean_query,
-                        "fields": search_fields,
-                        "type": "best_fields",
-                        "fuzziness": "AUTO",
-                        "prefix_length": 2,
+    if clean_query:
+        query = {
+            "bool": {
+                "should": [
+                    # Name matching
+                    {
+                        "multi_match": {
+                            "query": clean_query,
+                            "fields": name_fields,
+                            "type": "best_fields",
+                            "fuzziness": "AUTO",
+                            "prefix_length": 1,
+                            "minimum_should_match": "20%",
+                            "boost": 2
+                        }
+                    },
+                    # Prefix matching for partial searches
+                    {
+                        "match_phrase_prefix": {
+                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
+                                "query": clean_query,
+                                "boost": 1.5
+                            }
+                        }
+                    },
+                    # Type and format matching
+                    {
+                        "multi_match": {
+                            "query": clean_query,
+                            "fields": type_fields,
+                            "type": "cross_fields",
+                            "operator": "or",
+                            "minimum_should_match": "1",
+                            "boost": 1
+                        }
+                    },
+                    # Partial word matching
+                    {
+                        "query_string": {
+                            "query": f"*{clean_query}*",
+                            "fields": name_fields,
+                            "analyze_wildcard": True,
+                            "boost": 0.7
+                        }
                     }
-                } if clean_query else {"match_all": {}}
-            ],
-            "filter": []
+                ],
+                "minimum_should_match": 1,
+                "filter": []
+            }
         }
-    }
+    else:
+        query = {
+            "bool": {
+                "must": [{"match_all": {}}],
+                "filter": []
+            }
+        }
 
     # Add filters from parsed keywords
     if parsed_filters:
@@ -314,41 +364,31 @@ def build_search_query(params: SearchParams) -> Dict:
         "aggs": {
             "file_types": {
                 "terms": {
-                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword"
+                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+                    "size": 20
                 }
             },
-            "asset_types": {"terms": {"field": "DigitalSourceAsset.Type.keyword"}},
-            "metadata_fields": {
-                "nested": {
-                    "path": "Metadata.Consolidated"
-                },
-                "aggs": {
-                    "keys": {
-                        "terms": {
-                            "field": "Metadata.Consolidated.*.keyword",
-                            "size": 50
-                        }
-                    }
+            "asset_types": {
+                "terms": {
+                    "field": "DigitalSourceAsset.Type.keyword",
+                    "size": 20
                 }
             }
         },
-        "suggest": {
-            "text": clean_query,
-            "simple_phrase": {
-                "phrase": {
-                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-                    "size": 1,
-                    "gram_size": 3,
-                    "direct_generator": [
-                        {
-                            "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-                            "suggest_mode": "always",
-                        }
-                    ],
-                    "highlight": {"pre_tag": "<em>", "post_tag": "</em>"},
-                }
-            },
-        },
+        "_source": {
+            "includes": [
+                "InventoryID",
+                "DigitalSourceAsset.Type",
+                "DigitalSourceAsset.MainRepresentation.Format",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+                "DigitalSourceAsset.CreateDate",
+                "DerivedRepresentations.Purpose",
+                "DerivedRepresentations.StorageInfo.PrimaryLocation",
+                "FileHash",
+                "Metadata.Consolidated.type"
+            ]
+        }
     }
 
 

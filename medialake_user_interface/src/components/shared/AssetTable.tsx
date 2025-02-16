@@ -76,8 +76,14 @@ function AssetTable<T>({
     };
 
     const handleMenuClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
+        event.preventDefault();
         event.stopPropagation();
         onMenuClick(item, event);
+        console.log('Menu clicked:', {
+            target: event.target,
+            currentTarget: event.currentTarget,
+            item
+        });
     };
 
     const handleEditClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
@@ -219,6 +225,12 @@ function AssetTable<T>({
                         <IconButton
                             size="small"
                             onClick={handleMenuClick(info.row.original)}
+                            id={`asset-menu-button-${getId(info.row.original)}`}
+                            aria-haspopup="true"
+                            sx={{
+                                position: 'relative',
+                                zIndex: 1
+                            }}
                         >
                             <MoreVertIcon fontSize="small" />
                         </IconButton>

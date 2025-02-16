@@ -65,6 +65,13 @@ const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boo
             maxHeight: rowCount > 0 ? '100%' : 'auto',
             position: 'relative',
             willChange: 'transform',
+            // '& .MuiTableCell-root': {
+            //     position: 'static !important',
+            //     '& .menu-container': {
+            //         position: 'relative',
+            //         zIndex: 1300
+            //     }
+            // },
             '&::-webkit-scrollbar': {
                 width: 8,
                 height: 8,
