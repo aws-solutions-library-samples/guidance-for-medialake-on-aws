@@ -20,7 +20,15 @@ from opensearchpy import (
 )
 from datetime import datetime
 import json
-from utils import generate_presigned_url
+from search_utils import (
+    generate_presigned_url,
+    parse_search_query,
+    parse_size_value,
+    parse_date_value,
+    parse_metadata_value,
+    replace_decimals,
+    CustomEncoder
+)
 
 # Initialize AWS clients and utilities
 logger = Logger()
@@ -205,9 +213,14 @@ def build_semantic_query(params: SearchParams) -> Dict:
 
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
-    print(f"parames are {params}")
+    logger.info("Building search query with params:", extra={"params": params.model_dump()})
+    
     if params.semantic:
         return build_semantic_query(params)
+
+    # Parse the search query for special keywords
+    clean_query, parsed_filters = parse_search_query(params.q)
+    logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
 
     search_fields = params.search_fields or [
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2",
@@ -216,36 +229,82 @@ def build_search_query(params: SearchParams) -> Dict:
         "*",
     ]
 
+    # Build the main query
     query = {
         "bool": {
-            "should": [
+            "must": [
                 {
                     "multi_match": {
-                        "query": params.q,
+                        "query": clean_query,
                         "fields": search_fields,
                         "type": "best_fields",
                         "fuzziness": "AUTO",
                         "prefix_length": 2,
                     }
-                },
-                {
-                    "wildcard": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath": f"*{params.q}*"
-                    }
-                },
+                } if clean_query else {"match_all": {}}
             ],
-            "minimum_should_match": 1,
+            "filter": []
         }
     }
 
+    # Add filters from parsed keywords
+    if parsed_filters:
+        # Media type filter
+        if 'type' in parsed_filters:
+            query["bool"]["filter"].append({
+                "term": {"DigitalSourceAsset.Type.keyword": parsed_filters['type'][0]}
+            })
+
+        # Format filter
+        if 'format' in parsed_filters:
+            query["bool"]["filter"].append({
+                "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
+            })
+
+        # Size filter
+        if 'size' in parsed_filters:
+            for size_filter in parsed_filters['size']:
+                range_operator = '>=' if size_filter['operator'].startswith('>=') else '<=' if size_filter['operator'].startswith('<=') else '>' if size_filter['operator'].startswith('>') else '<'
+                query["bool"]["filter"].append({
+                    "range": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
+                            range_operator: size_filter['value']
+                        }
+                    }
+                })
+
+        # Date filter
+        if 'date' in parsed_filters:
+            for date_filter in parsed_filters['date']:
+                range_operator = '>=' if date_filter['operator'].startswith('>=') else '<=' if date_filter['operator'].startswith('<=') else '>' if date_filter['operator'].startswith('>') else '<'
+                query["bool"]["filter"].append({
+                    "range": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
+                            range_operator: date_filter['value']
+                        }
+                    }
+                })
+
+        # Metadata filters
+        if 'metadata' in parsed_filters:
+            for metadata_filter in parsed_filters['metadata']:
+                query["bool"]["filter"].append({
+                    "term": {
+                        f"Metadata.Consolidated.{metadata_filter['key']}.keyword": metadata_filter['value']
+                    }
+                })
+
+    # Add any additional filters from params
     if params.filters:
-        filters = []
         for filter_item in params.filters:
             if filter_item.get("operator") == "term":
-                filters.append({"term": {filter_item["field"]: filter_item["value"]}})
+                query["bool"]["filter"].append(
+                    {"term": {filter_item["field"]: filter_item["value"]}}
+                )
             elif filter_item.get("operator") == "range":
-                filters.append({"range": {filter_item["field"]: filter_item["value"]}})
-        query["bool"]["filter"] = filters
+                query["bool"]["filter"].append(
+                    {"range": {filter_item["field"]: filter_item["value"]}}
+                )
 
     return {
         "query": query,
@@ -259,9 +318,22 @@ def build_search_query(params: SearchParams) -> Dict:
                 }
             },
             "asset_types": {"terms": {"field": "DigitalSourceAsset.Type.keyword"}},
+            "metadata_fields": {
+                "nested": {
+                    "path": "Metadata.Consolidated"
+                },
+                "aggs": {
+                    "keys": {
+                        "terms": {
+                            "field": "Metadata.Consolidated.*.keyword",
+                            "size": 50
+                        }
+                    }
+                }
+            }
         },
         "suggest": {
-            "text": params.q,
+            "text": clean_query,
             "simple_phrase": {
                 "phrase": {
                     "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
