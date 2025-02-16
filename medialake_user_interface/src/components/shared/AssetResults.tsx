@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Grid, Paper } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
@@ -12,6 +12,7 @@ import AssetPagination from './AssetPagination';
 import AssetActionsMenu from './AssetActionsMenu';
 import { useAssetResults } from '@/hooks/useAssetResults';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
+import { sortAssets } from '@/utils/sortAssets';
 
 export interface AssetResultsConfig<T extends AssetBase> {
     assetType: string;
@@ -59,6 +60,7 @@ function AssetResults<T extends AssetBase>({
         placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     } = config;
 
+    // Initialize asset results state and handlers
     const {
         viewMode,
         sorting,
@@ -73,12 +75,12 @@ function AssetResults<T extends AssetBase>({
         handleCardFieldToggle,
         handleColumnToggle,
         handleAssetError,
-    } = useAssetResults({
+    } = useAssetResults<T>({
         assets,
         searchMetadata,
         onPageChange,
         defaultCardFields,
-        defaultColumns,
+        defaultColumns
     });
 
     const {
@@ -146,7 +148,7 @@ function AssetResults<T extends AssetBase>({
 
                 {viewMode === 'card' ? (
                     <Grid container spacing={3}>
-                        {assets.map((asset) => (
+                        {useMemo(() => sortAssets(assets, sorting), [assets, sorting]).map((asset) => (
                             <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
                                 <AssetCard
                                     id={asset.InventoryID}
@@ -171,7 +173,7 @@ function AssetResults<T extends AssetBase>({
                     </Grid>
                 ) : (
                     <AssetTable
-                        data={assets}
+                        data={useMemo(() => sortAssets(assets, sorting), [assets, sorting])}
                         columns={columns}
                         sorting={sorting}
                         onSortingChange={setSorting}
