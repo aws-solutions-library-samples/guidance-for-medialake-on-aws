@@ -129,10 +129,6 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                     f"No specific cleanup needed for integration method: {integration_method}"
                 )
                 
-            s3.put_bucket_notification_configuration(
-                Bucket=bucket_name,
-                NotificationConfiguration={},  # Empty config removes all notifications
-            )
         except ClientError as e:
             if e.response["Error"]["Code"] != "NoSuchBucket":
                 error_msg = f"Error removing S3 bucket notification: {str(e)}"
