@@ -241,6 +241,11 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             <strong>Description:</strong> {connector.description}
                         </Typography>
                     )}
+                     {connector.objectPrefix && (
+                        <Typography variant="body2" >
+                            <strong>Prefix:</strong> {connector.objectPrefix}
+                        </Typography>
+                    )}
 
                     <Box sx={{ mt: 2 }}>
                         {connector.usage?.total !== undefined && (

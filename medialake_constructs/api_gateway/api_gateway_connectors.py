@@ -378,7 +378,7 @@ class ConnectorsConstruct(Construct):
             config=LambdaConfig(
                 name="connector_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
-                # iam_role_boundary_policy=lambda_iam_boundry_policy,
+                memory_size=256,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,

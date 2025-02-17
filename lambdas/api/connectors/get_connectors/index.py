@@ -69,6 +69,7 @@ def format_connector(item: dict) -> dict:
         "iamRoleArn": item.get("iamRoleArn", ""),
         "lambdaArn": item.get("lambdaArn", ""),
         "queueUrl": item.get("queueUrl", ""),
+        "objectPrefix": item.get("objectPrefix", ""),
         "configuration": {
             "queueUrl": item.get("queueUrl", ""),
             "lambdaArn": item.get("lambdaArn", ""),
@@ -77,6 +78,7 @@ def format_connector(item: dict) -> dict:
         "settings": {
             "bucket": item.get("storageIdentifier", ""),
             "region": item.get("region", ""),
+            "path": item.get("objectPrefix", ""),
         },
     }
 
