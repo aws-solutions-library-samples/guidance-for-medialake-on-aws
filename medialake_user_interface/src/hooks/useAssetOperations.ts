@@ -64,8 +64,22 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                 console.log('Share:', selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'download':
-                window.open(selectedAsset.thumbnailUrl, '_blank');
+                const fileName = selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+                fetch(selectedAsset.thumbnailUrl)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    })
+                    .catch(error => console.error('Download failed:', error));
                 break;
+
         }
         handleMenuClose();
     };
