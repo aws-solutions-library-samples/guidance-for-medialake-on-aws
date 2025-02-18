@@ -246,13 +246,13 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             <strong>Prefix:</strong> {connector.objectPrefix}
                         </Typography>
                     )}
-
+                    {connector.usage?.total !== undefined && (
+                        <Typography variant="body2" >
+                            <strong>Integration Method:</strong> {connector.integrationMethod}
+                        </Typography>
+                    )}
                     <Box sx={{ mt: 2 }}>
-                        {connector.usage?.total !== undefined && (
-                            <Typography variant="body2" >
-                                <strong>Storage:</strong> {formatBytes(connector.usage.total)}
-                            </Typography>
-                        )}
+
                         <Typography 
                             variant="body2" 
                             onClick={canToggleSeconds ? toggleSeconds : undefined}
