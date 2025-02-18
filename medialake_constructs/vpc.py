@@ -30,9 +30,9 @@ class CustomVpc(Construct):
             if not self.props.existing_vpc:
                 raise ValueError("Existing VPC configuration is missing")
 
-            vpc_id = self.props.existing_vpc["vpc_id"]
-            subnet_ids = self.props.existing_vpc["subnet_ids"]
-            vpc_cidr = self.props.existing_vpc["vpc_cidr"]
+            vpc_id = self.props.existing_vpc.vpc_id
+            subnet_ids = self.props.existing_vpc.subnet_ids
+            vpc_cidr = self.props.existing_vpc.vpc_cidr
 
             # Determine the number of AZs based on the number of public subnets
             num_azs = len(subnet_ids.get("public", []))

@@ -138,29 +138,41 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Security group for Lambdas
-        self._security_group = ec2.SecurityGroup(
-            self,
-            "MediaLakeSecurityGroup",
-            description="MediaLake Security Group",
-            vpc=self._vpc.vpc,
-        )
-        # If the environment is prod, apply a retention policy to the security group
-        if config.environment == "prod":
-            self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
+        if config.vpc.security_groups.use_existing_groups:
+            self._security_group = ec2.SecurityGroup.from_security_group_id(
+                self,
+                "MediaLakeSecurityGroup",
+                security_group_id=config.vpc.security_groups.existing_groups.media_lake_sg,
+            )
+        else:
+            self._security_group = ec2.SecurityGroup(
+                self,
+                "MediaLakeSecurityGroup",
+                vpc=self._vpc.vpc,
+                security_group_name=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].name,
+                description=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].description,
+            )
+            # If the environment is prod, apply a retention policy to the security group
+            if config.environment == "prod":
+                self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
 
-        # Allow HTTPS ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp(443),
-            description="Allow HTTPS ingress from VPC CIDR",
-        )
+            # Allow HTTPS ingress from the VPC CIDR
+            self._security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS ingress from VPC CIDR",
+            )
 
-        # Allow HTTP ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp(80),
-            description="Allow HTTP ingress from VPC CIDR",
-        )
+            # Allow HTTP ingress from the VPC CIDR
+            self._security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(80),
+                description="Allow HTTP ingress from VPC CIDR",
+            )
 
         # Create OpenSearch managed cluster
         if config.vpc.use_existing_vpc:
@@ -442,21 +454,21 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Subnet Outputs
-        for i, subnet in enumerate(self._vpc.vpc.public_subnets):
-            CfnOutput(
-                self,
-                f"RetainedPublicSubnet{i+1}",
-                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
-                description=f"Retained Public Subnet {i+1} (ID|AZ|CIDR)",
-            )
+        # for i, subnet in enumerate(self._vpc.vpc.public_subnets):
+        #     CfnOutput(
+        #         self,
+        #         f"RetainedPublicSubnet{i+1}",
+        #         value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
+        #         description=f"Retained Public Subnet {i+1} (ID|AZ|CIDR)",
+        #     )
 
-        for i, subnet in enumerate(self._vpc.vpc.private_subnets):
-            CfnOutput(
-                self,
-                f"RetainedPrivateSubnet{i+1}",
-                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
-                description=f"Retained Private Subnet {i+1} (ID|AZ|CIDR)",
-            )
+        # for i, subnet in enumerate(self._vpc.vpc.private_subnets):
+        #     CfnOutput(
+        #         self,
+        #         f"RetainedPrivateSubnet{i+1}",
+        #         value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
+        #         description=f"Retained Private Subnet {i+1} (ID|AZ|CIDR)",
+        #     )
 
         # Security Group Output
         CfnOutput(

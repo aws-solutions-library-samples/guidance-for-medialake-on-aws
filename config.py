@@ -221,10 +221,39 @@ class NewVpcConfig(BaseModel):
     enable_dns_support: bool = True
 
 
+class ExistingSecurityGroupsConfig(BaseModel):
+    media_lake_sg: str
+    opensearch_sg: str
+
+
+class NewSecurityGroupConfig(BaseModel):
+    name: str
+    description: str
+
+
+class SecurityGroupsConfig(BaseModel):
+    use_existing_groups: bool = False
+    existing_groups: Optional[ExistingSecurityGroupsConfig] = None
+    new_groups: Optional[Dict[str, NewSecurityGroupConfig]] = None
+
+    @model_validator(mode="after")
+    def check_security_groups_config(self):
+        if self.use_existing_groups and not self.existing_groups:
+            raise ValueError(
+                "When use_existing_groups is True, existing_groups must be provided"
+            )
+        if not self.use_existing_groups and not self.new_groups:
+            raise ValueError(
+                "When use_existing_groups is False, new_groups must be provided"
+            )
+        return self
+
+
 class VpcConfig(BaseModel):
     use_existing_vpc: bool = False
     existing_vpc: Optional[ExistingVpcConfig] = None
     new_vpc: Optional[NewVpcConfig] = NewVpcConfig()  # Provide a default NewVpcConfig
+    security_groups: SecurityGroupsConfig = Field(default_factory=SecurityGroupsConfig)
 
     @model_validator(mode="after")
     def check_vpc_config(self, values):
