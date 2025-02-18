@@ -154,131 +154,262 @@ def sanitize_metadata(metadata):
     return {k.capitalize(): sanitize_value(v) for k, v in metadata.items()}
 
 
-@logger.inject_lambda_context
+# @logger.inject_lambda_context
+# @tracer.capture_lambda_handler
+# def lambda_handler(event, context):
+#     error = False
+#     steps_messages = {}
+#     print(event)
+
+#     input_data = event["input"]
+#     s3_source_bucket = input_data["DigitalSourceAsset"]["MainRepresentation"][
+#         "StorageInfo"
+#     ]["PrimaryLocation"]["Bucket"]
+#     s3_source_key = input_data["DigitalSourceAsset"]["MainRepresentation"][
+#         "StorageInfo"
+#     ]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+#     inventory_id = input_data.get("InventoryID", "")
+#     clean_inventory_id = clean_asset_id(inventory_id)
+
+#     # Download file from S3 to /tmp/ for mediainfo
+#     local_path = f"/tmp/{os.path.basename(s3_source_key)}"
+#     try:
+#         s3_client.download_file(s3_source_bucket, s3_source_key, local_path)
+#         steps_messages[clean_inventory_id] = {"S3_download": "Success"}
+#         logger.info(
+#             "File downloaded successfully",
+#             extra={"bucket": s3_source_bucket, "key": s3_source_key},
+#         )
+#     except Exception as e:
+#         error_msg = f"Failed to download file: {str(e)}"
+#         logger.error(
+#             error_msg, extra={"bucket": s3_source_bucket, "key": s3_source_key}
+#         )
+#         steps_messages[clean_inventory_id] = {"S3_download": f"Failure: {e}"}
+#         error = True
+#         return {"statusCode": 500, "body": json.dumps(steps_messages)}
+
+#     ff_data = None
+#     mi_data = None
+
+#     try:
+#         ff_data = run_ffprobe(local_path)
+#         steps_messages[clean_inventory_id]["FFProbe_analysis"] = "Success"
+#         logger.info("FFProbe analysis completed successfully")
+#     except Exception as e:
+#         error_msg = f"FFProbe analysis failed: {str(e)}"
+#         logger.error(error_msg, extra={"local_path": local_path})
+#         steps_messages[clean_inventory_id]["FFProbe_analysis"] = f"Failure: {e}"
+#         error = True
+
+#     try:
+#         mi_data = run_mediainfo(local_path)
+#         steps_messages[clean_inventory_id]["Mediainfo_analysis"] = "Success"
+#         logger.info("MediaInfo analysis completed successfully")
+#     except Exception as e:
+#         error_msg = f"MediaInfo analysis failed: {str(e)}"
+#         logger.error(error_msg, extra={"local_path": local_path})
+#         steps_messages[clean_inventory_id]["Mediainfo_analysis"] = f"Failure: {e}"
+#         error = True
+
+#     if error or ff_data is None or mi_data is None:
+#         logger.error(
+#             "One or more analysis steps failed",
+#             extra={"ff_data": bool(ff_data), "mi_data": bool(mi_data)},
+#         )
+#         return {"statusCode": 500, "body": json.dumps(steps_messages)}
+
+#     # Merge metadata
+#     merged_output = merge_metadata(ff_data, mi_data)
+
+#     # Create new representation for proxy
+#     output_bucket = os.environ.get("OUTPUT_BUCKET")
+#     output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
+#     asset_id = f"{clean_inventory_id}:proxy"
+
+#     new_representation = {
+#         "ID": asset_id,
+#         "Type": "Video",
+#         "Format": "MP4",
+#         "Purpose": "proxy",
+#         "StorageInfo": {
+#             "PrimaryLocation": {
+#                 "StorageType": "s3",
+#                 "Provider": "aws",
+#                 "Bucket": output_bucket,
+#                 "ObjectKey": {
+#                     "FullPath": output_key,
+#                 },
+#                 "Status": "active",
+#                 "FileInfo": {
+#                     "Size": os.path.getsize(
+#                         local_path
+#                     ),  # Approximate size, as proxy might be smaller
+#                 },
+#             }
+#         },
+#         "VideoSpec": {
+#             "Resolution": {
+#                 "Width": merged_output["video"][0].get("width"),
+#                 "Height": merged_output["video"][0].get("height"),
+#             },
+#             "Codec": merged_output["video"][0].get("codec_name"),
+#             "BitRate": merged_output["video"][0].get("bit_rate"),
+#             "FrameRate": merged_output["video"][0].get("r_frame_rate"),
+#         },
+#     }
+
+#     # Update DynamoDB
+#     # Update DynamoDB
+#     try:
+#         logger.info(
+#             "Attempting DynamoDB update",
+#             extra={
+#                 "inventory_id": clean_inventory_id,
+#                 "new_representation": new_representation,
+#             },
+#         )
+
+#         # get the existing item
+#         existing_item = asset_table.get_item(
+#             Key={"InventoryID": clean_inventory_id}
+#         ).get("Item", {})
+
+#         # Get existing metadata
+#         existing_metadata = existing_item.get("Metadata", {}).get("CustomMetadata", {})
+
+#         # Sanitize the new metadata
+#         sanitized_merged_output = sanitize_metadata(merged_output)
+
+#         # Merge existing metadata with new metadata
+#         merged_metadata = {**existing_metadata, **sanitized_merged_output}
+
+#         # Update DynamoDB
+#         response = asset_table.update_item(
+#             Key={"InventoryID": clean_inventory_id},
+#             UpdateExpression="SET #md.#cm = :metadata",
+#             ExpressionAttributeNames={"#md": "Metadata", "#cm": "CustomMetadata"},
+#             ExpressionAttributeValues={
+#                 ":metadata": merged_metadata,
+#             },
+#             ReturnValues="UPDATED_NEW",
+#         )
+
+#         logger.info(
+#             "DynamoDB update response",
+#             extra={"response": response, "inventory_id": clean_inventory_id},
+#         )
+#         steps_messages[clean_inventory_id]["DDB_update"] = "Success"
+#     except Exception as e:
+#         logger.exception(
+#             "Error updating DynamoDB",
+#             extra={
+#                 "inventory_id": clean_inventory_id,
+#                 "error": str(e),
+#                 "error_type": type(e).__name__,
+#             },
+#         )
+#         steps_messages[clean_inventory_id]["DDB_update"] = f"Failure: {e}"
+#         error = True
+
+#     if error:
+#         statusCode = 500
+#     else:
+#         statusCode = 200
+
+#     return {"statusCode": statusCode, "body": json.dumps(steps_messages)}
+
+
+t @ logger.inject_lambda_context
+
+
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     error = False
     steps_messages = {}
+    error_message = ""
     print(event)
 
-    input_data = event["input"]
-    s3_source_bucket = input_data["DigitalSourceAsset"]["MainRepresentation"][
-        "StorageInfo"
-    ]["PrimaryLocation"]["Bucket"]
-    s3_source_key = input_data["DigitalSourceAsset"]["MainRepresentation"][
-        "StorageInfo"
-    ]["PrimaryLocation"]["ObjectKey"]["FullPath"]
-    inventory_id = input_data.get("InventoryID", "")
-    clean_inventory_id = clean_asset_id(inventory_id)
-
-    # Download file from S3 to /tmp/ for mediainfo
-    local_path = f"/tmp/{os.path.basename(s3_source_key)}"
     try:
-        s3_client.download_file(s3_source_bucket, s3_source_key, local_path)
-        steps_messages[clean_inventory_id] = {"S3_download": "Success"}
-        logger.info(
-            "File downloaded successfully",
-            extra={"bucket": s3_source_bucket, "key": s3_source_key},
-        )
-    except Exception as e:
-        error_msg = f"Failed to download file: {str(e)}"
-        logger.error(
-            error_msg, extra={"bucket": s3_source_bucket, "key": s3_source_key}
-        )
-        steps_messages[clean_inventory_id] = {"S3_download": f"Failure: {e}"}
-        error = True
-        return {"statusCode": 500, "body": json.dumps(steps_messages)}
+        input_data = event["input"]
+        s3_source_bucket = input_data["DigitalSourceAsset"]["MainRepresentation"][
+            "StorageInfo"
+        ]["PrimaryLocation"]["Bucket"]
+        s3_source_key = input_data["DigitalSourceAsset"]["MainRepresentation"][
+            "StorageInfo"
+        ]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+        inventory_id = input_data.get("InventoryID", "")
+        clean_inventory_id = clean_asset_id(inventory_id)
 
-    ff_data = None
-    mi_data = None
+        # Download file from S3 to /tmp/ for mediainfo
+        local_path = f"/tmp/{os.path.basename(s3_source_key)}"
+        try:
+            s3_client.download_file(s3_source_bucket, s3_source_key, local_path)
+            steps_messages[clean_inventory_id] = {"S3_download": "Success"}
+            logger.info(
+                "File downloaded successfully",
+                extra={"bucket": s3_source_bucket, "key": s3_source_key},
+            )
+        except Exception as e:
+            error_msg = f"Failed to download file: {str(e)}"
+            logger.error(
+                error_msg, extra={"bucket": s3_source_bucket, "key": s3_source_key}
+            )
+            steps_messages[clean_inventory_id] = {"S3_download": f"Failure: {e}"}
+            raise Exception(error_msg)
 
-    try:
         ff_data = run_ffprobe(local_path)
         steps_messages[clean_inventory_id]["FFProbe_analysis"] = "Success"
         logger.info("FFProbe analysis completed successfully")
-    except Exception as e:
-        error_msg = f"FFProbe analysis failed: {str(e)}"
-        logger.error(error_msg, extra={"local_path": local_path})
-        steps_messages[clean_inventory_id]["FFProbe_analysis"] = f"Failure: {e}"
-        error = True
 
-    try:
         mi_data = run_mediainfo(local_path)
         steps_messages[clean_inventory_id]["Mediainfo_analysis"] = "Success"
         logger.info("MediaInfo analysis completed successfully")
-    except Exception as e:
-        error_msg = f"MediaInfo analysis failed: {str(e)}"
-        logger.error(error_msg, extra={"local_path": local_path})
-        steps_messages[clean_inventory_id]["Mediainfo_analysis"] = f"Failure: {e}"
-        error = True
 
-    if error or ff_data is None or mi_data is None:
-        logger.error(
-            "One or more analysis steps failed",
-            extra={"ff_data": bool(ff_data), "mi_data": bool(mi_data)},
-        )
-        return {"statusCode": 500, "body": json.dumps(steps_messages)}
+        # Merge metadata
+        merged_output = merge_metadata(ff_data, mi_data)
 
-    # Merge metadata
-    merged_output = merge_metadata(ff_data, mi_data)
+        # Create new representation for proxy
+        output_bucket = os.environ.get("OUTPUT_BUCKET")
+        output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
+        asset_id = f"{clean_inventory_id}:proxy"
 
-    # Create new representation for proxy
-    output_bucket = os.environ.get("OUTPUT_BUCKET")
-    output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
-    asset_id = f"{clean_inventory_id}:proxy"
-
-    new_representation = {
-        "ID": asset_id,
-        "Type": "Video",
-        "Format": "MP4",
-        "Purpose": "proxy",
-        "StorageInfo": {
-            "PrimaryLocation": {
-                "StorageType": "s3",
-                "Provider": "aws",
-                "Bucket": output_bucket,
-                "ObjectKey": {
-                    "FullPath": output_key,
-                },
-                "Status": "active",
-                "FileInfo": {
-                    "Size": os.path.getsize(
-                        local_path
-                    ),  # Approximate size, as proxy might be smaller
-                },
-            }
-        },
-        "VideoSpec": {
-            "Resolution": {
-                "Width": merged_output["video"][0].get("width"),
-                "Height": merged_output["video"][0].get("height"),
+        new_representation = {
+            "ID": asset_id,
+            "Type": "Video",
+            "Format": "MP4",
+            "Purpose": "proxy",
+            "StorageInfo": {
+                "PrimaryLocation": {
+                    "StorageType": "s3",
+                    "Provider": "aws",
+                    "Bucket": output_bucket,
+                    "ObjectKey": {
+                        "FullPath": output_key,
+                    },
+                    "Status": "active",
+                    "FileInfo": {
+                        "Size": os.path.getsize(
+                            local_path
+                        ),  # Approximate size, as proxy might be smaller
+                    },
+                }
             },
-            "Codec": merged_output["video"][0].get("codec_name"),
-            "BitRate": merged_output["video"][0].get("bit_rate"),
-            "FrameRate": merged_output["video"][0].get("r_frame_rate"),
-        },
-    }
-
-    # Update DynamoDB
-    # Update DynamoDB
-    try:
-        logger.info(
-            "Attempting DynamoDB update",
-            extra={
-                "inventory_id": clean_inventory_id,
-                "new_representation": new_representation,
+            "VideoSpec": {
+                "Resolution": {
+                    "Width": merged_output["video"][0].get("width"),
+                    "Height": merged_output["video"][0].get("height"),
+                },
+                "Codec": merged_output["video"][0].get("codec_name"),
+                "BitRate": merged_output["video"][0].get("bit_rate"),
+                "FrameRate": merged_output["video"][0].get("r_frame_rate"),
             },
-        )
+        }
 
-        # get the existing item
         existing_item = asset_table.get_item(
             Key={"InventoryID": clean_inventory_id}
         ).get("Item", {})
-
-        # Get existing metadata
         existing_metadata = existing_item.get("Metadata", {}).get("CustomMetadata", {})
-
-        # Sanitize the new metadata
         sanitized_merged_output = sanitize_metadata(merged_output)
 
         # Merge existing metadata with new metadata
@@ -300,21 +431,18 @@ def lambda_handler(event, context):
             extra={"response": response, "inventory_id": clean_inventory_id},
         )
         steps_messages[clean_inventory_id]["DDB_update"] = "Success"
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {"message": "Process completed successfully", "steps": steps_messages}
+            ),
+        }
+
     except Exception as e:
-        logger.exception(
-            "Error updating DynamoDB",
-            extra={
-                "inventory_id": clean_inventory_id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            },
-        )
-        steps_messages[clean_inventory_id]["DDB_update"] = f"Failure: {e}"
-        error = True
-
-    if error:
-        statusCode = 500
-    else:
-        statusCode = 200
-
-    return {"statusCode": statusCode, "body": json.dumps(steps_messages)}
+        error_message = f"An error occurred: {str(e)}"
+        logger.exception(error_message)
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": error_message, "steps": steps_messages}),
+        }

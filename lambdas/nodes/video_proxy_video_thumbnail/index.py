@@ -207,43 +207,126 @@ def get_mediaconvert_endpoint():
     raise Exception("Failed to get MediaConvert endpoint after multiple retries")
 
 
+# @logger.inject_lambda_context
+# @tracer.capture_lambda_handler
+# def lambda_handler(event, context: LambdaContext):
+#     mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
+
+#     table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
+#     dynamodb = boto3.resource("dynamodb")
+#     table = dynamodb.Table(table_name)
+
+#     input_data = event.get("input", {}).get("DigitalSourceAsset", {})
+#     inventory_id = event.get("input", {}).get("InventoryID")
+#     clean_inventory_id = clean_asset_id(inventory_id)
+#     main_representation = input_data.get("MainRepresentation", {})
+#     master_asset_id = input_data.get("ID")
+#     asset_id = clean_asset_id(master_asset_id)
+#     storage_info = main_representation.get("StorageInfo", {})
+#     primary_location = storage_info.get("PrimaryLocation", {})
+#     bucket = primary_location.get("Bucket")
+#     key = primary_location.get("ObjectKey", {}).get("FullPath")
+
+#     output_bucket = event.get("output_bucket")
+#     create_thumbnail = event.get("create_thumbnail", True)
+#     thumbnail_width = event.get("thumbnail_width", 300)
+#     thumbnail_height = event.get("thumbnail_height", 400)
+
+#     duration_frames = (
+#         event.get("input", {})
+#         .get("DigitalSourceAsset", {})
+#         .get("MainRepresentation", {})
+#         .get("Duration", {})
+#         .get("Frames")
+#     )
+
+#     if not all([key, bucket, output_bucket]):
+#         return {"statusCode": 400, "body": "Missing required parameters"}
+
+#     try:
+#         mediaconvert_endpoint = get_mediaconvert_endpoint()
+#         mediaconvert = boto3.client("mediaconvert", endpoint_url=mediaconvert_endpoint)
+
+#         output_key = f"{bucket}/{key.rsplit('.', 1)[0]}"
+#         job_settings = create_proxy_job_settings(
+#             bucket,
+#             key,
+#             output_bucket,
+#             output_key,
+#             create_thumbnail=create_thumbnail,
+#             thumbnail_width=thumbnail_width,
+#             thumbnail_height=thumbnail_height,
+#             duration_frames=duration_frames,
+#         )
+
+#         response = mediaconvert.create_job(
+#             Role=os.environ["MEDIACONVERT_ROLE_ARN"],
+#             Settings=job_settings,
+#             Queue=mediaconvert_queue,
+#         )
+
+#         job_id = response["Job"]["Id"]
+#         logger.info(f"MediaConvert job created with ID: {job_id}")
+
+#         return {
+#             "statusCode": 200,
+#             "body": {
+#                 "JobId": job_id,
+#             },
+#         }
+
+#     except Exception as e:
+#         logger.exception(
+#             "Error processing video",
+#             extra={
+#                 "inventory_id": clean_inventory_id,
+#                 "error": str(e),
+#                 "error_type": type(e).__name__,
+#             },
+#         )
+#         return {"statusCode": 500, "body": f"Error processing video: {str(e)}"}
+
+
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
-    mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
-
-    table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(table_name)
-
-    input_data = event.get("input", {}).get("DigitalSourceAsset", {})
-    inventory_id = event.get("input", {}).get("InventoryID")
-    clean_inventory_id = clean_asset_id(inventory_id)
-    main_representation = input_data.get("MainRepresentation", {})
-    master_asset_id = input_data.get("ID")
-    asset_id = clean_asset_id(master_asset_id)
-    storage_info = main_representation.get("StorageInfo", {})
-    primary_location = storage_info.get("PrimaryLocation", {})
-    bucket = primary_location.get("Bucket")
-    key = primary_location.get("ObjectKey", {}).get("FullPath")
-
-    output_bucket = event.get("output_bucket")
-    create_thumbnail = event.get("create_thumbnail", True)
-    thumbnail_width = event.get("thumbnail_width", 300)
-    thumbnail_height = event.get("thumbnail_height", 400)
-
-    duration_frames = (
-        event.get("input", {})
-        .get("DigitalSourceAsset", {})
-        .get("MainRepresentation", {})
-        .get("Duration", {})
-        .get("Frames")
-    )
-
-    if not all([key, bucket, output_bucket]):
-        return {"statusCode": 400, "body": "Missing required parameters"}
-
     try:
+        mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
+
+        table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        input_data = event.get("input", {}).get("DigitalSourceAsset", {})
+        inventory_id = event.get("input", {}).get("InventoryID")
+        clean_inventory_id = clean_asset_id(inventory_id)
+        main_representation = input_data.get("MainRepresentation", {})
+        master_asset_id = input_data.get("ID")
+        asset_id = clean_asset_id(master_asset_id)
+        storage_info = main_representation.get("StorageInfo", {})
+        primary_location = storage_info.get("PrimaryLocation", {})
+        bucket = primary_location.get("Bucket")
+        key = primary_location.get("ObjectKey", {}).get("FullPath")
+
+        output_bucket = event.get("output_bucket")
+        create_thumbnail = event.get("create_thumbnail", True)
+        thumbnail_width = event.get("thumbnail_width", 300)
+        thumbnail_height = event.get("thumbnail_height", 400)
+
+        duration_frames = (
+            event.get("input", {})
+            .get("DigitalSourceAsset", {})
+            .get("MainRepresentation", {})
+            .get("Duration", {})
+            .get("Frames")
+        )
+
+        if not all([key, bucket, output_bucket]):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required parameters"}),
+            }
+
         mediaconvert_endpoint = get_mediaconvert_endpoint()
         mediaconvert = boto3.client("mediaconvert", endpoint_url=mediaconvert_endpoint)
 
@@ -268,12 +351,7 @@ def lambda_handler(event, context: LambdaContext):
         job_id = response["Job"]["Id"]
         logger.info(f"MediaConvert job created with ID: {job_id}")
 
-        return {
-            "statusCode": 200,
-            "body": {
-                "JobId": job_id,
-            },
-        }
+        return {"statusCode": 200, "body": json.dumps({"JobId": job_id})}
 
     except Exception as e:
         logger.exception(
@@ -284,4 +362,13 @@ def lambda_handler(event, context: LambdaContext):
                 "error_type": type(e).__name__,
             },
         )
-        return {"statusCode": 500, "body": f"Error processing video: {str(e)}"}
+        return {
+            "statusCode": 500,
+            "body": json.dumps(
+                {
+                    "error": "Error processing video",
+                    "details": str(e),
+                    "error_type": type(e).__name__,
+                }
+            ),
+        }

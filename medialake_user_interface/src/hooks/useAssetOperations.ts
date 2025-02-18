@@ -65,7 +65,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                 break;
             case 'download':
                 const fileName = selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-                fetch(selectedAsset.thumbnailUrl)
+                fetch(selectedAsset.proxyUrl)
                     .then(response => response.blob())
                     .then(blob => {
                         const url = window.URL.createObjectURL(blob);

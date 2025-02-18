@@ -317,4 +317,8 @@ def lambda_handler(event, context: LambdaContext):
         }
 
     except Exception as e:
-        return {"statusCode": 500, "body": f"Error processing image: {str(e)}"}
+        logger.exception("Error in lambda_handler")
+        return {
+            "statusCode": 500,
+            "body": {"error": str(e), "error_type": type(e).__name__},
+        }
