@@ -156,7 +156,7 @@ class AuthService {
                 } catch (attrError) {
                     console.error('Error fetching user attributes:', attrError);
                 }
-                window.location.href = '/'; // Redirect to home after successful auth
+                //window.location.href = '/'; // Redirect to home after successful auth
             } else {
                 console.error('No token in session');
                 this.clearTokens();

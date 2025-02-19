@@ -136,7 +136,7 @@ export const useAuthenticate = () => {
       user.signOut();
     }
     StorageHelper.clearToken();
-    window.location.href = '/';
+    //window.location.href = '/';
   };
 
   return { authenticate: initiateAuth, logout, refreshSession, changePassword };
