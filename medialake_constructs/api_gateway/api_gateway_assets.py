@@ -231,6 +231,66 @@ class AssetsConstruct(Construct):
             ],
         )
 
+        # Add POST /assets/generate-presigned-url endpoint
+        presigned_url_resource = assets_resource.add_resource("generate-presigned-url")
+        generate_presigned_url_lambda = Lambda(
+            self,
+            "GeneratePresignedUrlLambda",
+            config=LambdaConfig(
+                name=f"generate_presigned_url",
+                layers=[search_layer.layer],
+                entry="lambdas/api/assets/generate_presigned_url",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        # Add DynamoDB and S3 permissions for presigned URL Lambda
+        generate_presigned_url_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+        generate_presigned_url_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                ],
+                resources=["arn:aws:s3:::*/*"],  # Access to all objects in all buckets
+            )
+        )
+
+        # Add POST method to /assets/generate-presigned-url
+        presigned_url_resource.add_method(
+            "POST",
+            api_gateway.LambdaIntegration(
+                generate_presigned_url_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    api_gateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                api_gateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
+
         # Add POST /assets/{id}/rename endpoint
         rename_resource = asset_resource.add_resource("rename")
         rename_asset_lambda = Lambda(

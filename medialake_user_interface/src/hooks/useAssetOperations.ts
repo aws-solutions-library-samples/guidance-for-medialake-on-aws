@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRenameAsset, useDeleteAsset } from '../api/hooks/useAssets';
+import { useGeneratePresignedUrl } from '../api/hooks/usePresignedUrl';
 import { type AssetBase } from '../types/search/searchResults';
+
 
 interface UseAssetOperationsReturn<T extends AssetBase> {
     selectedAsset: T | null;
@@ -24,6 +26,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     isLoading: {
         rename: boolean;
         delete: boolean;
+        download: boolean;
     };
 }
 
@@ -38,6 +41,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
 
     const renameAsset = useRenameAsset();
     const deleteAsset = useDeleteAsset();
+    const generatePresignedUrl = useGeneratePresignedUrl();
 
 
     const handleMenuOpen = (asset: T, event: React.MouseEvent<HTMLElement>) => {
@@ -51,7 +55,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         setSelectedAsset(null);
     };
 
-    const handleAction = (action: string) => {
+    const handleAction = async (action: string) => {
         if (!selectedAsset) return;
 
         switch (action) {
@@ -64,20 +68,19 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                 console.log('Share:', selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'download':
+
+
                 const fileName = selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-                fetch(selectedAsset.proxyUrl)
-                    .then(response => response.blob())
-                    .then(blob => {
-                        const url = window.URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = fileName;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(url);
-                    })
-                    .catch(error => console.error('Download failed:', error));
+                const result = await generatePresignedUrl.mutateAsync({
+                    inventoryId: selectedAsset.InventoryID,
+                    expirationTime: 60 // 1 minute in seconds
+                });
+                const link = document.createElement('a');
+                link.href = result.presigned_url;
+                link.setAttribute('download', fileName);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
                 break;
 
         }
@@ -177,6 +180,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         isLoading: {
             rename: renameAsset.isPending,
             delete: deleteAsset.isPending,
+            download: generatePresignedUrl.isPending,
         },
     };
 }
