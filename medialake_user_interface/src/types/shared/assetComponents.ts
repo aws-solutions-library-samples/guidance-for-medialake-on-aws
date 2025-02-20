@@ -49,6 +49,10 @@ export interface AssetTableProps<T> {
     onEditNameComplete?: (item: T) => void;
 }
 
+export type CardSize = 'small' | 'medium' | 'large';
+export type AspectRatio = 'vertical' | 'square' | 'horizontal';
+export type ThumbnailScale = 'fit' | 'fill';
+
 export interface AssetViewControlsProps {
     viewMode: 'card' | 'table';
     onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
@@ -58,6 +62,14 @@ export interface AssetViewControlsProps {
     onSortChange: (columnId: string) => void;
     fields: AssetField[];
     onFieldToggle: (fieldId: string) => void;
+    cardSize: CardSize;
+    onCardSizeChange: (size: CardSize) => void;
+    aspectRatio: AspectRatio;
+    onAspectRatioChange: (ratio: AspectRatio) => void;
+    thumbnailScale: ThumbnailScale;
+    onThumbnailScaleChange: (scale: ThumbnailScale) => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
 }
 
 export interface SortOption {

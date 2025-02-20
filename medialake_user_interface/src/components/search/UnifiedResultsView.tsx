@@ -27,6 +27,14 @@ interface UnifiedResultsViewProps {
     groupByType: boolean;
     viewMode: 'card' | 'table';
     onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
     sorting: SortingState;
     onSortChange: (sorting: SortingState) => void;
     cardFields: { id: string; label: string; visible: boolean; }[];
@@ -53,6 +61,14 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     groupByType,
     viewMode,
     onViewModeChange,
+    cardSize,
+    onCardSizeChange,
+    aspectRatio,
+    onAspectRatioChange,
+    thumbnailScale,
+    onThumbnailScaleChange,
+    showMetadata,
+    onShowMetadataChange,
     sorting,
     onSortChange,
     cardFields,
@@ -86,58 +102,76 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
         }, {} as Record<string, AssetItem[]>);
     }, [results, groupByType]);
 
-    const renderAssetCard = (asset: AssetItem) => (
-        <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
-            <AssetCard
-                id={asset.InventoryID}
-                name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                thumbnailUrl={asset.thumbnailUrl}
-                proxyUrl={asset.proxyUrl}
-                assetType={asset.DigitalSourceAsset.Type}
-                fields={cardFields}
-                renderField={(fieldId) => {
-                    switch (fieldId) {
-                        case 'name':
-                            return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-                        case 'type':
-                            return asset.DigitalSourceAsset.Type;
-                        case 'format':
-                            return asset.DigitalSourceAsset.MainRepresentation.Format;
-                        case 'size':
-                            const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
-                            const sizes = ['B', 'KB', 'MB', 'GB'];
-                            let i = 0;
-                            let size = sizeInBytes;
-                            while (size >= 1024 && i < sizes.length - 1) {
-                                size /= 1024;
-                                i++;
-                            }
-                            return `${Math.round(size * 100) / 100} ${sizes[i]}`;
-                        default:
-                            return '';
-                    }
-                }}
-                onAssetClick={() => onAssetClick(asset)}
-                onDeleteClick={(event) => {
-                    event.stopPropagation();
-                    onDeleteClick(asset, event);
-                }}
-                onMenuClick={(event) => {
-                    event.stopPropagation();
-                    onMenuClick(asset, event);
-                }}
-                onEditClick={(event) => {
-                    event.stopPropagation();
-                    onEditClick(asset, event);
-                }}
-                onImageError={() => console.error('Image failed to load')}
-                isEditing={editingAssetId === asset.InventoryID}
-                editedName={editedName}
-                onEditNameChange={onEditNameChange}
-                onEditNameComplete={(save) => onEditNameComplete(asset, save)}
-            />
-        </Grid>
-    );
+    const getGridSizes = () => {
+        switch (cardSize) {
+            case 'small':
+                return { xs: 12, sm: 6, md: 3, lg: 2 };
+            case 'large':
+                return { xs: 12, sm: 12, md: 6, lg: 4 };
+            default: // medium
+                return { xs: 12, sm: 6, md: 4, lg: 3 };
+        }
+    };
+
+    const renderAssetCard = (asset: AssetItem) => {
+        const gridSizes = getGridSizes();
+        return (
+            <Grid item xs={gridSizes.xs} sm={gridSizes.sm} md={gridSizes.md} lg={gridSizes.lg} key={asset.InventoryID}>
+                <AssetCard
+                    cardSize={cardSize}
+                    aspectRatio={aspectRatio}
+                    id={asset.InventoryID}
+                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                    thumbnailUrl={asset.thumbnailUrl}
+                    proxyUrl={asset.proxyUrl}
+                    assetType={asset.DigitalSourceAsset.Type}
+                    fields={cardFields}
+                    renderField={(fieldId) => {
+                        switch (fieldId) {
+                            case 'name':
+                                return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+                            case 'type':
+                                return asset.DigitalSourceAsset.Type;
+                            case 'format':
+                                return asset.DigitalSourceAsset.MainRepresentation.Format;
+                            case 'size':
+                                const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                                const sizes = ['B', 'KB', 'MB', 'GB'];
+                                let i = 0;
+                                let size = sizeInBytes;
+                                while (size >= 1024 && i < sizes.length - 1) {
+                                    size /= 1024;
+                                    i++;
+                                }
+                                return `${Math.round(size * 100) / 100} ${sizes[i]}`;
+                            default:
+                                return '';
+                        }
+                    }}
+                    onAssetClick={() => onAssetClick(asset)}
+                    onDeleteClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteClick(asset, event);
+                    }}
+                    onMenuClick={(event) => {
+                        event.stopPropagation();
+                        onMenuClick(asset, event);
+                    }}
+                    onEditClick={(event) => {
+                        event.stopPropagation();
+                        onEditClick(asset, event);
+                    }}
+                    onImageError={() => console.error('Image failed to load')}
+                    isEditing={editingAssetId === asset.InventoryID}
+                    editedName={editedName}
+                    onEditNameChange={onEditNameChange}
+                    onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+                    thumbnailScale={thumbnailScale}
+                    showMetadata={showMetadata}
+                />
+            </Grid>
+        );
+    };
 
     const renderContent = () => {
         if (viewMode === 'card') {
@@ -233,6 +267,14 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
                 groupByType={groupByType}
                 onGroupByTypeChange={onGroupByTypeChange}
+                cardSize={cardSize}
+                onCardSizeChange={onCardSizeChange}
+                aspectRatio={aspectRatio}
+                onAspectRatioChange={onAspectRatioChange}
+                thumbnailScale={thumbnailScale}
+                onThumbnailScaleChange={onThumbnailScaleChange}
+                showMetadata={showMetadata}
+                onShowMetadataChange={onShowMetadataChange}
             />
 
             {renderContent()}

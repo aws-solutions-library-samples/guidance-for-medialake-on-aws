@@ -80,6 +80,10 @@ const SearchPage: React.FC = () => {
 
     const [groupByType, setGroupByType] = useState(true);
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>('medium');
+    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>('square');
+    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>('fill');
+    const [showMetadata, setShowMetadata] = useState(true);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [editingAssetId, setEditingAssetId] = useState<string>();
     const [editedName, setEditedName] = useState<string>();
@@ -386,6 +390,14 @@ const SearchPage: React.FC = () => {
                                 onGroupByTypeChange={setGroupByType}
                                 viewMode={viewMode}
                                 onViewModeChange={handleViewModeChange}
+                                cardSize={cardSize}
+                                onCardSizeChange={setCardSize}
+                                aspectRatio={aspectRatio}
+                                onAspectRatioChange={setAspectRatio}
+                                thumbnailScale={thumbnailScale}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                showMetadata={showMetadata}
+                                onShowMetadataChange={setShowMetadata}
                                 sorting={sorting}
                                 onSortChange={setSorting}
                                 cardFields={cardFields}
