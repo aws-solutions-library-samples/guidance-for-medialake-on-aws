@@ -1,9 +1,9 @@
 {
-    "environment": "prod",
-    "resource_prefix": "mldev3",
-    "account_id": "034362042487",
-    "global_prefix": "mldev3",
-    "resource_application_tag": "mldev3",
+    "environment": "dev",
+    "resource_prefix": "mldevlb",
+    "account_id": "273354633826",
+    "global_prefix": "mldevlb",
+    "resource_application_tag": "mldevlb",
     "api_path": "prod",
     "primary_region": "us-east-1",
     "initial_user": {
@@ -31,20 +31,20 @@
         ]
     },
     "vpc": {
-        "use_existing_vpc": true,
+        "use_existing_vpc": false,
         "existing_vpc": {
-            "vpc_id": "vpc-05d0d394782cb8db4",
+            "vpc_id": "vpc-0ebfebaff691c61f1",
             "vpc_cidr": "10.0.0.0/16",
             "subnet_ids": {
                 "public": [
-                    "subnet-00cd457042903c843",
-                    "subnet-07e16fdf7fa7118cf",
-                    "subnet-0b8a07681d3edbeeb"
+                    "subnet-0a05f00a53bd3b3f6",
+                    "subnet-0c8aa1e9b47e8f823",
+                    "subnet-0d09915719b444529"
                 ],
                 "private": [
-                    "subnet-0b2fdd4257d9b336c",
-                    "subnet-0c439f2a7c4a8c5a5",
-                    "subnet-06b63fade7a0da719"
+                    "subnet-0d8a71ba980747c6d",
+                    "subnet-095fb63726157b902",
+                    "subnet-0d557535259ef7d25"
                 ]
             }
         },
@@ -56,10 +56,10 @@
             "enable_dns_support": true
         },
         "security_groups": {
-            "use_existing_groups": true,
+            "use_existing_groups": false,
             "existing_groups": {
-                "media_lake_sg": "sg-023f7efa981d8400d",
-                "opensearch_sg": "sg-0ddda3fb1963a1a87"
+                "media_lake_sg": "",
+                "opensearch_sg": ""
             },
             "new_groups": {
                 "media_lake_sg": {
@@ -88,6 +88,6 @@
         "snapshot_options": {
             "automated_snapshot_start_hour": 20
         },
-        "domain_endpoint": "https://vpc-mldev3-os-us-east-1-prod-33jg4kuirptvjze336nupipece.us-east-1.es.amazonaws.com"
+        "domain_endpoint": null
     }
 }

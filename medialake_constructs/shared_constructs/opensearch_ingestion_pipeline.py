@@ -88,8 +88,8 @@ class OpenSearchIngestionPipeline(Construct):
             config=LambdaConfig(
                 name=f"{config.global_prefix}-os-pipeline-creator-{config.environment}",
                 timeout_minutes=15,
-                vpc=props.vpc.vpc,
-                security_groups=[props.security_group],
+                # vpc=props.vpc.vpc,
+                # security_groups=[props.security_group],
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": props.asset_table.table_arn,

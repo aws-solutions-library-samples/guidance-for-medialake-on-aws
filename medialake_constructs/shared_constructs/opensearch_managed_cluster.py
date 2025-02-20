@@ -194,9 +194,8 @@ class OpenSearchCluster(Construct):
             ]
 
         # Import an existing domain if domain_endpoint is provided
-        print("!!!!!hea", props)
+
         if config.opensearch_cluster_settings.domain_endpoint:
-            print("!!!!!prop")
             # Import the existing domain using the L2 construct
             self.domain = opensearch.Domain.from_domain_endpoint(
                 self,
