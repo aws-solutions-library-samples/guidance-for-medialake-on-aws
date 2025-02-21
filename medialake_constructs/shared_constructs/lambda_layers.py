@@ -7,9 +7,9 @@ from aws_cdk import (
     DockerImage,
 )
 from constructs import Construct
-from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from dataclasses import dataclass
 
+from .layer_base import (LambdaLayer, LambdaLayerConfig)
 
 @dataclass
 class PowertoolsLayerConfig:
@@ -42,16 +42,13 @@ class JinjaLambdaLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "JinjaLayer",
-            entry="lambdas/layers/jinja",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer with Jinja2 library",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/jinja",
+                description="A Lambda layer with Jinja2 library",
+            ),
         )
 
 
@@ -60,16 +57,13 @@ class OpenSearchPyLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "OpenSearchPyLayer",
-            entry="lambdas/layers/opensearchpy",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer with open serch py library",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/opensearchpy",
+                description="A Lambda layer with open serch py library",
+            ),
         )
 
 
@@ -78,16 +72,13 @@ class PynamoDbLambdaLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "PynamoDbLambdaLayer",
-            entry="lambdas/layers/pynamodb",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer with pynamodb library",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/pynamodb",
+                description="A Lambda layer with pynamodb library",
+            ),
         )
 
 
@@ -96,15 +87,13 @@ class PyMediaInfo(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "PyMediaInfoLayer",
-            entry="lambdas/layers/pymediainfo",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer with pymediainfo library",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/pymediainfo",
+                description="A Lambda layer with pymediainfo library",
+            ),
         )
 
 
@@ -112,46 +101,58 @@ class FFProbeLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        self.layer = lambda_.LayerVersion(
-            self,
-            "FFProbeLayer",
-            layer_version_name="ffprobe-layer",
-            compatible_runtimes=[
-                lambda_.Runtime.PYTHON_3_12,
-            ],
-            description="Layer containing ffprobe binary",
-            code=lambda_.Code.from_asset(
-                path=".",
-                bundling=BundlingOptions(
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
-                        set -e
-                        yum update -y && yum install -y wget xz zip tar
-                        TEMP_DIR=$(mktemp -d)
-                        cd $TEMP_DIR
-                        wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-                        wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5
-                        md5sum -c ffmpeg-release-amd64-static.tar.xz.md5
-                        mkdir ffmpeg-release-amd64
-                        tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64
-                        mkdir -p ffprobe/bin
-                        cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/
-                        cd ffprobe
-                        zip -9 -r $TEMP_DIR/ffprobe.zip .
-                        cp $TEMP_DIR/ffprobe.zip /asset-output/
-                        cd /
-                        rm -rf $TEMP_DIR
-                        """,
-                    ],
-                    user="root",
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:latest"
+        if "CI" in os.environ:
+            self.layer = lambda_.LayerVersion(
+                self,
+                "FFProbeLayer",
+                layer_version_name="ffprobe-layer",
+                compatible_runtimes=[
+                    lambda_.Runtime.PYTHON_3_12,
+                ],
+                description="Layer containing ffprobe binary",
+                code=lambda_.Code.from_asset("dist/lambdas/layers/ffprobe")
+            )
+        else:
+            self.layer = lambda_.LayerVersion(
+                self,
+                "FFProbeLayer",
+                layer_version_name="ffprobe-layer",
+                compatible_runtimes=[
+                    lambda_.Runtime.PYTHON_3_12,
+                ],
+                description="Layer containing ffprobe binary",
+                code=lambda_.Code.from_asset(
+                    path=".",
+                    bundling=BundlingOptions(
+                        command=[
+                            "/bin/bash",
+                            "-c",
+                            f"""
+                            set -e
+                            yum update -y && yum install -y wget xz zip tar
+                            TEMP_DIR=$(mktemp -d)
+                            cd $TEMP_DIR
+                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5
+                            md5sum -c ffmpeg-release-amd64-static.tar.xz.md5
+                            mkdir ffmpeg-release-amd64
+                            tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64
+                            mkdir -p ffprobe/bin
+                            cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/
+                            cd ffprobe
+                            zip -9 -r $TEMP_DIR/ffprobe.zip .
+                            cp $TEMP_DIR/ffprobe.zip /asset-output/
+                            cd /
+                            rm -rf $TEMP_DIR
+                            """,
+                        ],
+                        user="root",
+                        image=DockerImage.from_registry(
+                            "public.ecr.aws/amazonlinux/amazonlinux:latest"
+                        ),
                     ),
                 ),
-            ),
-        )
+            )
 
 
 class GoogleCloudStorageLayer(Construct):
@@ -159,16 +160,13 @@ class GoogleCloudStorageLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "GoogleCloudStorageLayer",
-            entry="lambdas/layers/googleCloudStorage",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer with google cloud storage and google auth library",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/googleCloudStorage",
+                description="A Lambda layer with google cloud storage and google auth library"
+            )
         )
 
 
@@ -177,16 +175,13 @@ class IngestMediaProcessorLayer(Construct):
         super().__init__(scope, construct_id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "IngestMediaProcessorLayer",
-            entry="lambdas/layers/ingest_media_processor",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer for analyzing media container media info",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/ingest_media_processor",
+                description="A Lambda layer for analyzing media container media info"
+            )
         )
 
 
@@ -195,16 +190,13 @@ class SearchLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "SearchLayer",
-            entry="lambdas/layers/search",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer for search",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/search",
+                description="A Lambda layer for search"
+            )
         )
 
 
@@ -213,16 +205,13 @@ class PyamlLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "PyamlLayer",
-            entry="lambdas/layers/pyaml",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer for pyaml",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/pyaml",
+                description="A Lambda layer for pyaml"
+            )
         )
 
 
@@ -231,16 +220,13 @@ class ShortuuidLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = PythonLayerVersion(
+        self.layer = LambdaLayer(
             self,
             "PyamlLayer",
-            entry="lambdas/layers/shortuuid",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-            description="A Lambda layer for shortuuid",
+            config=LambdaLayerConfig(
+                entry="lambdas/layers/shortuuid",
+                description="A Lambda layer for shortuuid"
+            )
         )
 
     @property
