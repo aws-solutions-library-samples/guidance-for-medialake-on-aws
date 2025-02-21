@@ -203,6 +203,84 @@ function sanitizeMetadata(obj) {
 }
 
 
+// exports.lambda_handler = async (event) => {
+//     console.log('Received event:', JSON.stringify(event));
+//     const { input } = event;
+//     const inventoryId = input?.InventoryID;
+//     const digitalSourceAsset = input?.DigitalSourceAsset;
+
+//     if (!inventoryId) {
+//         console.error('Invalid event format: missing InventoryID');
+//         return { statusCode: 400, body: 'Missing InventoryID' };
+//     }
+
+//     const bucket = digitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket;
+//     const key = digitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
+
+//     try {
+//         const extractedMetadata = await processImageFile(bucket, key);
+//         if (!extractedMetadata) {
+//             return { statusCode: 500, body: 'Failed to extract metadata' };
+//         }
+
+//         const sanitizedMetadata = sanitizeMetadata(extractedMetadata);
+//         const newCustomMetadata = { CustomMetadata: sanitizedMetadata };
+//         const convertedNewMetadata = convertFloatsToDecimals(newCustomMetadata);
+
+//         // Get existing item from DynamoDB
+//         const { Item: existingItem } = await dynamoDB.getItem({
+//             TableName: MEDIALAKE_ASSET_TABLE,
+//             Key: { InventoryID: { S: inventoryId } }
+//         }).promise();
+
+//         const existingMetadata = existingItem?.Metadata?.M || {};
+
+//         // Combine existing metadata with new CustomMetadata
+//         const updatedMetadata = {
+//             ...existingMetadata,
+//             ...AWS.DynamoDB.Converter.marshall(convertedNewMetadata)
+//         };
+
+//         // Update DynamoDB
+//         await dynamoDB.updateItem({
+//             TableName: MEDIALAKE_ASSET_TABLE,
+//             Key: { InventoryID: { S: inventoryId } },
+//             UpdateExpression: 'SET Metadata = :Metadata',
+//             ExpressionAttributeValues: {
+//                 ':Metadata': { M: updatedMetadata }
+//             },
+//             ReturnValues: 'UPDATED_NEW'
+//         }).promise();
+
+//         console.log('Successfully updated DynamoDB item');
+
+//         return {
+//             statusCode: 200,
+//             body: JSON.stringify({
+//                 inventoryId,
+//                 message: 'Metadata extracted and stored successfully',
+//                 // metadata: sanitizedMetadata
+//             }, (key, value) => {
+//                 if (typeof value === 'bigint') {
+//                     return value.toString();
+//                 }
+//                 return value;
+//             })
+//         };
+
+//     } catch (error) {
+//         console.error('Lambda handler error:', error);
+//         return {
+//             statusCode: 500,
+//             body: JSON.stringify({
+//                 error: 'Error extracting or storing image metadata',
+//                 message: error.message
+//             })
+//         };
+//     }
+// };
+
+
 exports.lambda_handler = async (event) => {
     console.log('Received event:', JSON.stringify(event));
     const { input } = event;
@@ -211,7 +289,7 @@ exports.lambda_handler = async (event) => {
 
     if (!inventoryId) {
         console.error('Invalid event format: missing InventoryID');
-        return { statusCode: 400, body: 'Missing InventoryID' };
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing InventoryID' }) };
     }
 
     const bucket = digitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket;
@@ -220,7 +298,7 @@ exports.lambda_handler = async (event) => {
     try {
         const extractedMetadata = await processImageFile(bucket, key);
         if (!extractedMetadata) {
-            return { statusCode: 500, body: 'Failed to extract metadata' };
+            throw new Error('Failed to extract metadata');
         }
 
         const sanitizedMetadata = sanitizeMetadata(extractedMetadata);
@@ -259,7 +337,6 @@ exports.lambda_handler = async (event) => {
             body: JSON.stringify({
                 inventoryId,
                 message: 'Metadata extracted and stored successfully',
-                // metadata: sanitizedMetadata
             }, (key, value) => {
                 if (typeof value === 'bigint') {
                     return value.toString();
@@ -274,7 +351,8 @@ exports.lambda_handler = async (event) => {
             statusCode: 500,
             body: JSON.stringify({
                 error: 'Error extracting or storing image metadata',
-                message: error.message
+                message: error.message,
+                stack: error.stack
             })
         };
     }

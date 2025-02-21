@@ -51,6 +51,7 @@ export interface VideoItem extends AssetBase {
         MainRepresentation: {
             Format: string;
             StorageInfo: {
+
                 PrimaryLocation: {
                     ObjectKey: { Name: string; };
                     FileInfo: { Size: number; };
@@ -71,6 +72,7 @@ export interface AudioItem extends AssetBase {
         MainRepresentation: {
             Format: string;
             StorageInfo: {
+
                 PrimaryLocation: {
                     ObjectKey: { Name: string; };
                     FileInfo: { Size: number; };

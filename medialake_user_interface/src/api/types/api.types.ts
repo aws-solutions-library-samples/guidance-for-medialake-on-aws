@@ -143,6 +143,7 @@ export interface ConnectorResponse {
   region: string;
   status?: string;
   integrationMethod?: string;
+  objectPrefix?: string;
   usage?: {
     total: number;
   };

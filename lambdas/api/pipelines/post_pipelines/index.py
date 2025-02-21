@@ -37,8 +37,8 @@ sqs_client = boto3.client("sqs")
 sfn_client = boto3.client("stepfunctions")
 eventbridge = boto3.client("events")
 
-MAX_RETRIES = 50
-RETRY_DELAY = 30
+MAX_RETRIES = 10
+RETRY_DELAY = 5
 
 
 class S3Pipeline(BaseModel):
@@ -339,6 +339,50 @@ def create_sqs_fifo_queue(queue_name: str, tags: dict) -> tuple[str, str]:
         raise
 
 
+def create_sqs_standard_queue(queue_name: str, tags: dict) -> tuple[str, str]:
+    """Create SQS standard queue and return queue URL and ARN"""
+    try:
+        # Create the queue
+        response = sqs_client.create_queue(
+            QueueName=queue_name,
+            Attributes={
+                "VisibilityTimeout": "300",
+            },
+            tags=tags,
+        )
+        queue_url = response["QueueUrl"]
+
+        # Get queue ARN
+        queue_attributes = sqs_client.get_queue_attributes(
+            QueueUrl=queue_url, AttributeNames=["QueueArn"]
+        )
+        queue_arn = queue_attributes["Attributes"]["QueueArn"]
+
+        # Add permission for EventBridge to send messages
+        queue_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "EventBridgeToSQS",
+                    "Effect": "Allow",
+                    "Principal": {"Service": "events.amazonaws.com"},
+                    "Action": "sqs:SendMessage",
+                    "Resource": queue_arn,
+                }
+            ],
+        }
+
+        # Set the queue policy
+        sqs_client.set_queue_attributes(
+            QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+        )
+
+        return queue_url, queue_arn
+    except Exception as e:
+        logger.error(f"Failed to create SQS standard queue: {str(e)}")
+        raise
+
+
 def create_state_machine(
     state_machine_name: str, role_arn: str, definition: dict, tags: dict
 ) -> str:
@@ -365,7 +409,7 @@ def create_eventbridge_rule(
     state_machine_arn: str,
     tags: dict,
 ) -> str:
-    """Create EventBridge rule to send all events to SQS FIFO queue"""
+    """Create EventBridge rule to send all events to SQS Standard queue"""
     try:
 
         # Create the rule
@@ -377,7 +421,7 @@ def create_eventbridge_rule(
             Tags=[{"Key": k, "Value": v} for k, v in tags.items()],
         )
 
-        # Add target (SQS queue)
+        # SQS FIFO
         # eventbridge.put_targets(
         #     Rule=rule_name,
         #     EventBusName=event_bus_name,
@@ -386,11 +430,17 @@ def create_eventbridge_rule(
         #             "Id": f"{rule_name}-target",
         #             "Arn": queue_arn,
         #             "SqsParameters": {
-        #                 "MessageGroupId": "default"  # Required for FIFO queues
+        #                 "MessageGroupId": "default",  # Required for FIFO queues
+        #             },
+        #             "InputTransformer": {
+        #                 "InputPathsMap": {"detail": "$.detail"},
+        #                 "InputTemplate": f'{{"Asset": <detail>, "StateMachineArn": "{state_machine_arn}"}}',
         #             },
         #         }
         #     ],
         # )
+
+        # Add target (SQS queue)
         eventbridge.put_targets(
             Rule=rule_name,
             EventBusName=event_bus_name,
@@ -398,9 +448,6 @@ def create_eventbridge_rule(
                 {
                     "Id": f"{rule_name}-target",
                     "Arn": queue_arn,
-                    "SqsParameters": {
-                        "MessageGroupId": "default",  # Required for FIFO queues
-                    },
                     "InputTransformer": {
                         "InputPathsMap": {"detail": "$.detail"},
                         "InputTemplate": f'{{"Asset": <detail>, "StateMachineArn": "{state_machine_arn}"}}',
@@ -480,31 +527,22 @@ def create_stepfunction_role(
 
 
 def modify_trigger_lambda_role(
-    role_name: str, queue_arn: str, state_machine_name: str, tags: dict
+    role_name: str, queue_arn: str, state_machine_name: str, tags: dict, unique_id: str
 ) -> str:
-    """Modify IAM role for trigger lambda"""
+    """
+    Modify the IAM role for the trigger Lambda by adding a new inline policy with a unique name.
+    The unique_id parameter (e.g. pipeline ID) ensures that concurrent invocations do not overwrite each other.
+    """
     try:
-        # Check if the role already exists
+        # Check if the role exists
         try:
             response = iam_client.get_role(RoleName=role_name)
             role_arn = response["Role"]["Arn"]
             logger.info(f"Role {role_name} already exists. Modifying...")
         except iam_client.exceptions.NoSuchEntityException:
-            raise Exception(f"Role {role_name} does not exists")
+            raise Exception(f"Role {role_name} does not exist")
 
-        # Get existing inline policies
-        existing_policies = iam_client.list_role_policies(RoleName=role_name)
-
-        # If there's an existing policy, get its content
-        existing_policy_doc = {}
-        if existing_policies["PolicyNames"]:
-            existing_policy_name = existing_policies["PolicyNames"][0]
-            existing_policy_response = iam_client.get_role_policy(
-                RoleName=role_name, PolicyName=existing_policy_name
-            )
-            existing_policy_doc = existing_policy_response["PolicyDocument"]
-
-        # Create new policy statements
+        # Define the new policy statements
         new_sqs_statement = {
             "Effect": "Allow",
             "Action": [
@@ -530,25 +568,21 @@ def modify_trigger_lambda_role(
             ],
         }
 
-        # Merge existing policy with new statements
-        if "Statement" in existing_policy_doc:
-            existing_policy_doc["Statement"].append(new_sqs_statement)
-            existing_policy_doc["Statement"].append(new_step_functions_statement)
-        else:
-            existing_policy_doc = {
-                "Version": "2012-10-17",
-                "Statement": [new_sqs_statement, new_step_functions_statement],
-            }
+        # Use a unique inline policy name by appending the unique_id
+        unique_policy_name = f"{role_name}-policy-{unique_id}"
+        new_policy_doc = {
+            "Version": "2012-10-17",
+            "Statement": [new_sqs_statement, new_step_functions_statement],
+        }
 
-        # Put the updated role policy
+        # Put the new inline policy on the role
         iam_client.put_role_policy(
             RoleName=role_name,
-            PolicyName=f"{role_name}-policy",
-            PolicyDocument=json.dumps(existing_policy_doc),
+            PolicyName=unique_policy_name,
+            PolicyDocument=json.dumps(new_policy_doc),
         )
 
-        logger.info(f"Updated inline policy for role {role_name}")
-
+        logger.info(f"Added inline policy {unique_policy_name} to role {role_name}")
         return role_arn
 
     except Exception as e:
@@ -602,9 +636,14 @@ def check_resource_exists(
     """Check if any of the resources already exist"""
     try:
         # Check SQS Queue
+        # try:
+        #     sqs_client.get_queue_url(QueueName=f"{queue_name}.fifo")
+        #     return True, f"SQS Queue {queue_name}.fifo already exists"
+        # except sqs_client.exceptions.QueueDoesNotExist:
+        #     pass
         try:
-            sqs_client.get_queue_url(QueueName=f"{queue_name}.fifo")
-            return True, f"SQS Queue {queue_name}.fifo already exists"
+            sqs_client.get_queue_url(QueueName=queue_name)
+            return True, f"SQS Queue {queue_name} already exists"
         except sqs_client.exceptions.QueueDoesNotExist:
             pass
 
@@ -675,7 +714,13 @@ def rollback_resources(resources_to_delete):
             if resource_type == "sqs":
                 sqs_client.delete_queue(QueueUrl=resource_id)
             elif resource_type == "eventbridge_rule":
-                eventbridge.delete_rule(Name=resource_id)
+                if isinstance(resource_id, dict):
+                    eventbridge.delete_rule(
+                        Name=resource_id["rule_name"],
+                        EventBusName=resource_id["eventbus_name"],
+                    )
+                else:
+                    eventbridge.delete_rule(Name=resource_id)
             elif resource_type == "lambda":
                 lambda_client.delete_function(FunctionName=resource_id)
             elif resource_type == "step_function":
@@ -806,6 +851,7 @@ def create_event_source_mapping(lambda_client, queue_arn, pipeline_trigger_lambd
                 EventSourceArn=queue_arn,
                 FunctionName=pipeline_trigger_lambda_arn,
                 Enabled=True,
+                # BatchSize=1000, #default is 100.
             )
             logger.info("Event source mapping created successfully")
             return event_source_mapping
@@ -914,20 +960,26 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             }
             logger.info(f"Resource tags: {tags}")
 
-            # Create SQS FIFO Queue
+            # Create SQS Standard Queue
             queue_name = f"medialake-pipeline-{pipeline_suffix}"
             try:
-                logger.info(f"Creating SQS FIFO queue: {queue_name}")
-                queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+                # logger.info(f"Creating SQS FIFO queue: {queue_name}")
+                logger.info(f"Creating SQS standard queue: {queue_name}")
+                queue_url, queue_arn = create_sqs_standard_queue(queue_name, tags)
                 resources_to_delete.append(("sqs", queue_url))
             except sqs_client.exceptions.QueueDeletedRecently as e:
                 logger.error(f"Failed to create pipeline: {str(e)}")
+                # return {
+                #     "status": "400",
+                #     "message": "SQS FIFO queue creation failed: 60-second wait required after deletion before reusing name.",
+                #     "data": {
+                #         "error": "You must wait 60 seconds after deleting a queue before you can create another with the same name."
+                #     },
+                # }
                 return {
                     "status": "400",
-                    "message": "SQS FIFO queue creation failed: 60-second wait required after deletion before reusing name.",
-                    "data": {
-                        "error": "You must wait 60 seconds after deleting a queue before you can create another with the same name."
-                    },
+                    "message": "SQS standard queue creation failed.",
+                    "data": {"error": str(e)},
                 }
 
             # Create IAM Role for Lambda and Step Functions
@@ -968,8 +1020,13 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             logger.info(
                 f"Modifying IAM role for Lambda trigger: {lambda_trigger_role_name}"
             )
+
             modify_trigger_lambda_role(
-                lambda_trigger_role_name, queue_arn, state_machine_name, tags
+                lambda_trigger_role_name,
+                queue_arn,
+                state_machine_name,
+                tags,
+                pipeline_id,  # Unique identifier to prevent overwrites
             )
 
             logger.info(f"Lambda trigger IAM role modified: {lambda_trigger_role_name}")
@@ -1076,7 +1133,7 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             if not wait_for_iam_role_propagation(iam_client, sfn_role_name):
                 raise Exception(f"Role {lambda_trigger_role_name} is not ready in time")
             # Add SQS trigger to Lambda
-            time.sleep(10)
+            time.sleep(20)
             logger.info("Creating event source mapping")
 
             try:

@@ -111,7 +111,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
                 {assetType === 'Video' ? (
                     <video
-                        onClick={onAssetClick}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            onAssetClick();
+                        }}
                         style={{
                             width: dimensions.width,
                             height: dimensions.height,

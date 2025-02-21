@@ -8,6 +8,9 @@ from typing import Optional, Dict, List
 from dataclasses import dataclass
 from aws_lambda_powertools import Logger
 
+# Import your CDK configuration to check the environment
+from config import config
+
 logger = Logger()
 
 
@@ -27,15 +30,15 @@ class CustomVpc(Construct):
             if not self.props.existing_vpc:
                 raise ValueError("Existing VPC configuration is missing")
 
-            vpc_id = self.props.existing_vpc.vpc_id
-            subnet_ids = self.props.existing_vpc.subnet_ids
-            vpc_cidr = self.props.existing_vpc.vpc_cidr
+            vpc_id = self.props.existing_vpc["vpc_id"]
+            subnet_ids = self.props.existing_vpc["subnet_ids"]
+            vpc_cidr = self.props.existing_vpc["vpc_cidr"]
 
             # Determine the number of AZs based on the number of public subnets
             num_azs = len(subnet_ids.get("public", []))
             logger.info(f"Using existing VPC: {vpc_id}")
-            logger.info(f"Public subnets: {subnet_ids.get("public", [])[:num_azs]}")
-            logger.info(f"Private subnets: {subnet_ids.get("private", [])[:num_azs]}")
+            logger.info(f"Public subnets: {subnet_ids.get('public', [])[:num_azs]}")
+            logger.info(f"Private subnets: {subnet_ids.get('private', [])[:num_azs]}")
             logger.info(f"CIDR: {vpc_cidr}")
 
             self.vpc = ec2.Vpc.from_vpc_attributes(
@@ -81,6 +84,12 @@ class CustomVpc(Construct):
                 },
             )
 
+            # If the environment is prod, apply a retention policy to the VPC.
+            if config.environment == "prod":
+                self.vpc.apply_removal_policy(RemovalPolicy.RETAIN)
+                for subnet in self.vpc.public_subnets + self.vpc.private_subnets:
+                    subnet.apply_removal_policy(RemovalPolicy.RETAIN)
+
         self.vpc_id = self.vpc.vpc_id
 
         # Create a CloudWatch Log Group for Flow Logs
@@ -105,7 +114,7 @@ class CustomVpc(Construct):
         """Get subnet IDs and their availability zones for a specific subnet type"""
         try:
             if self.props.use_existing_vpc:
-                subnet_ids = self.props.existing_vpc.subnet_ids
+                subnet_ids = self.props.existing_vpc["subnet_ids"]
                 if subnet_type == ec2.SubnetType.PRIVATE_WITH_EGRESS:
                     return [
                         {"subnet_id": subnet_id, "az": "unknown"}

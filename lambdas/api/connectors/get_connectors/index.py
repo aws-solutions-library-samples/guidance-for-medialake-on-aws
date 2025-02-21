@@ -1,5 +1,6 @@
 import os
 import boto3
+from botocore.exceptions import ClientError
 import json
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
@@ -29,7 +30,29 @@ app = APIGatewayRestResolver(
 dynamodb = boto3.resource("dynamodb")
 
 
+# def get_prefix_size(bucket_name, prefix):
+#     s3_client = boto3.client("s3")
+#     total_size = 0
+#     try:
+#         paginator = s3_client.get_paginator("list_objects_v2")
+#         for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+#             if "Contents" in page:
+#                 total_size += sum(obj["Size"] for obj in page["Contents"])
+#         return total_size
+#     except s3_client.exceptions.NoSuchBucket:
+#         logger.warning(f"Bucket {bucket_name} does not exist")
+#         return 0
+#     except s3_client.exceptions.ClientError as e:
+#         logger.warning(f"Error accessing bucket {bucket_name}: {str(e)}")
+#         return 0
+
+
 def format_connector(item: dict) -> dict:
+    # bucket_name = item.get("storageIdentifier", {})
+    # total_size = get_prefix_size(
+    #     bucket_name, ""
+    # )  # Empty prefix to get whole bucket size
+
     return {
         "id": item.get("id", ""),
         "name": item.get("name", ""),
@@ -46,6 +69,7 @@ def format_connector(item: dict) -> dict:
         "iamRoleArn": item.get("iamRoleArn", ""),
         "lambdaArn": item.get("lambdaArn", ""),
         "queueUrl": item.get("queueUrl", ""),
+        "objectPrefix": item.get("objectPrefix", ""),
         "configuration": {
             "queueUrl": item.get("queueUrl", ""),
             "lambdaArn": item.get("lambdaArn", ""),
@@ -54,6 +78,7 @@ def format_connector(item: dict) -> dict:
         "settings": {
             "bucket": item.get("storageIdentifier", ""),
             "region": item.get("region", ""),
+            "path": item.get("objectPrefix", ""),
         },
     }
 

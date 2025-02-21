@@ -212,7 +212,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # POST /api/pipelines V2
         post_pipelines_v2_lambda_config = LambdaConfig(
             name="pipeline_post_v2",
-            timeout_minutes=10,
+            timeout_minutes=15,
             entry="lambdas/api/pipelines/post_pipelines_v2",
             layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
@@ -390,7 +390,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # POST /api/pipelines
         post_pipelines_lambda_config = LambdaConfig(
             name="pipeline_post",
-            timeout_minutes=10,
+            timeout_minutes=15,
             entry="lambdas/api/pipelines/post_pipelines",
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={

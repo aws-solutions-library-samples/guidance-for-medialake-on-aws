@@ -491,8 +491,8 @@ def handle_delete(
 @logger.inject_lambda_context
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event, context):
-    print(event)
-    print(context)
+    # print(event)
+    # print(context)
     """
     Lambda handler to process CloudFormation Custom Resource events
     """

@@ -57,13 +57,28 @@ class OpenSearchIngestionPipeline(Construct):
         # self.create_service_linked_roles()
         # self.update_log_delivery_policy()
 
-        # Create CloudWatch logs for Ingestion Pipeline
+        # Define the physical name
+        log_group_name = f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}"
+
         ingestion_log_group = logs.LogGroup(
             self,
             "IngestionPipelineLogGroup",
-            log_group_name=f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}",
+            log_group_name=log_group_name,
             removal_policy=RemovalPolicy.DESTROY,
             retention=logs.RetentionDays.ONE_DAY,
+        )
+
+        # Manually compute the ARN
+        log_group_arn = f"arn:aws:logs:{self.region}:{Stack.of(self).account}:log-group:{log_group_name}"
+
+        ingestion_log_group.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="AllowLogDelivery",
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("delivery.logs.amazonaws.com")],
+                actions=["logs:CreateLogStream", "logs:PutLogEvents"],
+                resources=[f"{log_group_arn}:*"],
+            )
         )
 
         # OS ingest pipeline
@@ -71,7 +86,7 @@ class OpenSearchIngestionPipeline(Construct):
             self,
             "AssetTableIngestionPipeline",
             config=LambdaConfig(
-                name=f"{config.global_prefix}",
+                name=f"{config.global_prefix}-os-pipeline-creator-{config.environment}",
                 timeout_minutes=15,
                 vpc=props.vpc.vpc,
                 security_groups=[props.security_group],
@@ -237,6 +252,8 @@ class OpenSearchIngestionPipeline(Construct):
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
                     "logs:DescribeLogGroups",
                 ],
                 resources=[

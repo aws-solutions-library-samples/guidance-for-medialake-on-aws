@@ -218,10 +218,11 @@ function AssetResults<T extends AssetBase>({
     );
 
     return (
-        <Paper 
-            elevation={0} 
-            sx={{ 
-                bgcolor: 'transparent',
+        <Paper
+            elevation={0}
+            sx={{
+                bgcolor: 'transparent',  // Make background transparent
+                // Remove any padding if present
                 p: 0
             }}
         >
@@ -323,6 +324,7 @@ function AssetResults<T extends AssetBase>({
                     onClose={handleMenuClose}
                     onAction={handleAction}
                     actions={actions}
+                    isLoading={isLoading}
                 />
 
                 <ConfirmationModal

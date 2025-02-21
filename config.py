@@ -94,6 +94,7 @@ class OpenSearchClusterSettings(BaseModel):
     automated_snapshot_start_hour: int = 20  # Default to 8 PM UTC
     off_peak_window_enabled: bool = True
     off_peak_window_start: str = "20:00"
+    domain_endpoint: Optional[str] = None
 
     @field_validator("off_peak_window_start")
     @classmethod
@@ -245,6 +246,7 @@ class VpcConfig(BaseModel):
 
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
+
     lambda_tail_warming: bool = False
     primary_region: str
     account_id: str

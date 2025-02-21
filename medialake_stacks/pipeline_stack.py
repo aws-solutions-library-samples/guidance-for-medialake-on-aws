@@ -2,7 +2,7 @@ import json
 import os
 import glob
 from jinja2 import Environment, FileSystemLoader
-
+import time
 
 from aws_cdk import (
     Stack,
@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_lambda as lambda_,
     custom_resources as cr,
+    Duration,
 )
 
 # from config import config
@@ -39,8 +40,6 @@ class PipelineStack(Stack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
-        ## media convert queues
-
         ## pipelines deploy
         default_pipelines_template_dir = os.path.join(
             os.path.dirname(__file__), "..", "default_pipelines"
@@ -55,6 +54,9 @@ class PipelineStack(Stack):
         )
 
         for template_file in template_files:
+            print("!!!! " + template_file)
+            timestamp = int(time.time())
+
             template_name = os.path.basename(template_file)
             pipeline_name = template_name.replace(".jinja2", "")
 
@@ -95,7 +97,7 @@ class PipelineStack(Stack):
                         "ContentType": "application/json",
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"Create{pipeline_name.capitalize()}Json"
+                        f"Create{pipeline_name.capitalize()}Json-{timestamp}"
                     ),
                 ),
                 on_update=cr.AwsSdkCall(
@@ -108,7 +110,7 @@ class PipelineStack(Stack):
                         "ContentType": "application/json",
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"Update{pipeline_name.capitalize()}Json"
+                        f"Create{pipeline_name.capitalize()}Json-{timestamp}"
                     ),
                 ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(
@@ -145,6 +147,8 @@ class PipelineStack(Stack):
             invoke_lambda = cr.AwsCustomResource(
                 self,
                 f"InvokeLambda{pipeline_name.capitalize()}",
+                timeout=Duration.minutes(15),
+                service_timeout=Duration.minutes(15),
                 on_create=cr.AwsSdkCall(
                     service="Lambda",
                     action="invoke",
@@ -153,7 +157,7 @@ class PipelineStack(Stack):
                         "Payload": json.dumps(pipeline_data),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"InvokeLambda{pipeline_name.capitalize()}"
+                        f"InvokeLambda{pipeline_name.capitalize()}-{timestamp}"
                     ),
                 ),
                 on_update=cr.AwsSdkCall(
@@ -164,7 +168,7 @@ class PipelineStack(Stack):
                         "Payload": json.dumps(pipeline_data),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"UpdateLambda{pipeline_name.capitalize()}"
+                        f"UpdateLambda{pipeline_name.capitalize()}-{timestamp}"
                     ),
                 ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(
