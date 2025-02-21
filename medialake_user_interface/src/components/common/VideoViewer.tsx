@@ -48,6 +48,7 @@ const useOmakasePlayer = (
     callbacks: Partial<VideoViewerProps>
 ) => {
     const playerRef = useRef<OmakasePlayer | null>(null);
+    const [playerVolume, setPlayerVolume] = useState(1); // 1 is full volume
 
     // We'll store the incoming callbacks in a ref so that changes to these
     // callbacks do NOT trigger re-initialization of the player:
@@ -123,8 +124,10 @@ const useOmakasePlayer = (
             }),
             player.video.onVolumeChange$.subscribe({
                 next: (event) => {
-                    console.log(`Volume changed: ${event.volume}`);
-                    callbacksRef.current.onVolumeChange?.(event.volume);
+                    const newVolume = Math.round(event.volume * 100);
+                    console.log(`Volume changed: ${newVolume}`);
+                    setPlayerVolume(event.volume);
+                    callbacksRef.current.onVolumeChange?.(newVolume);
                 },
             }),
             player.video.onVideoTimeChange$.subscribe({
@@ -170,7 +173,9 @@ const useOmakasePlayer = (
     }, []);
 
     const setVolume = useCallback((volume: number) => {
-        playerRef.current?.video.setVolume(volume);
+        const newVolume = volume / 100;
+        playerRef.current?.video.setVolume(newVolume);
+        setPlayerVolume(newVolume);
     }, []);
 
     const mute = useCallback(() => {
@@ -403,21 +408,23 @@ export const VideoViewer: FC<VideoViewerProps> = ({
             seek(newValue);
         }
     };
-
     const handleVolumeChange = (event: Event, newValue: number | number[]) => {
         if (typeof newValue === 'number') {
             setPlayerVolume(newValue);
             setVolumeState(newValue);
+            setMuted(newValue === 0);
         }
     };
 
     const handleMuteToggle = () => {
         if (muted) {
             unmute();
+            setPlayerVolume(volume);
             setMuted(false);
             onUnmute?.();
         } else {
             mute();
+            setPlayerVolume(0);
             setMuted(true);
             onMute?.();
         }
@@ -474,6 +481,7 @@ export const VideoViewer: FC<VideoViewerProps> = ({
                 <Box sx={{ px: 2, pt: 1 }}>
                     <Slider
                         value={currentTime}
+
                         min={0}
                         max={duration}
                         step={0.1}
@@ -589,6 +597,11 @@ export const VideoViewer: FC<VideoViewerProps> = ({
                                     min={0}
                                     max={100}
                                     onChange={handleVolumeChange}
+                                    onChangeCommitted={(_, newValue) => {
+                                        if (typeof newValue === 'number') {
+                                            setPlayerVolume(newValue);
+                                        }
+                                    }}
                                     sx={{
                                         height: 100,
                                         '& .MuiSlider-rail': {
@@ -599,6 +612,7 @@ export const VideoViewer: FC<VideoViewerProps> = ({
                                         }
                                     }}
                                 />
+
                             </Tooltip>
                         </Paper>
                     </Box>

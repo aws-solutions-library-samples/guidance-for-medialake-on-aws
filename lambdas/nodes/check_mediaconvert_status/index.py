@@ -30,6 +30,12 @@ def lambda_handler(event, context):
     video_proxy_and_thumbnail_result = event["previous_task_output"][
         "VideoProxyandThumbnailResult"
     ]
+    # print(video_proxy_and_thumbnail_result["Payload"]['body']["JobId"])
+    if isinstance(video_proxy_and_thumbnail_result["Payload"]["body"], str):
+        video_proxy_and_thumbnail_result["Payload"]["body"] = json.loads(
+            video_proxy_and_thumbnail_result["Payload"]["body"]
+        )
+
     job_id = video_proxy_and_thumbnail_result["Payload"]["body"]["JobId"]
     inventory_id = event["input"]["InventoryID"]
     clean_inventory_id = clean_asset_id(inventory_id)

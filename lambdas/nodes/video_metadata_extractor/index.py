@@ -320,9 +320,7 @@ def sanitize_metadata(metadata):
 #     return {"statusCode": statusCode, "body": json.dumps(steps_messages)}
 
 
-t @ logger.inject_lambda_context
-
-
+@logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     error = False
