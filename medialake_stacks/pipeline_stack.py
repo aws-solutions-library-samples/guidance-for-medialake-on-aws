@@ -148,7 +148,7 @@ class PipelineStack(Stack):
                 self,
                 f"InvokeLambda{pipeline_name.capitalize()}",
                 timeout=Duration.minutes(15),
-                service_timeout=Duration.minutes(15),
+                # service_timeout=Duration.minutes(15),
                 on_create=cr.AwsSdkCall(
                     service="Lambda",
                     action="invoke",

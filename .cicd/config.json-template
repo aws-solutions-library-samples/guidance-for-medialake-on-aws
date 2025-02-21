@@ -1,0 +1,31 @@
+{
+    "environment": "<env>", 
+    "account_id": "<aws_account_id>",
+    "resource_prefix": "medialake",
+    "global_prefix": "medialake",
+    "resource_application_tag": "medialake",
+    "api_path": "prod",
+    "primary_region": "<aws_region>",
+    "initial_user": {
+        "email": "<initial_user_email>",
+        "first_name": "Medialake",
+        "last_name": "User"
+    },
+    "opensearch_cluster_settings": {
+        "master_node_count": 3,
+        "master_node_instance_type": "r7g.medium.search",
+        "data_node_count": 3,
+        "data_node_instance_type": "r7g.medium.search",
+        "data_node_volume_size": 10,
+        "data_node_volume_type": "gp3",
+        "data_node_volume_iops": 3000,
+        "availability_zone_count": 3
+    },
+    "authZ": {
+        "identity_providers": [
+            {
+                "identity_provider_method": "cognito"
+            }
+        ]
+    }
+}

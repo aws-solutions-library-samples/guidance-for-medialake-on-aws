@@ -544,6 +544,8 @@ from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from constructs import Construct
 
 from config import config
+from medialake_constructs.shared_constructs.layer_base import LambdaLayer, LambdaLayerConfig
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 # Add the optional domain_endpoint property to allow importing an existing domain.
@@ -789,35 +791,23 @@ class OpenSearchCluster(Construct):
             collection_endpoint = f"https://{self.domain.attr_domain_endpoint}"
 
         # Create Lambda function for index creation
-        create_index_lambda = lambda_.Function(
+        create_index_lambda = Lambda(
             self,
             "IndexCreationFunction",
-            runtime=lambda_.Runtime.PYTHON_3_13,
-            handler="index.handler",
-            vpc=props.vpc,
-            security_groups=[props.security_group],
-            code=lambda_.Code.from_asset("lambdas/back_end/create_oss_index/"),
-            timeout=Duration.seconds(60),
-            environment={
-                "COLLECTION_ENDPOINT": collection_endpoint,
-                "INDEX_NAMES": ",".join(props.collection_indexes),
-                "REGION": self.region,
-                "SCOPE": "es",
-            },
+            config=LambdaConfig(
+                entry="lambdas/back_end/create_oss_index",
+                lambda_handler="handler",
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=1,
+                environment_variables={
+                    "COLLECTION_ENDPOINT": collection_endpoint,
+                    "INDEX_NAMES": ",".join(props.collection_indexes),
+                    "REGION": self.region,
+                    "SCOPE": "es",
+                },
+            ),
         )
-
-        # Define and add a Lambda Layer for dependencies
-        index_layer = PythonLayerVersion(
-            self,
-            "RequestsLayer",
-            entry="lambdas/back_end/create_oss_index",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_13],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
-        )
-        create_index_lambda.add_layers(index_layer)
 
         # Add IAM permissions for the Lambda function to interact with OpenSearch
         # Use the appropriate ARN attribute based on whether the domain is imported.
@@ -826,7 +816,7 @@ class OpenSearchCluster(Construct):
             if hasattr(self.domain, "attr_arn")
             else self.domain.domain_arn
         )
-        create_index_lambda.role.add_to_principal_policy(
+        create_index_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -839,12 +829,23 @@ class OpenSearchCluster(Construct):
                 resources=[f"{domain_arn}/*"],
             )
         )
+        create_index_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface"
+                ],
+                resources=["*"],
+            )
+        )
 
         # Create a custom resource provider that triggers the Lambda for index creation
         provider = cr.Provider(
             self,
             "IndexCreateResourceProvider",
-            on_event_handler=create_index_lambda,
+            on_event_handler=create_index_lambda.function,
             log_retention=logs.RetentionDays.ONE_WEEK,
         )
 

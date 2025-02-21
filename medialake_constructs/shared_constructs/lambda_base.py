@@ -41,7 +41,7 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 )
 from aws_lambda_powertools import Logger
 
-from config import WORKFLOW_PAYLOAD_TEMP_BUCKET, config as env_config
+from config import WORKFLOW_PAYLOAD_TEMP_BUCKET, config as env_config, DIST_PATH
 
 # Constants
 DEFAULT_MEMORY_SIZE = 128
@@ -326,32 +326,7 @@ class Lambda(Construct):
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
-                # Corrected Node.js specific paths
-                common_lambda_props["runtime"] = lambda_.Runtime.NODEJS_20_X
-                common_lambda_props["project_root"] = common_lambda_props["entry"]
-                common_lambda_props["deps_lock_file_path"] = os.path.join(
-                    common_lambda_props["entry"], "lock.json"
-                )
-                common_lambda_props["entry"] = os.path.join(
-                    common_lambda_props["entry"], "index.js"
-                )
-
-                # Copy common libraries to entry directory
-                if common_libs:
-                    self._copy_common_libraries(
-                        common_libs, Path(common_lambda_props["project_root"])
-                    )
-
-                self._function = NodejsFunction(
-                    self,
-                    "StandardNodeJSLambda",
-                    bundling=NodeJSBundlingOptions(
-                        node_modules=["exifr", "aws-sdk"],
-                        force_docker_bundling=True,
-                    ),
-                    **common_lambda_props,
-                )
-                logger.info(f"Created Node.js Lambda: {self.function_name}")
+                self._create_nodejs_function(common_lambda_props, common_libs)
             else:
                 # Python specific bundling with hash-based asset tracking
                 self._create_python_function(common_lambda_props, config, entry_path, common_libs)
@@ -401,31 +376,57 @@ class Lambda(Construct):
             target_path = target_dir / Path(rel_path).name
             shutil.copy2(source_path, target_path)
 
-    def _create_nodejs_function(self, props: dict, config: LambdaConfig, common_libs: dict):
-        """Handle Node.js specific function creation"""
+    def _create_nodejs_function(self, props: dict, common_libs: dict):
         logger = Logger()
-        
-        # Set up Node.js specific paths
+
+        # Corrected Node.js specific paths
+        props["runtime"] = lambda_.Runtime.NODEJS_20_X
         props["project_root"] = props["entry"]
-        props["deps_lock_file_path"] = str(Path(props["entry"]) / "lock.json")
-        props["entry"] = str(Path(props["entry"]) / "index.js")
-
-        # Merge user-provided bundling options with defaults
-        bundling_options = config.nodejs_bundling or NodeJSBundlingOptions(
-            node_modules=["exifr", "aws-sdk"],
-            force_docker_bundling=True
+        props["deps_lock_file_path"] = os.path.join(
+            props["entry"], "lock.json"
         )
         
-        # Handle common libraries
+        # Copy common libraries to entry directory
         if common_libs:
-            self._copy_common_libraries(common_libs, Path(props['project_root']))
+            self._copy_common_libraries(
+                common_libs, Path(props["project_root"])
+            )
+        
+        # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
+        # CI env var is exposed by Gitlab. TODO: add Github specific env var
+        if "CI" in os.environ:
 
-        self._function = NodejsFunction(
-            self,
-            "StandardNodeJSLambda",
-            bundling=bundling_options,
-            **props,
-        )
+            # Replace the entry path to point to the dist folder
+            dist_path = os.path.join(DIST_PATH, props["entry"])
+            del props["entry"]
+            del props["project_root"]
+            del props["deps_lock_file_path"]
+
+            # Add a default index document if not defined
+            if not "." in props["handler"]:
+                props["handler"] = f"index.{props["handler"]}"
+            
+            self._function = lambda_.Function(
+                self,
+                "StandardNodeJSLambda",
+                code=lambda_.Code.from_asset(dist_path),
+                **props,
+            )
+        else:
+            props["entry"] = os.path.join(
+                props["entry"], "index.js"
+            )
+
+            self._function = NodejsFunction(
+                self,
+                "StandardNodeJSLambda",
+                bundling=NodeJSBundlingOptions(
+                    node_modules=["exifr", "aws-sdk"],
+                    force_docker_bundling=True,
+                ),
+                **props,
+            )
+
         logger.info(f"Created Node.js Lambda: {self.function_name}")
 
     def _create_python_function(self, props: dict, config: LambdaConfig, entry_path: Path, common_libs: dict):
@@ -445,12 +446,31 @@ class Lambda(Construct):
         if common_libs:
             self._copy_common_libraries(common_libs, entry_path)
 
-        self._function = PythonFunction(
-            self,
-            "StandardPythonLambda",
-            bundling=bundling_options,
-            **props,
-        )
+        # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
+        # CI env var is exposed by Gitlab. TODO: add Github specific env var
+        if "CI" in os.environ:
+
+            # Replace the entry path to point to the dist folder
+            dist_path = os.path.join(DIST_PATH, props["entry"])
+            del props["entry"]
+
+            # Add a default index document if not defined
+            if not "." in props["handler"]:
+                props["handler"] = f"index.{props["handler"]}"
+            
+            self._function = lambda_.Function(
+                self,
+                "StandardPythonLambda",
+                code=lambda_.Code.from_asset(dist_path),
+                **props,
+            )
+        else:
+            self._function = PythonFunction(
+                self,
+                "StandardPythonLambda",
+                bundling=bundling_options,
+                **props,
+            )
         logger.info(f"Created Python Lambda: {self.function_name}")
 
     def _generate_source_hash(self, entry_path: Path, common_libs: dict) -> str:
