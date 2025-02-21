@@ -3,6 +3,7 @@ from constructs import Construct
 from typing import Optional
 from aws_cdk import (
     aws_cognito as cognito,
+    aws_iam as iam,
     aws_dynamodb as dynamodb,
     RemovalPolicy,
     CfnOutput,

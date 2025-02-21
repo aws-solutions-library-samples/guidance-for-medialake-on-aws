@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, MenuItem } from '@mui/material';
+import { Menu, MenuItem, CircularProgress, Box } from '@mui/material';
 import { type AssetBase } from '../../types/search/searchResults';
 
 interface AssetActionsMenuProps<T extends AssetBase> {
@@ -7,6 +7,10 @@ interface AssetActionsMenuProps<T extends AssetBase> {
     selectedAsset: T | null;
     onClose: () => void;
     onAction: (action: string) => void;
+    isLoading: {
+        download: boolean;
+        [key: string]: boolean;
+    };
     actions?: Array<{
         id: string;
         label: string;
@@ -24,6 +28,7 @@ function AssetActionsMenu<T extends AssetBase>({
     onClose,
     onAction,
     actions = defaultActions,
+    isLoading,
 }: AssetActionsMenuProps<T>) {
     return (
         <Menu
@@ -44,9 +49,14 @@ function AssetActionsMenu<T extends AssetBase>({
                 <MenuItem
                     key={action.id}
                     onClick={() => onAction(action.id)}
-                    disabled={!selectedAsset}
+                    disabled={!selectedAsset || (action.id === 'download' && isLoading.download)}
                 >
-                    {action.label}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {action.label}
+                        {action.id === 'download' && isLoading.download && (
+                            <CircularProgress size={16} />
+                        )}
+                    </Box>
                 </MenuItem>
             ))}
         </Menu>
