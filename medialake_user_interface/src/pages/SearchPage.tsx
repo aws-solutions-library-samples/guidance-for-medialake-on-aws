@@ -1,17 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, LinearProgress, Paper } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    Box,
+    Typography,
+    LinearProgress,
+    Paper,
+    Menu,
+    MenuItem,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+    Button
+} from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
-import ImageResults from '../components/search/ImageResults';
-import VideoResults from '../components/search/VideoResults';
-import AudioResults from '../components/search/AudioResults';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import UnifiedResultsView from '../components/search/UnifiedResultsView';
 import { useSearch } from '../api/hooks/useSearch';
+import { useAssetOperations } from '@/hooks/useAssetOperations';
+import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
+import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
+
+type AssetItem = ImageItem | VideoItem | AudioItem;
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { alpha } from '@mui/material/styles';
 
 interface LocationState {
     query?: string;
     isSemantic?: boolean;
+    preserveSearch?: boolean;
+    viewMode?: 'card' | 'table';
+    cardSize?: 'small' | 'medium' | 'large';
+    aspectRatio?: 'vertical' | 'square' | 'horizontal';
+    thumbnailScale?: 'fit' | 'fill';
+    showMetadata?: boolean;
+    groupByType?: boolean;
 }
 
 interface Filters {
@@ -28,7 +53,7 @@ interface Filters {
     };
 }
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
@@ -37,6 +62,11 @@ const SearchPage: React.FC = () => {
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
     const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
+    const navigate = useNavigate();
+
+    const [pageSize, setPageSize] = useState<number>(
+        parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
+    );
 
     const {
         data: searchResults,
@@ -44,7 +74,7 @@ const SearchPage: React.FC = () => {
         isFetching
     } = useSearch(currentQuery, {
         page: currentPage,
-        pageSize: PAGE_SIZE,
+        pageSize: pageSize,
         isSemantic: currentSemantic
     });
 
@@ -59,13 +89,161 @@ const SearchPage: React.FC = () => {
             lastWeek: false,
             lastMonth: false,
             lastYear: false,
-        },
-        // status: {
-        //     favorites: false,
-        //     archived: false,
-        //     shared: false,
-        // }
+        }
     });
+
+    const [viewMode, setViewMode] = useState<'card' | 'table'>(
+        location.state?.preserveSearch ? location.state.viewMode : 'card'
+    );
+    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>(
+        location.state?.preserveSearch ? location.state.cardSize : 'medium'
+    );
+    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(
+        location.state?.preserveSearch ? location.state.aspectRatio : 'square'
+    );
+    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>(
+        location.state?.preserveSearch ? location.state.thumbnailScale : 'fit'
+    );
+    const [showMetadata, setShowMetadata] = useState(
+        location.state?.preserveSearch ? location.state.showMetadata : true
+    );
+    const [groupByType, setGroupByType] = useState(
+        location.state?.preserveSearch ? location.state.groupByType : false
+    );
+
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [editingAssetId, setEditingAssetId] = useState<string>();
+    const [editedName, setEditedName] = useState<string>();
+
+    const {
+        handleDeleteClick,
+        handleMenuOpen,
+        handleStartEditing,
+        handleNameChange,
+        handleNameEditComplete,
+        handleMenuClose,
+        handleAction,
+        handleDeleteConfirm,
+        handleDeleteCancel,
+        editingAssetId: currentEditingAssetId,
+        editedName: currentEditedName,
+        isDeleteModalOpen,
+        menuAnchorEl,
+        selectedAsset,
+    } = useAssetOperations<AssetBase>();
+
+    const handleAssetClick = useCallback((asset: AssetBase) => {
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}`, {
+            state: { 
+                assetType: asset.DigitalSourceAsset.Type,
+                searchTerm: currentQuery
+            }
+        });
+    }, [navigate, currentQuery]);
+
+    useEffect(() => {
+        setEditingAssetId(currentEditingAssetId || undefined);
+        setEditedName(currentEditedName);
+    }, [currentEditingAssetId, currentEditedName]);
+
+    const formatFileSize = (sizeInBytes: number) => {
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        let i = 0;
+        let size = sizeInBytes;
+        while (size >= 1024 && i < sizes.length - 1) {
+            size /= 1024;
+            i++;
+        }
+        return `${Math.round(size * 100) / 100} ${sizes[i]}`;
+    };
+
+    const [cardFields, setCardFields] = useState([
+        { id: 'name', label: 'Name', visible: true },
+        { id: 'type', label: 'Type', visible: true },
+        { id: 'format', label: 'Format', visible: true },
+        { id: 'size', label: 'Size', visible: true },
+    ]);
+
+    const [columns, setColumns] = useState<AssetTableColumn<AssetBase>[]>([
+        {
+            id: 'name',
+            label: 'Name',
+            visible: true,
+            minWidth: 200,
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            cell: (info: CellContext<AssetBase, unknown>) => info.getValue() as string,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
+                rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
+            )
+        },
+        {
+            id: 'type',
+            label: 'Type',
+            visible: true,
+            minWidth: 100,
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.Type,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type)
+        },
+        {
+            id: 'format',
+            label: 'Format',
+            visible: true,
+            minWidth: 100,
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.Format,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(rowB.original.DigitalSourceAsset.MainRepresentation.Format)
+        },
+        {
+            id: 'size',
+            label: 'Size',
+            visible: true,
+            minWidth: 100,
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            cell: (info: CellContext<AssetBase, unknown>) => formatFileSize(info.getValue() as number),
+            sortable: true,
+            sortingFn: (rowA, rowB) => {
+                const a = rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                const b = rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                return a - b;
+            }
+        },
+        {
+            id: 'date',
+            label: 'Date',
+            visible: true,
+            minWidth: 150,
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.CreateDate,
+            cell: (info: CellContext<AssetBase, unknown>) => {
+                const date = new Date(info.getValue() as string);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            },
+            sortable: true,
+            sortingFn: (rowA, rowB) => {
+                const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
+                const b = new Date(rowB.original.DigitalSourceAsset.CreateDate).getTime();
+                return a - b;
+            }
+        }
+    ]);
+
+    const handleViewModeChange = (_: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
+        if (newMode) setViewMode(newMode);
+    };
+
+    const handleCardFieldToggle = (fieldId: string) => {
+        setCardFields(prev => prev.map(field =>
+            field.id === fieldId ? { ...field, visible: !field.visible } : field
+        ));
+    };
+
+    const handleColumnToggle = (columnId: string) => {
+        setColumns(prev => prev.map(column =>
+            column.id === columnId ? { ...column, visible: !column.visible } : column
+        ));
+    };
 
     const filteredResults = searchResults?.data?.results?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
@@ -95,7 +273,6 @@ const SearchPage: React.FC = () => {
         time: true,
         status: true,
     });
-
 
     useEffect(() => {
         if ((query && !searchParams.has('q')) || (isSemantic !== undefined && !searchParams.has('semantic'))) {
@@ -129,8 +306,6 @@ const SearchPage: React.FC = () => {
         });
     };
 
-
-
     const handleSectionToggle = (section: string) => {
         setExpandedSections(prev => ({
             ...prev,
@@ -161,157 +336,212 @@ const SearchPage: React.FC = () => {
         });
     };
 
-
+    const handlePageSizeChange = (newPageSize: number) => {
+        setPageSize(newPageSize);
+        // Reset to first page when changing page size
+        setSearchParams(prev => {
+            prev.set('pageSize', newPageSize.toString());
+            prev.set('page', '1');
+            return prev;
+        });
+    };
 
     return (
         <RightSidebarProvider>
-            <Box sx={{
-                display: 'flex',
-                minHeight: '100%',
-                bgcolor: 'background.default',
-                position: 'relative',
-                overflow: 'auto'
-            }}>
-                {isFetching && (
-                    <LinearProgress
-                        sx={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            zIndex: 9999
-                        }}
-                    />
-                )}
-
-
-                {/* Main Content */}
+            <>
                 <Box sx={{
-                    flexGrow: 1,
-                    px: 4,
-                    py: 4,
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                    minHeight: 0,
-                    marginBottom: 4
+                    minHeight: '100%',
+                    bgcolor: 'background.default',
+                    position: 'relative',
+                    overflow: 'auto'
                 }}>
-                    {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
-                        <Box
+                    {isFetching && (
+                        <LinearProgress
                             sx={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minHeight: '50vh',
-                                textAlign: 'center',
-                                gap: 2
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                zIndex: 9999
                             }}
-                        >
-                            <Paper
-                                elevation={0}
+                        />
+                    )}
+
+                    {/* Main Content */}
+                    <Box sx={{
+                        flexGrow: 1,
+                        px: 4,
+                        py: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        minHeight: 0,
+                        marginBottom: 4
+                    }}>
+                        {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
+                            <Box
                                 sx={{
-                                    p: 4,
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
-                                    gap: 2,
-                                    bgcolor: 'background.paper',
-                                    borderRadius: 2
+                                    justifyContent: 'center',
+                                    minHeight: '50vh',
+                                    textAlign: 'center',
+                                    gap: 2
                                 }}
                             >
-                                <SearchOffIcon
+                                <Paper
+                                    elevation={0}
                                     sx={{
-                                        fontSize: 64,
-                                        color: 'text.secondary',
-                                        mb: 2
+                                        p: 4,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 2,
+                                        bgcolor: 'background.paper',
+                                        borderRadius: 2
                                     }}
-                                />
-                                <Typography variant="h5" color="text.primary" gutterBottom>
-                                    No results found
-                                </Typography>
-                                <Typography variant="body1" color="text.secondary">
-                                    We couldn't find any matches for "{currentQuery}"
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                    Try adjusting your search or filters to find what you're looking for
-                                </Typography>
-                            </Paper>
-                        </Box>
-                    )}
+                                >
+                                    <SearchOffIcon
+                                        sx={{
+                                            fontSize: 64,
+                                            color: 'text.secondary',
+                                            mb: 2
+                                        }}
+                                    />
+                                    <Typography variant="h5" color="text.primary" gutterBottom>
+                                        No results found
+                                    </Typography>
+                                    <Typography variant="body1" color="text.secondary">
+                                        We couldn't find any matches for "{currentQuery}"
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Try adjusting your search or filters to find what you're looking for
+                                    </Typography>
+                                </Paper>
+                            </Box>
+                        )}
 
-                    {filters.mediaTypes.images && imageResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <Box sx={{ 
-                            '& .MuiPaper-root': {
-                                bgcolor: 'transparent',
-                                boxShadow: 'none',
-                                p: 0
-                            }
-                        }}>
-                            <ImageResults
-                                images={imageResults}
+                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && (
+                            <UnifiedResultsView
+                                results={filteredResults}
                                 searchMetadata={{
                                     totalResults: searchResults.data.searchMetadata.totalResults || 0,
                                     page: currentPage,
-                                    pageSize: PAGE_SIZE,
+                                    pageSize: pageSize,
                                 }}
                                 onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                onPageSizeChange={handlePageSizeChange}
                                 searchTerm={currentQuery}
+                                groupByType={groupByType}
+                                onGroupByTypeChange={setGroupByType}
+                                viewMode={viewMode}
+                                onViewModeChange={handleViewModeChange}
+                                cardSize={cardSize}
+                                onCardSizeChange={setCardSize}
+                                aspectRatio={aspectRatio}
+                                onAspectRatioChange={setAspectRatio}
+                                thumbnailScale={thumbnailScale}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                showMetadata={showMetadata}
+                                onShowMetadataChange={setShowMetadata}
+                                sorting={sorting}
+                                onSortChange={setSorting}
+                                cardFields={cardFields}
+                                onCardFieldToggle={handleCardFieldToggle}
+                                columns={columns as AssetTableColumn<AssetItem>[]}
+                                onColumnToggle={handleColumnToggle}
+                                onAssetClick={handleAssetClick}
+                                onDeleteClick={handleDeleteClick}
+                                onMenuClick={handleMenuOpen}
+                                onEditClick={handleStartEditing}
+                                onEditNameChange={handleNameChange}
+                                onEditNameComplete={handleNameEditComplete}
+                                editingAssetId={editingAssetId}
+                                editedName={editedName}
                             />
-                        </Box>
-                    )}
-                    {filters.mediaTypes.videos && videoResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <Box sx={{ 
-                            '& .MuiPaper-root': {
-                                bgcolor: 'transparent',
-                                boxShadow: 'none',
-                                p: 0
-                            }
-                        }}>
-                            <VideoResults
-                                videos={videoResults}
-                                searchMetadata={{
-                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                    page: currentPage,
-                                    pageSize: PAGE_SIZE,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                searchTerm={currentQuery}
-                            />
-                        </Box>
-                    )}
-                    {filters.mediaTypes.audio && audioResults.length > 0 && searchResults?.data?.searchMetadata && (
-                        <Box sx={{ 
-                            '& .MuiPaper-root': {
-                                bgcolor: 'transparent',
-                                boxShadow: 'none',
-                                p: 0
-                            }
-                        }}>
-                            <AudioResults
-                                audios={audioResults}
-                                searchMetadata={{
-                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                    page: currentPage,
-                                    pageSize: PAGE_SIZE,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                searchTerm={currentQuery}
-                            />
-                        </Box>
-                    )}
+                        )}
+                    </Box>
 
+                    <RightSidebar>
+                        <SearchFilters
+                            filters={filters}
+                            expandedSections={expandedSections}
+                            onFilterChange={handleFilterChange}
+                            onSectionToggle={handleSectionToggle}
+                            groupByType={groupByType}
+                            onGroupByTypeChange={setGroupByType}
+                        />
+                    </RightSidebar>
                 </Box>
 
-                <RightSidebar>
-                    <SearchFilters
-                        filters={filters}
-                        expandedSections={expandedSections}
-                        onFilterChange={handleFilterChange}
-                        onSectionToggle={handleSectionToggle}
-                    />
-                </RightSidebar>
-            </Box>
+                {/* Asset Menu */}
+                <Menu
+                    anchorEl={menuAnchorEl}
+                    open={Boolean(menuAnchorEl)}
+                    onClose={handleMenuClose}
+                    MenuListProps={{
+                        'aria-labelledby': selectedAsset ? `asset-menu-button-${selectedAsset.InventoryID}` : undefined
+                    }}
+                    anchorOrigin={{
+                        vertical: 'bottom',
+                        horizontal: 'right',
+                    }}
+                    transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'right',
+                    }}
+                    PaperProps={{
+                        elevation: 0,
+                        sx: {
+                            borderRadius: '8px',
+                            minWidth: 200,
+                            mt: 1,
+                            border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                            backgroundColor: theme => theme.palette.background.paper,
+                            overflow: 'visible',
+                            position: 'fixed',
+                            zIndex: 1400,
+                        },
+                    }}
+                    slotProps={{
+                        paper: {
+                            sx: {
+                                overflow: 'visible',
+                                position: 'fixed',
+                            }
+                        }
+                    }}
+                >
+                    <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
+                    <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
+                    <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
+                </Menu>
+
+                {/* Delete Confirmation Dialog */}
+                <Dialog
+                    open={isDeleteModalOpen}
+                    onClose={handleDeleteCancel}
+                    aria-labelledby="delete-dialog-title"
+                    aria-describedby="delete-dialog-description"
+                >
+                    <DialogTitle id="delete-dialog-title">
+                        Confirm Delete
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText id="delete-dialog-description">
+                            Are you sure you want to delete this asset? This action cannot be undone.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleDeleteCancel}>Cancel</Button>
+                        <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </>
         </RightSidebarProvider>
     );
 };

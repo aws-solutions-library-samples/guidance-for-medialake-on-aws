@@ -4,6 +4,7 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetResults from '@/components/shared/AssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
+import { RecentlyViewedProvider } from '@/contexts/RecentlyViewedContext';
 
 interface AudioResultsProps {
     audios: AudioItem[];
@@ -14,6 +15,15 @@ interface AudioResultsProps {
     };
     onPageChange: (page: number) => void;
     searchTerm: string;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -29,30 +39,32 @@ const defaultColumns: AssetTableColumn<AudioItem>[] = [
         label: 'Object Name',
         visible: true,
         minWidth: 300,
-        accessor: (audio) => audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        accessorFn: (audio) => audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'format',
         label: 'Format',
         visible: true,
         minWidth: 100,
-        accessor: (audio) => audio.DigitalSourceAsset.MainRepresentation.Format,
+        accessorFn: (audio) => audio.DigitalSourceAsset.MainRepresentation.Format,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'createDate',
         label: 'Created',
         visible: true,
         minWidth: 160,
-        accessor: (audio) => audio.DigitalSourceAsset.CreateDate,
-        format: (value: string) => formatDate(value),
+        accessorFn: (audio) => audio.DigitalSourceAsset.CreateDate,
+        cell: info => formatDate(info.getValue() as string),
     },
     {
         id: 'fileSize',
         label: 'Size',
         visible: false,
         minWidth: 100,
-        accessor: (audio) => audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-        format: (value: number) => formatFileSize(value),
+        accessorFn: (audio) => audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+        cell: info => formatFileSize(info.getValue() as number),
     },
 ];
 
@@ -84,22 +96,18 @@ const actions = [
     { id: 'share', label: 'Share' },
 ];
 
-const AudioResults: React.FC<AudioResultsProps> = ({ audios, searchMetadata, onPageChange, searchTerm }) => {
+const AudioResults: React.FC<AudioResultsProps> = ({ audios, ...props }) => {
     return (
-        <AssetResults
+        <AssetResults<AudioItem>
             assets={audios}
-            searchMetadata={searchMetadata}
-            onPageChange={onPageChange}
             config={{
-                assetType: 'Audio',
+                assetType: 'audio',
                 defaultCardFields,
                 defaultColumns,
                 sortOptions,
-                renderCardField,
-                placeholderImage: 'https://placehold.co/300x200?text=Audio',
+                renderCardField: (fieldId, audio) => renderCardField(fieldId, audio as AudioItem)
             }}
-            searchTerm={searchTerm}
-            actions={actions}
+            {...props}
         />
     );
 };

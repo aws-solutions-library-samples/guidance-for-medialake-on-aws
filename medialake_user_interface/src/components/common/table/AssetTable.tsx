@@ -11,17 +11,19 @@ import {
     ColumnFiltersState,
     ColumnSizingState,
     ColumnResizeMode,
+    Row,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ResizableTable } from './ResizableTable';
 import { BaseTableToolbar } from './BaseTableToolbar';
 import { TableCellContent } from './TableCellContent';
 import { type AssetBase } from '@/types/search/searchResults';
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
 
-interface AssetTableProps<T extends AssetBase> {
+interface AssetTableProps<T> {
     data: T[];
-    columns: ColumnDef<T>[];
-    onRowClick?: (asset: T) => void;
+    columns: AssetTableColumn<T>[];
+    onRowClick?: (item: T) => void;
     onEditName?: (asset: T, newName: string) => void;
     searchPlaceholder?: string;
     sorting?: SortingState;
@@ -30,7 +32,7 @@ interface AssetTableProps<T extends AssetBase> {
     onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
 }
 
-export function AssetTable<T extends AssetBase>({
+export function AssetTable<T>({
     data,
     columns: userColumns,
     onRowClick,
@@ -167,6 +169,12 @@ export function AssetTable<T extends AssetBase>({
         overscan: 20,
     });
 
+    const handleRowClick = (row: Row<T>) => {
+        if (onRowClick && row.original) {
+            onRowClick(row.original);
+        }
+    };
+
     return (
         <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <BaseTableToolbar
@@ -189,12 +197,7 @@ export function AssetTable<T extends AssetBase>({
                 containerRef={containerRef}
                 virtualizer={rowVirtualizer}
                 rows={rows}
-                onRowClick={onRowClick ? (row) => {
-                    // Only trigger row click if we're not editing
-                    if (!editingId) {
-                        onRowClick(row.original);
-                    }
-                } : undefined}
+                onRowClick={(row) => handleRowClick(row)}
                 maxHeight="none"
             />
         </Box>
