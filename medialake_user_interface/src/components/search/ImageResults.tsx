@@ -15,6 +15,15 @@ interface ImageResultsProps {
     };
     onPageChange: (page: number) => void;
     searchTerm: string;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -30,30 +39,32 @@ const defaultColumns: AssetTableColumn<ImageItem>[] = [
         label: 'Object Name',
         visible: true,
         minWidth: 300,
-        accessor: (image) => image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        accessorFn: (image) => image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'format',
         label: 'Format',
         visible: true,
         minWidth: 100,
-        accessor: (image) => image.DigitalSourceAsset.MainRepresentation.Format,
+        accessorFn: (image) => image.DigitalSourceAsset.MainRepresentation.Format,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'createDate',
         label: 'Created',
         visible: true,
         minWidth: 160,
-        accessor: (image) => image.DigitalSourceAsset.CreateDate,
-        format: (value: string) => formatDate(value),
+        accessorFn: (image) => image.DigitalSourceAsset.CreateDate,
+        cell: info => formatDate(info.getValue() as string),
     },
     {
         id: 'fileSize',
         label: 'Size',
         visible: false,
         minWidth: 100,
-        accessor: (image) => image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-        format: (value: number) => formatFileSize(value),
+        accessorFn: (image) => image.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+        cell: info => formatFileSize(info.getValue() as number),
     },
 ];
 
@@ -85,7 +96,21 @@ const actions = [
     { id: 'share', label: 'Share' },
 ];
 
-const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onPageChange, searchTerm }) => {
+const ImageResults: React.FC<ImageResultsProps> = ({
+    images,
+    searchMetadata,
+    onPageChange,
+    searchTerm,
+    cardSize,
+    onCardSizeChange,
+    aspectRatio,
+    onAspectRatioChange,
+    thumbnailScale,
+    onThumbnailScaleChange,
+    showMetadata,
+    onShowMetadataChange,
+    onPageSizeChange,
+}) => {
     return (
         <RecentlyViewedProvider>
             <AssetResults
@@ -102,6 +127,15 @@ const ImageResults: React.FC<ImageResultsProps> = ({ images, searchMetadata, onP
                 }}
                 searchTerm={searchTerm}
                 actions={actions}
+                cardSize={cardSize}
+                onCardSizeChange={onCardSizeChange}
+                aspectRatio={aspectRatio}
+                onAspectRatioChange={onAspectRatioChange}
+                thumbnailScale={thumbnailScale}
+                onThumbnailScaleChange={onThumbnailScaleChange}
+                showMetadata={showMetadata}
+                onShowMetadataChange={onShowMetadataChange}
+                onPageSizeChange={onPageSizeChange}
             />
         </RecentlyViewedProvider>
     );

@@ -4,41 +4,41 @@ export interface CardFieldConfig {
     visible: boolean;
 }
 
-export interface AssetBase {
-    InventoryID: string;
-    thumbnailUrl?: string;
-    proxyUrl?: string;
-    DigitalSourceAsset: {
-        CreateDate: string;
-        MainRepresentation: {
-            Format: string;
-            StorageInfo: {
-                PrimaryLocation: {
-                    ObjectKey: {
-                        Name: string;
-                    };
-                    FileInfo: {
-                        Size: number;
-                    };
+interface DigitalSourceAsset {
+    Type: string;
+    CreateDate: string;
+    ModifiedDate?: string;
+    MainRepresentation: {
+        Format: string;
+        StorageInfo: {
+            PrimaryLocation: {
+                ObjectKey: {
+                    Name: string;
+                };
+                FileInfo: {
+                    Size: number;
                 };
             };
         };
     };
 }
 
+export interface AssetBase {
+    InventoryID: string;
+    DigitalSourceAsset: DigitalSourceAsset;
+    thumbnailUrl?: string;
+    proxyUrl?: string;
+}
+
 export interface ImageItem extends AssetBase {
-    DigitalSourceAsset: {
-        CreateDate: string;
+    DigitalSourceAsset: DigitalSourceAsset & {
+        Type: 'Image';
         MainRepresentation: {
             Format: string;
             StorageInfo: {
                 PrimaryLocation: {
-                    ObjectKey: {
-                        Name: string;
-                    };
-                    FileInfo: {
-                        Size: number;
-                    };
+                    ObjectKey: { Name: string; };
+                    FileInfo: { Size: number; };
                 };
             };
         };
@@ -46,18 +46,14 @@ export interface ImageItem extends AssetBase {
 }
 
 export interface VideoItem extends AssetBase {
-    DigitalSourceAsset: {
-        CreateDate: string;
+    DigitalSourceAsset: DigitalSourceAsset & {
+        Type: 'Video';
         MainRepresentation: {
             Format: string;
             StorageInfo: {
                 PrimaryLocation: {
-                    ObjectKey: {
-                        Name: string;
-                    };
-                    FileInfo: {
-                        Size: number;
-                    };
+                    ObjectKey: { Name: string; };
+                    FileInfo: { Size: number; };
                 };
             };
             TechnicalMetadata: {
@@ -70,18 +66,14 @@ export interface VideoItem extends AssetBase {
 }
 
 export interface AudioItem extends AssetBase {
-    DigitalSourceAsset: {
-        CreateDate: string;
+    DigitalSourceAsset: DigitalSourceAsset & {
+        Type: 'Audio';
         MainRepresentation: {
             Format: string;
             StorageInfo: {
                 PrimaryLocation: {
-                    ObjectKey: {
-                        Name: string;
-                    };
-                    FileInfo: {
-                        Size: number;
-                    };
+                    ObjectKey: { Name: string; };
+                    FileInfo: { Size: number; };
                 };
             };
             TechnicalMetadata: {

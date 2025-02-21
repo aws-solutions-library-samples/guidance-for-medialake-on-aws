@@ -20,6 +20,7 @@ import { Virtualizer } from '@tanstack/react-virtual';
 import { TableHeader } from './TableHeader';
 import { TableCellContent } from './TableCellContent';
 import { useTableDensity } from '../../../contexts/TableDensityContext';
+import { Table as MUITable } from '@mui/material';
 
 interface ResizableTableProps<T> {
     table: TanStackTable<T>;
@@ -27,13 +28,15 @@ interface ResizableTableProps<T> {
     virtualizer: Virtualizer<HTMLDivElement, Element>;
     rows: Row<T>[];
     maxHeight?: string;
+    onRowClick?: (row: Row<T>) => void;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     activeFilters?: Array<{ columnId: string; value: string }>;
     activeSorting?: Array<{ columnId: string; desc: boolean }>;
     onRemoveFilter?: (columnId: string) => void;
     onRemoveSort?: (columnId: string) => void;
-    onRowClick?: (row: Row<T>) => void;
 }
+
+type TableProps = React.ComponentProps<typeof MUITable>;
 
 const useTableStyles = (theme: any, mode: 'compact' | 'normal', hasRowClick: boolean, rowCount: number) => {
     const isDark = theme.palette.mode === 'dark';
@@ -159,17 +162,23 @@ export function ResizableTable<T>({
     containerRef,
     virtualizer,
     rows,
-    maxHeight,
+    maxHeight = '100%',
+    onRowClick,
     onFilterClick,
     activeFilters = [],
     activeSorting = [],
     onRemoveFilter,
     onRemoveSort,
-    onRowClick,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
     const { mode } = useTableDensity();
     const styles = useTableStyles(theme, mode, Boolean(onRowClick), rows.length);
+
+    const handleRowClick = useCallback((row: Row<T>, event: React.MouseEvent<HTMLElement>) => {
+        if (!(event.target as HTMLElement).closest('.action-buttons')) {
+            onRowClick?.(row);
+        }
+    }, [onRowClick]);
 
     return (
         <Box
@@ -225,50 +234,50 @@ export function ResizableTable<T>({
                             ))}
                         </TableHead>
                         <TableBody>
-                            {virtualizer.getVirtualItems().map(virtualRow => {
-                                const row = rows[virtualRow.index];
-                                return (
-                                    <TableRow
-                                        key={row.id}
-                                        sx={styles.tableRow}
-                                        role="row"
-                                        onClick={(e) => {
-                                            const selection = window.getSelection();
-                                            if (!selection || selection.toString().length === 0) {
-                                                onRowClick?.(row);
-                                            }
-                                        }}
-                                    >
-                                        {row.getVisibleCells().map(cell => {
-                                            const content = flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            );
+                            {rows.map(row => (
+                                <TableRow
+                                    hover
+                                    key={row.id}
+                                    onClick={(e) => handleRowClick(row, e)}
+                                    sx={{ 
+                                        cursor: 'pointer',
+                                        '&:hover': {
+                                            backgroundColor: (theme) => 
+                                                theme.palette.mode === 'light' 
+                                                    ? alpha(theme.palette.primary.main, 0.04)
+                                                    : alpha(theme.palette.primary.main, 0.08)
+                                        }
+                                    }}
+                                >
+                                    {row.getVisibleCells().map(cell => {
+                                        const content = flexRender(
+                                            cell.column.columnDef.cell,
+                                            cell.getContext()
+                                        );
 
-                                            return (
-                                                <TableCell
-                                                    key={cell.id}
-                                                    sx={{
-                                                        width: `${cell.column.getSize()}px`,
-                                                        maxWidth: `${cell.column.getSize()}px`,
-                                                        position: 'relative',
-                                                        overflow: 'visible',
-                                                    }}
-                                                    role="gridcell"
-                                                >
-                                                    {React.isValidElement(content) ? (
-                                                        content
-                                                    ) : (
-                                                        <TableCellContent>
-                                                            {content}
-                                                        </TableCellContent>
-                                                    )}
-                                                </TableCell>
-                                            );
-                                        })}
-                                    </TableRow>
-                                );
-                            })}
+                                        return (
+                                            <TableCell
+                                                key={cell.id}
+                                                sx={{
+                                                    width: `${cell.column.getSize()}px`,
+                                                    maxWidth: `${cell.column.getSize()}px`,
+                                                    position: 'relative',
+                                                    overflow: 'visible',
+                                                }}
+                                                role="gridcell"
+                                            >
+                                                {React.isValidElement(content) ? (
+                                                    content
+                                                ) : (
+                                                    <TableCellContent>
+                                                        {content}
+                                                    </TableCellContent>
+                                                )}
+                                            </TableCell>
+                                        );
+                                    })}
+                                </TableRow>
+                            ))}
                         </TableBody>
                     </Table>
                 </TableContainer>

@@ -1,5 +1,6 @@
 import { type AssetBase } from '../search/searchResults';
-import { type SortingState } from '@tanstack/react-table';
+import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
+import type React from 'react';
 
 export interface AssetField {
     id: string;
@@ -7,29 +8,36 @@ export interface AssetField {
     visible: boolean;
 }
 
-export interface AssetTableColumn<T> {
+export interface AssetTableColumn<T> extends Omit<ColumnDef<T>, 'accessorKey' | 'accessorFn'> {
     id: string;
     label: string;
-    visible: boolean;
     minWidth: number;
-    format?: (value: any) => string | React.ReactNode;
-    accessor?: (row: T) => any;
+    visible: boolean;
     sortable?: boolean;
-    sortingFn?: (a: T, b: T) => number;
-}
+    accessorFn: (row: T) => unknown;
+    cell?: (info: CellContext<T, unknown>) => React.ReactNode;
+};
 
 export interface AssetCardProps {
     id: string;
     name: string;
     thumbnailUrl?: string;
     proxyUrl?: string;
+    assetType: string;
     fields: AssetField[];
-    renderField: (fieldId: string) => string | React.ReactNode;
+    renderField: (fieldId: string) => React.ReactNode;
     onAssetClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
-    placeholderImage?: string;
-    onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+    onEditClick: (event: React.MouseEvent<HTMLElement>) => void;
+    isEditing?: boolean;
+    editedName?: string;
+    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onEditNameComplete?: (save: boolean) => void;
+    cardSize: 'small' | 'medium' | 'large';
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    thumbnailScale: 'fit' | 'fill';
+    showMetadata: boolean;
 }
 
 export interface AssetTableProps<T> {
@@ -40,6 +48,7 @@ export interface AssetTableProps<T> {
     onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+    onAssetClick: (item: T) => void;
     getThumbnailUrl: (item: T) => string;
     getName: (item: T) => string;
     getId: (item: T) => string;
@@ -58,16 +67,18 @@ export interface AssetViewControlsProps {
     onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
     title: string;
     sorting: SortingState;
-    sortOptions: SortOption[];
+    sortOptions: Array<{ id: string; label: string }>;
     onSortChange: (columnId: string) => void;
-    fields: AssetField[];
+    fields: Array<{ id: string; label: string; visible: boolean }>;
     onFieldToggle: (fieldId: string) => void;
-    cardSize: CardSize;
-    onCardSizeChange: (size: CardSize) => void;
-    aspectRatio: AspectRatio;
-    onAspectRatioChange: (ratio: AspectRatio) => void;
-    thumbnailScale: ThumbnailScale;
-    onThumbnailScaleChange: (scale: ThumbnailScale) => void;
+    groupByType: boolean;
+    onGroupByTypeChange: (checked: boolean) => void;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
     showMetadata: boolean;
     onShowMetadataChange: (show: boolean) => void;
 }

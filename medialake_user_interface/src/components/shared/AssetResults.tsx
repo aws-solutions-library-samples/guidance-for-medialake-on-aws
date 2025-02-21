@@ -13,12 +13,13 @@ import AssetActionsMenu from './AssetActionsMenu';
 import { useAssetResults } from '@/hooks/useAssetResults';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { sortAssets } from '@/utils/sortAssets';
+import { type AssetViewControlsProps } from '@/types/shared/assetComponents';
 
 export interface AssetResultsConfig<T extends AssetBase> {
     assetType: string;
     defaultCardFields: CardFieldConfig[];
     defaultColumns: AssetTableColumn<T>[];
-    sortOptions: Array<{ id: string; label: string }>;
+    sortOptions: { id: string; label: string; }[];
     renderCardField: (fieldId: string, asset: T) => string;
     placeholderImage?: string;
 }
@@ -37,6 +38,15 @@ interface AssetResultsProps<T extends AssetBase> {
         id: string;
         label: string;
     }>;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 type AssetWithHeader<T> = T | { isHeader: true; type: string };
@@ -48,6 +58,15 @@ function AssetResults<T extends AssetBase>({
     config,
     searchTerm,
     actions,
+    cardSize = 'medium',
+    onCardSizeChange,
+    aspectRatio = 'square',
+    onAspectRatioChange,
+    thumbnailScale = 'fill',
+    onThumbnailScaleChange,
+    showMetadata = true,
+    onShowMetadataChange,
+    onPageSizeChange,
 }: AssetResultsProps<T>) {
     const navigate = useNavigate();
     const [currentAsset, setCurrentAsset] = useState<T | null>(null);
@@ -160,8 +179,8 @@ function AssetResults<T extends AssetBase>({
     };
 
     const handleAssetClick = (asset: T) => {
-        setCurrentAsset(asset);
-        navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`);
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}${searchTerm ? `?searchTerm=${encodeURIComponent(searchTerm)}` : ''}`);
     };
 
     const handleFilterClick = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
@@ -214,10 +233,24 @@ function AssetResults<T extends AssetBase>({
                     sorting={sorting}
                     sortOptions={sortOptions}
                     onSortChange={handleRequestSort}
-                    fields={viewMode === 'card' ? cardFields : columns}
+                    fields={viewMode === 'card' 
+                        ? cardFields 
+                        : columns.map(col => ({
+                            id: col.id,
+                            label: col.label,
+                            visible: col.visible
+                        }))}
                     onFieldToggle={viewMode === 'card' ? handleCardFieldToggle : handleColumnToggle}
                     groupByType={groupByType}
                     onGroupByTypeChange={setGroupByType}
+                    cardSize={cardSize}
+                    onCardSizeChange={onCardSizeChange}
+                    aspectRatio={aspectRatio}
+                    onAspectRatioChange={onAspectRatioChange}
+                    thumbnailScale={thumbnailScale}
+                    onThumbnailScaleChange={onThumbnailScaleChange}
+                    showMetadata={showMetadata}
+                    onShowMetadataChange={onShowMetadataChange}
                 />
 
                 {viewMode === 'card' ? (
@@ -262,14 +295,14 @@ function AssetResults<T extends AssetBase>({
                         onDeleteClick={handleDeleteClick}
                         onMenuClick={handleMenuOpen}
                         onEditClick={handleStartEditing}
-                        onRowClick={handleAssetClick}
+                        onAssetClick={handleAssetClick}
                         getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
                         getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                         getId={(asset) => asset.InventoryID}
                         editingId={editingAssetId}
                         editedName={editedName}
                         onEditNameChange={handleNameChange}
-                        onEditNameComplete={handleNameEditComplete}
+                        onEditNameComplete={(asset) => handleNameEditComplete(asset, true)}
                         onFilterClick={handleFilterClick}
                         activeFilters={columnFilters}
                         onRemoveFilter={handleRemoveFilter}
@@ -281,6 +314,7 @@ function AssetResults<T extends AssetBase>({
                     pageSize={searchMetadata.pageSize}
                     totalResults={searchMetadata.totalResults}
                     onPageChange={handlePageChange}
+                    onPageSizeChange={onPageSizeChange}
                 />
 
                 <AssetActionsMenu

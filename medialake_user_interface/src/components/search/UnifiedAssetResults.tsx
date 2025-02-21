@@ -21,6 +21,19 @@ interface UnifiedAssetResultsProps {
     onPageChange: (page: number) => void;
     searchTerm: string;
     groupByType: boolean;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onAssetClick: (asset: AssetItem) => void;
+    onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
@@ -28,12 +41,44 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
     searchMetadata,
     onPageChange,
     searchTerm,
-    groupByType
+    groupByType,
+    cardSize,
+    onCardSizeChange,
+    aspectRatio,
+    onAspectRatioChange,
+    thumbnailScale,
+    onThumbnailScaleChange,
+    showMetadata,
+    onShowMetadataChange,
+    onAssetClick,
+    onDeleteClick,
+    onMenuClick,
+    onEditClick,
+    onPageSizeChange,
 }) => {
     // Split results by type if grouping is enabled
     const imageResults = results.filter(item => item.DigitalSourceAsset.Type === 'Image') as ImageItem[];
     const videoResults = results.filter(item => item.DigitalSourceAsset.Type === 'Video') as VideoItem[];
     const audioResults = results.filter(item => item.DigitalSourceAsset.Type === 'Audio') as AudioItem[];
+
+    const commonProps = {
+        searchMetadata,
+        onPageChange,
+        searchTerm,
+        cardSize,
+        onCardSizeChange,
+        aspectRatio,
+        onAspectRatioChange,
+        thumbnailScale,
+        onThumbnailScaleChange,
+        showMetadata,
+        onShowMetadataChange,
+        onAssetClick,
+        onDeleteClick,
+        onMenuClick,
+        onEditClick,
+        onPageSizeChange,
+    };
 
     if (groupByType) {
         return (
@@ -48,9 +93,7 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
                     }}>
                         <ImageResults
                             images={imageResults}
-                            searchMetadata={searchMetadata}
-                            onPageChange={onPageChange}
-                            searchTerm={searchTerm}
+                            {...commonProps}
                         />
                     </Box>
                 )}
@@ -64,9 +107,7 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
                     }}>
                         <VideoResults
                             videos={videoResults}
-                            searchMetadata={searchMetadata}
-                            onPageChange={onPageChange}
-                            searchTerm={searchTerm}
+                            {...commonProps}
                         />
                     </Box>
                 )}
@@ -80,9 +121,7 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
                     }}>
                         <AudioResults
                             audios={audioResults}
-                            searchMetadata={searchMetadata}
-                            onPageChange={onPageChange}
-                            searchTerm={searchTerm}
+                            {...commonProps}
                         />
                     </Box>
                 )}
@@ -90,9 +129,6 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
         );
     }
 
-    // When grouping is disabled, show all results in a single section
-    // We'll use ImageResults as the base since it has the same card structure
-    // Note: We need to cast the results to ImageItem[] since we're using ImageResults component
     return (
         <Box sx={{ 
             '& .MuiPaper-root': {
@@ -103,9 +139,7 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
         }}>
             <ImageResults
                 images={results as ImageItem[]}
-                searchMetadata={searchMetadata}
-                onPageChange={onPageChange}
-                searchTerm={searchTerm}
+                {...commonProps}
             />
         </Box>
     );

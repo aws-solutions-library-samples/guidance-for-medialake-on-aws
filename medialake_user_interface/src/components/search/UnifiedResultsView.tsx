@@ -4,10 +4,14 @@ import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/s
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetCard from '../shared/AssetCard';
-import AssetTable from '../shared/AssetTable';
+import { AssetTable } from '../shared/AssetTable';
 import AssetViewControls from '../shared/AssetViewControls';
 import AssetPagination from '../shared/AssetPagination';
 import { sortAssets } from '@/utils/sortAssets';
+import { useNavigate, useLocation } from 'react-router-dom';
+import UnifiedAssetResults from './UnifiedAssetResults';
+import { formatFileSize } from '@/utils/fileSize';
+import { formatDate } from '@/utils/dateFormat';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
@@ -51,6 +55,7 @@ interface UnifiedResultsViewProps {
     editingAssetId?: string;
     editedName?: string;
     onGroupByTypeChange: (checked: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
@@ -84,13 +89,38 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     editingAssetId,
     editedName,
     onGroupByTypeChange,
+    onPageSizeChange,
 }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const locationState = location.state as { filters?: unknown; isSemantic?: boolean } | null;
+
+    const handleAssetClick = (asset: AssetItem) => {
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}`, {
+            state: {
+                searchTerm,
+                page: searchMetadata.page,
+                viewMode,
+                cardSize,
+                aspectRatio,
+                thumbnailScale,
+                showMetadata,
+                groupByType,
+                filters: locationState?.filters,
+                sorting,
+                isSemantic: locationState?.isSemantic,
+                currentResult: results.findIndex(r => r.InventoryID === asset.InventoryID) + 1,
+                totalResults: searchMetadata.totalResults
+            }
+        });
+    };
+
     // Group results by type if needed
     const groupedResults = React.useMemo(() => {
         if (!groupByType) return { all: results };
 
         return results.reduce((acc, item) => {
-            // Normalize the type to ensure consistent grouping
             const type = item.DigitalSourceAsset.Type.toLowerCase();
             const normalizedType = type === 'image' ? 'Image' :
                                  type === 'video' ? 'Video' :
@@ -113,69 +143,28 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
         }
     };
 
-    const renderAssetCard = (asset: AssetItem) => {
-        const gridSizes = getGridSizes();
-        return (
-            <Grid item xs={gridSizes.xs} sm={gridSizes.sm} md={gridSizes.md} lg={gridSizes.lg} key={asset.InventoryID}>
-                <AssetCard
-                    cardSize={cardSize}
-                    aspectRatio={aspectRatio}
-                    id={asset.InventoryID}
-                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                    thumbnailUrl={asset.thumbnailUrl}
-                    proxyUrl={asset.proxyUrl}
-                    assetType={asset.DigitalSourceAsset.Type}
-                    fields={cardFields}
-                    renderField={(fieldId) => {
-                        switch (fieldId) {
-                            case 'name':
-                                return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-                            case 'type':
-                                return asset.DigitalSourceAsset.Type;
-                            case 'format':
-                                return asset.DigitalSourceAsset.MainRepresentation.Format;
-                            case 'size':
-                                const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
-                                const sizes = ['B', 'KB', 'MB', 'GB'];
-                                let i = 0;
-                                let size = sizeInBytes;
-                                while (size >= 1024 && i < sizes.length - 1) {
-                                    size /= 1024;
-                                    i++;
-                                }
-                                return `${Math.round(size * 100) / 100} ${sizes[i]}`;
-                            default:
-                                return '';
-                        }
-                    }}
-                    onAssetClick={() => onAssetClick(asset)}
-                    onDeleteClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteClick(asset, event);
-                    }}
-                    onMenuClick={(event) => {
-                        event.stopPropagation();
-                        onMenuClick(asset, event);
-                    }}
-                    onEditClick={(event) => {
-                        event.stopPropagation();
-                        onEditClick(asset, event);
-                    }}
-                    onImageError={() => console.error('Image failed to load')}
-                    isEditing={editingAssetId === asset.InventoryID}
-                    editedName={editedName}
-                    onEditNameChange={onEditNameChange}
-                    onEditNameComplete={(save) => onEditNameComplete(asset, save)}
-                    thumbnailScale={thumbnailScale}
-                    showMetadata={showMetadata}
-                />
-            </Grid>
-        );
+    const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
+        switch (fieldId) {
+            case 'name':
+                return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+            case 'type':
+                return asset.DigitalSourceAsset.Type;
+            case 'format':
+                return asset.DigitalSourceAsset.MainRepresentation.Format;
+            case 'size':
+                const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                return formatFileSize(sizeInBytes);
+            case 'createdAt':
+                return formatDate(asset.DigitalSourceAsset.CreateDate);
+            case 'modifiedAt':
+                return formatDate(asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate);
+            default:
+                return '';
+        }
     };
 
     const renderContent = () => {
         if (viewMode === 'card') {
-            // Sort assets within their groups or as a whole
             const sortedResults = groupByType
                 ? Object.entries(groupedResults)
                     .filter(([type]) => ['Image', 'Video', 'Audio'].includes(type))
@@ -188,7 +177,31 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
             if (!groupByType) {
                 return (
                     <Grid container spacing={3}>
-                        {sortedResults[0].assets.map(renderAssetCard)}
+                        {sortedResults[0].assets.map(asset => (
+                            <Grid item {...getGridSizes()} key={asset.InventoryID}>
+                                <AssetCard
+                                    id={asset.InventoryID}
+                                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                    thumbnailUrl={asset.thumbnailUrl}
+                                    proxyUrl={asset.proxyUrl}
+                                    assetType={asset.DigitalSourceAsset.Type}
+                                    fields={cardFields.filter(f => f.visible)}
+                                    renderField={(fieldId) => renderCardField(fieldId, asset)}
+                                    onAssetClick={() => onAssetClick(asset)}
+                                    onDeleteClick={(e) => onDeleteClick(asset, e)}
+                                    onMenuClick={(e) => onMenuClick(asset, e)}
+                                    onEditClick={(e) => onEditClick(asset, e)}
+                                    isEditing={editingAssetId === asset.InventoryID}
+                                    editedName={editedName}
+                                    onEditNameChange={onEditNameChange}
+                                    onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+                                    cardSize={cardSize}
+                                    aspectRatio={aspectRatio}
+                                    thumbnailScale={thumbnailScale}
+                                    showMetadata={showMetadata}
+                                />
+                            </Grid>
+                        ))}
                     </Grid>
                 );
             }
@@ -201,7 +214,31 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                 {type}
                             </Typography>
                             <Grid container spacing={3}>
-                                {assets.map(renderAssetCard)}
+                                {assets.map(asset => (
+                                    <Grid item {...getGridSizes()} key={asset.InventoryID}>
+                                        <AssetCard
+                                            id={asset.InventoryID}
+                                            name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                            thumbnailUrl={asset.thumbnailUrl}
+                                            proxyUrl={asset.proxyUrl}
+                                            assetType={asset.DigitalSourceAsset.Type}
+                                            fields={cardFields.filter(f => f.visible)}
+                                            renderField={(fieldId) => renderCardField(fieldId, asset)}
+                                            onAssetClick={() => onAssetClick(asset)}
+                                            onDeleteClick={(e) => onDeleteClick(asset, e)}
+                                            onMenuClick={(e) => onMenuClick(asset, e)}
+                                            onEditClick={(e) => onEditClick(asset, e)}
+                                            isEditing={editingAssetId === asset.InventoryID}
+                                            editedName={editedName}
+                                            onEditNameChange={onEditNameChange}
+                                            onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+                                            cardSize={cardSize}
+                                            aspectRatio={aspectRatio}
+                                            thumbnailScale={thumbnailScale}
+                                            showMetadata={showMetadata}
+                                        />
+                                    </Grid>
+                                ))}
                             </Grid>
                         </Box>
                     ))}
@@ -210,36 +247,23 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
         }
 
         // Table view
-        const tableData = groupByType ? Object.values(groupedResults).flat() : results;
         return (
             <AssetTable
-                data={tableData}
-                columns={columns.map(col => ({
-                    ...col,
-                    getValue: (asset: AssetItem) => col.accessor ? col.accessor(asset) : '',
-                }))}
+                data={results}
+                columns={columns}
                 sorting={sorting}
                 onSortingChange={onSortChange}
+                onDeleteClick={onDeleteClick}
+                onMenuClick={onMenuClick}
+                onEditClick={onEditClick}
+                onAssetClick={onAssetClick}
                 getThumbnailUrl={(asset) => asset.thumbnailUrl || ''}
                 getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                 getId={(asset) => asset.InventoryID}
-                onDeleteClick={(asset, event) => {
-                    event.stopPropagation();
-                    onDeleteClick(asset, event);
-                }}
-                onMenuClick={(asset, event) => {
-                    event.stopPropagation();
-                    onMenuClick(asset, event);
-                }}
-                onEditClick={(asset, event) => {
-                    event.stopPropagation();
-                    onEditClick(asset, event);
-                }}
-                onRowClick={(asset) => onAssetClick(asset)}
                 editingId={editingAssetId}
                 editedName={editedName}
                 onEditNameChange={onEditNameChange}
-                onEditNameComplete={(asset, save) => onEditNameComplete(asset, save)}
+                onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
             />
         );
     };
@@ -263,7 +287,13 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                     const desc = currentSort?.id === columnId ? !currentSort.desc : false;
                     onSortChange([{ id: columnId, desc }]);
                 }}
-                fields={viewMode === 'card' ? cardFields : columns}
+                fields={viewMode === 'card' 
+                    ? cardFields 
+                    : columns.map(col => ({
+                        id: col.id,
+                        label: col.label,
+                        visible: col.visible
+                    }))}
                 onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
                 groupByType={groupByType}
                 onGroupByTypeChange={onGroupByTypeChange}
@@ -284,6 +314,7 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 pageSize={searchMetadata.pageSize}
                 totalResults={searchMetadata.totalResults}
                 onPageChange={(_, page) => onPageChange(page)}
+                onPageSizeChange={onPageSizeChange}
             />
         </Box>
     );

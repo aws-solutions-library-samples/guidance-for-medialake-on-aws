@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -19,15 +19,24 @@ import SearchFilters from '../components/search/SearchFilters';
 import UnifiedResultsView from '../components/search/UnifiedResultsView';
 import { useSearch } from '../api/hooks/useSearch';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
-import { type AssetBase } from '@/types/search/searchResults';
-import { type SortingState } from '@tanstack/react-table';
+import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
+import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { useLocation, useSearchParams } from 'react-router-dom';
+
+type AssetItem = ImageItem | VideoItem | AudioItem;
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 
 interface LocationState {
     query?: string;
     isSemantic?: boolean;
+    preserveSearch?: boolean;
+    viewMode?: 'card' | 'table';
+    cardSize?: 'small' | 'medium' | 'large';
+    aspectRatio?: 'vertical' | 'square' | 'horizontal';
+    thumbnailScale?: 'fit' | 'fill';
+    showMetadata?: boolean;
+    groupByType?: boolean;
 }
 
 interface Filters {
@@ -44,7 +53,7 @@ interface Filters {
     };
 }
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
@@ -53,6 +62,11 @@ const SearchPage: React.FC = () => {
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
     const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
+    const navigate = useNavigate();
+
+    const [pageSize, setPageSize] = useState<number>(
+        parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
+    );
 
     const {
         data: searchResults,
@@ -60,7 +74,7 @@ const SearchPage: React.FC = () => {
         isFetching
     } = useSearch(currentQuery, {
         page: currentPage,
-        pageSize: PAGE_SIZE,
+        pageSize: pageSize,
         isSemantic: currentSemantic
     });
 
@@ -78,12 +92,25 @@ const SearchPage: React.FC = () => {
         }
     });
 
-    const [groupByType, setGroupByType] = useState(true);
-    const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
-    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>('medium');
-    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>('square');
-    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>('fill');
-    const [showMetadata, setShowMetadata] = useState(true);
+    const [viewMode, setViewMode] = useState<'card' | 'table'>(
+        location.state?.preserveSearch ? location.state.viewMode : 'card'
+    );
+    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>(
+        location.state?.preserveSearch ? location.state.cardSize : 'medium'
+    );
+    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(
+        location.state?.preserveSearch ? location.state.aspectRatio : 'square'
+    );
+    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>(
+        location.state?.preserveSearch ? location.state.thumbnailScale : 'fit'
+    );
+    const [showMetadata, setShowMetadata] = useState(
+        location.state?.preserveSearch ? location.state.showMetadata : true
+    );
+    const [groupByType, setGroupByType] = useState(
+        location.state?.preserveSearch ? location.state.groupByType : false
+    );
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [editingAssetId, setEditingAssetId] = useState<string>();
     const [editedName, setEditedName] = useState<string>();
@@ -105,10 +132,15 @@ const SearchPage: React.FC = () => {
         selectedAsset,
     } = useAssetOperations<AssetBase>();
 
-    const handleAssetClick = (asset: AssetBase) => {
-        // Implement asset click behavior (e.g., open preview)
-        console.log('Asset clicked:', asset);
-    };
+    const handleAssetClick = useCallback((asset: AssetBase) => {
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}`, {
+            state: { 
+                assetType: asset.DigitalSourceAsset.Type,
+                searchTerm: currentQuery
+            }
+        });
+    }, [navigate, currentQuery]);
 
     useEffect(() => {
         setEditingAssetId(currentEditingAssetId || undefined);
@@ -133,45 +165,49 @@ const SearchPage: React.FC = () => {
         { id: 'size', label: 'Size', visible: true },
     ]);
 
-    const [columns, setColumns] = useState<AssetTableColumn<any>[]>([
+    const [columns, setColumns] = useState<AssetTableColumn<AssetBase>[]>([
         {
             id: 'name',
             label: 'Name',
             visible: true,
             minWidth: 200,
-            accessor: (asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            sortable: true
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            cell: (info: CellContext<AssetBase, unknown>) => info.getValue() as string,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
+                rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
+            )
         },
         {
             id: 'type',
             label: 'Type',
             visible: true,
             minWidth: 100,
-            accessor: (asset) => asset.DigitalSourceAsset.Type,
-            sortable: true
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.Type,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type)
         },
         {
             id: 'format',
             label: 'Format',
             visible: true,
             minWidth: 100,
-            accessor: (asset) => asset.DigitalSourceAsset.MainRepresentation.Format,
-            sortable: true
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.Format,
+            sortable: true,
+            sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(rowB.original.DigitalSourceAsset.MainRepresentation.Format)
         },
         {
             id: 'size',
             label: 'Size',
             visible: true,
             minWidth: 100,
-            accessor: (asset) => {
-                const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
-                return formatFileSize(sizeInBytes);
-            },
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            cell: (info: CellContext<AssetBase, unknown>) => formatFileSize(info.getValue() as number),
             sortable: true,
-            sortingFn: (a, b) => {
-                const sizeA = a.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
-                const sizeB = b.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
-                return sizeA - sizeB;
+            sortingFn: (rowA, rowB) => {
+                const a = rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                const b = rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+                return a - b;
             }
         },
         {
@@ -179,15 +215,16 @@ const SearchPage: React.FC = () => {
             label: 'Date',
             visible: true,
             minWidth: 150,
-            accessor: (asset) => {
-                const date = new Date(asset.DigitalSourceAsset.CreateDate);
+            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.CreateDate,
+            cell: (info: CellContext<AssetBase, unknown>) => {
+                const date = new Date(info.getValue() as string);
                 return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
             },
             sortable: true,
-            sortingFn: (a, b) => {
-                const dateA = new Date(a.DigitalSourceAsset.CreateDate).getTime();
-                const dateB = new Date(b.DigitalSourceAsset.CreateDate).getTime();
-                return dateA - dateB;
+            sortingFn: (rowA, rowB) => {
+                const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
+                const b = new Date(rowB.original.DigitalSourceAsset.CreateDate).getTime();
+                return a - b;
             }
         }
     ]);
@@ -299,6 +336,16 @@ const SearchPage: React.FC = () => {
         });
     };
 
+    const handlePageSizeChange = (newPageSize: number) => {
+        setPageSize(newPageSize);
+        // Reset to first page when changing page size
+        setSearchParams(prev => {
+            prev.set('pageSize', newPageSize.toString());
+            prev.set('page', '1');
+            return prev;
+        });
+    };
+
     return (
         <RightSidebarProvider>
             <>
@@ -382,9 +429,10 @@ const SearchPage: React.FC = () => {
                                 searchMetadata={{
                                     totalResults: searchResults.data.searchMetadata.totalResults || 0,
                                     page: currentPage,
-                                    pageSize: PAGE_SIZE,
+                                    pageSize: pageSize,
                                 }}
                                 onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                onPageSizeChange={handlePageSizeChange}
                                 searchTerm={currentQuery}
                                 groupByType={groupByType}
                                 onGroupByTypeChange={setGroupByType}
@@ -402,7 +450,7 @@ const SearchPage: React.FC = () => {
                                 onSortChange={setSorting}
                                 cardFields={cardFields}
                                 onCardFieldToggle={handleCardFieldToggle}
-                                columns={columns}
+                                columns={columns as AssetTableColumn<AssetItem>[]}
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
                                 onDeleteClick={handleDeleteClick}

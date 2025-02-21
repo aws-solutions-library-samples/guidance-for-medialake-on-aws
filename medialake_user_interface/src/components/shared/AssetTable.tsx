@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
 import {
     useReactTable,
@@ -8,21 +8,14 @@ import {
     createColumnHelper,
     type SortingState,
     type ColumnFiltersState,
+    type Row,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ResizableTable } from '../common/table';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-
-export interface AssetTableColumn<T> {
-    id: string;
-    label: string;
-    visible: boolean;
-    minWidth: number;
-    format?: (value: any) => string | React.ReactNode;
-    accessor?: (row: T) => any;
-}
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
 
 export interface AssetTableProps<T> {
     data: T[];
@@ -32,20 +25,20 @@ export interface AssetTableProps<T> {
     onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onMenuClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-    onRowClick?: (item: T) => void;
+    onAssetClick: (item: T) => void;
     getThumbnailUrl: (item: T) => string;
     getName: (item: T) => string;
     getId: (item: T) => string;
     editingId?: string;
     editedName?: string;
-    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onEditNameComplete?: (item: T, save: boolean) => void;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     activeFilters?: Array<{ columnId: string; value: string }>;
     onRemoveFilter?: (columnId: string) => void;
 }
 
-function AssetTable<T>({
+export function AssetTable<T>({
     data,
     columns,
     sorting,
@@ -53,7 +46,7 @@ function AssetTable<T>({
     onDeleteClick,
     onMenuClick,
     onEditClick,
-    onRowClick,
+    onAssetClick,
     getThumbnailUrl,
     getName,
     getId,
@@ -64,42 +57,10 @@ function AssetTable<T>({
     onFilterClick,
     activeFilters = [],
     onRemoveFilter,
-}: AssetTableProps<T>) {
+}: AssetTableProps<T>): React.ReactElement {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
-    const cursorPositionRef = useRef<number | null>(null);
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-
-    const handleDeleteClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation();
-        onDeleteClick(item, event);
-    };
-
-    const handleMenuClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onMenuClick(item, event);
-        console.log('Menu clicked:', {
-            target: event.target,
-            currentTarget: event.currentTarget,
-            item
-        });
-    };
-
-    const handleEditClick = (item: T) => (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation();
-        onEditClick?.(item, event);
-    };
-
-    useEffect(() => {
-        if (cursorPositionRef.current !== null) {
-            const input = document.querySelector(`input[value="${editedName}"]`) as HTMLInputElement;
-            if (input) {
-                input.setSelectionRange(cursorPositionRef.current, cursorPositionRef.current);
-            }
-            cursorPositionRef.current = null;
-        }
-    }, [editedName]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const tableColumns = React.useMemo(() => {
         const visibleColumns = columns.filter(col => col.visible);
@@ -109,7 +70,7 @@ function AssetTable<T>({
                 header: 'Preview',
                 size: 100,
                 enableSorting: false,
-                cell: (info) => (
+                cell: info => (
                     <Box sx={{ p: 1 }}>
                         <Box
                             component="img"
@@ -126,105 +87,97 @@ function AssetTable<T>({
                     </Box>
                 )
             }),
-            ...visibleColumns.map(col =>
-                columnHelper.accessor(
-                    row => col.accessor ? col.accessor(row) : (row as any)[col.id],
-                    {
-                        id: col.id,
-                        header: col.label,
-                        size: col.minWidth,
-                        enableSorting: true,
-                        filterFn: 'includesString',
-                        cell: (info) => {
-                            if (col.id === 'name' && onEditClick) {
-                                const isEditing = editingId === getId(info.row.original);
-                                return (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
-                                        {isEditing ? (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                                                <TextField
-                                                    value={editedName}
-                                                    onChange={(e) => {
-                                                        cursorPositionRef.current = e.target.selectionStart;
-                                                        onEditNameChange?.(e);
-                                                    }}
-                                                    onKeyPress={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            onEditNameComplete?.(info.row.original, true);
-                                                        } else if (e.key === 'Escape') {
-                                                            onEditNameComplete?.(info.row.original, false);
-                                                        }
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    autoFocus
-                                                    size="small"
-                                                    sx={{ flex: 1 }}
-                                                    inputRef={(input) => {
-                                                        if (input && cursorPositionRef.current !== null) {
-                                                            input.setSelectionRange(cursorPositionRef.current, cursorPositionRef.current);
-                                                        }
-                                                    }}
-                                                />
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                    <Button
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onEditNameComplete?.(info.row.original, true);
-                                                        }}
-                                                        variant="contained"
-                                                    >
-                                                        Save
-                                                    </Button>
-                                                    <Button
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onEditNameComplete?.(info.row.original, false);
-                                                        }}
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                </Box>
-                                            </Box>
-                                        ) : (
-                                            <>
-                                                <Typography>{info.getValue()}</Typography>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={handleEditClick(info.row.original)}
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </>
-                                        )}
-                                    </Box>
-                                );
-                            }
+            ...visibleColumns.map(col => columnHelper.accessor(
+                row => col.accessorFn ? col.accessorFn(row) : (row as any)[col.id],
+                {
+                    id: col.id,
+                    header: col.label,
+                    size: col.minWidth,
+                    enableSorting: true,
+                    cell: info => {
+                        if (col.id === 'name' && onEditClick) {
+                            const isEditing = editingId === getId(info.row.original);
                             return (
-                                <Box sx={{ p: 1 }}>
-                                    {col.format ? col.format(info.getValue()) : info.getValue()}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                                    {isEditing ? (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                            <TextField
+                                                value={editedName}
+                                                onChange={onEditNameChange}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        onEditNameComplete?.(info.row.original, true);
+                                                    } else if (e.key === 'Escape') {
+                                                        onEditNameComplete?.(info.row.original, false);
+                                                    }
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                autoFocus
+                                                size="small"
+                                                sx={{ flex: 1 }}
+                                            />
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Button
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditNameComplete?.(info.row.original, true);
+                                                    }}
+                                                    variant="contained"
+                                                >
+                                                    Save
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditNameComplete?.(info.row.original, false);
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    ) : (
+                                        <>
+                                            <Typography>{info.getValue()}</Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onEditClick(info.row.original, e);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </>
+                                    )}
                                 </Box>
                             );
                         }
+                        return (
+                            <Box sx={{ p: 1 }}>
+                                {col.cell ? col.cell(info) : info.getValue()}
+                            </Box>
+                        );
                     }
-                )
-            ),
+                }
+            )),
             columnHelper.display({
                 id: 'actions',
                 header: 'Actions',
                 size: 100,
-                cell: (info) => (
+                cell: info => (
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', p: 1 }}>
                         <IconButton
                             size="small"
-                            onClick={handleDeleteClick(info.row.original)}
+                            onClick={(e) => onDeleteClick(info.row.original, e)}
                         >
                             <DeleteIcon fontSize="small" />
                         </IconButton>
                         <IconButton
                             size="small"
-                            onClick={handleMenuClick(info.row.original)}
+                            onClick={(e) => onMenuClick(info.row.original, e)}
                             id={`asset-menu-button-${getId(info.row.original)}`}
                             aria-haspopup="true"
                             sx={{
@@ -260,25 +213,28 @@ function AssetTable<T>({
         },
     });
 
+    const { rows } = table.getRowModel();
     const rowVirtualizer = useVirtualizer({
-        count: table.getRowModel().rows.length,
+        count: rows.length,
         getScrollElement: () => containerRef.current,
-        estimateSize: () => 76,
-        overscan: 10,
+        estimateSize: () => 53,
+        overscan: 20,
     });
+
+    const handleRowClick = (row: Row<T>) => {
+        if (!editingId) {
+            onAssetClick(row.original);
+        }
+    };
 
     return (
         <ResizableTable
             table={table}
             containerRef={containerRef}
             virtualizer={rowVirtualizer}
-            rows={table.getRowModel().rows}
+            rows={rows}
+            onRowClick={handleRowClick}
             maxHeight="none"
-            onRowClick={onRowClick ? (row) => {
-                if (!editingId) {
-                    onRowClick(row.original);
-                }
-            } : undefined}
             onFilterClick={onFilterClick}
             activeFilters={activeFilters}
             onRemoveFilter={onRemoveFilter}
