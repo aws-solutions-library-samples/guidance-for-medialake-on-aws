@@ -130,7 +130,7 @@ class UIConstruct(Construct):
             self,
             "MediaLakeUserInterfaceBucket",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-user-interface-{config.account_id}-{config.environment}",
+                bucket_name=f"{config.global_prefix}-user-interface-{stack.account}-{config.environment}",
                 website_index_document=props.website_index_document,
                 website_error_document=props.website_error_document,
             ),
@@ -150,7 +150,7 @@ class UIConstruct(Construct):
         self.user_interface_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
-            log_group_name=f"aws-waf-logs-{config.global_prefix}-{config.primary_region}-{config.account_id}-user-interface-waf-logs",
+            log_group_name=f"aws-waf-logs-{config.global_prefix}-{stack.region}-{stack.account}-user-interface-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )

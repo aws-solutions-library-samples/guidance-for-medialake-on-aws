@@ -22,20 +22,26 @@ from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 
 app = cdk.App()
 
+# Define environment once
+env = cdk.Environment(
+    account=app.account,
+    region=app.region   
+)
+
 # Create Lambda warmer stack if enabled
 lambda_warmer = None
 if config.lambda_tail_warming:
     lambda_warmer = LambdaWarmerStack(
         app,
         "MediaLakeLambdaWarmer",
-        env=cdk.Environment(region=config.primary_region, account=config.account_id),
+        env=env
     )
 
 # Create base infrastructure stack first
 base_infrastructure = BaseInfrastructureStack(
     app,
     "MediaLakeBaseInfrastructure",
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env
 )
 
 # Create nodes stack
@@ -45,7 +51,7 @@ nodes_stack = NodesStack(
     props=NodesStackProps(
         iac_bucket=base_infrastructure.iac_assets_bucket,
     ),
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env,
 )
 
 pipeline_nodes_stack = PipelineNodesStack(
@@ -55,7 +61,7 @@ pipeline_nodes_stack = PipelineNodesStack(
         media_assets_bucket=base_infrastructure.media_assets_bucket,
         asset_table=base_infrastructure.asset_table,
     ),
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env,
 )
 
 # Create API Gateway Stack - includes auth and ui
@@ -81,7 +87,7 @@ api_gateway_stack = ApiGatewayStack(
         pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
         node_table=nodes_stack.pipelines_nodes_table,
     ),
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env,
 )
 
 # Add Lambda warming to API Gateway functions if enabled
@@ -102,7 +108,7 @@ pipeline_stack = PipelineStack(
         check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
         post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
     ),
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env,
 )
 
 cleanup_stack = CleanupStack(
@@ -113,7 +119,7 @@ cleanup_stack = CleanupStack(
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=api_gateway_stack.connector_table,
     ),
-    env=cdk.Environment(region=config.primary_region, account=config.account_id),
+    env=env,
 )
 
 cleanup_stack.add_dependency(api_gateway_stack)

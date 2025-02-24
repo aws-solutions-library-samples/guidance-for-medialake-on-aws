@@ -2,6 +2,7 @@
 from constructs import Construct
 from aws_cdk import (
     Stack,
+    Fn,
     Environment,
     aws_events as events,
     aws_dynamodb as dynamodb,
@@ -66,15 +67,15 @@ class BaseInfrastructureStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         env = kwargs.get("env")
-        region = env.region if isinstance(env, Environment) else config.primary_region
-        account = env.account if isinstance(env, Environment) else config.account_id
+        account = Stack.of(self).account
+        region = Stack.of(self).region
         opensearch_index_name = "media"
-
+        
         self.access_logs_bucket = S3Bucket(
             self,
             "AccessLogsBucket",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                # bucket_name=f"{config.global_prefix}-access-logs-{account}-{region}-{config.environment}".lower(),
                 intelligent_tiering_configurations=[
                     s3.IntelligentTieringConfiguration(
                         name="All",
@@ -112,7 +113,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
+                # bucket_name=f"{config.global_prefix}-ddb-export-{account}-{region}-{config.environment}".lower(),
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
@@ -184,7 +185,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
-                domain_name=f"{config.global_prefix}-os-{self.region}-{config.environment}",
+                domain_name=f"{config.global_prefix}-os-{region}-{config.environment}",
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
                 collection_indexes=[opensearch_index_name],
@@ -197,7 +198,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaAssets",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
+                # bucket_name=f"{config.global_prefix}-asset-bucket-{account}-{region}-{config.environment}",
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
                 cors=[
@@ -242,7 +243,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             props=S3BucketProps(
-                bucket_name=f"{config.global_prefix}-iac-assets-{config.account_id}-{self.region}-{config.environment}".lower(),
+                # bucket_name=f"{config.global_prefix}-iac-assets-{account}-{region}-{config.environment}".lower(),
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket.bucket,
             ),
@@ -252,7 +253,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IngestEventBus",
             props=EventBusConfig(
-                bus_name=f"{config.global_prefix}-ingest-{self.region}-{config.environment}",
+                bus_name=f"{config.global_prefix}-ingest-{region}-{config.environment}",
                 description="event bus",
                 log_all=True,
             ),

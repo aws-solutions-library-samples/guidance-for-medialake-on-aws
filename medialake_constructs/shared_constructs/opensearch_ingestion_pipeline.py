@@ -53,12 +53,13 @@ class OpenSearchIngestionPipeline(Construct):
 
         # Get the region and account ID
         self.region = stack.region
+        self.account_id = stack.account
 
         # self.create_service_linked_roles()
         # self.update_log_delivery_policy()
 
         # Define the physical name
-        log_group_name = f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}"
+        log_group_name = f"/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{self.account_id}"
 
         ingestion_log_group = logs.LogGroup(
             self,
@@ -131,7 +132,7 @@ class OpenSearchIngestionPipeline(Construct):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["es:DescribeDomain"],
-                resources=[f"arn:aws:es:*:{config.account_id}:domain/*"],
+                resources=[f"arn:aws:es:*:{self.account_id}:domain/*"],
             )
         )
 
@@ -214,7 +215,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "osis:ValidatePipeline",
                 ],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{config.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -242,7 +243,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "logs:PutLogEvents",
                 ],
                 resources=[
-                    f"arn:aws:logs:{self.region}:{config.account_id}:log-group:{ingestion_log_group.log_group_name}:*"
+                    f"arn:aws:logs:{self.region}:{self.account_id}:log-group:{ingestion_log_group.log_group_name}:*"
                 ],
             )
         )
@@ -257,7 +258,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "logs:DescribeLogGroups",
                 ],
                 resources=[
-                    f"arn:aws:logs:{self.region}:{config.account_id}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-*"
+                    f"arn:aws:logs:{self.region}:{self.account_id}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-*"
                 ],
             )
         )
@@ -304,7 +305,7 @@ class OpenSearchIngestionPipeline(Construct):
                         ]
                     }
                 },
-                resources=[f"arn:aws:iam::{config.account_id}:policy/*"],
+                resources=[f"arn:aws:iam::{self.account_id}:policy/*"],
             )
         )
 
@@ -355,7 +356,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "ec2:CreateTags",
                     "ec2:DeleteTags",
                 ],
-                resources=[f"arn:aws:ec2:{self.region}:{config.account_id}:*"],
+                resources=[f"arn:aws:ec2:{self.region}:{self.account_id}:*"],
             )
         )
 
@@ -375,7 +376,7 @@ class OpenSearchIngestionPipeline(Construct):
                 effect=iam.Effect.ALLOW,
                 actions=["osis:Ingest"],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{config.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -388,7 +389,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "opensearch:DescribeDomain",
                 ],
                 resources=[
-                    f"arn:aws:opensearch:{self.region}:{config.account_id}:domain/*"
+                    f"arn:aws:opensearch:{self.region}:{self.account_id}:domain/*"
                 ],
             )
         )
@@ -402,7 +403,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "osis:DeletePipeline",
                 ],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{config.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -442,7 +443,7 @@ class OpenSearchIngestionPipeline(Construct):
         ingestion_custom_resource.node.add_dependency(pipeline_role)
 
     # def update_log_delivery_policy(self):
-    #     new_resource_arn = f"arn:aws:logs:{self.region}:{config.account_id}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{config.account_id}:log-stream:*"
+    #     new_resource_arn = f"arn:aws:logs:{self.region}:{self.account_id}:log-group:/aws/vendedlogs/MediaLakeOpenSearchIngestion-{config.environment}-{self.region}-{self.account_id}:log-stream:*"
 
     #     # Construct the policy document using Fn.join and other intrinsic functions
     #     policy_document = {
@@ -474,11 +475,11 @@ class OpenSearchIngestionPipeline(Construct):
     #                             ],
     #                         ),
     #                         ',"Condition":{"StringEquals":{"aws:SourceAccount":"',
-    #                         self.account,
+    #                         self.account_id,
     #                         '"},"ArnLike":{"aws:SourceArn":"arn:aws:logs:',
     #                         self.region,
     #                         ":",
-    #                         self.account,
+    #                         self.account_id,
     #                         ':*"}}}]}',
     #                     ],
     #                 ),
