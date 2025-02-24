@@ -47,7 +47,11 @@ class S3Bucket(Construct):
             self.kms_key = kms.Key(
                 self,
                 "BucketEncryptionKey",
-                removal_policy=RemovalPolicy.DESTROY,
+                removal_policy=(
+                    RemovalPolicy.DESTROY
+                    if props.destroy_on_delete and config.environment != "prod"
+                    else RemovalPolicy.RETAIN
+                ),
                 enable_key_rotation=True,
             )
 
