@@ -7,6 +7,7 @@ import random
 import boto3
 import traceback
 from datetime import datetime
+from typing import List, Any
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
@@ -36,6 +37,7 @@ pipes = boto3.client("pipes")
 class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
+    objectPrefix: str | None = None
 
 
 class S3Connector(BaseModel):
@@ -95,7 +97,7 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 def setup_eventbridge_notifications(
-    s3_bucket: str, bucket_region: str, created_resources: list
+    s3_bucket: str, bucket_region: str, created_resources: list, object_prefix: str
 ) -> tuple[str, str]:
     """Set up EventBridge notifications and return queue URL and ARN"""
 
@@ -172,6 +174,16 @@ def setup_eventbridge_notifications(
             "object": {"key": [{"anything-but": ""}]},
         },
     }
+    
+    # Add prefix filter if object_prefix is provided
+    if object_prefix:
+        # Ensure prefix ends with '/'
+        prefix = object_prefix if object_prefix.endswith('/') else f"{object_prefix}/"
+        event_pattern["detail"]["object"]["key"] = [
+            {
+                "prefix": prefix
+            }
+        ]
 
     eventbridge.put_rule(
         Name=rule_name,
@@ -377,6 +389,76 @@ def check_existing_s3_notifications(s3_client, bucket_name):
     except s3_client.exceptions.ClientError as e:
         logger.error(f"Error checking S3 notifications: {str(e)}")
         return False
+    
+def update_bucket_notifications(s3: Any, s3_bucket: str, connector_id: str, queue_arn: str, object_prefix: str) -> List[str]:
+    errors: List[str] = []
+    try:
+        # Get existing configuration
+        current_config = s3.get_bucket_notification_configuration(Bucket=s3_bucket)
+        
+        # Create new configuration starting with existing config
+        new_config = current_config.copy()
+        
+        # Remove ResponseMetadata from the configuration
+        new_config = {
+            k: v for k, v in current_config.items() 
+            if k != 'ResponseMetadata'
+        }
+        
+        # Prepare new queue configuration
+        new_queue_config = {
+            "Id": f"{os.environ.get('RESOURCE_PREFIX')}_notifications_{connector_id}",
+            "QueueArn": queue_arn,
+            "Events": [
+                "s3:ObjectCreated:*",
+                "s3:ObjectRemoved:*",
+                "s3:ObjectRestore:*",
+                "s3:ObjectTagging:*",
+                "s3:ObjectAcl:Put",
+            ]
+        }
+
+        # Add filter if object_prefix is provided
+        if object_prefix:
+            new_queue_config["Filter"] = {
+                "Key": {
+                    "FilterRules": [
+                        {
+                            "Name": "prefix",
+                            "Value": object_prefix if object_prefix.endswith('/') else f"{object_prefix}/"
+                        }
+                    ]
+                }
+            }
+            
+        # Update QueueConfigurations
+        new_config['QueueConfigurations'] = [
+            config for config in new_config.get('QueueConfigurations', [])
+            if config.get('Id') != new_queue_config['Id']
+        ]
+        new_config['QueueConfigurations'].append(new_queue_config)
+
+
+        # Apply the updated configuration
+        s3.put_bucket_notification_configuration(
+            Bucket=s3_bucket,
+            NotificationConfiguration=new_config
+        )
+        
+        logger.info(f"Updated bucket notifications for bucket: {s3_bucket}")
+        return []
+        
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "NoSuchBucket":
+            error_msg = f"Error updating S3 bucket notifications: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"Unexpected error updating bucket notifications: {str(e)}"
+        logger.error(error_msg)
+        errors.append(error_msg)
+    
+    return errors
 
 
 def create_eventbridge_pipe(
@@ -514,16 +596,17 @@ def create_connector(createconnector: S3Connector) -> dict:
         connector_name = createconnector.name
         connector_description = createconnector.description
         integration_method = createconnector.configuration.s3IntegrationMethod
+        object_prefix = createconnector.configuration.objectPrefix
 
-        # Check for existing S3 notifications if using EventBridge
-        if integration_method == "eventbridge" and check_existing_s3_notifications(
-            s3_client, s3_bucket
-        ):
-            return {
-                "status": "400",
-                "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
-                "data": {},
-            }
+        # # Check for existing S3 notifications if using EventBridge
+        # if integration_method == "eventbridge" and check_existing_s3_notifications(
+        #     s3_client, s3_bucket
+        # ):
+        #     return {
+        #         "status": "400",
+        #         "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
+        #         "data": {},
+        #     }
 
         suffix = generate_suffix()
 
@@ -567,7 +650,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         queue_arn = None
         if integration_method == "eventbridge":
             queue_url, queue_arn = setup_eventbridge_notifications(
-                s3_bucket, bucket_region, created_resources
+                s3_bucket, bucket_region, created_resources, object_prefix
             )
         elif integration_method in ["s3Notifications", "s3-event-notifications"]:
             # Set up S3 event notifications
@@ -605,25 +688,21 @@ def create_connector(createconnector: S3Connector) -> dict:
             )
             created_resources.append(("queue_policy", queue_url))
 
-            # Configure S3 bucket notifications with comprehensive event types
-            notification_config = {
-                "QueueConfigurations": [
-                    {
-                        "QueueArn": queue_arn,
-                        "Events": [
-                            "s3:ObjectCreated:*",
-                            "s3:ObjectRemoved:*",
-                            "s3:ObjectRestore:*",
-                            "s3:ObjectTagging:*",
-                            "s3:ObjectAcl:Put",
-                            # "s3:ObjectStorageClass:Changed",
-                        ],
-                    }
-                ]
-            }
-            s3.put_bucket_notification_configuration(
-                Bucket=s3_bucket, NotificationConfiguration=notification_config
+            errors = update_bucket_notifications(
+                s3=s3_client,
+                s3_bucket=s3_bucket,
+                connector_id=connector_id,
+                queue_arn=queue_arn,
+                object_prefix=object_prefix
             )
+            if not errors:
+                created_resources.append(("bucket_notification", s3_bucket))
+            else:
+                logger.info(f"Encountered errors: {errors}")
+                raise Exception(
+                    f"Error: Failed to set up notifications for bucket {s3_bucket}: {errors}"
+                )
+
             created_resources.append(("bucket_notification", s3_bucket))
         else:
             raise ValueError(f"Invalid integration method: {integration_method}")
@@ -888,6 +967,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
+            "objectPrefix" : object_prefix
         }
 
         table.put_item(Item=connector_item)

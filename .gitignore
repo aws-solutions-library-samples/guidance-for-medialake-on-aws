@@ -97,6 +97,7 @@ jspm_packages/
 .env.development.local
 .env.test.local
 .env.production.local
+.envrc
 
 # Coverage directory used by tools like istanbul
 coverage/

@@ -4,6 +4,7 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetResults from '@/components/shared/AssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
+import { RecentlyViewedProvider } from '@/contexts/RecentlyViewedContext';
 
 interface VideoResultsProps {
     videos: VideoItem[];
@@ -14,6 +15,15 @@ interface VideoResultsProps {
     };
     onPageChange: (page: number) => void;
     searchTerm: string;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
 
 const defaultCardFields: CardFieldConfig[] = [
@@ -29,30 +39,32 @@ const defaultColumns: AssetTableColumn<VideoItem>[] = [
         label: 'Object Name',
         visible: true,
         minWidth: 300,
-        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        accessorFn: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'format',
         label: 'Format',
         visible: true,
         minWidth: 100,
-        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.Format,
+        accessorFn: (video) => video.DigitalSourceAsset.MainRepresentation.Format,
+        cell: info => info.getValue() as string,
     },
     {
         id: 'createDate',
         label: 'Created',
         visible: true,
         minWidth: 160,
-        accessor: (video) => video.DigitalSourceAsset.CreateDate,
-        format: (value: string) => formatDate(value),
+        accessorFn: (video) => video.DigitalSourceAsset.CreateDate,
+        cell: info => formatDate(info.getValue() as string),
     },
     {
         id: 'fileSize',
         label: 'Size',
         visible: false,
         minWidth: 100,
-        accessor: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-        format: (value: number) => formatFileSize(value),
+        accessorFn: (video) => video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+        cell: info => formatFileSize(info.getValue() as number),
     },
 ];
 
@@ -84,23 +96,48 @@ const actions = [
     { id: 'share', label: 'Share' },
 ];
 
-const VideoResults: React.FC<VideoResultsProps> = ({ videos, searchMetadata, onPageChange, searchTerm }) => {
+const VideoResults: React.FC<VideoResultsProps> = ({
+    videos,
+    searchMetadata,
+    onPageChange,
+    searchTerm,
+    cardSize,
+    onCardSizeChange,
+    aspectRatio,
+    onAspectRatioChange,
+    thumbnailScale,
+    onThumbnailScaleChange,
+    showMetadata,
+    onShowMetadataChange,
+    onPageSizeChange,
+}) => {
     return (
-        <AssetResults
-            assets={videos}
-            searchMetadata={searchMetadata}
-            onPageChange={onPageChange}
-            config={{
-                assetType: 'Video',
-                defaultCardFields,
-                defaultColumns,
-                sortOptions,
-                renderCardField,
-                placeholderImage: 'https://placehold.co/300x200?text=Video',
-            }}
-            searchTerm={searchTerm}
-            actions={actions}
-        />
+        <RecentlyViewedProvider>
+            <AssetResults
+                assets={videos}
+                searchMetadata={searchMetadata}
+                onPageChange={onPageChange}
+                config={{
+                    assetType: 'Video',
+                    defaultCardFields,
+                    defaultColumns,
+                    sortOptions,
+                    renderCardField,
+                    placeholderImage: 'https://placehold.co/300x200?text=Video'
+                }}
+                searchTerm={searchTerm}
+                actions={actions}
+                cardSize={cardSize}
+                onCardSizeChange={onCardSizeChange}
+                aspectRatio={aspectRatio}
+                onAspectRatioChange={onAspectRatioChange}
+                thumbnailScale={thumbnailScale}
+                onThumbnailScaleChange={onThumbnailScaleChange}
+                showMetadata={showMetadata}
+                onShowMetadataChange={onShowMetadataChange}
+                onPageSizeChange={onPageSizeChange}
+            />
+        </RecentlyViewedProvider>
     );
 };
 

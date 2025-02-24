@@ -142,8 +142,22 @@ const ImageDetailContent: React.FC = () => {
         { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
     ]);
 
-    const searchParams = new URLSearchParams(location.search);
-    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
+    // Get all the search state from location.state
+    const {
+        searchTerm = '',
+        page = 1,
+        viewMode = 'card',
+        cardSize = 'medium',
+        aspectRatio = 'square',
+        thumbnailScale = 'fit',
+        showMetadata = true,
+        groupByType = false,
+        filters = {},
+        sorting = [],
+        isSemantic = false,
+        currentResult = 1,
+        totalResults = 0
+    } = location.state || {};
 
     const handleCommentClick = useCallback((event: React.MouseEvent<HTMLElement>, index: number) => {
         setCommentAnchorEl(commentAnchorEl && selectedComment === index ? null : event.currentTarget);
@@ -245,6 +259,59 @@ const ImageDetailContent: React.FC = () => {
         }, [assetData, searchTerm])
     );
 
+    const handleBack = useCallback(() => {
+        // Construct query parameters
+        const queryParams = new URLSearchParams();
+        if (searchTerm) {
+            queryParams.set('q', searchTerm);
+        }
+        if (page > 1) {
+            queryParams.set('page', page.toString());
+        }
+        if (isSemantic) {
+            queryParams.set('semantic', 'true');
+        }
+
+        // Navigate back to search with all state preserved
+        const previousPath = location.pathname;
+        navigate({
+            pathname: previousPath,
+            search: queryParams.toString(),
+            state: {
+                preserveSearch: true,
+                searchTerm,
+                page,
+                viewMode,
+                cardSize,
+                aspectRatio,
+                thumbnailScale,
+                showMetadata,
+                groupByType,
+                filters,
+                sorting,
+                isSemantic,
+                currentResult,
+                totalResults
+            }
+        } as any); // Type assertion needed due to React Router types
+    }, [
+        navigate,
+        searchTerm,
+        page,
+        viewMode,
+        cardSize,
+        aspectRatio,
+        thumbnailScale,
+        showMetadata,
+        groupByType,
+        filters,
+        sorting,
+        isSemantic,
+        currentResult,
+        totalResults,
+        location.pathname
+    ]);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -286,11 +353,9 @@ const ImageDetailContent: React.FC = () => {
                 <Box sx={{ px: 3, py: 2 }}>
                     <BreadcrumbNavigation
                         searchTerm={searchTerm}
-                        currentResult={48}
-                        totalResults={156}
-                        onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
-                        onPrevious={() => navigate(-1)}
-                        onNext={() => navigate(1)}
+                        currentResult={currentResult}
+                        totalResults={totalResults}
+                        onBack={handleBack}
                         assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                         assetId={assetData.data.asset.InventoryID}
                         assetType="Image"

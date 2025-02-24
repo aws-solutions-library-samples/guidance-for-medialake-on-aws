@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Grid, Paper } from '@mui/material';
+import React, { useState, useMemo } from 'react';
+import { Box, Grid, Paper, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
@@ -12,12 +12,14 @@ import AssetPagination from './AssetPagination';
 import AssetActionsMenu from './AssetActionsMenu';
 import { useAssetResults } from '@/hooks/useAssetResults';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
+import { sortAssets } from '@/utils/sortAssets';
+import { type AssetViewControlsProps } from '@/types/shared/assetComponents';
 
 export interface AssetResultsConfig<T extends AssetBase> {
     assetType: string;
     defaultCardFields: CardFieldConfig[];
     defaultColumns: AssetTableColumn<T>[];
-    sortOptions: Array<{ id: string; label: string }>;
+    sortOptions: { id: string; label: string; }[];
     renderCardField: (fieldId: string, asset: T) => string;
     placeholderImage?: string;
 }
@@ -36,7 +38,18 @@ interface AssetResultsProps<T extends AssetBase> {
         id: string;
         label: string;
     }>;
+    cardSize: 'small' | 'medium' | 'large';
+    onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+    aspectRatio: 'vertical' | 'square' | 'horizontal';
+    onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+    thumbnailScale: 'fit' | 'fill';
+    onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    showMetadata: boolean;
+    onShowMetadataChange: (show: boolean) => void;
+    onPageSizeChange: (newPageSize: number) => void;
 }
+
+type AssetWithHeader<T> = T | { isHeader: true; type: string };
 
 function AssetResults<T extends AssetBase>({
     assets,
@@ -45,10 +58,20 @@ function AssetResults<T extends AssetBase>({
     config,
     searchTerm,
     actions,
+    cardSize = 'medium',
+    onCardSizeChange,
+    aspectRatio = 'square',
+    onAspectRatioChange,
+    thumbnailScale = 'fill',
+    onThumbnailScaleChange,
+    showMetadata = true,
+    onShowMetadataChange,
+    onPageSizeChange,
 }: AssetResultsProps<T>) {
     const navigate = useNavigate();
     const [currentAsset, setCurrentAsset] = useState<T | null>(null);
     const [columnFilters, setColumnFilters] = useState<Array<{ columnId: string; value: string }>>([]);
+    const [groupByType, setGroupByType] = useState(true);
 
     const {
         assetType,
@@ -59,6 +82,7 @@ function AssetResults<T extends AssetBase>({
         placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     } = config;
 
+    // Initialize asset results state and handlers
     const {
         viewMode,
         sorting,
@@ -73,13 +97,60 @@ function AssetResults<T extends AssetBase>({
         handleCardFieldToggle,
         handleColumnToggle,
         handleAssetError,
-    } = useAssetResults({
+    } = useAssetResults<T>({
         assets,
         searchMetadata,
         onPageChange,
         defaultCardFields,
-        defaultColumns,
+        defaultColumns
     });
+
+    // Group and sort assets
+    const displayedAssets = useMemo(() => {
+        let result = [...assets];
+
+        // Apply sorting first
+        result = sortAssets(result, sorting);
+        
+        // Apply grouping if enabled
+        if (groupByType) {
+            // Group by format
+            const groups = result.reduce((acc, asset) => {
+                const format = asset.DigitalSourceAsset.MainRepresentation.Format.toLowerCase();
+                if (!acc[format]) {
+                    acc[format] = [];
+                }
+                acc[format].push(asset);
+                return acc;
+            }, {} as Record<string, T[]>);
+
+            // Convert groups back to array, maintaining format-based ordering
+            result = Object.entries(groups)
+                .sort(([formatA], [formatB]) => formatA.localeCompare(formatB))
+                .flatMap(([_, assets]) => assets);
+        }
+        
+        return result;
+    }, [assets, groupByType, sorting]);
+
+    // Add section headers for grouped view
+    const assetsWithHeaders = useMemo(() => {
+        if (!groupByType) return displayedAssets;
+
+        const result: AssetWithHeader<T>[] = [];
+        let currentFormat = '';
+
+        displayedAssets.forEach(asset => {
+            const format = asset.DigitalSourceAsset.MainRepresentation.Format.toLowerCase();
+            if (format !== currentFormat) {
+                result.push({ isHeader: true, type: format });
+                currentFormat = format;
+            }
+            result.push(asset);
+        });
+
+        return result;
+    }, [displayedAssets, groupByType]);
 
     const {
         selectedAsset,
@@ -108,8 +179,8 @@ function AssetResults<T extends AssetBase>({
     };
 
     const handleAssetClick = (asset: T) => {
-        setCurrentAsset(asset);
-        navigate(`/${assetType.toLowerCase()}s/${asset.InventoryID}?searchTerm=${encodeURIComponent(searchTerm)}`);
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}${searchTerm ? `?searchTerm=${encodeURIComponent(searchTerm)}` : ''}`);
     };
 
     const handleFilterClick = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
@@ -122,6 +193,29 @@ function AssetResults<T extends AssetBase>({
     const handleRemoveFilter = (columnId: string) => {
         setColumnFilters(prev => prev.filter(f => f.columnId !== columnId));
     };
+
+    const renderAsset = (asset: T) => (
+        <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
+            <AssetCard
+                id={asset.InventoryID}
+                name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                thumbnailUrl={asset.thumbnailUrl}
+                proxyUrl={asset.proxyUrl}
+                assetType={assetType}
+                fields={cardFields}
+                renderField={(fieldId) => renderCardField(fieldId, asset)}
+                onAssetClick={() => handleAssetClick(asset)}
+                onDeleteClick={(e) => handleDeleteClick(asset, e)}
+                onMenuClick={(e) => handleMenuOpen(asset, e)}
+                onEditClick={(e) => handleStartEditing(asset, e)}
+                onImageError={handleAssetError}
+                isEditing={editingAssetId === asset.InventoryID}
+                editedName={editedName}
+                onEditNameChange={handleNameChange}
+                onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
+            />
+        </Grid>
+    );
 
     return (
         <Paper
@@ -140,52 +234,76 @@ function AssetResults<T extends AssetBase>({
                     sorting={sorting}
                     sortOptions={sortOptions}
                     onSortChange={handleRequestSort}
-                    fields={viewMode === 'card' ? cardFields : columns}
+                    fields={viewMode === 'card' 
+                        ? cardFields 
+                        : columns.map(col => ({
+                            id: col.id,
+                            label: col.label,
+                            visible: col.visible
+                        }))}
                     onFieldToggle={viewMode === 'card' ? handleCardFieldToggle : handleColumnToggle}
+                    groupByType={groupByType}
+                    onGroupByTypeChange={setGroupByType}
+                    cardSize={cardSize}
+                    onCardSizeChange={onCardSizeChange}
+                    aspectRatio={aspectRatio}
+                    onAspectRatioChange={onAspectRatioChange}
+                    thumbnailScale={thumbnailScale}
+                    onThumbnailScaleChange={onThumbnailScaleChange}
+                    showMetadata={showMetadata}
+                    onShowMetadataChange={onShowMetadataChange}
                 />
 
                 {viewMode === 'card' ? (
-                    <Grid container spacing={3}>
-                        {assets.map((asset) => (
-                            <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
-                                <AssetCard
-                                    id={asset.InventoryID}
-                                    name={asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                                    thumbnailUrl={asset.thumbnailUrl}
-                                    proxyUrl={asset.proxyUrl}
-                                    assetType={assetType}
-                                    fields={cardFields}
-                                    renderField={(fieldId) => renderCardField(fieldId, asset)}
-                                    onAssetClick={() => handleAssetClick(asset)}
-                                    onDeleteClick={(e) => handleDeleteClick(asset, e)}
-                                    onMenuClick={(e) => handleMenuOpen(asset, e)}
-                                    onEditClick={(e) => handleStartEditing(asset, e)}
-                                    onImageError={handleAssetError}
-                                    isEditing={editingAssetId === asset.InventoryID}
-                                    editedName={editedName}
-                                    onEditNameChange={handleNameChange}
-                                    onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
-                                />
+                    <Box>
+                        {groupByType ? (
+                            assetsWithHeaders.map((item, index) => {
+                                if ('isHeader' in item) {
+                                    return (
+                                        <Box
+                                            key={`header-${item.type}`}
+                                            sx={{
+                                                mt: index > 0 ? 4 : 0,
+                                                mb: 2,
+                                                px: 1,
+                                                typography: 'h6',
+                                                color: 'text.secondary',
+                                                textTransform: 'capitalize'
+                                            }}
+                                        >
+                                            {item.type}
+                                        </Box>
+                                    );
+                                }
+                                return (
+                                    <Grid container spacing={3} key={item.InventoryID}>
+                                        {renderAsset(item)}
+                                    </Grid>
+                                );
+                            })
+                        ) : (
+                            <Grid container spacing={3}>
+                                {displayedAssets.map(asset => renderAsset(asset))}
                             </Grid>
-                        ))}
-                    </Grid>
+                        )}
+                    </Box>
                 ) : (
                     <AssetTable
-                        data={assets}
+                        data={displayedAssets}
                         columns={columns}
                         sorting={sorting}
                         onSortingChange={setSorting}
                         onDeleteClick={handleDeleteClick}
                         onMenuClick={handleMenuOpen}
                         onEditClick={handleStartEditing}
-                        onRowClick={handleAssetClick}
+                        onAssetClick={handleAssetClick}
                         getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
                         getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                         getId={(asset) => asset.InventoryID}
                         editingId={editingAssetId}
                         editedName={editedName}
                         onEditNameChange={handleNameChange}
-                        onEditNameComplete={handleNameEditComplete}
+                        onEditNameComplete={(asset) => handleNameEditComplete(asset, true)}
                         onFilterClick={handleFilterClick}
                         activeFilters={columnFilters}
                         onRemoveFilter={handleRemoveFilter}
@@ -197,6 +315,7 @@ function AssetResults<T extends AssetBase>({
                     pageSize={searchMetadata.pageSize}
                     totalResults={searchMetadata.totalResults}
                     onPageChange={handlePageChange}
+                    onPageSizeChange={onPageSizeChange}
                 />
 
                 <AssetActionsMenu

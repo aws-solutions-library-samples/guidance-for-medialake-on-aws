@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, IconButton, Menu, MenuItem, Divider } from '@mui/material';
 import { ChevronLeft, ChevronRight, History, Trash2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useRecentlyViewed } from '../../contexts/RecentlyViewedContext';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -10,8 +10,8 @@ interface BreadcrumbNavigationProps {
     currentResult: number;
     totalResults: number;
     onBack: () => void;
-    onPrevious: () => void;
-    onNext: () => void;
+    onPrevious?: () => void;
+    onNext?: () => void;
     assetName?: string;
     assetId?: string;
     assetType?: string;
@@ -30,8 +30,9 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
-    const navigate = useNavigate();
     const { items, clearAll } = useRecentlyViewed();
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const handleHistoryClick = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -41,116 +42,69 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
         setAnchorEl(null);
     };
 
+    const handleBackClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onBack();
+    };
+
     // Only show breadcrumb navigation on detail pages
     if (!assetName || !assetId || !assetType) {
         return null;
     }
 
     return (
-        <Box
-            sx={{
-                position: 'sticky',
-                top: 64, // Below main header
-                zIndex: 1100,
-                bgcolor: 'background.paper',
-                borderBottom: 1,
-                borderColor: 'divider',
-                px: 3,
-                py: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-            }}
-        >
+        <Box sx={{
+            position: 'sticky',
+            top: 64,
+            zIndex: 1100,
+            bgcolor: 'background.paper',
+            borderBottom: 1,
+            borderColor: 'divider',
+            px: 3,
+            py: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        }}>
             {/* Left Section */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Link
-                    to={`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`}
-                    style={{
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: 'primary.main',
-                        fontSize: '0.875rem', // text-sm
-                    }}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        onBack();
-                    }}
-                >
-                    <ChevronLeft size={16} />
-                    <Typography
-                        sx={{
-                            fontSize: 'inherit',
+                <IconButton onClick={handleBackClick} size="small">
+                    <ChevronLeft />
+                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box 
+                        onClick={handleBackClick}
+                        sx={{ 
+                            cursor: 'pointer',
                             '&:hover': { textDecoration: 'underline' }
                         }}
                     >
-                        Back to search
+                        <Typography 
+                            variant="body2" 
+                            sx={{ color: 'text.secondary' }}
+                        >
+                            Search{searchTerm ? `: "${searchTerm}"` : ''}
+                        </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mx: 1 }}>
+                        /
                     </Typography>
-                </Link>
-
-                <Typography
-                    sx={{
-                        fontSize: '0.875rem',
-                        color: 'text.secondary',
-                        display: 'flex',
-                        alignItems: 'center',
-                        '&::before': {
-                            content: '"/"',
-                            mx: 1,
-                            color: 'text.disabled'
-                        }
-                    }}
-                >
-                    Search: "{searchTerm}"
-                </Typography>
-
-                <Typography
-                    component={Link}
-                    to={`/${assetType.toLowerCase()}s/${assetId}?searchTerm=${encodeURIComponent(searchTerm)}`}
-                    sx={{
-                        fontSize: '0.875rem',
-                        color: 'primary.main',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        '&:hover': { textDecoration: 'underline' },
-                        '&::before': {
-                            content: '"/"',
-                            mx: 1,
-                            color: 'text.disabled'
-                        }
-                    }}
-                >
-                    {assetName}
-                </Typography>
+                    <Typography variant="body2">
+                        {assetName}
+                    </Typography>
+                </Box>
             </Box>
 
-            {/* Right Section */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton
-                    onClick={onPrevious}
-                    size="small"
-                    sx={{ color: 'primary.main' }}
-                >
-                    <ChevronLeft size={16} />
-                </IconButton>
-                <IconButton
-                    onClick={onNext}
-                    size="small"
-                    sx={{ color: 'primary.main' }}
-                >
-                    <ChevronRight size={16} />
-                </IconButton>
+            {/* Right Section - Only History */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <IconButton
                     onClick={handleHistoryClick}
                     size="small"
-                    sx={{ color: 'primary.main' }}
+                    aria-label="show history"
                 >
-                    <History size={16} />
+                    <History />
                 </IconButton>
-
                 <Menu
                     anchorEl={anchorEl}
                     open={open}

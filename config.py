@@ -12,6 +12,7 @@ from pydantic import (
     ValidationInfo,
 )
 import warnings
+import os
 
 
 def validate_opensearch_instance_type(instance_type: str) -> str:
@@ -398,3 +399,15 @@ config = CDKConfig.load_from_file()
 
 # Define constants based on config values
 WORKFLOW_PAYLOAD_TEMP_BUCKET = "mne-mscdemo-workflow-payload-temp-data"
+
+# CI/CD constants
+_ROOT = os.path.dirname(__file__)
+DIST_DIR = "dist"
+LAMBDA_DIR = "lambdas"
+LAYER_DIR = "lambdas/layers"
+DIST_PATH = os.path.join(_ROOT, DIST_DIR)
+LAMBDA_BASE_PATH = os.path.join(_ROOT, LAMBDA_DIR)
+LAYER_BASE_PATH = os.path.join(_ROOT, LAYER_DIR)
+LAMBDA_DIST_PATH = os.path.join(_ROOT, DIST_DIR, LAMBDA_DIR)
+LAYER_DIST_PATH = os.path.join(_ROOT, DIST_DIR, LAYER_DIR)
+FFPROBE_LAYER_DIST_PATH = os.path.join(LAYER_DIST_PATH, "ffmpeg")

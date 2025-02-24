@@ -1,0 +1,99 @@
+stages:
+  - deploy
+  - test
+
+default:
+  image: registry.gitlab.aws.dev/aws-mne-msc/media-lake-v2
+  tags:
+    - arch:amd64
+    - size:large
+
+# Variables
+variables:
+  PROJECT_ENV: $CI_COMMIT_REF_SLUG
+  AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
+  AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
+  # Default deployment environment
+  INITIAL_USER_EMAIL: $DEFAULT_INITIAL_USER_EMAIL
+  AWS_CREDS_TARGET_ROLE: $DEFAULT_AWS_IAM_ROLE
+  AWS_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+  CDK_DEPLOY_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+  CDK_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+  AWS_DEFAULT_REGION: $DEFAULT_AWS_REGION
+  CDK_DEPLOY_REGION: $DEFAULT_AWS_REGION
+  AWS_REGION: $DEFAULT_AWS_REGION
+  AMAZON_REGION: $DEFAULT_AWS_REGION
+
+workflow:
+  rules:
+    # TODO: find a way to make the following more dynamic
+    - if: $CI_COMMIT_REF_NAME == "dev4"
+      variables:
+        INITIAL_USER_EMAIL: $DEV4_INITIAL_USER_EMAIL
+        AWS_CREDS_TARGET_ROLE: $DEV4_AWS_IAM_ROLE
+        AWS_DEFAULT_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
+        CDK_DEPLOY_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
+        CDK_DEFAULT_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
+        AWS_DEFAULT_REGION: $DEV4_AWS_REGION
+        CDK_DEPLOY_REGION: $DEV4_AWS_REGION
+        AWS_REGION: $DEV4_AWS_REGION
+        AMAZON_REGION: $DEV4_AWS_REGION
+    - if: $CI_COMMIT_REF_NAME == "dev5"
+      variables:
+        INITIAL_USER_EMAIL: $DEV5_INITIAL_USER_EMAIL
+        AWS_CREDS_TARGET_ROLE: $DEV5_AWS_IAM_ROLE
+        AWS_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
+        CDK_DEPLOY_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
+        CDK_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
+        AWS_DEFAULT_REGION: $DEV5_AWS_REGION
+        CDK_DEPLOY_REGION: $DEV5_AWS_REGION
+        AWS_REGION: $DEV5_AWS_REGION
+        AMAZON_REGION: $DEV5_AWS_REGION
+    - if: $CI_COMMIT_REF_NAME == "demo"
+      variables:
+        INITIAL_USER_EMAIL: $DEMO_INITIAL_USER_EMAIL
+        AWS_CREDS_TARGET_ROLE: $DEMO_AWS_IAM_ROLE
+        AWS_DEFAULT_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
+        CDK_DEPLOY_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
+        CDK_DEFAULT_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
+        AWS_DEFAULT_REGION: $DEMO_AWS_REGION
+        CDK_DEPLOY_REGION: $DEMO_AWS_REGION
+        AWS_REGION: $DEMO_AWS_REGION
+        AMAZON_REGION: $DEMO_AWS_REGION
+    - when: never
+
+# Cache modules in between jobs
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+    - .cache/pip
+
+.echo_versions: &echo_versions
+  before_script:
+    - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
+    - npm --version
+    - node --version
+    - aws --version
+    - cdk --version
+    - jq --version
+
+job_deploy:
+  stage: deploy
+  <<: *echo_versions
+  script:
+    - echo "Deploying the project"
+    - mv .cicd/config.json-template config.json
+    - echo "$( jq --arg e "$PROJECT_ENV" '.environment = $e' config.json )" > config.json
+    - echo "$( jq --arg a "$CDK_DEPLOY_ACCOUNT" '.account_id = $a' config.json )" > config.json
+    - echo "$( jq --arg r "$AWS_REGION" '.primary_region = $r' config.json )" > config.json
+    - echo "$( jq --arg u "$INITIAL_USER_EMAIL" '.initial_user.email = $u' config.json )" > config.json
+    - cat config.json
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt
+    - npm install
+    - python3 .cicd/build_lambdas.py build
+    - bash .cicd/build_ffprobe.sh
+    - cdk bootstrap
+    - cdk deploy --all --require-approval never

@@ -18,6 +18,8 @@ import json, time
 import hashlib
 from pathlib import Path
 
+from medialake_constructs.shared_constructs.layer_base import LambdaLayer, LambdaLayerConfig
+
 
 @dataclass
 class OpenSearchServerlessProps:
@@ -136,16 +138,23 @@ class OpenSearchServerlessConstruct(Construct):
             },
         )
 
-        layer = PythonLayerVersion(
+        layer = LambdaLayer(
             self,
             "RequestsLayer",
-            entry="lambdas/back_end/create_oss_index",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
-            compatible_architectures=[
-                lambda_.Architecture.ARM_64,
-                lambda_.Architecture.X86_64,
-            ],
+            config=LambdaLayerConfig(
+                entry="lambdas/back_end/create_oss_index",
+            ),
         )
+        # layer = PythonLayerVersion(
+        #     self,
+        #     "RequestsLayer",
+        #     entry="lambdas/back_end/create_oss_index",
+        #     compatible_runtimes=[_lambda.Runtime.PYTHON_3_13],
+        #     compatible_architectures=[
+        #         lambda_.Architecture.ARM_64,
+        #         lambda_.Architecture.X86_64,
+        #     ],
+        # )
 
         create_index_lambda.add_layers(layer)
 

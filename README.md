@@ -1,6 +1,6 @@
 # MediaLake
 
-MediaLake is a serverless media processing platform built on AWS, designed to handle large-scale media ingestion, processing, and delivery workflows. It provides a flexible connector system for various storage sources and customizable processing pipelines.
+MediaLake is a serverless media processing platform built on AWS, designed to handle small to large-scale media ingestion, processing, management, and workflows. MediaLake provides a flexible connector system for various storage sources and customizable processing pipelines.
 
 ## 🚀 Features
 

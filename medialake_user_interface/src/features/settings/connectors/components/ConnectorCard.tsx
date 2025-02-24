@@ -28,6 +28,8 @@ import {
 import { ConnectorResponse } from '@/api/types/api.types';
 import ConnectorEditModal from '@/features/settings/connectors/components/ConnectorEditModal';
 import { useDateFormat } from '@/shared/hooks/useDateFormat';
+import { Warning as WarningIcon } from '@mui/icons-material';
+
 
 const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -241,13 +243,18 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             <strong>Description:</strong> {connector.description}
                         </Typography>
                     )}
-
+                    {connector.objectPrefix && (
+                        <Typography variant="body2" >
+                            <strong>Prefix:</strong> {connector.objectPrefix}
+                        </Typography>
+                    )}
+                    {connector.usage?.total !== undefined && (
+                        <Typography variant="body2" >
+                            <strong>Integration Method:</strong> {connector.integrationMethod}
+                        </Typography>
+                    )}
                     <Box sx={{ mt: 2 }}>
-                        {connector.usage?.total !== undefined && (
-                            <Typography variant="body2" >
-                                <strong>Storage:</strong> {formatBytes(connector.usage.total)}
-                            </Typography>
-                        )}
+
                         <Typography 
                             variant="body2" 
                             onClick={canToggleSeconds ? toggleSeconds : undefined}
@@ -366,7 +373,25 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 <DialogContent>
                     <Typography sx={{ color: theme.palette.text.secondary }}>
                         Are you sure you want to delete the connector "{connector.name}"? This action cannot be undone.
+
                     </Typography>
+                    {connector.integrationMethod?.toLowerCase() === 'eventbridge' && (
+                        <Typography 
+                            sx={{ 
+                                mt: 2,
+                                color: theme.palette.warning.main,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                                borderRadius: 1,
+                                p: 1.5
+                            }}
+                        >
+                            <WarningIcon fontSize="small" />
+                            Please ensure you disable the EventBridge integration for this S3 bucket if it is no longer required.
+                        </Typography>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button
