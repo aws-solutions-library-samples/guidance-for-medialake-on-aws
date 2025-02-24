@@ -323,8 +323,6 @@ medialake/
 │   └── api_gateway.py         # API Gateway stack
 ├── lambdas/                  # Lambda functions
 │   ├── api/                  # API handlers
-│   │   ├── connectors/      # Storage connector handlers
-│   │   └── pipelines/       # Pipeline handlers
 │   └── pipelines/           # Pipeline processors
 ├── tests/                    # Test files
 ├── app.py                    # Main CDK app

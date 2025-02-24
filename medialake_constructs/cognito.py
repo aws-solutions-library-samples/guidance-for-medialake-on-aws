@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from constructs import Construct
 from typing import Optional
@@ -37,6 +38,10 @@ class CognitoConstruct(Construct):
         self, scope: Construct, construct_id: str, props: Optional[CognitoProps] = None
     ) -> None:
         super().__init__(scope, construct_id)
+
+        # Get the region from the stack
+        stack = Stack.of(self)
+        region = stack.region
 
         # Use provided props or create default props
         self.props = props or CognitoProps()
@@ -129,8 +134,13 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Create domain prefix using resource prefix, environment, and hash
-        domain_prefix = f"{config.resource_prefix.lower()}-{config.environment.lower()}-{config.primary_region.lower()}-{config.account_id}"
+        # Create a unique hash based on stack name and environment
+        import hashlib
+
+        # Using stack name ensures uniqueness across different deployments
+        unique_id = hashlib.md5(f"{stack.stack_name}-{config.environment}".encode()).hexdigest()[:8]
+        domain_prefix = f"medialake-{config.environment.lower()}-{unique_id}"
+        
         print(f"Domain prefix: {domain_prefix}")
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
@@ -205,8 +215,8 @@ class CognitoConstruct(Construct):
                             "https://d358w0v8eryzhn.cloudfront.net",  # CloudFront URL
                             "https://d358w0v8eryzhn.cloudfront.net/",  # With trailing slash
                             "https://d358w0v8eryzhn.cloudfront.net/sign-in",  # Sign-in page
-                            f"https://{domain_prefix.lower()}.auth.{config.primary_region}.amazoncognito.com/oauth2/idpresponse",  # OAuth callback
-                            f"https://{domain_prefix.lower()}.auth.{config.primary_region}.amazoncognito.com/saml2/idpresponse",  # SAML callback
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/oauth2/idpresponse",  # OAuth callback
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse",  # SAML callback
                         ],
                         logout_urls=[
                             "http://localhost:3000",  # For local development

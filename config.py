@@ -328,7 +328,7 @@ class CDKConfig(BaseModel):
     lambda_tail_warming: bool = False
     primary_region: str
     account_id: str
-    environment: str  # We'll only use this for DynamoDB decisions
+    environment: str  # Used for retain decisions 
     global_prefix: str
     resource_prefix: str
     resource_application_tag: str

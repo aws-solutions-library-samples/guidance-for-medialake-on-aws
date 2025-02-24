@@ -13,9 +13,9 @@ from config import config
 
 @dataclass
 class S3BucketProps:
-    bucket_name: str
     access_logs: bool = False
     destroy_on_delete: bool = True
+    bucket_name: Optional[str] = None
     access_logs_bucket: Optional[s3.Bucket] = None
     cors: Optional[List[s3.CorsRule]] = None
     website_index_document: Optional[str] = None
@@ -84,8 +84,8 @@ class S3Bucket(Construct):
                 bucket_props[bucket_prop_name] = props_dict[prop_name]
 
         # Add server access logs prefix if access_logs_bucket is provided
-        if props.access_logs_bucket:
-            bucket_props["server_access_logs_prefix"] = f"{props.bucket_name}/"
+        # if props.access_logs_bucket:
+        #     bucket_props["server_access_logs_prefix"] = f"{props.bucket_name}/"
 
         # If we have an existing bucket, import it instead of creating a new one
         if props.existing_bucket_arn:
