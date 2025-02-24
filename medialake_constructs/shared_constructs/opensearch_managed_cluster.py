@@ -21,7 +21,10 @@ from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from constructs import Construct
 
 from config import config
-from medialake_constructs.shared_constructs.layer_base import LambdaLayer, LambdaLayerConfig
+from medialake_constructs.shared_constructs.layer_base import (
+    LambdaLayer,
+    LambdaLayerConfig,
+)
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -282,25 +285,6 @@ class OpenSearchCluster(Construct):
             # For new domains, the endpoint is not available until deployment.
             collection_endpoint = f"https://{self.domain.attr_domain_endpoint}"
 
-        # Create Lambda function for index creation
-        create_index_lambda = Lambda(
-            self,
-            "IndexCreationFunction",
-            config=LambdaConfig(
-                entry="lambdas/back_end/create_oss_index",
-                lambda_handler="handler",
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=1,
-                environment_variables={
-                    "COLLECTION_ENDPOINT": collection_endpoint,
-                    "INDEX_NAMES": ",".join(props.collection_indexes),
-                    "REGION": self.region,
-                    "SCOPE": "es",
-                },
-            ),
-        )
-
         # Add IAM permissions for the Lambda function to interact with OpenSearch
         # Use the appropriate ARN attribute based on whether the domain is imported.
         domain_arn = (
@@ -312,6 +296,25 @@ class OpenSearchCluster(Construct):
         should_create_index = not config.opensearch_cluster_settings.domain_endpoint
 
         if should_create_index:
+            # Create Lambda function for index creation
+            create_index_lambda = Lambda(
+                self,
+                "IndexCreationFunction",
+                config=LambdaConfig(
+                    entry="lambdas/back_end/create_oss_index",
+                    lambda_handler="handler",
+                    vpc=props.vpc,
+                    security_groups=[props.security_group],
+                    timeout_minutes=1,
+                    environment_variables={
+                        "COLLECTION_ENDPOINT": collection_endpoint,
+                        "INDEX_NAMES": ",".join(props.collection_indexes),
+                        "REGION": self.region,
+                        "SCOPE": "es",
+                    },
+                ),
+            )
+
             create_index_lambda.function.add_to_role_policy(
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
@@ -325,25 +328,25 @@ class OpenSearchCluster(Construct):
                     resources=[f"{domain_arn}/*"],
                 )
             )
-        create_index_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ec2:CreateNetworkInterface",
-                    "ec2:DescribeNetworkInterfaces",
-                    "ec2:DeleteNetworkInterface"
-                ],
-                resources=["*"],
+            create_index_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "ec2:CreateNetworkInterface",
+                        "ec2:DescribeNetworkInterfaces",
+                        "ec2:DeleteNetworkInterface",
+                    ],
+                    resources=["*"],
+                )
             )
-        )
 
-        # Create a custom resource provider that triggers the Lambda for index creation
-        provider = cr.Provider(
-            self,
-            "IndexCreateResourceProvider",
-            on_event_handler=create_index_lambda.function,
-            log_retention=logs.RetentionDays.ONE_WEEK,
-        )
+            # Create a custom resource provider that triggers the Lambda for index creation
+            provider = cr.Provider(
+                self,
+                "IndexCreateResourceProvider",
+                on_event_handler=create_index_lambda.function,
+                log_retention=logs.RetentionDays.ONE_WEEK,
+            )
 
             lambda_code = Path("lambdas/back_end/create_oss_index/index.py").read_text(
                 encoding="utf-8"

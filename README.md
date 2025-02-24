@@ -175,6 +175,47 @@ touch config.json
 - vpc - VPC configuration settings
 - opensearch_cluster_settings - OpenSearch cluster configuration settings
 
+### Production Environment Behavior
+
+When `config.environment` is set to "prod" in config.json, it triggers several important retention behaviors:
+
+1. **DynamoDB Tables Retention**
+   - Asset tables (both v1 and v2) are retained with `RemovalPolicy.RETAIN` instead of being destroyed on stack deletion
+   - This includes all Global Secondary Indexes (GSIs) on these tables
+   - For Asset Table v1: Retains AssetIDIndex and FileHashIndex
+   - For Asset Table v2: Retains GSI1 through GSI6
+
+2. **S3 Buckets**
+   The following S3 buckets are retained in production mode:
+   - Access Logs Bucket (`{global_prefix}-access-logs-{account_id}-{region}-{environment}`)
+   - Media Assets Bucket (`{global_prefix}-asset-bucket-{account_id}-{region}-{environment}`)
+   
+   The following buckets are always set to destroy, regardless of environment:
+   - DynamoDB Export Bucket (`{global_prefix}-ddb-export-{account_id}-{region}-{environment}`)
+   - IAC Assets Bucket (`{global_prefix}-iac-assets-{account_id}-{region}-{environment}`)
+
+3. **Infrastructure Resources**
+   - Security Groups are retained when in prod mode
+   - VPC and associated networking components are preserved
+   - OpenSearch cluster and its configurations are preserved
+
+4. **KMS Keys**
+   - KMS keys used for S3 bucket encryption are retained in prod mode (specifically for Access Logs and Media Assets buckets)
+   - Key rotation remains enabled for these retained keys
+   - When importing existing buckets, their associated KMS keys are also preserved
+
+5. **CloudFormation Outputs**
+   In production mode, the system automatically creates CloudFormation outputs for all retained resources, including:
+   - VPC ID and CIDR
+   - Security Group IDs
+   - DynamoDB table names and ARNs (including GSIs)
+   - OpenSearch cluster endpoint and ARN
+   - S3 bucket names and ARNs (access logs, assets, IAC assets)
+
+6. **Existing Resources**
+   - When in prod mode, the system is configured to use existing tables (`should_use_existing_tables` property returns true)
+   - This allows for preserving data and maintaining continuity across deployments
+
 ### VPC Configuration
 
 The VPC configuration allows you to either use an existing VPC or create a new one. This is controlled by the `use_existing_vpc` flag in the `vpc` section of the configuration.
