@@ -1,9 +1,9 @@
 {
-    "environment": "prod",
-    "resource_prefix": "mldev3",
-    "account_id": "034362042487",
-    "global_prefix": "mldev3",
-    "resource_application_tag": "mldev3",
+    "environment": "dev",
+    "resource_prefix": "mldev",
+    "account_id": "273354633826",
+    "global_prefix": "mldev",
+    "resource_application_tag": "mldev",
     "api_path": "prod",
     "primary_region": "us-east-1",
     "initial_user": {

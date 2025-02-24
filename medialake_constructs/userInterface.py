@@ -131,6 +131,7 @@ class UIConstruct(Construct):
             "MediaLakeUserInterfaceBucket",
             props=S3BucketProps(
                 bucket_name=f"{config.global_prefix}-user-interface-{config.account_id}-{config.environment}",
+                destroy_on_delete=True,
                 website_index_document=props.website_index_document,
                 website_error_document=props.website_error_document,
             ),

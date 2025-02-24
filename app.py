@@ -19,6 +19,7 @@ from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStackProps,
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 app = cdk.App()
 
@@ -64,7 +65,7 @@ api_gateway_stack = ApiGatewayStack(
     "MediaLakeApiGatewayStack",
     props=ApiGatewayStackProps(
         iac_assets_bucket=base_infrastructure.iac_assets_bucket,
-        media_assets_bucket=base_infrastructure.media_assets_bucket,
+        media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
         pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
         asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
         asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,

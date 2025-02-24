@@ -63,17 +63,26 @@ class PipelinesExecutionsStack(Stack):
             targets=[targets.EventBus(self._pipelines_executions_event_bus.event_bus)],
         )
 
-        self._pipelnes_executions_table = DynamoDB(
-            self,
-            "PipelinesExecutionsTable",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}pipelines_executions_{config.environment}",
-                partition_key_name="execution_id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="start_time",
-                sort_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
+        if config.db.use_existing_tables:
+            self._pipelnes_executions_table = dynamodb.Table.from_table_arn(
+                self,
+                "ImportedPipelinesExecutionsTable",
+                config.db.pipelines_executions_arn,
+            )
+        else:
+
+            dynamodb_table = DynamoDB(
+                self,
+                "PipelinesExecutionsTable",
+                props=DynamoDBProps(
+                    name=f"{config.resource_prefix}pipelines_executions_{config.environment}",
+                    partition_key_name="execution_id",
+                    partition_key_type=dynamodb.AttributeType.STRING,
+                    sort_key_name="start_time",
+                    sort_key_type=dynamodb.AttributeType.STRING,
+                ),
+            )
+            self._pipelnes_executions_table = dynamodb_table.table
 
         self._pipeline_executions_event_processor = Lambda(
             self,
@@ -88,7 +97,7 @@ class PipelinesExecutionsStack(Stack):
             ),
         )
 
-        self._pipelnes_executions_table.table.grant_full_access(
+        self._pipelnes_executions_table.grant_full_access(
             self._pipeline_executions_event_processor.function
         )
 
@@ -125,7 +134,7 @@ class PipelinesExecutionsStack(Stack):
             ),
         )
 
-        self._pipelnes_executions_table.table.grant_full_access(
+        self._pipelnes_executions_table.grant_full_access(
             self._get_pipelines_executions_lambda.function
         )
 
@@ -143,7 +152,7 @@ class PipelinesExecutionsStack(Stack):
             ),
         )
 
-        self._pipelnes_executions_table.table.grant_full_access(
+        self._pipelnes_executions_table.grant_full_access(
             self._get_pipelines_executions_lambda.function
         )
         # POST /api/pipelines/executions/{executionId}/retry/
@@ -160,7 +169,7 @@ class PipelinesExecutionsStack(Stack):
             ),
         )
 
-        self._pipelnes_executions_table.table.grant_read_data(
+        self._pipelnes_executions_table.grant_read_data(
             self._post_retry_pipelines_executions_lambda.function
         )
 

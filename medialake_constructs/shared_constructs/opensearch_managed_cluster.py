@@ -128,11 +128,11 @@ class OpenSearchCluster(Construct):
             if config.environment == "prod":
                 os_security_group.apply_removal_policy(RemovalPolicy.RETAIN)
 
-            os_security_group.add_ingress_rule(
-                peer=props.security_group,
-                connection=ec2.Port.tcp(443),
-                description="Allow HTTPS access from trusted security group",
-            )
+        os_security_group.add_ingress_rule(
+            peer=props.security_group,
+            connection=ec2.Port.tcp(443),
+            description="Allow HTTPS access from trusted security group",
+        )
 
         # Create IAM Role for OpenSearch audit logging
         try:
@@ -386,11 +386,14 @@ class OpenSearchCluster(Construct):
 
     @property
     def domain_arn(self) -> str:
-        return (
-            self.domain.attr_arn
-            if hasattr(self.domain, "attr_arn")
-            else self.domain.domain_arn
-        )
+        if hasattr(self.domain, "attr_arn"):
+            return self.domain.attr_arn
+        else:
+            # Remove 'vpc-' prefix if it exists
+            domain_name = self.domain.domain_name
+            if domain_name.startswith("vpc-"):
+                domain_name = domain_name[4:]
+            return f"arn:aws:es:{self.region}:{self.account_id}:domain/{domain_name}"
 
     @property
     def opensearch_instance(self) -> opensearch.CfnDomain:

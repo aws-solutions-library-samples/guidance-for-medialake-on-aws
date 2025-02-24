@@ -8,6 +8,7 @@ from aws_cdk import (
 from constructs import Construct
 from typing import Optional, List
 from dataclasses import dataclass, asdict
+from config import config
 
 
 @dataclass
@@ -23,6 +24,8 @@ class S3BucketProps:
         List[s3.IntelligentTieringConfiguration]
     ] = None
     lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
+    existing_kms_key_arn: Optional[str] = None
+    existing_bucket_arn: Optional[str] = None
 
 
 class S3Bucket(Construct):
@@ -35,13 +38,18 @@ class S3Bucket(Construct):
     ):
         super().__init__(scope, id, **kwargs)
 
-        # Create KMS key for bucket encryption
-        self.kms_key = kms.Key(
-            self,
-            "BucketEncryptionKey",
-            removal_policy=RemovalPolicy.DESTROY,
-            enable_key_rotation=True,
-        )
+        # Handle KMS key for bucket encryption
+        if props.existing_kms_key_arn:
+            self.kms_key = kms.Key.from_key_arn(
+                self, "ImportedBucketEncryptionKey", key_arn=props.existing_kms_key_arn
+            )
+        else:
+            self.kms_key = kms.Key(
+                self,
+                "BucketEncryptionKey",
+                removal_policy=RemovalPolicy.DESTROY,
+                enable_key_rotation=True,
+            )
 
         bucket_props = {
             "encryption": s3.BucketEncryption.KMS,
@@ -51,11 +59,13 @@ class S3Bucket(Construct):
             "enforce_ssl": True,
             "removal_policy": (
                 RemovalPolicy.DESTROY
-                if props.destroy_on_delete
+                if props.destroy_on_delete and config.environment != "prod"
                 else RemovalPolicy.RETAIN
             ),
-            "auto_delete_objects": props.destroy_on_delete,
+            "auto_delete_objects": props.destroy_on_delete
+            and config.environment != "prod",
         }
+
         # Add optional properties from props if they exist
         props_dict = asdict(props)
         optional_props = {
@@ -73,8 +83,18 @@ class S3Bucket(Construct):
         if props.access_logs_bucket:
             bucket_props["server_access_logs_prefix"] = f"{props.bucket_name}/"
 
-        # Create S3 bucket with combined properties
-        self._bucket = s3.Bucket(self, "S3Bucket", **bucket_props)
+        # If we have an existing bucket, import it instead of creating a new one
+        if props.existing_bucket_arn:
+            self._bucket = s3.Bucket.from_bucket_attributes(
+                self,
+                "ImportedBucket",
+                bucket_name=props.bucket_name,
+                bucket_arn=props.existing_bucket_arn,
+                encryption_key=self.kms_key if props.existing_kms_key_arn else None,
+            )
+        else:
+            # Create new S3 bucket with combined properties
+            self._bucket = s3.Bucket(self, "S3Bucket", **bucket_props)
 
     @property
     def bucket(self) -> s3.IBucket:
@@ -96,3 +116,10 @@ class S3Bucket(Construct):
         Returns the underlying S3 bucket as an IBucket interface.
         """
         return self._bucket.bucket_name
+
+    @property
+    def key_arn(self) -> str:
+        """
+        Returns the ARN of the KMS key used for bucket encryption.
+        """
+        return self.kms_key.key_arn

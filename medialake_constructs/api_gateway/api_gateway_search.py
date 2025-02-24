@@ -14,6 +14,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 from config import config
 from typing import Optional
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
@@ -22,7 +23,7 @@ from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 @dataclass
 class SearchProps:
     asset_table: dynamodb.TableV2
-    media_assets_bucket: s3.Bucket
+    media_assets_bucket: S3Bucket
     api_resource: apigateway.IResource
     cognito_authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
@@ -111,9 +112,9 @@ class SearchConstruct(Construct):
                     "kms:GenerateDataKey",
                 ],
                 resources=[
-                    f"{props.media_assets_bucket.bucket_arn}/*",
-                    f"{props.media_assets_bucket.bucket_arn}",
-                    "arn:aws:kms:*:*:key/*",
+                    f"{props.media_assets_bucket.bucket.bucket_arn}/*",
+                    f"{props.media_assets_bucket.bucket.bucket_arn}",
+                    props.media_assets_bucket.kms_key.key_arn,
                 ],
             )
         )

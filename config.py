@@ -1,5 +1,5 @@
 import json
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union
 from datetime import datetime
 from aws_cdk import aws_logs as logs
 from pydantic import (
@@ -9,6 +9,7 @@ from pydantic import (
     model_validator,
     validator,
     root_validator,
+    ValidationInfo,
 )
 import warnings
 
@@ -249,6 +250,53 @@ class SecurityGroupsConfig(BaseModel):
         return self
 
 
+class ExistingS3Config(BaseModel):
+    bucket_name: str
+    bucket_arn: str
+    kms_key_arn: Optional[str] = None
+
+
+class S3Config(BaseModel):
+    use_existing_buckets: bool = False
+    asset_bucket: Optional[ExistingS3Config] = None
+    access_logs_bucket: Optional[ExistingS3Config] = None
+
+    @field_validator("asset_bucket", "access_logs_bucket")
+    @classmethod
+    def validate_bucket_config(
+        cls, v: Optional[ExistingS3Config], info: ValidationInfo
+    ) -> Optional[ExistingS3Config]:
+        if info.data.get("use_existing_buckets") and v is None:
+            raise ValueError(
+                f"{info.field_name} is required when use_existing_buckets is True"
+            )
+        return v
+
+
+class DatabaseConfig(BaseModel):
+    use_existing_tables: bool = False
+    pipelines_executions_arn: Optional[str] = None
+    asset_table_arn: Optional[str] = None
+    assetv2_table_arn: Optional[str] = None
+    pipeline_nodes_table_arn: Optional[str] = None
+
+    @field_validator(
+        "pipelines_executions_arn",
+        "asset_table_arn",
+        "assetv2_table_arn",
+        "pipeline_nodes_table_arn",
+    )
+    @classmethod
+    def validate_table_arns(
+        cls, v: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        if info.data.get("use_existing_tables") and v is None:
+            raise ValueError(
+                f"{info.field_name} is required when use_existing_tables is True"
+            )
+        return v
+
+
 class VpcConfig(BaseModel):
     use_existing_vpc: bool = False
     existing_vpc: Optional[ExistingVpcConfig] = None
@@ -290,6 +338,8 @@ class CDKConfig(BaseModel):
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
+    db: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    s3: S3Config = Field(default_factory=S3Config)
 
     @property
     def should_retain_tables(self) -> bool:

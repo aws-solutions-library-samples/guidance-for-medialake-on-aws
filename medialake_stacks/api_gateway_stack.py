@@ -70,6 +70,7 @@ from medialake_constructs.api_gateway.api_gateway_nodes import (
 )
 
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
 @dataclass
@@ -78,7 +79,7 @@ class ApiGatewayStackProps:
 
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
-    media_assets_bucket: s3.Bucket
+    media_assets_bucket: S3Bucket
     pipelines_nodes_templates_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str

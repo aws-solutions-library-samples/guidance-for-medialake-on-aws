@@ -418,6 +418,7 @@ class OpenSearchIngestionPipeline(Construct):
             self,
             "CreateIngestionPipeline",
             service_token=ingestion_provider.service_token,
+            removal_policy=RemovalPolicy.DESTROY,
             properties={
                 "PipelineName": f"{config.global_prefix}-asset-pipeline",
                 "TableArn": props.asset_table.table_arn,

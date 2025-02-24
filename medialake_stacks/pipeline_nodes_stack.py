@@ -47,15 +47,23 @@ class PipelineNodesStack(Stack):
 
         self.mediaconvert_role = self.create_mediaconvert_role()
 
-        self._pipeline_nodes_table = DynamoDB(
-            self,
-            "PipelineNodesTable",
-            props=DynamoDBProps(
-                name=f"{config.global_prefix}_pipeline_nodes_table",
-                partition_key_name="id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
+        if config.db.use_existing_tables:
+            self._pipeline_nodes_table = dynamodb.Table.from_table_arn(
+                self,
+                "ImportedPipelineNodesTable",
+                config.db.pipeline_nodes_table_arn,
+            )
+        else:
+            pipeline_nodes_table = DynamoDB(
+                self,
+                "PipelineNodesTable",
+                props=DynamoDBProps(
+                    name=f"{config.global_prefix}_pipeline_nodes_table",
+                    partition_key_name="id",
+                    partition_key_type=dynamodb.AttributeType.STRING,
+                ),
+            )
+            self._pipeline_nodes_table = pipeline_nodes_table.table
 
         proxy_queue = MediaConvert.create_queue(
             self,
@@ -700,7 +708,7 @@ class PipelineNodesStack(Stack):
         return self._check_mediaconvert_status.function_arn
 
     @property
-    def pipelne_nodes_table(self) -> dynamodb.TableV2:
+    def pipelne_nodes_table(self) -> dynamodb.ITable:
         return self._pipeline_nodes_table
 
     def get_functions(self) -> list[lambda_.Function]:
