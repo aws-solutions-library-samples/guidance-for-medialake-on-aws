@@ -15,10 +15,12 @@ from config import DIST_PATH
 DEFAULT_RUNTIMES = [lambda_.Runtime.PYTHON_3_12]
 DEFAULT_ARCHITECTURES = [lambda_.Architecture.X86_64, lambda_.Architecture.ARM_64]
 
+
 @dataclass
 class PowertoolsLayerConfig:
     architecture: str = lambda_.Architecture.X86_64
     layer_version: str = "68"
+
 
 @dataclass
 class LambdaLayerConfig:
@@ -34,8 +36,11 @@ class LambdaLayerConfig:
 
     entry: Optional[str] = None
     compatible_runtimes: list = field(default_factory=lambda: DEFAULT_RUNTIMES)
-    compatible_architectures: list = field(default_factory=lambda: DEFAULT_ARCHITECTURES)
-    description: (Optional[str]) = None
+    compatible_architectures: list = field(
+        default_factory=lambda: DEFAULT_ARCHITECTURES
+    )
+    description: Optional[str] = None
+
 
 class LambdaLayer(Construct):
     """
@@ -93,7 +98,7 @@ class LambdaLayer(Construct):
                 "StandardPythonLayer",
                 **common_layer_props,
             )
-    
+
     @property
     def layer(self) -> lambda_.ILayerVersion:
         """
@@ -103,7 +108,7 @@ class LambdaLayer(Construct):
             lambda_.ILayerVersion: The created Lambda layer instance
         """
         return self._layer
-    
+
     @property
     def layer_version_arn(self) -> str:
         return self._layer.layer_version_arn
