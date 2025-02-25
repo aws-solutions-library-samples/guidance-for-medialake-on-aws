@@ -42,7 +42,6 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
 
     return instance_type
 
-
 class LoggingConfig(BaseModel):
     retention_days: int = 90
     s3_retention_days: int = 90
