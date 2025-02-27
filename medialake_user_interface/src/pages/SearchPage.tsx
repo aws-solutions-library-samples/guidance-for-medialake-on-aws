@@ -22,6 +22,7 @@ import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
+import { SearchError } from '@/api/hooks/useSearch';
 
 type AssetItem = ImageItem | VideoItem | AudioItem;
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
@@ -71,7 +72,8 @@ const SearchPage: React.FC = () => {
     const {
         data: searchResults,
         isLoading,
-        isFetching
+        isFetching,
+        error
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: pageSize,
@@ -423,7 +425,7 @@ const SearchPage: React.FC = () => {
                             </Box>
                         )}
 
-                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error && (
                             <UnifiedResultsView
                                 results={filteredResults}
                                 searchMetadata={{
@@ -450,7 +452,7 @@ const SearchPage: React.FC = () => {
                                 onSortChange={setSorting}
                                 cardFields={cardFields}
                                 onCardFieldToggle={handleCardFieldToggle}
-                                columns={columns as AssetTableColumn<AssetItem>[]}
+                                columns={columns}
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
                                 onDeleteClick={handleDeleteClick}
@@ -460,6 +462,51 @@ const SearchPage: React.FC = () => {
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
+                            />
+                        )}
+
+                        {error && (
+                            <UnifiedResultsView
+                                results={[]}
+                                searchMetadata={{
+                                    totalResults: 0,
+                                    page: currentPage,
+                                    pageSize: pageSize,
+                                }}
+                                onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                onPageSizeChange={handlePageSizeChange}
+                                searchTerm={currentQuery}
+                                groupByType={groupByType}
+                                onGroupByTypeChange={setGroupByType}
+                                viewMode={viewMode}
+                                onViewModeChange={handleViewModeChange}
+                                cardSize={cardSize}
+                                onCardSizeChange={setCardSize}
+                                aspectRatio={aspectRatio}
+                                onAspectRatioChange={setAspectRatio}
+                                thumbnailScale={thumbnailScale}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                showMetadata={showMetadata}
+                                onShowMetadataChange={setShowMetadata}
+                                sorting={sorting}
+                                onSortChange={setSorting}
+                                cardFields={cardFields}
+                                onCardFieldToggle={handleCardFieldToggle}
+                                columns={columns}
+                                onColumnToggle={handleColumnToggle}
+                                onAssetClick={handleAssetClick}
+                                onDeleteClick={handleDeleteClick}
+                                onMenuClick={handleMenuOpen}
+                                onEditClick={handleStartEditing}
+                                onEditNameChange={handleNameChange}
+                                onEditNameComplete={handleNameEditComplete}
+                                editingAssetId={editingAssetId}
+                                editedName={editedName}
+                                error={{
+                                    status: (error as SearchError).apiResponse?.status || error.name,
+                                    message: (error as SearchError).apiResponse?.message || error.message
+                                }}
+                                isLoading={isLoading || isFetching}
                             />
                         )}
                     </Box>

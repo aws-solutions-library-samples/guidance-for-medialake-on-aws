@@ -45,7 +45,9 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
     const handleBackClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        onBack();
+        
+        // Use browser's history API to go back
+        window.history.back();
     };
 
     // Only show breadcrumb navigation on detail pages

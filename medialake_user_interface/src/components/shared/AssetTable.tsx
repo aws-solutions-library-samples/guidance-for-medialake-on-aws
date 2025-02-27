@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
+import { Box, Typography, IconButton, TextField, Button, TableContainer } from '@mui/material';
 import {
     useReactTable,
     getCoreRowModel,
@@ -228,17 +228,30 @@ export function AssetTable<T>({
     };
 
     return (
-        <ResizableTable
-            table={table}
-            containerRef={containerRef}
-            virtualizer={rowVirtualizer}
-            rows={rows}
-            onRowClick={handleRowClick}
-            maxHeight="none"
-            onFilterClick={onFilterClick}
-            activeFilters={activeFilters}
-            onRemoveFilter={onRemoveFilter}
-        />
+        <TableContainer 
+            sx={{ 
+                maxHeight: '100%',
+                overflowY: 'visible',
+                width: '100%',
+                border: 'none',
+                '& .MuiTable-root': {
+                    borderCollapse: 'separate',
+                    borderSpacing: 0,
+                }
+            }}
+        >
+            <ResizableTable
+                table={table}
+                containerRef={containerRef}
+                virtualizer={rowVirtualizer}
+                rows={rows}
+                onRowClick={handleRowClick}
+                maxHeight="none"
+                onFilterClick={onFilterClick}
+                activeFilters={activeFilters}
+                onRemoveFilter={onRemoveFilter}
+            />
+        </TableContainer>
     );
 }
 

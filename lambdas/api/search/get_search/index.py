@@ -72,7 +72,7 @@ class SearchParams(BaseModelWithConfig):
 
     q: str = Field(..., min_length=1)
     page: conint(gt=0) = Field(default=1)  # type: ignore
-    pageSize: conint(gt=0, le=100) = Field(default=50)  # type: ignore
+    pageSize: conint(gt=0, le=500) = Field(default=50)  # type: ignore
     min_score: float = Field(default=0.01)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
