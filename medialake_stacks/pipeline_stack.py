@@ -54,7 +54,6 @@ class PipelineStack(Stack):
         )
 
         for template_file in template_files:
-            print("!!!! " + template_file)
             timestamp = int(time.time())
 
             template_name = os.path.basename(template_file)

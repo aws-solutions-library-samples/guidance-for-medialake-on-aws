@@ -79,8 +79,16 @@ class NodesStack(Stack):
             self,
             "ApiLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
-            parent_folder="nodes/integrations",
+            parent_folder="nodes/integration",
             code_path=["lambdas", "nodes", "api_handler"],
+        )
+
+        self.pre_signed_url_lambda_deployment = LambdaDeployment(
+            self,
+            "PreSignedUrlLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "pre_signed_url"],
         )
 
         # Create DynamoDB table for nodes

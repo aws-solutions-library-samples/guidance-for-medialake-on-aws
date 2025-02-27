@@ -1,0 +1,45 @@
+spec: v1.0.0
+node:
+  id: choice
+  title: Choice
+  description: Branch based on a condition
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: choice
+actions:
+  choice:
+    summary: Branch based on a condition
+    description: This step will branch the workflow based on a condition
+    operationId: choice
+    parameters:
+      - in: body
+        name: Choices
+        required: true
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              variable:
+                type: string
+                description: The variable to check (JSONPath)
+              value:
+                type: string
+                description: The value to compare against
+              next:
+                type: string
+                description: The next state to transition to if the condition is true
+      - in: body
+        name: Default
+        required: true
+        schema:
+          type: string
+          description: The default state to transition to if no condition matches
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

@@ -74,7 +74,7 @@ class PipelineNodesStack(Stack):
 
         ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
-        layer_objects = [ffprobe_layer.layer, pymediainfo_layer.layer.layer]
+        layer_objects = [ffprobe_layer.layer, pymediainfo_layer.layer]
 
         self._trigger_node_lambda = Lambda(
             self,

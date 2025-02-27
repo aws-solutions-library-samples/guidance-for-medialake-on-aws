@@ -9,7 +9,8 @@ from aws_cdk import (
 from constructs import Construct
 from dataclasses import dataclass
 
-from .layer_base import (LambdaLayer, LambdaLayerConfig)
+from .layer_base import LambdaLayer, LambdaLayerConfig
+
 
 @dataclass
 class PowertoolsLayerConfig:
@@ -87,7 +88,7 @@ class PyMediaInfo(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = LambdaLayer(
+        self.layer_version = LambdaLayer(
             self,
             "PyMediaInfoLayer",
             config=LambdaLayerConfig(
@@ -95,6 +96,10 @@ class PyMediaInfo(Construct):
                 description="A Lambda layer with pymediainfo library",
             ),
         )
+
+    @property
+    def layer(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer
 
 
 class FFProbeLayer(Construct):
@@ -110,7 +115,7 @@ class FFProbeLayer(Construct):
                     lambda_.Runtime.PYTHON_3_12,
                 ],
                 description="Layer containing ffprobe binary",
-                code=lambda_.Code.from_asset("dist/lambdas/layers/ffprobe")
+                code=lambda_.Code.from_asset("dist/lambdas/layers/ffprobe"),
             )
         else:
             self.layer = lambda_.LayerVersion(
@@ -165,8 +170,8 @@ class GoogleCloudStorageLayer(Construct):
             "GoogleCloudStorageLayer",
             config=LambdaLayerConfig(
                 entry="lambdas/layers/googleCloudStorage",
-                description="A Lambda layer with google cloud storage and google auth library"
-            )
+                description="A Lambda layer with google cloud storage and google auth library",
+            ),
         )
 
 
@@ -180,8 +185,8 @@ class IngestMediaProcessorLayer(Construct):
             "IngestMediaProcessorLayer",
             config=LambdaLayerConfig(
                 entry="lambdas/layers/ingest_media_processor",
-                description="A Lambda layer for analyzing media container media info"
-            )
+                description="A Lambda layer for analyzing media container media info",
+            ),
         )
 
 
@@ -194,9 +199,8 @@ class SearchLayer(Construct):
             self,
             "SearchLayer",
             config=LambdaLayerConfig(
-                entry="lambdas/layers/search",
-                description="A Lambda layer for search"
-            )
+                entry="lambdas/layers/search", description="A Lambda layer for search"
+            ),
         )
 
 
@@ -205,14 +209,17 @@ class PyamlLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = LambdaLayer(
+        self.layer_version = LambdaLayer(
             self,
             "PyamlLayer",
             config=LambdaLayerConfig(
-                entry="lambdas/layers/pyaml",
-                description="A Lambda layer for pyaml"
-            )
+                entry="lambdas/layers/pyaml", description="A Lambda layer for pyaml"
+            ),
         )
+
+    @property
+    def layer(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer
 
 
 class ShortuuidLayer(Construct):
@@ -220,15 +227,15 @@ class ShortuuidLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = LambdaLayer(
+        self.layer_version = LambdaLayer(
             self,
-            "PyamlLayer",
+            "ShortuuidLayer",
             config=LambdaLayerConfig(
                 entry="lambdas/layers/shortuuid",
-                description="A Lambda layer for shortuuid"
-            )
+                description="A Lambda layer for shortuuid",
+            ),
         )
 
     @property
-    def layer_version(self) -> lambda_.LayerVersion:
-        return self.layer
+    def layer(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer

@@ -8,7 +8,7 @@ node:
   integration:
     config:
       lambda:
-        handler: utility/pre_signed_url.zip
+        handler: utility/PreSignedUrlLambdaDeployment
         runtime: python3.12
 actions:
   generate:

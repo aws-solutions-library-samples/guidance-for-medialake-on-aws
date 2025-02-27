@@ -257,6 +257,16 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
+                actions=["s3:ListBucket"],
+                resources=[
+                    props.pipelines_nodes_templates_bucket.bucket_arn,
+                    f"{props.pipelines_nodes_templates_bucket.bucket_arn}/*",
+                ],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
                 actions=[
                     "iam:TagRole",
                     "iam:CreateRole",

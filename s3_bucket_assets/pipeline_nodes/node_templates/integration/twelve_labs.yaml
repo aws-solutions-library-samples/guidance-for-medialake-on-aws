@@ -11,7 +11,7 @@ node:
     config:
       lambda:
         version: 1.0.0
-        handler: integrations/ApiLambdaDeployment
+        handler: integration/ApiLambdaDeployment
         runtime: python3.12
         iam_policy:
           statements:

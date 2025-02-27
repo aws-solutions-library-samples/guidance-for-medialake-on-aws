@@ -1,0 +1,248 @@
+import uuid
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+
+import boto3
+from aws_lambda_powertools import Logger
+
+from config import PIPELINES_TABLE, ACCOUNT_ID, NODE_TABLE
+
+# Initialize logger
+logger = Logger()
+
+
+def get_node_info_from_dynamodb(node_id: str) -> Dict[str, Any]:
+    """
+    Retrieve node information from DynamoDB.
+
+    Args:
+        node_id: ID of the node
+
+    Returns:
+        Node information dictionary
+    """
+    logger.info(f"Retrieving node info from DynamoDB for node_id: {node_id}")
+    dynamodb = boto3.resource("dynamodb")
+
+    if not NODE_TABLE:
+        msg = "Environment variable NODE_TABLE is not set."
+        logger.error(msg)
+        raise ValueError(msg)
+
+    table = dynamodb.Table(NODE_TABLE)
+
+    # Adjust the key to match the table schema.
+    # For example, if the partition key is "pk" and the sort key is "sk" and your records use a prefix "NODE#":
+    key = {"pk": f"NODE#{node_id}", "sk": "INFO"}
+    logger.debug(f"Using DynamoDB key: {key}")
+
+    response = table.get_item(Key=key)
+    node_info = response.get("Item", {})
+    logger.info(f"Retrieved node info for {node_id}: {node_info}")
+    return node_info
+
+
+def compare_pipeline_definitions(
+    existing_def: Dict[str, Any], new_def: Dict[str, Any]
+) -> bool:
+    """
+    Compare two pipeline definitions to check if they are functionally equivalent.
+
+    Args:
+        existing_def: Existing pipeline definition
+        new_def: New pipeline definition
+
+    Returns:
+        True if the definitions are functionally equivalent, False otherwise
+    """
+    # Compare nodes
+    existing_nodes = {
+        node["data"]["id"]: node
+        for node in existing_def.get("configuration", {}).get("nodes", [])
+    }
+    new_nodes = {
+        node["data"]["id"]: node
+        for node in new_def.get("configuration", {}).get("nodes", [])
+    }
+
+    if existing_nodes.keys() != new_nodes.keys():
+        return False
+
+    for node_id, existing_node in existing_nodes.items():
+        new_node = new_nodes[node_id]
+        if (
+            existing_node["data"]["type"] != new_node["data"]["type"]
+            or existing_node["data"]["configuration"]
+            != new_node["data"]["configuration"]
+        ):
+            return False
+
+    # Compare edges
+    existing_edges = {
+        edge["id"]: edge
+        for edge in existing_def.get("configuration", {}).get("edges", [])
+    }
+    new_edges = {
+        edge["id"]: edge for edge in new_def.get("configuration", {}).get("edges", [])
+    }
+
+    if existing_edges.keys() != new_edges.keys():
+        return False
+
+    for edge_id, existing_edge in existing_edges.items():
+        new_edge = new_edges[edge_id]
+        if (
+            existing_edge["source"] != new_edge["source"]
+            or existing_edge["target"] != new_edge["target"]
+        ):
+            return False
+
+    return True
+
+
+def get_pipeline_by_name(
+    pipeline_name: str, definition: Optional[Dict[str, Any]] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get pipeline record from DynamoDB by name and optionally check if definition matches.
+
+    Args:
+        pipeline_name: Name of the pipeline to look up
+        definition: Optional pipeline definition to compare against
+
+    Returns:
+        Pipeline record if found and definition matches (if provided), None otherwise
+    """
+    logger.info(f"Looking up pipeline with name: {pipeline_name}")
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+
+    try:
+        # Scan for items with matching name
+        response = table.scan(
+            FilterExpression="#n = :name",
+            ExpressionAttributeNames={"#n": "name"},
+            ExpressionAttributeValues={":name": pipeline_name},
+        )
+        items = response.get("Items", [])
+        if items:
+            pipeline = items[0]
+            # Check if the pipeline has a definition
+            if "definition" in pipeline:
+                # If definition is provided, check if it matches
+                if definition and not compare_pipeline_definitions(
+                    pipeline["definition"], definition
+                ):
+                    logger.info("Found pipeline but definition does not match")
+                    return None
+                return pipeline
+        return None
+    except Exception as e:
+        logger.error(f"Error looking up pipeline: {e}")
+        return None
+
+
+def store_pipeline_info(
+    pipeline: Any,
+    state_machine_arn: str,
+    lambda_arns: Dict[str, str],
+    eventbridge_rule_arns: Optional[Dict[str, str]] = None,
+) -> None:
+    """
+    Store or update pipeline information in DynamoDB.
+
+    Args:
+        pipeline: Pipeline definition object
+        state_machine_arn: ARN of the state machine
+        lambda_arns: Dictionary mapping node IDs to Lambda ARNs
+        eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
+    """
+    logger.info("Storing/updating pipeline information in DynamoDB")
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+
+    # Check for existing pipeline with same name and definition
+    existing_pipeline = get_pipeline_by_name(pipeline.name, pipeline.dict())
+    now_iso = datetime.utcnow().isoformat()
+
+    # Build list of dependent resources
+    dependent_resources = []
+    for node_id, arn in lambda_arns.items():
+        if arn:  # Only add if ARN is not None
+            dependent_resources.append(["lambda", arn])
+            logger.debug(
+                f"Added dependent resource for node {node_id}: lambda -> {arn}"
+            )
+
+    dependent_resources.append(["step_function", state_machine_arn])
+    logger.debug(
+        f"Added dependent resource for state machine: step_function -> {state_machine_arn}"
+    )
+
+    # Add EventBridge rules if any
+    if eventbridge_rule_arns:
+        for node_id, arn in eventbridge_rule_arns.items():
+            if arn:  # Only add if ARN is not None
+                dependent_resources.append(["eventbridge_rule", arn])
+                logger.debug(
+                    f"Added dependent resource for node {node_id}: eventbridge_rule -> {arn}"
+                )
+
+    if existing_pipeline:
+        # Update existing pipeline
+        pipeline_id = existing_pipeline["id"]
+        logger.info(f"Updating existing pipeline with id {pipeline_id}")
+
+        try:
+            update_expr = """
+            SET #def = :def,
+                #res = :res,
+                #arn = :arn,
+                #up = :updated
+            """
+
+            expr_values = {
+                ":def": pipeline.dict(),
+                ":res": dependent_resources,
+                ":arn": state_machine_arn,
+                ":updated": now_iso,
+            }
+
+            expr_names = {
+                "#def": "definition",
+                "#res": "dependentResources",
+                "#arn": "stateMachineArn",
+                "#up": "updatedAt",
+            }
+
+            table.update_item(
+                Key={"id": pipeline_id},
+                UpdateExpression=update_expr,
+                ExpressionAttributeValues=expr_values,
+                ExpressionAttributeNames=expr_names,
+            )
+            logger.info(f"Successfully updated pipeline info with id {pipeline_id}")
+        except Exception as e:
+            logger.exception(f"Failed to update pipeline info: {e}")
+            raise
+    else:
+        # Create new pipeline
+        pipeline_id = str(uuid.uuid4())
+        item = {
+            "id": pipeline_id,
+            "createdAt": now_iso,
+            "updatedAt": now_iso,
+            "definition": pipeline.dict(),
+            "dependentResources": dependent_resources,
+            "name": pipeline.name,
+            "stateMachineArn": state_machine_arn,
+            "type": "Ingest Triggered",
+            "system": False,
+        }
+
+        try:
+            table.put_item(Item=item)
+            logger.info(f"Successfully stored new pipeline info with id {pipeline_id}")
+        except Exception as e:
+            logger.exception(f"Failed to store pipeline info: {e}")
+            raise

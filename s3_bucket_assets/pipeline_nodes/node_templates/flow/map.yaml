@@ -1,0 +1,41 @@
+spec: v1.0.0
+node:
+  id: map
+  title: Map
+  description: Iterate over an array of items
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: map
+actions:
+  map:
+    summary: Iterate over an array of items
+    description: This step will iterate over an array of items and execute the same steps for each item
+    operationId: map
+    parameters:
+      - in: body
+        name: ItemsPath
+        required: true
+        schema:
+          type: string
+          description: JSONPath that identifies the array to iterate over
+      - in: body
+        name: MaxConcurrency
+        required: false
+        schema:
+          type: number
+          description: Maximum number of concurrent iterations (0 for unlimited)
+          default: 0
+      - in: body
+        name: Iterator
+        required: true
+        schema:
+          type: object
+          description: The state machine definition that processes each item
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]
