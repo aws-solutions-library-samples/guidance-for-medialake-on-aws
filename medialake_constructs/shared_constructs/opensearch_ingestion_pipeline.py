@@ -87,7 +87,7 @@ class OpenSearchIngestionPipeline(Construct):
             self,
             "AssetTableIngestionPipeline",
             config=LambdaConfig(
-                name=f"{config.global_prefix}-os-pipeline-creator-{config.environment}",
+                name=f"{config.resource_prefix}-os-pipeline-creator-{config.environment}",
                 timeout_minutes=15,
                 vpc=props.vpc.vpc,
                 security_groups=[props.security_group],
@@ -99,7 +99,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "INDEX_NAME": props.index_name,
                     "REGION": self.region,
                     "LOG_GROUP_NAME": ingestion_log_group.log_group_name,
-                    "PIPELINE_NAME": f"{config.global_prefix}-etl-pipeline",
+                    "PIPELINE_NAME": f"{config.resource_prefix}-etl-pipeline",
                     "SUBNET_IDS_PIPELINE": json.dumps(
                         props.vpc.vpc.select_subnets(
                             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
@@ -215,7 +215,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "osis:ValidatePipeline",
                 ],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.resource_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -376,7 +376,7 @@ class OpenSearchIngestionPipeline(Construct):
                 effect=iam.Effect.ALLOW,
                 actions=["osis:Ingest"],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.resource_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -403,7 +403,7 @@ class OpenSearchIngestionPipeline(Construct):
                     "osis:DeletePipeline",
                 ],
                 resources=[
-                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.global_prefix}-etl-pipeline"
+                    f"arn:aws:osis:{self.region}:{self.account_id}:pipeline/{config.resource_prefix}-etl-pipeline"
                 ],
             )
         )
@@ -420,7 +420,7 @@ class OpenSearchIngestionPipeline(Construct):
             "CreateIngestionPipeline",
             service_token=ingestion_provider.service_token,
             properties={
-                "PipelineName": f"{config.global_prefix}-asset-pipeline",
+                "PipelineName": f"{config.resource_prefix}-asset-pipeline",
                 "TableArn": props.asset_table.table_arn,
                 "BucketName": props.ddb_export_bucket.bucket.bucket_arn,
                 "CollectionEndpoint": props.opensearch_cluster.domain_endpoint,

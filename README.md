@@ -91,11 +91,8 @@ touch config.json
 {
     "environment": "dev",
     "resource_prefix": "medialake",
-    "account_id": "your-aws-account-id",
-    "global_prefix": "medialake",
     "resource_application_tag": "medialake",
     "api_path": "prod",
-    "primary_region": "us-east-1",
     "initial_user": {
         "email": "email account for initial user",
         "first_name": "first name of initial user",
@@ -166,7 +163,6 @@ touch config.json
 - environment - Environment name, used in resource naming and configuration
 - account_id - AWS Account ID that will be deployed to
 - resource_prefix - Prefix for resources being previsioned
-- global_prefix - Being replaced by resource_prefix, still used
 - api_path - API path, used in resource naming and configuration
 - primary_region - Primary region for deployment - tested in us-east-1
 - initial_user_email - Initial user email, used in Cognito

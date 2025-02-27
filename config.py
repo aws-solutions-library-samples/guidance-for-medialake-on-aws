@@ -248,10 +248,7 @@ class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
     lambda_tail_warming: bool = False
-    primary_region: str
-    account_id: str
     environment: str  # Used for retain decisions 
-    global_prefix: str
     resource_prefix: str
     resource_application_tag: str
     api_path: str

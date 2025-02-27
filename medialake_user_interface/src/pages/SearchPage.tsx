@@ -132,9 +132,9 @@ const SearchPage: React.FC = () => {
         isDeleteModalOpen,
         menuAnchorEl,
         selectedAsset,
-    } = useAssetOperations<AssetBase>();
+    } = useAssetOperations<AssetItem>();
 
-    const handleAssetClick = useCallback((asset: AssetBase) => {
+    const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
         navigate(`/${assetType}s/${asset.InventoryID}`, {
             state: { 
@@ -167,14 +167,14 @@ const SearchPage: React.FC = () => {
         { id: 'size', label: 'Size', visible: true },
     ]);
 
-    const [columns, setColumns] = useState<AssetTableColumn<AssetBase>[]>([
+    const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
         {
             id: 'name',
             label: 'Name',
             visible: true,
             minWidth: 200,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            cell: (info: CellContext<AssetBase, unknown>) => info.getValue() as string,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
                 rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
@@ -185,7 +185,7 @@ const SearchPage: React.FC = () => {
             label: 'Type',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.Type,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type)
         },
@@ -194,7 +194,7 @@ const SearchPage: React.FC = () => {
             label: 'Format',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.Format,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(rowB.original.DigitalSourceAsset.MainRepresentation.Format)
         },
@@ -203,8 +203,8 @@ const SearchPage: React.FC = () => {
             label: 'Size',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            cell: (info: CellContext<AssetBase, unknown>) => formatFileSize(info.getValue() as number),
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            cell: (info: CellContext<AssetItem, unknown>) => formatFileSize(info.getValue() as number),
             sortable: true,
             sortingFn: (rowA, rowB) => {
                 const a = rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
@@ -217,8 +217,8 @@ const SearchPage: React.FC = () => {
             label: 'Date',
             visible: true,
             minWidth: 150,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.CreateDate,
-            cell: (info: CellContext<AssetBase, unknown>) => {
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
+            cell: (info: CellContext<AssetItem, unknown>) => {
                 const date = new Date(info.getValue() as string);
                 return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
             },

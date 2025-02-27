@@ -13,11 +13,11 @@ import base64
 import json
 from boto3.dynamodb.conditions import Key
 from pydantic import BaseModel, Field, validator
-from config import global_prefix
+from config import config
 
 # Initialize AWS X-Ray, metrics, and logger
 tracer = Tracer(service="asset-service")
-metrics = Metrics(namespace=f"{global_prefix}-asset-service", service="asset-api")
+metrics = Metrics(namespace=f"{config.resource_prefix}-asset-service", service="asset-api")
 logger = Logger(service="asset-api", level=os.getenv("LOG_LEVEL", "WARNING"))
 
 # Initialize DynamoDB

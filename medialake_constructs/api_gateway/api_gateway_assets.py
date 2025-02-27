@@ -64,7 +64,7 @@ class AssetsConstruct(Construct):
             self,
             "GetAssetsLambda",
             config=LambdaConfig(
-                name=f"{config.global_prefix}-get-assets-{config.environment}",
+                name=f"{config.resource_prefix}-get-assets-{config.environment}",
                 entry="lambdas/api/assets/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -107,7 +107,7 @@ class AssetsConstruct(Construct):
             self,
             "GetAssetLambda",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_get_asset_{config.environment}",
+                name=f"{config.resource_prefix}_get_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -136,7 +136,7 @@ class AssetsConstruct(Construct):
             self,
             "DeleteAssetLambda",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_delete_asset_{config.environment}",
+                name=f"{config.resource_prefix}_delete_asset_{config.environment}",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -297,7 +297,7 @@ class AssetsConstruct(Construct):
             self,
             "RenameAssetLambda",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_rename_asset_{config.environment}",
+                name=f"{config.resource_prefix}_rename_asset_{config.environment}",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/rp_assets_id/rename/post_rename",
                 environment_variables={

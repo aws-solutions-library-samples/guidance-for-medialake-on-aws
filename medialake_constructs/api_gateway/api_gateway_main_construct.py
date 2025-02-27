@@ -38,7 +38,7 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
-            log_group_name=f"aws-waf-logs-{config.global_prefix}-api-gateway-waf-logs",
+            log_group_name=f"aws-waf-logs-{config.resource_prefix}-api-gateway-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
