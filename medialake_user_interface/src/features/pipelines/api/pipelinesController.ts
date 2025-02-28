@@ -66,10 +66,52 @@ export const useDeletePipeline = (
     options?: Omit<UseMutationOptions<void, PipelineError, string>, 'mutationFn'>
 ) => {
     return useMutation({
-        mutationFn: (id: string) => PipelinesService.deletePipeline(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: PIPELINES_QUERY_KEYS.list() });
+        mutationFn: async (id: string) => {
+            console.log(`[pipelinesController] Starting delete mutation for pipeline ID: ${id}`);
+
+            // Create a timeout promise to prevent hanging
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => {
+                    console.error(`[pipelinesController] Delete request timed out after 30 seconds for pipeline ID: ${id}`);
+                    reject(new Error('Delete request timed out after 30 seconds'));
+                }, 30000);
+            });
+
+            try {
+                // Race the deletion against the timeout
+                await Promise.race([
+                    PipelinesService.deletePipeline(id),
+                    timeoutPromise
+                ]);
+
+                console.log(`[pipelinesController] Delete mutation completed successfully for pipeline ID: ${id}`);
+            } catch (error) {
+                console.error(`[pipelinesController] Delete mutation failed for pipeline ID: ${id}`, error);
+
+                // Convert the error to a PipelineError format
+                const pipelineError: PipelineError = {
+                    message: error instanceof Error ? error.message : 'Unknown error occurred during pipeline deletion',
+                    status: error?.response?.status
+                };
+
+                // Log additional details if available
+                if (error?.response?.data) {
+                    console.error('[pipelinesController] API error details:', error.response.data);
+                }
+
+                throw pipelineError;
+            }
         },
+        onSuccess: (_, id) => {
+            console.log(`[pipelinesController] Invalidating queries after successful deletion of pipeline: ${id}`);
+            queryClient.invalidateQueries({ queryKey: PIPELINES_QUERY_KEYS.list() });
+            queryClient.invalidateQueries({ queryKey: PIPELINES_QUERY_KEYS.detail(id) });
+        },
+        onError: (error, id) => {
+            console.error(`[pipelinesController] Error in delete mutation for pipeline ${id}:`, error);
+        },
+        // No retries for deletion to avoid multiple delete attempts
+        retry: false,
         ...options
     });
 };
@@ -98,4 +140,4 @@ export const useStopPipeline = (
         },
         ...options
     });
-}; 
+};

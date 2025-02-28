@@ -58,7 +58,26 @@ def get_event_pattern_for_rule(
         if param not in ["pipeline_name"] and node.data.configuration[param]:
             if "detail" not in pattern:
                 pattern["detail"] = {}
-            pattern["detail"][param] = [node.data.configuration[param]]
+
+            # Handle parameters differently - they need to be properly formatted for EventBridge
+            if param == "parameters":
+                # If parameters is a dictionary or list, process it properly
+                if isinstance(node.data.configuration[param], dict):
+                    # For dictionaries, add each key-value pair directly to detail
+                    for key, value in node.data.configuration[param].items():
+                        pattern["detail"][key] = [value]
+                elif isinstance(node.data.configuration[param], list):
+                    # For lists of dictionaries, extract and flatten
+                    for item in node.data.configuration[param]:
+                        if isinstance(item, dict):
+                            for key, value in item.items():
+                                pattern["detail"][key] = [value]
+                else:
+                    # For simple values, add as is
+                    pattern["detail"][param] = [node.data.configuration[param]]
+            else:
+                # For all other parameters, add as is
+                pattern["detail"][param] = [node.data.configuration[param]]
 
     return pattern
 
@@ -103,7 +122,14 @@ def create_eventbridge_rule(
             return None
 
         # Create a unique rule name for this pipeline and node
-        unique_rule_name = f"{pipeline_name}-{rule_name}-{node.data.id}"[
+        # Sanitize the pipeline name to replace spaces with hyphens and remove any other invalid characters
+        sanitized_pipeline_name = pipeline_name.replace(" ", "-")
+        # Replace any characters that aren't alphanumeric, periods, hyphens, or underscores
+        sanitized_pipeline_name = "".join(
+            c for c in sanitized_pipeline_name if c.isalnum() or c in ".-_"
+        )
+
+        unique_rule_name = f"{sanitized_pipeline_name}-{rule_name}-{node.data.id}"[
             :64
         ]  # Ensure name is not too long
 
@@ -134,7 +160,7 @@ def create_eventbridge_rule(
             EventBusName=event_bus_name,
             Targets=[
                 {
-                    "Id": f"{pipeline_name}-target",
+                    "Id": f"{sanitized_pipeline_name}-target",
                     "Arn": state_machine_arn,
                     "RoleArn": role_arn,
                     # Add input transformer to include metadata about the trigger
@@ -184,8 +210,11 @@ def delete_eventbridge_rule(rule_name: str) -> None:
 
     try:
         # First remove targets
+        # Extract a sanitized target ID from the rule name
+        target_id = f"{rule_name}-target"
+
         events_client.remove_targets(
-            Rule=rule_name, EventBusName=event_bus_name, Ids=[f"{rule_name}-target"]
+            Rule=rule_name, EventBusName=event_bus_name, Ids=[target_id]
         )
 
         # Then delete the rule

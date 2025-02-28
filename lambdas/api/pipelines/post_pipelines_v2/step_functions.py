@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import Dict, Any
 
@@ -9,6 +10,37 @@ from iam_operations import create_sfn_role
 
 # Initialize logger
 logger = Logger()
+
+
+def sanitize_role_name(name: str) -> str:
+    """
+    Create a sanitized IAM role name from a pipeline name.
+
+    Args:
+        name: Name to sanitize
+
+    Returns:
+        A sanitized name suitable for IAM roles
+    """
+    # Convert to lowercase
+    sanitized_name = name.lower()
+
+    # Replace spaces with hyphens
+    sanitized_name = sanitized_name.replace(" ", "-")
+
+    # Replace non-alphanumeric characters (except allowed special chars) with underscores
+    sanitized_name = re.sub(r"[^a-z0-9+=,.@_-]", "_", sanitized_name)
+
+    # Ensure the name starts with a letter or allowed character
+    sanitized_name = re.sub(r"^[^a-z0-9+=,.@_-]+", "", sanitized_name)
+
+    # Truncate to 64 characters (maximum length for IAM role names)
+    sanitized_name = sanitized_name[:64]
+
+    # Ensure the name doesn't end with a hyphen or underscore
+    sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
+
+    return sanitized_name
 
 
 def get_flow_state_definition(node: Any) -> Dict[str, Any]:
@@ -201,20 +233,29 @@ def build_step_function_definition(
 
     # First pass: create unique state names for each node
     for node in pipeline.configuration.nodes:
-        # Create a unique state name that combines the node ID and data ID
-        # This ensures that multiple nodes with the same data.id get unique state names
-        unique_state_name = f"{node.data.id}_{node.id}"
+        # Create a unique state name that combines the node label and node ID
+        # This ensures that each node gets a descriptive and unique state name
+        unique_state_name = f"{node.data.label} ({node.id})"
+
+        # Sanitize the state name to ensure it's valid for Step Functions
+        # Remove special characters and spaces that might cause issues
+        sanitized_state_name = "".join(
+            c if c.isalnum() else "_" for c in unique_state_name
+        )
+        # Ensure it starts with a letter or number
+        if not sanitized_state_name[0].isalnum():
+            sanitized_state_name = "state_" + sanitized_state_name
 
         # Store the mapping from node ID to unique state name
-        node_id_to_state_name[node.id] = unique_state_name
+        node_id_to_state_name[node.id] = sanitized_state_name
 
-        # Also store the reverse mapping
+        # Also store the reverse mapping using data.id for backward compatibility
         if node.data.id not in data_id_to_unique_states:
             data_id_to_unique_states[node.data.id] = []
-        data_id_to_unique_states[node.data.id].append(unique_state_name)
+        data_id_to_unique_states[node.data.id].append(sanitized_state_name)
 
         logger.info(
-            f"Created unique state name for node {node.id}: {unique_state_name}"
+            f"Created unique state name for node {node.id}: {sanitized_state_name} (from label: {node.data.label})"
         )
 
     # Second pass: create state definitions using the unique state names
@@ -605,6 +646,34 @@ def delete_step_function(state_machine_name: str) -> None:
         logger.error(f"Error deleting Step Function: {e}")
 
 
+def sanitize_state_machine_name(name: str) -> str:
+    """
+    Create a sanitized state machine name from a pipeline name.
+
+    Args:
+        name: Name to sanitize
+
+    Returns:
+        A sanitized name suitable for AWS Step Functions state machines
+    """
+    # Replace spaces with hyphens
+    sanitized_name = name.replace(" ", "-")
+
+    # Replace non-alphanumeric characters (except hyphens) with underscores
+    sanitized_name = re.sub(r"[^a-zA-Z0-9-]", "_", sanitized_name)
+
+    # Ensure the name starts with a letter or number
+    sanitized_name = re.sub(r"^[^a-zA-Z0-9]+", "", sanitized_name)
+
+    # Truncate to 80 characters (maximum length for Step Function names)
+    sanitized_name = sanitized_name[:80]
+
+    # Ensure the name doesn't end with a hyphen or underscore
+    sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
+
+    return sanitized_name
+
+
 def create_step_function(
     pipeline_name: str, definition: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -620,28 +689,40 @@ def create_step_function(
     """
     logger.info(f"Creating Step Functions state machine for pipeline: {pipeline_name}")
     sfn_client = boto3.client("stepfunctions")
-    role_arn = create_sfn_role(f"{pipeline_name}StepFunctionRole")
+
+    # Sanitize the pipeline name for use in the IAM role name and state machine name
+    sanitized_role_name = sanitize_role_name(pipeline_name)
+    sanitized_state_machine_name = sanitize_state_machine_name(pipeline_name)
+
+    role_name = f"{sanitized_role_name}StepFunctionRole"
+    logger.info(f"Using sanitized role name: {role_name}")
+    logger.info(f"Using sanitized state machine name: {sanitized_state_machine_name}")
+    role_arn = create_sfn_role(role_name)
 
     try:
         # Check if state machine exists
-        if check_step_function_exists(pipeline_name):
-            logger.info(f"Found existing Step Function {pipeline_name}, deleting it")
-            delete_step_function(pipeline_name)
-            wait_for_state_machine_deletion(pipeline_name)
+        if check_step_function_exists(sanitized_state_machine_name):
+            logger.info(
+                f"Found existing Step Function {sanitized_state_machine_name}, deleting it"
+            )
+            delete_step_function(sanitized_state_machine_name)
+            wait_for_state_machine_deletion(sanitized_state_machine_name)
 
         # Print the definition for debugging
         definition_json = json.dumps(definition, indent=2)
-        print(f"Step Function Definition for {pipeline_name}:\n{definition_json}")
+        # print(f"Step Function Definition for {pipeline_name}:\n{definition_json}")
         logger.info(f"Step Function Definition for {pipeline_name}:\n{definition_json}")
 
         # Create new state machine
-        logger.info(f"Creating new Step Function: {pipeline_name}")
+        logger.info(f"Creating new Step Function: {sanitized_state_machine_name}")
         response = sfn_client.create_state_machine(
-            name=pipeline_name,
+            name=sanitized_state_machine_name,
             definition=json.dumps(definition),
             roleArn=role_arn,
         )
-        logger.info(f"Created state machine for pipeline '{pipeline_name}': {response}")
+        logger.info(
+            f"Created state machine for pipeline '{pipeline_name}' with name '{sanitized_state_machine_name}': {response}"
+        )
         return response
     except Exception as e:
         logger.exception(

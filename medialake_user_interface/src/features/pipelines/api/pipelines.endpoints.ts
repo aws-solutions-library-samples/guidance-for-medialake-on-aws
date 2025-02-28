@@ -5,10 +5,10 @@ export const PIPELINES_API = {
         GET_PIPELINE: (id: string) => `/pipelines/${id}`,
         CREATE_PIPELINE: '/pipelinesv2',
         UPDATE_PIPELINE: (id: string) => `/pipelines/${id}`,
-        DELETE_PIPELINE: (id: string) => `/pipelines/${id}`,
+        DELETE_PIPELINE: (id: string) => `/pipelinesv2/${id}`,
         UPDATE_STATUS: (id: string) => `/pipelines/${id}/status`,
         GET_PIPELINE_RUNS: (id: string) => `/pipelines/${id}/runs`,
         START_PIPELINE: (id: string) => `/pipelines/${id}/start`,
         STOP_PIPELINE: (id: string) => `/pipelines/${id}/stop`
     }
-} as const; 
+} as const;

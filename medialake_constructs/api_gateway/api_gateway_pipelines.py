@@ -229,7 +229,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 # "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
-                # "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name,
                 # "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "NODE_TABLE": props.node_table.table_arn,
                 "ACCOUNT_ID": scope.account,
@@ -393,6 +393,101 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_v2_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_pipelines_v2_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # DELETE /api/pipelinesv2
+        delete_pipelines_v2_lambda_config = LambdaConfig(
+            name="pipeline_delete_v2",
+            timeout_minutes=15,
+            entry="lambdas/api/pipelines/delete_pipelines_v2",
+            layers=[pyaml_layer.layer, shortuuid_layer.layer],
+            iam_role_boundary_policy=del_lambda_iam_boundary_policy,
+            environment_variables={
+                "PIPELINES_TABLE": props.pipeline_table.table_arn,
+                "NODE_TABLE": props.node_table.table_arn,
+                "ACCOUNT_ID": scope.account,
+            },
+        )
+        self._delete_pipelines_v2_handler = Lambda(
+            self,
+            "DeletePipelinesHandlerV2",
+            config=delete_pipelines_v2_lambda_config,
+        )
+
+        # Add Lambda function deletion permissions
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "lambda:DeleteFunction",
+                    "lambda:ListEventSourceMappings",
+                    "lambda:DeleteEventSourceMapping",
+                    "lambda:GetFunction",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Add Step Functions deletion permissions
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:DeleteStateMachine", "states:DescribeStateMachine"],
+                resources=["*"],
+            )
+        )
+
+        # Add EventBridge permissions
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:RemoveTargets",
+                    "events:DeleteRule",
+                    "events:DescribeRule",
+                    "events:ListTargetsByRule",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Add IAM role and policy deletion permissions
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:ListAttachedRolePolicies",
+                    "iam:ListRolePolicies",
+                    "iam:GetRole",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Add DynamoDB permissions
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+
+        # Add the DELETE method to the pipelines_v2_resource
+        pipelines_v2_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+
+        # Add a resource for pipeline ID specific operations
+        pipeline_id_v2_resource = pipelines_v2_resource.add_resource("{pipelineId}")
+
+        # Add the DELETE method to the pipeline_id_v2_resource
+        pipeline_id_v2_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
@@ -730,6 +825,10 @@ class ApiGatewayPipelinesConstruct(Construct):
     @property
     def del_pipeline_id_handler(self) -> Lambda:
         return self._del_pipeline_id_handler
+
+    @property
+    def delete_pipelines_v2_handler(self) -> Lambda:
+        return self._delete_pipelines_v2_handler
 
     @property
     def pipeline_trigger_lambda(self) -> Lambda:

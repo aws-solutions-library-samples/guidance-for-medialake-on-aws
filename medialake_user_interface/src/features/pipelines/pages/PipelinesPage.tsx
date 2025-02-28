@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Button, Snackbar, Alert, useTheme } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,40 @@ import { usePipelineManager } from '../hooks/usePipelineManager';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
 
+// Performance monitoring helper
+const logPerf = (message: string, startTime?: number) => {
+    const now = window.performance.now();
+    const timeInfo = startTime ? ` (took ${(now - startTime).toFixed(2)}ms)` : '';
+    console.log(`[PERF-PAGE] ${message}${timeInfo} at ${now.toFixed(2)}ms`);
+    return now;
+};
+
 const PipelinesPage: React.FC = () => {
+    // Performance monitoring
+    const perfMarks = useRef({
+        pageLoad: window.performance.now(),
+        deleteStart: 0,
+        deleteEnd: 0
+    });
+
+    // Log when component mounts
+    useEffect(() => {
+        logPerf('PipelinesPage mounted', perfMarks.current.pageLoad);
+
+        // Log memory usage if available (Chrome only)
+        const performanceWithMemory = window.performance as any;
+        if (performanceWithMemory.memory) {
+            const memoryInfo = performanceWithMemory.memory;
+            console.log('[PERF-PAGE] Initial memory usage:', {
+                totalJSHeapSize: Math.round(memoryInfo.totalJSHeapSize / (1024 * 1024)) + ' MB',
+                usedJSHeapSize: Math.round(memoryInfo.usedJSHeapSize / (1024 * 1024)) + ' MB'
+            });
+        }
+
+        return () => {
+            logPerf('PipelinesPage unmounting');
+        };
+    }, []);
     const { t } = useTranslation();
     const theme = useTheme();
     const navigate = useNavigate();
@@ -64,16 +97,24 @@ const PipelinesPage: React.FC = () => {
         setColumnVisibility: (visibility) => setTableState(prev => ({ ...prev, columnVisibility: visibility })),
         handleCloseSnackbar: () => setTableState(prev => ({ ...prev, snackbar: { ...prev.snackbar, open: false } })),
         handleEdit: (id) => navigate(`/settings/pipelines/${id}/edit`),
+        // Ultra-simplified openDeleteDialog function
         openDeleteDialog: (id, name) => {
-            setTableState(prev => ({
-                ...prev,
-                deleteDialog: {
-                    open: true,
-                    pipelineName: name,
-                    pipelineId: id,
-                    userInput: '',
-                },
-            }));
+            logPerf(`Opening delete dialog for pipeline: ${id}, ${name}`);
+
+            try {
+                // Set all dialog properties in a single update with no frills
+                setTableState(prev => ({
+                    ...prev,
+                    deleteDialog: {
+                        open: true,
+                        pipelineName: name,
+                        pipelineId: id,
+                        userInput: '',
+                    },
+                }));
+            } catch (error) {
+                console.error('[PERF-PAGE] Error opening delete dialog:', error);
+            }
         },
         closeDeleteDialog: () => setTableState(prev => ({
             ...prev,
@@ -103,26 +144,72 @@ const PipelinesPage: React.FC = () => {
         })),
     };
 
+    // Optimized handleDeletePipeline function with performance monitoring
     const handleDeletePipeline = async (id: string) => {
+        perfMarks.current.deleteStart = logPerf(`Starting pipeline deletion process for ID: ${id}`);
+
+        // Log memory before deletion
+        const performanceWithMemory = window.performance as any;
+        if (performanceWithMemory.memory) {
+            const memoryInfo = performanceWithMemory.memory;
+            console.log('[PERF-PAGE] Memory before deletion:', {
+                totalJSHeapSize: Math.round(memoryInfo.totalJSHeapSize / (1024 * 1024)) + ' MB',
+                usedJSHeapSize: Math.round(memoryInfo.usedJSHeapSize / (1024 * 1024)) + ' MB'
+            });
+        }
+
+        // Note: The dialog is already closed by the PipelineDeleteDialog component
+        // before calling this function, so we don't need to close it here
+        logPerf('Dialog should be closed at this point');
+
         try {
+            const apiCallStart = logPerf(`Calling deletePipeline for ID: ${id}`);
             await deletePipeline(id);
-            setTableState(prev => ({
-                ...prev,
-                snackbar: {
-                    open: true,
-                    severity: 'success',
-                    message: t('pipelines.messages.deleteSuccess'),
-                },
-            }));
+            logPerf(`Pipeline deletion API call completed for ID: ${id}`, apiCallStart);
+
+            // Show success message
+            const snackbarStart = logPerf('Setting success snackbar');
+            setTableState(prev => {
+                logPerf('Inside success snackbar setState callback');
+                return {
+                    ...prev,
+                    snackbar: {
+                        open: true,
+                        severity: 'success',
+                        message: t('pipelines.messages.deleteSuccess'),
+                    },
+                };
+            });
+            logPerf('After setting success snackbar', snackbarStart);
         } catch (error) {
-            setTableState(prev => ({
-                ...prev,
-                snackbar: {
-                    open: true,
-                    severity: 'error',
-                    message: t('pipelines.messages.deleteError'),
-                },
-            }));
+            logPerf(`Error deleting pipeline ${id}:`, perfMarks.current.deleteStart);
+            console.error(`Error deleting pipeline ${id}:`, error);
+
+            // Show error message
+            const snackbarStart = logPerf('Setting error snackbar');
+            setTableState(prev => {
+                logPerf('Inside error snackbar setState callback');
+                return {
+                    ...prev,
+                    snackbar: {
+                        open: true,
+                        severity: 'error',
+                        message: t('pipelines.messages.deleteError'),
+                    },
+                };
+            });
+            logPerf('After setting error snackbar', snackbarStart);
+        } finally {
+            perfMarks.current.deleteEnd = logPerf('Pipeline deletion process completed', perfMarks.current.deleteStart);
+
+            // Log memory after deletion
+            if (performanceWithMemory.memory) {
+                const memoryInfo = performanceWithMemory.memory;
+                console.log('[PERF-PAGE] Memory after deletion:', {
+                    totalJSHeapSize: Math.round(memoryInfo.totalJSHeapSize / (1024 * 1024)) + ' MB',
+                    usedJSHeapSize: Math.round(memoryInfo.usedJSHeapSize / (1024 * 1024)) + ' MB'
+                });
+            }
         }
     };
 

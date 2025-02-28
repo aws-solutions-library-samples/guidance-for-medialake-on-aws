@@ -31,7 +31,12 @@ export class PipelinesService {
     }
 
     static async deletePipeline(id: string): Promise<void> {
+        console.log(`[PipelinesService] Deleting pipeline with ID: ${id}`);
+        console.log(`[PipelinesService] Using endpoint: ${PIPELINES_API.endpoints.DELETE_PIPELINE(id)}`);
+
+        // Simple, direct approach - let the controller handle timeouts and retries
         await apiClient.delete(PIPELINES_API.endpoints.DELETE_PIPELINE(id));
+        console.log(`[PipelinesService] Delete request sent for pipeline ID: ${id}`);
     }
 
     static async updateStatus(id: string, status: Partial<PipelineStatus>): Promise<Pipeline> {
@@ -51,4 +56,4 @@ export class PipelinesService {
     static async stopPipeline(id: string): Promise<void> {
         await apiClient.post(PIPELINES_API.endpoints.STOP_PIPELINE(id));
     }
-} 
+}
