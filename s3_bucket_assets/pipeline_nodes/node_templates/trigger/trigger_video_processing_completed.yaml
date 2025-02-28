@@ -1,14 +1,19 @@
 spec: v1.0.0
 node:
-  id: trigger_video_ingested
+  id: trigger_video_processing_completed
   title: Video Processing Completed
-  description: Wait for a specific duration
+  description: Trigger when a video processing pipeline execution is completed
   version: 1.0.0
   type: trigger
   integration:
     config:
       aws_eventbridge:
-        aws_eventbridge_rule: video_ingested
+        aws_eventbridge_rule: pipeline_execution_completed
+        event_pattern:
+          source: ["medialake.pipeline"]
+          detail-type: ["Pipeline Execution Completed"]
+          detail:
+            pipelineName: ["Default Video Pipeline"]
 actions:
   trigger:
     summary: Trigger after video processing is completed
@@ -23,5 +28,5 @@ actions:
     connections:
       incoming:
         type: [any]
-      outgoing: 
+      outgoing:
         type: [video]

@@ -44,6 +44,13 @@ def get_event_pattern_for_rule(
                 "detail": {"DigitalSourceAsset": {"Type": ["Video"]}},
             }
         )
+    elif rule_name == "pipeline_execution_completed":
+        # Override the source for pipeline execution completed events
+        pattern = {
+            "source": ["medialake.pipeline"],
+            "detail-type": ["Pipeline Execution Completed"],
+            "detail": {"pipelineName": ["Default Video Pipeline"]},
+        }
     elif rule_name == "workflow_completed":
         # Get pipeline name from node configuration if available
         target_pipeline = node.data.configuration.get("pipeline_name", "")
