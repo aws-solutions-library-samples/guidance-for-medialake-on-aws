@@ -262,19 +262,16 @@ export default {
             menu: {
                 home: 'Home',
                 assets: 'Assets',
-                metadata: 'Metadata',
                 pipelines: 'Pipelines',
                 pipelineExecutions: 'Pipeline Executions',
-                reviewQueue: 'Review Queue',
-                tags: 'Tags',
                 settings: 'Settings'
             },
             submenu: {
-                integrations: 'Integrations',
+                system: 'System Settings',
                 connectors: 'Connectors',
                 userManagement: 'User Management',
                 roles: 'Roles',
-                system: 'System',
+                integrations: 'Integrations',
                 environments: 'Environments'
             }
         },
@@ -511,6 +508,44 @@ export default {
                         active: "Active",
                         disabled: "Disabled"
                     }
+                }
+            },
+            systemSettings: {
+                title: 'System Settings',
+                tabs: {
+                    search: 'Search',
+                    notifications: 'Notifications',
+                    security: 'Security',
+                    performance: 'Performance'
+                },
+                search: {
+                    title: 'Search Configuration',
+                    description: 'Configure the search provider for enhanced search capabilities across your media assets.',
+                    provider: 'Search Provider:',
+                    configureProvider: 'Configure Provider',
+                    editProvider: 'Edit Provider',
+                    resetProvider: 'Reset Provider',
+                    providerDetails: 'Provider Details',
+                    providerName: 'Provider Name',
+                    providerType: 'Provider Type',
+                    apiKey: 'API Key',
+                    endpoint: 'Endpoint URL',
+                    enabled: 'Search Enabled',
+                    noProvider: 'No search provider configured.',
+                    configurePrompt: 'Configure Twelve Labs to enable search capabilities.',
+                    errorLoading: 'Error loading search provider configuration'
+                },
+                notifications: {
+                    title: 'Notifications Settings',
+                    comingSoon: 'Notification settings coming soon.'
+                },
+                security: {
+                    title: 'Security Settings',
+                    comingSoon: 'Security settings coming soon.'
+                },
+                performance: {
+                    title: 'Performance Settings',
+                    comingSoon: 'Performance settings coming soon.'
                 }
             }
         }

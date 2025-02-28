@@ -31,6 +31,7 @@ class SearchProps:
     open_search_index: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
+    system_settings_table: str
 
 
 class SearchConstruct(Construct):
@@ -62,6 +63,8 @@ class SearchConstruct(Construct):
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.open_search_index,
                     "SCOPE": "es",
+                    "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
+                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                 },
             ),
         )
@@ -115,6 +118,31 @@ class SearchConstruct(Construct):
                     f"{props.media_assets_bucket.bucket_arn}",
                     "arn:aws:kms:*:*:key/*",
                 ],
+            )
+        )
+
+        # Add permissions to access Secrets Manager and the system settings table
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=["*"],  # You might want to restrict this to specific secrets
+            )
+        )
+
+        # Add permissions to access the system settings table
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"],
             )
         )
 

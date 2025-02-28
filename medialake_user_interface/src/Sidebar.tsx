@@ -131,6 +131,7 @@ function Sidebar() {
             isExpandable: true,
             isExpanded: settingsOpen,
             subItems: [
+                { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system' },
                 { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
                 { text: t('sidebar.submenu.userManagement'), icon: <GroupIcon />, path: '/settings/users' },
                 { text: t('sidebar.submenu.roles'), icon: <SecurityIcon />, path: '/settings/roles' },

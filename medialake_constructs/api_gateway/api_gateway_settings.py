@@ -17,6 +17,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_cognito as cognito,
+    aws_dynamodb as dynamodb,
     Stack,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
@@ -81,6 +82,162 @@ class SettingsConstruct(Construct):
 
         # Create settings resource
         settings_resource = props.api_resource.root.add_resource("settings")
+        
+        # Create system settings resource and DynamoDB table
+        system_resource = settings_resource.add_resource("system")
+        
+        # Create DynamoDB table for system settings
+        self.system_settings_table = DynamoDB(
+            self,
+            "SystemSettingsTable",
+            props=DynamoDBProps(
+                name=f"medialake-system-settings",
+                partition_key_name="PK",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="SK",
+                sort_key_type=dynamodb.AttributeType.STRING,
+                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+                point_in_time_recovery=True,
+            ),
+        )
+        
+        # GET /settings/system
+        self._get_system_settings_handler = Lambda(
+            self,
+            "GetSystemSettingsHandler",
+            config=LambdaConfig(
+                name="get_system_settings",
+                entry="lambdas/api/settings/system/get_system_settings",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self.system_settings_table.table.grant_read_data(
+            self._get_system_settings_handler.function
+        )
+
+        system_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(self._get_system_settings_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        
+        # Create search provider resource
+        search_resource = system_resource.add_resource("search")
+
+        # GET /settings/system/search
+        self._get_search_provider_handler = Lambda(
+            self,
+            "GetSearchProviderHandler",
+            config=LambdaConfig(
+                name="get_search_provider",
+                entry="lambdas/api/settings/system/search/get_search",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self.system_settings_table.table.grant_read_data(
+            self._get_search_provider_handler.function
+        )
+
+        search_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(self._get_search_provider_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # POST /settings/system/search
+        self._post_search_provider_handler = Lambda(
+            self,
+            "PostSearchProviderHandler",
+            config=LambdaConfig(
+                name="post_search_provider",
+                entry="lambdas/api/settings/system/search/post_search",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self.system_settings_table.table.grant_write_data(
+            self._post_search_provider_handler.function
+        )
+        
+        # Add permissions to access Secrets Manager
+        self._post_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:PutSecretValue",
+                    "secretsmanager:UpdateSecret",
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:TagResource",
+                ],
+                resources=["*"],  # You might want to restrict this to specific secrets
+            )
+        )
+
+        search_resource.add_method(
+            "POST",
+            api_gateway.LambdaIntegration(self._post_search_provider_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # PUT /settings/system/search
+        self._put_search_provider_handler = Lambda(
+            self,
+            "PutSearchProviderHandler",
+            config=LambdaConfig(
+                name="put_search_provider",
+                entry="lambdas/api/settings/system/search/put_search",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self.system_settings_table.table.grant_write_data(
+            self._put_search_provider_handler.function
+        )
+        
+        # Add permissions to access Secrets Manager
+        self._put_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:UpdateSecret",
+                    "secretsmanager:PutSecretValue",
+                    "secretsmanager:CreateSecret",
+                ],
+                resources=["*"],  # You might want to restrict this to specific secrets
+            )
+        )
+
+        search_resource.add_method(
+            "PUT",
+            api_gateway.LambdaIntegration(self._put_search_provider_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        
+        # Create users resource
         settings_users_resource = settings_resource.add_resource("users")
         settings_users_userid_resource = settings_users_resource.add_resource("{id}")
         settings_users_user_resource = settings_users_resource.add_resource("user")
@@ -304,3 +461,27 @@ class SettingsConstruct(Construct):
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
+        
+    @property
+    def system_settings_table_name(self) -> str:
+        return self.system_settings_table.table_name
+
+    @property
+    def system_settings_table_arn(self) -> str:
+        return self.system_settings_table.table_arn
+
+    @property
+    def get_system_settings_handler(self) -> Lambda:
+        return self._get_system_settings_handler
+
+    @property
+    def get_search_provider_handler(self) -> Lambda:
+        return self._get_search_provider_handler
+
+    @property
+    def post_search_provider_handler(self) -> Lambda:
+        return self._post_search_provider_handler
+
+    @property
+    def put_search_provider_handler(self) -> Lambda:
+        return self._put_search_provider_handler
