@@ -12,6 +12,8 @@ import {
     Checkbox,
     Switch,
     Radio,
+    ListItemIcon,
+    ListItemText,
 } from '@mui/material';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
@@ -361,26 +363,23 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                                 }
                             }}
                         />
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={showMetadata}
-                                    onChange={(e) => onShowMetadataChange(e.target.checked)}
-                                    size="small"
-                                />
-                            }
-                            label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <InfoIcon fontSize="small" />
-                                    <span>Metadata</span>
-                                </Box>
-                            }
-                            sx={{
-                                '& .MuiFormControlLabel-label': {
-                                    fontSize: '0.875rem'
+                        {viewMode === 'card' && (
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={showMetadata}
+                                        onChange={(e) => onShowMetadataChange(e.target.checked)}
+                                        size="small"
+                                    />
                                 }
-                            }}
-                        />
+                                label="Metadata"
+                                sx={{
+                                    '& .MuiFormControlLabel-label': {
+                                        fontSize: '0.875rem'
+                                    }
+                                }}
+                            />
+                        )}
                     </Box>
                 </Box>
             </Menu>

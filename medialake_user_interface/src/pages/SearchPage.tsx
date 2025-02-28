@@ -22,6 +22,7 @@ import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
+import { SearchError } from '@/api/hooks/useSearch';
 
 type AssetItem = ImageItem | VideoItem | AudioItem;
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
@@ -71,7 +72,8 @@ const SearchPage: React.FC = () => {
     const {
         data: searchResults,
         isLoading,
-        isFetching
+        isFetching,
+        error
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: pageSize,
@@ -130,9 +132,9 @@ const SearchPage: React.FC = () => {
         isDeleteModalOpen,
         menuAnchorEl,
         selectedAsset,
-    } = useAssetOperations<AssetBase>();
+    } = useAssetOperations<AssetItem>();
 
-    const handleAssetClick = useCallback((asset: AssetBase) => {
+    const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
         navigate(`/${assetType}s/${asset.InventoryID}`, {
             state: { 
@@ -165,14 +167,14 @@ const SearchPage: React.FC = () => {
         { id: 'size', label: 'Size', visible: true },
     ]);
 
-    const [columns, setColumns] = useState<AssetTableColumn<AssetBase>[]>([
+    const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
         {
             id: 'name',
             label: 'Name',
             visible: true,
             minWidth: 200,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            cell: (info: CellContext<AssetBase, unknown>) => info.getValue() as string,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
                 rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
@@ -183,7 +185,7 @@ const SearchPage: React.FC = () => {
             label: 'Type',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.Type,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type)
         },
@@ -192,7 +194,7 @@ const SearchPage: React.FC = () => {
             label: 'Format',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.Format,
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(rowB.original.DigitalSourceAsset.MainRepresentation.Format)
         },
@@ -201,8 +203,8 @@ const SearchPage: React.FC = () => {
             label: 'Size',
             visible: true,
             minWidth: 100,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            cell: (info: CellContext<AssetBase, unknown>) => formatFileSize(info.getValue() as number),
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            cell: (info: CellContext<AssetItem, unknown>) => formatFileSize(info.getValue() as number),
             sortable: true,
             sortingFn: (rowA, rowB) => {
                 const a = rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
@@ -215,8 +217,8 @@ const SearchPage: React.FC = () => {
             label: 'Date',
             visible: true,
             minWidth: 150,
-            accessorFn: (row: AssetBase) => row.DigitalSourceAsset.CreateDate,
-            cell: (info: CellContext<AssetBase, unknown>) => {
+            accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
+            cell: (info: CellContext<AssetItem, unknown>) => {
                 const date = new Date(info.getValue() as string);
                 return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
             },
@@ -423,7 +425,7 @@ const SearchPage: React.FC = () => {
                             </Box>
                         )}
 
-                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && (
+                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error && (
                             <UnifiedResultsView
                                 results={filteredResults}
                                 searchMetadata={{
@@ -450,7 +452,7 @@ const SearchPage: React.FC = () => {
                                 onSortChange={setSorting}
                                 cardFields={cardFields}
                                 onCardFieldToggle={handleCardFieldToggle}
-                                columns={columns as AssetTableColumn<AssetItem>[]}
+                                columns={columns}
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
                                 onDeleteClick={handleDeleteClick}
@@ -460,6 +462,51 @@ const SearchPage: React.FC = () => {
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
+                            />
+                        )}
+
+                        {error && (
+                            <UnifiedResultsView
+                                results={[]}
+                                searchMetadata={{
+                                    totalResults: 0,
+                                    page: currentPage,
+                                    pageSize: pageSize,
+                                }}
+                                onPageChange={(newPage) => handleSearch({ page: newPage })}
+                                onPageSizeChange={handlePageSizeChange}
+                                searchTerm={currentQuery}
+                                groupByType={groupByType}
+                                onGroupByTypeChange={setGroupByType}
+                                viewMode={viewMode}
+                                onViewModeChange={handleViewModeChange}
+                                cardSize={cardSize}
+                                onCardSizeChange={setCardSize}
+                                aspectRatio={aspectRatio}
+                                onAspectRatioChange={setAspectRatio}
+                                thumbnailScale={thumbnailScale}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                showMetadata={showMetadata}
+                                onShowMetadataChange={setShowMetadata}
+                                sorting={sorting}
+                                onSortChange={setSorting}
+                                cardFields={cardFields}
+                                onCardFieldToggle={handleCardFieldToggle}
+                                columns={columns}
+                                onColumnToggle={handleColumnToggle}
+                                onAssetClick={handleAssetClick}
+                                onDeleteClick={handleDeleteClick}
+                                onMenuClick={handleMenuOpen}
+                                onEditClick={handleStartEditing}
+                                onEditNameChange={handleNameChange}
+                                onEditNameComplete={handleNameEditComplete}
+                                editingAssetId={editingAssetId}
+                                editedName={editedName}
+                                error={{
+                                    status: (error as SearchError).apiResponse?.status || error.name,
+                                    message: (error as SearchError).apiResponse?.message || error.message
+                                }}
+                                isLoading={isLoading || isFetching}
                             />
                         )}
                     </Box>

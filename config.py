@@ -42,7 +42,6 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
 
     return instance_type
 
-
 class LoggingConfig(BaseModel):
     retention_days: int = 90
     s3_retention_days: int = 90
@@ -249,10 +248,7 @@ class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
     lambda_tail_warming: bool = False
-    primary_region: str
-    account_id: str
     environment: str  # Used for retain decisions 
-    global_prefix: str
     resource_prefix: str
     resource_application_tag: str
     api_path: str

@@ -39,7 +39,7 @@ class NodesStack(Stack):
             self,
             "NodesBucket",
             S3BucketProps(
-                bucket_name=f"{config.global_prefix}-nodes-templates-{self.account}-{self.region}--{config.environment}",
+                bucket_name=f"{config.resource_prefix}-nodes-templates-{self.account}-{self.region}--{config.environment}",
                 destroy_on_delete=True,
             ),
         )
@@ -96,7 +96,7 @@ class NodesStack(Stack):
             self,
             "PipelineNodesTable",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}-pipeline-nodes-{config.environment}",
+                name=f"{config.resource_prefix}-pipeline-nodes-{config.environment}",
                 partition_key_name="pk",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="sk",
@@ -166,7 +166,7 @@ class NodesStack(Stack):
             self,
             "NodesProcessor",
             LambdaConfig(
-                name=f"{config.global_prefix}-nodes-processor",
+                name=f"{config.resource_prefix}-nodes-processor",
                 entry="lambdas/nodes/pipeline_nodes_deployment",
                 memory_size=256,
                 timeout_minutes=15,

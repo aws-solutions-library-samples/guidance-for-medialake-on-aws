@@ -51,7 +51,7 @@ class PipelineNodesStack(Stack):
             self,
             "PipelineNodesTable",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}_pipeline_nodes_table",
+                name=f"{config.resource_prefix}_pipeline_nodes_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
@@ -67,7 +67,7 @@ class PipelineNodesStack(Stack):
                 status="ACTIVE",  # Could also be "PAUSED"
                 tags=[
                     {"Environment": config.environment},
-                    {"Owner": config.global_prefix},
+                    {"Owner": config.resource_prefix},
                 ],
             ),
         )
@@ -80,7 +80,7 @@ class PipelineNodesStack(Stack):
             self,
             "TriggerNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_trigger_node",
+                name=f"{config.resource_prefix}_trigger_node",
                 timeout_minutes=5,
                 entry="lambdas/nodes/trigger",
                 environment_variables={
@@ -94,7 +94,7 @@ class PipelineNodesStack(Stack):
             self,
             "VideoMetadataExtractorNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_video_metadata_extractor_node",
+                name=f"{config.resource_prefix}_video_metadata_extractor_node",
                 timeout_minutes=15,
                 memory_size=10240,
                 architecture=lambda_.Architecture.X86_64,
@@ -110,7 +110,7 @@ class PipelineNodesStack(Stack):
             self,
             "ImageMetadataExtractorNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_image_metadata_extractor_node",
+                name=f"{config.resource_prefix}_image_metadata_extractor_node",
                 runtime=lambda_.Runtime.NODEJS_18_X,
                 timeout_minutes=15,
                 memory_size=10240,
@@ -126,7 +126,7 @@ class PipelineNodesStack(Stack):
             self,
             "ImageProxyNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_image_proxy_node",
+                name=f"{config.resource_prefix}_image_proxy_node",
                 memory_size=10240,
                 timeout_minutes=15,
                 entry="lambdas/nodes/image_proxy",
@@ -140,7 +140,7 @@ class PipelineNodesStack(Stack):
             self,
             "VideoProxyThumbnailNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_video_proxy_thumbnail_node",
+                name=f"{config.resource_prefix}_video_proxy_thumbnail_node",
                 timeout_minutes=15,
                 entry="lambdas/nodes/video_proxy_video_thumbnail",
                 environment_variables={
@@ -155,7 +155,7 @@ class PipelineNodesStack(Stack):
             self,
             "CheckMediaconvertStatusNode",
             config=LambdaConfig(
-                name=f"{config.global_prefix}_check_mediaconvert_status_node",
+                name=f"{config.resource_prefix}_check_mediaconvert_status_node",
                 timeout_minutes=15,
                 entry="lambdas/nodes/check_mediaconvert_status",
                 environment_variables={

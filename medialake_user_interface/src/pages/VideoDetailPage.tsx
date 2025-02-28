@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Paper, List, ListItem, Divider, Button } from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
@@ -229,6 +229,16 @@ const VideoDetailContent: React.FC = () => {
         } : null
     );
 
+    const handleBack = useCallback(() => {
+        // If we came from a specific location with state, go back to that location
+        if (location.state && (location.state.searchTerm || location.state.preserveSearch)) {
+            navigate(-1);
+        } else {
+            // Fallback to search page with search term if available
+            navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`);
+        }
+    }, [navigate, location.state, searchTerm]);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -244,7 +254,7 @@ const VideoDetailContent: React.FC = () => {
                     searchTerm={searchTerm}
                     currentResult={48}
                     totalResults={156}
-                    onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
+                    onBack={handleBack}
                     onPrevious={() => navigate(-1)}
                     onNext={() => navigate(1)}
                 />
@@ -276,7 +286,7 @@ const VideoDetailContent: React.FC = () => {
                     searchTerm={searchTerm}
                     currentResult={48}
                     totalResults={156}
-                    onBack={() => navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`)}
+                    onBack={handleBack}
                     onPrevious={() => navigate(-1)}
                     onNext={() => navigate(1)}
                     assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
