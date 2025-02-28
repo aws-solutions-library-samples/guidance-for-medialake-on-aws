@@ -32,9 +32,13 @@ class CognitoProps:
 
 class CognitoConstruct(Construct):
     def __init__(
-        self, scope: Construct, construct_id: str, props: Optional[CognitoProps] = None
+        self, 
+        scope: Construct, 
+        construct_id: str, 
+        props: CognitoProps,
+        **kwargs,
     ) -> None:
-        super().__init__(scope, construct_id)
+        super().__init__(scope, construct_id, **kwargs)
 
         # Get the region from the stack
         stack = Stack.of(self)
@@ -135,7 +139,7 @@ class CognitoConstruct(Construct):
         # Create a unique hash based on stack name and environment
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
-        unique_id = hashlib.md5(f"{config.resource_prefix}-{region}-{account}-{config.environment}".encode()).hexdigest()[:16]
+        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         
         print(f"Domain prefix: {domain_prefix}")

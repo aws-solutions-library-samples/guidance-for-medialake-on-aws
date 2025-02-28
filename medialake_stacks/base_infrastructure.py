@@ -544,7 +544,7 @@ class BaseInfrastructureStack(Stack):
             dynamodb.TableV2: The configured DynamoDB table
         """
 
-        return self._asset_table
+        return self._asset_table.table
 
     @property
     def pipeline_table(self) -> dynamodb.TableV2:

@@ -230,13 +230,6 @@ class ApiGatewayConstruct(Construct):
             self.api_gateway_rest_api.deployment_stage
         )
 
-        # self.api_gateway_endpoint = props.api_gateway_endpoint
-
-        # Restrict Security Group Ingress**
-        # self.api_gateway_endpoint.connections.allow_from_any_ipv4(
-        #     ec2.Port.tcp(443), "Allow HTTPS traffic from anywhere within the VPC"
-        # )
-
     @property
     def rest_api(self) -> apigateway.RestApi:
         return self.api_gateway_rest_api

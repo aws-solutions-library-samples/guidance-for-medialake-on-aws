@@ -251,6 +251,8 @@ class CDKConfig(BaseModel):
     environment: str  # Used for retain decisions 
     resource_prefix: str
     resource_application_tag: str
+    account_id: str
+    primary_region: str
     api_path: str
     initial_user: UserConfig
     logging: LoggingConfig = LoggingConfig()
