@@ -22,7 +22,7 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 )
 
 from pydantic import BaseModel
-from config import config
+
 
 tracer = Tracer()
 logger = Logger()
@@ -903,19 +903,19 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             #         "data": {"error": str(e)},
             #     }
 
-            config.resource_prefix = os.environ["config.resource_prefix"]
-            logger.info(f"Global prefix: {config.resource_prefix}")
+            global_prefix = os.environ["GLOBAL_PREFIX"]
+            logger.info(f"Global prefix: {global_prefix}")
             # Generate names for resources
             pipeline_suffix = createpipeline.name.replace(" ", "-").lower()
-            queue_name = f"{config.resource_prefix}-pl-{pipeline_suffix}"
-            rule_name = f"{config.resource_prefix}-pl-{pipeline_suffix}-rule"
-            sfn_role_name = f"{config.resource_prefix}-pl-sfn-{pipeline_suffix}"
+            queue_name = f"{global_prefix}-pl-{pipeline_suffix}"
+            rule_name = f"{global_prefix}-pl-{pipeline_suffix}-rule"
+            sfn_role_name = f"{global_prefix}-pl-sfn-{pipeline_suffix}"
 
             lambda_s3_dynamo_rw_role_name = (
-                f"{config.resource_prefix}-pl-s3_dynamo_rw-lam-{pipeline_suffix}"
+                f"{global_prefix}-pl-s3_dynamo_rw-lam-{pipeline_suffix}"
             )
 
-            state_machine_name = f"{config.resource_prefix}-pl-{pipeline_suffix}"
+            state_machine_name = f"{global_prefix}-pl-{pipeline_suffix}"
 
             logger.info(
                 f"Generated resource names: queue={queue_name}, rule={rule_name}, sfn_role={sfn_role_name}, lambda_roles={lambda_s3_dynamo_rw_role_name}, state_machine={state_machine_name}"
