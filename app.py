@@ -19,7 +19,7 @@ from medialake_stacks.pipeline_nodes_stack import (
     PipelineNodesStackProps,
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
-
+from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 app = cdk.App()
 
 # Define environment once
@@ -122,18 +122,31 @@ cleanup_stack = CleanupStack(
     env=env,
 )
 
+asset_sync_stack = AssetSyncStack(
+    app,
+    "MediaLakeAssetSyncStack",
+    props=AssetSyncStackProps(
+        asset_table=base_infrastructure.asset_table,
+        api_resource=api_gateway_stack.rest_api,
+        x_origin_verify_secret=api_gateway_stack.x_origin_verify_secret,
+        cognito_authorizer=api_gateway_stack.cognito_authorizer,
+    ),
+    env=env,
+)
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
 cleanup_stack.add_dependency(nodes_stack)
+cleanup_stack.add_dependency(asset_sync_stack)
 
 if lambda_warmer:
     cleanup_stack.add_dependency(lambda_warmer)
 
-cdk.Tags.of(app).add("Application", config.resource_application_tag)
+if config.resource_application_tag:
+    cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
-# Add AWS Solutions checks to the entire app
+# AWS Solutions checks
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
 cdk.CfnOutput(

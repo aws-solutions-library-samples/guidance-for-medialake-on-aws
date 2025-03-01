@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_lambda as lambda_,
     aws_events as events,
+    aws_secretsmanager as secretsmanager,
     aws_apigateway as apigateway,
     aws_iam as iam,
     custom_resources as cr,
@@ -59,7 +60,7 @@ from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
 )
-from medialake_constructs.api_gateway.api_gateway_integrations import (
+from medialake_constructs.api_gateway.api_gateway_integrations import(
     ApiGatewayIntegrationsConstruct,
     ApiGatewayIntegrationsProps,
 )
@@ -402,6 +403,14 @@ class ApiGatewayStack(Stack):
     @property
     def connector_table(self) -> dynamodb.TableV2:
         return self._connectors_api_gateway.connector_table
+
+    @property
+    def x_origin_verify_secret(self) -> secretsmanager.Secret:
+        return self._api_gateway.x_origin_verify_secret
+
+    @property
+    def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
+        return self._api_gateway.cognito_authorizer
 
     @property
     def user_interface_url(self) -> str:
