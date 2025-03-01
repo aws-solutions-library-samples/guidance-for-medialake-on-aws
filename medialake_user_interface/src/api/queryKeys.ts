@@ -62,4 +62,8 @@ export const QUERY_KEYS = {
         details: () => [...QUERY_KEYS.ENVIRONMENTS.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.ENVIRONMENTS.details(), id] as const,
     },
+    SYSTEM_SETTINGS: {
+        all: ['system-settings'] as const,
+        search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, 'search'] as const,
+    },
 } as const;
