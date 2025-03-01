@@ -29,9 +29,9 @@ class SearchProps:
     open_search_endpoint: str
     open_search_arn: str
     open_search_index: str
+    system_settings_table: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
-    system_settings_table: str
 
 
 class SearchConstruct(Construct):

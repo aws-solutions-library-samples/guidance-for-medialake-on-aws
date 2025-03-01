@@ -7,7 +7,6 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.parameters import get_secret
-from aws_lambda_powertools.utilities.validation import validate_request_body
 
 # Initialize powertools
 logger = Logger()
@@ -22,18 +21,6 @@ secretsmanager = boto3.client('secretsmanager')
 # Initialize API Gateway resolver
 app = APIGatewayRestResolver()
 
-# JSON Schema for request validation
-SEARCH_PROVIDER_UPDATE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "apiKey": {"type": "string"},
-        "endpoint": {"type": "string"},
-        "isEnabled": {"type": "boolean"}
-    },
-    "additionalProperties": False
-}
-
 @app.put("/settings/system/search")
 @tracer.capture_method
 def update_search_provider():
@@ -44,8 +31,15 @@ def update_search_provider():
         # Get request body
         body = app.current_event.json_body
         
-        # Validate request body
-        validate_request_body(SEARCH_PROVIDER_UPDATE_SCHEMA, body)
+        # Manual validation of request body
+        allowed_fields = ["name", "apiKey", "endpoint", "isEnabled"]
+        for field in body:
+            if field not in allowed_fields:
+                return {
+                    "status": "error",
+                    "message": f"Invalid field: {field}. Allowed fields are: {', '.join(allowed_fields)}",
+                    "data": {}
+                }
         
         # Check if search provider exists
         existing_provider = system_settings_table.get_item(

@@ -241,7 +241,7 @@ Resources:
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
       Source:
         Type: CODEPIPELINE
-        BuildSpec: !Sub |
+        BuildSpec: 
           version: 0.2
           phases:
             install:
@@ -285,7 +285,7 @@ Resources:
             Value: !Ref NodejsVersion
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
+        BuildSpec:
           version: 0.2
           phases:
             install:
@@ -298,10 +298,12 @@ Resources:
                 - pip install -U pip
                 - echo "Listing directory structure to locate CDK and frontend code"
                 - find . -type d -maxdepth 3 | sort
-                - "if [ -d \"./medialake-2-12-25/cdk\" ]; then export CDK_DIR=\"./medialake-2-12-25/cdk\"; elif [ -d \"./cdk\" ]; then export CDK_DIR=\"./cdk\"; else export CDK_DIR=$(find . -type f -name \"cdk.json\" -o -name \"app.py\" | grep -v \"node_modules\" | head -1 | xargs dirname); if [ -z \"$CDK_DIR\" ]; then echo \"Could not find CDK directory\"; exit 1; fi; fi"
-                - "if [ -d \"./medialake-2-12-25/medialake_user_interface\" ]; then export FRONTEND_DIR=\"./medialake-2-12-25/medialake_user_interface\"; elif [ -d \"./medialake_user_interface\" ]; then export FRONTEND_DIR=\"./medialake_user_interface\"; elif [ -d \"./medialake-2-12-25/frontend\" ]; then export FRONTEND_DIR=\"./medialake-2-12-25/frontend\"; elif [ -d \"./frontend\" ]; then export FRONTEND_DIR=\"./frontend\"; else export FRONTEND_DIR=$(find . -name \"package.json\" -not -path \"*/node_modules/*\" | head -1 | xargs dirname); if [ -z \"$FRONTEND_DIR\" ]; then echo \"Could not find frontend directory\"; exit 1; fi; fi"
+                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export FRONTEND_DIR=$(if [ -d "./medialake-2-12-25/medialake_user_interface" ]; then echo "./medialake-2-12-25/medialake_user_interface"; elif [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./medialake-2-12-25/frontend" ]; then echo "./medialake-2-12-25/frontend"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
                 - echo "CDK directory: $CDK_DIR"
                 - echo "Frontend directory: $FRONTEND_DIR"
+                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
+                - if [ -z "$FRONTEND_DIR" ]; then echo "Could not find frontend directory"; exit 1; fi
                 - cd $CDK_DIR
                 - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
                 - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
@@ -311,12 +313,13 @@ Resources:
                 - echo Building frontend
                 - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
                 - if [ -f "package.json" ]; then npm run build || echo "Build failed, continuing"; fi
-                - "echo \"Checking for build output directory\"; if [ -d \"build\" ]; then export BUILD_DIR=\"build\"; elif [ -d \"dist\" ]; then export BUILD_DIR=\"dist\"; else echo \"Looking for any build output directory...\"; export BUILD_DIR=$(find . -maxdepth 2 -type d -name \"build\" -o -name \"dist\" | head -1 | xargs basename); if [ -z \"$BUILD_DIR\" ]; then echo \"Could not find build output directory, creating empty one\"; mkdir -p build; export BUILD_DIR=\"build\"; fi; fi"
+                - export BUILD_DIR=$(if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
+                - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
                 - echo "Build output directory: $BUILD_DIR"
                 - echo CDK synthesis
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
                 - mkdir -p assets
-                - "if [ -d \"$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR\" ]; then echo \"Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets\"; cp -r \"$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/\" assets/; else echo \"No frontend build found to copy\"; fi"
+                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
                 - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
             post_build:
               commands:
@@ -339,7 +342,7 @@ Resources:
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
+        BuildSpec:
           version: 0.2
           phases:
             install:
@@ -351,8 +354,9 @@ Resources:
                 - npm install -g aws-cdk
                 - pip install -U pip
                 - echo "Locating CDK directory"
-                - "if [ -d \"./medialake-2-12-25/cdk\" ]; then export CDK_DIR=\"./medialake-2-12-25/cdk\"; elif [ -d \"./cdk\" ]; then export CDK_DIR=\"./cdk\"; else export CDK_DIR=$(find . -type f -name \"cdk.json\" -o -name \"app.py\" | grep -v \"node_modules\" | head -1 | xargs dirname); if [ -z \"$CDK_DIR\" ]; then echo \"Could not find CDK directory\"; exit 1; fi; fi"
+                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
                 - echo "CDK directory: $CDK_DIR"
+                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - cd $CDK_DIR
                 - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
             build:

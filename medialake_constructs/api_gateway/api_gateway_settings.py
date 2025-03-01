@@ -171,7 +171,7 @@ class SettingsConstruct(Construct):
             ),
         )
 
-        self.system_settings_table.table.grant_write_data(
+        self.system_settings_table.table.grant_read_write_data(
             self._post_search_provider_handler.function
         )
         
@@ -186,7 +186,7 @@ class SettingsConstruct(Construct):
                     "secretsmanager:DeleteSecret",
                     "secretsmanager:TagResource",
                 ],
-                resources=["*"],  # You might want to restrict this to specific secrets
+                resources=["*"],
             )
         )
 
@@ -212,7 +212,7 @@ class SettingsConstruct(Construct):
             ),
         )
 
-        self.system_settings_table.table.grant_write_data(
+        self.system_settings_table.table.grant_read_write_data(
             self._put_search_provider_handler.function
         )
         
@@ -226,7 +226,7 @@ class SettingsConstruct(Construct):
                     "secretsmanager:PutSecretValue",
                     "secretsmanager:CreateSecret",
                 ],
-                resources=["*"],  # You might want to restrict this to specific secrets
+                resources=["*"],
             )
         )
 
