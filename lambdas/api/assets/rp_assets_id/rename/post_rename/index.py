@@ -130,6 +130,10 @@ def get_object_name_from_path(full_path: str) -> str:
     """Extracts the object name from the full path."""
     return full_path.split("/")[-1]
 
+def get_object_path(full_path: str) -> str:
+    """Extracts the object path from the full path."""
+    return full_path.rsplit("/",1)[0]
+
 
 @tracer.capture_method
 def copy_s3_object_with_tags(
@@ -258,7 +262,8 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
 
         # Update object name in DynamoDB
         main_rep["Name"] = get_object_name_from_path(new_name)
-        new_path = f"{new_name}"
+
+        new_path = f"{get_object_path(source_path)}/{new_name}"
 
         # Check if main representation already exists
         if check_object_exists(source_bucket, new_path):
@@ -450,10 +455,11 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
     try:
         main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
         old_path = main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+        new_object_path = get_object_path(old_path)
         new_object_name = get_object_name_from_path(new_name)
 
         # Update main representation path and name
-        main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"] = new_name
+        main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"] = f"{new_object_path}/{new_object_name}"
         main_rep["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
             "Name"
         ] = new_object_name
