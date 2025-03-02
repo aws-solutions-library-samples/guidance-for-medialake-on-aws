@@ -231,6 +231,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
                 "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name,
                 # "CONNECTOR_TABLE": props.connector_table.table_arn,
+                "RESOURCE_PREFIX": config.resource_prefix,
                 "NODE_TABLE": props.node_table.table_arn,
                 "ACCOUNT_ID": scope.account,
             },

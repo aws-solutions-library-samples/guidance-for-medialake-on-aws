@@ -13,6 +13,8 @@ from iam_operations import create_lambda_role, wait_for_role_propagation
 # Initialize logger
 logger = Logger()
 
+resource_prefix = os.environ["RESOURCE_PREFIX"]
+
 
 def sanitize_function_name(pipeline_name, node_label, version):
     """
@@ -27,7 +29,7 @@ def sanitize_function_name(pipeline_name, node_label, version):
         A sanitized function name suitable for AWS Lambda
     """
     # Combine the components
-    raw_name = f"{pipeline_name}-{node_label}-{version}".lower()
+    raw_name = f"{resource_prefix}_{pipeline_name}_{node_label}_{version}".lower()
 
     # Replace spaces with hyphens
     raw_name = raw_name.replace(" ", "-")
@@ -193,11 +195,13 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
     zip_file_key = get_zip_file_key(IAC_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
-    role_arn = create_lambda_role(node.data.id, yaml_data)
+    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data)
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
-        wait_for_role_propagation(f"{node.data.id}LambdaExecutionRole")
+        wait_for_role_propagation(
+            f"{resource_prefix}_{pipeline_name}_{node.data.id}_lambda_execution_role"
+        )
     except Exception as e:
         logger.warning(
             f"Error waiting for role propagation: {e}, will proceed with Lambda creation anyway"
@@ -221,7 +225,7 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     Runtime=runtime,
                     Timeout=300,
                     Role=role_arn,
-                    Handler="lambda_function.lambda_handler",
+                    Handler="index.lambda_handler",
                     Code={"S3Bucket": IAC_BUCKET, "S3Key": zip_file_key},
                     Environment={
                         "Variables": {

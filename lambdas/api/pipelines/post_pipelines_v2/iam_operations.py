@@ -16,6 +16,21 @@ from config import (
 # Initialize logger
 logger = Logger()
 
+resource_prefix = os.environ["RESOURCE_PREFIX"]
+
+
+def sanitize_role_name(name: str) -> str:
+    """Sanitize the role name to comply with AWS IAM naming rules."""
+    # Remove any characters that are not alphanumeric or in the set +=,.@_-
+    sanitized = re.sub(r"[^a-zA-Z0-9+=,.@_-]", "", name)
+
+    # Ensure the name doesn't start with 'aws' or 'AWS'
+    if sanitized.lower().startswith("aws"):
+        sanitized = "_" + sanitized
+
+    # Truncate to 64 characters if necessary (IAM role name limit)
+    return sanitized[:64]
+
 
 def create_iam_lambda_s3_dynamo_rw_policy():
     """Create a policy document for Lambda to access S3 and DynamoDB."""
@@ -320,10 +335,14 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
         raise
 
 
-def create_lambda_role(node_id: str, yaml_data: Dict[str, Any]) -> str:
+def create_lambda_role(
+    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any]
+) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")
-    role_name = f"{node_id}LambdaExecutionRole"
+    role_name = sanitize_role_name(
+        f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
+    )
     max_retries = 5  # Increased from 3 to 5
     retry_delay = 3  # Increased from 2 to 3 seconds
 
@@ -405,11 +424,11 @@ def create_lambda_role(node_id: str, yaml_data: Dict[str, Any]) -> str:
         raise
 
 
-def get_events_role_arn() -> str:
+def get_events_role_arn(pipeline_name: str) -> str:
     """Get or create an IAM role for EventBridge to invoke Step Functions."""
     iam_client = boto3.client("iam")
-    role_name = "MediaLakeEventBridgeToStepFunctionsRole"
-
+    role_name = f"{resource_prefix}_{pipeline_name}_trigger_role"
+    # mldev3_connector_ml-video-repo-pipe-role
     try:
         response = iam_client.get_role(RoleName=role_name)
         return response["Role"]["Arn"]

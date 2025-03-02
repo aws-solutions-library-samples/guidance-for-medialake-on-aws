@@ -13,7 +13,12 @@ node:
           source: ["medialake.pipeline"]
           detail-type: ["Pipeline Execution Completed"]
           detail:
-            pipelineName: ["Default Video Pipeline"]
+            outputs:
+              input:
+                DigitalSourceAsset:
+                  Type: ["Video"]
+                  MainRepresentation:
+                    Format: ["${Video Type}"]
 actions:
   trigger:
     summary: Trigger after video processing is completed

@@ -2,13 +2,23 @@ spec: v1.0.0
 node:
   id: trigger_image_processing_completed
   title: Image Processing Completed
-  description: Wait for a specific duration
+  description: Trigger when a image processing pipeline execution is completed
   version: 1.0.0
   type: trigger
   integration:
     config:
       aws_eventbridge:
-        aws_eventbridge_rule: image_processing_completed
+        aws_eventbridge_rule: pipeline_execution_completed
+        event_pattern:
+          source: ["medialake.pipeline"]
+          detail-type: ["Pipeline Execution Completed"]
+          detail:
+            outputs:
+              input:
+                DigitalSourceAsset:
+                  Type: ["Image"]
+                  MainRepresentation:
+                    Format: ["${Image Type}"]
 actions:
   trigger:
     summary: Trigger after image processing is completed

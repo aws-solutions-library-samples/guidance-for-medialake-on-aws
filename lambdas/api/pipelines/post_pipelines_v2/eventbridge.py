@@ -45,12 +45,26 @@ def get_event_pattern_for_rule(
             }
         )
     elif rule_name == "pipeline_execution_completed":
+        # Get video type from node configuration, default to MP4 if not provided
+        video_type = node.data.configuration.get("Video Type", "MP4")
+
+        # Create the base pattern with MainRepresentation.Format set to the video type
+        digital_source_asset = {
+            "Type": ["Video"],
+            "MainRepresentation": {"Format": [video_type]},
+        }
+
         # Override the source for pipeline execution completed events
         pattern = {
             "source": ["medialake.pipeline"],
             "detail-type": ["Pipeline Execution Completed"],
-            "detail": {"pipelineName": ["Default Video Pipeline"]},
+            "detail": {
+                "outputs": {"input": {"DigitalSourceAsset": digital_source_asset}},
+            },
         }
+
+        # Skip the rest of the function to avoid adding parameters at the top level
+        return pattern
     elif rule_name == "workflow_completed":
         # Get pipeline name from node configuration if available
         target_pipeline = node.data.configuration.get("pipeline_name", "")
@@ -62,7 +76,12 @@ def get_event_pattern_for_rule(
 
     # Add any additional filters from node configuration
     for param in node.data.configuration:
-        if param not in ["pipeline_name"] and node.data.configuration[param]:
+        # Skip pipeline_name, method, and Video Type parameters
+        # Video Type is handled separately for pipeline_execution_completed
+        if (
+            param not in ["pipeline_name", "method", "Video Type"]
+            and node.data.configuration[param]
+        ):
             if "detail" not in pattern:
                 pattern["detail"] = {}
 
@@ -159,7 +178,7 @@ def create_eventbridge_rule(
         )
 
         # Create or get IAM role for EventBridge to invoke Step Functions
-        role_arn = get_events_role_arn()
+        role_arn = get_events_role_arn(sanitized_pipeline_name)
 
         # Set the Step Function as the target
         events_client.put_targets(

@@ -2,7 +2,7 @@ import json
 import re
 import time
 from typing import Dict, Any
-
+import os
 import boto3
 from aws_lambda_powertools import Logger
 
@@ -10,6 +10,8 @@ from iam_operations import create_sfn_role
 
 # Initialize logger
 logger = Logger()
+
+resource_prefix = os.environ["RESOURCE_PREFIX"]
 
 
 def sanitize_role_name(name: str) -> str:
@@ -671,7 +673,7 @@ def sanitize_state_machine_name(name: str) -> str:
     # Ensure the name doesn't end with a hyphen or underscore
     sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
 
-    return sanitized_name
+    return f"{resource_prefix}_{sanitized_name}_pipeline"
 
 
 def create_step_function(
@@ -694,7 +696,7 @@ def create_step_function(
     sanitized_role_name = sanitize_role_name(pipeline_name)
     sanitized_state_machine_name = sanitize_state_machine_name(pipeline_name)
 
-    role_name = f"{sanitized_role_name}StepFunctionRole"
+    role_name = f"{resource_prefix}_{sanitized_role_name}_sfn_role"
     logger.info(f"Using sanitized role name: {role_name}")
     logger.info(f"Using sanitized state machine name: {sanitized_state_machine_name}")
     role_arn = create_sfn_role(role_name)
