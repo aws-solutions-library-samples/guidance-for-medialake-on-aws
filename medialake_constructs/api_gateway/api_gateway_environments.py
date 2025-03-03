@@ -42,7 +42,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self,
             "EnvironmentsTable",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}-environments",
+                name=f"{config.resource_prefix}-environments",
                 partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="SK",
@@ -65,7 +65,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self.environments_table.table_name,
-                    "METRICS_NAMESPACE": config.global_prefix,
+                    "METRICS_NAMESPACE": config.resource_prefix,
                 },
             ),
         )
@@ -119,7 +119,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self.environments_table.table_name,
-                    "METRICS_NAMESPACE": config.global_prefix,
+                    "METRICS_NAMESPACE": config.resource_prefix,
                 },
             ),
         )

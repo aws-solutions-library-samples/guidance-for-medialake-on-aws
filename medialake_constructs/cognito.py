@@ -4,8 +4,6 @@ from constructs import Construct
 from typing import Optional
 from aws_cdk import (
     aws_cognito as cognito,
-    aws_iam as iam,
-    aws_dynamodb as dynamodb,
     RemovalPolicy,
     CfnOutput,
     Stack,
@@ -15,7 +13,6 @@ from aws_cdk.aws_cognito_identitypool_alpha import (
     UserPoolAuthenticationProvider,
     IdentityPoolAuthenticationProviders,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from config import config
 
@@ -35,12 +32,17 @@ class CognitoProps:
 
 class CognitoConstruct(Construct):
     def __init__(
-        self, scope: Construct, construct_id: str, props: Optional[CognitoProps] = None
+        self, 
+        scope: Construct, 
+        construct_id: str, 
+        props: CognitoProps,
+        **kwargs,
     ) -> None:
-        super().__init__(scope, construct_id)
+        super().__init__(scope, construct_id, **kwargs)
 
         # Get the region from the stack
         stack = Stack.of(self)
+        account = stack.account
         region = stack.region
 
         # Use provided props or create default props
@@ -135,11 +137,10 @@ class CognitoConstruct(Construct):
         )
 
         # Create a unique hash based on stack name and environment
-        import hashlib
 
-        # Using stack name ensures uniqueness across different deployments
-        unique_id = hashlib.md5(f"{stack.stack_name}-{config.environment}".encode()).hexdigest()[:8]
-        domain_prefix = f"medialake-{config.environment.lower()}-{unique_id}"
+        # Using stack name, region, account, and environment ensures uniqueness across different deployments
+        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
+        domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         
         print(f"Domain prefix: {domain_prefix}")
         self._domain = self._user_pool.add_domain(
@@ -211,18 +212,13 @@ class CognitoConstruct(Construct):
                             cognito.OAuthScope.PROFILE,
                         ],
                         callback_urls=[
-                            "http://localhost:3000",  # For local development
-                            "https://d358w0v8eryzhn.cloudfront.net",  # CloudFront URL
-                            "https://d358w0v8eryzhn.cloudfront.net/",  # With trailing slash
-                            "https://d358w0v8eryzhn.cloudfront.net/sign-in",  # Sign-in page
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/oauth2/idpresponse",  # OAuth callback
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse",  # SAML callback
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse"  # SAML callback
                         ],
                         logout_urls=[
-                            "http://localhost:3000",  # For local development
-                            "https://d358w0v8eryzhn.cloudfront.net",  # CloudFront URL
-                            "https://d358w0v8eryzhn.cloudfront.net/",  # With trailing slash
-                            "https://d358w0v8eryzhn.cloudfront.net/sign-in",  # Sign-in page
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",  
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",  
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/sign-in"  
                         ],
                     ),
                 }

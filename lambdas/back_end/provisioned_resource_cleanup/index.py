@@ -16,6 +16,7 @@ s3 = boto3.client("s3")
 sqs = boto3.client("sqs")
 cloudwatch_logs = boto3.client("logs")
 eventbridge = boto3.client("events")
+pipes = boto3.client("pipes")
 
 # Define log groups to clean up
 LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
@@ -144,6 +145,20 @@ def clean_up_connector(item, table):
         pass
     else:
         logger.warning(f"Unknown integration method: {integration_method}")
+
+    # Clean up EventBridge Pipe if present
+    if "pipeArn" in item:
+        try:
+            delete_eventbridge_pipe(item["pipeArn"])
+        except Exception as e:
+            errors.append(f"Error deleting EventBridge Pipe: {str(e)}")
+
+    # Clean up EventBridge Pipe IAM role if present
+    if "pipeRoleArn" in item:
+        try:
+            delete_iam_role(item["pipeRoleArn"])
+        except Exception as e:
+            errors.append(f"Error deleting EventBridge Pipe IAM role: {str(e)}")
 
     # Delete the connector record
     try:
@@ -350,6 +365,44 @@ def delete_cloudwatch_log_groups(log_group_names):
             if e.response["Error"]["Code"] != "ResourceNotFoundException":
                 raise
             logger.warning(f"CloudWatch log group {log_group_name} not found")
+
+
+def delete_eventbridge_pipe(pipe_arn):
+    """Delete an EventBridge Pipe"""
+    try:
+        # Get the pipe name from ARN
+        pipe_name = pipe_arn.split("/")[-1]
+        
+        # Check if pipe exists and get its current state
+        try:
+            pipe_info = pipes.describe_pipe(Name=pipe_name)
+            current_state = pipe_info.get('CurrentState')
+            
+            # If pipe is running, stop it first
+            if current_state == 'RUNNING':
+                pipes.stop_pipe(Name=pipe_name)
+                logger.info(f"Stopped EventBridge Pipe {pipe_name}")
+                
+                # Wait for pipe to stop before deleting
+                max_retries = 10
+                for i in range(max_retries):
+                    time.sleep(2)  # Wait 2 seconds between checks
+                    pipe_info = pipes.describe_pipe(Name=pipe_name)
+                    if pipe_info.get('CurrentState') != 'RUNNING':
+                        break
+                    if i == max_retries - 1:
+                        logger.warning(f"Pipe {pipe_name} did not stop in time, attempting delete anyway")
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ResourceNotFoundException":
+                raise
+        
+        # Delete the pipe
+        pipes.delete_pipe(Name=pipe_name)
+        logger.info(f"Deleted EventBridge Pipe {pipe_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        logger.warning(f"EventBridge Pipe {pipe_arn} already deleted")
 
 
 @tracer.capture_lambda_handler

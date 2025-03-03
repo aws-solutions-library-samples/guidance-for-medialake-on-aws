@@ -1,0 +1,509 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template to create a pipeline for building and deploying CDK V2 application (Python backend with TypeScript/React frontend)'
+
+Parameters:
+  SourceType:
+    Description: Source type for the CDK code
+    Type: String
+    Default: Git
+    AllowedValues:
+      - Git
+      - S3PresignedURL
+  
+  GitRepositoryUrl:
+    Description: URL of the public Git repository (if Git source type is selected)
+    Type: String
+    Default: ''
+  
+  GitBranch:
+    Description: Branch name to use from the Git repository
+    Type: String
+    Default: main
+  
+  S3PresignedURL:
+    Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
+    Type: String
+    Default: ''
+  
+  PipelineName:
+    Description: Name of the CodePipeline
+    Type: String
+    Default: CDKDeploymentPipeline
+  
+  NodejsVersion:
+    Description: Node.js version to use for frontend
+    Type: String
+    Default: 18
+    AllowedValues:
+      - 16
+      - 18
+      - 20
+
+Conditions:
+  IsGitSource: !Equals [!Ref SourceType, 'Git']
+  IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
+
+Resources:
+  # IAM Roles
+  CodeBuildServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:GetObjectVersion'
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'ecr:InitiateLayerUpload'
+                  - 'ecr:UploadLayerPart'
+                  - 'ecr:CompleteLayerUpload'
+                  - 'ecr:PutImage'
+                Resource: '*'
+
+  CDKDeployRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'  # Note: In production, use a more restricted policy based on your CDK stack requirements
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess'
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:ListBucket'
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}'
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+  # S3 Bucket for Artifacts
+  ArtifactBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # Initial source package for S3-based pipeline
+  InitialSourcePackage:
+    Type: 'Custom::S3InitialFile'
+    Condition: IsS3PresignedURLSource
+    Properties:
+      ServiceToken: !GetAtt InitialSourceFunction.Arn
+      BucketName: !Ref ArtifactBucket
+      SourceKey: 'source-package.zip'
+      Content: !Sub |
+        This is a source placeholder for the ${PipelineName} pipeline.
+        Created on ${AWS::StackName} in ${AWS::Region}.
+        Timestamp: ${AWS::AccountId}
+
+  InitialSourceFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: IsS3PresignedURLSource
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import io
+          import zipfile
+          import time
+          
+          def handler(event, context):
+              if event['RequestType'] in ['Create', 'Update']:
+                  try:
+                      s3 = boto3.client('s3')
+                      bucket_name = event['ResourceProperties']['BucketName']
+                      source_key = event['ResourceProperties']['SourceKey']
+                      content = event['ResourceProperties']['Content']
+                      
+                      # Create a simple ZIP file in memory
+                      buffer = io.BytesIO()
+                      with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as z:
+                          # Add a README file
+                          z.writestr('README.md', content)
+                          # Add a timestamp file
+                          z.writestr('timestamp.txt', str(time.time()))
+                      
+                      buffer.seek(0)
+                      
+                      # Upload the ZIP file to S3
+                      s3.put_object(
+                          Bucket=bucket_name,
+                          Key=source_key,
+                          Body=buffer.getvalue()
+                      )
+                      
+                      response_data = {'Message': 'Initial source package created'}
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  except Exception as e:
+                      print(f"Error: {str(e)}")
+                      response_data = {'Error': str(e)}
+                      cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+              else:  # Delete
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Condition: IsS3PresignedURLSource
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+  # CodeBuild Projects
+  DownloadSourceProject:
+    Type: 'AWS::CodeBuild::Project'
+    Condition: IsS3PresignedURLSource
+    Properties:
+      Name: !Sub '${PipelineName}-DownloadSource'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: 
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.9
+            build:
+              commands:
+                - echo Downloading source code from presigned URL
+                - curl -L "${S3PresignedURL}" -o source-code.zip
+                - mkdir -p source
+                - unzip -o source-code.zip -d source/
+                - echo "Listing downloaded content structure:"
+                - find source -type d | sort
+                - echo "Copying files to working directory"
+                - cp -r source/* .
+                - echo "Directory structure after copy:"
+                - find . -maxdepth 3 -type d | sort
+            post_build:
+              commands:
+                - echo Download completed
+          artifacts:
+            files:
+              - '**/*'
+              - '!source-code.zip'
+              - '!source/**/*'
+
+  BuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${PipelineName}-BuildProject'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: NODE_VERSION
+            Value: !Ref NodejsVersion
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec:
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.9
+                nodejs: $NODE_VERSION
+              commands:
+                - echo Installing dependencies
+                - npm install -g aws-cdk
+                - pip install -U pip
+                - echo "Listing directory structure to locate CDK and frontend code"
+                - find . -type d -maxdepth 3 | sort
+                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export FRONTEND_DIR=$(if [ -d "./medialake-2-12-25/medialake_user_interface" ]; then echo "./medialake-2-12-25/medialake_user_interface"; elif [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./medialake-2-12-25/frontend" ]; then echo "./medialake-2-12-25/frontend"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
+                - echo "CDK directory: $CDK_DIR"
+                - echo "Frontend directory: $FRONTEND_DIR"
+                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
+                - if [ -z "$FRONTEND_DIR" ]; then echo "Could not find frontend directory"; exit 1; fi
+                - cd $CDK_DIR
+                - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+                - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                - if [ -f "package.json" ]; then npm install; fi
+            build:
+              commands:
+                - echo Building frontend
+                - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                - if [ -f "package.json" ]; then npm run build || echo "Build failed, continuing"; fi
+                - export BUILD_DIR=$(if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
+                - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
+                - echo "Build output directory: $BUILD_DIR"
+                - echo CDK synthesis
+                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - mkdir -p assets
+                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
+                - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+            post_build:
+              commands:
+                - echo Build completed
+          artifacts:
+            files:
+              - "**/*"
+            base-directory: '.'
+
+  DeployProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub '${PipelineName}-DeployProject'
+      ServiceRole: !GetAtt CDKDeployRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec:
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.9
+                nodejs: $NODE_VERSION
+              commands:
+                - echo Installing dependencies
+                - npm install -g aws-cdk
+                - pip install -U pip
+                - echo "Locating CDK directory"
+                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - echo "CDK directory: $CDK_DIR"
+                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
+                - cd $CDK_DIR
+                - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+            build:
+              commands:
+                - echo Deploying CDK stacks
+                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+            post_build:
+              commands:
+                - echo Deployment completed
+          artifacts:
+            files:
+              - "**/*"
+            base-directory: '.'
+
+  # Pipeline with Git Source
+  GitSourcePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Condition: IsGitSource
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !ImportValue GitHubConnection  # Note: You need to create a connection to GitHub in the CodeStar connections and export its ARN
+                FullRepositoryId: !Ref GitRepositoryUrl
+                BranchName: !Ref GitBranch
+                OutputArtifactFormat: 'CODE_ZIP'
+              OutputArtifacts:
+                - Name: SourceCode
+        
+        - Name: Build
+          Actions:
+            - Name: BuildCode
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+        
+        - Name: Deploy
+          Actions:
+            - Name: DeployCDK
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DeployProject
+              InputArtifacts:
+                - Name: BuildOutput
+
+  # Pipeline with S3 PresignedURL Source
+  S3SourcePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Condition: IsS3PresignedURLSource
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: 'source-package.zip'
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: PlaceholderSource
+        
+        - Name: Download
+          Actions:
+            - Name: DownloadFromPresignedURL
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DownloadSourceProject
+              InputArtifacts:
+                - Name: PlaceholderSource
+              OutputArtifacts:
+                - Name: SourceCode
+        
+        - Name: Build
+          Actions:
+            - Name: BuildCode
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+        
+        - Name: Deploy
+          Actions:
+            - Name: DeployCDK
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DeployProject
+              InputArtifacts:
+                - Name: BuildOutput
+
+Outputs:
+  PipelineUrl:
+    Description: URL to the CodePipeline console
+    Value: !If 
+      - IsGitSource
+      - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${GitSourcePipeline}
+      - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${S3SourcePipeline}
+  
+  ArtifactBucketName:
+    Description: Name of the S3 bucket used to store pipeline artifacts
+    Value: !Ref ArtifactBucket

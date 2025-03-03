@@ -233,7 +233,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 # "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "NODE_TABLE": props.node_table.table_arn,
                 "ACCOUNT_ID": scope.account,
-                # "GLOBAL_PREFIX": config.global_prefix,
             },
         )
         self._post_pipelines_v2_handler = Lambda(
@@ -408,7 +407,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
                 "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "AWS_ACCOUNT_ID": scope.account,
-                "GLOBAL_PREFIX": config.global_prefix,
+                "GLOBAL_PREFIX": config.resource_prefix,
             },
         )
         self._post_pipelines_handler = Lambda(

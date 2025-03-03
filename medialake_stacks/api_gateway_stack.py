@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_lambda as lambda_,
     aws_events as events,
+    aws_secretsmanager as secretsmanager,
     aws_apigateway as apigateway,
     aws_iam as iam,
     custom_resources as cr,
@@ -59,7 +60,7 @@ from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
 )
-from medialake_constructs.api_gateway.api_gateway_integrations import (
+from medialake_constructs.api_gateway.api_gateway_integrations import(
     ApiGatewayIntegrationsConstruct,
     ApiGatewayIntegrationsProps,
 )
@@ -207,6 +208,20 @@ class ApiGatewayStack(Stack):
             ),
         )
 
+        # Create Settings API Gateway construct (now includes system settings)
+        self._settings_construct = SettingsConstruct(
+            self,
+            "SettingsApiGateway",
+            props=SettingsConstructProps(
+                api_resource=self._api_gateway.rest_api,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
+                cognito_user_pool=self._cognito_construct.user_pool,
+                cognito_app_client=self._cognito_construct.user_pool_client,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+            ),
+        )
+
+        # Update the SearchConstruct to include the system settings table
         _ = SearchConstruct(
             self,
             "SearchApiGateway",
@@ -221,6 +236,7 @@ class ApiGatewayStack(Stack):
                 open_search_index="media",
                 vpc=props.vpc,
                 security_group=props.security_group,
+                system_settings_table=self._settings_construct.system_settings_table_name,
             ),
         )
 
@@ -231,18 +247,6 @@ class ApiGatewayStack(Stack):
                 asset_table=props.asset_table,
                 api_resource=self._api_gateway.rest_api,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-            ),
-        )
-
-        _ = SettingsConstruct(
-            self,
-            "SettingsApiGateway",
-            props=SettingsConstructProps(
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                cognito_user_pool=self._cognito_construct.user_pool,
-                cognito_app_client=self._cognito_construct.user_pool_client,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
             ),
         )
@@ -403,6 +407,14 @@ class ApiGatewayStack(Stack):
     @property
     def connector_table(self) -> dynamodb.TableV2:
         return self._connectors_api_gateway.connector_table
+
+    @property
+    def x_origin_verify_secret(self) -> secretsmanager.Secret:
+        return self._api_gateway.x_origin_verify_secret
+
+    @property
+    def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
+        return self._api_gateway.cognito_authorizer
 
     @property
     def user_interface_url(self) -> str:

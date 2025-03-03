@@ -38,7 +38,7 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
-            log_group_name=f"aws-waf-logs-{config.global_prefix}-api-gateway-waf-logs",
+            log_group_name=f"aws-waf-logs-{config.resource_prefix}-api-gateway-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -229,13 +229,6 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_waf_association.node.add_dependency(
             self.api_gateway_rest_api.deployment_stage
         )
-
-        # self.api_gateway_endpoint = props.api_gateway_endpoint
-
-        # Restrict Security Group Ingress**
-        # self.api_gateway_endpoint.connections.allow_from_any_ipv4(
-        #     ec2.Port.tcp(443), "Allow HTTPS traffic from anywhere within the VPC"
-        # )
 
     @property
     def rest_api(self) -> apigateway.RestApi:

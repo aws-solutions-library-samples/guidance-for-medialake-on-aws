@@ -467,7 +467,7 @@ def create_eventbridge_pipe(
     lambda_arn: str,
     bucket_region: str,
     created_resources: list,
-) -> str:
+) -> tuple[str, str]:
     """Create EventBridge Pipe between SQS and Lambda"""
 
     # Truncate pipe role name if it exceeds 64 characters
@@ -490,6 +490,7 @@ def create_eventbridge_pipe(
         RoleName=pipe_role_name, AssumeRolePolicyDocument=json.dumps(assume_role_policy)
     )
     created_resources.append(("iam_role", pipe_role_name))
+    pipe_role_arn = pipe_role["Role"]["Arn"]
 
     # Create policy for source (SQS) permissions
     source_policy = {
@@ -545,7 +546,7 @@ def create_eventbridge_pipe(
     pipe_name = f"{resource_name_prefix}-pipe"
     response = pipes.create_pipe(
         Name=pipe_name,
-        RoleArn=pipe_role["Role"]["Arn"],
+        RoleArn=pipe_role_arn,
         Source=queue_arn,
         Target=lambda_arn,
         SourceParameters={
@@ -559,8 +560,9 @@ def create_eventbridge_pipe(
         },
     )
     created_resources.append(("eventbridge_pipe", pipe_name))
+    pipe_arn = response["Arn"]
 
-    return response["Arn"]
+    return pipe_arn, pipe_role_arn
 
 
 @app.post("/connectors/s3")
@@ -597,16 +599,6 @@ def create_connector(createconnector: S3Connector) -> dict:
         connector_description = createconnector.description
         integration_method = createconnector.configuration.s3IntegrationMethod
         object_prefix = createconnector.configuration.objectPrefix
-
-        # # Check for existing S3 notifications if using EventBridge
-        # if integration_method == "eventbridge" and check_existing_s3_notifications(
-        #     s3_client, s3_bucket
-        # ):
-        #     return {
-        #         "status": "400",
-        #         "message": "S3 Event Notifications enabled, cannot enable EventBridge event notifications.",
-        #         "data": {},
-        #     }
 
         suffix = generate_suffix()
 
@@ -928,14 +920,14 @@ def create_connector(createconnector: S3Connector) -> dict:
             created_resources.append(("lambda_function", target_function_name))
 
             # Instead of creating event source mapping, create EventBridge Pipe
-            pipe_arn = create_eventbridge_pipe(
+            pipe_arn, pipe_role_arn = create_eventbridge_pipe(
                 resource_name_prefix,
                 queue_arn,
                 lambda_arn,
                 bucket_region,
                 created_resources,
             )
-            logger.info(f"Created EventBridge Pipe: {pipe_arn}")
+            logger.info(f"Created EventBridge Pipe: {pipe_arn} with role: {pipe_role_arn}")
         except Exception as e:
             logger.error(f"Failed to deploy/configure lambda: {str(e)}")
             raise
@@ -967,7 +959,9 @@ def create_connector(createconnector: S3Connector) -> dict:
             "queueUrl": queue_url,
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
-            "objectPrefix" : object_prefix
+            "objectPrefix": object_prefix,
+            "pipeArn": pipe_arn,
+            "pipeRoleArn": pipe_role_arn
         }
 
         table.put_item(Item=connector_item)
@@ -979,13 +973,17 @@ def create_connector(createconnector: S3Connector) -> dict:
 
     except Exception as e:
         eventbridge = boto3.client("events")
+        pipes_client = boto3.client("pipes")
         logger.exception(f"Unexpected error: {str(e)}")
         error_traceback = traceback.format_exc()
 
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
             try:
-                if resource_type == "eventbridge_target":
+                if resource_type == "eventbridge_pipe":
+                    pipes_client.delete_pipe(Name=resource_id)
+                    logger.info(f"Deleted EventBridge Pipe: {resource_id}")
+                elif resource_type == "eventbridge_target":
                     rule_name, target_id = resource_id
                     eventbridge.remove_targets(Rule=rule_name, Ids=[target_id])
                 elif resource_type == "eventbridge_rule":

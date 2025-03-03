@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from '@/api/endpoints';
 import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
 import { QUERY_KEYS } from '@/api/queryKeys';
+import axios from 'axios';
 
 interface SearchParams {
     page?: number;
@@ -25,10 +26,14 @@ interface SearchResponseData {
     suggestions: any;
 }
 
-interface SearchResponseType {
+export interface SearchResponseType {
     status: string;
     message: string;
-    data: SearchResponseData;
+    data: SearchResponseData | null;
+}
+
+export interface SearchError extends Error {
+    apiResponse?: SearchResponseType;
 }
 
 export const useSearch = (query: string, params?: SearchParams) => {
@@ -37,7 +42,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const isSemantic = params?.isSemantic ?? false;
     const { showError } = useErrorModal();
 
-    return useQuery<SearchResponseType>({
+    return useQuery<SearchResponseType, SearchError>({
         queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic),
         queryFn: async ({ signal }) => {
             try {
@@ -46,6 +51,13 @@ export const useSearch = (query: string, params?: SearchParams) => {
                     { signal }
                 );
 
+                // Check if the response status is not a success (2xx)
+                if (response.data?.status && !response.data.status.startsWith('2')) {
+                    const error = new Error(response.data.message || 'Search request failed') as SearchError;
+                    error.apiResponse = response.data;
+                    throw error;
+                }
+
                 if (!response.data?.data?.results) {
                     throw new Error('Invalid search response structure');
                 }
@@ -53,7 +65,17 @@ export const useSearch = (query: string, params?: SearchParams) => {
                 return response.data;
             } catch (error) {
                 logger.error('Search error:', error);
-                showError('Failed to perform search');
+                
+                // Handle axios errors
+                if (axios.isAxiosError(error) && error.response?.data) {
+                    const apiError = new Error(
+                        error.response.data.message || 'Search request failed'
+                    ) as SearchError;
+                    apiError.apiResponse = error.response.data;
+                    throw apiError;
+                }
+                
+                // Rethrow the error to be handled by the component
                 throw error;
             }
         },

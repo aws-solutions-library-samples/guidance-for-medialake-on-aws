@@ -89,7 +89,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "AccessLogsBucket",
                 props=S3BucketProps(
-                    # bucket_name=f"{config.global_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                    # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
                     destroy_on_delete=config.environment != "prod",
                     intelligent_tiering_configurations=[
                         s3.IntelligentTieringConfiguration(
@@ -128,7 +128,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             props=S3BucketProps(
-                # bucket_name=f"{config.global_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
+                # bucket_name=f"{config.resource_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
                 destroy_on_delete=True,
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
@@ -140,7 +140,7 @@ class BaseInfrastructureStack(Stack):
         #     self,
         #     "MediaLakeVPC",
         #     props=CustomVpcProps(
-        #         vpc_name=f"{config.global_prefix}-vpc-{self.region}-{config.environment}"
+        #         vpc_name=f"{config.resource_prefix}-vpc-{self.region}-{config.environment}"
         #     ),
         # )
 
@@ -213,7 +213,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
-                domain_name=f"{config.global_prefix}-os-{region}-{config.environment}",
+                domain_name=f"{config.resource_prefix}-os-{region}-{config.environment}",
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
                 collection_indexes=[opensearch_index_name],
@@ -246,7 +246,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "MediaAssets",
                 props=S3BucketProps(
-                    # bucket_name=f"{config.global_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
+                    # bucket_name=f"{config.resource_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
                     destroy_on_delete=config.environment != "prod",
                     access_logs=True,
                     access_logs_bucket=self.access_logs_bucket,
@@ -288,7 +288,7 @@ class BaseInfrastructureStack(Stack):
         #     self,
         #     "InternalS3Bucket",
         #     props=S3ExpressOneZoneBucketProps(
-        #         bucket_name=f"{config.global_prefix}-internal-s3-bucket".lower(),
+        #         bucket_name=f"{config.resource_prefix}-internal-s3-bucket".lower(),
         #         access_logs=True,
         #         access_logs_bucket=self.access_logs_bucket.bucket,
         #     ),
@@ -301,7 +301,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IACAssets",
             props=S3BucketProps(
-                # bucket_name=f"{config.global_prefix}-iac-assets-{account}-{region}-{config.environment}".lower(),
+                # bucket_name=f"{config.resource_prefix}-iac-assets-{account}-{region}-{config.environment}".lower(),
                 destroy_on_delete=True,
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
@@ -312,7 +312,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "IngestEventBus",
             props=EventBusConfig(
-                bus_name=f"{config.global_prefix}-ingest-{region}-{config.environment}",
+                bus_name=f"{config.resource_prefix}-ingest-{region}-{config.environment}",
                 description="event bus",
                 log_all=True,
             ),
@@ -324,7 +324,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "PipelinesTable",
             props=DynamoDBProps(
-                name=f"{config.global_prefix}_pipeline_table",
+                name=f"{config.resource_prefix}_pipeline_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 removal_policy=RemovalPolicy.DESTROY,
@@ -344,10 +344,10 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "MediaLakeAssetTable",
                 props=DynamoDBProps(
-                    name=f"{config.global_prefix}-asset-table",
+                    name=f"{config.resource_prefix}-asset-table",
                     partition_key_name="InventoryID",
                     partition_key_type=dynamodb.AttributeType.STRING,
-                    pipeline_name=f"{config.global_prefix}-dynamodb-etl-pipeline",
+                    pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
                     ddb_export_bucket=self.ddb_export_bucket,
                     stream=dynamodb.StreamViewType.NEW_IMAGE,
                     point_in_time_recovery=True,
@@ -393,7 +393,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "MediaLakeAssetTableV2",
                 props=DynamoDBProps(
-                    name=f"{config.global_prefix}-asset-table-v2",
+                    name=f"{config.resource_prefix}-asset-table-v2",
                     partition_key_name="PK",
                     partition_key_type=dynamodb.AttributeType.STRING,
                     point_in_time_recovery=True,

@@ -29,6 +29,7 @@ from search_utils import (
     replace_decimals,
     CustomEncoder
 )
+from api_utils import get_api_key, get_endpoint
 
 # Initialize AWS clients and utilities
 logger = Logger()
@@ -72,7 +73,7 @@ class SearchParams(BaseModelWithConfig):
 
     q: str = Field(..., min_length=1)
     page: conint(gt=0) = Field(default=1)  # type: ignore
-    pageSize: conint(gt=0, le=100) = Field(default=50)  # type: ignore
+    pageSize: conint(gt=0, le=500) = Field(default=50)  # type: ignore
     min_score: float = Field(default=0.01)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
@@ -180,39 +181,52 @@ def build_semantic_query(params: SearchParams) -> Dict:
     from twelvelabs import TwelveLabs
     from twelvelabs.models.embed import SegmentEmbedding
     
-    twelve_labs_client = TwelveLabs(api_key="tlk_15G4M1P19ECJF522H79N51AA6WQ1")
-    res = twelve_labs_client.embed.create(
-        model_name="Marengo-retrieval-2.7",
-        text=params.q,
-    )
+    # Get the API key from Secrets Manager
+    api_key = get_api_key()
     
-    if res.text_embedding is not None and res.text_embedding.segments is not None:
-        # Extract the embedding as a flat list of floats
-        embedding = list(res.text_embedding.segments[0].embeddings_float)
+    if not api_key:
+        raise SearchException("Search provider API key not configured or provider not enabled")
+    
+    # Get the endpoint from the configuration
+    endpoint = get_endpoint()
+    
+    # Initialize the Twelve Labs client
+    twelve_labs_client = TwelveLabs(api_key=api_key, base_url=endpoint)
+    
+    try:
+        # Create embedding for the search query
+        res = twelve_labs_client.embed.create(
+            model_name="Marengo-retrieval-2.7",
+            text=params.q,
+        )
         
-        # Verify it's a flat list of numbers
-        if not all(isinstance(x, (int, float)) for x in embedding):
-            raise SearchException("Invalid embedding format")
+        if res.text_embedding is not None and res.text_embedding.segments is not None:
+            # Extract the embedding as a flat list of floats
+            embedding = list(res.text_embedding.segments[0].embeddings_float)
             
-        return {
-            "size": params.pageSize,
-            "query": {
-                "knn": {
-                    "embedding": {
-                        "vector": embedding,
-                        "k": params.pageSize
+            # Verify it's a flat list of numbers
+            if not all(isinstance(x, (int, float)) for x in embedding):
+                raise SearchException("Invalid embedding format")
+                
+            return {
+                "size": params.pageSize,
+                "query": {
+                    "knn": {
+                        "embedding": {
+                            "vector": embedding,
+                            "k": params.pageSize
+                        }
                     }
+                },
+                "_source": {
+                    "excludes": ["embedding"]
                 }
-            },
-            "_source": {
-                "excludes": ["embedding"]
             }
-        }
-    else:
-        raise SearchException("Failed to generate embedding for search term")
-
-
-
+        else:
+            raise SearchException("Failed to generate embedding for search term")
+    except Exception as e:
+        logger.exception("Error generating embedding for search term")
+        raise SearchException(f"Error generating embedding: {str(e)}")
 
 
 def build_search_query(params: SearchParams) -> Dict:

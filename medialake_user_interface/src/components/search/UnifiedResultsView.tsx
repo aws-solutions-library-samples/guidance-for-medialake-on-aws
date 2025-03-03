@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Grid, Typography } from '@mui/material';
+import { Box, Grid, Typography, Paper, Alert, AlertTitle } from '@mui/material';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -12,6 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import UnifiedAssetResults from './UnifiedAssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
+import ErrorDisplay from '../shared/ErrorDisplay';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
@@ -56,6 +57,8 @@ interface UnifiedResultsViewProps {
     editedName?: string;
     onGroupByTypeChange: (checked: boolean) => void;
     onPageSizeChange: (newPageSize: number) => void;
+    error?: { status: string; message: string } | null;
+    isLoading?: boolean;
 }
 
 const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
@@ -90,6 +93,8 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     editedName,
     onGroupByTypeChange,
     onPageSizeChange,
+    error,
+    isLoading,
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -162,6 +167,61 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 return '';
         }
     };
+
+    // If there's an error, display the error component
+    if (error) {
+        return (
+            <Box>
+                <AssetViewControls
+                    viewMode={viewMode}
+                    onViewModeChange={onViewModeChange}
+                    title="Results"
+                    sorting={sorting}
+                    sortOptions={columns
+                        .filter(col => col.sortable)
+                        .map(col => ({
+                            id: col.id,
+                            label: col.label
+                        }))
+                    }
+                    onSortChange={(columnId) => {
+                        const currentSort = sorting[0];
+                        const desc = currentSort?.id === columnId ? !currentSort.desc : false;
+                        onSortChange([{ id: columnId, desc }]);
+                    }}
+                    fields={viewMode === 'card' 
+                        ? cardFields 
+                        : columns.map(col => ({
+                            id: col.id,
+                            label: col.label,
+                            visible: col.visible
+                        }))}
+                    onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
+                    groupByType={groupByType}
+                    onGroupByTypeChange={onGroupByTypeChange}
+                    cardSize={cardSize}
+                    onCardSizeChange={onCardSizeChange}
+                    aspectRatio={aspectRatio}
+                    onAspectRatioChange={onAspectRatioChange}
+                    thumbnailScale={thumbnailScale}
+                    onThumbnailScaleChange={onThumbnailScaleChange}
+                    showMetadata={showMetadata}
+                    onShowMetadataChange={onShowMetadataChange}
+                />
+                
+                <ErrorDisplay 
+                    title="Search Error" 
+                    message="There was a problem searching for content." 
+                    detailedMessage={error.message}
+                />
+            </Box>
+        );
+    }
+
+    // If loading, you could add a loading state here
+    if (isLoading) {
+        // Return loading UI
+    }
 
     const renderContent = () => {
         if (viewMode === 'card') {
@@ -247,6 +307,40 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
         }
 
         // Table view
+        if (groupByType) {
+            return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {Object.entries(groupedResults)
+                        .filter(([type]) => ['Image', 'Video', 'Audio'].includes(type) && groupedResults[type].length > 0)
+                        .map(([type, assets]) => (
+                            <Box key={type}>
+                                <Typography variant="h6" sx={{ mb: 2, px: 1, color: 'text.secondary' }}>
+                                    {type}
+                                </Typography>
+                                <AssetTable
+                                    data={assets}
+                                    columns={columns}
+                                    sorting={sorting}
+                                    onSortingChange={onSortChange}
+                                    onDeleteClick={onDeleteClick}
+                                    onMenuClick={onMenuClick}
+                                    onEditClick={onEditClick}
+                                    onAssetClick={onAssetClick}
+                                    getThumbnailUrl={(asset) => asset.thumbnailUrl || ''}
+                                    getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                    getId={(asset) => asset.InventoryID}
+                                    editingId={editingAssetId}
+                                    editedName={editedName}
+                                    onEditNameChange={onEditNameChange}
+                                    onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
+                                />
+                            </Box>
+                        ))}
+                </Box>
+            );
+        }
+
+        // Non-grouped table view
         return (
             <AssetTable
                 data={results}

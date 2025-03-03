@@ -238,6 +238,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         [isCanvasLocked, MIN_ZOOM, MAX_ZOOM]
     );
 
+
     // Add or remove the wheel listener
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -338,8 +339,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             setScaleSize(newScaleSize);
 
             // Re-fit the image fully on container resize:
-            setZoom(newScaleSize);
-            setOffset({ x: 0, y: 0 });
+            // setZoom(newScaleSize);
+            // setOffset({ x: 0, y: 0 });
 
             // Redraw after resizing
             requestAnimationFrame(() => {
