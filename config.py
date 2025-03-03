@@ -1,5 +1,5 @@
 import json
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union
 from datetime import datetime
 from aws_cdk import aws_logs as logs
 from pydantic import (
@@ -9,6 +9,7 @@ from pydantic import (
     model_validator,
     validator,
     root_validator,
+    ValidationInfo,
 )
 import warnings
 import os
@@ -221,10 +222,86 @@ class NewVpcConfig(BaseModel):
     enable_dns_support: bool = True
 
 
+class ExistingSecurityGroupsConfig(BaseModel):
+    media_lake_sg: str
+    opensearch_sg: str
+
+
+class NewSecurityGroupConfig(BaseModel):
+    name: str
+    description: str
+
+
+class SecurityGroupsConfig(BaseModel):
+    use_existing_groups: bool = False
+    existing_groups: Optional[ExistingSecurityGroupsConfig] = None
+    new_groups: Optional[Dict[str, NewSecurityGroupConfig]] = None
+
+    @model_validator(mode="after")
+    def check_security_groups_config(self):
+        if self.use_existing_groups and not self.existing_groups:
+            raise ValueError(
+                "When use_existing_groups is True, existing_groups must be provided"
+            )
+        if not self.use_existing_groups and not self.new_groups:
+            raise ValueError(
+                "When use_existing_groups is False, new_groups must be provided"
+            )
+        return self
+
+
+class ExistingS3Config(BaseModel):
+    bucket_name: str
+    bucket_arn: str
+    kms_key_arn: Optional[str] = None
+
+
+class S3Config(BaseModel):
+    use_existing_buckets: bool = False
+    asset_bucket: Optional[ExistingS3Config] = None
+    access_logs_bucket: Optional[ExistingS3Config] = None
+
+    @field_validator("asset_bucket", "access_logs_bucket")
+    @classmethod
+    def validate_bucket_config(
+        cls, v: Optional[ExistingS3Config], info: ValidationInfo
+    ) -> Optional[ExistingS3Config]:
+        if info.data.get("use_existing_buckets") and v is None:
+            raise ValueError(
+                f"{info.field_name} is required when use_existing_buckets is True"
+            )
+        return v
+
+
+class DatabaseConfig(BaseModel):
+    use_existing_tables: bool = False
+    pipelines_executions_arn: Optional[str] = None
+    asset_table_arn: Optional[str] = None
+    assetv2_table_arn: Optional[str] = None
+    pipeline_nodes_table_arn: Optional[str] = None
+
+    @field_validator(
+        "pipelines_executions_arn",
+        "asset_table_arn",
+        "assetv2_table_arn",
+        "pipeline_nodes_table_arn",
+    )
+    @classmethod
+    def validate_table_arns(
+        cls, v: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        if info.data.get("use_existing_tables") and v is None:
+            raise ValueError(
+                f"{info.field_name} is required when use_existing_tables is True"
+            )
+        return v
+
+
 class VpcConfig(BaseModel):
     use_existing_vpc: bool = False
     existing_vpc: Optional[ExistingVpcConfig] = None
     new_vpc: Optional[NewVpcConfig] = NewVpcConfig()  # Provide a default NewVpcConfig
+    security_groups: SecurityGroupsConfig = Field(default_factory=SecurityGroupsConfig)
 
     @model_validator(mode="after")
     def check_vpc_config(self, values):
@@ -260,6 +337,8 @@ class CDKConfig(BaseModel):
     opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
+    db: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    s3: S3Config = Field(default_factory=S3Config)
 
     @property
     def should_retain_tables(self) -> bool:

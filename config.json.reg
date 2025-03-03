@@ -1,9 +1,9 @@
 {
-    "environment": "prod",
-    "resource_prefix": "mldev3",
-    "account_id": "034362042487",
-    "global_prefix": "mldev3",
-    "resource_application_tag": "mldev3",
+    "environment": "dev",
+    "resource_prefix": "mldevlb",
+    "account_id": "273354633826",
+    "global_prefix": "mldevlb",
+    "resource_application_tag": "mldevlb",
     "api_path": "prod",
     "primary_region": "us-east-1",
     "initial_user": {
@@ -33,18 +33,18 @@
     "vpc": {
         "use_existing_vpc": false,
         "existing_vpc": {
-            "vpc_id": "vpc-0b725173ca66d6122",
+            "vpc_id": "vpc-0ebfebaff691c61f1",
             "vpc_cidr": "10.0.0.0/16",
             "subnet_ids": {
                 "public": [
-                    "subnet-01d5702175c1c33ea",
-                    "subnet-007d1263e420501c3",
-                    "subnet-0b8bb00fef29a94d9"
+                    "subnet-0a05f00a53bd3b3f6",
+                    "subnet-0c8aa1e9b47e8f823",
+                    "subnet-0d09915719b444529"
                 ],
                 "private": [
-                    "subnet-0a543207b58d71b03",
-                    "subnet-091aa4554dc7164a1",
-                    "subnet-0ef469ab4d03b899d"
+                    "subnet-0d8a71ba980747c6d",
+                    "subnet-095fb63726157b902",
+                    "subnet-0d557535259ef7d25"
                 ]
             }
         },
@@ -58,8 +58,8 @@
         "security_groups": {
             "use_existing_groups": false,
             "existing_groups": {
-                "media_lake_sg": "sg-01860409547420a5d",
-                "opensearch_sg": "sg-0c5c8e3ac1a6fcb67"
+                "media_lake_sg": "",
+                "opensearch_sg": ""
             },
             "new_groups": {
                 "media_lake_sg": {

@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_ec2 as ec2,
+    aws_kms as kms,
     # custom_resources as cr,
     Duration,
     RemovalPolicy,
@@ -70,36 +71,50 @@ class BaseInfrastructureStack(Stack):
         account = Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
-        
-        self.access_logs_bucket = S3Bucket(
-            self,
-            "AccessLogsBucket",
-            props=S3BucketProps(
-                # bucket_name=f"{config.resource_prefix}-access-logs-{account}-{region}-{config.environment}".lower(),
-                intelligent_tiering_configurations=[
-                    s3.IntelligentTieringConfiguration(
-                        name="All",
-                        archive_access_tier_time=Duration.days(90),
-                        deep_archive_access_tier_time=Duration.days(180),
-                    )
-                ],
-                lifecycle_rules=[
-                    s3.LifecycleRule(
-                        enabled=True,
-                        abort_incomplete_multipart_upload_after=Duration.days(7),
-                    ),
-                    s3.LifecycleRule(
-                        enabled=True,
-                        transitions=[
-                            s3.Transition(
-                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
-                                transition_after=Duration.minutes(0),
-                            )
-                        ],
-                    ),
-                ],
-            ),
-        )
+
+        if config.s3.use_existing_buckets:
+            # Import existing buckets
+            self._access_logs_bucket = S3Bucket(
+                self,
+                "AccessLogsBucket",
+                props=S3BucketProps(
+                    bucket_name=config.s3.access_logs_bucket.bucket_name,
+                    destroy_on_delete=config.environment != "prod",
+                    existing_bucket_arn=config.s3.access_logs_bucket.bucket_arn,
+                ),
+            )
+
+        else:
+            self._access_logs_bucket = S3Bucket(
+                self,
+                "AccessLogsBucket",
+                props=S3BucketProps(
+                    # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                    destroy_on_delete=config.environment != "prod",
+                    intelligent_tiering_configurations=[
+                        s3.IntelligentTieringConfiguration(
+                            name="All",
+                            archive_access_tier_time=Duration.days(90),
+                            deep_archive_access_tier_time=Duration.days(180),
+                        )
+                    ],
+                    lifecycle_rules=[
+                        s3.LifecycleRule(
+                            enabled=True,
+                            abort_incomplete_multipart_upload_after=Duration.days(7),
+                        ),
+                        s3.LifecycleRule(
+                            enabled=True,
+                            transitions=[
+                                s3.Transition(
+                                    storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                                    transition_after=Duration.minutes(0),
+                                )
+                            ],
+                        ),
+                    ],
+                ),
+            )
 
         # self.dynamodb_cloudtrail_logs = DynamoDBCloudTrailLogs(
         #     self,
@@ -113,9 +128,10 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             props=S3BucketProps(
-                # bucket_name=f"{config.resource_prefix}-ddb-export-{account}-{region}-{config.environment}".lower(),
+                # bucket_name=f"{config.resource_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
+                destroy_on_delete=True,
                 access_logs=True,
-                access_logs_bucket=self.access_logs_bucket.bucket,
+                access_logs_bucket=self.access_logs_bucket,
             ),
         )
 
@@ -139,29 +155,41 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Security group for Lambdas
-        self._security_group = ec2.SecurityGroup(
-            self,
-            "MediaLakeSecurityGroup",
-            description="MediaLake Security Group",
-            vpc=self._vpc.vpc,
-        )
-        # If the environment is prod, apply a retention policy to the security group
-        if config.environment == "prod":
-            self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
+        if config.vpc.security_groups.use_existing_groups:
+            self._security_group = ec2.SecurityGroup.from_security_group_id(
+                self,
+                "MediaLakeSecurityGroup",
+                security_group_id=config.vpc.security_groups.existing_groups.media_lake_sg,
+            )
+        else:
+            self._security_group = ec2.SecurityGroup(
+                self,
+                "MediaLakeSecurityGroup",
+                vpc=self._vpc.vpc,
+                security_group_name=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].name,
+                description=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].description,
+            )
+            # If the environment is prod, apply a retention policy to the security group
+            if config.environment == "prod":
+                self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
 
-        # Allow HTTPS ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp(443),
-            description="Allow HTTPS ingress from VPC CIDR",
-        )
+            # Allow HTTPS ingress from the VPC CIDR
+            self._security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS ingress from VPC CIDR",
+            )
 
-        # Allow HTTP ingress from the VPC CIDR
-        self._security_group.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp(80),
-            description="Allow HTTP ingress from VPC CIDR",
-        )
+            # Allow HTTP ingress from the VPC CIDR
+            self._security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(80),
+                description="Allow HTTP ingress from VPC CIDR",
+            )
 
         # Create OpenSearch managed cluster
         if config.vpc.use_existing_vpc:
@@ -193,39 +221,67 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        # Create media asset bucket
-        self.media_assets_s3_bucket = S3Bucket(
-            self,
-            "MediaAssets",
-            props=S3BucketProps(
-                # bucket_name=f"{config.resource_prefix}-asset-bucket-{account}-{region}-{config.environment}",
-                access_logs=True,
-                access_logs_bucket=self.access_logs_bucket.bucket,
-                cors=[
-                    s3.CorsRule(
-                        allowed_methods=[
-                            s3.HttpMethods.GET,
-                            s3.HttpMethods.PUT,
-                            s3.HttpMethods.POST,
-                            s3.HttpMethods.DELETE,
-                            s3.HttpMethods.HEAD,
-                        ],
-                        allowed_origins=[
-                            "http://localhost:5173",
-                            "https://*.cloudfront.net",
-                        ],
-                        allowed_headers=["*"],
-                        exposed_headers=["ETag"],
-                        max_age=3000,
-                    )
-                ],
-            ),
-        )
+        # Handle media asset bucket
+        if config.s3.use_existing_buckets and config.s3.asset_bucket:
+            # Import existing asset bucket
+            self.media_assets_s3_bucket = S3Bucket(
+                self,
+                "MediaAssets",
+                props=S3BucketProps(
+                    # bucket_name=config.s3.asset_bucket.bucket_name,
+                    destroy_on_delete=config.environment != "prod",
+                    access_logs=True,
+                    access_logs_bucket=self.access_logs_bucket,
+                    existing_bucket_arn=config.s3.asset_bucket.bucket_arn,
+                    existing_kms_key_arn=(
+                        config.s3.asset_bucket.kms_key_arn
+                        if config.s3.asset_bucket.kms_key_arn
+                        else None
+                    ),
+                ),
+            )
+        else:
+            # Create new media asset bucket
+            self.media_assets_s3_bucket = S3Bucket(
+                self,
+                "MediaAssets",
+                props=S3BucketProps(
+                    # bucket_name=f"{config.resource_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
+                    destroy_on_delete=config.environment != "prod",
+                    access_logs=True,
+                    access_logs_bucket=self.access_logs_bucket,
+                    existing_kms_key_arn=(
+                        config.s3.asset_bucket.kms_key_arn
+                        if config.s3.use_existing_buckets
+                        and config.s3.asset_bucket
+                        and config.s3.asset_bucket.kms_key_arn
+                        else None
+                    ),
+                    cors=[
+                        s3.CorsRule(
+                            allowed_methods=[
+                                s3.HttpMethods.GET,
+                                s3.HttpMethods.PUT,
+                                s3.HttpMethods.POST,
+                                s3.HttpMethods.DELETE,
+                                s3.HttpMethods.HEAD,
+                            ],
+                            allowed_origins=[
+                                "http://localhost:5173",
+                                "https://*.cloudfront.net",
+                            ],
+                            allowed_headers=["*"],
+                            exposed_headers=["ETag"],
+                            max_age=3000,
+                        )
+                    ],
+                ),
+            )
 
         add_s3_access_logging_policy(
             self,
-            access_logs_bucket=self.access_logs_bucket.bucket,
-            source_bucket=self.media_assets_s3_bucket.bucket,
+            access_logs_bucket=self.access_logs_bucket,
+            source_bucket=self.media_assets_s3_bucket,
         )
 
         # self.internal_s3_bucket = S3ExpressOneZoneBucket(
@@ -238,14 +294,17 @@ class BaseInfrastructureStack(Stack):
         #     ),
         # )
 
-        # Create IAC assets bucket with explicit name including region
+        # Handle IAC assets bucket
+
+        # Create new IAC assets bucket
         self.iac_assets_bucket = S3Bucket(
             self,
             "IACAssets",
             props=S3BucketProps(
                 # bucket_name=f"{config.resource_prefix}-iac-assets-{account}-{region}-{config.environment}".lower(),
+                destroy_on_delete=True,
                 access_logs=True,
-                access_logs_bucket=self.access_logs_bucket.bucket,
+                access_logs_bucket=self.access_logs_bucket,
             ),
         )
 
@@ -260,84 +319,98 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Pipeline table
-        self._pipeline_table = DynamoDB(
+
+        pipeline_table = DynamoDB(
             self,
             "PipelinesTable",
             props=DynamoDBProps(
                 name=f"{config.resource_prefix}_pipeline_table",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                removal_policy=(
-                    RemovalPolicy.RETAIN
-                    if config.should_retain_tables
-                    else RemovalPolicy.DESTROY
-                ),
+                removal_policy=RemovalPolicy.DESTROY,
             ),
         )
+        self._pipeline_table = pipeline_table.table
 
         # Asset table
-        self._asset_table = DynamoDB(
-            self,
-            "MediaLakeAssetTable",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}-asset-table",
-                partition_key_name="InventoryID",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
-                ddb_export_bucket=self.ddb_export_bucket,
-                stream=dynamodb.StreamViewType.NEW_IMAGE,
-                point_in_time_recovery=True,
-                removal_policy=(
-                    RemovalPolicy.RETAIN
-                    if config.should_retain_tables
-                    else RemovalPolicy.DESTROY
+        if config.db.use_existing_tables:
+            self._asset_table = dynamodb.Table.from_table_arn(
+                self,
+                "ImportedAssetTable",
+                config.db.asset_table_arn,
+            )
+        else:
+            asset_table = DynamoDB(
+                self,
+                "MediaLakeAssetTable",
+                props=DynamoDBProps(
+                    name=f"{config.resource_prefix}-asset-table",
+                    partition_key_name="InventoryID",
+                    partition_key_type=dynamodb.AttributeType.STRING,
+                    pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
+                    ddb_export_bucket=self.ddb_export_bucket,
+                    stream=dynamodb.StreamViewType.NEW_IMAGE,
+                    point_in_time_recovery=True,
+                    removal_policy=(
+                        RemovalPolicy.RETAIN
+                        if config.should_retain_tables
+                        else RemovalPolicy.DESTROY
+                    ),
                 ),
-            ),
-        )
+            )
+            self._asset_table = asset_table.table
 
-        # if not config.should_use_existing_tables:
-        self._asset_table.table.add_global_secondary_index(
-            index_name="AssetIDIndex",
-            partition_key=dynamodb.Attribute(
-                name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="DigitalSourceAsset.IngestedAt",
-                type=dynamodb.AttributeType.STRING,
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
-        )
+            # Add GSIs only for new tables
+            self._asset_table.add_global_secondary_index(
+                index_name="AssetIDIndex",
+                partition_key=dynamodb.Attribute(
+                    name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
+                ),
+                sort_key=dynamodb.Attribute(
+                    name="DigitalSourceAsset.IngestedAt",
+                    type=dynamodb.AttributeType.STRING,
+                ),
+                projection_type=dynamodb.ProjectionType.ALL,
+            )
 
-        self._asset_table.table.add_global_secondary_index(
-            index_name="FileHashIndex",
-            partition_key=dynamodb.Attribute(
-                name="FileHash", type=dynamodb.AttributeType.STRING
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
-        )
+            self._asset_table.add_global_secondary_index(
+                index_name="FileHashIndex",
+                partition_key=dynamodb.Attribute(
+                    name="FileHash", type=dynamodb.AttributeType.STRING
+                ),
+                projection_type=dynamodb.ProjectionType.ALL,
+            )
 
         # Asset V2 table
-        self._assetv2_table = DynamoDB(
-            self,
-            "MediaLakeAssetTableV2",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}-asset-table-v2",
-                partition_key_name="PK",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                point_in_time_recovery=True,
-                sort_key_name="SK",
-                sort_key_type=dynamodb.AttributeType.STRING,
-                removal_policy=(
-                    RemovalPolicy.RETAIN
-                    if config.should_retain_tables
-                    else RemovalPolicy.DESTROY
+        if config.db.use_existing_tables:
+            self._assetv2_table = dynamodb.Table.from_table_arn(
+                self,
+                "ImportedAssetV2Table",
+                config.db.assetv2_table_arn,
+            )
+        else:
+            assetv2_table = DynamoDB(
+                self,
+                "MediaLakeAssetTableV2",
+                props=DynamoDBProps(
+                    name=f"{config.resource_prefix}-asset-table-v2",
+                    partition_key_name="PK",
+                    partition_key_type=dynamodb.AttributeType.STRING,
+                    point_in_time_recovery=True,
+                    sort_key_name="SK",
+                    sort_key_type=dynamodb.AttributeType.STRING,
+                    removal_policy=(
+                        RemovalPolicy.RETAIN
+                        if config.should_retain_tables
+                        else RemovalPolicy.DESTROY
+                    ),
                 ),
-            ),
-        )
+            )
+            self._assetv2_table = assetv2_table.table
 
-        if not config.should_use_existing_tables:
+        if not config.db.use_existing_tables:
             # Add GSI1 -
-            self._assetv2_table.table.add_global_secondary_index(
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI1",
                 partition_key=dynamodb.Attribute(
                     name="GSI1PK", type=dynamodb.AttributeType.STRING
@@ -348,7 +421,7 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Add GSI2 - Hash Index
-            self._assetv2_table.table.add_global_secondary_index(
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI2",
                 partition_key=dynamodb.Attribute(
                     name="GSI2PK", type=dynamodb.AttributeType.STRING
@@ -359,7 +432,7 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Add GSI3 - Recent Assets Index
-            self._assetv2_table.table.add_global_secondary_index(
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI3",
                 partition_key=dynamodb.Attribute(
                     name="GSI3PK", type=dynamodb.AttributeType.STRING
@@ -370,7 +443,7 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Add GSI4 - TBD
-            self._assetv2_table.table.add_global_secondary_index(
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI4",
                 partition_key=dynamodb.Attribute(
                     name="GSI4PK", type=dynamodb.AttributeType.STRING
@@ -380,8 +453,8 @@ class BaseInfrastructureStack(Stack):
                 ),
             )
 
-            # Add GSI4 - TBD
-            self._assetv2_table.table.add_global_secondary_index(
+            # Add GSI5 - TBD
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI5",
                 partition_key=dynamodb.Attribute(
                     name="GSI5PK", type=dynamodb.AttributeType.STRING
@@ -391,8 +464,8 @@ class BaseInfrastructureStack(Stack):
                 ),
             )
 
-            # Add GSI4 - TBD
-            self._assetv2_table.table.add_global_secondary_index(
+            # Add GSI6 - TBD
+            self._assetv2_table.add_global_secondary_index(
                 index_name="GSI6",
                 partition_key=dynamodb.Attribute(
                     name="GSI6PK", type=dynamodb.AttributeType.STRING
@@ -442,23 +515,6 @@ class BaseInfrastructureStack(Stack):
             description="Retained VPC CIDR Block",
         )
 
-        # Subnet Outputs
-        for i, subnet in enumerate(self._vpc.vpc.public_subnets):
-            CfnOutput(
-                self,
-                f"RetainedPublicSubnet{i+1}",
-                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
-                description=f"Retained Public Subnet {i+1} (ID|AZ|CIDR)",
-            )
-
-        for i, subnet in enumerate(self._vpc.vpc.private_subnets):
-            CfnOutput(
-                self,
-                f"RetainedPrivateSubnet{i+1}",
-                value=f"{subnet.subnet_id}|{subnet.availability_zone}|{subnet.ipv4_cidr_block}",
-                description=f"Retained Private Subnet {i+1} (ID|AZ|CIDR)",
-            )
-
         # Security Group Output
         CfnOutput(
             self,
@@ -471,14 +527,14 @@ class BaseInfrastructureStack(Stack):
         CfnOutput(
             self,
             "RetainedPipelineTable",
-            value=f"{self._pipeline_table.table.table_name}|{self._pipeline_table.table.table_arn}",
+            value=f"{self._pipeline_table.table_name}|{self._pipeline_table.table_arn}",
             description="Retained Pipeline Table (Name|ARN)",
         )
 
         CfnOutput(
             self,
             "RetainedAssetTable",
-            value=f"{self._asset_table.table.table_name}|{self._asset_table.table.table_arn}",
+            value=f"{self._asset_table.table_name}|{self._asset_table.table_arn}",
             description="Retained Asset Table (Name|ARN)",
         )
 
@@ -493,7 +549,7 @@ class BaseInfrastructureStack(Stack):
         CfnOutput(
             self,
             "RetainedAssetV2Table",
-            value=f"{self._assetv2_table.table.table_name}|{self._assetv2_table.table.table_arn}",
+            value=f"{self._assetv2_table.table_name}|{self._assetv2_table.table_arn}",
             description="Retained Asset V2 Table (Name|ARN)",
         )
 
@@ -511,6 +567,28 @@ class BaseInfrastructureStack(Stack):
             "RetainedOpenSearchCluster",
             value=f"{self._opensearch_cluster.domain_endpoint}|{self._opensearch_cluster.domain_arn}",
             description="Retained OpenSearch Cluster (Endpoint|ARN)",
+        )
+
+        # S3 Bucket Outputs
+        CfnOutput(
+            self,
+            "RetainedAccessLogsBucket",
+            value=f"{self._access_logs_bucket.bucket_name}|{self._access_logs_bucket.bucket_arn}",
+            description="Retained Access Logs Bucket (Name|ARN)",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedAssetBucket",
+            value=f"{self.media_assets_s3_bucket.bucket_name}|{self.media_assets_s3_bucket.bucket_arn}",
+            description="Retained Asset Bucket (Name|ARN)",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedIACAssetsBucket",
+            value=f"{self.iac_assets_bucket.bucket_name}|{self.iac_assets_bucket.bucket_arn}",
+            description="Retained IAC Assets Bucket (Name|ARN)",
         )
 
     @property
@@ -536,26 +614,26 @@ class BaseInfrastructureStack(Stack):
         return self._ingest_event_bus.event_bus_name
 
     @property
-    def asset_table(self) -> dynamodb.TableV2:
+    def asset_table(self) -> dynamodb.ITable:
         """
         Returns the DynamoDB table used for storing media asset metadata.
 
         Returns:
-            dynamodb.TableV2: The configured DynamoDB table
+            dynamodb.ITable: The configured DynamoDB table
         """
 
-        return self._asset_table.table
+        return self._asset_table
 
     @property
-    def pipeline_table(self) -> dynamodb.TableV2:
+    def pipeline_table(self) -> dynamodb.ITable:
         """
         Returns the DynamoDB table used for storing pipelines.
 
         Returns:
-            dynamodb.TableV2: The configured DynamoDB table
+            dynamodb.ITable: The configured DynamoDB table
         """
 
-        return self._pipeline_table.table
+        return self._pipeline_table
 
     @property
     def asset_table_name(self) -> str:
@@ -566,7 +644,7 @@ class BaseInfrastructureStack(Stack):
             str: Name of the DynamoDB table
         """
 
-        return self._asset_table.table.table_name
+        return self._asset_table.table_name
 
     @property
     def asset_table_file_hash_index_name(self) -> str:
@@ -588,7 +666,7 @@ class BaseInfrastructureStack(Stack):
             str: ARN of the FileHash global secondary index
         """
 
-        return f"{self._asset_table.table.table_arn}/index/FileHashIndex"
+        return f"{self._asset_table.table_arn}/index/FileHashIndex"
 
     @property
     def asset_table_asset_id_index_name(self) -> str:
@@ -610,7 +688,7 @@ class BaseInfrastructureStack(Stack):
             str: ARN of the AssetID global secondary index
         """
 
-        return f"{self._asset_table.table.table_arn}/index/AssetIDIndex"
+        return f"{self._asset_table.table_arn}/index/AssetIDIndex"
 
     @property
     def collection_dashboards_url(self) -> str:
@@ -668,13 +746,24 @@ class BaseInfrastructureStack(Stack):
     @property
     def media_assets_bucket(self) -> s3.IBucket:
         """
-        Returns the URL for the OpenSearch Dashboards interface.
+        Returns the media assets bucket.
 
         Returns:
             s3.IBucket: S3 bucket object
         """
+        return self.media_assets_s3_bucket.bucket
 
-        return self.media_assets_s3_bucket
+    @property
+    def access_logs_bucket(self) -> s3.IBucket:
+        """
+        Returns the access logs bucket, handling both existing and new bucket cases.
+
+        Returns:
+            s3.IBucket: The S3 bucket for access logs
+        """
+        if isinstance(self._access_logs_bucket, S3Bucket):
+            return self._access_logs_bucket.bucket
+        return self._access_logs_bucket
 
     @property
     def access_log_bucket(self) -> s3.IBucket:
@@ -684,4 +773,4 @@ class BaseInfrastructureStack(Stack):
         Returns:
             s3.IBucket: S3 bucket object
         """
-        return self.access_logs_bucket.bucket
+        return self.access_logs_bucket

@@ -14,6 +14,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 from config import config
 from typing import Optional
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
@@ -22,13 +23,14 @@ from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 @dataclass
 class SearchProps:
     asset_table: dynamodb.TableV2
-    media_assets_bucket: s3.Bucket
+    media_assets_bucket: S3Bucket
     api_resource: apigateway.IResource
     cognito_authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     open_search_arn: str
     open_search_index: str
+    system_settings_table: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -62,6 +64,8 @@ class SearchConstruct(Construct):
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.open_search_index,
                     "SCOPE": "es",
+                    "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
+                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                 },
             ),
         )
@@ -111,10 +115,35 @@ class SearchConstruct(Construct):
                     "kms:GenerateDataKey",
                 ],
                 resources=[
-                    f"{props.media_assets_bucket.bucket_arn}/*",
-                    f"{props.media_assets_bucket.bucket_arn}",
-                    "arn:aws:kms:*:*:key/*",
+                    f"{props.media_assets_bucket.bucket.bucket_arn}/*",
+                    f"{props.media_assets_bucket.bucket.bucket_arn}",
+                    props.media_assets_bucket.kms_key.key_arn,
                 ],
+            )
+        )
+
+        # Add permissions to access Secrets Manager and the system settings table
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=["*"],  # You might want to restrict this to specific secrets
+            )
+        )
+
+        # Add permissions to access the system settings table
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"],
             )
         )
 

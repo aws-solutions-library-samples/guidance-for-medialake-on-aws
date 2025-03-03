@@ -20,28 +20,20 @@ from medialake_stacks.pipeline_nodes_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
+
 app = cdk.App()
 
 # Define environment once
-env = cdk.Environment(
-    account=app.account,
-    region=app.region   
-)
+env = cdk.Environment(account=app.account, region=app.region)
 
 # Create Lambda warmer stack if enabled
 lambda_warmer = None
 if config.lambda_tail_warming:
-    lambda_warmer = LambdaWarmerStack(
-        app,
-        "MediaLakeLambdaWarmer",
-        env=env
-    )
+    lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
 
 # Create base infrastructure stack first
 base_infrastructure = BaseInfrastructureStack(
-    app,
-    "MediaLakeBaseInfrastructure",
-    env=env
+    app, "MediaLakeBaseInfrastructure", env=env
 )
 
 # Create nodes stack
@@ -70,7 +62,7 @@ api_gateway_stack = ApiGatewayStack(
     "MediaLakeApiGatewayStack",
     props=ApiGatewayStackProps(
         iac_assets_bucket=base_infrastructure.iac_assets_bucket,
-        media_assets_bucket=base_infrastructure.media_assets_bucket,
+        media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
         pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
         asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
         asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,

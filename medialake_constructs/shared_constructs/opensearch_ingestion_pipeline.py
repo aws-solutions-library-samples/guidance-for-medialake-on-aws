@@ -89,8 +89,8 @@ class OpenSearchIngestionPipeline(Construct):
             config=LambdaConfig(
                 name=f"{config.resource_prefix}-os-pipeline-creator-{config.environment}",
                 timeout_minutes=15,
-                vpc=props.vpc.vpc,
-                security_groups=[props.security_group],
+                # vpc=props.vpc.vpc,
+                # security_groups=[props.security_group],
                 entry="lambdas/back_end/asset_table_ingestion_pipline",
                 environment_variables={
                     "TABLE_ARN": props.asset_table.table_arn,
@@ -419,6 +419,7 @@ class OpenSearchIngestionPipeline(Construct):
             self,
             "CreateIngestionPipeline",
             service_token=ingestion_provider.service_token,
+            removal_policy=RemovalPolicy.DESTROY,
             properties={
                 "PipelineName": f"{config.resource_prefix}-asset-pipeline",
                 "TableArn": props.asset_table.table_arn,

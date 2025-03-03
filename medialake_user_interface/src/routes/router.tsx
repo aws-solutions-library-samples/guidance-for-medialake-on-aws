@@ -17,6 +17,7 @@ import UserManagement from '@/pages/settings/UserManagement';
 import RoleManagement from '@/pages/settings/RoleManagement';
 import IntegrationsPage from '@/pages/settings/IntegrationsPage';
 import EnvironmentsPage from '@/pages/settings/EnvironmentsPage';
+import SystemSettingsPage from '@/pages/settings/SystemSettingsPage';
 
 const S3ExplorerWrapper = () => {
     const { connectorId } = useParams<{ connectorId: string }>();
@@ -107,6 +108,10 @@ export const router = createBrowserRouter([
             {
                 path: 'settings/pipelines/edit/:id',
                 element: <PipelineEditorPage />
+            },
+            {
+                path: 'settings/system',
+                element: <SystemSettingsPage />
             },
             {
                 path: 'settings',

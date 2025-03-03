@@ -71,6 +71,7 @@ from medialake_constructs.api_gateway.api_gateway_nodes import (
 )
 
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
 @dataclass
@@ -79,7 +80,7 @@ class ApiGatewayStackProps:
 
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
-    media_assets_bucket: s3.Bucket
+    media_assets_bucket: S3Bucket
     pipelines_nodes_templates_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
@@ -207,6 +208,20 @@ class ApiGatewayStack(Stack):
             ),
         )
 
+        # Create Settings API Gateway construct (now includes system settings)
+        self._settings_construct = SettingsConstruct(
+            self,
+            "SettingsApiGateway",
+            props=SettingsConstructProps(
+                api_resource=self._api_gateway.rest_api,
+                cognito_authorizer=self._api_gateway.cognito_authorizer,
+                cognito_user_pool=self._cognito_construct.user_pool,
+                cognito_app_client=self._cognito_construct.user_pool_client,
+                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+            ),
+        )
+
+        # Update the SearchConstruct to include the system settings table
         _ = SearchConstruct(
             self,
             "SearchApiGateway",
@@ -221,6 +236,7 @@ class ApiGatewayStack(Stack):
                 open_search_index="media",
                 vpc=props.vpc,
                 security_group=props.security_group,
+                system_settings_table=self._settings_construct.system_settings_table_name,
             ),
         )
 
@@ -231,18 +247,6 @@ class ApiGatewayStack(Stack):
                 asset_table=props.asset_table,
                 api_resource=self._api_gateway.rest_api,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-            ),
-        )
-
-        _ = SettingsConstruct(
-            self,
-            "SettingsApiGateway",
-            props=SettingsConstructProps(
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                cognito_user_pool=self._cognito_construct.user_pool,
-                cognito_app_client=self._cognito_construct.user_pool_client,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
             ),
         )
