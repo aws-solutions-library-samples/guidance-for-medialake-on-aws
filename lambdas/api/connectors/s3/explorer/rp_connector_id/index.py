@@ -69,6 +69,11 @@ def lambda_handler(event, context):
             }
 
         bucket = connector.get("storageIdentifier")
+        object_prefix = connector.get("objectPrefix", "")
+
+        if not prefix:
+            prefix = object_prefix 
+        
         if not bucket:
             return {
                 "statusCode": 400,
