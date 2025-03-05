@@ -184,8 +184,10 @@ def get_state_machine_definition(
 
         if node_data["type"] in [
             "videometadata",
+            "audiometadata",
             "imagemetadata",
             "videoproxyandthumbnail",
+            "audioproxyandthumbnail",
             "imageproxy",
             "imagethumbnail",
             "checkmediaconvertstatus",
@@ -257,15 +259,20 @@ def get_state_machine_definition(
             "imageproxy",
             "imagethumbnail",
             "videoproxyandthumbnail",
+            "audioproxyandthumbnail",
         ]:
             state["Parameters"]["Payload"]["output_bucket"] = output_bucket_name
             state["Parameters"]["Payload"]["mode"] = (
                 "proxy"
-                if node_data["type"] in ["imageproxy", "videoproxy"]
+                if node_data["type"] in ["imageproxy", "videoproxy", "audioproxy"]
                 else "thumbnail"
             )
             # Add width and height for Image Thumbnail and Video Thumbnail
-            if node_data["type"] in ["imagethumbnail", "videothumbnail"]:
+            if node_data["type"] in [
+                "imagethumbnail",
+                "videothumbnail",
+                "audiothumbnail",
+            ]:
                 state["Parameters"]["Payload"]["width"] = node_data.get("width")
                 state["Parameters"]["Payload"]["height"] = node_data.get("height")
 

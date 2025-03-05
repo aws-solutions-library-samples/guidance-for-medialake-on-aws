@@ -62,6 +62,7 @@ api_gateway_stack = ApiGatewayStack(
     "MediaLakeApiGatewayStack",
     props=ApiGatewayStackProps(
         iac_assets_bucket=base_infrastructure.iac_assets_bucket,
+        external_payload_bucket=base_infrastructure.external_payload_bucket,
         media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
         pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
         asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
@@ -96,7 +97,9 @@ pipeline_stack = PipelineStack(
         image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
         image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
         video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
-        video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
+        audio_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
+        video_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
+        audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
         check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
         post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
     ),

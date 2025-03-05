@@ -262,6 +262,11 @@ def build_step_function_definition(
 
     # Second pass: create state definitions using the unique state names
     for node in pipeline.configuration.nodes:
+        # Skip trigger nodes as they don't need to be created as steps
+        if node.data.type.lower() == "trigger":
+            logger.info(f"Skipping trigger node {node.id}")
+            continue
+
         unique_state_name = node_id_to_state_name[node.id]
         logger.info(f"Creating state definition for {unique_state_name}")
 
@@ -307,7 +312,29 @@ def build_step_function_definition(
                 logger.info(f"Created task state for {unique_state_name}")
 
     # Get the root node's unique state name to use as the start state
-    start_at = node_id_to_state_name.get(root_node_id)
+    # If the root node is a trigger, find the first non-trigger node connected to it
+    if (
+        root_node_id
+        and node_id_to_node.get(root_node_id)
+        and node_id_to_node[root_node_id].data.type.lower() == "trigger"
+    ):
+        logger.info(f"Root node {root_node_id} is a trigger, finding next node")
+        if root_node_id in graph and graph[root_node_id]:
+            # Get the first target from the graph
+            next_node_id = graph[root_node_id][0]
+            start_at = node_id_to_state_name.get(next_node_id)
+            logger.info(
+                f"Using node {next_node_id} as start state instead of trigger node"
+            )
+        else:
+            logger.warning(
+                f"Trigger root node {root_node_id} has no outgoing edges, using first available state"
+            )
+            # Use the first available state as start state
+            start_at = next(iter(states)) if states else None
+    else:
+        start_at = node_id_to_state_name.get(root_node_id)
+
     logger.info(f"Start state: {start_at}")
 
     # Connect states based on edges using the unique state names

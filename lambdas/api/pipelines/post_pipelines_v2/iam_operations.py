@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+import traceback
 from typing import Dict, Any
 import boto3
 
@@ -65,20 +66,9 @@ def create_iam_lambda_s3_dynamo_rw_policy():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "kms:Encrypt",
                     "kms:Decrypt",
-                    "kms:ReEncrypt*",
-                    "kms:GenerateDataKey*",
-                    "kms:DescribeKey",
                 ],
                 "Resource": ["*"],
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["kms:GenerateDataKey"],
-                "Resource": [
-                    MEDIA_ASSETS_BUCKET_NAME_KMS_KEY,
-                ],
             },
         ],
     }
@@ -246,6 +236,78 @@ def create_sfn_role(role_name: str) -> str:
         raise
 
 
+def standardize_policy_statement(statement: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Standardize a policy statement to ensure correct capitalization and format.
+
+    This function ensures that:
+    1. Keys are properly capitalized (Effect, Action, Resource)
+    2. Action and Resource are always arrays
+    """
+    standardized = {}
+
+    # Handle Effect (capitalize)
+    if "effect" in statement:
+        standardized["Effect"] = statement["effect"]
+    elif "Effect" in statement:
+        standardized["Effect"] = statement["Effect"]
+
+    # Handle Action (capitalize and ensure it's an array)
+    if "actions" in statement:
+        actions = statement["actions"]
+        standardized["Action"] = actions if isinstance(actions, list) else [actions]
+    elif "action" in statement:
+        actions = statement["action"]
+        standardized["Action"] = actions if isinstance(actions, list) else [actions]
+    elif "Action" in statement:
+        actions = statement["Action"]
+        standardized["Action"] = actions if isinstance(actions, list) else [actions]
+
+    # Handle Resource (capitalize and ensure it's an array)
+    if "resources" in statement:
+        resources = statement["resources"]
+        standardized["Resource"] = (
+            resources if isinstance(resources, list) else [resources]
+        )
+    elif "resource" in statement:
+        resources = statement["resource"]
+        standardized["Resource"] = (
+            resources if isinstance(resources, list) else [resources]
+        )
+    elif "Resource" in statement:
+        resources = statement["Resource"]
+        standardized["Resource"] = (
+            resources if isinstance(resources, list) else [resources]
+        )
+
+    # Copy any other keys as-is
+    for key, value in statement.items():
+        if key.lower() not in ["effect", "action", "actions", "resource", "resources"]:
+            standardized[key] = value
+
+    return standardized
+
+
+def standardize_policy_document(policy_document: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Standardize an entire policy document to ensure correct format.
+
+    This function processes all statements in a policy document to ensure they
+    follow the correct format with proper capitalization and structure.
+    """
+    if "Statement" not in policy_document:
+        return policy_document
+
+    standardized_statements = []
+    for statement in policy_document["Statement"]:
+        standardized_statements.append(standardize_policy_statement(statement))
+
+    return {
+        "Version": policy_document.get("Version", "2012-10-17"),
+        "Statement": standardized_statements,
+    }
+
+
 def process_policy_template(template_str: str) -> str:
     """Process a policy template string by replacing environment variables."""
     # Find all ${VAR} patterns in the template
@@ -279,7 +341,15 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Action": ["s3:GetObject", "s3:PutObject"],
                 "Resource": [
                     f"arn:aws:s3:::{os.environ['NODE_TEMPLATES_BUCKET']}/*",
-                    f"arn:aws:s3:::{os.environ['IAC_BUCKET']}/*",
+                    f"arn:aws:s3:::{os.environ['IAC_ASSETS_BUCKET']}/*",
+                ],
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["s3:ListBucket"],
+                "Resource": [
+                    f"arn:aws:s3:::{os.environ['NODE_TEMPLATES_BUCKET']}",
+                    f"arn:aws:s3:::{os.environ['IAC_ASSETS_BUCKET']}",
                 ],
             },
             {
@@ -293,45 +363,107 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
     }
 
     try:
+        # Log environment variables for debugging
+        logger.info(
+            f"NODE_TEMPLATES_BUCKET: {os.environ.get('NODE_TEMPLATES_BUCKET', 'NOT_SET')}"
+        )
+        logger.info(
+            f"IAC_ASSETS_BUCKET: {os.environ.get('IAC_ASSETS_BUCKET', 'NOT_SET')}"
+        )
+        logger.info(f"AWS_REGION: {os.environ.get('AWS_REGION', 'NOT_SET')}")
+        logger.info(f"ACCOUNT_ID: {os.environ.get('ACCOUNT_ID', 'NOT_SET')}")
+        logger.info(f"NODE_TABLE: {os.environ.get('NODE_TABLE', 'NOT_SET')}")
+        logger.info(f"PIPELINES_TABLE: {os.environ.get('PIPELINES_TABLE', 'NOT_SET')}")
+
         # Get IAM policy from YAML if it exists
         policy_document = default_policy
-        if (
+        logger.info(f"YAML data: {yaml_data}")
+
+        has_iam_policy = (
             yaml_data.get("node", {})
             .get("integration", {})
             .get("config", {})
             .get("lambda", {})
             .get("iam_policy")
-        ):
-            statements = yaml_data["node"]["integration"]["config"]["lambda"][
-                "iam_policy"
-            ]["statements"]
+        )
 
-            # Process each statement to replace environment variables
-            processed_statements = []
-            for statement in statements:
-                # Convert statement to JSON string to process all nested values
-                statement_str = json.dumps(statement)
-                processed_str = process_policy_template(statement_str)
-                processed_statement = json.loads(processed_str)
-                processed_statements.append(processed_statement)
+        logger.info(f"Has IAM policy in YAML: {has_iam_policy is not None}")
 
-            policy_document = {
-                "Version": "2012-10-17",
-                "Statement": processed_statements,
-            }
+        if has_iam_policy:
+            try:
+                statements = yaml_data["node"]["integration"]["config"]["lambda"][
+                    "iam_policy"
+                ]["statements"]
+
+                logger.info(f"Found {len(statements)} statements in YAML")
+
+                # Process each statement to replace environment variables
+                processed_statements = []
+                for i, statement in enumerate(statements):
+                    try:
+                        # Convert statement to JSON string to process all nested values
+                        statement_str = json.dumps(statement)
+                        logger.info(f"Statement {i} before processing: {statement_str}")
+
+                        processed_str = process_policy_template(statement_str)
+                        logger.info(f"Statement {i} after processing: {processed_str}")
+
+                        processed_statement = json.loads(processed_str)
+                        # Standardize the statement to ensure correct format
+                        standardized_statement = standardize_policy_statement(
+                            processed_statement
+                        )
+                        processed_statements.append(standardized_statement)
+                    except Exception as stmt_err:
+                        logger.error(f"Error processing statement {i}: {stmt_err}")
+                        raise
+
+                policy_document = {
+                    "Version": "2012-10-17",
+                    "Statement": processed_statements,
+                }
+
+                # Log the standardized policy document
+                logger.info(
+                    f"Standardized policy document: {json.dumps(policy_document)}"
+                )
+            except Exception as yaml_err:
+                logger.error(f"Error processing YAML IAM policy: {yaml_err}")
+                logger.info("Falling back to default policy")
+                policy_document = default_policy
+
+        # Log the final policy document
+        logger.info(f"Final policy document: {json.dumps(policy_document)}")
 
         # Create inline policy
         policy_name = f"{role_name}ExecutionPolicy"
-        iam.put_role_policy(
-            RoleName=role_name,
-            PolicyName=policy_name,
-            PolicyDocument=json.dumps(policy_document),
-        )
-        logger.info(
-            f"Successfully attached inline policy {policy_name} to role {role_name}"
-        )
+        try:
+            iam.put_role_policy(
+                RoleName=role_name,
+                PolicyName=policy_name,
+                PolicyDocument=json.dumps(policy_document),
+            )
+            logger.info(
+                f"Successfully attached inline policy {policy_name} to role {role_name}"
+            )
+
+            # Verify the policy was attached
+            try:
+                response = iam.get_role_policy(
+                    RoleName=role_name, PolicyName=policy_name
+                )
+                logger.info(f"Verified policy attachment: {response}")
+            except Exception as verify_err:
+                logger.error(f"Failed to verify policy attachment: {verify_err}")
+
+        except Exception as attach_err:
+            logger.error(f"Error attaching policy to role: {attach_err}")
+            raise
+
     except Exception as e:
         logger.error(f"Error creating/attaching policy to role {role_name}: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception traceback: {traceback.format_exc()}")
         raise
 
 
@@ -365,7 +497,7 @@ def create_lambda_role(
             delete_role(role_name)
             wait_for_role_deletion(role_name)
         except iam.exceptions.NoSuchEntityException:
-            pass
+            logger.info(f"Role {role_name} does not exist, creating new role")
 
         # Create the role with retries
         logger.info(f"Creating new role: {role_name}")
@@ -377,21 +509,36 @@ def create_lambda_role(
                 )
 
                 role_arn = response["Role"]["Arn"]
+                logger.info(f"Role created with ARN: {role_arn}")
 
                 # Wait for role to be available with increased delay and max attempts
                 waiter = iam.get_waiter("role_exists")
                 waiter.wait(
                     RoleName=role_name, WaiterConfig={"Delay": 2, "MaxAttempts": 15}
                 )
+                logger.info(f"Role {role_name} is now available")
 
                 # Attach the basic execution policy
+                logger.info(f"Attaching AWSLambdaBasicExecutionRole to {role_name}")
                 iam.attach_role_policy(
                     RoleName=role_name,
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
                 )
 
                 # Create and attach our custom execution policy
-                create_lambda_execution_policy(role_name, yaml_data)
+                logger.info(
+                    f"Creating and attaching custom execution policy for {role_name}"
+                )
+                try:
+                    create_lambda_execution_policy(role_name, yaml_data)
+                    logger.info(
+                        f"Custom execution policy created and attached successfully for {role_name}"
+                    )
+                except Exception as policy_error:
+                    logger.error(
+                        f"Error creating/attaching custom policy: {str(policy_error)}"
+                    )
+                    raise
 
                 logger.info(
                     f"Role {role_name} created successfully with ARN: {role_arn}"
@@ -399,6 +546,10 @@ def create_lambda_role(
 
                 # Add a small delay after role creation to allow for propagation
                 time.sleep(2)
+
+                # Verify attached policies
+                attached_policies = iam.list_attached_role_policies(RoleName=role_name)
+                logger.info(f"Attached policies for {role_name}: {attached_policies}")
 
                 return role_arn
 
@@ -421,6 +572,8 @@ def create_lambda_role(
 
     except Exception as e:
         logger.error(f"Error creating role: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception traceback: {traceback.format_exc()}")
         raise
 
 
@@ -460,6 +613,9 @@ def get_events_role_arn(pipeline_name: str) -> str:
                 }
             ],
         }
+
+        # Ensure the policy document is standardized
+        policy_document = standardize_policy_document(policy_document)
 
         iam_client.put_role_policy(
             RoleName=role_name,

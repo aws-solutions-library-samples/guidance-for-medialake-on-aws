@@ -89,73 +89,117 @@ touch config.json
 
 ```json
 {
-    "environment": "dev",
-    "resource_prefix": "medialake",
-    "resource_application_tag": "medialake",
-    "api_path": "prod",
-    "initial_user": {
-        "email": "email account for initial user",
-        "first_name": "first name of initial user",
-        "last_name": "last name of initial user"
-    },
-    "logging": {
-        "retention_days": 90,
-        "s3_retention_days": 90,
-        "cloudwatch_retention_days": 90,
-        "waf_retention_days": 90,
-        "api_gateway_retention_days": 90
-    },
-    "authZ": {
-        "identity_providers": [
-            {
-                "identity_provider_method": "saml",
-                "identity_provider_name": "IDENTITY_PROVIDER_NAME",
-                "identity_provider_metadata_url": "IDENTITY_PROVIDER_METADATA_URL"
-            },
-            {
-                "identity_provider_method": "cognito"
-            }
+  "environment": "dev",
+  "resource_prefix": "examplePrefix",
+  "account_id": "123456789012",
+  "global_prefix": "exampleGlobal",
+  "resource_application_tag": "exampleTag",
+  "api_path": "prod",
+  "primary_region": "us-east-1",
+  "initial_user": {
+    "email": "user@example.com",
+    "first_name": "John",
+    "last_name": "Doe"
+  },
+  "logging": {
+    "retention_days": 90,
+    "s3_retention_days": 90,
+    "cloudwatch_retention_days": 90,
+    "waf_retention_days": 90,
+    "api_gateway_retention_days": 90
+  },
+  "authZ": {
+    "identity_providers": [
+      {
+        "identity_provider_method": "saml",
+        "identity_provider_name": "ExampleIDP",
+        "identity_provider_metadata_url": "https://example.com/metadata"
+      },
+      {
+        "identity_provider_method": "cognito"
+      }
+    ]
+  },
+  "vpc": {
+    "use_existing_vpc": false,
+    "existing_vpc": {
+      "vpc_id": "vpc-xxxxxxxx",
+      "vpc_cidr": "10.0.0.0/16",
+      "subnet_ids": {
+        "public": [
+          "subnet-aaaaaaa",
+          "subnet-bbbbbbb",
+          "subnet-ccccccc"
+        ],
+        "private": [
+          "subnet-ddddddd",
+          "subnet-eeeeeee",
+          "subnet-fffffff"
         ]
+      }
     },
-    "vpc": {
-        "use_existing_vpc": <boolean>,
-        "existing_vpc": {
-            "vpc_id": "VPC-ID",
-            "vpc_cidr": "VPC-CIDR",
-            "subnet_ids": {
-                "public": [
-                    "subnet-xxx",
-                    "subnet-xxx",
-                    "subnet-xxx"
-                ],
-                "private": [
-                    "subnet-xxx",
-                    "subnet-xxx",
-                    "subnet-xxx"
-                ]
-            }
+    "new_vpc": {
+      "vpc_name": "ExampleVPC",
+      "max_azs": 3,
+      "cidr": "10.0.0.0/16",
+      "enable_dns_hostnames": true,
+      "enable_dns_support": true
+    },
+    "security_groups": {
+      "use_existing_groups": false,
+      "existing_groups": {
+        "media_lake_sg": "sg-xxxxxxxx",
+        "opensearch_sg": "sg-yyyyyyyy"
+      },
+      "new_groups": {
+        "media_lake_sg": {
+          "name": "ExampleMediaLakeSecurityGroup",
+          "description": "Example MediaLake Security Group"
         },
-        "new_vpc": {
-            "vpc_name": "MediaLakeVPC",
-            "max_azs": 3,
-            "cidr": "VPC-CIDR",
-            "enable_dns_hostnames": <boolean>,
-            "enable_dns_support": <boolean>
+        "opensearch_sg": {
+          "name": "ExampleOpenSearchSG",
+          "description": "Example OpenSearch Security Group"
         }
-    },
-    "opensearch_cluster_settings": {
-        "master_node_count": 3, # Must be at least the number of AZ zone count
-        "master_node_instance_type": "r7g.medium.search",
-        "data_node_count": 2, #Must be even numbers if 2 AZ zone count and odd if odd 
-        "data_node_instance_type": "r7g.medium.search",
-        "data_node_volume_size": 10,
-        "data_node_volume_type": "gp3",
-        "data_node_volume_iops": 3000,
-        "multi_az_with_standby_enabled": false,
-        "availability_zone_count": 2
+      }
     }
+  },
+  "opensearch_cluster_settings": {
+    "master_node_count": 3,
+    "master_node_instance_type": "example.search.instance",
+    "data_node_count": 2,
+    "data_node_instance_type": "example.search.instance",
+    "data_node_volume_size": 10,
+    "data_node_volume_type": "gp3",
+    "data_node_volume_iops": 3000,
+    "multi_az_with_standby_enabled": false,
+    "availability_zone_count": 2,
+    "off_peak_window_start": "20:00",
+    "off_peak_window_enabled": true,
+    "snapshot_options": {
+      "automated_snapshot_start_hour": 20
+    },
+    "domain_endpoint": null
+  },
+  "db": {
+    "use_existing_tables": false,
+    "pipelines_executions_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-pipelines_executions_prod",
+    "pipeline_nodes_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example_pipeline_nodes_table",
+    "asset_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-asset-table",
+    "assetv2_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-asset-table-v2"
+  },
+  "s3": {
+    "use_existing_buckets": false,
+    "access_logs_bucket": {
+      "bucket_name": "example-access-logs-123456789012-us-east-1-prod",
+      "bucket_arn": "arn:aws:s3:::example-access-logs-123456789012-us-east-1-prod"
+    },
+    "asset_bucket": {
+      "bucket_name": "example-asset-bucket-123456789012-us-east-1-prod",
+      "bucket_arn": "arn:aws:s3:::example-asset-bucket-123456789012-us-east-1-prod",
+      "kms_key_arn": "arn:aws:kms:us-east-1:123456789012:key/example-key-id"
+    }
+  }
 }
-
 ```
 
 ## 📚 Configuration Parameters

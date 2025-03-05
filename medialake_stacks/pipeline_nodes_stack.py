@@ -82,6 +82,7 @@ class PipelineNodesStack(Stack):
 
         ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
+
         layer_objects = [ffprobe_layer.layer, pymediainfo_layer.layer]
 
         self._trigger_node_lambda = Lambda(
@@ -107,6 +108,22 @@ class PipelineNodesStack(Stack):
                 memory_size=10240,
                 architecture=lambda_.Architecture.X86_64,
                 entry="lambdas/nodes/video_metadata_extractor",
+                layers=layer_objects,
+                environment_variables={
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                },
+            ),
+        )
+
+        self._audio_metadata_extractor_lambda = Lambda(
+            self,
+            "AudioMetadataExtractorNode",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_audio_metadata_extractor_node",
+                timeout_minutes=15,
+                memory_size=10240,
+                architecture=lambda_.Architecture.X86_64,
+                entry="lambdas/nodes/audio_metadata_extractor",
                 layers=layer_objects,
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
@@ -159,6 +176,21 @@ class PipelineNodesStack(Stack):
             ),
         )
 
+        self._audio_proxy_thumbnail_lambda = Lambda(
+            self,
+            "AudioProxyThumbnailNode",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_audio_proxy_thumbnail_node",
+                timeout_minutes=15,
+                entry="lambdas/nodes/audio_proxy_audio_thumbnail",
+                environment_variables={
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
+                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
+                },
+            ),
+        )
+
         self._check_mediaconvert_status = Lambda(
             self,
             "CheckMediaconvertStatusNode",
@@ -185,6 +217,17 @@ class PipelineNodesStack(Stack):
         )
 
         self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:CreateJob",
+                    "mediaconvert:GetJob",
+                    "mediaconvert:ListJobs",
+                ],
+                resources=[proxy_queue.queue_arn],
+            )
+        )
+
+        self._audio_proxy_thumbnail_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:CreateJob",
@@ -225,7 +268,24 @@ class PipelineNodesStack(Stack):
                 ],
             )
         )
+        self._audio_proxy_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mediaconvert:DescribeEndpoints",
+                ],
+                resources=[
+                    f"arn:aws:mediaconvert:{Stack.of(self).region}:{Stack.of(self).account}:endpoints/*",
+                ],
+            )
+        )
         self._video_proxy_thumbnail_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[self.mediaconvert_role.role_arn],
+            )
+        )
+
+        self._audio_proxy_thumbnail_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["iam:PassRole"],
                 resources=[self.mediaconvert_role.role_arn],
@@ -504,6 +564,88 @@ class PipelineNodesStack(Stack):
                 "PutRequest": {
                     "Item": {
                         "id": unique_id(),
+                        "name": {"S": "audio_metadata_extractor"},
+                        "arn": {
+                            "S": self._audio_metadata_extractor_lambda.function_arn
+                        },
+                        "description": {"S": "Extracts metadata from audio files"},
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
+                        "name": {"S": "audio_proxy"},
+                        "arn": {"S": self._audio_proxy_thumbnail_lambda.function_arn},
+                        "description": {"S": "Generates proxy versions of audio files"},
+                        "props": {
+                            "M": {
+                                "derived_representation": {
+                                    "M": {
+                                        "proxy": {
+                                            "M": {
+                                                "format": {
+                                                    "M": {
+                                                        "type": {"S": "string"},
+                                                        "default": {"S": "MP3"},
+                                                        "description": {
+                                                            "S": "Output format for the proxy audio"
+                                                        },
+                                                    }
+                                                },
+                                                "audio_spec": {
+                                                    "M": {
+                                                        "codec": {
+                                                            "M": {
+                                                                "type": {"S": "string"},
+                                                                "default": {"S": "MP3"},
+                                                                "description": {
+                                                                    "S": "Audio codec for the proxy"
+                                                                },
+                                                            }
+                                                        },
+                                                        "bitrate": {
+                                                            "M": {
+                                                                "type": {
+                                                                    "S": "integer"
+                                                                },
+                                                                "default": {
+                                                                    "N": "128000"
+                                                                },
+                                                                "description": {
+                                                                    "S": "Audio bitrate in bits per second"
+                                                                },
+                                                            }
+                                                        },
+                                                        "sample_rate": {
+                                                            "M": {
+                                                                "type": {
+                                                                    "S": "integer"
+                                                                },
+                                                                "default": {
+                                                                    "N": "44100"
+                                                                },
+                                                                "description": {
+                                                                    "S": "Audio sample rate in Hz"
+                                                                },
+                                                            }
+                                                        },
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "id": unique_id(),
                         "name": {"S": "check_mediaconvert_status"},
                         "arn": {"S": self._check_mediaconvert_status.function_arn},
                         "description": {"S": "Checks the status of MediaConvert jobs"},
@@ -708,6 +850,22 @@ class PipelineNodesStack(Stack):
         return self._check_mediaconvert_status.function_arn
 
     @property
+    def audio_metadata_extractor_lambda(self) -> lambda_.Function:
+        return self._audio_metadata_extractor_lambda
+
+    @property
+    def audio_metadata_extractor_function_arn(self) -> str:
+        return self._audio_metadata_extractor_lambda.function_arn
+
+    @property
+    def audio_proxy_thumbnail_lambda(self) -> lambda_.Function:
+        return self._audio_proxy_thumbnail_lambda
+
+    @property
+    def audio_proxy_thumbnail_function_arn(self) -> str:
+        return self._audio_proxy_thumbnail_lambda.function_arn
+
+    @property
     def pipelne_nodes_table(self) -> dynamodb.ITable:
         return self._pipeline_nodes_table
 
@@ -720,4 +878,6 @@ class PipelineNodesStack(Stack):
             self._image_proxy_lambda.function,
             self._video_proxy_thumbnail_lambda.function,
             self._check_mediaconvert_status.function,
+            self._audio_metadata_extractor_lambda.function,
+            self._audio_proxy_thumbnail_lambda.function,
         ]

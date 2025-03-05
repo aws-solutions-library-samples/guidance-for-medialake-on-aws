@@ -27,16 +27,29 @@ def lambda_handler(event, context):
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(table_name)
 
-    video_proxy_and_thumbnail_result = event["previous_task_output"][
-        "VideoProxyandThumbnailResult"
-    ]
-    # print(video_proxy_and_thumbnail_result["Payload"]['body']["JobId"])
-    if isinstance(video_proxy_and_thumbnail_result["Payload"]["body"], str):
-        video_proxy_and_thumbnail_result["Payload"]["body"] = json.loads(
-            video_proxy_and_thumbnail_result["Payload"]["body"]
+    # Check if we have video or audio result
+    if "VideoProxyandThumbnailResult" in event["previous_task_output"]:
+        media_type = "Video"
+        proxy_and_thumbnail_result = event["previous_task_output"][
+            "VideoProxyandThumbnailResult"
+        ]
+    elif "AudioProxyandThumbnailResult" in event["previous_task_output"]:
+        media_type = "Audio"
+        proxy_and_thumbnail_result = event["previous_task_output"][
+            "AudioProxyandThumbnailResult"
+        ]
+    else:
+        raise ValueError(
+            "Neither VideoProxyandThumbnailResult nor AudioProxyandThumbnailResult found in event"
         )
 
-    job_id = video_proxy_and_thumbnail_result["Payload"]["body"]["JobId"]
+    # Parse the payload body if it's a string
+    if isinstance(proxy_and_thumbnail_result["Payload"]["body"], str):
+        proxy_and_thumbnail_result["Payload"]["body"] = json.loads(
+            proxy_and_thumbnail_result["Payload"]["body"]
+        )
+
+    job_id = proxy_and_thumbnail_result["Payload"]["body"]["JobId"]
     inventory_id = event["input"]["InventoryID"]
     clean_inventory_id = clean_asset_id(inventory_id)
     asset_id = clean_asset_id(event["input"]["DigitalSourceAsset"]["ID"])
@@ -70,7 +83,7 @@ def lambda_handler(event, context):
             # Create proxy representation
             proxy_representation = {
                 "ID": f"{asset_id}:proxy",
-                "Type": "Video",
+                "Type": media_type,
                 "Format": "MP4",
                 "Purpose": "proxy",
                 "StorageInfo": {

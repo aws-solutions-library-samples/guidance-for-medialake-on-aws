@@ -75,6 +75,14 @@ class NodesStack(Stack):
             code_path=["lambdas", "nodes", "video_metadata_extractor"],
         )
 
+        self.audio_metadata_extractor_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioMetadataExtractorLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_metadata_extractor"],
+        )
+
         self.api_lambda_deployment = LambdaDeployment(
             self,
             "ApiLambdaDeployment",

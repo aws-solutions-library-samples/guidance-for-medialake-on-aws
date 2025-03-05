@@ -1,4 +1,5 @@
 import uuid
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -140,6 +141,78 @@ def get_pipeline_by_name(
     except Exception as e:
         logger.error(f"Error looking up pipeline: {e}")
         return None
+
+
+def get_node_auth_config(node_id: str) -> Dict[str, Any]:
+    """
+    Retrieve node authentication configuration from DynamoDB.
+
+    Args:
+        node_id: ID of the node
+
+    Returns:
+        Auth configuration dictionary or None if not found
+    """
+    logger.info(f"Retrieving auth config from DynamoDB for node_id: {node_id}")
+    dynamodb = boto3.resource("dynamodb")
+
+    if not NODE_TABLE:
+        msg = "Environment variable NODE_TABLE is not set."
+        logger.error(msg)
+        raise ValueError(msg)
+
+    table = dynamodb.Table(NODE_TABLE)
+
+    key = {"pk": f"NODE#{node_id}", "sk": "AUTH"}
+    logger.debug(f"Using DynamoDB key: {key}")
+
+    response = table.get_item(Key=key)
+    auth_config = response.get("Item", {})
+    logger.info(f"Retrieved auth config for {node_id}: {auth_config}")
+    return auth_config
+
+
+def get_integration_secret_arn(integration_id: str) -> Optional[str]:
+    """
+    Get the API key secret ARN for an integration.
+
+    Args:
+        integration_id: ID of the integration
+
+    Returns:
+        Secret ARN or None if not found
+    """
+    logger.info(f"Retrieving secret ARN for integration_id: {integration_id}")
+    dynamodb = boto3.resource("dynamodb")
+
+    integrations_table = os.environ.get("INTEGRATIONS_TABLE")
+    if not integrations_table:
+        logger.warning("INTEGRATIONS_TABLE environment variable not set")
+        return None
+
+    table = dynamodb.Table(integrations_table)
+
+    # Construct the partition key with the INTEGRATION# prefix
+    pk = f"INTEGRATION#{integration_id}"
+
+    # Query for items with this partition key
+    response = table.query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key("PK").eq(pk)
+    )
+
+    items = response.get("Items", [])
+    if not items:
+        logger.warning(f"No integration found with ID: {integration_id}")
+        return None
+
+    # Use the first item (assuming there's only one configuration per integration)
+    integration = items[0]
+
+    # Extract the ApiKeySecretArn from the top level
+    secret_arn = integration.get("ApiKeySecretArn", {})
+
+    logger.info(f"Retrieved secret ARN for integration {integration_id}: {secret_arn}")
+    return secret_arn
 
 
 def store_pipeline_info(

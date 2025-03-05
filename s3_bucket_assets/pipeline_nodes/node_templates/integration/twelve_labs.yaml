@@ -21,8 +21,15 @@ node:
                 - s3:PutObject
               resources:
                 - arn:aws:s3:::${NODE_TEMPLATES_BUCKET}/*
-                - arn:aws:s3:::${IAC_BUCKET}/*
+                - arn:aws:s3:::${IAC_ASSETS_BUCKET}/*
                 - arn:aws:s3:::${EXTERNAL_PAYLOAD_BUCKET}/*
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+              resources:
+                - arn:aws:s3:::${NODE_TEMPLATES_BUCKET}
+                - arn:aws:s3:::${IAC_ASSETS_BUCKET}
+                - arn:aws:s3:::${EXTERNAL_PAYLOAD_BUCKET}
             - effect: Allow
               actions:
                 - dynamodb:GetItem
@@ -30,8 +37,8 @@ node:
                 - dynamodb:UpdateItem
                 - dynamodb:Scan
               resources:
-                - arn:aws:dynamodb:${AWS_REGION}:${ACCOUNT_ID}:table/${NODE_TABLE}
-                - arn:aws:dynamodb:${AWS_REGION}:${ACCOUNT_ID}:table/${PIPELINES_TABLE}
+                - ${NODE_TABLE}
+                - ${PIPELINES_TABLE}
             - effect: Allow
               actions:
                 - iam:CreateRole

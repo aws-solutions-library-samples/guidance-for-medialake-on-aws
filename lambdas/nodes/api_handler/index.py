@@ -224,7 +224,8 @@ def load_and_execute_function_from_s3(
 def download_s3_object(bucket: str, key: str) -> str:
     """Download an object from S3 and return its content."""
     try:
-        response = s3_client.get_object(Bucket=bucket, Key=key)
+
+        response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
         return response["Body"].read().decode("utf-8")
     except ClientError as e:
         print(f"Error downloading S3 object: {e}")
@@ -578,7 +579,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if output_size > 240 * 1024:  # 240KB in bytes
             # Get the S3 bucket name from environment variable
-            external_payload_s3_bucket = os.environ.get("EXTERNAL_PAYLOAD_S3_BUCKET")
+            external_payload_s3_bucket = os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
 
             # Generate a unique key for the S3 object
             workflow_id = event["metadata"].get("workflowId", "unknown")

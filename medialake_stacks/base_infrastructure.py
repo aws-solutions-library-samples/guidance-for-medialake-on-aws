@@ -124,6 +124,16 @@ class BaseInfrastructureStack(Stack):
         #     ),
         # )
 
+        self.external_payload_bucket = S3Bucket(
+            self,
+            "ExternalPaylodBucket",
+            props=S3BucketProps(
+                destroy_on_delete=True,
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket,
+            ),
+        )
+
         self.ddb_export_bucket = S3Bucket(
             self,
             "DynamodbExportBucket",

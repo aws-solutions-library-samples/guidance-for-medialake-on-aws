@@ -4,7 +4,7 @@ import os
 ACCOUNT_ID = os.environ.get("ACCOUNT_ID")
 NODE_TABLE = os.environ.get("NODE_TABLE")
 PIPELINES_TABLE = os.environ.get("PIPELINES_TABLE")
-IAC_BUCKET = os.environ.get("IAC_ASSETS_BUCKET")
+IAC_ASSETS_BUCKET = os.environ.get("IAC_ASSETS_BUCKET")
 NODE_TEMPLATES_BUCKET = os.environ.get("NODE_TEMPLATES_BUCKET")
 INGEST_EVENT_BUS_NAME = os.environ.get("INGEST_EVENT_BUS_NAME")
 MEDIALAKE_ASSET_TABLE = os.environ.get("MEDIALAKE_ASSET_TABLE")
@@ -17,7 +17,7 @@ required_env_vars = [
     ACCOUNT_ID,
     NODE_TABLE,
     PIPELINES_TABLE,
-    IAC_BUCKET,
+    IAC_ASSETS_BUCKET,
     NODE_TEMPLATES_BUCKET,
 ]
 
