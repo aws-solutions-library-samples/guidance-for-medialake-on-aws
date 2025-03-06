@@ -56,6 +56,16 @@ pipeline_nodes_stack = PipelineNodesStack(
     env=env,
 )
 
+asset_sync_stack = AssetSyncStack(
+    app,
+    "MediaLakeAssetSyncStack",
+    props=AssetSyncStackProps(
+        asset_table=base_infrastructure.asset_table,
+        ingest_event_bus=base_infrastructure.ingest_event_bus,
+    ),
+    env=env,
+)
+
 # Create API Gateway Stack - includes auth and ui
 api_gateway_stack = ApiGatewayStack(
     app,
@@ -78,9 +88,13 @@ api_gateway_stack = ApiGatewayStack(
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
         pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
         node_table=nodes_stack.pipelines_nodes_table,
+        asset_sync_state_machine=asset_sync_stack.asset_sync_state_machine,
+        asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
     ),
     env=env,
 )
+
+
 
 # Add Lambda warming to API Gateway functions if enabled
 if lambda_warmer:
@@ -114,23 +128,12 @@ cleanup_stack = CleanupStack(
     env=env,
 )
 
-asset_sync_stack = AssetSyncStack(
-    app,
-    "MediaLakeAssetSyncStack",
-    props=AssetSyncStackProps(
-        asset_table=base_infrastructure.asset_table,
-        api_resource=api_gateway_stack.rest_api,
-        x_origin_verify_secret=api_gateway_stack.x_origin_verify_secret,
-        cognito_authorizer=api_gateway_stack.cognito_authorizer,
-    ),
-    env=env,
-)
+api_gateway_stack.add_dependency(asset_sync_stack)
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
 cleanup_stack.add_dependency(nodes_stack)
-cleanup_stack.add_dependency(asset_sync_stack)
 
 if lambda_warmer:
     cleanup_stack.add_dependency(lambda_warmer)

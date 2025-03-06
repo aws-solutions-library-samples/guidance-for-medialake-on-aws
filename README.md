@@ -276,6 +276,8 @@ cdk bootstrap
 
 This service is highly sensitive to VPC subnet Availability Zone selection. When using an external VPC, ensure that:
 
+When using instances smaller than r7g.medium.search, you cannot configure dedicated master nodes. Instead, your data nodes must also serve as master nodes.  Due to this we recommend using r7g.medium.search or larger.
+
 1. The number of private subnets is at least equal to the `availability_zone_count` specified in OpenSearch cluster settings.
 2. Each subnet is in a distinct Availability Zone.
 

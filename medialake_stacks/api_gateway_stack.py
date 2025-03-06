@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_apigateway as apigateway,
     aws_iam as iam,
+    aws_stepfunctions as sfn,
     custom_resources as cr,
     RemovalPolicy,
 )
@@ -95,6 +96,9 @@ class ApiGatewayStackProps:
     image_proxy_lambda: lambda_.Function
     pipelines_nodes_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
+    asset_sync_state_machine: sfn.StateMachine
+    asset_sync_job_table: dynamodb.TableV2
+
 
 
 def generate_random_password(length=16):
@@ -164,6 +168,8 @@ class ApiGatewayStack(Stack):
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 ingest_event_bus=props.ingest_event_bus,
+                asset_sync_state_machine=props.asset_sync_state_machine,
+                asset_sync_job_table=props.asset_sync_job_table,
             ),
         )
 
