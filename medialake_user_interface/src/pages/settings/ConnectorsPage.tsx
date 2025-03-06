@@ -13,7 +13,8 @@ import {
     useGetConnectors,
     useDeleteConnector,
     useToggleConnector,
-    useCreateS3Connector
+    useCreateS3Connector,
+    useSyncConnector
 } from '@/api/hooks/useConnectors';
 import {
     ConnectorResponse,
@@ -35,6 +36,7 @@ const ConnectorsPage: React.FC = () => {
 
     const { mutateAsync: deleteConnector } = useDeleteConnector();
     const { mutateAsync: toggleConnector } = useToggleConnector();
+    const { mutateAsync: syncConnector } = useSyncConnector();
     const {
         mutateAsync: createS3Connector,
         isPending: isCreatingConnector
@@ -80,6 +82,21 @@ const ConnectorsPage: React.FC = () => {
         } catch (error) {
             setAlert({
                 message: `Failed to ${enabled ? 'enable' : 'disable'} connector`,
+                severity: 'error'
+            });
+        }
+    };
+
+    const handleSync = async (id: string) => {
+        try {
+            await syncConnector(id);
+            setAlert({
+                message: 'Connector sync initiated successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            setAlert({
+                message: 'Failed to sync connector',
                 severity: 'error'
             });
         }
@@ -177,6 +194,7 @@ const ConnectorsPage: React.FC = () => {
                                 onEdit={handleEditClick}
                                 onDelete={handleDelete}
                                 onToggleStatus={handleToggleStatus}
+                                onSync={handleSync}
                             />
                         </Box>
                     );

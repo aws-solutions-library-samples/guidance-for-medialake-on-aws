@@ -20,6 +20,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
     Stack,
+    aws_stepfunctions as sfn,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 
@@ -43,10 +44,13 @@ class ConnectorsProps:
     iac_assets_bucket: s3.IBucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
+    asset_sync_state_machine: sfn.StateMachine
+    asset_sync_job_table: dynamodb.TableV2
     ingest_event_bus: str | None
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
+
 
 
 class ConnectorsConstruct(Construct):
@@ -585,29 +589,38 @@ class ConnectorsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
         
-        s3_connector_id = connector_s3_resource.add_resource("{connector_id}")
-        # s3_sync_connector_resource = s3_connector_id.add_resource("sync")
+        s3_sync_connector_resource = connector_id_resource.add_resource("sync")
 
-        # s3_sync_lambda = Lambda(
-        #     self,
-        #     "S3SyncLambda",
-        #     config=LambdaConfig(
-        #         name="post_connector_s3_sync",
-        #         entry="lambdas/api/connectors/s3/connector_id/post_sync",
-        #         environment_variables={
-        #             "X_ORIGIN_VERIFY_SECRET_ARN": (
-        #                 props.x_origin_verify_secret.secret_arn
-        #             ),
-        #         },
-        #     ),
-        # )        
+        s3_sync_lambda = Lambda(
+            self,
+            "S3SyncLambda",
+            config=LambdaConfig(
+                name="post_connector_s3_sync",
+                entry="lambdas/api/connectors/rp_connectorid/sync/post_sync",
+                environment_variables={
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                    "MEDIALAKE_ASSET_SYNC_STATE_MACHINE_ARN": props.asset_sync_state_machine.state_machine_arn,
+                    "MEDIALAKE_ASSET_SYNC_JOB_TABLE_ARN": props.asset_sync_job_table.table_arn,
+                },
+            ),
+        )   
+        props.asset_sync_job_table.grant_read_write_data(s3_sync_lambda.function)
+        props.asset_sync_state_machine.grant_start_execution(s3_sync_lambda.function)
         
-
+        s3_sync_connector_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(s3_sync_lambda.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        
         # Create s3 explorer resource with path parameter
         s3_explorer_resource = connector_s3_resource.add_resource("explorer")
         s3_explorer_connector_resource = s3_explorer_resource.add_resource(
             "{connector_id}"
         )
+
 
         s3_explorer_get_lambda = Lambda(
             self,

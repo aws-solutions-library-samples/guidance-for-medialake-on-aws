@@ -321,3 +321,26 @@ export const useCreateGCSConnector = () => {
         },
     });
 };
+
+export const useSyncConnector = () => {
+    const { showError } = useErrorModal();
+
+    return useMutation<ApiResponse<any>, Error, string>({
+        mutationFn: async (connectorId) => {
+            try {
+                const response = await apiClient.post<ApiResponse<any>>(
+                    `${API_ENDPOINTS.CONNECTORS}/${connectorId}/sync`
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Sync connector error:', error);
+                showError('Failed to sync connector');
+                throw error;
+            }
+        },
+        onSuccess: () => {
+            // No need to invalidate queries as sync doesn't change connector data
+            // but we might want to show a success message
+        },
+    });
+};

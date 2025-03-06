@@ -26,10 +26,12 @@ import {
     Sidebar,
     NodeConfigurationForm,
     PipelineToolbar,
+    JobStatusNode
 } from '../components/PipelineEditor';
 import type { PipelineToolbarProps } from '../components/PipelineEditor/PipelineToolbar';
 import { Node as NodeType, NodeConfiguration, NodeMethod } from '../types';
 import { RightSidebarProvider, useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
+import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -47,6 +49,7 @@ interface CustomNodeData {
 
 const nodeTypes = {
     custom: CustomNode,
+    jobStatusNode: JobStatusNode
 };
 
 const edgeTypes = {
@@ -335,9 +338,12 @@ const PipelineEditorContent = () => {
                 y: event.clientY - reactFlowBounds.top,
             });
 
+            // Check if this is our special job status node
+            const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
+            
             const newReactFlowNode: Node<CustomNodeData> = {
                 id: getId(),
-                type: 'custom',
+                type: isJobStatusNode ? 'jobStatusNode' : 'custom',
                 position,
                 data: {
                     nodeId: nodeData.id,
@@ -347,7 +353,7 @@ const PipelineEditorContent = () => {
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
                     type: nodeData.type,
-                    configuration: {
+                    configuration: nodeData.methodConfig || {
                         method: '',
                         parameters: {},
                         requestMapping: '',
