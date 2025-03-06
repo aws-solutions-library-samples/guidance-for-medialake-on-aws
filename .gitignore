@@ -53,6 +53,10 @@ cdk.context.json
 docs/
 cline_docs/
 
+# Playwrght testing
+playwright-report/
+test-results/
+
 # OS generated files
 .DS_Store
 .DS_Store?

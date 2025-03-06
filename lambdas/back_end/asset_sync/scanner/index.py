@@ -2,18 +2,23 @@ import os
 import boto3
 import json
 import uuid
+from datetime import datetime
 from common import logger, AssetProcessor, JobStatus, ErrorType
 
-def handle(event, context):
+def lambda_handler(event, context):
     try:
         job_id = event['jobId']
         bucket_name = event['bucketName']
         batch_size = event.get('batchSize', 1000)
-        continuation_token = event.get('continuationToken')
+        
+        if 'scanResult' in event and event['scanResult'] and 'Payload' in event['scanResult']:
+            continuation_token = event['scanResult']['Payload']['continuationToken']
+        else:
+            continuation_token = None
         
         # Update job status
         AssetProcessor.update_job_status(
-            job_id, 
+            job_id,
             JobStatus.SCANNING, 
             f"Scanning bucket {bucket_name}"
         )

@@ -512,7 +512,7 @@ class UIConstruct(Construct):
                                 "domain": f"{config.resource_prefix}-{config.environment}.auth.{scope.region}.amazoncognito.com",
                                 "scopes": ["email", "openid", "profile"],
                                 "responseType": "code",
-                                "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}",
+                                "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
                                 "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
                             },
                         },

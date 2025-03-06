@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_event_sources,
     aws_logs as logs,
+    aws_events as events,
     aws_sqs as sqs,
     aws_secretsmanager as secretsmanager,
     aws_stepfunctions as sfn,
@@ -26,9 +27,7 @@ from config import config
 @dataclass
 class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
-    api_resource: apigateway.IResource
-    x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    ingest_event_bus: events.EventBus
 
 
 
@@ -37,7 +36,7 @@ class AssetSyncStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
 
-        self.asset_sync_job_table = DynamoDB(
+        self._asset_sync_job_table = DynamoDB(
             self,
             "AssetSyncJobTable",
             props=DynamoDBProps(
@@ -47,9 +46,9 @@ class AssetSyncStack(Stack):
             )
         )
         
-        storage_resource = props.api_resource.root.add_resource("storage")
-        sync_resource = storage_resource.add_resource("sync")
-        job_resource = sync_resource.add_resource("{jobId}")
+        # storage_resource = props.api_resource.root.add_resource("storage")
+        # sync_resource = storage_resource.add_resource("sync")
+        # job_resource = sync_resource.add_resource("{jobId}")
 
 
         # SQS Queues
@@ -92,10 +91,11 @@ class AssetSyncStack(Stack):
         # Common Lambda configuration
         asset_sync_lambda_env = {
             "ASSETS_TABLE_NAME": props.asset_table.table_name,
-            "JOB_TABLE_NAME": self.asset_sync_job_table.table_name,
+            "JOB_TABLE_NAME": self._asset_sync_job_table.table_name,
             "LOG_GROUP_NAME": self.log_group.log_group_name,
             "PROCESSING_QUEUE_URL": self.processing_queue.queue_url,
             "DLQ_URL": self.dlq.queue_url,
+            "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
         }
 
         self._initialize_job_lambda = Lambda(
@@ -145,6 +145,7 @@ class AssetSyncStack(Stack):
                 name=f"{config.resource_prefix}-worker-{config.environment}",
                 entry="lambdas/back_end/asset_sync/worker",
                 environment_variables=asset_sync_lambda_env,
+                
             ),
         )
         
@@ -169,15 +170,16 @@ class AssetSyncStack(Stack):
         )
 
         # Grant permissions
-        self.asset_sync_job_table.table.grant_read_write_data(self._initialize_job_lambda.function)
-        self.asset_sync_job_table.table.grant_read_write_data(self._scanner_lambda.function)
-        self.asset_sync_job_table.table.grant_read_write_data(self._query_lambda.function)
-        self.asset_sync_job_table.table.grant_read_write_data(self._batch_processor_lambda.function)
-        self.asset_sync_job_table.table.grant_read_write_data(self._worker_lambda.function)
-        self.asset_sync_job_table.table.grant_read_data(self._job_status_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._initialize_job_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._scanner_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._query_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._batch_processor_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._worker_lambda.function)
+        self._asset_sync_job_table.table.grant_read_data(self._job_status_lambda.function)
         
         props.asset_table.grant_read_data(self._query_lambda.function)
         props.asset_table.grant_read_write_data(self._worker_lambda.function)
+        self._asset_sync_job_table.table.grant_read_write_data(self._worker_lambda.function)
         
         self.processing_queue.grant_send_messages(self._batch_processor_lambda.function)
         self.processing_queue.grant_consume_messages(self._worker_lambda.function)
@@ -187,7 +189,7 @@ class AssetSyncStack(Stack):
         self._scanner_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:ListBucket", "s3:GetObject", "s3:GetObjectTagging", "s3:PutObjectTagging"],
-                resources=["*"],  # Allow access to any bucket in any region
+                resources=["*"],
             )
         )
         
@@ -195,9 +197,13 @@ class AssetSyncStack(Stack):
         self._worker_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:GetObject", "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObject"],
-                resources=["*"],  # Allow access to any bucket in any region
+                resources=["*"], 
             )
         )
+
+        props.ingest_event_bus.grant_put_events_to(self._worker_lambda.function)
+        props.asset_table.grant_read_write_data(self._worker_lambda.function)
+        
 
         # Step Functions Definition - using error handling and retries
         initialize_job_task = sfn_tasks.LambdaInvoke(
@@ -220,12 +226,12 @@ class AssetSyncStack(Stack):
             lambda_function=self._scanner_lambda.function,
             retry_on_service_exceptions=True,
             result_path="$.scanResult",
-            payload=sfn.TaskInput.from_object({
-                "jobId.$": "$.jobInfo.jobId",
-                "bucketName.$": "$.jobInfo.bucketName",
-                "batchSize.$": "$.jobInfo.batchSize",
-                "continuationToken.$": "$.continuationToken"
-            })
+            # payload=sfn.TaskInput.from_object({
+            #     "jobId.$": "$.jobInfo.jobId",
+            #     "bucketName.$": "$.jobInfo.bucketName",
+            #     "batchSize.$": "$.jobInfo.batchSize",
+            #     "continuationToken.$": "$.continuationToken"
+            # })
         )
 
         query_task = sfn_tasks.LambdaInvoke(
@@ -314,16 +320,23 @@ class AssetSyncStack(Stack):
         
 
         
-        sync_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(self._storage_sync_post_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
+        # sync_resource.add_method(
+        #     "POST",
+        #     apigateway.LambdaIntegration(self._storage_sync_post_lambda.function),
+        #     authorization_type=apigateway.AuthorizationType.COGNITO,
+        #     authorizer=props.cognito_authorizer,
+        # )
         
-        job_resource.add_method(
-            "GET",
-            apigateway.LambdaIntegration(self._job_status_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )   
+        # job_resource.add_method(
+        #     "GET",
+        #     apigateway.LambdaIntegration(self._job_status_lambda.function),
+        #     authorization_type=apigateway.AuthorizationType.COGNITO,
+        #     authorizer=props.cognito_authorizer,
+        # )
+    @property
+    def asset_sync_job_table(self) -> dynamodb.TableV2:
+        return self._asset_sync_job_table.table
+    
+    @property
+    def asset_sync_state_machine(self) -> sfn.StateMachine:
+        return self.state_machine

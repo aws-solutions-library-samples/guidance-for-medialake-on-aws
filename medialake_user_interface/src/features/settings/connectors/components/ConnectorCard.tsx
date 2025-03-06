@@ -24,6 +24,7 @@ import {
     CloudUpload as CloudUploadIcon,
     PowerSettingsNew as PowerIcon,
     AccessTime as AccessTimeIcon,
+    Sync as SyncIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse } from '@/api/types/api.types';
 import ConnectorEditModal from '@/features/settings/connectors/components/ConnectorEditModal';
@@ -44,6 +45,7 @@ interface ConnectorCardProps {
     onEdit: (connector: ConnectorResponse) => void;
     onDelete: (id: string) => Promise<void>;
     onToggleStatus: (id: string, enabled: boolean) => Promise<void>;
+    onSync?: (id: string) => Promise<void>;
     showSeconds?: boolean;
     allowSecondsToggle?: boolean;
 }
@@ -53,6 +55,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     onEdit,
     onDelete,
     onToggleStatus,
+    onSync,
     showSeconds: initialShowSeconds = false,
     allowSecondsToggle = true,
 }) => {
@@ -60,6 +63,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     
     const { 
         formattedDate, 
@@ -90,6 +94,17 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 
     const handleToggleStatus = async () => {
         await onToggleStatus(connector.id, connector.status === 'disabled');
+    };
+
+    const handleSyncClick = async () => {
+        if (onSync) {
+            try {
+                setIsSyncing(true);
+                await onSync(connector.id);
+            } finally {
+                setIsSyncing(false);
+            }
+        }
     };
 
     const getConnectorIcon = (type: string) => {
@@ -338,6 +353,38 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         >
                             <PowerIcon fontSize="small" />
                         </IconButton> */}
+                        {onSync && connector.type === 's3' && (
+                            <Tooltip title="Sync connector">
+                                <IconButton
+                                    onClick={handleSyncClick}
+                                    size="small"
+                                    disabled={isSyncing}
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        width: 40,
+                                        height: 40,
+                                        '&:hover': {
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                        },
+                                    }}
+                                >
+                                    <SyncIcon 
+                                        fontSize="small" 
+                                        sx={{
+                                            animation: isSyncing ? 'spin 2s linear infinite' : 'none',
+                                            '@keyframes spin': {
+                                                '0%': {
+                                                    transform: 'rotate(0deg)',
+                                                },
+                                                '100%': {
+                                                    transform: 'rotate(360deg)',
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                         <IconButton
                             onClick={handleDeleteClick}
                             size="small"

@@ -37,7 +37,6 @@ class AuthService {
                 case 'signedIn':
                     console.log('User signed in');
                     await this.handleAuthenticationCheck();
-                    window.location.replace('/');
                     break;
                 case 'signedOut':
                     console.log('User signed out');

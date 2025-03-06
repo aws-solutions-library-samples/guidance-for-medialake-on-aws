@@ -14,6 +14,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useGetUnconfiguredNodeMethods } from '@/shared/nodes/api/nodesController';
 import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
 import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
+import { createJobStatusNodeData } from './jobStatusNodeUtils';
 
 interface NodeSection {
     title: string;
@@ -131,6 +132,16 @@ const SidebarContent: React.FC = () => {
         console.log('[Sidebar] Node data for drag:', nodeData);
 
         event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
+        event.dataTransfer.effectAllowed = 'move';
+    };
+
+    // Handler for dragging the custom job status node
+    const onDragStartJobStatus = (event: React.DragEvent) => {
+        const nodeData = createJobStatusNodeData();
+        event.dataTransfer.setData('application/reactflow', JSON.stringify({
+            ...nodeData,
+            customNodeType: 'jobStatusNode' // This helps identify it as a special node type
+        }));
         event.dataTransfer.effectAllowed = 'move';
     };
 
@@ -268,6 +279,35 @@ const SidebarContent: React.FC = () => {
                         </AccordionSummary>
                         <AccordionDetails sx={{ p: 2 }}>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                {/* If this is the Utilities section, add our custom Job Status node */}
+                                {section.types[0] === 'UTILITY' && (
+                                    <Paper
+                                        elevation={2}
+                                        onDragStart={onDragStartJobStatus}
+                                        draggable
+                                        sx={{
+                                            p: 2,
+                                            cursor: 'grab',
+                                            '&:hover': {
+                                                backgroundColor: 'action.hover',
+                                            },
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography variant="subtitle1">
+                                                Check Job Status
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Checks the status of a job and routes based on completion status
+                                        </Typography>
+                                    </Paper>
+                                )}
+                                
+                                {/* Render existing nodes */}
                                 {section.nodes.map(({ node, methodName, method }) => (
                                     <Paper
                                         key={`${node.nodeId}-${methodName}`}
