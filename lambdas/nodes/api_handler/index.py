@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import ast
 import boto3
 from botocore.exceptions import ClientError
 import requests
@@ -74,7 +75,7 @@ def make_api_call(
                     response = requests.get(url, headers=headers)
             elif method.lower() == "post":
                 if data:
-                    response = requests.post(url, headers=headers, data=data)
+                    response = requests.post(url, headers=headers, files=data)
                 else:
                     response = requests.post(url, headers=headers)
             else:
@@ -145,17 +146,19 @@ def build_environment_dict(config):
     return env_vars
 
 
-def retrieve_api_key(service_name: str) -> Dict[str, str]:
-    """Retrieve the API key from AWS Secrets Manager."""
-    secret_name = f"{service_name}_api_key"
+def retrieve_api_key(api_key_secret_arn: str) -> Dict[str, str]:
+    """Retrieve the API key from AWS Secrets Manager using the provided ARN."""
+    logger.info(f"Retrieving API key for arn: {api_key_secret_arn}")
+
     try:
         get_secret_value_response = secretsmanager_client.get_secret_value(
-            SecretId=secret_name
+            SecretId=api_key_secret_arn  # Use the provided ARN here
         )
-        secret = json.loads(get_secret_value_response["SecretString"])
+
+        secret = get_secret_value_response["SecretString"]
         return secret
     except ClientError as e:
-        print(f"Error retrieving secret: {e}")
+        logger.error(f"Error retrieving secret: {e}")
         raise
 
 
@@ -175,7 +178,7 @@ def load_and_execute_function_from_s3(
 
     try:
         # Download the file from S3
-        response = s3_client.get_object(Bucket=bucket, Key=key)
+        response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
         file_content = response["Body"].read().decode("utf-8")
 
         # Create a temporary module
@@ -225,17 +228,18 @@ def download_s3_object(bucket: str, key: str) -> str:
     """Download an object from S3 and return its content."""
     try:
 
-        response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
+        response = s3_client.get_object(Bucket=bucket, Key=key)
         return response["Body"].read().decode("utf-8")
     except ClientError as e:
         print(f"Error downloading S3 object: {e}")
         raise
 
 
-def create_authentication(api_auth_type: str, api_service_name: str):
+##todo
+def create_authentication(api_auth_type: str, api_key_secret_arn: str):
     if api_auth_type == "api_key":
-        api_key = retrieve_api_key(api_service_name)
-        return api_key
+        api_key = retrieve_api_key(api_key_secret_arn)
+        return {"x-api-key": api_key}
     else:
         return None
 
@@ -281,39 +285,33 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 def build_s3_templates_path(
     api_service_name: str,
+    api_service_path: str,
     api_service_method: str,
+    templates_path: str,  # remains for backward compatibility if needed
     api_service_resource: Optional[str] = None,
-    api_service_path: Optional[str] = None,
 ) -> dict:
     """
-    Builds S3 object paths for request template and mapping file based on service name, method, resource, and path.
-    Handles cases where input variables may or may not have leading/trailing slashes.
+    Builds S3 object paths for templates using the API service resource as the base.
+    It creates keys such as:
+      /embed/tasks/tasks_post_request.jinja
 
-    :param api_service_name: The name of the API service
-    :param api_service_method: The HTTP method (e.g., GET, POST)
-    :param api_service_resource: Optional resource name
-    :param api_service_path: Optional path
-    :return: A dictionary containing paths for request template and mapping file
+    :param api_service_method: The HTTP method (e.g., "post")
+    :param templates_path: Unused in this modified version (kept for signature consistency)
+    :param api_service_resource: The API service resource (e.g., "/embed/tasks")
+    :return: A dictionary containing keys for the request template, mapping file, etc.
     """
+    if not api_service_resource:
+        raise ValueError("API service resource must be provided.")
 
-    def clean_path(path: str) -> str:
-        """Remove leading and trailing slashes from a path."""
-        return path.strip("/")
+    # Preserve the leading slash and remove any trailing slashes
+    base_path = api_service_resource.rstrip("/")
 
-    base_path = clean_path(api_service_name)
+    if api_service_path and api_service_name:
+        full_path = f"{api_service_name}/{api_service_path}{base_path}"
 
-    if api_service_path and api_service_resource:
-        full_path = f"{base_path}/{clean_path(api_service_path)}/{clean_path(api_service_resource)}"
-    elif api_service_resource:
-        full_path = f"{base_path}/{clean_path(api_service_resource)}"
-    else:
-        full_path = base_path
-
-    # Construct the file names with method included
-    if api_service_resource:
-        file_prefix = f"{clean_path(api_service_resource)}_{api_service_method.lower()}"
-    else:
-        file_prefix = api_service_method.lower()
+    # Use the last segment of the resource for the file prefix
+    resource_name = base_path.split("/")[-1]
+    file_prefix = f"{resource_name}_{api_service_method.lower()}"
 
     request_template = f"{full_path}/{file_prefix}_request.jinja"
     mapping_file = f"{full_path}/{file_prefix}_request_mapping.py"
@@ -323,7 +321,7 @@ def build_s3_templates_path(
     response_mapping_file = f"{full_path}/{file_prefix}_response_mapping.py"
     custom_code_file = f"{full_path}/{file_prefix}_custom_code.py"
 
-    template_mapping = {
+    return {
         "request_template": request_template,
         "mapping_file": mapping_file,
         "url_template": url_template,
@@ -332,17 +330,17 @@ def build_s3_templates_path(
         "response_mapping_file": response_mapping_file,
         "custom_code_file": custom_code_file,
     }
-    return template_mapping
 
 
 def request_header_creation():
-    request_headers = json.loads(os.environ.get("CUSTOM_HEADERS", "{}"))
-    return request_headers
+    headers = json.loads(os.environ.get("CUSTOM_HEADERS", "{}"))
+    return headers
 
 
 def create_request_body(s3_templates, api_template_bucket, event):
+    logger.info("Building a request body")
     function_name = "translate_event_to_request"
-    request_template_path = s3_templates["request_template"]
+    request_template_path = f"api_templates/{s3_templates['request_template']}"
     mapping_path = s3_templates["mapping_file"]
 
     request_template = download_s3_object(api_template_bucket, request_template_path)
@@ -354,7 +352,7 @@ def create_request_body(s3_templates, api_template_bucket, event):
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
     request_body = query_template.render(variables=mapping)
-
+    request_body = ast.literal_eval(request_body)
     return request_body
 
 
@@ -364,7 +362,6 @@ def create_custom_url(s3_templates, api_template_bucket, event):
     url_template_path = s3_templates["url_template"]
     url_mapping_path = s3_templates["url_mapping_file"]
 
-    print(url_template_path)
     request_template = download_s3_object(api_template_bucket, url_template_path)
     mapping = load_and_execute_function_from_s3(
         api_template_bucket, url_mapping_path, function_name, event
@@ -449,6 +446,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     workflow_step_name = os.environ.get("WORKFLOW_STEP_NAME")
     api_service_url = os.environ.get("API_SERVICE_URL")
+    api_key_secret_arn = os.environ.get("API_KEY_SECRET_ARN")
+    request_templates_path = os.environ.get("REQUEST_TEMPLATES_PATH")
+    response_templates_path = os.environ.get("RESPONSE_TEMPLATES_PATH")
     api_service_resource = os.environ.get("API_SERVICE_RESOURCE")
     api_service_path = os.environ.get("API_SERVICE_PATH")
     api_service_method = os.environ.get("API_SERVICE_METHOD")
@@ -468,6 +468,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             api_service_name=api_service_name,
             api_service_path=api_service_path,
             api_service_resource=api_service_resource,
+            templates_path=request_templates_path,
             api_service_method=api_service_method,
         )
     except ValueError as e:
@@ -478,9 +479,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Get API header
     request_headers = request_header_creation()
-
+    logger.info(f"Request headers are: {request_headers}")
     # Build auth
-    auth_credentials = create_authentication(api_auth_type, api_service_name)
+    auth_credentials = create_authentication(api_auth_type, api_key_secret_arn)
 
     if api_auth_type == "api_key":
         request_headers.update(auth_credentials)

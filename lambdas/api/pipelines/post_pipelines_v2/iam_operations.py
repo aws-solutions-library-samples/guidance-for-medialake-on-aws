@@ -163,7 +163,24 @@ def delete_role(role_name: str) -> None:
     """Delete an IAM role and its attached policies."""
     iam_client = boto3.client("iam")
     try:
-        # First detach all policies
+        # First delete all inline policies
+        try:
+            # List all inline policies
+            inline_policies = iam_client.list_role_policies(RoleName=role_name)
+
+            # Delete each inline policy
+            for policy_name in inline_policies.get("PolicyNames", []):
+                logger.info(
+                    f"Deleting inline policy {policy_name} from role {role_name}"
+                )
+                iam_client.delete_role_policy(
+                    RoleName=role_name, PolicyName=policy_name
+                )
+        except Exception as inline_err:
+            logger.error(f"Error deleting inline policies: {inline_err}")
+            # Continue with other cleanup even if this fails
+
+        # Next detach all managed policies
         paginator = iam_client.get_paginator("list_attached_role_policies")
         for page in paginator.paginate(RoleName=role_name):
             for policy in page["AttachedPolicies"]:
@@ -174,7 +191,7 @@ def delete_role(role_name: str) -> None:
                     RoleName=role_name, PolicyArn=policy["PolicyArn"]
                 )
 
-        # Then delete the role
+        # Finally delete the role
         iam_client.delete_role(RoleName=role_name)
         logger.info(f"Deleted role: {role_name}")
     except iam_client.exceptions.NoSuchEntityException:
@@ -364,16 +381,6 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
     try:
         # Log environment variables for debugging
-        logger.info(
-            f"NODE_TEMPLATES_BUCKET: {os.environ.get('NODE_TEMPLATES_BUCKET', 'NOT_SET')}"
-        )
-        logger.info(
-            f"IAC_ASSETS_BUCKET: {os.environ.get('IAC_ASSETS_BUCKET', 'NOT_SET')}"
-        )
-        logger.info(f"AWS_REGION: {os.environ.get('AWS_REGION', 'NOT_SET')}")
-        logger.info(f"ACCOUNT_ID: {os.environ.get('ACCOUNT_ID', 'NOT_SET')}")
-        logger.info(f"NODE_TABLE: {os.environ.get('NODE_TABLE', 'NOT_SET')}")
-        logger.info(f"PIPELINES_TABLE: {os.environ.get('PIPELINES_TABLE', 'NOT_SET')}")
 
         # Get IAM policy from YAML if it exists
         policy_document = default_policy
@@ -391,9 +398,27 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
         if has_iam_policy:
             try:
-                statements = yaml_data["node"]["integration"]["config"]["lambda"][
-                    "iam_policy"
-                ]["statements"]
+                # statements = yaml_data["node"]["integration"]["config"]["lambda"][
+                #     "iam_policy"
+                # ]["statements"]
+
+                statements = yaml_data["node"].get("integration", {}).get(
+                    "config", {}
+                ).get("lambda", {}).get("iam_policy", {}).get(
+                    "statements"
+                ) or yaml_data[
+                    "node"
+                ].get(
+                    "utility", {}
+                ).get(
+                    "config", {}
+                ).get(
+                    "lambda", {}
+                ).get(
+                    "iam_policy", {}
+                ).get(
+                    "statements"
+                )
 
                 logger.info(f"Found {len(statements)} statements in YAML")
 

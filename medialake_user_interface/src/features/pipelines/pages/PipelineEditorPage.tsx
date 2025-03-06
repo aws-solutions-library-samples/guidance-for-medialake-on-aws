@@ -87,13 +87,95 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
 });
 
 const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
+    console.log('[PipelineEditorPage] convertApiResponseToNode called with:', response);
     if (!response || !response.data || !response.data[0]) {
+        console.log('[PipelineEditorPage] Invalid response structure');
         return null;
     }
 
     const nodeData = response.data[0];
+    console.log('[PipelineEditorPage] Node data from response:', nodeData);
 
-    return {
+    // Create a methods object with the config property
+    const methods = nodeData.methods?.reduce((acc, method) => {
+        console.log('[PipelineEditorPage] Processing method:', method);
+
+        // Convert parameters to Record format
+        const parameters = Array.isArray(method.parameters)
+            ? method.parameters.reduce((paramAcc, param) => {
+                const parameterData: any = {
+                    name: param.name,
+                    label: param.label,
+                    type: param.schema.type === 'string' ? 'text' : param.schema.type as 'number' | 'boolean' | 'select',
+                    required: param.required || false,
+                    description: param.description
+                };
+
+                // Add options if they exist in the schema
+                if (param.schema.options) {
+                    parameterData.options = param.schema.options;
+                }
+
+                return {
+                    ...paramAcc,
+                    [param.name]: parameterData
+                };
+            }, {})
+            : {};
+
+        // Extract config from method using type assertion
+        // For trigger nodes, the config is different from integration nodes
+        const nodeType = nodeData.info?.nodeType;
+        let config;
+
+        if (nodeType === 'TRIGGER') {
+            // For trigger nodes, use the method name as the operationId
+            config = {
+                path: '',
+                operationId: method.name,
+                parameters: (method as any).parameters || [],
+                requestMapping: (method as any).requestMapping || null,
+                responseMapping: (method as any).responseMapping || null
+            };
+        } else {
+            // For integration nodes, extract from config property
+            config = {
+                path: (method as any).config?.path || '',
+                operationId: (method as any).config?.operationId || '',
+                parameters: (method as any).config?.parameters || [],
+                requestMapping: (method as any).requestMapping || (method as any).config?.requestMapping || null,
+                responseMapping: (method as any).responseMapping || (method as any).config?.responseMapping || null
+            };
+        }
+
+        console.log('[PipelineEditorPage] Method config:', config);
+        console.log('[PipelineEditorPage] Method:', method);
+
+        // If method already exists, merge parameters
+        if (acc[method.name]) {
+            return {
+                ...acc,
+                [method.name]: {
+                    ...acc[method.name],
+                    parameters: { ...acc[method.name].parameters, ...parameters },
+                    config: config // Add config property
+                }
+            };
+        }
+
+        // Add new method with config
+        return {
+            ...acc,
+            [method.name]: {
+                name: method.name,
+                description: method.description || '',
+                parameters,
+                config: config // Add config property
+            }
+        };
+    }, {} as Record<string, any>);
+
+    const result = {
         nodeId: nodeData.nodeId,
         info: {
             enabled: nodeData.info?.enabled || false,
@@ -108,52 +190,11 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             outputTypes: nodeData.info?.outputTypes || [],
             createdAt: nodeData.info?.createdAt || new Date().toISOString(),
         },
-        methods: nodeData.methods?.reduce((acc, method) => {
-            // Convert parameters to Record format
-            const parameters = Array.isArray(method.parameters)
-                ? method.parameters.reduce((paramAcc, param) => {
-                    const parameterData: any = {
-                        name: param.name,
-                        label: param.label,
-                        type: param.schema.type === 'string' ? 'text' : param.schema.type as 'number' | 'boolean' | 'select',
-                        required: param.required || false,
-                        description: param.description
-                    };
-
-                    // Add options if they exist in the schema
-                    if (param.schema.options) {
-                        parameterData.options = param.schema.options;
-                    }
-
-                    return {
-                        ...paramAcc,
-                        [param.name]: parameterData
-                    };
-                }, {})
-                : {};
-
-            // If method already exists, merge parameters
-            if (acc[method.name]) {
-                return {
-                    ...acc,
-                    [method.name]: {
-                        ...acc[method.name],
-                        parameters: { ...acc[method.name].parameters, ...parameters }
-                    }
-                };
-            }
-
-            // Add new method
-            return {
-                ...acc,
-                [method.name]: {
-                    name: method.name,
-                    description: method.description || '',
-                    parameters
-                }
-            };
-        }, {} as Record<string, NodeMethod>),
+        methods: methods
     };
+
+    console.log('[PipelineEditorPage] Converted node:', result);
+    return result;
 };
 
 const PipelineEditorContent = () => {
@@ -190,7 +231,28 @@ const PipelineEditorContent = () => {
         enabled: !!pipelineId && pipelineId !== 'new'
     });
 
-    const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(selectedNode?.data?.nodeId || '');
+    // Only fetch node details when the dialog is open and we have a selected node
+    // Store the nodeId in a ref to prevent unnecessary re-renders
+    const nodeIdRef = React.useRef<string>('');
+
+    // Only update the nodeId when the dialog opens or closes
+    React.useEffect(() => {
+        if (isNodeConfigOpen && selectedNode?.data?.nodeId) {
+            nodeIdRef.current = selectedNode.data.nodeId;
+        } else if (!isNodeConfigOpen) {
+            nodeIdRef.current = '';
+        }
+    }, [isNodeConfigOpen, selectedNode]);
+
+    const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(nodeIdRef.current, {
+        enabled: isNodeConfigOpen && !!nodeIdRef.current
+    });
+
+    // Memoize the converted node data to prevent unnecessary recalculations
+    const convertedNodeData = React.useMemo(() =>
+        nodeDetails ? (convertApiResponseToNode(nodeDetails) || {} as NodeType) : ({} as NodeType),
+        [nodeDetails]
+    );
 
     const createPipeline = useCreatePipeline({
         onSuccess: () => {
@@ -324,7 +386,7 @@ const PipelineEditorContent = () => {
             if (!reactFlowWrapper.current) return;
 
             const nodeData = JSON.parse(event.dataTransfer.getData('application/reactflow'));
-
+            console.log(nodeData)
             if (typeof nodeData === 'undefined' || !nodeData) {
                 return;
             }
@@ -347,14 +409,17 @@ const PipelineEditorContent = () => {
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
                     type: nodeData.type,
-                    configuration: {
+                    configuration: nodeData.methodConfig || {
                         method: '',
+                        path: '',
                         parameters: {},
+                        operationId: '',
                         requestMapping: '',
                         responseMapping: ''
                     },
                 }
             };
+
 
             const newPipelineNode = convertToPipelineNode(newReactFlowNode);
 
@@ -397,9 +462,13 @@ const PipelineEditorContent = () => {
     }, []);
 
     const handleNodeConfigSave = useCallback(async (configuration: any) => {
+        console.log('[PipelineEditorPage] handleNodeConfigSave called with:', configuration);
+        console.log('[PipelineEditorPage] Configuration JSON:', JSON.stringify(configuration));
         try {
             if (selectedNode) {
+                console.log('[PipelineEditorPage] Selected node:', selectedNode);
                 // Update node in ReactFlow
+
                 const updatedNode = {
                     ...selectedNode,
                     data: {
@@ -411,23 +480,34 @@ const PipelineEditorContent = () => {
                     }
                 };
 
+                console.log('[PipelineEditorPage] Updated node:', updatedNode);
+                console.log('[PipelineEditorPage] Updated node configuration:', updatedNode.data.configuration);
+
                 // Update ReactFlow state
-                setNodes((nds) =>
-                    nds.map((node) =>
+                setNodes((nds) => {
+                    console.log('[PipelineEditorPage] Current nodes:', nds);
+                    const updatedNodes = nds.map((node) =>
                         node.id === selectedNode.id ? updatedNode : node
-                    )
-                );
+                    );
+                    console.log('[PipelineEditorPage] Updated nodes:', updatedNodes);
+                    return updatedNodes;
+                });
+                console.log('[PipelineEditorPage] Nodes updated');
 
                 // Convert to pipeline node format and update form data
                 const updatedPipelineNode = convertToPipelineNode(updatedNode);
+                console.log('[PipelineEditorPage] Updated pipeline node:', updatedPipelineNode);
+                console.log('[PipelineEditorPage] Updated pipeline node data:', updatedPipelineNode.data);
 
                 // Update pipeline configuration in form data
                 setFormData(prev => {
+                    console.log('[PipelineEditorPage] Previous form data:', prev);
                     const updatedNodes = prev.configuration.nodes.map(node =>
                         node.id === selectedNode.id ? updatedPipelineNode : node
                     );
+                    console.log('[PipelineEditorPage] Updated nodes in form data:', updatedNodes);
 
-                    return {
+                    const newFormData = {
                         ...prev,
                         configuration: {
                             ...prev.configuration,
@@ -439,12 +519,18 @@ const PipelineEditorContent = () => {
                             }
                         }
                     };
+                    console.log('[PipelineEditorPage] New form data:', newFormData);
+                    return newFormData;
                 });
+                console.log('[PipelineEditorPage] Form data updated');
             }
+
+            // Close the dialog
+            console.log('[PipelineEditorPage] Closing node config dialog');
             handleNodeConfigClose();
         } catch (error) {
-            console.error('Error saving node configuration:', error);
-            // You might want to show an error message to the user here
+            console.error('[PipelineEditorPage] Error saving node configuration:', error);
+            // Don't close the dialog on error so the user can try again
         }
     }, [selectedNode, setNodes, handleNodeConfigClose]);
 
@@ -566,7 +652,7 @@ const PipelineEditorContent = () => {
                 <DialogContent>
                     {selectedNode && !isNodeDetailsLoading && nodeDetails && (
                         <NodeConfigurationForm
-                            node={convertApiResponseToNode(nodeDetails) || {} as NodeType}
+                            node={convertedNodeData}
                             configuration={selectedNode.data.configuration}
                             onSubmit={handleNodeConfigSave}
                             onCancel={() => setIsNodeConfigOpen(false)}

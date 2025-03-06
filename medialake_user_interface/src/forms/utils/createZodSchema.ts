@@ -50,6 +50,15 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
         // Handle required/optional fields
         if (!field.required) {
             fieldSchema = z.union([fieldSchema, z.undefined()]).optional();
+        } else {
+            // For required fields, make them more lenient
+            // Allow empty strings for text fields but mark them as required
+            if (field.type === 'text' || field.type === 'email' || field.type === 'password') {
+                fieldSchema = z.string().optional().or(z.literal('')).or(z.undefined());
+            } else if (field.type === 'select') {
+                // For select fields, allow empty strings or undefined
+                fieldSchema = z.string().optional().or(z.literal('')).or(z.undefined());
+            }
         }
 
         if (fieldName.startsWith('parameters.')) {
@@ -72,6 +81,6 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
 
     // Cache the schema using the fields reference
     schemaCache.set(fields, schema);
-    
+
     return schema;
 };

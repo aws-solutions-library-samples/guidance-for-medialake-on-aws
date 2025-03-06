@@ -10,6 +10,20 @@ node:
       lambda:
         handler: utility/PreSignedUrlLambdaDeployment
         runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME_KMS_KEY}/*
 actions:
   generate:
     summary: Generate pre-signed URL
@@ -19,6 +33,7 @@ actions:
       - in: body
         name: URL Validity Duration
         required: true
+        default: 3600
         schema:
           type: number
     x-requestMapping: utility/pre_signed_url/generate/

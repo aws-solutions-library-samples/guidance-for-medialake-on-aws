@@ -25,6 +25,11 @@ node:
                 - arn:aws:s3:::${EXTERNAL_PAYLOAD_BUCKET}/*
             - effect: Allow
               actions:
+                - kms:Decrypt
+              resources:
+                - "arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:key/*"
+            - effect: Allow
+              actions:
                 - s3:ListBucket
               resources:
                 - arn:aws:s3:::${NODE_TEMPLATES_BUCKET}

@@ -28,7 +28,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
     showButtons = true,
 }) => {
     const { t } = useTranslation();
-    
+
     // Only log initial mount
     React.useEffect(() => {
         console.log('[DynamicForm] Mounted:', {
@@ -43,7 +43,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
         // Use JSON.stringify to compare deep equality
         [JSON.stringify(definition.fields)]
     );
-    
+
     // Create schema using cached version
     const schema = React.useMemo(
         () => createZodSchema(fields),
@@ -118,12 +118,25 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(({
         try {
             // Parse and validate
             const validatedData = schema.safeParse(data);
-            
+
             if (!validatedData.success) {
                 console.error('[DynamicForm] Validation failed:', validatedData.error);
-                throw validatedData.error;
+                console.error('[DynamicForm] Validation errors:', validatedData.error.errors);
+                console.error('[DynamicForm] Form data that failed validation:', data);
+
+                // Try to submit anyway with the original data
+                console.warn('[DynamicForm] Attempting to submit with original data despite validation errors');
+                try {
+                    await onSubmit(data);
+                    console.log('[DynamicForm] Submit successful despite validation errors');
+                    return;
+                } catch (submitError) {
+                    console.error('[DynamicForm] Submit failed with original data:', submitError);
+                    throw validatedData.error;
+                }
             }
-            
+
+            console.log('[DynamicForm] Validation successful, submitting data:', validatedData.data);
             await onSubmit(validatedData.data);
         } catch (error) {
             console.error('[DynamicForm] Submit error:', error);

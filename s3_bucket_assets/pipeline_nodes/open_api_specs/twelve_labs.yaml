@@ -11,14 +11,15 @@ tags:
   - name: Embeddings
 
 servers:
-  - url: https://api.twelvelabs.io/v1.3
+  - url: https://api.twelvelabs.io/
+    path: v1.3
     description: Production API Server
     x-server-environment: Production
 
 components:
   securitySchemes:
     apiKey:
-      type: apiKey
+      type: api_key
       in: header
       name: x-api-key
   headers:
@@ -43,8 +44,8 @@ paths:
           required: true
           schema:
             type: string
-      x-requestMapping: twelve_labs/embed/tasks/post/input
-      x-responseMapping: twelve_labs/embed/tasks/post/output
+      x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks
+      x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks
   /embed/tasks/{task_id}/status:
     get:
       summary: Get the status of a video embedding task
@@ -55,8 +56,8 @@ paths:
           required: true
           schema:
             type: string
-      x-requestMapping: twelve_labs/embed/tasks/task_id/status/get/input
-      x-responseMapping: twelve_labs/embed/tasks/task_id/status/get/output
+      x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks/status
+      x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks/status
   /embed/tasks/{task_id}:
     get:
       summary: Get the results of a video embedding task
@@ -67,5 +68,5 @@ paths:
           required: true
           schema:
             type: string
-      x-requestMapping: twelve_labs/embed/tasks/task_id/get/input
-      x-responseMapping: twelve_labs/embed/tasks/task_id/get/output
+      x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks/task_id
+      x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks/task_id

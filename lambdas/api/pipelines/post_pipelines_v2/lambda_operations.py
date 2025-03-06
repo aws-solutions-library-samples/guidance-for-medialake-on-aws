@@ -10,7 +10,12 @@ from aws_lambda_powertools import Logger
 
 from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET
 from iam_operations import create_lambda_role, wait_for_role_propagation
-from dynamodb_operations import get_node_auth_config, get_integration_secret_arn
+from dynamodb_operations import (
+    get_node_info,
+    get_node_method,
+    get_node_auth_config,
+    get_integration_secret_arn,
+)
 
 # Initialize logger
 logger = Logger()
@@ -164,14 +169,9 @@ def get_auth_type_for_node(node_id: str) -> str:
         if auth_config_map:
             # Get the auth type, in, and name
             auth_type = auth_config_map.get("type", {})
-            auth_in = auth_config_map.get("in", {})
-            auth_name = auth_config_map.get("name", {})
 
-            if auth_type and auth_in and auth_name:
-                api_auth_type = f"{auth_type}:{auth_in}:{auth_name}"
-                logger.info(
-                    f"Constructed auth type for node {node_id}: {api_auth_type}"
-                )
+            api_auth_type = f"{auth_type}"
+            logger.info(f"Constructed auth type for node {node_id}: {api_auth_type}")
 
     return api_auth_type
 
@@ -223,28 +223,43 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
 
     # Get API service URL from OpenAPI spec if available
     api_service_url = os.environ.get("API_SERVICE_URL", "")
+    api_path = os.environ.get("API_PATH", "")
+    request_templates_path = node.data.configuration.get("requestMapping")
+    response_templates_path = node.data.configuration.get("responseMapping")
+
     try:
         if (
             node.data.type.lower() == "integration"
             and "integration" in yaml_data.get("node", {})
             and "api" in yaml_data["node"]["integration"]
         ):
-            open_api_spec_path = yaml_data["node"]["integration"]["api"].get(
-                "open_api_spec_path"
+            node_info = get_node_info(node.data.id)
+            production_server = next(
+                (
+                    server
+                    for server in node_info["servers"]
+                    if server.get("x-server-environment") == "Production"
+                ),
+                None,
             )
-            if open_api_spec_path:
-                logger.info(f"Found OpenAPI spec path: {open_api_spec_path}")
-                open_api_spec = read_yaml_from_s3(
-                    NODE_TEMPLATES_BUCKET, open_api_spec_path
+            if production_server:
+                api_service_url = production_server.get("url")
+                api_path = production_server.get("path", "")
+            else:
+                raise ValueError(f"No Production server found for node {node.data.id}")
+
+            if api_service_url is None:
+                raise ValueError(
+                    f"No Production server URL found for node {node.data.id}"
                 )
-                if "servers" in open_api_spec and open_api_spec["servers"]:
-                    # Use the first server URL from the OpenAPI spec
-                    api_service_url = open_api_spec["servers"][0].get("url", "")
-                    logger.info(
-                        f"Using API service URL from OpenAPI spec: {api_service_url}"
-                    )
+
+            logger.info(f"Using API service URL: {api_service_url}")
+            logger.info(f"Using API path: {api_path}")
+
     except Exception as e:
-        logger.warning(f"Failed to extract API service URL from OpenAPI spec: {e}")
+        logger.warning(
+            f"Failed to extract API service URL and path from node info: {e}"
+        )
 
     # Get Lambda configuration from YAML
     lambda_config = yaml_data["node"]["integration"]["config"]["lambda"]
@@ -279,67 +294,130 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
         logger.info(f"Creating new Lambda function: {function_name}")
         for attempt in range(max_retries):
             try:
-                response = lambda_client.create_function(
-                    FunctionName=function_name,
-                    Runtime=runtime,
-                    Timeout=300,
-                    Role=role_arn,
-                    Handler="index.lambda_handler",
-                    Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
-                    Environment={
-                        "Variables": {
-                            # Core workflow variables
-                            "WORKFLOW_STEP_NAME": function_name,
-                            "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
-                            # API Service Configuration
-                            "API_SERVICE_URL": api_service_url,
-                            "API_SERVICE_RESOURCE": (
-                                node.data.configuration.get("path", "")
-                                if node.data.type.lower() == "integration"
-                                else os.environ.get("API_SERVICE_RESOURCE", "")
-                            ),
-                            "API_SERVICE_PATH": os.environ.get("API_SERVICE_PATH", ""),
-                            # Extract API_SERVICE_METHOD from node configuration if it's an integration node
-                            "API_SERVICE_METHOD": (
-                                node.data.configuration.get("method", "")
-                                if node.data.type.lower() == "integration"
-                                else os.environ.get("API_SERVICE_METHOD", "")
-                            ),
-                            "API_AUTH_TYPE": (
-                                get_auth_type_for_node(node.data.id)
-                                if node.data.type.lower() == "integration"
-                                else os.environ.get("API_AUTH_TYPE", "")
-                            ),
-                            "API_SERVICE_NAME": os.environ.get("API_SERVICE_NAME", ""),
-                            "API_TEMPLATE_BUCKET": os.environ.get(
-                                "NODE_TEMPLATES_BUCKET"
-                            ),
-                            "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
-                            "API_CUSTOM_CODE": os.environ.get(
-                                "API_CUSTOM_CODE", "false"
-                            ),
-                            # For integration nodes, add the secret ARN if available
-                            **(
-                                {
-                                    "API_KEY_SECRET_ARN": get_integration_secret_arn(
-                                        node.data.configuration.get("integrationId", "")
-                                    )
-                                    or ""
-                                }
-                                if node.data.type.lower() == "integration"
-                                and node.data.configuration.get("integrationId")
-                                else {}
-                            ),
-                            # S3 Configuration
-                            "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
-                                "EXTERNAL_PAYLOAD_BUCKET"
-                            ),
-                            # Custom Headers (defaults to empty JSON object)
-                            "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
-                        }
-                    },
-                    Publish=True,
-                )
+                # response = lambda_client.create_function(
+                #     FunctionName=function_name,
+                #     Runtime=runtime,
+                #     Timeout=300,
+                #     Role=role_arn,
+                #     Handler="index.lambda_handler",
+                #     Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
+                #     Environment={
+                #         "Variables": {
+                #             # Core workflow variables
+                #             "WORKFLOW_STEP_NAME": function_name,
+                #             "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
+                #             # API Service Configuration
+                #             "REQUEST_TEMPLATES_PATH": request_templates_path,
+                #             "RESPONSE_TEMPLATES_PATH": response_templates_path,
+                #             "API_SERVICE_URL": api_service_url,
+                #             "API_SERVICE_RESOURCE": (
+                #                 node.data.configuration.get("path", "")
+                #                 if node.data.type.lower() == "integration"
+                #                 else os.environ.get("API_SERVICE_RESOURCE", "")
+                #             ),
+                #             "API_SERVICE_PATH": api_path,
+                #             # Extract API_SERVICE_METHOD from node configuration if it's an integration node
+                #             "API_SERVICE_METHOD": (
+                #                 node.data.configuration.get("method", "")
+                #                 if node.data.type.lower() == "integration"
+                #                 else os.environ.get("API_SERVICE_METHOD", "")
+                #             ),
+                #             "API_AUTH_TYPE": (
+                #                 get_auth_type_for_node(node.data.id)
+                #                 if node.data.type.lower() == "integration"
+                #                 else os.environ.get("API_AUTH_TYPE", "")
+                #             ),
+                #             "API_SERVICE_NAME": node.data.id,
+                #             "API_TEMPLATE_BUCKET": os.environ.get(
+                #                 "NODE_TEMPLATES_BUCKET"
+                #             ),
+                #             "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
+                #             "API_CUSTOM_CODE": os.environ.get(
+                #                 "API_CUSTOM_CODE", "false"
+                #             ),
+                #             # For integration nodes, add the secret ARN if available
+                #             **(
+                #                 {
+                #                     "API_KEY_SECRET_ARN": get_integration_secret_arn(
+                #                         node.data.configuration.get("integrationId", "")
+                #                     )
+                #                     or ""
+                #                 }
+                #                 if node.data.type.lower() == "integration"
+                #                 and node.data.configuration.get("integrationId")
+                #                 else {}
+                #             ),
+                #             # S3 Configuration
+                #             "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
+                #                 "EXTERNAL_PAYLOAD_BUCKET"
+                #             ),
+                #             # Custom Headers (defaults to empty JSON object)
+                #             "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
+                #         }
+                #     },
+                #     Publish=True,
+                # )
+
+                # Build common parameters for the Lambda function creation
+                create_function_params = {
+                    "FunctionName": function_name,
+                    "Runtime": runtime,
+                    "Timeout": 300,
+                    "Role": role_arn,
+                    "Handler": "index.lambda_handler",
+                    "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
+                    "Publish": True,
+                }
+
+                # Only include Environment variables if the node type is "integration"
+                if node.data.type.lower() == "integration":
+                    env_vars = {
+                        "WORKFLOW_STEP_NAME": function_name,
+                        "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
+                        "REQUEST_TEMPLATES_PATH": request_templates_path,
+                        "RESPONSE_TEMPLATES_PATH": response_templates_path,
+                        "API_SERVICE_URL": api_service_url,
+                        "API_SERVICE_RESOURCE": (
+                            node.data.configuration.get("path", "")
+                            if node.data.type.lower() == "integration"
+                            else os.environ.get("API_SERVICE_RESOURCE", "")
+                        ),
+                        "API_SERVICE_PATH": api_path,
+                        "API_SERVICE_METHOD": (
+                            node.data.configuration.get("method", "")
+                            if node.data.type.lower() == "integration"
+                            else os.environ.get("API_SERVICE_METHOD", "")
+                        ),
+                        "API_AUTH_TYPE": (
+                            get_auth_type_for_node(node.data.id)
+                            if node.data.type.lower() == "integration"
+                            else os.environ.get("API_AUTH_TYPE", "")
+                        ),
+                        "API_SERVICE_NAME": node.data.id,
+                        "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
+                        "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
+                        "API_CUSTOM_CODE": os.environ.get("API_CUSTOM_CODE", "false"),
+                        **(
+                            {
+                                "API_KEY_SECRET_ARN": get_integration_secret_arn(
+                                    node.data.configuration.get("integrationId", "")
+                                )
+                                or ""
+                            }
+                            if node.data.type.lower() == "integration"
+                            and node.data.configuration.get("integrationId")
+                            else {}
+                        ),
+                        "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
+                            "EXTERNAL_PAYLOAD_BUCKET"
+                        ),
+                        "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
+                    }
+                    create_function_params["Environment"] = {"Variables": env_vars}
+
+                # Create the Lambda function with the appropriate parameters
+                response = lambda_client.create_function(**create_function_params)
+
                 function_arn = response["FunctionArn"]
 
                 # Wait for function to be active

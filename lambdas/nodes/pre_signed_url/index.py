@@ -16,21 +16,23 @@ s3_client = boto3.client("s3")
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     try:
-        # Extract input parameters
-        input_data = event.get("input", {})
+        # Retrieve configuration from the input section if needed
+        input_data = event.get("detail", {}).get("outputs", {}).get("input", {})
 
-        # Extract S3 object information
+        # Extract S3 object information from CheckMediaConvertStatusResult
+        check_media_convert = (
+            event.get("detail", {})
+            .get("outputs", {})
+            .get("CheckMediaConvertStatusResult", {})
+        )
+        payload = check_media_convert.get("Payload", {})
+        proxy_file = payload.get("proxy", {})
+
         s3_bucket = (
-            input_data.get("DigitalSourceAsset", {})
-            .get("MainRepresentation", {})
-            .get("StorageInfo", {})
-            .get("PrimaryLocation", {})
-            .get("Bucket")
+            proxy_file.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
         )
         s3_key = (
-            input_data.get("DigitalSourceAsset", {})
-            .get("MainRepresentation", {})
-            .get("StorageInfo", {})
+            proxy_file.get("StorageInfo", {})
             .get("PrimaryLocation", {})
             .get("ObjectKey", {})
             .get("FullPath")
@@ -38,7 +40,7 @@ def lambda_handler(event, context):
 
         # Validate required parameters
         if not s3_bucket or not s3_key:
-            error_message = "Missing required S3 bucket or key information"
+            error_message = "Missing required S3 bucket or key information in CheckMediaConvertStatusResult"
             logger.error(error_message)
             return {"statusCode": 400, "body": json.dumps({"error": error_message})}
 
@@ -55,7 +57,7 @@ def lambda_handler(event, context):
             logger.error(error_message)
             return {"statusCode": 400, "body": json.dumps({"error": error_message})}
 
-        # Generate pre-signed URL
+        # Generate pre-signed URL for the file from CheckMediaConvertStatusResult
         presigned_url = s3_client.generate_presigned_url(
             "get_object",
             Params={"Bucket": s3_bucket, "Key": s3_key},

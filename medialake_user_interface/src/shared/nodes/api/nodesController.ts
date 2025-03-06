@@ -31,7 +31,7 @@ export const useGetNodes = () => {
     });
 };
 
-export const useGetNode = (nodeId: string) => {
+export const useGetNode = (nodeId: string, options?: { enabled?: boolean }) => {
     const { showError } = useErrorModal();
 
     return useQuery<NodesResponse>({
@@ -54,7 +54,7 @@ export const useGetNode = (nodeId: string) => {
                 throw error;
             }
         },
-        enabled: !!nodeId,
+        enabled: options?.enabled !== undefined ? options.enabled : !!nodeId,
     });
 };
 

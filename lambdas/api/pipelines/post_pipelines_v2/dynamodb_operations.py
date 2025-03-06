@@ -172,6 +172,67 @@ def get_node_auth_config(node_id: str) -> Dict[str, Any]:
     return auth_config
 
 
+def get_node_info(node_id: str) -> Dict[str, Any]:
+    """
+    Retrieve node info from DynamoDB.
+
+    Args:
+        node_id: ID of the node
+
+    Returns:
+        Info dictionary or None if not found
+    """
+    logger.info(f"Retrieving info from DynamoDB for node_id: {node_id}")
+    dynamodb = boto3.resource("dynamodb")
+
+    if not NODE_TABLE:
+        msg = "Environment variable NODE_TABLE is not set."
+        logger.error(msg)
+        raise ValueError(msg)
+
+    table = dynamodb.Table(NODE_TABLE)
+
+    key = {"pk": f"NODE#{node_id}", "sk": "INFO"}
+    logger.debug(f"Using DynamoDB key: {key}")
+
+    response = table.get_item(Key=key)
+    info = response.get("Item", {})
+    logger.info(f"Retrieved info for {node_id}: {info}")
+    return info
+
+
+def get_node_method(node_id: str, node_method: str) -> Dict[str, Any]:
+    """
+    Retrieve node method from DynamoDB.
+
+    Args:
+        node_id: ID of the node
+
+    Returns:
+        Method dictionary or None if not found
+    """
+    logger.info(f"Retrieving method from DynamoDB for node_id: {node_id}")
+    dynamodb = boto3.resource("dynamodb")
+
+    if not NODE_TABLE:
+        msg = "Environment variable NODE_TABLE is not set."
+        logger.error(msg)
+        raise ValueError(msg)
+
+    table = dynamodb.Table(NODE_TABLE)
+
+    key = {
+        "pk": f"NODE#{node_id}",
+        "sk": f"METHOD#{node_method}",
+    }  # i.e. embed_tasks_post
+    logger.debug(f"Using DynamoDB key: {key}")
+
+    response = table.get_item(Key=key)
+    method = response.get("Item", {})
+    logger.info(f"Retrieved mthod for {node_id}: {method}")
+    return method
+
+
 def get_integration_secret_arn(integration_id: str) -> Optional[str]:
     """
     Get the API key secret ARN for an integration.

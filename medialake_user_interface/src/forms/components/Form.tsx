@@ -34,6 +34,13 @@ export const Form: React.FC<FormProps> = React.memo(({
 
     const handleSubmit = React.useCallback(async (data: any) => {
         console.log('[Form] Submitting form:', { formId: id });
+        console.log('[Form] Form data to submit:', data);
+        console.log('[Form] Form validation state:', {
+            isValid: form.formState.isValid,
+            isDirty: form.formState.isDirty,
+            errors: form.formState.errors
+        });
+
         try {
             await onSubmit(data);
             console.log('[Form] Submit successful');
@@ -69,16 +76,16 @@ export const Form: React.FC<FormProps> = React.memo(({
             {showButtons && (
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
                     {onCancel && (
-                        <Button 
+                        <Button
                             onClick={handleCancel}
                             variant="outlined"
                         >
                             {t('common.cancel')}
                         </Button>
                     )}
-                    <Button 
-                        type="submit" 
-                        variant="contained" 
+                    <Button
+                        type="submit"
+                        variant="contained"
                         color="primary"
                     >
                         {t(submitLabel)}
