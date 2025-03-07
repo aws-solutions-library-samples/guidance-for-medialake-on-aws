@@ -38,6 +38,19 @@ Parameters:
       - 16
       - 18
       - 20
+  
+  InitialUserEmail:
+    Description: Initial Cognito user email
+    Type: String
+    AllowedPattern: '[^@]+@[^@]+\.[^@]+'
+  
+  ProjectEnvironment:
+    Description: Project environment (dev, prod, ...)
+    Type: String
+    MinLength: 1
+    MaxLength: 10
+    AllowedPattern: ^[a-zA-Z0-9]*$
+    Default: dev
 
 Conditions:
   IsGitSource: !Equals [!Ref SourceType, 'Git']
@@ -241,7 +254,7 @@ Resources:
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
       Source:
         Type: CODEPIPELINE
-        BuildSpec: 
+        BuildSpec: !Sub |
           version: 0.2
           phases:
             install:
@@ -249,19 +262,19 @@ Resources:
                 python: 3.9
             build:
               commands:
-                - echo Downloading source code from presigned URL
+                - echo "Downloading source code from presigned URL"
                 - curl -L "${S3PresignedURL}" -o source-code.zip
                 - mkdir -p source
                 - unzip -o source-code.zip -d source/
-                - echo "Listing downloaded content structure:"
+                - echo "Listing downloaded content structure"
                 - find source -type d | sort
                 - echo "Copying files to working directory"
                 - cp -r source/* .
-                - echo "Directory structure after copy:"
+                - echo "Directory structure after copy"
                 - find . -maxdepth 3 -type d | sort
             post_build:
               commands:
-                - echo Download completed
+                - echo "Download completed"
           artifacts:
             files:
               - '**/*'
@@ -280,50 +293,66 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         PrivilegedMode: true
-        EnvironmentVariables:
-          - Name: NODE_VERSION
-            Value: !Ref NodejsVersion
       Source:
         Type: CODEPIPELINE
-        BuildSpec:
+        BuildSpec: !Sub |
           version: 0.2
+          env:
+            variables:
+              CI: CODEBUILD
           phases:
             install:
               runtime-versions:
-                python: 3.9
-                nodejs: $NODE_VERSION
+                python: 3.12
+                nodejs: ${NodejsVersion}
               commands:
-                - echo Installing dependencies
+                - echo "Installing dependencies"
+                - yum install jq
                 - npm install -g aws-cdk
+                - npm install -g esbuild
                 - pip install -U pip
-                - echo "Listing directory structure to locate CDK and frontend code"
-                - find . -type d -maxdepth 3 | sort
                 - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
                 - export FRONTEND_DIR=$(if [ -d "./medialake-2-12-25/medialake_user_interface" ]; then echo "./medialake-2-12-25/medialake_user_interface"; elif [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./medialake-2-12-25/frontend" ]; then echo "./medialake-2-12-25/frontend"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
-                - echo "CDK directory: $CDK_DIR"
-                - echo "Frontend directory: $FRONTEND_DIR"
+                - echo "CDK directory $CDK_DIR"
+                - echo "Frontend directory $FRONTEND_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - if [ -z "$FRONTEND_DIR" ]; then echo "Could not find frontend directory"; exit 1; fi
                 - cd $CDK_DIR
                 - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+                - if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
+                - if [ -f "package.json" ]; then npm install; fi
                 - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
                 - if [ -f "package.json" ]; then npm install; fi
+            pre_build:
+              commands:
+                - echo "Preparing config file"
+                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - if [ -f "config.json" ]; then echo "Using existing config file"; else echo "Creating config file"; cp .cicd/config.json-template config.json; fi
+                - echo "$( jq --arg e "${ProjectEnvironment}" '.environment = $e' config.json )" > config.json
+                - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
+                - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
+                - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
             build:
               commands:
-                - echo Building frontend
+                - echo "Building frontend"
                 - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
-                - if [ -f "package.json" ]; then npm run build || echo "Build failed, continuing"; fi
+                - if [ -f "package.json" ]; then npm run build || echo "Frontend Build failed, continuing"; fi
                 - export BUILD_DIR=$(if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
                 - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
-                - echo "Build output directory: $BUILD_DIR"
-                - echo CDK synthesis
+                - echo "Build output directory $BUILD_DIR"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - echo "CDK synthesis"
                 - mkdir -p assets
                 - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
-                - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                - echo "Building Lambda functions"
+                - python3 .cicd/build_lambdas.py build
+                - echo "Building FFprobe"
+                - bash .cicd/build_ffprobe.sh
+                # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                - cdk synth || (echo "CDK synth failed" && exit 1)
             post_build:
               commands:
-                - echo Build completed
+                - echo "Build completed"
           artifacts:
             files:
               - "**/*"
@@ -340,22 +369,25 @@ Resources:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: CI
+            Value: CODEBUILD
       Source:
         Type: CODEPIPELINE
-        BuildSpec:
+        BuildSpec: !Sub |
           version: 0.2
           phases:
             install:
               runtime-versions:
-                python: 3.9
-                nodejs: $NODE_VERSION
+                python: 3.12
+                nodejs: ${NodejsVersion}
               commands:
                 - echo Installing dependencies
                 - npm install -g aws-cdk
                 - pip install -U pip
                 - echo "Locating CDK directory"
                 - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
-                - echo "CDK directory: $CDK_DIR"
+                - echo "CDK directory $CDK_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - cd $CDK_DIR
                 - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
@@ -363,7 +395,8 @@ Resources:
               commands:
                 - echo Deploying CDK stacks
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                # - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
             post_build:
               commands:
                 - echo Deployment completed
