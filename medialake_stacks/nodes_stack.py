@@ -99,6 +99,14 @@ class NodesStack(Stack):
             code_path=["lambdas", "nodes", "pre_signed_url"],
         )
 
+        self.debug_input_lambda_deployment = LambdaDeployment(
+            self,
+            "DebugInputLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "debug_input"],
+        )
+
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,

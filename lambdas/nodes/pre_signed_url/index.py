@@ -3,13 +3,14 @@ import json
 import os
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.config import Config  # Import Config to set signature version
 
 # Initialize Powertools
 logger = Logger()
 tracer = Tracer()
 
-# Initialize AWS clients
-s3_client = boto3.client("s3")
+# Initialize AWS S3 client with Signature Version 4
+s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 
 @logger.inject_lambda_context

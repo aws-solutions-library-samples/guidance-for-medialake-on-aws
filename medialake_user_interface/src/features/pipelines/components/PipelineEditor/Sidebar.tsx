@@ -65,20 +65,53 @@ const SidebarContent: React.FC = () => {
             }
         }
 
+        // Extract operationId from methodName if it's in the format "name:operationId"
+        let targetOperationId: string | undefined;
+        if (methodName.includes(':')) {
+            const parts = methodName.split(':');
+            actualMethodName = parts[0];
+            targetOperationId = parts[1];
+            console.log('[Sidebar] Extracted operationId from methodName:', targetOperationId);
+        }
+
         // Find the method in the methods array or object
         let method;
         if (Array.isArray(node.methods)) {
-            method = node.methods.find((m: any) => m.name === actualMethodName);
+            // If we have an operationId, use it to find the exact method
+            if (targetOperationId) {
+                method = node.methods.find((m: any) =>
+                    m.name === actualMethodName &&
+                    m.config?.operationId === targetOperationId
+                );
+                console.log('[Sidebar] Finding method by name and operationId:', actualMethodName, targetOperationId);
+            }
+
+            // If no method found with operationId or no operationId provided, fall back to name only
+            if (!method) {
+                method = node.methods.find((m: any) => m.name === actualMethodName);
+                console.log('[Sidebar] Finding method by name only:', actualMethodName);
+            }
+
+            // If still not found and methodName is a number, use it as an index
             if (!method && !isNaN(parseInt(methodName))) {
-                // If method not found by name but methodName is a number, use it as an index
                 method = node.methods[parseInt(methodName)];
+                console.log('[Sidebar] Using method at index:', methodName);
             }
         } else if (typeof node.methods === 'object') {
             method = node.methods[methodName];
             if (!method) {
                 // Try to find by name in the object values
                 const methods = Object.values(node.methods);
-                method = methods.find((m: any) => m.name === actualMethodName);
+
+                // If we have an operationId, use it to find the exact method
+                if (targetOperationId) {
+                    method = methods.find((m: any) =>
+                        m.name === actualMethodName &&
+                        m.config?.operationId === targetOperationId
+                    );
+                } else {
+                    method = methods.find((m: any) => m.name === actualMethodName);
+                }
             }
         }
 
@@ -116,18 +149,68 @@ const SidebarContent: React.FC = () => {
             console.log('[Sidebar] Integration node methodConfig:', methodConfig);
         }
 
+        // Check if this node has multiple output types in its connections
+        let outputTypes = node.info.outputTypes || [];
+
+        console.log('[Sidebar] Node ID:', node.nodeId);
+        console.log('[Sidebar] Node type:', node.info.nodeType);
+        console.log('[Sidebar] Initial outputTypes:', outputTypes);
+        console.log('[Sidebar] Node connections:', node.connections);
+
+        // For nodes with multiple outputs like Choice, extract the output types from connections
+        console.log('[Sidebar] Checking for multiple outputs in node:', node.nodeId);
+
+        // Log all connections for debugging
+        if (node.connections) {
+            console.log('[Sidebar] Node connections structure:', JSON.stringify(node.connections, null, 2));
+        }
+
+        // Try to find the output types in different possible locations
+        let outputTypesConfig;
+
+        // Check in the standard location first
+        if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.types) {
+            outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.types;
+            console.log('[Sidebar] Found output types in standard location:', outputTypesConfig);
+        }
+        // If not found, try to look in all outgoing connections
+        else if (node.connections?.outgoing) {
+            // Look through all methods in outgoing connections
+            Object.entries(node.connections.outgoing).forEach(([method, connections]) => {
+                if (Array.isArray(connections) && connections.length > 0) {
+                    connections.forEach((connection: any) => {
+                        if (connection.connectionConfig?.types) {
+                            outputTypesConfig = connection.connectionConfig.types;
+                            console.log('[Sidebar] Found output types in method:', method, outputTypesConfig);
+                        }
+                    });
+                }
+            });
+        }
+
+        // If we found output types, use them
+        if (outputTypesConfig) {
+            outputTypes = outputTypesConfig.map((type: any) => ({
+                name: type.name,
+                description: type.description
+            }));
+            console.log('[Sidebar] Node has multiple output types:', outputTypes);
+        }
+
         const nodeData = {
             id: node.nodeId,
             type: node.info.nodeType,
             label: node.info.title,
             description: method?.description || node.info.description,
             inputTypes: node.info.inputTypes || [],
-            outputTypes: node.info.outputTypes || [],
+            outputTypes: outputTypes,
             methods: node.methods || {},
             icon: node.info.iconUrl,
             selectedMethod: actualMethodName,
             methodConfig: methodConfig,
         };
+
+        console.log('[Sidebar] Final node data for drag:', nodeData);
 
         console.log('[Sidebar] Node data for drag:', nodeData);
 
@@ -157,16 +240,60 @@ const SidebarContent: React.FC = () => {
 
         nodesResponse.data.forEach((node) => {
             if (node.methods) {
-                Object.entries(node.methods).forEach(([methodName, method]) => {
-                    const nodeType = node.info.nodeType;
-                    const section = groupedNodes.find(s =>
-                        s.types.some(type => nodeType.includes(type))
-                    );
+                // For integration nodes with multiple methods with the same name,
+                // we need to use the operationId to distinguish between them
+                if (node.info.nodeType === 'INTEGRATION' && Array.isArray(node.methods)) {
+                    // Group methods by name to check for duplicates
+                    const methodsByName: Record<string, any[]> = {};
 
-                    if (section) {
-                        section.nodes.push({ node, methodName, method });
-                    }
-                });
+                    node.methods.forEach((method: any, index: number) => {
+                        if (!methodsByName[method.name]) {
+                            methodsByName[method.name] = [];
+                        }
+                        methodsByName[method.name].push({ method, index });
+                    });
+
+                    // For each group of methods with the same name
+                    Object.entries(methodsByName).forEach(([name, methods]) => {
+                        const nodeType = node.info.nodeType;
+                        const section = groupedNodes.find(s =>
+                            s.types.some(type => nodeType.includes(type))
+                        );
+
+                        if (section) {
+                            // If there's only one method with this name, use the index as methodName
+                            if (methods.length === 1) {
+                                section.nodes.push({
+                                    node,
+                                    methodName: methods[0].index.toString(),
+                                    method: methods[0].method
+                                });
+                            } else {
+                                // If there are multiple methods with the same name, use name:operationId format
+                                methods.forEach(({ method, index }) => {
+                                    const operationId = method.config?.operationId;
+                                    const uniqueMethodName = operationId
+                                        ? `${name}:${operationId}`
+                                        : index.toString();
+
+                                    section.nodes.push({ node, methodName: uniqueMethodName, method });
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    // For non-integration nodes or nodes with object methods, use the original logic
+                    Object.entries(node.methods).forEach(([methodName, method]) => {
+                        const nodeType = node.info.nodeType;
+                        const section = groupedNodes.find(s =>
+                            s.types.some(type => nodeType.includes(type))
+                        );
+
+                        if (section) {
+                            section.nodes.push({ node, methodName, method });
+                        }
+                    });
+                }
             }
         });
 
@@ -306,7 +433,7 @@ const SidebarContent: React.FC = () => {
                                         </Typography>
                                     </Paper>
                                 )}
-                                
+
                                 {/* Render existing nodes */}
                                 {section.nodes.map(({ node, methodName, method }) => (
                                     <Paper

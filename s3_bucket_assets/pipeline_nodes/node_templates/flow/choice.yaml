@@ -42,4 +42,8 @@ actions:
       incoming:
         type: [any]
       outgoing:
-        type: [any]
+        types:
+          - name: condition_true
+            description: Path taken when condition evaluates to true
+          - name: condition_false
+            description: Path taken when condition evaluates to false

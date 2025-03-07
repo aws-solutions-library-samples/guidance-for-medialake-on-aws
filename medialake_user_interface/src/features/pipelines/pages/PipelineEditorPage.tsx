@@ -190,7 +190,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             tags: nodeData.info?.tags || [],
             title: nodeData.info?.title || '',
             inputTypes: nodeData.info?.inputTypes || [],
-            outputTypes: nodeData.info?.outputTypes || [],
+            // outputTypes: nodeData.info?.outputTypes || [],
+            outputTypes: (nodeData.info?.outputTypes || []).map(item => String(item)),
+
             createdAt: nodeData.info?.createdAt || new Date().toISOString(),
         },
         methods: methods

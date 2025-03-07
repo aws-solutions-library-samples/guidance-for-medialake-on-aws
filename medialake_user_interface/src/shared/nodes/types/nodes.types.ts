@@ -1,3 +1,8 @@
+export interface OutputType {
+    name: string;
+    description?: string;
+}
+
 export interface NodeInfo {
     enabled: boolean;
     categories: string[];
@@ -9,7 +14,7 @@ export interface NodeInfo {
     tags: string[];
     title: string;
     inputTypes?: string[];
-    outputTypes?: string[];
+    outputTypes?: string[] | OutputType[];
 }
 
 export interface NodeAuth {
@@ -40,11 +45,31 @@ export interface NodeMethod {
     parameters: NodeMethodParameter[];
 }
 
+export interface NodeConnection {
+    entityType: string;
+    connectionConfig: {
+        type?: string[];
+        types?: Array<{
+            name: string;
+            description?: string;
+        }>;
+    };
+    methodId: string;
+    connectionType: string;
+    nodeId: string;
+}
+
+export interface NodeConnections {
+    incoming: Record<string, NodeConnection[]>;
+    outgoing: Record<string, NodeConnection[]>;
+}
+
 export interface Node {
     info: NodeInfo;
     auth: NodeAuth;
     nodeId?: string;
     methods: NodeMethod[];
+    connections?: NodeConnections;
 }
 
 export interface NodesResponse {

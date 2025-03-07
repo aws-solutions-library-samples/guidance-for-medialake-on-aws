@@ -10,7 +10,7 @@ from aws_lambda_powertools import Logger
 
 from config import (
     MEDIA_ASSETS_BUCKET_NAME,
-    MEDIA_ASSETS_BUCKET_NAME_KMS_KEY,
+    MEDIA_ASSETS_BUCKET_ARN_KMS_KEY,
     MEDIALAKE_ASSET_TABLE,
 )
 

@@ -91,17 +91,24 @@ def get_flow_state_definition(node: Any) -> Dict[str, Any]:
     elif step_name == "choice":
         # Choice state
         choices = node.data.configuration.get("choices", [])
+        
+        # Ensure we have at least one choice in the Choices array
+        if not choices:
+            choices = [{"variable": "$.status", "value": "SUCCESS"}]
+        
+        # For Choice states, we'll set placeholder Next values that will be updated later
+        # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
         state_def = {
             "Type": "Choice",
             "Choices": [
                 {
                     "Variable": choice.get("variable", "$.status"),
                     "StringEquals": choice.get("value", "SUCCESS"),
-                    "Next": choice.get("next", "SuccessState"),
+                    "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
                 }
                 for choice in choices
             ],
-            "Default": node.data.configuration.get("default", "DefaultState"),
+            "Default": f"__PLACEHOLDER__{node.id}_FALSE__",  # Placeholder to be replaced later
         }
     elif step_name == "parallel":
         # Parallel state
@@ -110,6 +117,20 @@ def get_flow_state_definition(node: Any) -> Dict[str, Any]:
     elif step_name == "map":
         # Map state
         iterator = node.data.configuration.get("iterator", {})
+        
+        # Ensure the Iterator has the required fields
+        if not iterator or "States" not in iterator or "StartAt" not in iterator:
+            # Create a minimal valid Iterator
+            iterator = {
+                "StartAt": "PassState",
+                "States": {
+                    "PassState": {
+                        "Type": "Pass",
+                        "End": True
+                    }
+                }
+            }
+        
         state_def = {
             "Type": "Map",
             "ItemsPath": node.data.configuration.get("itemsPath", "$.items"),
@@ -207,7 +228,13 @@ def build_step_function_definition(
 
     # Find the root node (node with no incoming edges)
     all_nodes = set(node.id for node in pipeline.configuration.nodes)
-    target_nodes = set(edge.target for edge in pipeline.configuration.edges)
+    target_nodes = set()
+    for edge in pipeline.configuration.edges:
+        # Handle both dictionary and object structures
+        if isinstance(edge, dict):
+            target_nodes.add(edge.get("target"))
+        else:
+            target_nodes.add(edge.target)
     root_nodes = all_nodes - target_nodes
 
     if not root_nodes:
@@ -237,7 +264,8 @@ def build_step_function_definition(
     for node in pipeline.configuration.nodes:
         # Create a unique state name that combines the node label and node ID
         # This ensures that each node gets a descriptive and unique state name
-        unique_state_name = f"{node.data.label} ({node.id})"
+        operation_id = node.data.configuration.get("operationId", "")
+        unique_state_name = f"{node.data.label} {operation_id} ({node.id})"
 
         # Sanitize the state name to ensure it's valid for Step Functions
         # Remove special characters and spaces that might cause issues
@@ -339,26 +367,68 @@ def build_step_function_definition(
 
     # Connect states based on edges using the unique state names
     for edge in pipeline.configuration.edges:
-        source_id = edge.source
-        target_id = edge.target
+        # Handle both dictionary and object structures for edge properties
+        if isinstance(edge, dict):
+            source_id = edge.get("source")
+            target_id = edge.get("target")
+            source_handle = edge.get("sourceHandle")
+        else:
+            source_id = edge.source
+            target_id = edge.target
+            source_handle = getattr(edge, "sourceHandle", None)
 
         # Get the unique state names for the source and target nodes
         source_state_name = node_id_to_state_name.get(source_id)
         target_state_name = node_id_to_state_name.get(target_id)
 
         logger.info(
-            f"Connecting: {source_id} ({source_state_name}) -> {target_id} ({target_state_name})"
+            f"Connecting: {source_id} ({source_state_name}) -> {target_id} ({target_state_name}), sourceHandle: {source_handle}"
         )
 
         if source_state_name in states and target_state_name in states:
             source_state = states[source_state_name]
+            source_node = node_id_to_node.get(source_id)
 
             # Skip if the source state is a terminal state
             if source_state.get("Type") in ["Succeed", "Fail"]:
                 continue
 
-            # For Choice states, don't modify the Next property
-            if source_state.get("Type") != "Choice":
+            # Handle Choice states specially
+            if source_state.get("Type") == "Choice":
+                # Check if this is a conditional edge (has a sourceHandle)
+                if source_handle == "condition_true" or source_handle == "condition_true_output":
+                    # This is the "true" path from the Choice
+                    if "Choices" in source_state and source_state["Choices"]:
+                        # Replace the placeholder with the actual target
+                        for choice in source_state["Choices"]:
+                            if "__PLACEHOLDER__" in str(choice.get("Next", "")):
+                                choice["Next"] = target_state_name
+                                logger.info(f"Connected Choice true path: {source_state_name} -> {target_state_name}")
+                
+                elif source_handle == "condition_false" or source_handle == "condition_false_output":
+                    # This is the "false" path from the Choice (Default)
+                    if "Default" in source_state and "__PLACEHOLDER__" in str(source_state["Default"]):
+                        source_state["Default"] = target_state_name
+                        logger.info(f"Connected Choice default path: {source_state_name} -> {target_state_name}")
+                
+                else:
+                    # If no sourceHandle but it's a Choice state, this might be a regular connection
+                    # We'll handle this as a fallback, but it's not the expected case for Choice states
+                    logger.warning(f"Choice state {source_state_name} has a connection without a sourceHandle")
+                    
+                    # If Choices is empty or Default is not set, set them with the target
+                    if "Choices" not in source_state or not source_state["Choices"]:
+                        source_state["Choices"] = [{
+                            "Variable": "$.status",
+                            "StringEquals": "SUCCESS",
+                            "Next": target_state_name
+                        }]
+                    
+                    if "Default" not in source_state or "__PLACEHOLDER__" in str(source_state["Default"]):
+                        source_state["Default"] = target_state_name
+            
+            else:
+                # For non-Choice states, handle normally
                 # Remove End: True if it exists
                 if "End" in source_state:
                     del source_state["End"]
@@ -462,8 +532,16 @@ def build_step_function_definition(
     # Create a graph representation using unique state names
     state_graph = {}
     for edge in pipeline.configuration.edges:
-        source_state_name = node_id_to_state_name.get(edge.source)
-        target_state_name = node_id_to_state_name.get(edge.target)
+        # Handle both dictionary and object structures
+        if isinstance(edge, dict):
+            source_id = edge.get("source")
+            target_id = edge.get("target")
+        else:
+            source_id = edge.source
+            target_id = edge.target
+            
+        source_state_name = node_id_to_state_name.get(source_id)
+        target_state_name = node_id_to_state_name.get(target_id)
 
         if source_state_name and target_state_name:
             if source_state_name not in state_graph:
@@ -736,6 +814,61 @@ def create_step_function(
             )
             delete_step_function(sanitized_state_machine_name)
             wait_for_state_machine_deletion(sanitized_state_machine_name)
+
+        # Validate states to ensure they have valid Next targets and are reachable
+        for state_name, state in definition["States"].items():
+            # Handle Choice states
+            if state.get("Type") == "Choice":
+                # Check Choices
+                if "Choices" in state:
+                    # Ensure Choices is not empty
+                    if not state["Choices"]:
+                        # Add a default choice
+                        valid_next = next((s for s in definition["States"].keys() if s != state_name), None)
+                        if valid_next:
+                            state["Choices"] = [{
+                                "Variable": "$.status",
+                                "StringEquals": "SUCCESS",
+                                "Next": valid_next
+                            }]
+                            logger.info(f"Added default choice to empty Choices array in {state_name}")
+                    
+                    # Check existing choices
+                    for choice in state["Choices"]:
+                        if "__PLACEHOLDER__" in str(choice.get("Next", "")):
+                            logger.warning(f"Choice state {state_name} has placeholder Next target in Choices")
+                            # Find a valid state to use as Next
+                            valid_next = next((s for s in definition["States"].keys() if s != state_name), None)
+                            if valid_next:
+                                choice["Next"] = valid_next
+                                logger.info(f"Updated Choice state {state_name} Choices Next to {valid_next}")
+                
+                # Check Default
+                if "__PLACEHOLDER__" in str(state.get("Default", "")):
+                    logger.warning(f"Choice state {state_name} has placeholder Default target")
+                    # Find a valid state to use as Default
+                    valid_default = next((s for s in definition["States"].keys() if s != state_name), None)
+                    if valid_default:
+                        state["Default"] = valid_default
+                        logger.info(f"Updated Choice state {state_name} Default to {valid_default}")
+            
+            # Handle Map states
+            elif state.get("Type") == "Map":
+                # Ensure Iterator has required fields
+                if "Iterator" in state:
+                    iterator = state["Iterator"]
+                    if not isinstance(iterator, dict) or "States" not in iterator or "StartAt" not in iterator:
+                        # Create a minimal valid Iterator
+                        state["Iterator"] = {
+                            "StartAt": "PassState",
+                            "States": {
+                                "PassState": {
+                                    "Type": "Pass",
+                                    "End": True
+                                }
+                            }
+                        }
+                        logger.info(f"Fixed Map state {state_name} Iterator with missing required fields")
 
         # Print the definition for debugging
         definition_json = json.dumps(definition, indent=2)

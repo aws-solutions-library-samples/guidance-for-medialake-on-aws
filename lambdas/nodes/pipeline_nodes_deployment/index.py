@@ -431,6 +431,65 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
             }
             items.append(method_item)
 
+            # Process connections if they exist in the action
+            if "connections" in action_details:
+                # Process incoming connections
+                if "incoming" in action_details["connections"]:
+                    incoming_conn = action_details["connections"]["incoming"]
+                    incoming_item = {
+                        "pk": f"NODE#{node_id}",
+                        "sk": f"CONNECTION#INCOMING#{method_id}",
+                        "methodId": method_id,
+                        "connectionType": "INCOMING",
+                        "connectionConfig": incoming_conn,
+                        "entityType": "NODE",
+                        "nodeId": f"NODE#{node_id}",
+                    }
+                    items.append(incoming_item)
+
+                # Process outgoing connections
+                if "outgoing" in action_details["connections"]:
+                    outgoing_conn = action_details["connections"]["outgoing"]
+                    outgoing_item = {
+                        "pk": f"NODE#{node_id}",
+                        "sk": f"CONNECTION#OUTGOING#{method_id}",
+                        "methodId": method_id,
+                        "connectionType": "OUTGOING",
+                        "connectionConfig": outgoing_conn,
+                        "entityType": "NODE",
+                        "nodeId": f"NODE#{node_id}",
+                    }
+                    items.append(outgoing_item)
+
+        # Also check for connections at the node level in case they're not in actions
+        if "connections" in node_data:
+            logger.info(f"Processing node-level connections for {node_id}")
+            # Process incoming connections
+            if "incoming" in node_data["connections"]:
+                incoming_conn = node_data["connections"]["incoming"]
+                incoming_item = {
+                    "pk": f"NODE#{node_id}",
+                    "sk": "CONNECTION#INCOMING",
+                    "connectionType": "INCOMING",
+                    "connectionConfig": incoming_conn,
+                    "entityType": "NODE",
+                    "nodeId": f"NODE#{node_id}",
+                }
+                items.append(incoming_item)
+
+            # Process outgoing connections
+            if "outgoing" in node_data["connections"]:
+                outgoing_conn = node_data["connections"]["outgoing"]
+                outgoing_item = {
+                    "pk": f"NODE#{node_id}",
+                    "sk": "CONNECTION#OUTGOING",
+                    "connectionType": "OUTGOING",
+                    "connectionConfig": outgoing_conn,
+                    "entityType": "NODE",
+                    "nodeId": f"NODE#{node_id}",
+                }
+                items.append(outgoing_item)
+
         return {"items": items}
 
     except Exception as e:

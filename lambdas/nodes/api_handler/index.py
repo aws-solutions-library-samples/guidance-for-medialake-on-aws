@@ -378,7 +378,8 @@ def create_custom_url(s3_templates, api_template_bucket, event):
 
 def create_response_output(s3_templates, api_template_bucket, response_body):
     function_name = "translate_event_to_request"
-    response_template_path = s3_templates["response_template"]
+    response_template_path = f"api_templates/{s3_templates["response_template"]}"
+
     response_mapping_path = s3_templates["response_mapping_file"]
 
     response_template = download_s3_object(api_template_bucket, response_template_path)
