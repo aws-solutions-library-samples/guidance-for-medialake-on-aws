@@ -33,7 +33,7 @@ def get_job_errors(job_id, limit=100, last_evaluated_key=None):
             'count': 0
         }
 
-def handle(event, context):
+def lambda_handler(event, context):
     try:
         # Extract job ID from path parameters
         job_id = event.get('pathParameters', {}).get('jobId')

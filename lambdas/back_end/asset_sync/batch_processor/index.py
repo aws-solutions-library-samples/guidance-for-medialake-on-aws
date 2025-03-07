@@ -4,7 +4,7 @@ import json
 import uuid
 from common import logger, AssetProcessor, JobStatus, ErrorType
 
-def handle(event, context):
+def lambda_handler(event, context):
     try:
         job_id = event['jobId']
         bucket_name = event['bucketName']

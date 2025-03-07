@@ -556,7 +556,7 @@ def create_eventbridge_pipe(
             }
         },
         TargetParameters={
-            "LambdaFunctionParameters": {"InvocationType": "REQUEST_RESPONSE"}
+            "LambdaFunctionParameters": {"InvocationType": "FIRE_AND_FORGET"}
         },
     )
     created_resources.append(("eventbridge_pipe", pipe_name))
