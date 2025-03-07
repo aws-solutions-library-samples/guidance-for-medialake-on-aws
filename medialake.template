@@ -140,6 +140,10 @@ Resources:
                   - 'ecr:CompleteLayerUpload'
                   - 'ecr:PutImage'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeAvailabilityZones'
+                Resource: '*'
 
   CDKDeployRole:
     Type: 'AWS::IAM::Role'
@@ -341,6 +345,8 @@ Resources:
           env:
             variables:
               CI: CODEBUILD
+              CDK_DEFAULT_ACCOUNT: ${AWS::AccountId}
+              CDK_DEFAULT_REGION: ${AWS::Region}
           phases:
             install:
               runtime-versions:
@@ -417,6 +423,8 @@ Resources:
           env:
             variables:
               CI: CODEBUILD
+              CDK_DEFAULT_ACCOUNT: ${AWS::AccountId}
+              CDK_DEFAULT_REGION: ${AWS::Region}
           phases:
             install:
               runtime-versions:
