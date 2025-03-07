@@ -52,6 +52,47 @@ Parameters:
     AllowedPattern: ^[a-zA-Z0-9]*$
     Default: dev
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: MediaLake Source Code Origin
+        Parameters:
+          - SourceType
+          - GitRepositoryUrl
+          - GitBranch
+          - S3PresignedURL
+      -
+        Label:
+          default: CDK Build Customization
+        Parameters:
+          - PipelineName
+          - NodejsVersion
+          - ProjectEnvironment
+      -
+        Label:
+          default: Amazon Cognito / Amazon Simple Notification Service
+        Parameters:
+          - InitialUserEmail
+    ParameterLabels:
+      PipelineName:
+        default: CodePipeline Pipeline Name
+      InitialUserEmail:
+        default: Email
+      NodejsVersion:
+        default: Nodejs Version
+      ProjectEnvironment:
+        default: Project Environment
+      SourceType:
+        default: Source Type
+      GitRepositoryUrl:
+        default: Git Repository Url
+      GitBranch:
+        default: Git Branch
+      S3PresignedURL:
+        default: S3 Presigned URL
+
 Conditions:
   IsGitSource: !Equals [!Ref SourceType, 'Git']
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
@@ -172,7 +213,7 @@ Resources:
     Properties:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: python3.9
+      Runtime: python3.12
       Timeout: 30
       Code:
         ZipFile: |
@@ -259,7 +300,7 @@ Resources:
           phases:
             install:
               runtime-versions:
-                python: 3.9
+                python: 3.12
             build:
               commands:
                 - echo "Downloading source code from presigned URL"
@@ -341,7 +382,6 @@ Resources:
                 - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
                 - echo "Build output directory $BUILD_DIR"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                - echo "CDK synthesis"
                 - mkdir -p assets
                 - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
                 - echo "Building Lambda functions"
@@ -349,6 +389,7 @@ Resources:
                 - echo "Building FFprobe"
                 - bash .cicd/build_ffprobe.sh
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
             post_build:
               commands:
@@ -369,13 +410,13 @@ Resources:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
-        EnvironmentVariables:
-          - Name: CI
-            Value: CODEBUILD
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
           version: 0.2
+          env:
+            variables:
+              CI: CODEBUILD
           phases:
             install:
               runtime-versions:

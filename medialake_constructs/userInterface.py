@@ -25,6 +25,7 @@ from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketPr
 from typing import List, Dict, Optional
 from config import config
 import jsii
+from pathlib import Path
 
 
 @jsii.implements(ILocalBundling)
@@ -529,14 +530,20 @@ class UIConstruct(Construct):
         )
 
         # deploy assets to S3
-        asset = s3deploy.Source.asset(
-            props.app_path,
-            bundling=BundlingOptions(
-                image=DockerImage.from_registry(props.docker_image),
-                command=props.command,
-                local=LocalBundling(props.app_path, build_path),
-            ),
-        )
+        if "CI" in os.environ and "CODEBUILD_BUILD_ID" in os.environ:
+            dist_path = Path(props.app_path).parent / "assets/dist"
+            asset = s3deploy.Source.asset(
+                str(dist_path)
+            )
+        else:
+            asset = s3deploy.Source.asset(
+                props.app_path,
+                bundling=BundlingOptions(
+                    image=DockerImage.from_registry(props.docker_image),
+                    command=props.command,
+                    local=LocalBundling(props.app_path, build_path),
+                ),
+            )
 
         s3deploy.BucketDeployment(
             self,
