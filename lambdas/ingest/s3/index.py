@@ -1,4 +1,4 @@
-from typing import Dict, Optional, TypedDict, List, Any
+from typing import Dict, Optional, TypedDict, List
 import boto3
 import json
 import uuid
@@ -9,64 +9,13 @@ import hashlib
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.validation import validate, validator
-from aws_lambda_powertools.utilities.validation.exceptions import SchemaValidationError
-from aws_lambda_powertools.utilities.data_classes import S3Event, event_source
 
 from botocore.exceptions import ClientError
-
-# Import libraries for file type detection and metadata extraction
-try:
-    import magic
-    from io import BytesIO
-    from PIL import Image
-    import ffmpeg
-    import mutagen
-except ImportError:
-    pass  # Libraries will be available in Lambda layer
 
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
 
-# Define S3 event schema for validation
-S3_EVENT_SCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "Records": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "eventName": {"type": "string"},
-                    "s3": {
-                        "type": "object",
-                        "properties": {
-                            "bucket": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"}
-                                },
-                                "required": ["name"]
-                            },
-                            "object": {
-                                "type": "object",
-                                "properties": {
-                                    "key": {"type": "string"}
-                                },
-                                "required": ["key"]
-                            }
-                        },
-                        "required": ["bucket", "object"]
-                    }
-                },
-                "required": ["eventName", "s3"]
-            }
-        }
-    },
-    "required": ["Records"]
-}
 
 class FileHash(TypedDict):
     Algorithm: str
@@ -155,181 +104,14 @@ class AssetProcessor:
     def _calculate_md5(self, bucket: str, key: str) -> str:
         """Calculate MD5 hash of S3 object for file identification purposes"""
         try:
-            # Get the object's ETag which is usually the MD5 hash for non-multipart uploads
-            response = self.s3.head_object(Bucket=bucket, Key=key)
-            etag = response.get('ETag', '').strip('"')
-            
-            # If this is a multipart upload (ETag contains a dash), we need to calculate our own MD5
-            if '-' in etag:
-                # Only read the first 8KB of the file for header analysis
-                response = self.s3.get_object(Bucket=bucket, Key=key, Range='bytes=0-8191')
-                md5_hash = hashlib.md5(usedforsecurity=False)
-                md5_hash.update(response["Body"].read())
-                return md5_hash.hexdigest()
-            
-            return etag
+            response = self.s3.get_object(Bucket=bucket, Key=key)
+            md5_hash = hashlib.md5(usedforsecurity=False)
+            for chunk in response["Body"].iter_chunks(4096):
+                md5_hash.update(chunk)
+            return md5_hash.hexdigest()
         except Exception as e:
             logger.exception(
                 f"Error calculating MD5 hash for {bucket}/{key}, error: {e}"
-            )
-            raise
-
-    @tracer.capture_method
-    def _detect_file_type(self, bucket: str, key: str) -> Dict[str, Any]:
-        """Detect file type and extract technical metadata from file header"""
-        try:
-            # Only read the first 8KB of the file for header analysis
-            response = self.s3.get_object(Bucket=bucket, Key=key, Range='bytes=0-8191')
-            header_bytes = response["Body"].read()
-            
-            # Add metadata to trace
-            tracer.add_metadata(key="file_size", value=response.get("ContentLength", 0))
-            tracer.add_metadata(key="content_type", value=response.get("ContentType", "unknown"))
-            
-            # Use python-magic to detect file type from header bytes
-            mime_type = magic.from_buffer(header_bytes, mime=True)
-            file_type = mime_type.split('/')[0].capitalize()
-            
-            # Add file type to trace
-            tracer.add_annotation(key="file_type", value=file_type)
-            
-            # Extract basic technical metadata
-            technical_metadata = {
-                "MimeType": mime_type,
-                "FileType": file_type,
-                "FileExtension": key.split('.')[-1] if '.' in key else '',
-            }
-            
-            # Add more specific metadata based on file type
-            if file_type == "Image":
-                try:
-                    img = Image.open(BytesIO(header_bytes))
-                    technical_metadata.update({
-                        "Width": img.width,
-                        "Height": img.height,
-                        "Format": img.format,
-                        "Mode": img.mode,
-                    })
-                except Exception as e:
-                    logger.warning(f"Could not extract image metadata: {e}")
-            
-            elif file_type == "Video":
-                try:
-                    # For video files, we need to download to a temp file for ffmpeg
-                    import tempfile
-                    
-                    # Create a temporary file to store the video header
-                    with tempfile.NamedTemporaryFile(suffix=f".{technical_metadata['FileExtension']}") as temp_file:
-                        # Write the header bytes to the temp file
-                        temp_file.write(header_bytes)
-                        temp_file.flush()
-                        
-                        # Use ffmpeg to extract video metadata
-                        probe = ffmpeg.probe(temp_file.name)
-                        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-                        
-                        if video_stream:
-                            technical_metadata.update({
-                                "Width": int(video_stream.get('width', 0)),
-                                "Height": int(video_stream.get('height', 0)),
-                                "Codec": video_stream.get('codec_name', ''),
-                                "Duration": float(probe.get('format', {}).get('duration', 0)),
-                                "Bitrate": int(probe.get('format', {}).get('bit_rate', 0)),
-                                "FrameRate": eval(video_stream.get('r_frame_rate', '0/1')),
-                            })
-                            
-                            # Extract audio stream info if available
-                            audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
-                            if audio_stream:
-                                technical_metadata["AudioCodec"] = audio_stream.get('codec_name', '')
-                                technical_metadata["AudioChannels"] = int(audio_stream.get('channels', 0))
-                                technical_metadata["AudioSampleRate"] = int(audio_stream.get('sample_rate', 0))
-                except Exception as e:
-                    logger.warning(f"Could not extract video metadata: {e}")
-                    
-                    # Fallback: try to get more complete metadata by downloading more of the file
-                    try:
-                        # Get more of the file (first 1MB) for better metadata extraction
-                        response = self.s3.get_object(Bucket=bucket, Key=key, Range='bytes=0-1048575')
-                        larger_header = response["Body"].read()
-                        
-                        with tempfile.NamedTemporaryFile(suffix=f".{technical_metadata['FileExtension']}") as temp_file:
-                            temp_file.write(larger_header)
-                            temp_file.flush()
-                            
-                            probe = ffmpeg.probe(temp_file.name)
-                            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-                            
-                            if video_stream:
-                                technical_metadata.update({
-                                    "Width": int(video_stream.get('width', 0)),
-                                    "Height": int(video_stream.get('height', 0)),
-                                    "Codec": video_stream.get('codec_name', ''),
-                                    "Duration": float(probe.get('format', {}).get('duration', 0)),
-                                    "Bitrate": int(probe.get('format', {}).get('bit_rate', 0)),
-                                    "FrameRate": eval(video_stream.get('r_frame_rate', '0/1')),
-                                })
-                    except Exception as e2:
-                        logger.warning(f"Could not extract video metadata with fallback method: {e2}")
-            
-            elif file_type == "Audio":
-                try:
-                    # For audio files, we need to download to a temp file for mutagen
-                    import tempfile
-                    
-                    # Create a temporary file to store the audio header
-                    with tempfile.NamedTemporaryFile(suffix=f".{technical_metadata['FileExtension']}") as temp_file:
-                        # Write the header bytes to the temp file
-                        temp_file.write(header_bytes)
-                        temp_file.flush()
-                        
-                        # Use mutagen to extract audio metadata
-                        audio = mutagen.File(temp_file.name)
-                        
-                        if audio:
-                            technical_metadata.update({
-                                "Duration": audio.info.length,
-                                "Bitrate": audio.info.bitrate,
-                                "Channels": getattr(audio.info, 'channels', None),
-                                "SampleRate": getattr(audio.info, 'sample_rate', None),
-                            })
-                            
-                            # Extract tags if available
-                            if hasattr(audio, 'tags') and audio.tags:
-                                tags = {}
-                                for key in audio.tags.keys():
-                                    tags[key] = str(audio.tags[key])
-                                technical_metadata["Tags"] = tags
-                except Exception as e:
-                    logger.warning(f"Could not extract audio metadata: {e}")
-                    
-                    # Fallback: try to get more complete metadata by downloading more of the file
-                    try:
-                        # Get more of the file (first 1MB) for better metadata extraction
-                        response = self.s3.get_object(Bucket=bucket, Key=key, Range='bytes=0-1048575')
-                        larger_header = response["Body"].read()
-                        
-                        with tempfile.NamedTemporaryFile(suffix=f".{technical_metadata['FileExtension']}") as temp_file:
-                            temp_file.write(larger_header)
-                            temp_file.flush()
-                            
-                            audio = mutagen.File(temp_file.name)
-                            
-                            if audio:
-                                technical_metadata.update({
-                                    "Duration": audio.info.length,
-                                    "Bitrate": audio.info.bitrate,
-                                    "Channels": getattr(audio.info, 'channels', None),
-                                    "SampleRate": getattr(audio.info, 'sample_rate', None),
-                                })
-                    except Exception as e2:
-                        logger.warning(f"Could not extract audio metadata with fallback method: {e2}")
-                
-            return technical_metadata
-            
-        except Exception as e:
-            logger.exception(
-                f"Error detecting file type for {bucket}/{key}, error: {e}"
             )
             raise
 
@@ -355,7 +137,6 @@ class AssetProcessor:
         key = self._decode_s3_event_key(key)
 
         try:
-            # Get basic object metadata using head_object (no content download)
             response = self.s3.head_object(Bucket=bucket, Key=key)
             existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
@@ -364,7 +145,7 @@ class AssetProcessor:
                 logger.info(f"Asset already processed: {tags['AssetID']}")
                 return None
 
-            # Calculate MD5 hash using optimized method (uses ETag when possible)
+            # Calculate MD5 hash and check for duplicates
             md5_hash = self._calculate_md5(bucket, key)
             existing_file = self._check_existing_file(md5_hash)
 
@@ -433,11 +214,8 @@ class AssetProcessor:
                     )
                     return None
 
-            # Detect file type and extract technical metadata from header
-            technical_metadata = self._detect_file_type(bucket, key)
-            
-            # Process new unique file with technical metadata
-            metadata = self._create_asset_metadata(response, bucket, key, md5_hash, technical_metadata)
+            # Process new unique file...
+            metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
             dynamo_entry = self.create_dynamo_entry(metadata)
 
             # Add tags to S3 object
@@ -469,7 +247,7 @@ class AssetProcessor:
             raise
 
     def _create_asset_metadata(
-        self, s3_response: Dict, bucket: str, key: str, md5_hash: str, technical_metadata: Dict[str, Any]
+        self, s3_response: Dict, bucket: str, key: str, md5_hash: str
     ) -> StorageInfo:
         """Create asset metadata structure"""
         return {
@@ -502,7 +280,6 @@ class AssetProcessor:
                         "ContentType": s3_response.get("ContentType"),
                         "LastModified": s3_response["LastModified"].isoformat(),
                     },
-                    "Technical": technical_metadata,
                 }
             },
         }
@@ -513,36 +290,22 @@ class AssetProcessor:
         inventory_id = str(uuid.uuid4())
         asset_id = str(uuid.uuid4())
 
-        # Get technical metadata if available
-        technical_metadata = (
+        # Extract and capitalize the first part of the MIME type
+        content_type = (
             metadata.get("Metadata", {})
             .get("Embedded", {})
-            .get("Technical", {})
+            .get("S3", {})
+            .get("ContentType", "")
         )
-        
-        # Extract and capitalize the first part of the MIME type from technical metadata if available
-        mime_type = technical_metadata.get("MimeType", "")
-        if mime_type:
-            asset_type = technical_metadata.get("FileType", "Image")
-        else:
-            # Fallback to content type from S3 metadata
-            content_type = (
-                metadata.get("Metadata", {})
-                .get("Embedded", {})
-                .get("S3", {})
-                .get("ContentType", "")
-            )
-            asset_type = (
-                content_type.split("/")[0].capitalize() if content_type else "Image"
-            )
+        asset_type = (
+            content_type.split("/")[0].capitalize() if content_type else "Image"
+        )
 
         # Map asset types to their abbreviations
         type_abbreviations = {
             "Image": "img",
             "Video": "vid",
-            "Audio": "aud",
-            "Application": "doc",
-            "Text": "txt"
+            "Audio": "aud"
         }
         type_abbrev = type_abbreviations.get(asset_type, "img")  # Default to "img" if type not found
 
@@ -572,65 +335,49 @@ class AssetProcessor:
             "Metadata": metadata.get("Metadata"),
         }
 
-        # Add technical dimensions if available
-        if technical_metadata and "Width" in technical_metadata and "Height" in technical_metadata:
-            item["DigitalSourceAsset"]["Dimensions"] = {
-                "Width": technical_metadata["Width"],
-                "Height": technical_metadata["Height"]
-            }
-            
-        # Add duration for video/audio if available
-        if technical_metadata and "Duration" in technical_metadata:
-            item["DigitalSourceAsset"]["Duration"] = technical_metadata["Duration"]
-
         self.dynamodb.put_item(Item=item)
         return item
 
     @tracer.capture_method
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
-        """Publish asset creation event to EventBridge"""
+        """Publish event to EventBridge using the same structure"""
         try:
-            # Extract technical metadata if available
-            technical_metadata = (
+            content_type = (
                 metadata.get("Metadata", {})
                 .get("Embedded", {})
-                .get("Technical", {})
+                .get("S3", {})
+                .get("ContentType", "")
             )
-            
-            # Create event detail with basic information
-            event_detail = {
-                "InventoryID": inventory_id,
-                "AssetID": asset_id,
-                "StorageInfo": {
-                    "Bucket": metadata["StorageInfo"]["PrimaryLocation"]["Bucket"],
-                    "Key": metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"],
-                },
-                "FileInfo": {
-                    "Size": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Size"],
-                    "Hash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"]["MD5Hash"],
-                },
-                "CreatedAt": datetime.utcnow().isoformat(),
-            }
-            
-            # Add technical metadata if available
-            if technical_metadata:
-                event_detail["TechnicalMetadata"] = {
-                    "FileType": technical_metadata.get("FileType", ""),
-                    "MimeType": technical_metadata.get("MimeType", ""),
-                }
-                
-                # Add dimensions if available
-                if "Width" in technical_metadata and "Height" in technical_metadata:
-                    event_detail["TechnicalMetadata"]["Dimensions"] = {
-                        "Width": technical_metadata["Width"],
-                        "Height": technical_metadata["Height"]
-                    }
-                
-                # Add duration for video/audio if available
-                if "Duration" in technical_metadata:
-                    event_detail["TechnicalMetadata"]["Duration"] = technical_metadata["Duration"]
+            asset_type = (
+                content_type.split("/")[0].capitalize() if content_type else "Image"
+            )
 
-            logger.info(f"Publishing event: {json.dumps(event_detail)}")
+            event_detail: AssetRecord = {
+                "InventoryID": inventory_id,
+                "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
+                    "Hash"
+                ]["MD5Hash"],
+                "DigitalSourceAsset": {
+                    "ID": asset_id,
+                    "Type": asset_type,
+                    "CreateDate": datetime.utcnow().isoformat(),
+                    "MainRepresentation": {
+                        "ID": f"{asset_id}:master",
+                        "Type": asset_type,
+                        "Format": metadata["StorageInfo"]["PrimaryLocation"][
+                            "ObjectKey"
+                        ]["Name"]
+                        .split(".")[-1]
+                        .upper(),
+                        "Purpose": "master",
+                        "StorageInfo": metadata["StorageInfo"],
+                    },
+                },
+                "DerivedRepresentations": [],
+                "Metadata": metadata.get("Metadata"),
+            }
+
+            logger.info(f"Publishing event with detail: {json.dumps(event_detail)}")
 
             response = self.eventbridge.put_events(
                 Entries=[
@@ -643,9 +390,10 @@ class AssetProcessor:
                 ]
             )
 
-            logger.info(f"Event published: {response}")
+            logger.info(f"EventBridge response: {json.dumps(response)}")
+
         except Exception as e:
-            logger.exception(f"Error publishing event: {e}")
+            logger.exception(f"Error publishing event: {str(e)}")
             raise
 
     @tracer.capture_method
@@ -718,38 +466,80 @@ class AssetProcessor:
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-@event_source(data_class=S3Event)
-def handler(event: S3Event, context: LambdaContext) -> Dict:
-    """Handle S3 events using Powertools V3 data classes"""
+def handler(event: Dict, context: LambdaContext) -> Dict:
+    """Handle S3 events via SQS from either direct S3 notifications or EventBridge Pipes"""
     processor = AssetProcessor()
 
     try:
-        # Validate the event against our schema
-        try:
-            # Convert S3Event back to dict for validation
-            event_dict = event.raw_event
-            validate(event=event_dict, schema=S3_EVENT_SCHEMA)
-            logger.info("Event validation successful")
-        except SchemaValidationError as e:
-            logger.warning(f"Event validation failed: {e}")
-            # Continue processing as the event_source decorator already parsed the event
-        
-        # Process each S3 record
-        for record in event.records:
+        # Process each record directly since event is already a list
+        for record in event:
             try:
-                bucket = record.s3.bucket.name
-                key = record.s3.object.key
-                event_name = record.event_name
+                # Log the raw message for debugging
+                logger.debug(f"Processing SQS record: {json.dumps(record)}")
 
-                # Add custom metrics for monitoring
-                metrics.add_metric(name="IncomingEvents", unit=MetricUnit.Count, value=1)
-                
-                # Process the S3 event
-                process_s3_event(processor, bucket, key, event_name)
+                # Extract and parse the message body
+                if "body" not in record:
+                    logger.warning("No body found in SQS record")
+                    continue
 
+                body = json.loads(record["body"])
+
+                # Check if this is a test event
+                if body.get("Event") == "s3:TestEvent":
+                    logger.info("Received S3 test event - skipping processing")
+                    continue
+
+                # Handle both direct S3 events and EventBridge events
+                if "Records" in body:
+                    # Direct S3 event format
+                    for s3_record in body["Records"]:
+                        if "s3" not in s3_record:
+                            logger.warning("No S3 data in record")
+                            continue
+
+                        bucket = s3_record["s3"]["bucket"]["name"]
+                        key = s3_record["s3"]["object"]["key"]
+                        event_name = s3_record.get("eventName", "")
+
+                        process_s3_event(processor, bucket, key, event_name)
+
+                elif "detail-type" in body:
+                    # EventBridge event format
+                    if body.get("source") != "aws.s3":
+                        logger.warning(f"Unexpected event source: {body.get('source')}")
+                        continue
+
+                    detail = body.get("detail", {})
+                    bucket = detail.get("bucket", {}).get("name")
+                    key = detail.get("object", {}).get("key")
+                    
+                    # Map EventBridge detail-type to S3 event name
+                    event_type_mapping = {
+                        "Object Created": "ObjectCreated:",
+                        "Object Deleted": "ObjectRemoved:",
+                        "Object Restored": "ObjectRestore:",
+                        "Object Tagged": "ObjectTagging:"
+                    }
+                    
+                    event_name = event_type_mapping.get(body.get("detail-type", ""), "")
+                    
+                    if not all([bucket, key, event_name]):
+                        logger.warning("Missing required fields in EventBridge event")
+                        continue
+
+                    process_s3_event(processor, bucket, key, event_name)
+
+                else:
+                    logger.warning("Unrecognized event format in message body")
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse SQS message body: {e}")
+                continue
+            except KeyError as e:
+                logger.error(f"Missing required field in event structure: {e}")
+                continue
             except Exception as e:
                 logger.exception(f"Error processing record: {e}")
-                metrics.add_metric(name="FailedRecords", unit=MetricUnit.Count, value=1)
                 continue
 
         return {"statusCode": 200, "body": "Processing complete"}

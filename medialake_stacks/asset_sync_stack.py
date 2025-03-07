@@ -78,15 +78,14 @@ class AssetSyncStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-
         # Lambda Layer for shared code
-        shared_layer = lambda_.LayerVersion(
-            self,
-            "SharedLayer",
-            code=lambda_.Code.from_asset("lambdas/layers/asset_sync_shared"),
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Shared utility functions for asset management",
-        )
+        # shared_layer = lambda_.LayerVersion(
+        #     self,
+        #     "SharedLayer",
+        #     code=lambda_.Code.from_asset("lambdas/layers/asset_sync_shared"),
+        #     compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+        #     description="Shared utility functions for asset management",
+        # )
 
         # Common Lambda configuration
         asset_sync_lambda_env = {
@@ -115,6 +114,8 @@ class AssetSyncStack(Stack):
                 name=f"{config.resource_prefix}-scanner-{config.environment}",
                 entry="lambdas/back_end/asset_sync/scanner",
                 environment_variables=asset_sync_lambda_env,
+                memory_size=1024,
+                timeout_minutes=15,
             ),
         )
 
@@ -125,6 +126,8 @@ class AssetSyncStack(Stack):
                 name=f"{config.resource_prefix}-query-{config.environment}",
                 entry="lambdas/back_end/asset_sync/query",
                 environment_variables=asset_sync_lambda_env,
+                memory_size=1024,
+                timeout_minutes=15,
             ),
         )
 
@@ -135,6 +138,8 @@ class AssetSyncStack(Stack):
                 name=f"{config.resource_prefix}-batch-processor-{config.environment}",
                 entry="lambdas/back_end/asset_sync/batch_processor",
                 environment_variables=asset_sync_lambda_env,
+                memory_size=1024,
+                timeout_minutes=15,
             ),
         )
         
@@ -145,7 +150,9 @@ class AssetSyncStack(Stack):
                 name=f"{config.resource_prefix}-worker-{config.environment}",
                 entry="lambdas/back_end/asset_sync/worker",
                 environment_variables=asset_sync_lambda_env,
-                
+                memory_size=1024,
+                timeout_minutes=15,
+
             ),
         )
         
@@ -155,6 +162,8 @@ class AssetSyncStack(Stack):
             LambdaConfig(
                 name=f"{config.resource_prefix}-job-status-{config.environment}",
                 entry="lambdas/back_end/asset_sync/job_status",
+                memory_size=1024,
+                timeout_minutes=15,
                 environment_variables=asset_sync_lambda_env,
             ),
         )
@@ -311,28 +320,15 @@ class AssetSyncStack(Stack):
             LambdaConfig(
                 name=f"{config.resource_prefix}-storage-sync-post-{config.environment}",
                 entry="lambdas/api/storage/s3/sync/post_sync",
+                memory_size=1024,
+                timeout_minutes=15,
                 environment_variables={
                     **asset_sync_lambda_env,
                     "STATE_MACHINE_ARN": self.state_machine.state_machine_arn
                 },
             ),
         )
-        
 
-        
-        # sync_resource.add_method(
-        #     "POST",
-        #     apigateway.LambdaIntegration(self._storage_sync_post_lambda.function),
-        #     authorization_type=apigateway.AuthorizationType.COGNITO,
-        #     authorizer=props.cognito_authorizer,
-        # )
-        
-        # job_resource.add_method(
-        #     "GET",
-        #     apigateway.LambdaIntegration(self._job_status_lambda.function),
-        #     authorization_type=apigateway.AuthorizationType.COGNITO,
-        #     authorizer=props.cognito_authorizer,
-        # )
     @property
     def asset_sync_job_table(self) -> dynamodb.TableV2:
         return self._asset_sync_job_table.table
