@@ -22,12 +22,15 @@ from aws_cdk import (
     Stack,
     RemovalPolicy,
     Duration,
+    BundlingOutput,
 )
 from aws_cdk.aws_lambda_python_alpha import (
     PythonFunction,
     PythonLayerVersion,
     BundlingOptions,
 )
+
+
 from aws_cdk.aws_lambda_nodejs import (
     NodejsFunction,
     BundlingOptions as NodeJSBundlingOptions,
@@ -40,6 +43,7 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PynamoDbLambdaLayer,
 )
 from aws_lambda_powertools import Logger
+
 
 from config import WORKFLOW_PAYLOAD_TEMP_BUCKET, config as env_config, DIST_PATH
 
@@ -241,13 +245,21 @@ class Lambda(Construct):
         if config.iam_role_name:
             logger.debug(f"Using custom role name: {config.iam_role_name}")
             # Truncate role name if it exceeds 64 characters
-            role_name = config.iam_role_name[:MAX_ROLE_NAME_LENGTH] if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH else config.iam_role_name
+            role_name = (
+                config.iam_role_name[:MAX_ROLE_NAME_LENGTH]
+                if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH
+                else config.iam_role_name
+            )
             logger.debug(f"Final role name after truncation: {role_name}")
             role_props["role_name"] = role_name
         else:
             # Handle default role name truncation
             default_role_name = f"role-{lambda_function_name}"
-            role_name = default_role_name[:MAX_ROLE_NAME_LENGTH] if len(default_role_name) > MAX_ROLE_NAME_LENGTH else default_role_name
+            role_name = (
+                default_role_name[:MAX_ROLE_NAME_LENGTH]
+                if len(default_role_name) > MAX_ROLE_NAME_LENGTH
+                else default_role_name
+            )
             logger.debug(f"Using default role name after truncation: {role_name}")
             role_props["role_name"] = role_name
 
@@ -329,8 +341,10 @@ class Lambda(Construct):
                 self._create_nodejs_function(common_lambda_props, common_libs)
             else:
                 # Python specific bundling with hash-based asset tracking
-                self._create_python_function(common_lambda_props, config, entry_path, common_libs)
-            
+                self._create_python_function(
+                    common_lambda_props, config, entry_path, common_libs
+                )
+
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
@@ -382,16 +396,12 @@ class Lambda(Construct):
         # Corrected Node.js specific paths
         props["runtime"] = lambda_.Runtime.NODEJS_20_X
         props["project_root"] = props["entry"]
-        props["deps_lock_file_path"] = os.path.join(
-            props["entry"], "lock.json"
-        )
-        
+        props["deps_lock_file_path"] = os.path.join(props["entry"], "lock.json")
+
         # Copy common libraries to entry directory
         if common_libs:
-            self._copy_common_libraries(
-                common_libs, Path(props["project_root"])
-            )
-        
+            self._copy_common_libraries(common_libs, Path(props["project_root"]))
+
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
         if "CI" in os.environ:
@@ -405,7 +415,7 @@ class Lambda(Construct):
             # Add a default index document if not defined
             if not "." in props["handler"]:
                 props["handler"] = f"index.{props["handler"]}"
-            
+
             self._function = lambda_.Function(
                 self,
                 "StandardNodeJSLambda",
@@ -413,9 +423,7 @@ class Lambda(Construct):
                 **props,
             )
         else:
-            props["entry"] = os.path.join(
-                props["entry"], "index.js"
-            )
+            props["entry"] = os.path.join(props["entry"], "index.js")
 
             self._function = NodejsFunction(
                 self,
@@ -429,17 +437,24 @@ class Lambda(Construct):
 
         logger.info(f"Created Node.js Lambda: {self.function_name}")
 
-    def _create_python_function(self, props: dict, config: LambdaConfig, entry_path: Path, common_libs: dict):
+    def _create_python_function(
+        self, props: dict, config: LambdaConfig, entry_path: Path, common_libs: dict
+    ):
         """Handle Python specific function creation with asset hashing"""
         logger = Logger()
-        
+
         # Generate hash of source files for deterministic builds
-        source_hash = self._generate_source_hash(entry_path, common_libs)
-        
-        # Merge user-provided bundling options with hash
-        bundling_options = config.python_bundling or BundlingOptions(
-            # asset_hash=source_hash,
-            asset_hash_type=AssetHashType.SOURCE
+        # source_hash = self._generate_source_hash(entry_path, common_libs)
+
+        bundling_options = BundlingOptions(
+            # Override the default command to install dependencies without caching and then copy assets.
+            command=[
+                "bash",
+                "-c",
+                "if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt -t /asset-output; fi && cp -au . /asset-output",
+            ],
+            # We can adjust the working directory if needed (default is /asset-input)
+            working_directory="/asset-input",
         )
 
         # Copy common libraries
@@ -457,7 +472,7 @@ class Lambda(Construct):
             # Add a default index document if not defined
             if not "." in props["handler"]:
                 props["handler"] = f"index.{props["handler"]}"
-            
+
             self._function = lambda_.Function(
                 self,
                 "StandardPythonLambda",
@@ -476,21 +491,22 @@ class Lambda(Construct):
     def _generate_source_hash(self, entry_path: Path, common_libs: dict) -> str:
         """Generate MD5 hash of all source files in the entry directory"""
         import hashlib
+
         hash_md5 = hashlib.md5()
-        
+
         # Hash application code
-        for file_path in entry_path.glob('**/*'):
+        for file_path in entry_path.glob("**/*"):
             if file_path.is_file():
-                with open(file_path, 'rb') as f:
+                with open(file_path, "rb") as f:
                     while chunk := f.read(4096):
                         hash_md5.update(chunk)
-        
+
         # Hash common libraries
         for lib_path in common_libs.values():
-            with open(lib_path, 'rb') as f:
+            with open(lib_path, "rb") as f:
                 while chunk := f.read(4096):
                     hash_md5.update(chunk)
-        
+
         return hash_md5.hexdigest()
 
     @property

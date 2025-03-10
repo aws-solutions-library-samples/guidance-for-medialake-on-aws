@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import uuid
 from functools import wraps
 from typing import Any, Dict, Optional, Callable, TypeVar, Union
 from typing_extensions import ParamSpec
@@ -9,6 +10,7 @@ import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
 
 # Type variables for better type hinting
 P = ParamSpec("P")
@@ -18,11 +20,38 @@ R = TypeVar("R")
 class LambdaMiddleware:
     """
     Middleware for AWS Lambda functions that provides:
-    - Event bus integration for progress/status updates
+    - EventBridge integration for progress/status updates
     - CloudWatch metrics for monitoring
     - Payload size management with S3 fallback
     - Standardized error handling
     - Input/output payload standardization
+
+    The output is standardized to the following format:
+
+    {
+        "metadata": {
+            "service": "S3EventIngest",           # Mandatory
+            "stepName": "assetRegistration",      # Mandatory
+            "stepStatus": "Completed",            # Mandatory - ENUM (Started, InProgress, Completed)
+            "stepId": "",                         # Mandatory - UID Generated and logged
+            "externalTaskId": "",                 # Optional
+            "externalTaskStatus": "",             # Optional enum (completed, inProgress, Started)
+            "externalPayload": "",                # Mandatory  (True or False)
+            "externalPayloadLocation": {          # Optional, mandatory if externalPayload is set to True
+                "bucket": "bucket-name",
+                "key": "object-key"
+            },
+            "stepCost": "",                       # Optional
+            "stepResult": "",                     # Optional
+            "stepDuration": ""                    # Optional
+        },
+        "payload": {                            # Mandatory
+            "assets": [],
+            "rights": [],
+            "titles": [],
+            "tasks": []
+        }
+    }
     """
 
     def __init__(
@@ -35,30 +64,16 @@ class LambdaMiddleware:
         max_retries: int = 3,
         standardize_payloads: bool = True,
     ):
-        """
-        Initialize the middleware.
-
-        Args:
-            event_bus_name: Name of the EventBridge event bus
-            metrics_namespace: Namespace for CloudWatch metrics
-            max_event_size: Maximum size for EventBridge events in bytes
-            cleanup_s3: Whether to cleanup S3 objects used for large payloads
-            large_payload_bucket: S3 bucket for storing large payloads
-            max_retries: Maximum number of retries for recoverable errors
-        """
+        # Initialize EventBridge and S3 clients
         self.event_bus = boto3.client("events")
         self.event_bus_name = event_bus_name
         self.max_event_size = max_event_size
         self.cleanup_s3 = cleanup_s3
         self.max_retries = max_retries
-
-        # Initialize AWS clients
         self.s3 = boto3.client("s3")
 
         # Set up large payload handling
-        self.large_payload_bucket = large_payload_bucket or os.environ.get(
-            "LARGE_PAYLOAD_BUCKET"
-        )
+        self.large_payload_bucket = large_payload_bucket or os.environ.get("LARGE_PAYLOAD_BUCKET")
         if not self.large_payload_bucket:
             raise ValueError(
                 "large_payload_bucket must be provided or LARGE_PAYLOAD_BUCKET environment variable must be set"
@@ -79,16 +94,6 @@ class LambdaMiddleware:
         self.retry_errors = set()
 
     def should_retry(self, error: Exception) -> bool:
-        """
-        Determine if an error should trigger a retry.
-
-        Args:
-            error: The exception that occurred
-
-        Returns:
-            Boolean indicating if retry should be attempted
-        """
-        # List of error types that should trigger retries
         RETRYABLE_ERRORS = (
             "RequestTimeout",
             "InternalServerError",
@@ -98,15 +103,9 @@ class LambdaMiddleware:
             "TooManyRequestsException",
             "ProvisionedThroughputExceededException",
         )
-
         error_type = error.__class__.__name__
-
-        # Track unique error types for metrics
         self.retry_errors.add(error_type)
-
-        return self.retry_count < self.max_retries and any(
-            err in error_type for err in RETRYABLE_ERRORS
-        )
+        return self.retry_count < self.max_retries and any(err in error_type for err in RETRYABLE_ERRORS)
 
     def emit_progress(
         self,
@@ -115,15 +114,6 @@ class LambdaMiddleware:
         status: str,
         detail: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """
-        Emit a progress update event.
-
-        Args:
-            context: Lambda context
-            progress: Progress percentage (0-100)
-            status: Current status message
-            detail: Additional details to include
-        """
         progress_details = {
             "function_name": context.function_name,
             "request_id": context.aws_request_id,
@@ -131,10 +121,8 @@ class LambdaMiddleware:
             "status": status,
             "timestamp": int(time.time()),
         }
-
         if detail:
             progress_details.update(detail)
-
         self.emit_event(
             detail_type="FunctionExecutionProgress",
             detail=progress_details,
@@ -142,82 +130,56 @@ class LambdaMiddleware:
         )
 
     def standardize_input(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Standardize the input event format.
-
-        Args:
-            event: Raw Lambda event
-
-        Returns:
-            Standardized event
-        """
         if not self.standardize_payloads:
             return event
 
-        # Check if payload is in S3
         if "s3_bucket" in event and "s3_key" in event:
             try:
-                response = self.s3.get_object(
-                    Bucket=event["s3_bucket"], Key=event["s3_key"]
-                )
+                response = self.s3.get_object(Bucket=event["s3_bucket"], Key=event["s3_key"])
                 event = json.loads(response["Body"].read().decode("utf-8"))
             except Exception as e:
                 self.logger.error(f"Failed to fetch payload from S3: {str(e)}")
                 raise
 
-        # Add standard metadata if not present
         if "metadata" not in event:
             event["metadata"] = {}
-
-        event["metadata"].update(
-            {
-                "timestamp": int(time.time()),
-                "service": self.service_name,
-            }
-        )
-
+        event["metadata"].update({"timestamp": int(time.time()), "service": self.service_name})
         return event
 
     def standardize_output(self, result: Any) -> Dict[str, Any]:
         """
-        Standardize the output format.
-
-        Args:
-            result: Handler result
-
-        Returns:
-            Standardized result
+        Wraps the handler result in the standardized output format.
         """
         if not self.standardize_payloads:
             return result
 
-        if not isinstance(result, dict):
-            result = {"data": result}
+        # Ensure the handler's result is a dict; otherwise, wrap it.
+        payload_content = result if isinstance(result, dict) else {"data": result}
 
-        # Add standard metadata
-        if "metadata" not in result:
-            result["metadata"] = {}
+        # Build metadata according to the required standard.
+        metadata = {
+            "service": self.service_name,             # e.g., "S3EventIngest"
+            "stepName": "assetRegistration",           # Mandatory step name
+            "stepStatus": "Completed",                 # Expected to be one of: Started, InProgress, Completed
+            "stepId": str(uuid.uuid4()),               # Generate a unique ID
+            "externalTaskId": "",                      # Optional: set if applicable
+            "externalTaskStatus": "",                  # Optional: e.g., "completed", "inProgress", "Started"
+            "externalPayload": "False",                # Mandatory: "True" or "False" (as a string)
+            "externalPayloadLocation": None,           # Optional: must be filled if externalPayload is "True"
+            "stepCost": "",                            # Optional cost information
+            "stepResult": "",                          # Optional result details
+            "stepDuration": ""                         # Optional duration info
+        }
 
-        result["metadata"].update(
-            {
-                "timestamp": int(time.time()),
-                "service": self.service_name,
-            }
-        )
-
-        return result
+        output = {
+            "metadata": metadata,
+            "payload": payload_content
+        }
+        return output
 
     def emit_event(
         self, detail_type: str, detail: Dict[str, Any], resources: Optional[list] = None
     ) -> None:
-        """
-        Emit an event to EventBridge, handling large payloads via S3 if needed.
-
-        Args:
-            detail_type: Type of the event
-            detail: Event details
-            resources: List of AWS resources involved
-        """
         try:
             event = {
                 "Source": self.service_name,
@@ -226,41 +188,23 @@ class LambdaMiddleware:
                 "EventBusName": self.event_bus_name,
                 "Resources": resources or [],
             }
-
-            # Check if payload is too large
             event_size = len(json.dumps(event).encode("utf-8"))
             if event_size > self.max_event_size:
-                self.logger.info(
-                    f"Event size {event_size} exceeds limit {self.max_event_size}, using S3"
-                )
-
-                # Store detail in S3
+                self.logger.info(f"Event size {event_size} exceeds limit {self.max_event_size}, using S3")
                 key = f"events/{int(time.time())}-{detail_type}.json"
-                self.s3.put_object(
-                    Bucket=self.large_payload_bucket, Key=key, Body=json.dumps(detail)
-                )
+                self.s3.put_object(Bucket=self.large_payload_bucket, Key=key, Body=json.dumps(detail))
                 self.temp_s3_objects.append(key)
-
-                # Update event with S3 reference
                 event["Detail"] = json.dumps(
-                    {
-                        "s3_bucket": self.large_payload_bucket,
-                        "s3_key": key,
-                        "original_size": event_size,
-                    }
+                    {"s3_bucket": self.large_payload_bucket, "s3_key": key, "original_size": event_size}
                 )
-
             self.event_bus.put_events(Entries=[event])
-
         except Exception as e:
             self.logger.error(f"Failed to emit event: {str(e)}")
             self.metrics.add_metric(name="FailedEvents", unit=MetricUnit.Count, value=1)
 
     def cleanup_temp_s3_objects(self) -> None:
-        """Clean up any temporary S3 objects created for large payloads."""
         if not self.cleanup_s3 or not self.temp_s3_objects:
             return
-
         try:
             self.s3.delete_objects(
                 Bucket=self.large_payload_bucket,
@@ -271,13 +215,6 @@ class LambdaMiddleware:
             self.logger.error(f"Failed to cleanup S3 objects: {str(e)}")
 
     def handle_failure(self, error: Exception, context: LambdaContext) -> None:
-        """
-        Handle function execution failures.
-
-        Args:
-            error: The exception that occurred
-            context: Lambda context
-        """
         error_type = error.__class__.__name__
         error_details = {
             "error_type": error_type,
@@ -286,45 +223,20 @@ class LambdaMiddleware:
             "request_id": context.aws_request_id,
             "function_version": context.function_version,
         }
-
-        # Log error
         self.logger.exception("Function execution failed")
-
-        # Emit failure event
         self.emit_event(
             detail_type="FunctionExecutionFailure",
             detail=error_details,
             resources=[context.invoked_function_arn],
         )
-
-        # Record metrics
         self.metrics.add_metric(name="Errors", unit=MetricUnit.Count, value=1)
-        self.metrics.add_metric(
-            name=f"Errors_{error_type}", unit=MetricUnit.Count, value=1
-        )
+        self.metrics.add_metric(name=f"Errors_{error_type}", unit=MetricUnit.Count, value=1)
 
     def __call__(self, handler: Callable[..., R]) -> Callable[..., R]:
-        """
-        Decorator that wraps the Lambda handler with middleware functionality.
-
-        Args:
-            handler: The Lambda handler function to wrap
-
-        Returns:
-            Wrapped handler function
-        """
-
-        @wraps(handler)
-        def wrapper(
-            event: Dict[str, Any],
-            context: LambdaContext,
-            *args: P.args,
-            **kwargs: P.kwargs,
-        ) -> R:
+        @lambda_handler_decorator
+        def wrapper(inner_handler, event, context):
             start_time = time.time()
-
             try:
-                # Emit start event
                 self.emit_event(
                     detail_type="FunctionExecutionStart",
                     detail={
@@ -335,40 +247,25 @@ class LambdaMiddleware:
                     resources=[context.invoked_function_arn],
                 )
 
-                # Add standard dimensions for metrics
-                self.metrics.add_dimension(
-                    name="FunctionName", value=context.function_name
-                )
-                self.metrics.add_dimension(
-                    name="Environment", value=os.getenv("ENVIRONMENT", "undefined")
-                )
+                self.metrics.add_dimension(name="FunctionName", value=context.function_name)
+                self.metrics.add_dimension(name="Environment", value=os.getenv("ENVIRONMENT", "undefined"))
 
-                # Standardize input
                 processed_event = self.standardize_input(event)
-
-                # Add progress method to context
-                context.emit_progress = (
-                    lambda progress, status, detail=None: self.emit_progress(
-                        context, progress, status, detail
-                    )
+                context.emit_progress = lambda progress, status, detail=None: self.emit_progress(
+                    context, progress, status, detail
                 )
 
-                # Initialize retry state
                 self.retry_count = 0
                 self.retry_errors.clear()
 
                 while True:
                     try:
-                        # Execute handler
-                        result = handler(processed_event, context, *args, **kwargs)
+                        result = inner_handler(processed_event, context)
                         break
                     except Exception as e:
                         if self.should_retry(e):
                             self.retry_count += 1
-                            retry_delay = min(
-                                2**self.retry_count, 30
-                            )  # Exponential backoff capped at 30s
-
+                            retry_delay = min(2 ** self.retry_count, 30)
                             self.logger.warning(
                                 f"Retrying after error (attempt {self.retry_count}/{self.max_retries})",
                                 extra={
@@ -377,8 +274,6 @@ class LambdaMiddleware:
                                     "retry_delay": retry_delay,
                                 },
                             )
-
-                            # Emit retry event
                             self.emit_event(
                                 detail_type="FunctionExecutionRetry",
                                 detail={
@@ -391,54 +286,26 @@ class LambdaMiddleware:
                                 },
                                 resources=[context.invoked_function_arn],
                             )
-
                             time.sleep(retry_delay)
                             continue
                         raise
 
-                # Record retry metrics if any occurred
                 if self.retry_count > 0:
-                    self.metrics.add_metric(
-                        name="RetryAttempts",
-                        unit=MetricUnit.Count,
-                        value=self.retry_count,
-                    )
+                    self.metrics.add_metric(name="RetryAttempts", unit=MetricUnit.Count, value=self.retry_count)
                     for error_type in self.retry_errors:
-                        self.metrics.add_metric(
-                            name=f"RetryErrors_{error_type}",
-                            unit=MetricUnit.Count,
-                            value=1,
-                        )
+                        self.metrics.add_metric(name=f"RetryErrors_{error_type}", unit=MetricUnit.Count, value=1)
 
-                # Standardize output
                 processed_result = self.standardize_output(result)
-
-                # Calculate execution time
                 execution_time = (time.time() - start_time) * 1000
 
-                # Record success metrics
-                self.metrics.add_metric(
-                    name="Invocations", unit=MetricUnit.Count, value=1
-                )
-                self.metrics.add_metric(
-                    name="ExecutionTime",
-                    unit=MetricUnit.Milliseconds,
-                    value=execution_time,
-                )
-                self.metrics.add_metric(
-                    name="MemoryUsed",
-                    unit=MetricUnit.Megabytes,
-                    value=context.memory_limit_in_mb,
-                )
+                self.metrics.add_metric(name="Invocations", unit=MetricUnit.Count, value=1)
+                self.metrics.add_metric(name="ExecutionTime", unit=MetricUnit.Milliseconds, value=execution_time)
+                self.metrics.add_metric(name="MemoryUsed", unit=MetricUnit.Megabytes, value=float(context.memory_limit_in_mb))
 
-                # Add cold start metric
                 if not hasattr(LambdaMiddleware, "_cold_start_recorded"):
-                    self.metrics.add_metric(
-                        name="ColdStart", unit=MetricUnit.Count, value=1
-                    )
+                    self.metrics.add_metric(name="ColdStart", unit=MetricUnit.Count, value=1)
                     LambdaMiddleware._cold_start_recorded = True
 
-                # Emit completion event
                 self.emit_event(
                     detail_type="FunctionExecutionComplete",
                     detail={
@@ -457,10 +324,9 @@ class LambdaMiddleware:
                 raise
 
             finally:
-                # Cleanup any temporary S3 objects
                 self.cleanup_temp_s3_objects()
 
-        return wrapper
+        return wrapper(handler)
 
 
 def lambda_middleware(
@@ -472,30 +338,6 @@ def lambda_middleware(
     max_retries: int = 3,
     standardize_payloads: bool = True,
 ) -> Callable[[Callable[..., R]], Callable[..., R]]:
-    """
-    Decorator factory for creating Lambda middleware instances.
-
-    Args:
-        event_bus_name: Name of the EventBridge event bus
-        metrics_namespace: Namespace for CloudWatch metrics
-        max_event_size: Maximum size for EventBridge events in bytes
-        cleanup_s3: Whether to cleanup S3 objects used for large payloads
-        large_payload_bucket: S3 bucket for storing large payloads
-        max_retries: Maximum number of retries for recoverable errors
-
-    Returns:
-        Decorator function that wraps Lambda handlers with middleware functionality
-
-    Example:
-        @lambda_middleware(
-            event_bus_name="MediaProcessingEvents",
-            metrics_namespace="MediaLake",
-            max_retries=3
-        )
-        def process_media(event, context):
-            # Handler implementation
-            pass
-    """
     middleware = LambdaMiddleware(
         event_bus_name=event_bus_name,
         metrics_namespace=metrics_namespace,

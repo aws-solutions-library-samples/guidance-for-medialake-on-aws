@@ -3,7 +3,7 @@ import os
 import re
 import time
 import traceback
-from typing import Dict, Any
+from typing import Dict, Any, List
 import boto3
 
 from aws_lambda_powertools import Logger
@@ -12,6 +12,7 @@ from config import (
     MEDIA_ASSETS_BUCKET_NAME,
     MEDIA_ASSETS_BUCKET_ARN_KMS_KEY,
     MEDIALAKE_ASSET_TABLE,
+    INGEST_EVENT_BUS_NAME,
 )
 
 # Initialize logger
@@ -304,6 +305,47 @@ def standardize_policy_statement(statement: Dict[str, Any]) -> Dict[str, Any]:
 
     return standardized
 
+def deduplicate_policy_statements(statements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Deduplicate policy statements to avoid redundancy.
+    
+    This function identifies and removes duplicate statements based on their
+    Effect, Action, and Resource values.
+    """
+    # Helper function to create a hashable representation of a statement
+    def statement_key(stmt):
+        # Convert lists to tuples for hashability
+        effect = stmt.get("Effect", "")
+        
+        # Sort and convert actions to a tuple
+        actions = stmt.get("Action", [])
+        if isinstance(actions, str):
+            actions = [actions]
+        actions = tuple(sorted(actions))
+        
+        # Sort and convert resources to a tuple
+        resources = stmt.get("Resource", [])
+        if isinstance(resources, str):
+            resources = [resources]
+        resources = tuple(sorted(resources))
+        
+        # Handle conditions if present (simplified)
+        conditions = stmt.get("Condition", {})
+        condition_str = json.dumps(conditions, sort_keys=True) if conditions else ""
+        
+        return (effect, actions, resources, condition_str)
+    
+    # Use a dictionary to track unique statements
+    unique_statements = {}
+    for stmt in statements:
+        key = statement_key(stmt)
+        # Only keep the first occurrence of each unique statement
+        if key not in unique_statements:
+            unique_statements[key] = stmt
+    
+    logger.info(f"Deduplicated {len(statements)} statements to {len(unique_statements)} unique statements")
+    return list(unique_statements.values())
+
 
 def standardize_policy_document(policy_document: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -376,14 +418,21 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                     f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}",
                 ],
             },
+            {
+                "Effect": "Allow",
+                "Action": ["events:PutEvents"],
+                "Resource": [
+                    f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{INGEST_EVENT_BUS_NAME}",
+                ],
+            },
         ],
     }
 
     try:
         # Log environment variables for debugging
 
-        # Get IAM policy from YAML if it exists
-        policy_document = default_policy
+        # Start with the default policy statements
+        policy_statements = default_policy["Statement"].copy()
         logger.info(f"YAML data: {yaml_data}")
 
         has_iam_policy = (
@@ -443,19 +492,30 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                         logger.error(f"Error processing statement {i}: {stmt_err}")
                         raise
 
+                # Add the processed YAML statements to the default policy statements
+                policy_statements.extend(processed_statements)
+                logger.info(f"Combined {len(processed_statements)} YAML statements with default policy")
+                
+                # Deduplicate the combined statements
+                deduplicated_statements = deduplicate_policy_statements(policy_statements)
+                
+                # Create the combined policy document
                 policy_document = {
                     "Version": "2012-10-17",
-                    "Statement": processed_statements,
+                    "Statement": deduplicated_statements,
                 }
 
-                # Log the standardized policy document
+                # Log the combined policy document
                 logger.info(
-                    f"Standardized policy document: {json.dumps(policy_document)}"
+                    f"Combined and deduplicated policy document: {json.dumps(policy_document)}"
                 )
             except Exception as yaml_err:
                 logger.error(f"Error processing YAML IAM policy: {yaml_err}")
-                logger.info("Falling back to default policy")
+                logger.info("Using default policy only")
                 policy_document = default_policy
+        else:
+            # If no YAML policy, use the default policy
+            policy_document = default_policy
 
         # Log the final policy document
         logger.info(f"Final policy document: {json.dumps(policy_document)}")
@@ -493,13 +553,32 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
 
 def create_lambda_role(
-    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any]
+    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any], operation_id: str = ""
 ) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")
-    role_name = sanitize_role_name(
-        f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
-    )
+    
+    # Create a base role name without the operation_id
+    base_role_name = f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
+    
+    # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
+    if operation_id:
+        # Calculate how much space we have left for the operation_id
+        # We need to account for the underscore that will be added before the operation_id
+        max_base_length = 63 - len(operation_id) - 1  # 63 to leave room for the underscore
+        
+        if len(base_role_name) > max_base_length:
+            # Truncate the base_role_name to make room for the operation_id
+            base_role_name = base_role_name[:max_base_length]
+        
+        # Now add the operation_id
+        role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
+    else:
+        role_name = sanitize_role_name(base_role_name)
+    
+    # Ensure the final role name is within the 64-character limit
+    if len(role_name) > 64:
+        role_name = role_name[:64]
     max_retries = 5  # Increased from 3 to 5
     retry_delay = 3  # Increased from 2 to 3 seconds
 

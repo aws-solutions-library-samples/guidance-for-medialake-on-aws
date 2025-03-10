@@ -87,14 +87,15 @@ def get_flow_state_definition(node: Any) -> Dict[str, Any]:
     if step_name == "wait":
         # Wait state
         seconds = node.data.configuration.get("seconds", 1)
-        state_def = {"Type": "Wait", "Seconds": seconds, "End": True}
+        # Don't set End: true for Wait states, as they often need to loop back to another state
+        state_def = {"Type": "Wait", "Seconds": seconds}
     elif step_name == "choice":
         # Choice state
         choices = node.data.configuration.get("choices", [])
         
         # Ensure we have at least one choice in the Choices array
         if not choices:
-            choices = [{"variable": "$.status", "value": "SUCCESS"}]
+            choices = [{"variable": "$.payload.externalTaskStatus", "value": "ready"}]
         
         # For Choice states, we'll set placeholder Next values that will be updated later
         # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
@@ -102,8 +103,8 @@ def get_flow_state_definition(node: Any) -> Dict[str, Any]:
             "Type": "Choice",
             "Choices": [
                 {
-                    "Variable": choice.get("variable", "$.status"),
-                    "StringEquals": choice.get("value", "SUCCESS"),
+                    "Variable": choice.get("variable", "$.payload.externalTaskStatus"),
+                    "StringEquals": choice.get("value", "ready"),
                     "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
                 }
                 for choice in choices
@@ -181,11 +182,11 @@ def build_step_function_definition(
     logger.info(f"Pipeline name: {pipeline.name}")
     logger.info(f"Number of nodes: {len(pipeline.configuration.nodes)}")
     logger.info(f"Number of edges: {len(pipeline.configuration.edges)}")
-
     # Create mappings between different node ID formats
     node_id_to_data_id = {}
     data_id_to_node_id = {}
     node_id_to_node = {}
+    node_id_to_lambda_key = {}  # New mapping for node ID to Lambda ARN key
 
     # Build the mappings
     for node in pipeline.configuration.nodes:
@@ -193,6 +194,17 @@ def build_step_function_definition(
             node_id_to_data_id[node.id] = node.data.id
             data_id_to_node_id[node.data.id] = node.id
             node_id_to_node[node.id] = node
+            
+            # Create a more specific key for Lambda ARN mapping that includes the method
+            # This ensures different operations (GET, POST) for the same node type get different Lambda functions
+            lambda_key = node.data.id
+            if node.data.type.lower() == "integration" and "method" in node.data.configuration:
+                lambda_key = f"{node.data.id}_{node.data.configuration['method']}"
+                # Add operationId to the key if available
+                if "operationId" in node.data.configuration and node.data.configuration["operationId"]:
+                    lambda_key = f"{lambda_key}_{node.data.configuration['operationId']}"
+            node_id_to_lambda_key[node.id] = lambda_key
+            
             logger.info(f"Node mapping: {node.id} -> {node.data.id} ({node.data.type})")
 
     # Log the edges for debugging
@@ -255,6 +267,9 @@ def build_step_function_definition(
 
     # Initialize states dictionary
     states = {}
+    
+    # Track states that are targets of Choice state branches and their source Choice states
+    choice_branch_targets = {}  # Map from target state name to source Choice state name
 
     # Create mappings for unique state names
     node_id_to_state_name = {}
@@ -314,10 +329,13 @@ def build_step_function_definition(
                 continue
         else:
             # Handle Lambda function nodes
-            lambda_arn = lambda_arns.get(node.data.id)
+            # Use the more specific lambda key that includes the method if available
+            lambda_key = node_id_to_lambda_key.get(node.id, node.data.id)
+            lambda_arn = lambda_arns.get(lambda_key)
+            
             if not lambda_arn:
                 logger.warning(
-                    f"No Lambda ARN found for node {node.data.id}; creating pass state instead."
+                    f"No Lambda ARN found for node {node.data.id} with key {lambda_key}; creating pass state instead."
                 )
                 # Create a Pass state as a fallback - without End: true
                 states[unique_state_name] = {
@@ -404,12 +422,18 @@ def build_step_function_definition(
                             if "__PLACEHOLDER__" in str(choice.get("Next", "")):
                                 choice["Next"] = target_state_name
                                 logger.info(f"Connected Choice true path: {source_state_name} -> {target_state_name}")
+                    # Track this target as a Choice branch target
+                    choice_branch_targets[target_state_name] = source_state_name
+                    logger.info(f"Tracking Choice branch target: {target_state_name} from {source_state_name}")
                 
                 elif source_handle == "condition_false" or source_handle == "condition_false_output":
                     # This is the "false" path from the Choice (Default)
                     if "Default" in source_state and "__PLACEHOLDER__" in str(source_state["Default"]):
                         source_state["Default"] = target_state_name
                         logger.info(f"Connected Choice default path: {source_state_name} -> {target_state_name}")
+                    # Track this target as a Choice branch target
+                    choice_branch_targets[target_state_name] = source_state_name
+                    logger.info(f"Tracking Choice branch target: {target_state_name} from {source_state_name}")
                 
                 else:
                     # If no sourceHandle but it's a Choice state, this might be a regular connection
@@ -597,17 +621,27 @@ def build_step_function_definition(
             if states[current_state].get("Type") in ["Succeed", "Fail"]:
                 continue
 
-            # For Choice states, don't modify the Next property
-            if states[current_state].get("Type") != "Choice":
-                # Remove End: True if it exists
-                if "End" in states[current_state]:
-                    del states[current_state]["End"]
-
-                # Add Next property
-                states[current_state]["Next"] = next_state
+            # Skip if the current state is a Choice state
+            if states[current_state].get("Type") == "Choice":
+                continue
+                
+            # Skip if the next state is a target of a Choice state branch
+            # and the current state is not the Choice state that targets it
+            if next_state in choice_branch_targets and choice_branch_targets[next_state] != current_state:
                 logger.info(
-                    f"Connected {current_state} -> {next_state} in execution path"
+                    f"Skipping connection {current_state} -> {next_state} because {next_state} is a target of a Choice state branch"
                 )
+                continue
+
+            # Remove End: True if it exists
+            if "End" in states[current_state]:
+                del states[current_state]["End"]
+
+            # Add Next property
+            states[current_state]["Next"] = next_state
+            logger.info(
+                f"Connected {current_state} -> {next_state} in execution path"
+            )
 
     # Mark the last state in the execution path as terminal
     if execution_path:
@@ -651,6 +685,33 @@ def build_step_function_definition(
                 logger.info(
                     f"Connected last state {last_state_id} to {succeed_state_id}"
                 )
+
+    # Ensure Choice branch targets are terminal if they don't have Next
+    for target_state, source_state in choice_branch_targets.items():
+        if target_state in states and "Next" not in states[target_state] and states[target_state].get("Type") not in ["Succeed", "Fail"]:
+            # Special handling for Wait states that are targets of Choice states
+            if states[target_state].get("Type") == "Wait":
+                # Make sure to remove End if it exists before adding Next
+                if "End" in states[target_state]:
+                    del states[target_state]["End"]
+                    logger.info(f"Removed End from Wait state {target_state} to prepare for loop connection")
+                
+                # Find the state that the Choice state is checking status for
+                # This is typically the state that comes before the Choice in the workflow
+                for state_name, state_def in states.items():
+                    if state_def.get("Next") == source_state:
+                        # Connect the Wait state back to the status check state
+                        states[target_state]["Next"] = state_name
+                        logger.info(f"Connected Wait state {target_state} back to status check state {state_name}")
+                        break
+                
+                # If we couldn't find a specific state to loop back to, default to End: true
+                if "Next" not in states[target_state]:
+                    states[target_state]["End"] = True
+                    logger.info(f"Marked Wait state {target_state} as a terminal state (no loop target found)")
+            else:
+                states[target_state]["End"] = True
+                logger.info(f"Marked Choice branch target {target_state} as a terminal state")
 
     logger.info(f"Determined start node: {start_at}")
     definition = {
@@ -827,8 +888,8 @@ def create_step_function(
                         valid_next = next((s for s in definition["States"].keys() if s != state_name), None)
                         if valid_next:
                             state["Choices"] = [{
-                                "Variable": "$.status",
-                                "StringEquals": "SUCCESS",
+                                "Variable": "$.payload.externalTaskStatus",
+                                "StringEquals": "ready",
                                 "Next": valid_next
                             }]
                             logger.info(f"Added default choice to empty Choices array in {state_name}")
@@ -846,11 +907,18 @@ def create_step_function(
                 # Check Default
                 if "__PLACEHOLDER__" in str(state.get("Default", "")):
                     logger.warning(f"Choice state {state_name} has placeholder Default target")
-                    # Find a valid state to use as Default
-                    valid_default = next((s for s in definition["States"].keys() if s != state_name), None)
-                    if valid_default:
-                        state["Default"] = valid_default
-                        logger.info(f"Updated Choice state {state_name} Default to {valid_default}")
+                    # Look for a Wait state to use as Default
+                    wait_state = next((s for s, st in definition["States"].items()
+                                      if st.get("Type") == "Wait" and s != state_name), None)
+                    if wait_state:
+                        state["Default"] = wait_state
+                        logger.info(f"Updated Choice state {state_name} Default to Wait state {wait_state}")
+                    else:
+                        # If no Wait state, find any valid state
+                        valid_default = next((s for s in definition["States"].keys() if s != state_name), None)
+                        if valid_default:
+                            state["Default"] = valid_default
+                            logger.info(f"Updated Choice state {state_name} Default to {valid_default}")
             
             # Handle Map states
             elif state.get("Type") == "Map":
@@ -870,6 +938,12 @@ def create_step_function(
                         }
                         logger.info(f"Fixed Map state {state_name} Iterator with missing required fields")
 
+        # Final validation: ensure no state has both End and Next properties
+        for state_name, state in definition["States"].items():
+            if "End" in state and "Next" in state:
+                logger.warning(f"State {state_name} has both End and Next properties, removing End")
+                del state["End"]
+        
         # Print the definition for debugging
         definition_json = json.dumps(definition, indent=2)
         # print(f"Step Function Definition for {pipeline_name}:\n{definition_json}")

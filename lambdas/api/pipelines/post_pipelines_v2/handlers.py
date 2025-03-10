@@ -104,7 +104,17 @@ def create_pipeline() -> Dict[str, Any]:
             logger.info(f"Processing node with id: {node.id}")
             logger.info(node)
             lambda_arn = create_lambda_function(pipeline_name, node)
-            lambda_arns[node.data.id] = lambda_arn
+            
+            # Create a more specific key for Lambda ARN mapping that includes the method
+            # This ensures different operations (GET, POST) for the same node type get different Lambda functions
+            lambda_key = node.data.id
+            if node.data.type.lower() == "integration" and "method" in node.data.configuration:
+                lambda_key = f"{node.data.id}_{node.data.configuration['method']}"
+                # Add operationId to the key if available
+                if "operationId" in node.data.configuration and node.data.configuration["operationId"]:
+                    lambda_key = f"{lambda_key}_{node.data.configuration['operationId']}"
+            
+            lambda_arns[lambda_key] = lambda_arn
 
         # Log edge processing (if any)
         for edge in pipeline.configuration.edges:

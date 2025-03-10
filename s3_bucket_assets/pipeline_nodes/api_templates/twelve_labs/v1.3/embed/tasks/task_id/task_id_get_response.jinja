@@ -4,15 +4,7 @@
   },
   "payload": {
     "externalTaskId": {{ variables.task_id|jsonify }},
-    "externalTaskStatus": {{ variables.task_status|jsonify }}
-    {% if variables.task_status == "Ready" %}"assets": [
-      {
-        "embedding": {
-          "type": "video_full",
-          "model": {{ variables.task_embedding_model|jsonify}},
-          "embedding: {{ variables.task_video_embedding}}
-        }
-      }
-    ]{% endif %}
+    "externalTaskStatus": {{ variables.task_status|jsonify }},
+    "externalTaskResults": {{ variables.segments|jsonify }}
   }
 }

@@ -82,9 +82,14 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         [node.info.nodeType]
     );
 
+    const isFlowNode = useMemo(() =>
+        node.info.nodeType === 'FLOW',
+        [node.info.nodeType]
+    );
+
     const hasParameters = useMemo(() => {
-        if (node.info.nodeType === 'TRIGGER') {
-            // For trigger nodes, check if there are parameters in the config
+        if (node.info.nodeType === 'TRIGGER' || node.info.nodeType === 'FLOW') {
+            // For trigger and flow nodes, check if there are parameters in the config
             const parameters = (methodInfo as any)?.config?.parameters || [];
             return parameters.length > 0;
         } else {
@@ -138,8 +143,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         // Add method parameters
 
         // Handle different parameter structures based on node type
-        if (isTriggerNode) {
-            // For trigger nodes, parameters are in a different format
+        if (isTriggerNode || isFlowNode) {
+            // For trigger and flow nodes, parameters are in a different format
             // They are in an array format with config.parameters
             const parameters = (methodInfo as any)?.config?.parameters || [];
 
@@ -251,10 +256,10 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
             let requestMapping = null;
             let responseMapping = null;
 
-            if (node.info.nodeType === 'TRIGGER') {
-                // For trigger nodes, use the method name directly
+            if (node.info.nodeType === 'TRIGGER' || node.info.nodeType === 'FLOW') {
+                // For trigger and flow nodes, use the method name directly
                 method = methodName;
-                console.log('[NodeConfigurationForm] Using method name for trigger node:', method);
+                console.log('[NodeConfigurationForm] Using method name for trigger/flow node:', method);
             } else if (node.info.nodeType === 'INTEGRATION') {
                 // For integration nodes, use the method name (post, get, etc.)
                 method = methodName;
@@ -310,7 +315,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
 
     // Auto-submit when there are no parameters and it's not an integration node or trigger node
     useEffect(() => {
-        if (!hasParameters && !isIntegrationNode && !isTriggerNode) {
+        if (!hasParameters && !isIntegrationNode && !isTriggerNode && !isFlowNode) {
             console.log('[NodeConfigurationForm] Auto-submitting for node with no parameters');
 
             // Set method based on node type
@@ -337,7 +342,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         }
     }, [hasParameters, methodName, methodInfo, node.info.nodeType, configuration?.path, configuration?.operationId, configuration?.requestMapping, configuration?.responseMapping, onSubmit, isIntegrationNode, isTriggerNode]);
 
-    if (!hasParameters && !isIntegrationNode && !isTriggerNode) {
+    if (!hasParameters && !isIntegrationNode && !isTriggerNode && !isFlowNode) {
         return (
             <Box sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="body1" color="text.secondary">

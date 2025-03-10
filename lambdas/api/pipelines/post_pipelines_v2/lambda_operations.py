@@ -8,8 +8,8 @@ from typing import Dict, Any, Optional
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET
-from iam_operations import create_lambda_role, wait_for_role_propagation
+from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME
+from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name
 from dynamodb_operations import (
     get_node_info,
     get_node_method,
@@ -212,8 +212,25 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
     logger.info(f"Creating/updating Lambda function for node: {node.id}")
     lambda_client = boto3.client("lambda")
 
+    # For integration nodes, include the method in the function name to differentiate
+    # between different operations (GET, POST, etc.) on the same integration
+    method_suffix = ""
+    if node.data.type.lower() == "integration" and "method" in node.data.configuration:
+        method_suffix = f"_{node.data.configuration['method']}"
+    
+    # Extract operation_id from node configuration
+    operation_id = node.data.configuration.get("operationId", "")
     version = node.data.configuration.get("version", "v1")
-    function_name = sanitize_function_name(pipeline_name, node.data.label, version)
+    
+    # Create a base function name without the operation_id
+    base_name = f"{node.data.label}{method_suffix}"
+    
+    # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
+    if operation_id:
+        # We'll create the function name with the operation_id and let sanitize_function_name handle the truncation
+        function_name = sanitize_function_name(pipeline_name, f"{base_name}_{operation_id}", version)
+    else:
+        function_name = sanitize_function_name(pipeline_name, base_name, version)
     logger.debug(f"Lambda function name generated: {function_name}")
 
     # Read YAML file from S3
@@ -269,13 +286,31 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
-    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data)
+    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data, operation_id)
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
-        wait_for_role_propagation(
-            f"{resource_prefix}_{pipeline_name}_{node.data.id}_lambda_execution_role"
-        )
+        # Use the same role name construction logic as in create_lambda_role
+        base_role_name = f"{resource_prefix}_{pipeline_name}_{node.data.id}_lambda_execution_role"
+        
+        if operation_id:
+            # Calculate how much space we have left for the operation_id
+            max_base_length = 63 - len(operation_id) - 1  # 63 to leave room for the underscore
+            
+            if len(base_role_name) > max_base_length:
+                # Truncate the base_role_name to make room for the operation_id
+                base_role_name = base_role_name[:max_base_length]
+            
+            # Now add the operation_id
+            role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
+        else:
+            role_name = sanitize_role_name(base_role_name)
+        
+        # Ensure the final role name is within the 64-character limit
+        if len(role_name) > 64:
+            role_name = role_name[:64]
+            
+        wait_for_role_propagation(role_name)
     except Exception as e:
         logger.warning(
             f"Error waiting for role propagation: {e}, will proceed with Lambda creation anyway"
@@ -372,6 +407,10 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                 # Only include Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":
                     env_vars = {
+                        "LARGE_PAYLOAD_BUCKET":os.environ.get(
+                            "EXTERNAL_PAYLOAD_BUCKET"
+                        ),
+                        "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
                         "WORKFLOW_STEP_NAME": function_name,
                         "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
                         "REQUEST_TEMPLATES_PATH": request_templates_path,
