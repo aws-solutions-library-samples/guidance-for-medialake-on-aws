@@ -142,7 +142,10 @@ function Sidebar() {
     ];
 
     const handleNavigation = (path: string) => {
-        navigate(path);
+        // Only navigate if we're not already on this path
+        if (location.pathname !== path) {
+            navigate(path);
+        }
     };
 
     const toggleDrawer = () => {
