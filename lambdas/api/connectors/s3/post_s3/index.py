@@ -644,7 +644,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             queue_url, queue_arn = setup_eventbridge_notifications(
                 s3_bucket, bucket_region, created_resources, object_prefix
             )
-        elif integration_method in ["s3Notifications", "s3-event-notifications"]:
+        elif integration_method in ["s3Notifications"]:
             # Set up S3 event notifications
             # Create SQS queue in the same region as the bucket
             queue_name = f"-connector-{s3_bucket}-notifications"

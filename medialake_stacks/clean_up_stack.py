@@ -43,6 +43,25 @@ class CleanupStack(Stack):
         props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
+
+        # Add EventBridge Pipes permissions
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+         
+                    "pipes:DeletePipe",
+                    "pipes:DescribePipe",
+                    "pipes:ListPipes",
+          
+                    "pipes:StopPipe",
+              
+            
+                    "pipes:UntagResource",
+                    "pipes:ListTagsForResource"
+                ],
+                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
+            )
+        )
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,

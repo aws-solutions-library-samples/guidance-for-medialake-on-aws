@@ -114,7 +114,7 @@ export interface CreateConnectorRequest {
   configuration: {
     connectorType?: string;
     bucket?: string;
-    s3IntegrationMethod?: 's3-event-notifications' | 'eventbridge';
+    s3IntegrationMethod?: 's3Notifications' | 'eventbridge';
     region?: string;
     [key: string]: string | undefined;
   };

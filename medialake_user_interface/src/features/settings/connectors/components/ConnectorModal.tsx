@@ -60,7 +60,7 @@ const S3_CONNECTOR_TYPES = [
 
 const S3_INTEGRATION_METHODS = [
     { value: 'eventbridge' as const, label: 'S3 EventBridge Notifications' },
-    { value: 's3-event-notifications' as const, label: 'S3 Event Notifications' },
+    { value: 's3Notifications' as const, label: 'S3 Event Notifications' },
 ] as const;
 
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
@@ -120,7 +120,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             configuration: {
                 ...configuration,
                 connectorType: s3ConnectorType,
-                s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3-event-notifications',
+                s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3Notifications',
             },
         };
 

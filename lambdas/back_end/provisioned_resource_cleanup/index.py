@@ -146,6 +146,22 @@ def clean_up_connector(item, table):
     else:
         logger.warning(f"Unknown integration method: {integration_method}")
 
+ 
+        # Clean up EventBridge Pipe if present
+    if "pipeArn" in item:
+        try:
+            delete_eventbridge_pipe(item["pipeArn"])
+        except Exception as e:
+            errors.append(f"Error deleting EventBridge Pipe: {str(e)}")
+
+    # Clean up EventBridge Pipe IAM role if present
+    if "pipeRoleArn" in item:
+        try:
+            delete_iam_role(item["pipeRoleArn"])
+        except Exception as e:
+            errors.append(f"Error deleting EventBridge Pipe IAM role: {str(e)}")
+
+
     # Clean up EventBridge Pipe if present
     if "pipeArn" in item:
         try:
