@@ -208,7 +208,7 @@ const PipelinesPage: React.FC = () => {
         
         // Navigate immediately without waiting for prefetch
         console.log(`[PERF] Navigating to edit page for pipeline ID: ${id}`);
-        navigate(`/settings/pipelines/${id}/edit`);
+        navigate(`/settings/pipelines/edit/${id}`);
     }, [navigate]);
     
     // Non-blocking openDeleteDialog function

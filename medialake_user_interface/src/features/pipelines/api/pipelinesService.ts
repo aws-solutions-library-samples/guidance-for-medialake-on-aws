@@ -16,7 +16,40 @@ export class PipelinesService {
     }
 
     static async getPipeline(id: string): Promise<Pipeline> {
-        const response = await apiClient.get<Pipeline>(PIPELINES_API.endpoints.GET_PIPELINE(id));
+        const response = await apiClient.get<any>(PIPELINES_API.endpoints.GET_PIPELINE(id));
+        
+        // Check if the response has the expected structure
+        if (response.data && response.data.data && response.data.data.pipeline) {
+            const pipelineData = response.data.data.pipeline;
+            
+            // Transform the pipeline data to match the expected structure
+            // Extract name, description, and configuration from the definition property if it exists
+            if (pipelineData.definition) {
+                return {
+                    id: pipelineData.id,
+                    name: pipelineData.definition.name || pipelineData.name || '',
+                    description: pipelineData.definition.description || pipelineData.description || '',
+                    configuration: pipelineData.definition.configuration || pipelineData.configuration || {
+                        nodes: [],
+                        edges: [],
+                        settings: {
+                            autoStart: false,
+                            retryAttempts: 3,
+                            timeout: 3600
+                        }
+                    },
+                    type: pipelineData.type || 'Custom',
+                    system: pipelineData.system || false,
+                    createdAt: pipelineData.createdAt || new Date().toISOString(),
+                    updatedAt: pipelineData.updatedAt || new Date().toISOString()
+                } as Pipeline;
+            }
+            
+            // If definition doesn't exist, return the pipeline data as is
+            return pipelineData as Pipeline;
+        }
+        
+        // If the response doesn't have the expected structure, return the data as is
         return response.data;
     }
 

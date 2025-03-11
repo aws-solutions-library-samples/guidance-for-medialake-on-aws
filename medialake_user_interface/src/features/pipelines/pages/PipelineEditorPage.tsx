@@ -261,6 +261,50 @@ const PipelineEditorContent = () => {
     const { id: pipelineId } = useParams();
     const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    // Track whether the pipeline has been initialized
+    const pipelineInitialized = useRef(false);
+    
+    // Custom handler for node changes to update the pipeline configuration
+    const handleNodesChange = useCallback((changes) => {
+        // First apply the changes to the nodes state
+        onNodesChange(changes);
+        
+        // Then update the pipeline configuration with the new node positions
+        changes.forEach(change => {
+            if (change.type === 'position' && change.positionAbsolute) {
+                console.log('[PipelineEditorPage] Node position changed:', change);
+                
+                // Update the form data with the new node position
+                setFormData(prev => {
+                    const updatedNodes = prev.configuration.nodes.map(node => {
+                        if (node.id === change.id) {
+                            console.log('[PipelineEditorPage] Updating node position in form data:', node.id);
+                            return {
+                                ...node,
+                                position: {
+                                    x: change.positionAbsolute.x.toString(),
+                                    y: change.positionAbsolute.y.toString()
+                                },
+                                positionAbsolute: {
+                                    x: change.positionAbsolute.x.toString(),
+                                    y: change.positionAbsolute.y.toString()
+                                }
+                            };
+                        }
+                        return node;
+                    });
+                    
+                    return {
+                        ...prev,
+                        configuration: {
+                            ...prev.configuration,
+                            nodes: updatedNodes
+                        }
+                    };
+                });
+            }
+        });
+    }, [onNodesChange]);
     const { screenToFlowPosition } = useReactFlow();
     const reactFlowInstance = useReactFlow();
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
@@ -339,15 +383,31 @@ const PipelineEditorContent = () => {
     // Set form data when pipeline data is loaded
     React.useEffect(() => {
         if (pipeline) {
+            console.log('[PipelineEditorPage] Setting form data from pipeline:', pipeline);
             setFormData({
                 name: pipeline.name,
-                description: pipeline.description,
-                configuration: pipeline.configuration
+                description: pipeline.description || '',
+                configuration: pipeline.configuration || {
+                    nodes: [],
+                    edges: [],
+                    settings: {
+                        autoStart: false,
+                        retryAttempts: 3,
+                        timeout: 3600
+                    }
+                }
             });
         }
     }, [pipeline]);
 
     const handleSave = async () => {
+        console.log('[PipelineEditorPage] Saving pipeline with form data:', formData);
+        console.log('[PipelineEditorPage] Node positions:', formData.configuration.nodes.map(node => ({
+            id: node.id,
+            position: node.position,
+            positionAbsolute: node.positionAbsolute
+        })));
+        
         if (pipelineId && pipelineId !== 'new') {
             updatePipeline.mutate({ id: pipelineId, data: formData });
         } else {
@@ -382,6 +442,98 @@ const PipelineEditorContent = () => {
             setIsNodeConfigOpen(true);
         }
     }, [nodes]);
+
+    // Initialize ReactFlow nodes and edges from pipeline configuration
+    React.useEffect(() => {
+        // Only initialize if the pipeline has data and hasn't been initialized yet
+        if (pipeline?.configuration?.nodes &&
+            pipeline.configuration.nodes.length > 0 &&
+            !pipelineInitialized.current) {
+            
+            console.log('[PipelineEditorPage] Initializing ReactFlow from pipeline configuration');
+            console.log('[PipelineEditorPage] Configuration nodes:', pipeline.configuration.nodes);
+            console.log('[PipelineEditorPage] Configuration edges:', pipeline.configuration.edges);
+            
+            // Convert configuration nodes to ReactFlow nodes
+            const reactFlowNodes = pipeline.configuration.nodes.map(node => {
+                console.log('[PipelineEditorPage] Processing node:', node);
+                
+                // Create a ReactFlow node from the pipeline node
+                return {
+                    id: node.id,
+                    type: node.type || 'custom',
+                    position: {
+                        x: typeof node.position.x === 'string' ? parseFloat(node.position.x) : node.position.x,
+                        y: typeof node.position.y === 'string' ? parseFloat(node.position.y) : node.position.y
+                    },
+                    data: {
+                        nodeId: node.data.id,
+                        label: node.data.label,
+                        description: '',  // Use empty string for description
+                        icon: <FaFileVideo size={20} />,
+                        inputTypes: node.data.inputTypes || [],
+                        outputTypes: node.data.outputTypes || [],
+                        type: node.data.type,
+                        configuration: node.data.configuration,
+                        onDelete: onDeleteNode,
+                        onConfigure: onConfigureNode,
+                    },
+                    // Preserve width and height
+                    width: typeof node.width === 'string' ? parseFloat(node.width) : node.width,
+                    height: typeof node.height === 'string' ? parseFloat(node.height) : node.height,
+                    // Preserve positionAbsolute if it exists
+                    ...(node.positionAbsolute && {
+                        positionAbsolute: {
+                            x: typeof node.positionAbsolute.x === 'string'
+                                ? parseFloat(node.positionAbsolute.x)
+                                : node.positionAbsolute.x,
+                            y: typeof node.positionAbsolute.y === 'string'
+                                ? parseFloat(node.positionAbsolute.y)
+                                : node.positionAbsolute.y
+                        }
+                    }),
+                    // Preserve dragging and selected states if they exist
+                    ...(node.dragging !== undefined && { dragging: node.dragging }),
+                    ...(node.selected !== undefined && { selected: node.selected })
+                };
+            });
+            
+            console.log('[PipelineEditorPage] ReactFlow nodes:', reactFlowNodes);
+            
+            // Set the nodes state
+            setNodes(reactFlowNodes);
+            
+            // Convert configuration edges to ReactFlow edges
+            if (pipeline.configuration.edges && pipeline.configuration.edges.length > 0) {
+                const reactFlowEdges = pipeline.configuration.edges.map(edge => {
+                    console.log('[PipelineEditorPage] Processing edge:', edge);
+                    
+                    // Use type assertion to handle sourceHandle and targetHandle
+                    const edgeWithHandles = edge as any;
+                    
+                    return {
+                        id: edge.id,
+                        source: edge.source,
+                        target: edge.target,
+                        type: edge.type || 'custom',
+                        data: edge.data,
+                        // Include sourceHandle and targetHandle if they exist in the edge data
+                        ...(edgeWithHandles.sourceHandle && { sourceHandle: edgeWithHandles.sourceHandle }),
+                        ...(edgeWithHandles.targetHandle && { targetHandle: edgeWithHandles.targetHandle })
+                    };
+                });
+                
+                console.log('[PipelineEditorPage] ReactFlow edges:', reactFlowEdges);
+                
+                // Set the edges state
+                setEdges(reactFlowEdges);
+            }
+            
+            // Mark the pipeline as initialized
+            pipelineInitialized.current = true;
+            console.log('[PipelineEditorPage] Pipeline initialized');
+        }
+    }, [pipeline, onDeleteNode, onConfigureNode, setNodes, setEdges]);
 
     // Update existing nodes with handlers
     React.useEffect(() => {
@@ -696,7 +848,7 @@ const PipelineEditorContent = () => {
                         snapGrid={[16, 16]}
                         nodes={nodes}
                         edges={edges}
-                        onNodesChange={onNodesChange}
+                        onNodesChange={handleNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         nodeTypes={nodeTypes}
