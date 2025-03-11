@@ -169,8 +169,9 @@ export const usePipelineManager = () => {
         isLoading,
         error,
         isDeleting: deletePipelineMutation.isPending,
-        // Wrap the mutation in a function that handles errors and timeouts
-        deletePipeline: async (id: string) => {
+        // Non-blocking function that handles errors and timeouts
+        deletePipeline: (id: string) => {
+            const startTime = performance.now();
             console.log(`[usePipelineManager] Starting delete operation for pipeline ID: ${id}`);
 
             // Create a timeout promise to prevent hanging
@@ -181,31 +182,36 @@ export const usePipelineManager = () => {
                 }, 30000);
             });
 
-            try {
+            // Return a promise that resolves when the operation completes
+            return new Promise((resolve, reject) => {
                 // Race the deletion against the timeout
-                await Promise.race([
+                Promise.race([
                     deletePipelineMutation.mutateAsync(id),
                     timeoutPromise
-                ]);
-
-                console.log(`[usePipelineManager] Delete operation completed successfully for pipeline ID: ${id}`);
-
-                // Refresh the pipeline list
-                await refetch();
-
-                return true;
-            } catch (error) {
-                console.error(`[usePipelineManager] Error in delete operation for pipeline ID: ${id}`, error);
-
-                // Still try to refresh the list in case the deletion actually succeeded
-                try {
-                    await refetch();
-                } catch (refetchError) {
-                    console.error(`[usePipelineManager] Error refreshing pipeline list after deletion:`, refetchError);
-                }
-
-                throw error;
-            }
+                ])
+                    .then(() => {
+                        console.log(`[usePipelineManager] Delete operation completed successfully for pipeline ID: ${id} in ${performance.now() - startTime}ms`);
+                        
+                        // Refresh the pipeline list in the background
+                        refetch()
+                            .catch(refetchError => {
+                                console.error(`[usePipelineManager] Error refreshing pipeline list after deletion:`, refetchError);
+                            });
+                        
+                        resolve(true);
+                    })
+                    .catch(error => {
+                        console.error(`[usePipelineManager] Error in delete operation for pipeline ID: ${id} after ${performance.now() - startTime}ms`, error);
+                        
+                        // Still try to refresh the list in case the deletion actually succeeded
+                        refetch()
+                            .catch(refetchError => {
+                                console.error(`[usePipelineManager] Error refreshing pipeline list after deletion:`, refetchError);
+                            });
+                        
+                        reject(error);
+                    });
+            });
         },
         startPipeline: startPipelineMutation.mutate,
         stopPipeline: stopPipelineMutation.mutate,

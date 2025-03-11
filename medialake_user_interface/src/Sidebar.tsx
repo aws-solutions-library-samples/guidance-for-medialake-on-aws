@@ -142,10 +142,18 @@ function Sidebar() {
     ];
 
     const handleNavigation = (path: string) => {
-        // Only navigate if we're not already on this path
-        if (location.pathname !== path) {
-            navigate(path);
+        // Don't navigate if:
+        // 1. We're already on this exact path, or
+        // 2. We're on a sub-route of this path (except for root path '/')
+        if (location.pathname === path ||
+            (path !== '/' && location.pathname.startsWith(path))) {
+            console.log(`[Navigation] Prevented duplicate navigation to ${path}`);
+            return;
         }
+        
+        // Log navigation for debugging
+        console.log(`[Navigation] Navigating from ${location.pathname} to ${path}`);
+        navigate(path);
     };
 
     const toggleDrawer = () => {

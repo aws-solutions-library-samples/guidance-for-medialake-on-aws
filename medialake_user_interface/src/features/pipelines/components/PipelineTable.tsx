@@ -118,6 +118,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                         <IconButton
                             size="small"
                             onClick={() => tableActions.handleEdit(info.row.original.id)}
+                            disabled={info.row.original.system}
                         >
                             <EditIcon fontSize="small" />
                         </IconButton>
@@ -135,6 +136,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                         <IconButton
                             size="small"
                             onClick={() => onStartPipeline(info.row.original.id)}
+                            disabled={true}
                         >
                             <PlayIcon fontSize="small" />
                         </IconButton>
@@ -143,6 +145,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                         <IconButton
                             size="small"
                             onClick={() => onStopPipeline(info.row.original.id)}
+                            disabled={true}
                         >
                             <StopIcon fontSize="small" />
                         </IconButton>
