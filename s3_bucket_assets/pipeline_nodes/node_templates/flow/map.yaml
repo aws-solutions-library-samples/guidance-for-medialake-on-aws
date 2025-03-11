@@ -38,4 +38,8 @@ actions:
       incoming:
         type: [any]
       outgoing:
-        type: [any]
+        types:
+          - name: processor
+            description: json payload item processor
+          - name: next
+            description: output to the next node

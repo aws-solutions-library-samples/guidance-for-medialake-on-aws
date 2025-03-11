@@ -661,6 +661,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=get_pipeline_id_lambda_config,
         )
 
+        self._get_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:Scan"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+
         pipeline_id_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_pipeline_id_handler.function),
