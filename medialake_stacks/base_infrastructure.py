@@ -145,15 +145,6 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        # VPC used for OpenSearch, Lambda's, and VPC Endpoints
-        # self._vpc = CustomVpc(
-        #     self,
-        #     "MediaLakeVPC",
-        #     props=CustomVpcProps(
-        #         vpc_name=f"{config.resource_prefix}-vpc-{self.region}-{config.environment}"
-        #     ),
-        # )
-
         self._vpc = CustomVpc(
             self,
             "MediaLakeVPC",
@@ -216,8 +207,6 @@ class BaseInfrastructureStack(Stack):
                     : config.opensearch_cluster_settings.availability_zone_count
                 ]
             ]
-
-        # print(f"Selected subnet IDs for OpenSearch cluster: {selected_subnet_ids}")
 
         self._opensearch_cluster = OpenSearchCluster(
             self,

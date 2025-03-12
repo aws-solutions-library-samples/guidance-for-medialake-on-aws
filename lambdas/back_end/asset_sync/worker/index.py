@@ -480,35 +480,22 @@ class AssetProcessor:
             # Publish event to EventBridge
             event_detail = {
                 "InventoryID": inventory_id,
-                "AssetID": asset_id,
-                "StorageInfo": {
-                    "Bucket": bucket,
-                    "Key": key,
-                },
-                "FileInfo": {
-                    "Size": response["ContentLength"],
-                    "Hash": md5_hash,
-                },
-                "CreatedAt": datetime.utcnow().isoformat(),
-            }
-            
-            # Add technical metadata to event
-            if technical_metadata:
-                event_detail["TechnicalMetadata"] = {
-                    "FileType": technical_metadata.get("FileType", ""),
-                    "MimeType": technical_metadata.get("MimeType", ""),
-                }
-                
-                # Add dimensions if available
-                if "Width" in technical_metadata and "Height" in technical_metadata:
-                    event_detail["TechnicalMetadata"]["Dimensions"] = {
-                        "Width": technical_metadata["Width"],
-                        "Height": technical_metadata["Height"]
+                "FileHash": md5_hash,
+                "DigitalSourceAsset": {
+                    "ID": asset_id,
+                    "Type": file_type,
+                    "CreateDate": datetime.utcnow().isoformat(),
+                    "MainRepresentation": {
+                        "ID": f"{asset_id}:master",
+                        "Type": file_type,
+                        "Format": key.split(".")[-1].upper() if "." in key else "",
+                        "Purpose": "master",
+                        "StorageInfo": metadata["StorageInfo"],
                     }
-                
-                # Add duration for video/audio if available
-                if "Duration" in technical_metadata:
-                    event_detail["TechnicalMetadata"]["Duration"] = technical_metadata["Duration"]
+                },
+                "DerivedRepresentations": [],
+                "Metadata": metadata.get("Metadata"),
+            }
             
             event_bus_name = os.environ.get("INGEST_EVENT_BUS_NAME", "default")
             event_entry = {

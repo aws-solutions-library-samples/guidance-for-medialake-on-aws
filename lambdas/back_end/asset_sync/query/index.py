@@ -1,207 +1,350 @@
+# lambda/query/handler.py
 import os
-import boto3
 import json
+import boto3
 import uuid
+from datetime import datetime
+from typing import Dict, Any, List, Optional, Set
 from concurrent.futures import ThreadPoolExecutor
-from common import logger, AssetProcessor, JobStatus, ErrorType
 
-def check_object_status(obj, job_id, bucket_name):
-    """Check if an object needs processing based on tags"""
-    try:
-        # Log the object being checked for debugging
-        logger.debug(f"Checking object: {json.dumps(obj)}")
-        
-        # First try with inventoryId if available (primary key)
-        if obj.get('inventoryId'):
-            # Strip any prefix like "asset:uuid:" from the inventoryId
-            clean_inventory_id = obj['inventoryId'].split(':')[-1] if ':' in obj['inventoryId'] else obj['inventoryId']
-            logger.info(f"Checking asset existence with clean inventoryId: {clean_inventory_id}, original: {obj['inventoryId']}")
-            try:
-                # For primary key, we don't need to specify an index
-                logger.info(f"Calling check_asset_exists with inventory_id={clean_inventory_id}")
-                
-                # Try direct DynamoDB query to avoid any method parameter issues
-                try:
-                    dynamodb = boto3.resource('dynamodb')
-                    assets_table = dynamodb.Table(os.environ.get('ASSETS_TABLE_NAME'))
-                    response = assets_table.get_item(Key={"InventoryID": clean_inventory_id})
-                    exists = "Item" in response
-                    logger.info(f"Direct DynamoDB query for InventoryID={clean_inventory_id}: {exists}")
-                except Exception as direct_query_error:
-                    logger.error(f"Direct DynamoDB query failed: {str(direct_query_error)}")
-                    # Fall back to the method
-                    exists = AssetProcessor.check_asset_exists(inventory_id=clean_inventory_id)
-                    logger.info(f"Asset check result for inventory_id {clean_inventory_id}: {exists}")
-                
-                if not exists:
-                    return obj
-            except Exception as inventory_error:
-                error_msg = f"Failed to check asset with inventoryId={clean_inventory_id}: {str(inventory_error)}"
-                logger.error(error_msg)
-                error_id = str(uuid.uuid4())
-                error_details = AssetProcessor.format_error(
-                    error_id,
-                    obj['key'],
-                    ErrorType.DYNAMO_QUERY_ERROR,
-                    error_msg,
-                    0,
-                    job_id,
-                    bucket_name
-                )
-                AssetProcessor.log_error(error_details)
-                # Continue to try with assetId if available
-        
-        # Then try with assetId if available (using AssetIDIndex)
-        if obj.get('assetId'):
-            # Strip any prefix like "asset:uuid:" or "asset:img:" from the assetId
-            clean_asset_id = obj['assetId'].split(':')[-1] if ':' in obj['assetId'] else obj['assetId']
-            logger.info(f"Checking asset existence with clean assetId: {clean_asset_id}, original: {obj['assetId']}")
-            try:
-                # Try direct DynamoDB query using the secondary index
-                try:
-                    dynamodb = boto3.resource('dynamodb')
-                    assets_table = dynamodb.Table(os.environ.get('ASSETS_TABLE_NAME'))
-                    response = assets_table.query(
-                        IndexName="AssetIDIndex",
-                        KeyConditionExpression="DigitalSourceAsset.ID = :assetId",
-                        ExpressionAttributeValues={":assetId": clean_asset_id}
-                    )
-                    exists = len(response.get("Items", [])) > 0
-                    logger.info(f"Direct DynamoDB query for AssetIDIndex with DigitalSourceAsset.ID={clean_asset_id}: {exists}")
-                except Exception as direct_query_error:
-                    error_msg = f"Direct DynamoDB query failed: {str(direct_query_error)}"
-                    logger.error(error_msg)
-                    # Fall back to the method
-                    exists = AssetProcessor.check_asset_exists(asset_id=clean_asset_id)
-                    logger.info(f"Asset check result for asset_id {clean_asset_id}: {exists}")
-                
-                if not exists:
-                    return obj
-            except Exception as asset_error:
-                error_msg = f"Failed to check asset with assetId={clean_asset_id}: {str(asset_error)}"
-                logger.error(error_msg)
-                error_id = str(uuid.uuid4())
-                error_details = AssetProcessor.format_error(
-                    error_id,
-                    obj['key'],
-                    ErrorType.DYNAMO_QUERY_ERROR,
-                    error_msg,
-                    0,
-                    job_id,
-                    bucket_name
-                )
-                AssetProcessor.log_error(error_details)
-                # Return the object for processing if we can't determine its status
-                return obj
-        
-        # If no identifiers are available, process the object
-        if not obj.get('assetId') and not obj.get('inventoryId'):
-            logger.info(f"Object has no assetId or inventoryId, will be processed: {obj['key']}")
-            return obj
-            
-        # If we got here, the asset exists in the database
-        return None
-            
-    except Exception as e:
-        error_id = str(uuid.uuid4())
-        error_msg = f"Error checking object {obj.get('key', 'unknown')}: {str(e)}"
-        logger.error(error_msg)
-        error_details = AssetProcessor.format_error(
-            error_id,
-            obj['key'],
-            ErrorType.DYNAMO_QUERY_ERROR,
-            error_msg,
-            0,
-            job_id,
-            bucket_name
-        )
-        AssetProcessor.log_error(error_details)
-        # Raise the exception to fail the Lambda and make it visible in Step Functions
-        raise Exception(f"Object status check failed for {obj.get('key', 'unknown')}: {str(e)}")
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.data_classes import SQSEvent
+from aws_lambda_powertools.utilities.batch import BatchProcessor, EventType
 
-def lambda_handler(event, context):
-    try:
-        # Validate required input parameters
-        if not event.get('jobId'):
-            raise ValueError("Missing required parameter: jobId")
-        if not event.get('bucketName'):
-            raise ValueError("Missing required parameter: bucketName")
-        if not event.get('scanResult') or not event.get('scanResult', {}).get('objects'):
-            raise ValueError("Missing required parameter: scanResult.objects")
-            
-        job_id = event['jobId']
-        bucket_name = event['bucketName']
-        scan_result = event['scanResult']
-        objects = scan_result['objects']
+# Import common utilities
+import sys
+sys.path.append('/opt/python')
+from common import (
+    AssetProcessor, JobStatus, PartitionStatus, ErrorType, logger, tracer, metrics,
+    get_optimized_client, get_optimized_s3_client, MAX_THREADS, DecimalEncoder
+)
+
+# Initialize batch processor
+processor = BatchProcessor(event_type=EventType.SQS)
+
+@tracer.capture_method
+def load_scan_results(result_key: str) -> List[Dict[str, Any]]:
+    """
+    Load scan results from S3
+    
+    Args:
+        result_key: S3 object key with scan results
         
-        # Update job status
-        AssetProcessor.update_job_status(
-            job_id, 
-            JobStatus.PROCESSING, 
-            f"Checking {len(objects)} objects against assets table"
+    Returns:
+        List of scanned objects
+    """
+    s3 = get_optimized_client('s3')
+    result_bucket = os.environ.get('RESULTS_BUCKET_NAME')
+    
+    # Load results from S3
+    response = s3.get_object(
+        Bucket=result_bucket,
+        Key=result_key
+    )
+    
+    # Parse JSON response
+    return json.loads(response['Body'].read().decode('utf-8'))
+
+@tracer.capture_method
+def save_query_results(
+    job_id: str,
+    partition_id: str,
+    objects: List[Dict[str, Any]],
+    page_number: int = 1
+) -> str:
+    """
+    Save query results to S3
+    
+    Args:
+        job_id: Job ID
+        partition_id: Partition ID
+        objects: List of objects to process
+        page_number: Page number
+        
+    Returns:
+        S3 object key where results are stored
+    """
+    # If no objects to process, return empty key
+    if not objects:
+        return ""
+    
+    s3 = get_optimized_client('s3')
+    result_bucket = os.environ.get('RESULTS_BUCKET_NAME')
+    
+    # Create chunked results (100 objects per chunk)
+    chunks = [objects[i:i+100] for i in range(0, len(objects), 100)]
+    result_keys = []
+    
+    # Save each chunk to S3
+    for i, chunk in enumerate(chunks):
+        # Create S3 key for chunk
+        chunk_key = f"job-results/{job_id}/to-process/{partition_id}/page-{page_number}-chunk-{i+1}.json"
+        
+        # Save chunk to S3
+        s3.put_object(
+            Bucket=result_bucket,
+            Key=chunk_key,
+            Body=json.dumps(chunk, cls=DecimalEncoder),
+            ContentType="application/json"
         )
         
-        logger.info(f"Checking {len(objects)} objects for job {job_id}")
-        
-        # Use ThreadPoolExecutor for parallel processing
-        objects_to_process = []
-        error_count = 0
-        errors = []
-        
-        with ThreadPoolExecutor(max_workers=min(32, len(objects))) as executor:
-            futures = [executor.submit(check_object_status, obj, job_id, bucket_name) for obj in objects]
-            for future in futures:
-                try:
-                    result = future.result()
-                    if result:
-                        objects_to_process.append(result)
-                except Exception as e:
-                    error_count += 1
-                    error_msg = f"Error checking object status: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
-        
-        # If we encountered errors, fail the Lambda
-        if error_count > 0:
-            AssetProcessor.increment_job_counter(job_id, 'errors', error_count)
-            error_summary = f"Encountered {error_count} errors during object status check"
-            AssetProcessor.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_summary
-            )
-            raise Exception(f"{error_summary}: {'; '.join(errors[:5])}{'...' if len(errors) > 5 else ''}")
-        
-        # Update job statistics
-        AssetProcessor.increment_job_counter(job_id, 'objectsToProcess', len(objects_to_process))
-        
-        logger.info(f"Found {len(objects_to_process)} objects requiring processing for job {job_id}")
-        
-        return {
-            'objectsToProcess': objects_to_process,
-            'processCount': len(objects_to_process)
+        result_keys.append({
+            'key': chunk_key,
+            'count': len(chunk)
+        })
+    
+    # Create S3 key for chunk manifest
+    manifest_key = f"job-results/{job_id}/to-process/{partition_id}/page-{page_number}-manifest.json"
+    
+    # Save manifest to S3
+    s3.put_object(
+        Bucket=result_bucket,
+        Key=manifest_key,
+        Body=json.dumps({
+            'chunks': result_keys,
+            'totalObjects': len(objects)
+        }, cls=DecimalEncoder),
+        ContentType="application/json"
+    )
+    
+    return manifest_key
+
+@tracer.capture_method
+def send_to_processing_queue(
+    job_id: str,
+    bucket_name: str,
+    partition_id: str,
+    manifest_key: str,
+    total_objects: int
+) -> None:
+    """
+    Send query results to processing queue
+    
+    Args:
+        job_id: Job ID
+        bucket_name: S3 bucket name
+        partition_id: Partition ID
+        manifest_key: S3 object key with chunk manifest
+        total_objects: Total number of objects to process
+    """
+    sqs = get_optimized_client('sqs')
+    
+    # Create message body
+    message_body = {
+        'jobId': job_id,
+        'bucketName': bucket_name,
+        'partitionId': partition_id,
+        'operation': 'PROCESS_OBJECTS',
+        'manifestKey': manifest_key,
+        'objectsCount': total_objects,
+        'manifestType': 'CHUNKED'
+    }
+    
+    # Create message attributes
+    message_attributes = {
+        'jobId': {
+            'DataType': 'String',
+            'StringValue': job_id
+        },
+        'partitionId': {
+            'DataType': 'String',
+            'StringValue': partition_id
+        },
+        'operation': {
+            'DataType': 'String',
+            'StringValue': 'PROCESS_OBJECTS'
         }
+    }
+    
+    # Create message group ID for FIFO queue
+    # This ensures ordering for each partition
+    message_group_id = f"job-{job_id}-partition-{partition_id}"
+    
+    # Create message deduplication ID
+    message_deduplication_id = f"{job_id}-{partition_id}-{manifest_key.split('/')[-1]}"
+    
+    # Send message to processing queue
+    sqs.send_message(
+        QueueUrl=os.environ.get('PROCESSING_QUEUE_URL'),
+        MessageBody=json.dumps(message_body),
+        MessageAttributes=message_attributes,
+        MessageGroupId=message_group_id,
+        MessageDeduplicationId=message_deduplication_id
+    )
+    
+    logger.info(f"Sent {total_objects} objects to processing queue for job {job_id}, partition {partition_id}")
+
+@tracer.capture_method
+def filter_objects_to_process(objects: List[Dict[str, Any]], job_id: str, bucket_name: str) -> List[Dict[str, Any]]:
+    """
+    Filter objects that need processing
+    
+    Args:
+        objects: List of scanned objects
+        job_id: Job ID
+        bucket_name: S3 bucket name
+        
+    Returns:
+        List of objects that need processing
+    """
+    # Extract IDs for batch checking
+    asset_ids = [obj['assetId'] for obj in objects if obj.get('assetId')]
+    inventory_ids = [obj['inventoryId'] for obj in objects if obj.get('inventoryId')]
+    
+    # Batch check existence
+    existing = AssetProcessor.batch_check_asset_exists(asset_ids, inventory_ids)
+    existing_asset_ids = existing['asset_ids']
+    existing_inventory_ids = existing['inventory_ids']
+    
+    # Filter objects that need processing
+    objects_to_process = []
+    
+    for obj in objects:
+        # Object needs processing if:
+        # 1. It has an AssetID that doesn't exist in the asset table
+        # 2. It has an InventoryID that doesn't exist in the asset table
+        # 3. It has neither AssetID nor InventoryID
+        asset_id = obj.get('assetId')
+        inventory_id = obj.get('inventoryId')
+        
+        if (asset_id and asset_id not in existing_asset_ids) or \
+           (inventory_id and inventory_id not in existing_inventory_ids) or \
+           (not asset_id and not inventory_id):
+            objects_to_process.append(obj)
+    
+    return objects_to_process
+
+@tracer.capture_method
+def process_record(record: Dict[str, Any]) -> None:
+    """
+    Process a single SQS record
+    
+    Args:
+        record: SQS record
+    """
+    # Parse message body
+    body = json.loads(record['body'])
+    job_id = body.get('jobId')
+    bucket_name = body.get('bucketName')
+    partition_id = body.get('partitionId')
+    operation = body.get('operation')
+    
+    # Only process QUERY_OBJECTS operations
+    if operation != 'QUERY_OBJECTS':
+        logger.warning(f"Skipping non-query operation: {operation}")
+        return
+    
+    # Get scan results
+    result_key = body.get('resultKey')
+    page_number = body.get('pageNumber', 1)
+    objects_count = body.get('objectsCount', 0)
+    
+    # Update partition status
+    AssetProcessor.update_partition_status(
+        job_id,
+        partition_id,
+        PartitionStatus.PROCESSING,
+        f"Querying {objects_count} objects from page {page_number}"
+    )
+    
+    try:
+        # Load scan results
+        scanned_objects = load_scan_results(result_key)
+        
+        # Filter objects that need processing
+        objects_to_process = filter_objects_to_process(scanned_objects, job_id, bucket_name)
+        
+        # Update partition stats
+        AssetProcessor.increment_partition_counter(
+            job_id, partition_id, 'objectsToProcess', len(objects_to_process)
+        )
+        
+        # Update job stats
+        AssetProcessor.increment_job_counter(
+            job_id, 'totalObjectsToProcess', len(objects_to_process)
+        )
+        
+        # If no objects to process, we're done
+        if not objects_to_process:
+            logger.info(f"No objects to process for job {job_id}, partition {partition_id}, page {page_number}")
+            return
+        
+        # Save query results
+        manifest_key = save_query_results(job_id, partition_id, objects_to_process, page_number)
+        
+        # Send to processing queue
+        send_to_processing_queue(
+            job_id=job_id,
+            bucket_name=bucket_name,
+            partition_id=partition_id,
+            manifest_key=manifest_key,
+            total_objects=len(objects_to_process)
+        )
+        
+        # Record metrics
+        metrics.add_metric(name="ObjectsToProcess", unit=MetricUnit.Count, value=len(objects_to_process))
+        
+        logger.info(f"Found {len(objects_to_process)} objects to process for job {job_id}, partition {partition_id}, page {page_number}")
+        
     except Exception as e:
         error_id = str(uuid.uuid4())
-        error_msg = f"Query lambda failed: {str(e)}"
-        logger.error(error_msg)
-        error_details = AssetProcessor.format_error(
-            error_id,
-            "N/A",
-            ErrorType.DYNAMO_QUERY_ERROR,
-            error_msg,
-            0,
-            event.get('jobId', 'unknown'),
-            event.get('bucketName', 'unknown')
-        )
-        AssetProcessor.log_error(error_details)
-        
-        # Update job status to reflect error
-        AssetProcessor.update_job_status(
-            event.get('jobId', 'unknown'),
-            JobStatus.FAILED,
-            f"Failed to query assets: {str(e)}"
+        AssetProcessor.log_error(
+            AssetProcessor.format_error(
+                error_id=error_id,
+                object_key=f"partition-{partition_id}-page-{page_number}",
+                error_type=ErrorType.DYNAMO_QUERY_ERROR,
+                error_message=str(e),
+                retry_count=0,
+                job_id=job_id,
+                bucket_name=bucket_name
+            )
         )
         
-        # Re-raise the exception to fail the Lambda and make it visible in Step Functions
+        # Record error metrics
+        metrics.add_metric(name="QueryErrors", unit=MetricUnit.Count, value=1)
+        
+        # Re-raise to trigger SQS retry mechanism
         raise
+
+@metrics.log_metrics
+@tracer.capture_lambda_handler
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
+    """
+    Lambda handler for query
+    
+    Args:
+        event: SQS event
+        context: Lambda context
+        
+    Returns:
+        Dict with processing results
+    """
+    # Log the entire event to diagnose the issue
+    logger.info(f"Received event: {json.dumps(event, default=str)}")
+    
+    # Parse SQS event
+    batch_item_failures = []
+    
+    try:
+        # Check if 'Records' exists in the event
+        if 'Records' not in event:
+            logger.error(f"Event does not contain 'Records' key. Event structure: {json.dumps(event, default=str)}")
+            return {"batchItemFailures": []}
+            
+        # Process each record with the batch processor
+        with processor(records=event['Records'], handler=process_record) as processed:
+            batch_item_failures = processed.partial_response
+            
+    except Exception as e:
+        logger.exception(f"Error in batch processing: {str(e)}")
+        # Add all records as failures if Records exists
+        if 'Records' in event:
+            batch_item_failures = [{"itemIdentifier": record["messageId"]} for record in event['Records']]
+        else:
+            logger.error("Cannot create batch_item_failures: 'Records' key missing from event")
+            batch_item_failures = []
+        
+    # Return failures if any
+    return {"batchItemFailures": batch_item_failures}

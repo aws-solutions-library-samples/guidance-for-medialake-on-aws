@@ -6,13 +6,12 @@ from aws_cdk import (
 from constructs import Construct
 from typing import Optional, Dict, List
 from dataclasses import dataclass
-from aws_lambda_powertools import Logger
 
-# Import your CDK configuration to check the environment
+# Import the CDK logger instead of aws_lambda_powertools
+from cdk_logger import get_logger
 from config import config
 
-logger = Logger()
-
+logger = get_logger("VPC")
 
 @dataclass
 class CustomVpcProps:
@@ -26,8 +25,11 @@ class CustomVpc(Construct):
         super().__init__(scope, id)
         self.props = props
 
+        logger.debug(f"Initializing CustomVpc with id: {id}")
+
         if self.props.use_existing_vpc:
             if not self.props.existing_vpc:
+                logger.error("Existing VPC configuration is missing")
                 raise ValueError("Existing VPC configuration is missing")
 
             vpc_id = self.props.existing_vpc.vpc_id
@@ -37,9 +39,9 @@ class CustomVpc(Construct):
             # Determine the number of AZs based on the number of public subnets
             num_azs = len(subnet_ids.get("public", []))
             logger.info(f"Using existing VPC: {vpc_id}")
-            logger.info(f"Public subnets: {subnet_ids.get('public', [])[:num_azs]}")
-            logger.info(f"Private subnets: {subnet_ids.get('private', [])[:num_azs]}")
-            logger.info(f"CIDR: {vpc_cidr}")
+            logger.debug(f"Public subnets: {subnet_ids.get('public', [])[:num_azs]}")
+            logger.debug(f"Private subnets: {subnet_ids.get('private', [])[:num_azs]}")
+            logger.debug(f"CIDR: {vpc_cidr}")
 
             self.vpc = ec2.Vpc.from_vpc_attributes(
                 self,
@@ -50,8 +52,10 @@ class CustomVpc(Construct):
                 public_subnet_ids=subnet_ids.get("public", []),
                 vpc_cidr_block=vpc_cidr,
             )
+            logger.info(f"Successfully initialized existing VPC with ID: {vpc_id}")
         else:
             if not self.props.new_vpc:
+                logger.error("New VPC configuration is missing")
                 raise ValueError("New VPC configuration is missing")
 
             new_vpc_config = self.props.new_vpc
@@ -68,6 +72,10 @@ class CustomVpc(Construct):
                 ),
             ]
 
+            logger.info(f"Creating new VPC: {new_vpc_config.vpc_name}")
+            logger.debug(f"VPC CIDR: {new_vpc_config.cidr}")
+            logger.debug(f"Max AZs: {new_vpc_config.max_azs}")
+
             self.vpc = ec2.Vpc(
                 self,
                 "CustomVPC",
@@ -83,9 +91,11 @@ class CustomVpc(Construct):
                     "DynamoDB": {"service": ec2.GatewayVpcEndpointAwsService.DYNAMODB},
                 },
             )
+            logger.info(f"Successfully created new VPC: {self.vpc.vpc_id}")
 
             # If the environment is prod, apply a retention policy to the VPC.
             if config.environment == "prod":
+                logger.info("Production environment detected - applying RETAIN removal policy")
                 self.vpc.apply_removal_policy(RemovalPolicy.RETAIN)
                 for subnet in self.vpc.public_subnets + self.vpc.private_subnets:
                     subnet.apply_removal_policy(RemovalPolicy.RETAIN)
@@ -93,6 +103,7 @@ class CustomVpc(Construct):
         self.vpc_id = self.vpc.vpc_id
 
         # Create a CloudWatch Log Group for Flow Logs
+        logger.info("Creating VPC Flow Logs")
         flow_log_group = logs.LogGroup(
             self,
             "VpcFlowLogGroup",
@@ -109,47 +120,60 @@ class CustomVpc(Construct):
             traffic_type=ec2.FlowLogTrafficType.ALL,
             destination=ec2.FlowLogDestination.to_cloud_watch_logs(flow_log_group),
         )
+        logger.info("VPC Flow Logs successfully configured")
 
     def get_subnet_ids(self, subnet_type: ec2.SubnetType) -> List[Dict[str, str]]:
         """Get subnet IDs and their availability zones for a specific subnet type"""
+        logger.debug(f"Getting subnet IDs for subnet type: {subnet_type}")
         try:
             if self.props.use_existing_vpc:
                 subnet_ids = self.props.existing_vpc["subnet_ids"]
                 if subnet_type == ec2.SubnetType.PRIVATE_WITH_EGRESS:
-                    return [
+                    subnets = [
                         {"subnet_id": subnet_id, "az": "unknown"}
                         for subnet_id in subnet_ids["private"]
                     ]
+                    logger.debug(f"Found {len(subnets)} private subnets in existing VPC")
+                    return subnets
                 elif subnet_type == ec2.SubnetType.PUBLIC:
-                    return [
+                    subnets = [
                         {"subnet_id": subnet_id, "az": "unknown"}
                         for subnet_id in subnet_ids["public"]
                     ]
+                    logger.debug(f"Found {len(subnets)} public subnets in existing VPC")
+                    return subnets
             else:
                 if isinstance(self.vpc, ec2.Vpc):
                     subnets = self.vpc.select_subnets(subnet_type=subnet_type).subnets
-                    return [
+                    result = [
                         {"subnet_id": subnet.subnet_id, "az": subnet.availability_zone}
                         for subnet in subnets
                     ]
+                    logger.debug(f"Found {len(result)} subnets of type {subnet_type} in new VPC")
+                    return result
                 elif isinstance(self.vpc, ec2.IVpc):
                     if subnet_type == ec2.SubnetType.PRIVATE_WITH_EGRESS:
-                        return [
+                        result = [
                             {
                                 "subnet_id": subnet.subnet_id,
                                 "az": subnet.availability_zone,
                             }
                             for subnet in self.vpc.private_subnets
                         ]
+                        logger.debug(f"Found {len(result)} private subnets in VPC")
+                        return result
                     elif subnet_type == ec2.SubnetType.PUBLIC:
-                        return [
+                        result = [
                             {
                                 "subnet_id": subnet.subnet_id,
                                 "az": subnet.availability_zone,
                             }
                             for subnet in self.vpc.public_subnets
                         ]
+                        logger.debug(f"Found {len(result)} public subnets in VPC")
+                        return result
+            logger.warning(f"No subnets found for subnet type: {subnet_type}")
             return []
         except Exception as e:
-            print(f"Error getting subnet IDs: {e}")
+            logger.error(f"Error getting subnet IDs: {str(e)}")
             return []

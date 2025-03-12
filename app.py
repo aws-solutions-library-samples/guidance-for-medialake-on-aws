@@ -2,7 +2,9 @@
 """
 This module serves as the entry point for the MediaLake CDK application.
 """
+import os
 import aws_cdk as cdk
+from cdk_logger import CDKLogger, get_logger
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from config import config
 
@@ -20,6 +22,14 @@ from medialake_stacks.pipeline_nodes_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
+
+# Initialize global logger configuration
+if hasattr(config, 'logging') and hasattr(config.logging, 'level'):
+    CDKLogger.set_level(config.logging.level)
+
+# Create application-level logger
+logger = get_logger("CDKApp")
+logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.level}")
 
 app = cdk.App()
 
@@ -94,8 +104,6 @@ api_gateway_stack = ApiGatewayStack(
     ),
     env=env,
 )
-
-
 
 # Add Lambda warming to API Gateway functions if enabled
 if lambda_warmer:

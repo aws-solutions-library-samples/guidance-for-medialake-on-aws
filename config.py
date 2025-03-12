@@ -44,11 +44,20 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
     return instance_type
 
 class LoggingConfig(BaseModel):
+    level: str = "INFO"
     retention_days: int = 90
     s3_retention_days: int = 90
     cloudwatch_retention_days: int = 90
     waf_retention_days: int = 90
     api_gateway_retention_days: int = 90
+
+    @field_validator("level")
+    @classmethod
+    def validate_level(cls, v):
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in valid_levels:
+            raise ValueError(f"Log level must be one of {valid_levels}")
+        return v.upper()
 
     @property
     def cloudwatch_retention(self) -> logs.RetentionDays:
@@ -121,6 +130,7 @@ class OpenSearchClusterSettings(BaseModel):
         return validate_opensearch_instance_type(v)
 
     @root_validator(pre=True)
+    @classmethod
     def validate_master_node_count(cls, values):
         multi_az = values.get("multi_az_with_standby_enabled", False)
         master_count = values.get("master_node_count", 2)
@@ -155,6 +165,7 @@ class IdentityProviderConfig(BaseModel):
     identity_provider_arn: Optional[str] = None
 
     @validator("identity_provider_method")
+    @classmethod
     def validate_provider_method(cls, v):
         if v not in ["cognito", "saml"]:
             raise ValueError(
@@ -163,6 +174,7 @@ class IdentityProviderConfig(BaseModel):
         return v
 
     @validator("identity_provider_name", "identity_provider_metadata_url")
+    @classmethod
     def validate_saml_fields(cls, v, values):
         if values.get("identity_provider_method") == "saml" and not v:
             raise ValueError(
@@ -177,6 +189,7 @@ class AuthConfig(BaseModel):
     ]
 
     @validator("identity_providers")
+    @classmethod
     def validate_providers(cls, v):
         if not v:
             raise ValueError("At least one identity provider must be configured")
