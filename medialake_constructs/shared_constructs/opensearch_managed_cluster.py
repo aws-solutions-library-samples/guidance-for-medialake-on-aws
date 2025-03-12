@@ -299,7 +299,7 @@ class OpenSearchCluster(Construct):
             # Create Lambda function for index creation
             create_index_lambda = Lambda(
                 self,
-                "IndexCreationFunction",
+                "MediaLakeIndexCreationFunction",
                 config=LambdaConfig(
                     entry="lambdas/back_end/create_oss_index",
                     lambda_handler="handler",

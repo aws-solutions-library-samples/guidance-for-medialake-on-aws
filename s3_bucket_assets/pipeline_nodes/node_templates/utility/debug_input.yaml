@@ -1,0 +1,33 @@
+spec: v1.0.0
+node:
+  id: debug_input
+  title: Input Debugger
+  description: Debug and log input data
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/DebugInputLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+actions:
+  debug:
+    summary: Debug Input
+    description: Log and return input data for debugging purposes
+    operationId: debugInput
+    x-requestMapping: utility/debug_input/debug/
+    x-responseMapping: utility/debug_input/debug/
+    connections:
+      incoming:
+        type: [video, image, audio, document, any]
+      outgoing:
+        type: [debug_output]

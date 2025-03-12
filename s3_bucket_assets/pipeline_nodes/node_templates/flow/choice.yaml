@@ -42,4 +42,8 @@ actions:
       incoming:
         type: [any]
       outgoing:
-        type: [any]
+        types:
+          - name: Completed
+            description: Path taken when condition evaluates to true
+          - name: In Progress
+            description: Path taken when condition evaluates to false

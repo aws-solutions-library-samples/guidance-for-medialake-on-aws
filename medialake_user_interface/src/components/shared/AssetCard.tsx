@@ -1,9 +1,8 @@
 import React from 'react';
-import { Box, Typography, IconButton, TextField, Button } from '@mui/material';
+import { Box, Typography, IconButton, TextField, Button, CircularProgress } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
-// import VideoViewer from '../common/VideoViewer';
 
 export interface AssetField {
     id: string;
@@ -18,6 +17,7 @@ export interface AssetCardProps {
     proxyUrl?: string;
     assetType?: string;
     fields: AssetField[];
+    isRenaming?: boolean;
     renderField: (fieldId: string) => string | React.ReactNode;
     onAssetClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
@@ -49,6 +49,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onEditClick,
     placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     onImageError,
+    isRenaming = false,
     isEditing,
     editedName,
     onEditNameChange,
@@ -58,21 +59,29 @@ const AssetCard: React.FC<AssetCardProps> = ({
     thumbnailScale = 'fill',
     showMetadata = true,
 }) => {
+ 
+    const [selectionRange, setSelectionRange] = React.useState<[number, number] | null>(null);
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+    // Determine the card dimensions based on props
     const getCardDimensions = () => {
-        const baseHeight = aspectRatio === 'vertical' ? 300 :
-                          aspectRatio === 'square' ? 200 :
-                          aspectRatio === 'horizontal' ? 150 : 200;
-        
-        const sizeMultiplier = cardSize === 'small' ? 0.8 :
-                              cardSize === 'large' ? 1.2 : 1;
-        
+        const baseHeight = aspectRatio === 'vertical' ? 300
+            : aspectRatio === 'square' ? 200
+            : aspectRatio === 'horizontal' ? 150
+            : 200;
+
+        const sizeMultiplier = cardSize === 'small' ? 0.8
+            : cardSize === 'large' ? 1.2
+            : 1;
+
         return {
             height: baseHeight * sizeMultiplier,
-            width: '100%'
+            width: '100%',
         };
     };
-
     const dimensions = getCardDimensions();
+
+    // Fallback image error
     const defaultImageErrorHandler = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
         event.currentTarget.src = placeholderImage;
     };
@@ -87,14 +96,41 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onMenuClick(event);
     };
 
+console.log("isRenaming",isRenaming)
+    React.useEffect(() => {
+        if (isEditing && inputRef.current) {
+            // Move caret to the beginning of the string
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(0, 0);
+            setSelectionRange([0, 0]);
+        }
+    }, [isEditing]);
+
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Remember where the user was typing
+        const start = e.target.selectionStart ?? 0;
+        const end = e.target.selectionEnd ?? start;
+        onEditNameChange?.(e);
+        setSelectionRange([start, end]);
+    };
+
+
+    React.useEffect(() => {
+        if (isEditing && inputRef.current && selectionRange) {
+            // After the new value is in place, reset selection
+            inputRef.current.setSelectionRange(selectionRange[0], selectionRange[1]);
+        }
+    }, [isEditing, editedName, selectionRange]);
+
     return (
         <Box
             sx={{
                 position: 'relative',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
-                    transform: 'translateY(-4px)'
-                }
+                    transform: 'translateY(-4px)',
+                },
             }}
         >
             <Box
@@ -105,10 +141,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     '&:hover': {
                         boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                    }
+                    },
                 }}
             >
-
+                {/* Image or Video */}
                 {assetType === 'Video' ? (
                     <video
                         onClick={(event) => {
@@ -119,11 +155,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             width: dimensions.width,
                             height: dimensions.height,
                             backgroundColor: 'rgba(0,0,0,0.03)',
-                            objectFit: 'cover'
+                            objectFit: 'cover',
                         }}
                         controls
                         src={proxyUrl}
-                    ></video>
+                    />
                 ) : (
                     <Box
                         onClick={onAssetClick}
@@ -138,119 +174,123 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             height: dimensions.height,
                             backgroundColor: 'rgba(0,0,0,0.03)',
                             objectFit: thumbnailScale === 'fit' ? 'contain' : 'cover',
-                            transition: 'all 0.2s ease-in-out'
+                            transition: 'all 0.2s ease-in-out',
                         }}
                     />
                 )}
 
-                {/* Non-clickable text content area */}
+                {/* Metadata (non-clickable) */}
                 {showMetadata ? (
                     <Box sx={{ p: 2 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {fields.map(field => field.visible && (
-                                <Box key={field.id}>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                    >
-                                        {field.label}:
-                                    </Typography>
-                                    {field.id === 'name' && onEditClick ? (
-                                        isEditing ? (
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                <TextField
-                                                    value={editedName}
-                                                    onChange={onEditNameChange}
-                                                    onKeyPress={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            onEditNameComplete?.(true);
-                                                        } else if (e.key === 'Escape') {
-                                                            onEditNameComplete?.(false);
-                                                        }
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    autoFocus
-                                                    size="small"
-                                                    fullWidth
-                                                />
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                    <Button
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onEditNameComplete?.(true);
-                                                        }}
-                                                        variant="contained"
-                                                    >
-                                                        Save
-                                                    </Button>
-                                                    <Button
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onEditNameComplete?.(false);
-                                                        }}
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                </Box>
-                                            </Box>
-                                        ) : (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Typography
-                                                    sx={{
-                                                        wordBreak: "break-word",
-                                                        userSelect: "text" // Allow text selection
-                                                    }}
-                                                    display="inline"
-                                                    variant="body2"
-                                                >
-                                                    {renderField(field.id)}
-                                                </Typography>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditClick(e);
-                                                    }}
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </Box>
-                                        )
-                                    ) : (
-                                        <Typography
-                                            variant="body2"
-                                            sx={{ userSelect: "text" }} // Allow text selection
-                                        >
-                                            {renderField(field.id)}
+                            {fields.map((field) =>
+                                field.visible && (
+                                    <Box key={field.id}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {field.label}:
                                         </Typography>
-                                    )}
-                                </Box>
-                            ))}
-                            <Box sx={{
-                                display: 'flex',
-                                justifyContent: 'flex-end',
-                                gap: 1,
-                                mt: 1
-                            }}>
-                                <IconButton
-                                    size="small"
-                                    onClick={handleDeleteClick}
-                                >
+                                        {field.id === 'name' && onEditClick ? (
+                                            isEditing ? (
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                    <TextField
+                                                        inputRef={inputRef}
+                                                        value={editedName}
+                                                        disabled={isRenaming}
+                                                        onChange={handleInputChange}
+                                                        onKeyPress={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                onEditNameComplete?.(true);
+                                                            } else if (e.key === 'Escape') {
+                                                                onEditNameComplete?.(false);
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        autoFocus
+                                                        size="small"
+                                                        fullWidth
+                                                        InputProps={{
+                                                            endAdornment: isRenaming && (
+                                                              <CircularProgress size={16} />
+                                                            )
+                                                          }}
+                                                    />
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <Button
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditNameComplete?.(true);
+                                                            }}
+                                                            variant="contained"
+                                                            disabled={isRenaming}
+                                                        >
+                                                            Save
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            disabled={isRenaming}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditNameComplete?.(false);
+                                                            }}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </Box>
+                                                </Box>
+                                            ) : (
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Typography
+                                                        sx={{
+                                                            wordBreak: 'break-word',
+                                                            userSelect: 'text', // Allow text selection
+                                                        }}
+                                                        display="inline"
+                                                        variant="body2"
+                                                    >
+                                                        {renderField(field.id)}
+                                                    </Typography>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEditClick(e);
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Box>
+                                            )
+                                        ) : (
+                                            <Typography variant="body2" sx={{ userSelect: 'text' }}>
+                                                {renderField(field.id)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )
+                            )}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    gap: 1,
+                                    mt: 1,
+                                }}
+                            >
+                                <IconButton size="small" onClick={handleDeleteClick}>
                                     <DeleteIcon fontSize="small" />
                                 </IconButton>
-                                <IconButton
-                                    size="small"
-                                    onClick={handleMenuClick}
-                                >
+                                <IconButton size="small" onClick={handleMenuClick}>
                                     <MoreVertIcon fontSize="small" />
                                 </IconButton>
                             </Box>
                         </Box>
                     </Box>
                 ) : (
-                    <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+                    // If showMetadata = false, place action buttons as overlay
+                    <Box
+                        sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}
+                    >
                         <IconButton
                             size="small"
                             onClick={handleDeleteClick}

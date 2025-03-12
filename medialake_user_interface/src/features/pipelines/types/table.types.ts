@@ -31,9 +31,11 @@ export interface TableActions {
     handleEdit: (id: string) => void;
     openDeleteDialog: (id: string, name: string) => void;
     closeDeleteDialog: () => void;
+    handleDirectDelete?: (id: string, name: string) => void;
+    handleDeleteConfirm?: () => void;
     handleColumnMenuOpen: (event: React.MouseEvent<HTMLElement>) => void;
     handleColumnMenuClose: () => void;
     handleFilterMenuOpen: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     handleFilterMenuClose: () => void;
     setDeleteDialogInput: (input: string) => void;
-} 
+}

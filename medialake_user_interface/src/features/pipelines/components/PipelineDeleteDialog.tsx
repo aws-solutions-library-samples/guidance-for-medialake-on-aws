@@ -20,7 +20,7 @@ interface PipelineDeleteDialogProps {
     isDeleting: boolean;
 }
 
-export const PipelineDeleteDialog: React.FC<PipelineDeleteDialogProps> = ({
+export const PipelineDeleteDialog: React.FC<PipelineDeleteDialogProps> = React.memo(({
     open,
     pipelineName,
     userInput,
@@ -65,4 +65,4 @@ export const PipelineDeleteDialog: React.FC<PipelineDeleteDialogProps> = ({
             </DialogActions>
         </Dialog>
     );
-};
+});

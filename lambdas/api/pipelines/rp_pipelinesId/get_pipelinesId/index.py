@@ -6,7 +6,7 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.utilities.validation import validate_request_parameters
+
 import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel
@@ -62,7 +62,7 @@ def get_pipeline(pipeline_id: str):
             ).dict()
 
         # Query DynamoDB
-        response = table.get_item(Key={"pipeline_id": pipeline_id})
+        response = table.get_item(Key={"id": pipeline_id})
 
         # Check if item exists
         if "Item" not in response:

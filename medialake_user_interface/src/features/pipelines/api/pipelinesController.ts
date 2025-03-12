@@ -20,6 +20,11 @@ export const useGetPipelines = (
     return useQuery({
         queryKey: PIPELINES_QUERY_KEYS.list(),
         queryFn: () => PipelinesService.getPipelines(),
+        // Add optimizations to prevent unnecessary refetching
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
         ...options
     });
 };

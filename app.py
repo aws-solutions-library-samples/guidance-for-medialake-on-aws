@@ -22,6 +22,7 @@ from medialake_stacks.pipeline_nodes_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
+import os
 
 # Initialize global logger configuration
 if hasattr(config, 'logging') and hasattr(config.logging, 'level'):
@@ -34,7 +35,10 @@ logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.lev
 app = cdk.App()
 
 # Define environment once
-env = cdk.Environment(account=app.account, region=app.region)
+if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
+    env = cdk.Environment(account=os.environ["CDK_DEFAULT_ACCOUNT"], region=os.environ["CDK_DEFAULT_REGION"])
+else:
+    env = cdk.Environment(account=app.account, region=app.region)
 
 # Create Lambda warmer stack if enabled
 lambda_warmer = None

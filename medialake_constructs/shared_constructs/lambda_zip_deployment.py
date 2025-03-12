@@ -57,7 +57,7 @@ class LambdaZipDeployment(Construct):
         # Install dependencies and create zip if requirements.txt exists
         if os.path.exists(requirements_path):
             subprocess.run(
-                ["pip", "install", "-r", requirements_path, "-t", lambda_package_path],
+                ["pip", "install","--no-cache-dir", "-r", requirements_path, "-t", lambda_package_path],
                 check=True,
             )
 

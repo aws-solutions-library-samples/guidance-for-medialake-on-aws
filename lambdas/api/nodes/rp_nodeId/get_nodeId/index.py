@@ -109,7 +109,63 @@ def get_unconfigured_nodes():
                     }
                     for method in methods
                 ],
+                "connections": {"incoming": {}, "outgoing": {}},
             }
+
+            # Get connection data for this node
+            connection_params = {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :connection)",
+                "ExpressionAttributeValues": {
+                    ":pk": f"NODE#{node_id}",
+                    ":connection": "CONNECTION#",
+                },
+            }
+            logger.info(f"Querying connections with params: {connection_params}")
+
+            try:
+                connection_response = table.query(**connection_params)
+                connection_items = connection_response.get("Items", [])
+                logger.info(
+                    f"Found {len(connection_items)} connection items for node {node_id}"
+                )
+
+                for item in connection_items:
+                    # Extract connection type (INCOMING or OUTGOING)
+                    if "CONNECTION#INCOMING" in item["sk"]:
+                        connection_type = "incoming"
+                    elif "CONNECTION#OUTGOING" in item["sk"]:
+                        connection_type = "outgoing"
+                    else:
+                        continue
+
+                    # Extract method ID if present
+                    method_id = None
+                    if "#" in item["sk"].split("CONNECTION#")[1]:
+                        method_id = item["sk"].split("#")[-1]
+
+                    # Remove pk and sk from connection data
+                    connection_data = {
+                        k: v for k, v in item.items() if k not in ["pk", "sk"]
+                    }
+
+                    # Add connection data to the node
+                    if method_id:
+                        # Method-specific connection
+                        if method_id not in node_data["connections"][connection_type]:
+                            node_data["connections"][connection_type][method_id] = []
+                        node_data["connections"][connection_type][method_id].append(
+                            connection_data
+                        )
+                    else:
+                        # Node-level connection
+                        node_data["connections"][connection_type][
+                            "node"
+                        ] = connection_data
+            except Exception as e:
+                logger.error(
+                    f"Error getting connection data for node {node_id}: {str(e)}"
+                )
+
             logger.info(
                 f"Created node data: {json.dumps(node_data, cls=DecimalEncoder, default=str)}"
             )
@@ -176,7 +232,57 @@ def get_node_methods(node_id: str):
             }
             for method in methods_response.get("Items", [])
         ],
+        "connections": {"incoming": {}, "outgoing": {}},
     }
+
+    # Get connection data for this node
+    connection_params = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :connection)",
+        "ExpressionAttributeValues": {
+            ":pk": f"NODE#{node_id}",
+            ":connection": "CONNECTION#",
+        },
+    }
+    logger.info(f"Querying connections with params: {connection_params}")
+
+    try:
+        connection_response = table.query(**connection_params)
+        connection_items = connection_response.get("Items", [])
+        logger.info(
+            f"Found {len(connection_items)} connection items for node {node_id}"
+        )
+
+        for item in connection_items:
+            # Extract connection type (INCOMING or OUTGOING)
+            if "CONNECTION#INCOMING" in item["sk"]:
+                connection_type = "incoming"
+            elif "CONNECTION#OUTGOING" in item["sk"]:
+                connection_type = "outgoing"
+            else:
+                continue
+
+            # Extract method ID if present
+            method_id = None
+            if "#" in item["sk"].split("CONNECTION#")[1]:
+                method_id = item["sk"].split("#")[-1]
+
+            # Remove pk and sk from connection data
+            connection_data = {k: v for k, v in item.items() if k not in ["pk", "sk"]}
+
+            # Add connection data to the node
+            if method_id:
+                # Method-specific connection
+                if method_id not in node_data["connections"][connection_type]:
+                    node_data["connections"][connection_type][method_id] = []
+                node_data["connections"][connection_type][method_id].append(
+                    connection_data
+                )
+            else:
+                # Node-level connection
+                node_data["connections"][connection_type]["node"] = connection_data
+    except Exception as e:
+        logger.error(f"Error getting connection data for node {node_id}: {str(e)}")
+
     logger.info(
         f"Final node data: {json.dumps(node_data, cls=DecimalEncoder, default=str)}"
     )
@@ -225,6 +331,7 @@ def get_node_by_id(node_id: str):
             "inputTypes": node_info.get("inputTypes", []),
             "outputTypes": node_info.get("outputTypes", []),
         },
+        "connections": {"incoming": {}, "outgoing": {}},
     }
 
     # Add auth if available
@@ -245,6 +352,54 @@ def get_node_by_id(node_id: str):
         }
         for method in methods_response.get("Items", [])
     ]
+
+    # Get connection data for this node
+    connection_params = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :connection)",
+        "ExpressionAttributeValues": {
+            ":pk": f"NODE#{node_id}",
+            ":connection": "CONNECTION#",
+        },
+    }
+    logger.info(f"Querying connections with params: {connection_params}")
+
+    try:
+        connection_response = table.query(**connection_params)
+        connection_items = connection_response.get("Items", [])
+        logger.info(
+            f"Found {len(connection_items)} connection items for node {node_id}"
+        )
+
+        for item in connection_items:
+            # Extract connection type (INCOMING or OUTGOING)
+            if "CONNECTION#INCOMING" in item["sk"]:
+                connection_type = "incoming"
+            elif "CONNECTION#OUTGOING" in item["sk"]:
+                connection_type = "outgoing"
+            else:
+                continue
+
+            # Extract method ID if present
+            method_id = None
+            if "#" in item["sk"].split("CONNECTION#")[1]:
+                method_id = item["sk"].split("#")[-1]
+
+            # Remove pk and sk from connection data
+            connection_data = {k: v for k, v in item.items() if k not in ["pk", "sk"]}
+
+            # Add connection data to the node
+            if method_id:
+                # Method-specific connection
+                if method_id not in node_data["connections"][connection_type]:
+                    node_data["connections"][connection_type][method_id] = []
+                node_data["connections"][connection_type][method_id].append(
+                    connection_data
+                )
+            else:
+                # Node-level connection
+                node_data["connections"][connection_type]["node"] = connection_data
+    except Exception as e:
+        logger.error(f"Error getting connection data for node {node_id}: {str(e)}")
 
     return node_data
 

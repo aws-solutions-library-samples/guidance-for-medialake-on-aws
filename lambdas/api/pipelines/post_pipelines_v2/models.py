@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -7,8 +7,8 @@ class NodeData(BaseModel):
     type: str
     label: str
     icon: Dict[str, Any]
-    inputTypes: List[str] = Field(default_factory=list)
-    outputTypes: List[str] = Field(default_factory=list)
+    inputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
+    outputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     configuration: Dict[str, Any]
 
 

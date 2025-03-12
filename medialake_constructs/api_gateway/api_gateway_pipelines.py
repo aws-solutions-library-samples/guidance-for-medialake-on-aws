@@ -220,7 +220,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket_name,
-                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.key_arn,
+                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": media_assets_bucket.key_arn,
                 "PIPELINES_TABLE": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
@@ -505,7 +505,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket_name,
-                "MEDIA_ASSETS_BUCKET_NAME_KMS_KEY": media_assets_bucket.key_arn,
+                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": media_assets_bucket.key_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
@@ -659,6 +659,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             self,
             "GetPipelineIdHandler",
             config=get_pipeline_id_lambda_config,
+        )
+
+        self._get_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:Scan"],
+                resources=[props.pipeline_table.table_arn],
+            )
         )
 
         pipeline_id_resource.add_method(

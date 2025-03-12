@@ -1,15 +1,20 @@
 import React, { useCallback } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Box, Typography, IconButton } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { FaCog, FaTrash } from 'react-icons/fa';
 
 const HANDLE_CONNECT_RADIUS = 50;
+
+export interface OutputType {
+    name: string;
+    description?: string;
+}
 
 export interface CustomNodeData {
     label: string;
     icon: React.ReactNode;
     inputTypes: string[];
-    outputTypes: string[];
+    outputTypes: string[] | OutputType[]; // Can be either simple strings or objects with name/description
     nodeId: string; // Original node ID from the API
     description: string; // Node description
     configuration?: any; // Node configuration
@@ -20,6 +25,17 @@ export interface CustomNodeData {
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
     const { project } = useReactFlow();
+
+    // Debug logging
+    // console.log('[CustomNode] Rendering node:', id);
+    // console.log('[CustomNode] Node data:', data);
+    // console.log('[CustomNode] Output types:', data.outputTypes);
+    // console.log('[CustomNode] Is array of objects?',
+    //     Array.isArray(data.outputTypes) &&
+    //     data.outputTypes.length > 0 &&
+    //     typeof data.outputTypes[0] === 'object' &&
+    //     'name' in (data.outputTypes[0] as any)
+    // );
 
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
@@ -33,28 +49,35 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
 
     const handleNodeClick = useCallback((event: React.MouseEvent) => {
         const rect = (event.target as HTMLElement).getBoundingClientRect();
-        const sourceHandleX = rect.right;
-        const sourceHandleY = rect.top + rect.height / 2;
-
         const clickX = event.clientX;
         const clickY = event.clientY;
 
-        // Calculate distance from click to source handle
-        const distance = Math.sqrt(
-            Math.pow(clickX - sourceHandleX, 2) +
-            Math.pow(clickY - sourceHandleY, 2)
-        );
+        // Helper function to check if click is near a handle
+        const isNearHandle = (handleElement: Element | null) => {
+            if (!handleElement) return false;
+            const handleRect = handleElement.getBoundingClientRect();
+            const handleX = handleRect.left + handleRect.width / 2;
+            const handleY = handleRect.top + handleRect.height / 2;
 
-        // If click is within radius of source handle, start connection
-        if (distance <= HANDLE_CONNECT_RADIUS) {
-            const { x, y } = project({ x: clickX, y: clickY });
-            const event = new MouseEvent('mousedown', {
-                clientX: sourceHandleX,
-                clientY: sourceHandleY,
-                bubbles: true
-            });
-            const sourceHandle = document.querySelector(`[data-nodeid="${id}"] .react-flow__handle-source`);
-            sourceHandle?.dispatchEvent(event);
+            const distance = Math.sqrt(
+                Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2)
+            );
+
+            return distance <= HANDLE_CONNECT_RADIUS;
+        };
+
+        // Find the closest handle
+        const handles = Array.from(document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`));
+        for (const handle of handles) {
+            if (isNearHandle(handle)) {
+                const event = new MouseEvent('mousedown', {
+                    clientX: clickX,
+                    clientY: clickY,
+                    bubbles: true,
+                });
+                handle.dispatchEvent(event);
+                break;
+            }
         }
     }, [id, project]);
 
@@ -64,13 +87,14 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         <Box
             onClick={handleNodeClick}
             sx={{
-                padding: '10px',
+                padding: '12px',
                 borderRadius: '8px',
                 backgroundColor: 'background.paper',
                 border: 1,
                 borderColor: data.configuration ? 'primary.main' : 'divider',
                 width: '200px', // Set fixed width to half of original
                 maxWidth: '200px',
+                minHeight: '100px',
                 position: 'relative',
                 boxShadow: 2,
                 cursor: 'pointer',
@@ -142,18 +166,67 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 </Box>
             </Box>
 
-            <Handle
-                type="source"
-                position={Position.Right}
-                isConnectable={isConnectable}
-                style={{
-                    background: '#555',
-                    width: '12px',
-                    height: '12px',
-                    border: '2px solid #fff',
-                    borderRadius: '6px'
-                }}
-            />
+            {/* Check if we have multiple output types or a single output */}
+            {Array.isArray(data.outputTypes) && data.outputTypes.length > 0 &&
+                typeof data.outputTypes[0] === 'object' && 'name' in (data.outputTypes[0] as any) ? (
+                // Multiple output types as objects with name/description
+                <Box sx={{
+                    position: 'absolute',
+                    right: 3,
+                    top: '25%',
+                    height: '75%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'start'
+                }}>
+                    {(data.outputTypes as OutputType[]).map((output, index) => (
+                        <Box
+                            key={output.name}
+                            sx={{
+                                position: 'relative',
+                                height: '24px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                mr: '-6px'
+                            }}
+                        >
+                            {/* <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
+                                {output.name}
+                            </Typography> */}
+                            <Tooltip title={output.name}>
+                              
+                            <Handle
+                                type="source"
+                                position={Position.Right}
+                                id={output.name}
+                                isConnectable={isConnectable}
+                                style={{
+                                    background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#F44336',
+                                    width: '12px',
+                                    height: '12px',
+                                    border: '2px solid #fff',
+                                    borderRadius: '5px',
+                                }}
+                            />
+                              </Tooltip>
+                        </Box>
+                    ))}
+                </Box>
+            ) : (
+                // Single output handle (default behavior)
+                <Handle
+                    type="source"
+                    position={Position.Right}
+                    isConnectable={isConnectable}
+                    style={{
+                        background: '#555',
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid #fff',
+                        borderRadius: '6px'
+                    }}
+                />
+            )}
         </Box>
     );
 };

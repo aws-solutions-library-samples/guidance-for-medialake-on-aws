@@ -17,7 +17,7 @@ export const createJobStatusNodeData = () => {
     inputTypes: ['*'],
     outputTypes: ['completed', 'in-progress', 'failed'],
     selectedMethod: JOB_STATUS_NODE_METHOD,
-    icon: React.createElement(FaRegCheckCircle, { size: 18, color: "#4CAF50" }),
+    icon: "",//React.createElement(FaRegCheckCircle, { size: 18, color: "#4CAF50" }),
     methodConfig: {
       method: JOB_STATUS_NODE_METHOD,
       parameters: {

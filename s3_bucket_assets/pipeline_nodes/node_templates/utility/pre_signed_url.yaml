@@ -23,7 +23,7 @@ node:
               actions:
                 - kms:Decrypt
               resources:
-                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME_KMS_KEY}/*
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
 actions:
   generate:
     summary: Generate pre-signed URL

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState ,useMemo} from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
     Background,
@@ -9,6 +9,7 @@ import ReactFlow, {
     addEdge,
     ReactFlowProvider,
     useReactFlow,
+    ReactFlowInstance,
     BackgroundVariant,
     Connection,
     Node,
@@ -127,7 +128,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             : {};
 
         // Extract config from method using type assertion
-        // For trigger nodes, the config is different from integration nodes
+        // Different node types have different config structures
         const nodeType = nodeData.info?.nodeType;
         let config;
 
@@ -140,6 +141,103 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 requestMapping: (method as any).requestMapping || null,
                 responseMapping: (method as any).responseMapping || null
             };
+        // } else if (nodeType === 'FLOW') {
+        //     // For flow nodes, get parameters from the actions section
+        //     const actionName = method.name;
+        //     console.log('[PipelineEditorPage] Flow node action name:', actionName);
+        //     console.log('[PipelineEditorPage] Node data:', nodeData);
+        //     console.log('[PipelineEditorPage] Actions:', (nodeData as any).actions);
+            
+        //     const actionParams = (nodeData as any).actions?.[actionName]?.parameters || [];
+        //     console.log('[PipelineEditorPage] Action parameters:', actionParams);
+            
+        //     // Convert action parameters to Record format
+        //     const flowParameters = actionParams.reduce((paramAcc: Record<string, any>, param: any) => {
+        //         console.log('[PipelineEditorPage] Processing parameter:', param);
+        //         return {
+        //             ...paramAcc,
+        //             [param.name]: {
+        //                 name: param.name,
+        //                 label: param.name,
+        //                 type: param.schema?.type === 'string' ? 'text' : param.schema?.type as 'number' | 'boolean' | 'select',
+        //                 required: param.required || false,
+        //                 description: param.description
+        //             }
+        //         };
+        //     }, {});
+            
+        //     console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
+            
+        //     config = {
+        //         path: '',
+        //         operationId: method.name,
+        //         parameters: actionParams.map(param => ({
+        //             in: 'body',
+        //             name: param.name,
+        //             required: param.required || false,
+        //             schema: param.schema || { type: 'string' }
+        //         })),
+        //         requestMapping: (method as any).requestMapping || null,
+        //         responseMapping: (method as any).responseMapping || null
+        //     };
+
+        //     console.log('[PipelineEditorPage] Flow node config:', config);
+
+        //     // Add method with flow parameters
+        //     return {
+        //         ...acc,
+        //         [method.name]: {
+        //             name: method.name,
+        //             description: method.description || '',
+        //             parameters: flowParameters,
+        //             config: config
+        //         }
+        //     };
+    } else if (nodeType === 'FLOW') {
+        // For FLOW nodes, use the parameters from the method object directly
+        console.log('[PipelineEditorPage] Flow node action name:', method.name);
+        // Instead of using nodeData.actions, use method.parameters:
+        const flowParameters = Array.isArray(method.parameters)
+          ? method.parameters.reduce((paramAcc, param) => {
+              console.log('[PipelineEditorPage] Processing parameter:', param);
+              const parameterData: any = {
+                name: param.name,
+                label: param.label || param.name,
+                // Convert type: if schema.type is 'string', use 'text', otherwise use schema.type
+                type: param.schema?.type === 'string' ? 'text' : (param.schema?.type as 'number' | 'boolean' | 'select'),
+                required: param.required || false,
+                description: param.description
+              };
+              return { ...paramAcc, [param.name]: parameterData };
+            }, {})
+          : {};
+      
+        console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
+      
+        const config = {
+          path: '',
+          operationId: method.name,
+          // Here, we use method.parameters as an array (if available) for the config
+          parameters: Array.isArray(method.parameters) ? method.parameters : [],
+          requestMapping: (method as any).requestMapping || null,
+          responseMapping: (method as any).responseMapping || null
+        };
+      
+        console.log('[PipelineEditorPage] Flow node config:', config);
+      
+        // Return the method entry with the converted parameters record.
+        return {
+          ...acc,
+          [method.name]: {
+            name: method.name,
+            description: method.description || '',
+            parameters: flowParameters, // This will be a record (e.g. { Duration: { ... } })
+            config: config
+          }
+        };
+      
+      
+      
         } else {
             // For integration nodes, extract from config property
             config = {
@@ -190,7 +288,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             tags: nodeData.info?.tags || [],
             title: nodeData.info?.title || '',
             inputTypes: nodeData.info?.inputTypes || [],
-            outputTypes: nodeData.info?.outputTypes || [],
+            // outputTypes: nodeData.info?.outputTypes || [],
+            outputTypes: (nodeData.info?.outputTypes || []).map(item => String(item)),
+
             createdAt: nodeData.info?.createdAt || new Date().toISOString(),
         },
         methods: methods
@@ -206,7 +306,52 @@ const PipelineEditorContent = () => {
     const { id: pipelineId } = useParams();
     const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    // Track whether the pipeline has been initialized
+    const pipelineInitialized = useRef(false);
+    
+    // Custom handler for node changes to update the pipeline configuration
+    const handleNodesChange = useCallback((changes) => {
+        // First apply the changes to the nodes state
+        onNodesChange(changes);
+        
+        // Then update the pipeline configuration with the new node positions
+        changes.forEach(change => {
+            if (change.type === 'position' && change.positionAbsolute) {
+                console.log('[PipelineEditorPage] Node position changed:', change);
+                
+                // Update the form data with the new node position
+                setFormData(prev => {
+                    const updatedNodes = prev.configuration.nodes.map(node => {
+                        if (node.id === change.id) {
+                            console.log('[PipelineEditorPage] Updating node position in form data:', node.id);
+                            return {
+                                ...node,
+                                position: {
+                                    x: change.positionAbsolute.x.toString(),
+                                    y: change.positionAbsolute.y.toString()
+                                },
+                                positionAbsolute: {
+                                    x: change.positionAbsolute.x.toString(),
+                                    y: change.positionAbsolute.y.toString()
+                                }
+                            };
+                        }
+                        return node;
+                    });
+                    
+                    return {
+                        ...prev,
+                        configuration: {
+                            ...prev.configuration,
+                            nodes: updatedNodes
+                        }
+                    };
+                });
+            }
+        });
+    }, [onNodesChange]);
     const { screenToFlowPosition } = useReactFlow();
+    const reactFlowInstance = useReactFlow();
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
     const [errorType, setErrorType] = useState<'trigger' | 'compatibility'>('compatibility');
     const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
@@ -251,11 +396,22 @@ const PipelineEditorContent = () => {
         enabled: isNodeConfigOpen && !!nodeIdRef.current
     });
 
+    // Add debug logging for node details
+    React.useEffect(() => {
+        if (nodeDetails) {
+            console.log('[PipelineEditorPage] Node details from API:', nodeDetails);
+            console.log('[PipelineEditorPage] Node type:', nodeDetails.data?.[0]?.info?.nodeType);
+            console.log('[PipelineEditorPage] Node methods:', nodeDetails.data?.[0]?.methods);
+        }
+    }, [nodeDetails]);
+
     // Memoize the converted node data to prevent unnecessary recalculations
-    const convertedNodeData = React.useMemo(() =>
-        nodeDetails ? (convertApiResponseToNode(nodeDetails) || {} as NodeType) : ({} as NodeType),
-        [nodeDetails]
-    );
+    const convertedNodeData = React.useMemo(() => {
+        if (!nodeDetails) return {} as NodeType;
+        const converted = convertApiResponseToNode(nodeDetails);
+        console.log('[PipelineEditorPage] Converted node data:', converted);
+        return converted || {} as NodeType;
+    }, [nodeDetails]);
 
     const createPipeline = useCreatePipeline({
         onSuccess: () => {
@@ -272,15 +428,31 @@ const PipelineEditorContent = () => {
     // Set form data when pipeline data is loaded
     React.useEffect(() => {
         if (pipeline) {
+            console.log('[PipelineEditorPage] Setting form data from pipeline:', pipeline);
             setFormData({
                 name: pipeline.name,
-                description: pipeline.description,
-                configuration: pipeline.configuration
+                description: pipeline.description || '',
+                configuration: pipeline.configuration || {
+                    nodes: [],
+                    edges: [],
+                    settings: {
+                        autoStart: false,
+                        retryAttempts: 3,
+                        timeout: 3600
+                    }
+                }
             });
         }
     }, [pipeline]);
 
     const handleSave = async () => {
+        console.log('[PipelineEditorPage] Saving pipeline with form data:', formData);
+        console.log('[PipelineEditorPage] Node positions:', formData.configuration.nodes.map(node => ({
+            id: node.id,
+            position: node.position,
+            positionAbsolute: node.positionAbsolute
+        })));
+        
         if (pipelineId && pipelineId !== 'new') {
             updatePipeline.mutate({ id: pipelineId, data: formData });
         } else {
@@ -315,6 +487,99 @@ const PipelineEditorContent = () => {
             setIsNodeConfigOpen(true);
         }
     }, [nodes]);
+
+    // Initialize ReactFlow nodes and edges from pipeline configuration
+    React.useEffect(() => {
+        // Only initialize if the pipeline has data and hasn't been initialized yet
+        if (pipeline?.configuration?.nodes &&
+            pipeline.configuration.nodes.length > 0 &&
+            !pipelineInitialized.current) {
+            
+            console.log('[PipelineEditorPage] Initializing ReactFlow from pipeline configuration');
+            console.log('[PipelineEditorPage] Configuration nodes:', pipeline.configuration.nodes);
+            console.log('[PipelineEditorPage] Configuration edges:', pipeline.configuration.edges);
+            
+            // Convert configuration nodes to ReactFlow nodes
+            const reactFlowNodes = pipeline.configuration.nodes.map(node => {
+                console.log('[PipelineEditorPage] Processing node:', node);
+                
+                // Create a ReactFlow node from the pipeline node
+                const stableIcon = useMemo(() => <FaFileVideo size={20} />, []);
+                return {
+                    id: node.id,
+                    type: node.type || 'custom',
+                    position: {
+                        x: typeof node.position.x === 'string' ? parseFloat(node.position.x) : node.position.x,
+                        y: typeof node.position.y === 'string' ? parseFloat(node.position.y) : node.position.y
+                    },
+                    data: {
+                        nodeId: node.data.id,
+                        label: node.data.label,
+                        description: '',  // Use empty string for description
+                        icon: stableIcon,
+                        inputTypes: node.data.inputTypes || [],
+                        outputTypes: node.data.outputTypes || [],
+                        type: node.data.type,
+                        configuration: node.data.configuration,
+                        onDelete: onDeleteNode,
+                        onConfigure: onConfigureNode,
+                    },
+                    // Preserve width and height
+                    width: typeof node.width === 'string' ? parseFloat(node.width) : node.width,
+                    height: typeof node.height === 'string' ? parseFloat(node.height) : node.height,
+                    // Preserve positionAbsolute if it exists
+                    ...(node.positionAbsolute && {
+                        positionAbsolute: {
+                            x: typeof node.positionAbsolute.x === 'string'
+                                ? parseFloat(node.positionAbsolute.x)
+                                : node.positionAbsolute.x,
+                            y: typeof node.positionAbsolute.y === 'string'
+                                ? parseFloat(node.positionAbsolute.y)
+                                : node.positionAbsolute.y
+                        }
+                    }),
+                    // Preserve dragging and selected states if they exist
+                    ...(node.dragging !== undefined && { dragging: node.dragging }),
+                    ...(node.selected !== undefined && { selected: node.selected })
+                };
+            });
+            
+            console.log('[PipelineEditorPage] ReactFlow nodes:', reactFlowNodes);
+            
+            // Set the nodes state
+            setNodes(reactFlowNodes);
+            
+            // Convert configuration edges to ReactFlow edges
+            if (pipeline.configuration.edges && pipeline.configuration.edges.length > 0) {
+                const reactFlowEdges = pipeline.configuration.edges.map(edge => {
+                    console.log('[PipelineEditorPage] Processing edge:', edge);
+                    
+                    // Use type assertion to handle sourceHandle and targetHandle
+                    const edgeWithHandles = edge as any;
+                    
+                    return {
+                        id: edge.id,
+                        source: edge.source,
+                        target: edge.target,
+                        type: edge.type || 'custom',
+                        data: edge.data,
+                        // Include sourceHandle and targetHandle if they exist in the edge data
+                        ...(edgeWithHandles.sourceHandle && { sourceHandle: edgeWithHandles.sourceHandle }),
+                        ...(edgeWithHandles.targetHandle && { targetHandle: edgeWithHandles.targetHandle })
+                    };
+                });
+                
+                console.log('[PipelineEditorPage] ReactFlow edges:', reactFlowEdges);
+                
+                // Set the edges state
+                setEdges(reactFlowEdges);
+            }
+            
+            // Mark the pipeline as initialized
+            pipelineInitialized.current = true;
+            console.log('[PipelineEditorPage] Pipeline initialized');
+        }
+    }, [pipeline, onDeleteNode, onConfigureNode, setNodes, setEdges]);
 
     // Update existing nodes with handlers
     React.useEffect(() => {
@@ -414,7 +679,7 @@ const PipelineEditorContent = () => {
                     icon: nodeData.icon || <FaFileVideo size={20} />,
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
-                    type: nodeData.type,
+                    type: nodeData.type?.toUpperCase(),
                     configuration: nodeData.methodConfig || {
                         method: '',
                         path: '',
@@ -439,25 +704,51 @@ const PipelineEditorContent = () => {
                 }
             };
 
-            setNodes((nds) => nds.concat(nodeWithHandlers));
+            // Update nodes and pipeline configuration as before
+setNodes((nds) => nds.concat(nodeWithHandlers));
 
-            // Update pipeline configuration
-            setFormData(prev => ({
-                ...prev,
-                configuration: {
-                    ...prev.configuration,
-                    nodes: [...prev.configuration.nodes, newPipelineNode],
-                    settings: prev.configuration.settings || {
-                        autoStart: false,
-                        retryAttempts: 3,
-                        timeout: 3600
-                    }
-                }
-            }));
+setFormData((prev) => ({
+  ...prev,
+  configuration: {
+    ...prev.configuration,
+    nodes: [...prev.configuration.nodes, newPipelineNode],
+    settings: prev.configuration.settings || { autoStart: false, retryAttempts: 3, timeout: 3600 }
+  }
+}));
 
-            // Automatically open configuration dialog for the new node
-            setSelectedNode(nodeWithHandlers);
-            setIsNodeConfigOpen(true);
+// Determine whether configuration parameters exist
+const parameters = newReactFlowNode.data.configuration?.parameters;
+const hasParameters = parameters && Object.keys(parameters).length > 0;
+
+if (hasParameters) {
+  // If parameters exist, open the configuration dialog
+  setSelectedNode(nodeWithHandlers);
+  setIsNodeConfigOpen(true);
+} else {
+  // No configuration needed—skip opening the dialog
+  console.log("Node has no configuration parameters; skipping config dialog.");
+}
+
+
+            // setNodes((nds) => nds.concat(nodeWithHandlers));
+
+            // // Update pipeline configuration
+            // setFormData(prev => ({
+            //     ...prev,
+            //     configuration: {
+            //         ...prev.configuration,
+            //         nodes: [...prev.configuration.nodes, newPipelineNode],
+            //         settings: prev.configuration.settings || {
+            //             autoStart: false,
+            //             retryAttempts: 3,
+            //             timeout: 3600
+            //         }
+            //     }
+            // }));
+
+            // // Automatically open configuration dialog for the new node
+            // setSelectedNode(nodeWithHandlers);
+            // setIsNodeConfigOpen(true);
         },
         [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode]
     );
@@ -540,6 +831,8 @@ const PipelineEditorContent = () => {
         }
     }, [selectedNode, setNodes, handleNodeConfigClose]);
 
+    const stableIcon = useMemo(() => <FaFileVideo size={20} />, []);
+    
     const convertNodeToReactFlowNode = (node: NodeType): Node<CustomNodeData> => ({
         id: node.nodeId || getId(),
         type: 'custom',
@@ -548,7 +841,7 @@ const PipelineEditorContent = () => {
             nodeId: node.nodeId || '',
             label: node.info.title,
             description: node.info.description || '',
-            icon: <FaFileVideo size={20} />,
+            icon: stableIcon,
             inputTypes: node.info.inputTypes || [],
             outputTypes: node.info.outputTypes || [],
             configuration: null,
@@ -570,6 +863,9 @@ const PipelineEditorContent = () => {
                 isLoading={createPipeline.isPending || updatePipeline.isPending}
                 pipelineName={formData.name}
                 onPipelineNameChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
+                reactFlowInstance={reactFlowInstance} 
+                setNodes={setNodes}
+                setEdges={setEdges}
             />
             <Box sx={{
                 position: 'fixed',
@@ -626,7 +922,7 @@ const PipelineEditorContent = () => {
                         snapGrid={[16, 16]}
                         nodes={nodes}
                         edges={edges}
-                        onNodesChange={onNodesChange}
+                        onNodesChange={handleNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         nodeTypes={nodeTypes}
@@ -646,13 +942,20 @@ const PipelineEditorContent = () => {
 
             <Dialog
                 open={isNodeConfigOpen}
-                onClose={() => setIsNodeConfigOpen(false)}
+                onClose={(event, reason) => {
+                    // Prevent closing on backdrop click or escape key
+                    if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+                        return;
+                    }
+                    setIsNodeConfigOpen(false);
+                }}
                 maxWidth="sm"
                 PaperProps={{
                     sx: {
                         width: '400px'
                     }
                 }}
+                disableEscapeKeyDown
             >
                 <DialogTitle>Configure Node</DialogTitle>
                 <DialogContent>
@@ -663,6 +966,11 @@ const PipelineEditorContent = () => {
                             onSubmit={handleNodeConfigSave}
                             onCancel={() => setIsNodeConfigOpen(false)}
                         />
+                    )}
+                    {isNodeDetailsLoading && (
+                        <Box sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography>Loading node configuration...</Typography>
+                        </Box>
                     )}
                 </DialogContent>
             </Dialog>
