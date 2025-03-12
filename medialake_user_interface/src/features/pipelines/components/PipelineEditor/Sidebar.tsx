@@ -290,7 +290,7 @@ const SidebarContent: React.FC = () => {
                         );
 
                         if (section) {
-                            section.nodes.push({ node, methodName, method });
+                            section.nodes.push({ node, methodName: method.name, method });
                         }
                     });
                 }

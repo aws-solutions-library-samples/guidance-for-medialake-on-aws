@@ -43,7 +43,7 @@ actions:
         type: [any]
       outgoing:
         types:
-          - name: condition_true
+          - name: Completed
             description: Path taken when condition evaluates to true
-          - name: condition_false
+          - name: In Progress
             description: Path taken when condition evaluates to false

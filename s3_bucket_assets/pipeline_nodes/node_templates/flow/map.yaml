@@ -39,7 +39,7 @@ actions:
         type: [any]
       outgoing:
         types:
-          - name: processor
+          - name: Processor
             description: json payload item processor
-          - name: next
+          - name: Next
             description: output to the next node

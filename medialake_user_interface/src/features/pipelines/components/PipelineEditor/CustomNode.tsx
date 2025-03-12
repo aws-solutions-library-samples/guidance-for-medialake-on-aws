@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Box, Typography, IconButton } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { FaCog, FaTrash } from 'react-icons/fa';
 
 const HANDLE_CONNECT_RADIUS = 50;
@@ -27,15 +27,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
     const { project } = useReactFlow();
 
     // Debug logging
-    console.log('[CustomNode] Rendering node:', id);
-    console.log('[CustomNode] Node data:', data);
-    console.log('[CustomNode] Output types:', data.outputTypes);
-    console.log('[CustomNode] Is array of objects?',
-        Array.isArray(data.outputTypes) &&
-        data.outputTypes.length > 0 &&
-        typeof data.outputTypes[0] === 'object' &&
-        'name' in (data.outputTypes[0] as any)
-    );
+    // console.log('[CustomNode] Rendering node:', id);
+    // console.log('[CustomNode] Node data:', data);
+    // console.log('[CustomNode] Output types:', data.outputTypes);
+    // console.log('[CustomNode] Is array of objects?',
+    //     Array.isArray(data.outputTypes) &&
+    //     data.outputTypes.length > 0 &&
+    //     typeof data.outputTypes[0] === 'object' &&
+    //     'name' in (data.outputTypes[0] as any)
+    // );
 
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
@@ -172,12 +172,12 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 // Multiple output types as objects with name/description
                 <Box sx={{
                     position: 'absolute',
-                    right: 0,
+                    right: 3,
                     top: '25%',
                     height: '75%',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'start'
                 }}>
                     {(data.outputTypes as OutputType[]).map((output, index) => (
                         <Box
@@ -190,9 +190,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                                 mr: '-6px'
                             }}
                         >
-                            <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
+                            {/* <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
                                 {output.name}
-                            </Typography>
+                            </Typography> */}
+                            <Tooltip title={output.name}>
+                              
                             <Handle
                                 type="source"
                                 position={Position.Right}
@@ -200,12 +202,13 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                                 isConnectable={isConnectable}
                                 style={{
                                     background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#F44336',
-                                    width: '10px',
-                                    height: '10px',
+                                    width: '12px',
+                                    height: '12px',
                                     border: '2px solid #fff',
                                     borderRadius: '5px',
                                 }}
                             />
+                              </Tooltip>
                         </Box>
                     ))}
                 </Box>

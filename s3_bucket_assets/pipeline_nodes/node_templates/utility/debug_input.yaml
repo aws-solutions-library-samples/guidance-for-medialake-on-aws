@@ -24,13 +24,6 @@ actions:
     summary: Debug Input
     description: Log and return input data for debugging purposes
     operationId: debugInput
-    parameters:
-      - in: body
-        name: Log Level
-        required: false
-        default: "INFO"
-        schema:
-          type: string
     x-requestMapping: utility/debug_input/debug/
     x-responseMapping: utility/debug_input/debug/
     connections:
