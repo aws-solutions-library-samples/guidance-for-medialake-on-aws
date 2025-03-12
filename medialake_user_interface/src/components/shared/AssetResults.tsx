@@ -211,7 +211,7 @@ function AssetResults<T extends AssetBase>({
                 onImageError={handleAssetError}
                 isEditing={editingAssetId === asset.InventoryID}
                 editedName={editedName}
-                onEditNameChange={handleNameChange}
+                // onEditNameChange={handleNameChange}
                 onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
             />
         </Grid>
