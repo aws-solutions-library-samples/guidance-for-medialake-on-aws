@@ -1,4 +1,4 @@
-import React from 'react';
+import React , {useState} from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -9,6 +9,7 @@ import {
     Typography,
     CircularProgress
 } from '@mui/material';
+
 
 interface PipelineDeleteDialogProps {
     open: boolean;

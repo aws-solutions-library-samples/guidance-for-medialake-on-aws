@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from aws_cdk import (
+    Stack,
     aws_apigateway as apigateway,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_ec2 as ec2,
     aws_events as events,
     aws_dynamodb as dynamodb,
     aws_secretsmanager as secretsmanager,
@@ -10,6 +12,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 from config import config
+from typing import Optional
 
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import (
@@ -39,6 +42,11 @@ class ApiGatewayPipelinesProps:
     image_metadata_extractor_lambda: lambda_.IFunction
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
+    open_search_endpoint: str
+    # open_search_arn: str
+    # open_search_index: str
+    vpc: Optional[ec2.IVpc] = None
+    security_group: Optional[ec2.SecurityGroup] = None
 
 
 class ApiGatewayPipelinesConstruct(Construct):
@@ -56,6 +64,13 @@ class ApiGatewayPipelinesConstruct(Construct):
         props: ApiGatewayPipelinesProps,
     ) -> None:
         super().__init__(scope, id)
+
+        # Determine the current stack
+        stack = Stack.of(self)
+
+        # Get the region and account ID
+        self.region = stack.region
+        self.account_id = stack.account
 
         del_lambda_iam_boundary_policy = iam.ManagedPolicy(
             self,
@@ -149,6 +164,16 @@ class ApiGatewayPipelinesConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
+                # Add EC2 permissions needed for VPC Lambda functions
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "ec2:DescribeVpcs",
+                        "ec2:DescribeSubnets",
+                        "ec2:DescribeSecurityGroups"
+                    ],
+                    resources=["*"],
+                ),
             ],
         )
 
@@ -230,7 +255,10 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "RESOURCE_PREFIX": config.resource_prefix,
                 "NODE_TABLE": props.node_table.table_arn,
                 "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
-                "ACCOUNT_ID": scope.account,
+                "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                "OPENSEARCH_VPC_SUBNET_IDS": ','.join([subnet.subnet_id for subnet in props.vpc.private_subnets]),
+                "OPENSEARCH_SECURITY_GROUP_ID": props.security_group.security_group_id,
+                "ACCOUNT_ID": self.account_id,
             },
         )
         self._post_pipelines_v2_handler = Lambda(
@@ -238,6 +266,18 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PostPipelinesHandlerV2",
             config=post_pipelines_v2_lambda_config,
         )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+               actions=[
+                    "ec2:DescribeVpcs",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups"
+                ],
+                resources=["*"],
+            )
+        )
+
 
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(

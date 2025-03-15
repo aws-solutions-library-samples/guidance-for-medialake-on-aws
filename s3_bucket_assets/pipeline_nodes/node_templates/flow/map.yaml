@@ -18,27 +18,15 @@ actions:
       - in: body
         name: ItemsPath
         required: true
+        default: $.payload.externalTaskStatus
         schema:
           type: string
           description: JSONPath that identifies the array to iterate over
-      - in: body
-        name: MaxConcurrency
-        required: false
-        schema:
-          type: number
-          description: Maximum number of concurrent iterations (0 for unlimited)
-          default: 0
-      - in: body
-        name: Iterator
-        required: true
-        schema:
-          type: object
-          description: The state machine definition that processes each item
     connections:
       incoming:
         type: [any]
       outgoing:
-        types:
+        type:
           - name: Processor
             description: json payload item processor
           - name: Next

@@ -4,8 +4,6 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
     aws_ec2 as ec2,
-    aws_s3 as s3,
-    Duration,
     aws_iam as iam,
 )
 from aws_cdk import Fn, Stack

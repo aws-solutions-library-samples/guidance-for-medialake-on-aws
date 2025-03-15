@@ -40,6 +40,6 @@ actions:
     x-responseMapping: utility/pre_signed_url/generate/
     connections:
       incoming:
-        type: [video, image, audio]
+        type: [any]
       outgoing:
         type: [presigned_url]

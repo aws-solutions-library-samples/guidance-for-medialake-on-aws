@@ -214,6 +214,12 @@ class ApiGatewayStack(Stack):
                 pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+                open_search_endpoint=props.collection_endpoint,
+                # open_search_arn=props.collection_arn,
+                # open_search_index="media",
+                vpc=props.vpc,
+                security_group=props.security_group
+              
             ),
         )
 

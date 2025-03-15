@@ -18,6 +18,7 @@ actions:
       - in: body
         name: Duration
         required: true
+        default: 15
         schema:
           type: number
     connections:

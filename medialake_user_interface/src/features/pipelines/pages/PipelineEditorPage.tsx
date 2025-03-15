@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState ,useMemo} from 'react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
     Background,
@@ -13,10 +13,11 @@ import ReactFlow, {
     BackgroundVariant,
     Connection,
     Node,
+    reconnectEdge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button } from '@mui/material';
-import { FaFileVideo } from 'react-icons/fa';
+import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from 'react-icons/fa';
 import { useGetPipeline, useCreatePipeline, useUpdatePipeline } from '../api/pipelinesController';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
 import type { Pipeline, CreatePipelineDto, PipelineEdge, PipelineNode } from '../types/pipelines.types';
@@ -119,6 +120,12 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 if (param.schema.options) {
                     parameterData.options = param.schema.options;
                 }
+                
+                // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
+                if ((param as any).default !== undefined) {
+                    parameterData.defaultValue = (param as any).default;
+                    console.log(`[PipelineEditorPage] Found default value for ${param.name}:`, (param as any).default);
+                }
 
                 return {
                     ...paramAcc,
@@ -141,103 +148,109 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 requestMapping: (method as any).requestMapping || null,
                 responseMapping: (method as any).responseMapping || null
             };
-        // } else if (nodeType === 'FLOW') {
-        //     // For flow nodes, get parameters from the actions section
-        //     const actionName = method.name;
-        //     console.log('[PipelineEditorPage] Flow node action name:', actionName);
-        //     console.log('[PipelineEditorPage] Node data:', nodeData);
-        //     console.log('[PipelineEditorPage] Actions:', (nodeData as any).actions);
-            
-        //     const actionParams = (nodeData as any).actions?.[actionName]?.parameters || [];
-        //     console.log('[PipelineEditorPage] Action parameters:', actionParams);
-            
-        //     // Convert action parameters to Record format
-        //     const flowParameters = actionParams.reduce((paramAcc: Record<string, any>, param: any) => {
-        //         console.log('[PipelineEditorPage] Processing parameter:', param);
-        //         return {
-        //             ...paramAcc,
-        //             [param.name]: {
-        //                 name: param.name,
-        //                 label: param.name,
-        //                 type: param.schema?.type === 'string' ? 'text' : param.schema?.type as 'number' | 'boolean' | 'select',
-        //                 required: param.required || false,
-        //                 description: param.description
-        //             }
-        //         };
-        //     }, {});
-            
-        //     console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
-            
-        //     config = {
-        //         path: '',
-        //         operationId: method.name,
-        //         parameters: actionParams.map(param => ({
-        //             in: 'body',
-        //             name: param.name,
-        //             required: param.required || false,
-        //             schema: param.schema || { type: 'string' }
-        //         })),
-        //         requestMapping: (method as any).requestMapping || null,
-        //         responseMapping: (method as any).responseMapping || null
-        //     };
+            // } else if (nodeType === 'FLOW') {
+            //     // For flow nodes, get parameters from the actions section
+            //     const actionName = method.name;
+            //     console.log('[PipelineEditorPage] Flow node action name:', actionName);
+            //     console.log('[PipelineEditorPage] Node data:', nodeData);
+            //     console.log('[PipelineEditorPage] Actions:', (nodeData as any).actions);
 
-        //     console.log('[PipelineEditorPage] Flow node config:', config);
+            //     const actionParams = (nodeData as any).actions?.[actionName]?.parameters || [];
+            //     console.log('[PipelineEditorPage] Action parameters:', actionParams);
 
-        //     // Add method with flow parameters
-        //     return {
-        //         ...acc,
-        //         [method.name]: {
-        //             name: method.name,
-        //             description: method.description || '',
-        //             parameters: flowParameters,
-        //             config: config
-        //         }
-        //     };
-    } else if (nodeType === 'FLOW') {
-        // For FLOW nodes, use the parameters from the method object directly
-        console.log('[PipelineEditorPage] Flow node action name:', method.name);
-        // Instead of using nodeData.actions, use method.parameters:
-        const flowParameters = Array.isArray(method.parameters)
-          ? method.parameters.reduce((paramAcc, param) => {
-              console.log('[PipelineEditorPage] Processing parameter:', param);
-              const parameterData: any = {
-                name: param.name,
-                label: param.label || param.name,
-                // Convert type: if schema.type is 'string', use 'text', otherwise use schema.type
-                type: param.schema?.type === 'string' ? 'text' : (param.schema?.type as 'number' | 'boolean' | 'select'),
-                required: param.required || false,
-                description: param.description
-              };
-              return { ...paramAcc, [param.name]: parameterData };
-            }, {})
-          : {};
-      
-        console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
-      
-        const config = {
-          path: '',
-          operationId: method.name,
-          // Here, we use method.parameters as an array (if available) for the config
-          parameters: Array.isArray(method.parameters) ? method.parameters : [],
-          requestMapping: (method as any).requestMapping || null,
-          responseMapping: (method as any).responseMapping || null
-        };
-      
-        console.log('[PipelineEditorPage] Flow node config:', config);
-      
-        // Return the method entry with the converted parameters record.
-        return {
-          ...acc,
-          [method.name]: {
-            name: method.name,
-            description: method.description || '',
-            parameters: flowParameters, // This will be a record (e.g. { Duration: { ... } })
-            config: config
-          }
-        };
-      
-      
-      
+            //     // Convert action parameters to Record format
+            //     const flowParameters = actionParams.reduce((paramAcc: Record<string, any>, param: any) => {
+            //         console.log('[PipelineEditorPage] Processing parameter:', param);
+            //         return {
+            //             ...paramAcc,
+            //             [param.name]: {
+            //                 name: param.name,
+            //                 label: param.name,
+            //                 type: param.schema?.type === 'string' ? 'text' : param.schema?.type as 'number' | 'boolean' | 'select',
+            //                 required: param.required || false,
+            //                 description: param.description
+            //             }
+            //         };
+            //     }, {});
+
+            //     console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
+
+            //     config = {
+            //         path: '',
+            //         operationId: method.name,
+            //         parameters: actionParams.map(param => ({
+            //             in: 'body',
+            //             name: param.name,
+            //             required: param.required || false,
+            //             schema: param.schema || { type: 'string' }
+            //         })),
+            //         requestMapping: (method as any).requestMapping || null,
+            //         responseMapping: (method as any).responseMapping || null
+            //     };
+
+            //     console.log('[PipelineEditorPage] Flow node config:', config);
+
+            //     // Add method with flow parameters
+            //     return {
+            //         ...acc,
+            //         [method.name]: {
+            //             name: method.name,
+            //             description: method.description || '',
+            //             parameters: flowParameters,
+            //             config: config
+            //         }
+            //     };
+        } else if (nodeType === 'FLOW') {
+            // For FLOW nodes, use the parameters from the method object directly
+            console.log('[PipelineEditorPage] Flow node action name:', method.name);
+            // Instead of using nodeData.actions, use method.parameters:
+            const flowParameters = Array.isArray(method.parameters)
+                ? method.parameters.reduce((paramAcc, param) => {
+                    console.log('[PipelineEditorPage] Processing parameter:', param);
+                    const parameterData: any = {
+                        name: param.name,
+                        label: param.label || param.name,
+                        // Convert type: if schema.type is 'string', use 'text', otherwise use schema.type
+                        type: param.schema?.type === 'string' ? 'text' : (param.schema?.type as 'number' | 'boolean' | 'select'),
+                        required: param.required || false,
+                        description: param.description
+                    };
+                    
+                    // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
+                    if ((param as any).default !== undefined) {
+                        parameterData.defaultValue = (param as any).default;
+                        console.log(`[PipelineEditorPage] Found default value for ${param.name}:`, (param as any).default);
+                    }
+                    return { ...paramAcc, [param.name]: parameterData };
+                }, {})
+                : {};
+
+            console.log('[PipelineEditorPage] Converted flow parameters:', flowParameters);
+
+            const config = {
+                path: '',
+                operationId: method.name,
+                // Here, we use method.parameters as an array (if available) for the config
+                parameters: Array.isArray(method.parameters) ? method.parameters : [],
+                requestMapping: (method as any).requestMapping || null,
+                responseMapping: (method as any).responseMapping || null
+            };
+
+            console.log('[PipelineEditorPage] Flow node config:', config);
+
+            // Return the method entry with the converted parameters record.
+            return {
+                ...acc,
+                [method.name]: {
+                    name: method.name,
+                    description: method.description || '',
+                    parameters: flowParameters, // This will be a record (e.g. { Duration: { ... } })
+                    config: config
+                }
+            };
+
+
+
         } else {
             // For integration nodes, extract from config property
             config = {
@@ -276,6 +289,39 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         };
     }, {} as Record<string, any>);
 
+
+    // Determine inputTypes:
+    // If the API provided inputTypes in info, use those;
+    // Otherwise, if there are incoming connections, extract the types from connectionConfig.
+    let inputTypes: string[] = [];
+    if (nodeData.info?.inputTypes && nodeData.info.inputTypes.length > 0) {
+        inputTypes = nodeData.info.inputTypes.map(item => String(item));
+    } else if (nodeData.connections && nodeData.connections.incoming) {
+        // Flatten all types found in all incoming connections
+
+        const typesFromConnections = Object.values(nodeData.connections.incoming)
+            .flatMap((conns: any) =>
+                conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
+            );
+        inputTypes = Array.from(new Set(typesFromConnections));
+    }
+
+    // Determine outputTypes:
+    // If the API provided outputTypes in info, use those;
+    // Otherwise, if there are outgoing connections, extract the types from connectionConfig.
+    let outputTypes: string[] = [];
+    if (nodeData.info?.outputTypes && nodeData.info.outputTypes.length > 0) {
+        outputTypes = nodeData.info.outputTypes.map(item => String(item));
+    } else if (nodeData.connections && nodeData.connections.outgoing) {
+        // Flatten all types found in all outgoing connections
+
+        const typesFromConnections = Object.values(nodeData.connections.outgoing)
+            .flatMap((conns: any) =>
+                conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
+            );
+        outputTypes = Array.from(new Set(typesFromConnections));
+    }
+
     const result = {
         nodeId: nodeData.nodeId,
         info: {
@@ -287,9 +333,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             description: nodeData.info?.description || '',
             tags: nodeData.info?.tags || [],
             title: nodeData.info?.title || '',
-            inputTypes: nodeData.info?.inputTypes || [],
+            inputTypes: inputTypes,
             // outputTypes: nodeData.info?.outputTypes || [],
-            outputTypes: (nodeData.info?.outputTypes || []).map(item => String(item)),
+            outputTypes: outputTypes,
 
             createdAt: nodeData.info?.createdAt || new Date().toISOString(),
         },
@@ -308,17 +354,19 @@ const PipelineEditorContent = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     // Track whether the pipeline has been initialized
     const pipelineInitialized = useRef(false);
-    
+    // Track whether edge reconnection was successful
+    const edgeReconnectSuccessful = useRef(true);
+
     // Custom handler for node changes to update the pipeline configuration
     const handleNodesChange = useCallback((changes) => {
         // First apply the changes to the nodes state
         onNodesChange(changes);
-        
+
         // Then update the pipeline configuration with the new node positions
         changes.forEach(change => {
             if (change.type === 'position' && change.positionAbsolute) {
                 console.log('[PipelineEditorPage] Node position changed:', change);
-                
+
                 // Update the form data with the new node position
                 setFormData(prev => {
                     const updatedNodes = prev.configuration.nodes.map(node => {
@@ -338,7 +386,7 @@ const PipelineEditorContent = () => {
                         }
                         return node;
                     });
-                    
+
                     return {
                         ...prev,
                         configuration: {
@@ -452,7 +500,7 @@ const PipelineEditorContent = () => {
             position: node.position,
             positionAbsolute: node.positionAbsolute
         })));
-        
+
         if (pipelineId && pipelineId !== 'new') {
             updatePipeline.mutate({ id: pipelineId, data: formData });
         } else {
@@ -494,17 +542,17 @@ const PipelineEditorContent = () => {
         if (pipeline?.configuration?.nodes &&
             pipeline.configuration.nodes.length > 0 &&
             !pipelineInitialized.current) {
-            
+
             console.log('[PipelineEditorPage] Initializing ReactFlow from pipeline configuration');
             console.log('[PipelineEditorPage] Configuration nodes:', pipeline.configuration.nodes);
             console.log('[PipelineEditorPage] Configuration edges:', pipeline.configuration.edges);
-            
+
             // Convert configuration nodes to ReactFlow nodes
             const reactFlowNodes = pipeline.configuration.nodes.map(node => {
                 console.log('[PipelineEditorPage] Processing node:', node);
-                
+
                 // Create a ReactFlow node from the pipeline node
-                const stableIcon = useMemo(() => <FaFileVideo size={20} />, []);
+                const nodeIcon = useMemo(() => getNodeIcon(node.data.type), [node.data.type]);
                 return {
                     id: node.id,
                     type: node.type || 'custom',
@@ -516,7 +564,7 @@ const PipelineEditorContent = () => {
                         nodeId: node.data.id,
                         label: node.data.label,
                         description: '',  // Use empty string for description
-                        icon: stableIcon,
+                        icon: nodeIcon,
                         inputTypes: node.data.inputTypes || [],
                         outputTypes: node.data.outputTypes || [],
                         type: node.data.type,
@@ -543,20 +591,20 @@ const PipelineEditorContent = () => {
                     ...(node.selected !== undefined && { selected: node.selected })
                 };
             });
-            
+
             console.log('[PipelineEditorPage] ReactFlow nodes:', reactFlowNodes);
-            
+
             // Set the nodes state
             setNodes(reactFlowNodes);
-            
+
             // Convert configuration edges to ReactFlow edges
             if (pipeline.configuration.edges && pipeline.configuration.edges.length > 0) {
                 const reactFlowEdges = pipeline.configuration.edges.map(edge => {
                     console.log('[PipelineEditorPage] Processing edge:', edge);
-                    
+
                     // Use type assertion to handle sourceHandle and targetHandle
                     const edgeWithHandles = edge as any;
-                    
+
                     return {
                         id: edge.id,
                         source: edge.source,
@@ -568,13 +616,13 @@ const PipelineEditorContent = () => {
                         ...(edgeWithHandles.targetHandle && { targetHandle: edgeWithHandles.targetHandle })
                     };
                 });
-                
+
                 console.log('[PipelineEditorPage] ReactFlow edges:', reactFlowEdges);
-                
+
                 // Set the edges state
                 setEdges(reactFlowEdges);
             }
-            
+
             // Mark the pipeline as initialized
             pipelineInitialized.current = true;
             console.log('[PipelineEditorPage] Pipeline initialized');
@@ -594,6 +642,61 @@ const PipelineEditorContent = () => {
             }))
         );
     }, [onDeleteNode, onConfigureNode, setNodes]);
+
+    // Handle edge reconnection start
+    const onReconnectStart = useCallback(() => {
+        edgeReconnectSuccessful.current = false;
+    }, []);
+
+    // Handle successful edge reconnection
+    const onReconnect = useCallback((oldEdge, newConnection) => {
+        edgeReconnectSuccessful.current = true;
+        setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
+        
+        // Update pipeline configuration with the reconnected edge
+        setFormData(prev => {
+            const updatedEdges = prev.configuration.edges.map(edge => {
+                if (edge.id === oldEdge.id) {
+                    return {
+                        ...edge,
+                        source: newConnection.source,
+                        target: newConnection.target,
+                        sourceHandle: newConnection.sourceHandle,
+                        targetHandle: newConnection.targetHandle
+                    };
+                }
+                return edge;
+            });
+            
+            return {
+                ...prev,
+                configuration: {
+                    ...prev.configuration,
+                    edges: updatedEdges
+                }
+            };
+        });
+    }, [setEdges]);
+
+    // Handle edge reconnection end - delete edge if reconnection failed
+    const onReconnectEnd = useCallback((_, edge) => {
+        if (!edgeReconnectSuccessful.current) {
+            // Remove the edge from the edges state
+            setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+            
+            // Also remove the edge from the pipeline configuration
+            setFormData(prev => ({
+                ...prev,
+                configuration: {
+                    ...prev.configuration,
+                    edges: prev.configuration.edges.filter((e) => e.id !== edge.id)
+                }
+            }));
+        }
+
+        // Reset the flag
+        edgeReconnectSuccessful.current = true;
+    }, [setEdges]);
 
     const onConnect = useCallback(
         (connection: Connection) => {
@@ -667,7 +770,7 @@ const PipelineEditorContent = () => {
 
             // Check if this is our special job status node
             const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
-            
+
             const newReactFlowNode: Node<CustomNodeData> = {
                 id: getId(),
                 type: isJobStatusNode ? 'jobStatusNode' : 'custom',
@@ -676,7 +779,7 @@ const PipelineEditorContent = () => {
                     nodeId: nodeData.id,
                     label: nodeData.label || 'New Node',
                     description: nodeData.description || '',
-                    icon: nodeData.icon || <FaFileVideo size={20} />,
+                    icon: nodeData.icon || getNodeIcon(nodeData.type?.toUpperCase()),
                     inputTypes: nodeData.inputTypes || [],
                     outputTypes: nodeData.outputTypes || [],
                     type: nodeData.type?.toUpperCase(),
@@ -691,9 +794,8 @@ const PipelineEditorContent = () => {
                 }
             };
 
-
             const newPipelineNode = convertToPipelineNode(newReactFlowNode);
-
+         
             // Update the node with handlers before adding it
             const nodeWithHandlers = {
                 ...newReactFlowNode,
@@ -705,29 +807,29 @@ const PipelineEditorContent = () => {
             };
 
             // Update nodes and pipeline configuration as before
-setNodes((nds) => nds.concat(nodeWithHandlers));
+            setNodes((nds) => nds.concat(nodeWithHandlers));
 
-setFormData((prev) => ({
-  ...prev,
-  configuration: {
-    ...prev.configuration,
-    nodes: [...prev.configuration.nodes, newPipelineNode],
-    settings: prev.configuration.settings || { autoStart: false, retryAttempts: 3, timeout: 3600 }
-  }
-}));
+            setFormData((prev) => ({
+                ...prev,
+                configuration: {
+                    ...prev.configuration,
+                    nodes: [...prev.configuration.nodes, newPipelineNode],
+                    settings: prev.configuration.settings || { autoStart: false, retryAttempts: 3, timeout: 3600 }
+                }
+            }));
 
-// Determine whether configuration parameters exist
-const parameters = newReactFlowNode.data.configuration?.parameters;
-const hasParameters = parameters && Object.keys(parameters).length > 0;
+            // Determine whether configuration parameters exist
+            const parameters = newReactFlowNode.data.configuration?.parameters;
+            const hasParameters = parameters && Object.keys(parameters).length > 0;
 
-if (hasParameters) {
-  // If parameters exist, open the configuration dialog
-  setSelectedNode(nodeWithHandlers);
-  setIsNodeConfigOpen(true);
-} else {
-  // No configuration needed—skip opening the dialog
-  console.log("Node has no configuration parameters; skipping config dialog.");
-}
+            if (hasParameters) {
+                // If parameters exist, open the configuration dialog
+                setSelectedNode(nodeWithHandlers);
+                setIsNodeConfigOpen(true);
+            } else {
+                // No configuration needed—skip opening the dialog
+                console.log("Node has no configuration parameters; skipping config dialog.");
+            }
 
 
             // setNodes((nds) => nds.concat(nodeWithHandlers));
@@ -831,8 +933,28 @@ if (hasParameters) {
         }
     }, [selectedNode, setNodes, handleNodeConfigClose]);
 
+    // Function to get the appropriate icon based on node type
+    const getNodeIcon = (nodeType: string | undefined) => {
+      if (!nodeType) return <FaFileVideo size={20} />;
+      
+      const type = nodeType?.toUpperCase() || '';
+      
+      if (type.includes('TRIGGER')) {
+        return <FaBolt size={20} />;
+      } else if (type.includes('FLOW')) {
+        return <FaCodeBranch size={20} />;
+      } else if (type.includes('UTILITY')) {
+        return <FaTools size={20} />;
+      } else if (type.includes('INTEGRATION')) {
+        return <FaPlug size={20} />;
+      }
+      
+      // Default icon for other types
+      return <FaCogs size={20} />;
+    };
+
     const stableIcon = useMemo(() => <FaFileVideo size={20} />, []);
-    
+
     const convertNodeToReactFlowNode = (node: NodeType): Node<CustomNodeData> => ({
         id: node.nodeId || getId(),
         type: 'custom',
@@ -841,7 +963,7 @@ if (hasParameters) {
             nodeId: node.nodeId || '',
             label: node.info.title,
             description: node.info.description || '',
-            icon: stableIcon,
+            icon: getNodeIcon(node.info.nodeType),
             inputTypes: node.info.inputTypes || [],
             outputTypes: node.info.outputTypes || [],
             configuration: null,
@@ -863,7 +985,7 @@ if (hasParameters) {
                 isLoading={createPipeline.isPending || updatePipeline.isPending}
                 pipelineName={formData.name}
                 onPipelineNameChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
-                reactFlowInstance={reactFlowInstance} 
+                reactFlowInstance={reactFlowInstance}
                 setNodes={setNodes}
                 setEdges={setEdges}
             />
@@ -925,6 +1047,9 @@ if (hasParameters) {
                         onNodesChange={handleNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
+                        onReconnectStart={onReconnectStart}
+                        onReconnect={onReconnect}
+                        onReconnectEnd={onReconnectEnd}
                         nodeTypes={nodeTypes}
                         edgeTypes={edgeTypes}
                         onDrop={onDrop}

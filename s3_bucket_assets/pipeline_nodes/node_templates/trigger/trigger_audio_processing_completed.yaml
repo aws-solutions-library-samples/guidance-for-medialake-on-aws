@@ -1,0 +1,37 @@
+spec: v1.0.0
+node:
+  id: trigger_audio_processing_completed
+  title: Audio Processing Completed
+  description: Trigger when a audio processing pipeline execution is completed
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: pipeline_execution_completed
+        event_pattern:
+          source: ["medialake.pipeline"]
+          detail-type: ["Pipeline Execution Completed"]
+          detail:
+            outputs:
+              input:
+                DigitalSourceAsset:
+                  Type: ["Audio"]
+                  MainRepresentation:
+                    Format: ["${Audio Type}"]
+actions:
+  trigger:
+    summary: Trigger after audio processing is completed
+    description: This step will trigger after audio processing is completed
+    operationId: triggerAudioProcessingCompleted
+    parameters:
+      - in: body
+        name: Audio Type
+        required: true
+        schema:
+          type: string
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [audio]

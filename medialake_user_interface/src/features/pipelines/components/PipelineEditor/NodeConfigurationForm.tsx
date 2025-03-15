@@ -514,33 +514,54 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
 
   // 4. Compute effective parameters.
   const effectiveParameters = useMemo(() => {
+    console.log('[NodeConfigurationForm] Computing effective parameters for node type:', node.info.nodeType);
+    console.log('[NodeConfigurationForm] Node ID:', node.nodeId);
+    
     if (node.info.nodeType === 'FLOW') {
       return Object.values(flowParameters);
     } else if (node.info.nodeType === 'UTILITY') {
       // For UTILITY nodes, first check config.parameters.
       const configParams = (methodInfo as any)?.config?.parameters;
+      console.log('[NodeConfigurationForm] UTILITY node configParams:', configParams);
+      
       // If configParams is an array with items, use it.
       if (Array.isArray(configParams) && configParams.length > 0) {
+        console.log('[NodeConfigurationForm] Using configParams array:', configParams);
         return configParams;
       }
+      
       // Otherwise, check if methodInfo.parameters exists.
       const topLevelParams = (methodInfo as any)?.parameters;
+      console.log('[NodeConfigurationForm] UTILITY node topLevelParams:', topLevelParams);
+      
       if (Array.isArray(topLevelParams) && topLevelParams.length > 0) {
+        console.log('[NodeConfigurationForm] Using topLevelParams array:', topLevelParams);
         return topLevelParams;
       }
+      
       // If topLevelParams exists as an object, convert it to an array.
       if (topLevelParams && typeof topLevelParams === 'object') {
-        return Object.values(topLevelParams);
+        const paramsArray = Object.values(topLevelParams);
+        console.log('[NodeConfigurationForm] Using topLevelParams object converted to array:', paramsArray);
+        return paramsArray;
       }
+      
       // Finally, if configParams exists as an object, convert it.
       if (configParams && typeof configParams === 'object') {
-        return Object.values(configParams);
+        const paramsArray = Object.values(configParams);
+        console.log('[NodeConfigurationForm] Using configParams object converted to array:', paramsArray);
+        return paramsArray;
       }
+      
+      console.log('[NodeConfigurationForm] No parameters found for UTILITY node');
       return [];
     }
+    
     // For TRIGGER or INTEGRATION nodes.
-    return (methodInfo as any)?.config?.parameters || [];
-  }, [node.info.nodeType, flowParameters, methodInfo]);
+    const params = (methodInfo as any)?.config?.parameters || [];
+    console.log('[NodeConfigurationForm] TRIGGER/INTEGRATION node parameters:', params);
+    return params;
+  }, [node.info.nodeType, flowParameters, methodInfo, node.nodeId]);
 
   const hasParameters = useMemo(() => effectiveParameters.length > 0, [effectiveParameters]);
 
@@ -791,13 +812,66 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
   }
 
   const formDefaultValues = useMemo(() => {
+    console.log('[NodeConfigurationForm] Computing form default values');
+    console.log('[NodeConfigurationForm] Node type:', node.info.nodeType);
+    console.log('[NodeConfigurationForm] Node ID:', node.nodeId);
+    console.log('[NodeConfigurationForm] Existing configuration:', configuration);
+    console.log('[NodeConfigurationForm] Effective parameters:', effectiveParameters);
+    
     const values = {
       parameters: configuration?.parameters || {},
       integrationId: isIntegrationNode ? configuration?.integrationId : undefined,
     };
+    
+    console.log('[NodeConfigurationForm] Initial values:', values);
+    
     if (isIntegrationNode && !values.integrationId && integrationOptions.length > 0) {
       values.integrationId = integrationOptions[0].value;
     }
+    
+    // Handle default values for UTILITY, FLOW, and TRIGGER nodes from effectiveParameters
+    if ((node.info.nodeType === 'UTILITY' || isFlowNode || isTriggerNode) && effectiveParameters.length > 0) {
+      console.log('[NodeConfigurationForm] Processing defaults for', node.info.nodeType, 'node');
+      
+      effectiveParameters.forEach((param: any) => {
+        console.log('[NodeConfigurationForm] Processing parameter:', param);
+        const paramName = param.name;
+        
+        // Log all properties of the parameter to see what's available
+        console.log(`[NodeConfigurationForm] Parameter ${paramName} properties:`, Object.keys(param));
+        
+        // Check for default in different possible locations
+        // The API response structure might vary, so we need to check multiple locations
+        let defaultValue = param.default !== undefined ? param.default :
+                          param.schema?.default !== undefined ? param.schema.default : 
+                          param.defaultValue !== undefined ? param.defaultValue :
+                          param.default_value !== undefined ? param.default_value : undefined;
+                            
+        // Log the raw parameter to see its structure
+        console.log(`[NodeConfigurationForm] Raw parameter object:`, JSON.stringify(param));
+        
+        // Hardcode default values for specific parameters since they're not being properly passed
+        if (node.nodeId === 'pre_signed_url' && param.name === 'URL Validity Duration') {
+          defaultValue = 3600;
+          console.log(`[NodeConfigurationForm] Hardcoding default value for ${param.name} to:`, defaultValue);
+        }
+        
+        console.log(`[NodeConfigurationForm] Default value for ${paramName}:`, defaultValue);
+        
+        // Only set default if it's not already set in configuration
+        if (defaultValue !== undefined && !values.parameters[paramName]) {
+          values.parameters = {
+            ...values.parameters,
+            [paramName]: defaultValue,
+          };
+          console.log(`[NodeConfigurationForm] Setting default value for ${paramName}:`, defaultValue);
+        } else {
+          console.log(`[NodeConfigurationForm] Not setting default for ${paramName}. Already set:`, values.parameters[paramName]);
+        }
+      });
+    }
+    
+    // Handle default values from methodInfo.parameters for other node types
     if (methodInfo?.parameters) {
       Object.entries(methodInfo.parameters).forEach(([key, param]: [string, NodeParameter]) => {
         if (param.type === 'select' && 'options' in param) {
@@ -830,7 +904,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       });
     }
     return values;
-  }, [configuration?.parameters, configuration?.integrationId, isIntegrationNode, methodInfo, integrationOptions]);
+  }, [configuration?.parameters, configuration?.integrationId, isIntegrationNode, methodInfo, integrationOptions, node.info.nodeType, effectiveParameters, isFlowNode, isTriggerNode]);
 
   return (
     <Box>
