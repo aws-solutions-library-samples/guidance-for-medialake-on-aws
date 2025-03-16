@@ -342,13 +342,16 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     "Publish": True,
                 }
 
-                # Only include Environment variables if the node type is "integration"
+                # Common environment variables for all Lambda functions
+                common_env_vars = {
+                    "LARGE_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
+                    "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                }
+
+                # Only include additional Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":
-                    env_vars = { 
-                        "LARGE_PAYLOAD_BUCKET":os.environ.get(
-                            "EXTERNAL_PAYLOAD_BUCKET"
-                        ),
-                        "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                    env_vars = {
+                        **common_env_vars,  # Include common env vars
                         "WORKFLOW_STEP_NAME": function_name,
                         "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
                         "REQUEST_TEMPLATES_PATH": request_templates_path,
@@ -392,12 +395,21 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
                 if node.data.type.lower() == "utility" and node.data.id == 'embedding_store':
+                    # Extract Index Name and Content Type from node configuration
+                    index_name = node.data.configuration.get("Index Name", "embeddings")
+                    content_type = node.data.configuration.get("Content Type", "text")
+                    
                     env_vars = {
-                        "OPENSEARCH_ENDPOINT":os.environ.get(
+                        **common_env_vars,  # Include common env vars
+                        "OPENSEARCH_ENDPOINT": os.environ.get(
                             "OPENSEARCH_ENDPOINT"
-                        )
+                        ),
+                        "INDEX_NAME": index_name,
+                        "CONTENT_TYPE": content_type
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
+                    
+                    logger.info(f"Added environment variables for embedding_store Lambda: INDEX_NAME={index_name}, CONTENT_TYPE={content_type}")
                     
                     # Add VPC configuration for the embedding_store Lambda to access OpenSearch
                     # OPENSEARCH_VPC_SUBNET_IDS contains a comma-separated list of subnet IDs
@@ -407,6 +419,10 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                         "SecurityGroupIds": [OPENSEARCH_SECURITY_GROUP_ID]
                     }
                     logger.info(f"Added VPC configuration to embedding_store Lambda: Subnets={subnet_ids}, SecurityGroup={OPENSEARCH_SECURITY_GROUP_ID}")
+                # For all other node types, just add the common environment variables
+                elif node.data.type.lower() != "integration":  # Integration nodes already handled above
+                    create_function_params["Environment"] = {"Variables": common_env_vars}
+                    logger.info(f"Added common environment variables to {node.data.type} Lambda function: {function_name}")
                 # Create the Lambda function with the appropriate parameters
                 response = lambda_client.create_function(**create_function_params)
 

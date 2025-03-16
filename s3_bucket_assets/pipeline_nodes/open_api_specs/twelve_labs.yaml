@@ -46,6 +46,19 @@ paths:
             type: string
       x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks
       x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks
+  /embed:
+    post:
+      summary: Generate image or audio embeddings
+      description: Generate embeddings for image or audio
+      operationId: generateImageOrAudioEmbeddings
+      parameters:
+        - in: query
+          name: nodeId
+          required: true
+          schema:
+            type: string
+      x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks
+      x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks
   /embed/tasks/{task_id}/status:
     get:
       summary: Get the status of a video embedding task

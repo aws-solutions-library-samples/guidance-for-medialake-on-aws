@@ -2,10 +2,13 @@ import json
 import os
 import boto3
 import uuid
+from urllib.parse import urlparse
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+
+from lambda_middleware import lambda_middleware
 
 # Initialize Powertools
 logger = Logger()
@@ -14,13 +17,14 @@ tracer = Tracer()
 # OpenSearch configuration
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
 INDEX_NAME = os.environ.get("INDEX_NAME", "twelvelabs_embeddings")
+CONTENT_TYPE = os.environ.get("CONTENT_TYPE", "video").lower()
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
 
 # Initialize AWS session and clients
 session = boto3.Session()
 credentials = session.get_credentials()
-auth = AWSV4SignerAuth(credentials, AWS_REGION, 'aoss')
+auth = AWSV4SignerAuth(credentials, AWS_REGION, 'es')  # 'es' for managed OpenSearch service
 
 def get_opensearch_client():
     """Initialize and return an OpenSearch client"""
@@ -28,10 +32,14 @@ def get_opensearch_client():
         logger.warning("OPENSEARCH_ENDPOINT environment variable not set")
         # Return a dummy client for testing
         return None
-        
+    
+    # Parse the endpoint to extract hostname if necessary
+    parsed = urlparse(OPENSEARCH_ENDPOINT)
+    host = parsed.netloc if parsed.scheme else OPENSEARCH_ENDPOINT
+
     # Initialize OpenSearch client
     client = OpenSearch(
-        hosts=[{'host': OPENSEARCH_ENDPOINT, 'port': 443}],
+        hosts=[{'host': host, 'port': 443}],
         http_auth=auth,
         use_ssl=True,
         verify_certs=True,
@@ -105,6 +113,10 @@ def create_index_if_not_exists(client, index_name, dimension=VECTOR_DIMENSION):
         logger.error(f"Error creating index {index_name}: {str(e)}")
         return False
 
+@lambda_middleware(
+    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
+    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
+)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
@@ -128,7 +140,7 @@ def lambda_handler(event, context):
         # Get configuration parameters
         config = metadata.get("configuration", {})
         index_name = config.get("indexName", INDEX_NAME)
-        content_type = config.get("contentType", "video")
+        content_type = config.get("contentType", CONTENT_TYPE)
         
         # Validate embedding vector
         embedding_vector = item.get("float", [])

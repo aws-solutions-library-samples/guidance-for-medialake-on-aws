@@ -45,15 +45,38 @@ def get_event_pattern_for_rule(
             }
         )
     elif rule_name == "pipeline_execution_completed":
-        # Get video type from node configuration, default to MP4 if not provided
-        video_type = node.data.configuration.get("Video Type", "MP4")
-
-        # Create the base pattern with MainRepresentation.Format set to the video type
+        # Determine asset type and format based on node configuration
+        asset_type = "Video"  # Default asset type
+        asset_format = "MP4"  # Default format
+        
+        # Get parameters from node configuration
+        parameters = node.data.configuration.get("parameters", {})
+        logger.info(f"Node parameters: {parameters}")
+        
+        # Check for different asset type parameters in configuration
+        if "Image Type" in parameters:
+            asset_type = "Image"
+            asset_format = parameters.get("Image Type", "PNG")
+            logger.info(f"Using Image asset type with format: {asset_format}")
+        elif "Video Type" in parameters:
+            asset_type = "Video"
+            asset_format = parameters.get("Video Type", "MP4")
+            logger.info(f"Using Video asset type with format: {asset_format}")
+        elif "Audio Type" in parameters:
+            asset_type = "Audio"
+            asset_format = parameters.get("Audio Type", "MP3")
+            logger.info(f"Using Audio asset type with format: {asset_format}")
+        else:
+            logger.warning(f"No specific asset type found in parameters, defaulting to Video/MP4")
+        
+        # Create the base pattern with appropriate asset type and format
         digital_source_asset = {
-            "Type": ["Video"],
-            "MainRepresentation": {"Format": [video_type]},
+            "Type": [asset_type],
+            "MainRepresentation": {"Format": [asset_format.upper()]},
         }
-
+        
+        logger.info(f"Created digital source asset pattern: {digital_source_asset}")
+        
         # Override the source for pipeline execution completed events
         pattern = {
             "source": ["medialake.pipeline"],
@@ -62,7 +85,7 @@ def get_event_pattern_for_rule(
                 "outputs": {"input": {"DigitalSourceAsset": digital_source_asset}},
             },
         }
-
+        
         # Skip the rest of the function to avoid adding parameters at the top level
         return pattern
     elif rule_name == "workflow_completed":

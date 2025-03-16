@@ -57,6 +57,7 @@ def lambda_handler(event, context):
     mediaconvert = boto3.client("mediaconvert", region_name="us-east-1")
 
     response = mediaconvert.get_job(Id=job_id)
+    logger.info(response)
     status = response["Job"]["Status"]
 
     if status == "COMPLETE":
@@ -71,9 +72,30 @@ def lambda_handler(event, context):
             f"s3://{output_bucket}/"
         )[1]
 
-        # Construct proxy and thumbnail paths
-        proxy_path = f"{base_path}.mp4"
-        thumbnail_path = f"{base_path}_thumbnail.0000000.jpg"
+        # Determine output format and paths based on media type
+        if media_type == "Video":
+            proxy_path = f"{base_path}.mp4"
+            thumbnail_path = f"{base_path}_thumbnail.0000000.jpg"
+            proxy_format = "MP4"
+            has_thumbnail = True
+        else:  # Audio
+            # For audio, the output is typically an MP3 file without a thumbnail
+            proxy_path = f"{base_path}.mp3"
+            thumbnail_path = None
+            proxy_format = "MP3"
+            has_thumbnail = False
+            
+            # Check if the output group name contains information about the format
+            for output_group in response["Job"]["Settings"]["OutputGroups"]:
+                if "Name" in output_group and "Audio" in output_group["Name"]:
+                    # Check if there are audio codec settings that specify the format
+                    if "Outputs" in output_group and len(output_group["Outputs"]) > 0:
+                        if "AudioDescriptions" in output_group["Outputs"][0]:
+                            audio_desc = output_group["Outputs"][0]["AudioDescriptions"][0]
+                            if "CodecSettings" in audio_desc:
+                                codec_settings = audio_desc["CodecSettings"]
+                                if "Codec" in codec_settings:
+                                    proxy_format = codec_settings["Codec"]
 
         # Get file sizes (mocked here, replace with actual S3 metadata retrieval if needed)
         proxy_size = 5000000  # Replace with actual size in bytes from S3
@@ -84,7 +106,7 @@ def lambda_handler(event, context):
             proxy_representation = {
                 "ID": f"{asset_id}:proxy",
                 "Type": media_type,
-                "Format": "MP4",
+                "Format": proxy_format,
                 "Purpose": "proxy",
                 "StorageInfo": {
                     "PrimaryLocation": {
@@ -102,33 +124,38 @@ def lambda_handler(event, context):
                 },
             }
 
-            # Create thumbnail representation
-            thumbnail_representation = {
-                "ID": f"{asset_id}:thumbnail",
-                "Type": "Image",
-                "Format": "JPEG",
-                "Purpose": "thumbnail",
-                "ImageSpec": {
-                    "Resolution": {
-                        "Height": 400,
-                        "Width": 300,
-                    }
-                },
-                "StorageInfo": {
-                    "PrimaryLocation": {
-                        "Bucket": output_bucket,
-                        "ObjectKey": {
-                            "FullPath": thumbnail_path,
-                        },
-                        "FileInfo": {
-                            "Size": thumbnail_size,
-                        },
-                        "Provider": "aws",
-                        "Status": "active",
-                        "StorageType": "s3",
-                    }
-                },
-            }
+            # Create representations list
+            representations = [proxy_representation]
+
+            # Create thumbnail representation if applicable (for video)
+            if has_thumbnail:
+                thumbnail_representation = {
+                    "ID": f"{asset_id}:thumbnail",
+                    "Type": "Image",
+                    "Format": "JPEG",
+                    "Purpose": "thumbnail",
+                    "ImageSpec": {
+                        "Resolution": {
+                            "Height": 400,
+                            "Width": 300,
+                        }
+                    },
+                    "StorageInfo": {
+                        "PrimaryLocation": {
+                            "Bucket": output_bucket,
+                            "ObjectKey": {
+                                "FullPath": thumbnail_path,
+                            },
+                            "FileInfo": {
+                                "Size": thumbnail_size,
+                            },
+                            "Provider": "aws",
+                            "Status": "active",
+                            "StorageType": "s3",
+                        }
+                    },
+                }
+                representations.append(thumbnail_representation)
 
             # Update DynamoDB
             try:
@@ -137,10 +164,7 @@ def lambda_handler(event, context):
                     UpdateExpression="SET DerivedRepresentations = list_append(if_not_exists(DerivedRepresentations, :empty_list), :new_reps)",
                     ConditionExpression="attribute_not_exists(DerivedRepresentations) OR NOT contains(DerivedRepresentations, :proxy_id)",
                     ExpressionAttributeValues={
-                        ":new_reps": [
-                            proxy_representation,
-                            thumbnail_representation,
-                        ],
+                        ":new_reps": representations,
                         ":empty_list": [],
                         ":proxy_id": proxy_representation["ID"],
                     },
@@ -168,7 +192,8 @@ def lambda_handler(event, context):
             )
             raise
 
-        return {
+        # Prepare the return object
+        result = {
             "status": status,
             "proxy": {
                 "StorageInfo": {
@@ -180,8 +205,12 @@ def lambda_handler(event, context):
                         "ObjectKey": {"FullPath": proxy_path},
                     }
                 }
-            },
-            "thumbnail": {
+            }
+        }
+        
+        # Add thumbnail information only if it exists (for video)
+        if has_thumbnail:
+            result["thumbnail"] = {
                 "StorageInfo": {
                     "PrimaryLocation": {
                         "StorageType": "s3",
@@ -191,7 +220,8 @@ def lambda_handler(event, context):
                         "ObjectKey": {"FullPath": thumbnail_path},
                     }
                 }
-            },
-        }
+            }
+            
+        return result
 
     return {"status": status}
