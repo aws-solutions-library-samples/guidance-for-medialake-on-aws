@@ -16,6 +16,7 @@ from constructs import Construct
 from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
+    aws_lambda as lambda_,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
@@ -44,7 +45,6 @@ class ConnectorsProps:
     iac_assets_bucket: s3.IBucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
-    asset_sync_state_machine: sfn.StateMachine
     asset_sync_job_table: dynamodb.TableV2
     ingest_event_bus: str | None
     api_resource: str | None = None
@@ -591,27 +591,25 @@ class ConnectorsConstruct(Construct):
         
         s3_sync_connector_resource = connector_id_resource.add_resource("sync")
 
-        s3_sync_lambda = Lambda(
+        self._connector_sync_lambda = Lambda(
             self,
-            "S3SyncLambda",
+            "ConnectorSyncLambda",
             config=LambdaConfig(
-                name="post_connector_s3_sync",
+                name="post_connector_sync",
                 entry="lambdas/api/connectors/rp_connectorid/sync/post_sync",
                 environment_variables={
                     "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                    "MEDIALAKE_ASSET_SYNC_STATE_MACHINE_ARN": props.asset_sync_state_machine.state_machine_arn,
                     "MEDIALAKE_ASSET_SYNC_JOB_TABLE_ARN": props.asset_sync_job_table.table_arn,
                 },
             ),
         )   
-        props.asset_sync_job_table.grant_read_write_data(s3_sync_lambda.function)
-        props.asset_sync_state_machine.grant_start_execution(s3_sync_lambda.function)
-        self.connectors_table.table.grant_read_data(s3_sync_lambda.function)
+        # props.asset_sync_job_table.grant_read_write_data(s3_sync_lambda.function)
+        self.connectors_table.table.grant_read_data(self._connector_sync_lambda.function)
         
         s3_sync_connector_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(s3_sync_lambda.function),
+            apigateway.LambdaIntegration(self._connector_sync_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
@@ -675,5 +673,8 @@ class ConnectorsConstruct(Construct):
 
     @property
     def connector_table(self) -> dynamodb.TableV2:
-
         return self.connectors_table.table
+    
+    @property
+    def connector_sync_lambda(self) -> lambda_.Function:
+        return self._connector_sync_lambda.function

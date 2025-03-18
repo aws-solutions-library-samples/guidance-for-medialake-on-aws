@@ -317,6 +317,41 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
+
+        self._application_service_events_internal_event_bus = EventBus(
+            self,
+            "ApplicationServiceEventsInternalEventBus",
+            props=EventBusConfig(
+                bus_name=f"{config.resource_prefix}-application-service-events-internal-{region}-{config.environment}",
+                description=f"{config.resource_prefix} application service events for internal use",
+                log_all=True,
+            ),
+        )
+
+        self._application_service_events_external_event_bus = EventBus(
+            self,
+            "ApplicationServiceEventsExternalEventBus",
+            props=EventBusConfig(
+                bus_name=f"{config.resource_prefix}-application-service-events-external-{region}-{config.environment}",
+                description=f"{config.resource_prefix} application service events for external use",
+                log_all=True,
+            ),
+        )
+        
+        # Create a rule to forward all events from internal to external event bus
+        # events.Rule(
+        #     self,
+        #     "InternalToExternalEventBusRule",
+        #     event_bus=self._application_service_events_internal_event_bus.event_bus,
+        #     description="Forwards all events from internal event bus to external event bus",
+        #     event_pattern=events.EventPattern(
+        #         source=[account]
+        #     ),
+        #     targets=[
+        #         events.EventBus(self._application_service_events_external_event_bus.event_bus)
+        #     ],
+        # )
+           
         # Pipeline table
 
         pipeline_table = DynamoDB(
