@@ -300,6 +300,7 @@ export default {
         },
         pipelines: {
             title: 'Pipelines',
+            searchPlaceholder: 'Search pipelines...',
             actions: {
                 create: 'Add New Pipeline',
                 deploy: 'Deploy Image Pipeline',

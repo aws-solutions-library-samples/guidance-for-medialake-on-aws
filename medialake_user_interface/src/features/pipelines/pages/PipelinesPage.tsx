@@ -1,21 +1,32 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Box, Button, Snackbar, Alert, useTheme } from '@mui/material';
+import React, { useState, useMemo } from 'react';
+import { Box, Button, Snackbar, Alert } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+    ColumnFiltersState,
+    SortingState,
+    ColumnSizingState,
+} from '@tanstack/react-table';
 
 import { PageHeader, PageContent } from '@/components/common/layout';
+import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
+import { BaseFilterPopover } from '@/components/common/table/BaseFilterPopover';
+import { ColumnVisibilityMenu } from '@/components/common/table/ColumnVisibilityMenu';
 import ApiStatusModal from '@/components/ApiStatusModal';
 import queryClient from '@/api/queryClient';
 import { PipelinesService } from '../api/pipelinesService';
 import {
-    PipelineTable,
     PipelineDeleteDialog,
-    PipelineColumnMenu,
-    PipelineFilterPopover,
 } from '../components';
+import PipelineList from '../components/PipelineList';
 import { usePipelineManager } from '../hooks/usePipelineManager';
-import type { TableState, TableActions } from '../types/table.types';
+import { usePipelineColumns, defaultColumnVisibility } from '../hooks/usePipelineColumns';
+import { TableFiltersProvider } from '../context/TableFiltersContext';
 
 // Define query keys for prefetching
 const PIPELINES_QUERY_KEYS = {
@@ -23,24 +34,9 @@ const PIPELINES_QUERY_KEYS = {
     detail: (id: string) => ['pipelines', 'detail', id] as const,
 };
 
-// Performance monitoring helper
-const logPerf = (message: string, startTime?: number) => {
-    const now = window.performance.now();
-    const timeInfo = startTime ? ` (took ${(now - startTime).toFixed(2)}ms)` : '';
-    console.log(`[PERF-PAGE] ${message}${timeInfo} at ${now.toFixed(2)}ms`);
-    return now;
-};
-
 const PipelinesPage: React.FC = () => {
-    // Performance monitoring
-    const perfMarks = useRef({
-        pageLoad: window.performance.now(),
-        deleteStart: 0,
-        deleteEnd: 0
-    });
-
-    // Add a state flag for deletion in progress
-    const [isDeletingInProgress, setIsDeletingInProgress] = useState(false);
+    const { t } = useTranslation();
+    const navigate = useNavigate();
 
     // API Status Modal state
     const [apiStatus, setApiStatus] = useState({
@@ -50,36 +46,45 @@ const PipelinesPage: React.FC = () => {
         message: ''
     });
 
+    // Delete dialog state
+    const [deleteDialog, setDeleteDialog] = useState({
+        open: false,
+        pipelineName: '',
+        pipelineId: '',
+        userInput: '',
+    });
+
+    // Table state
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [columnVisibility, setColumnVisibility] = useState(() => {
+        try {
+            const saved = localStorage.getItem('pipelineTableColumns');
+            return saved && saved !== 'undefined' ? JSON.parse(saved) : defaultColumnVisibility;
+        } catch (error) {
+            console.error('Error parsing column visibility from localStorage:', error);
+            return defaultColumnVisibility;
+        }
+    });
+    const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+    const [globalFilter, setGlobalFilter] = useState('');
+    const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+    const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+    const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+    const [isDeletingInProgress, setIsDeletingInProgress] = useState(false);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        severity: 'info' as 'info' | 'success' | 'error' | 'warning',
+        message: '',
+    });
+
     // Function to handle closing the ApiStatusModal
     const handleCloseApiStatus = () => {
         setApiStatus(prev => ({ ...prev, open: false }));
     };
 
-    // Log when component mounts
-    useEffect(() => {
-        logPerf('PipelinesPage mounted', perfMarks.current.pageLoad);
-
-        // Log memory usage if available (Chrome only)
-        const performanceWithMemory = window.performance as any;
-        if (performanceWithMemory.memory) {
-            const memoryInfo = performanceWithMemory.memory;
-            console.log('[PERF-PAGE] Initial memory usage:', {
-                totalJSHeapSize: Math.round(memoryInfo.totalJSHeapSize / (1024 * 1024)) + ' MB',
-                usedJSHeapSize: Math.round(memoryInfo.usedJSHeapSize / (1024 * 1024)) + ' MB'
-            });
-        }
-
-        return () => {
-            logPerf('PipelinesPage unmounting');
-        };
-    }, []);
-    const { t } = useTranslation();
-    const theme = useTheme();
-    const navigate = useNavigate();
-
     const {
         pipelines,
-        searchMetadata,
         isLoading,
         error,
         deletePipeline,
@@ -88,451 +93,208 @@ const PipelinesPage: React.FC = () => {
         stopPipeline
     } = usePipelineManager();
 
-    // Monitor re-renders with data
-    useEffect(() => {
-        console.log('[PERF-PAGE] PipelinesPage render with data:', {
-            pipelinesCount: pipelines?.length || 0,
-            isLoading,
-            hasError: !!error,
-            location: location.pathname
+    // Handle edit pipeline
+    const handleEdit = (id: string) => {
+        // Show loading modal
+        setApiStatus({
+            open: true,
+            status: 'loading',
+            action: 'Loading pipeline data...',
+            message: ''
         });
-    }, [pipelines, isLoading, error, location.pathname]);
-
-    // Table state
-    const [tableState, setTableState] = React.useState<TableState>({
-        globalFilter: '',
-        columnFilters: [],
-        columnVisibility: {},
-        columnMenuAnchor: null,
-        filterMenuAnchor: null,
-        activeFilterColumn: null,
-        pagination: {
-            pageIndex: 0,
-            pageSize: searchMetadata?.pageSize || 10,
-        },
-        deleteDialog: {
-            open: false,
-            pipelineName: '',
-            pipelineId: '',
-            userInput: '',
-        },
-        snackbar: {
-            open: false,
-            severity: 'info',
-            message: '',
-        },
-    });
-
-    // Define non-blocking callbacks separately to avoid hooks rules violations
-    const setPagination = useCallback((pagination) => {
-        setTimeout(() => {
-            setTableState(prev => ({ ...prev, pagination }));
-        }, 0);
-    }, []);
         
-    const setGlobalFilter = useCallback((filter) => {
-        setTimeout(() => {
-            setTableState(prev => ({ ...prev, globalFilter: filter }));
-        }, 0);
-    }, []);
-        
-    const setColumnFilters = useCallback((filters) => {
-        setTimeout(() => {
-            setTableState(prev => ({ ...prev, columnFilters: filters }));
-        }, 0);
-    }, []);
-        
-    const setColumnVisibility = useCallback((visibility) => {
-        setTimeout(() => {
-            setTableState(prev => ({ ...prev, columnVisibility: visibility }));
-        }, 0);
-    }, []);
-        
-    // Non-blocking handleCloseSnackbar function
-    const handleCloseSnackbar = useCallback(() => {
-        // Use setTimeout to make this operation non-blocking
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                snackbar: { ...prev.snackbar, open: false }
-            }));
-        }, 0);
-    }, []);
-        
-    const handleEdit = useCallback((id) => {
-        // Log performance start time
-        const startTime = performance.now();
-        console.log(`[PERF] Starting pipeline edit operation for ID: ${id}`);
-        
-        // Show loading modal - use setTimeout to make it non-blocking
-        setTimeout(() => {
-            setApiStatus({
-                open: true,
-                status: 'loading',
-                action: 'Loading pipeline data...',
-                message: ''
-            });
-            console.log(`[PERF] Loading modal shown in ${performance.now() - startTime}ms`);
-        }, 0);
-        
-        // Start prefetching in the background but don't await it
-        const prefetchPromise = queryClient.prefetchQuery({
+        // Start prefetching in the background
+        queryClient.prefetchQuery({
             queryKey: PIPELINES_QUERY_KEYS.detail(id),
             queryFn: () => PipelinesService.getPipeline(id),
             staleTime: 30000, // Consider data fresh for 30 seconds
+        })
+        .finally(() => {
+            // Close the modal regardless of prefetch result
+            setApiStatus(prev => ({ ...prev, open: false }));
         });
-        
-        // Add timeout to the prefetch operation
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-                reject(new Error('Pipeline data loading timed out after 5 seconds'));
-            }, 5000); // 5 second timeout
-        });
-        
-        // Race the prefetch against the timeout, but don't block navigation
-        Promise.race([prefetchPromise, timeoutPromise])
-            .then(() => {
-                const endTime = performance.now();
-                console.log(`[PERF] Prefetch completed successfully in ${endTime - startTime}ms`);
-            })
-            .catch(error => {
-                console.error(`[PERF] Prefetch error after ${performance.now() - startTime}ms:`, error);
-            })
-            .finally(() => {
-                // Close the modal regardless of prefetch result
-                setApiStatus(prev => ({ ...prev, open: false }));
-                console.log(`[PERF] Edit operation UI flow completed in ${performance.now() - startTime}ms`);
-            });
         
         // Navigate immediately without waiting for prefetch
-        console.log(`[PERF] Navigating to edit page for pipeline ID: ${id}`);
         navigate(`/settings/pipelines/edit/${id}`);
-    }, [navigate]);
-    
-    // Non-blocking openDeleteDialog function
-    const openDeleteDialog = useCallback((id, name) => {
-        // Log performance start time
-        const startTime = performance.now();
-        console.log(`[PERF] Opening delete dialog for pipeline: ${id}, name: ${name}`);
-        
-        // Use setTimeout to make this operation non-blocking
-        setTimeout(() => {
-            // Set dialog properties
-            setTableState(prev => ({
-                ...prev,
-                deleteDialog: {
-                    open: true,
-                    pipelineName: name,
-                    pipelineId: id,
-                    userInput: '',
-                },
-            }));
-            
-            console.log(`[PERF] Delete dialog opened in ${performance.now() - startTime}ms`);
-        }, 0);
-    }, []);
-    
-    // Non-blocking closeDeleteDialog function
-    const closeDeleteDialog = useCallback(() => {
-        // Use setTimeout to make this operation non-blocking
-       
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                deleteDialog: { ...prev.deleteDialog, open: false },
-            }));
-            setTimeout(() => {
-                setApiStatus({
-                    open: true,
-                    status: 'loading',
-                    action: 'Deleting pipline...',
-                    message: ''
-                });
-                // console.log(`[PERF] Loading modal shown in ${performance.now() - startTime}ms`);
-            }, 0);
-        }, 0);
-    }, []);
-    
-    // Non-blocking column menu functions
-    const handleColumnMenuOpen = useCallback((event) => {
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                columnMenuAnchor: event.currentTarget,
-            }));
-        }, 0);
-    }, []);
-    
-    const handleColumnMenuClose = useCallback(() => {
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                columnMenuAnchor: null,
-            }));
-        }, 0);
-    }, []);
-    
-    // Non-blocking filter menu functions
-    const handleFilterMenuOpen = useCallback((event, columnId) => {
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                filterMenuAnchor: event.currentTarget,
-                activeFilterColumn: columnId,
-            }));
-        }, 0);
-    }, []);
-    
-    const handleFilterMenuClose = useCallback(() => {
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                filterMenuAnchor: null,
-                activeFilterColumn: null,
-            }));
-        }, 0);
-    }, []);
-    
-    // Non-blocking setDeleteDialogInput function
-    const setDeleteDialogInput = useCallback((input) => {
-        // Use setTimeout to make this operation non-blocking
-        setTimeout(() => {
-            setTableState(prev => ({
-                ...prev,
-                deleteDialog: { ...prev.deleteDialog, userInput: input },
-            }));
-        }, 0);
-    }, []);
+    };
 
-    // Direct delete function with non-blocking approach
-    const handleDirectDelete = useCallback((id, name) => {
+    // Handle delete pipeline
+    const handleDeletePipeline = async (id: string) => {
         // If deletion is already in progress, do nothing
         if (isDeletingInProgress) {
             return;
         }
-        
-        // Log performance start time
-        const startTime = performance.now();
-        console.log(`[PERF] Starting direct pipeline deletion for ID: ${id}, name: ${name}`);
-        
-        // Set deletion in progress - use setTimeout to make it non-blocking
-        setTimeout(() => {
-            setIsDeletingInProgress(true);
-            console.log(`[PERF] Set deletion in progress in ${performance.now() - startTime}ms`);
-        }, 0);
-        
-        // Show loading modal - use setTimeout to make it non-blocking
-        setTimeout(() => {
-            setApiStatus({
-                open: true,
-                status: 'loading',
-                action: `Deleting pipeline "${name}"...`,
-                message: ''
-            });
-            console.log(`[PERF] Loading modal shown in ${performance.now() - startTime}ms`);
-        }, 0);
-        
-        // Create a timeout promise
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-                reject(new Error('Pipeline deletion timed out after 10 seconds'));
-            }, 10000); // 10 second timeout
-        });
-        
-        // Start deletion in the background but don't await it
-        Promise.race([
-            deletePipeline(id),
-            timeoutPromise
-        ])
-            .then(() => {
-                const endTime = performance.now();
-                console.log(`[PERF] Pipeline deletion completed successfully in ${endTime - startTime}ms`);
-                
-                // Show success modal - use setTimeout to make it non-blocking
-                setTimeout(() => {
-                    setApiStatus({
-                        open: true,
-                        status: 'success',
-                        action: 'Pipeline deleted successfully',
-                        message: `The pipeline "${name}" has been deleted.`
-                    });
-                    console.log(`[PERF] Success modal shown in ${performance.now() - startTime}ms`);
-                    
-                    // Auto-close the success modal after 2 seconds
-                    setTimeout(() => {
-                        setApiStatus(prev => ({ ...prev, open: false }));
-                        console.log(`[PERF] Success modal auto-closed in ${performance.now() - startTime}ms`);
-                    }, 2000);
-                }, 0);
-            })
-            .catch(error => {
-                console.error(`[PERF] Pipeline deletion error after ${performance.now() - startTime}ms:`, error);
-                
-                // Show error modal - use setTimeout to make it non-blocking
-                setTimeout(() => {
-                    setApiStatus({
-                        open: true,
-                        status: 'error',
-                        action: 'Error deleting pipeline',
-                        message: error instanceof Error ? error.message : 'An unknown error occurred'
-                    });
-                    console.log(`[PERF] Error modal shown in ${performance.now() - startTime}ms`);
-                }, 0);
-            })
-            .finally(() => {
-                // Reset deletion in progress - use setTimeout to make it non-blocking
-                setTimeout(() => {
-                    setIsDeletingInProgress(false);
-                    console.log(`[PERF] Delete operation UI flow completed in ${performance.now() - startTime}ms`);
-                }, 0);
-            });
-    }, [deletePipeline, isDeletingInProgress]);
 
-    
-    // Non-blocking handleDeletePipeline function WITH ApiStatusModal (Option #1)
-const handleDeletePipeline = useCallback((id: string) => {
-    // If deletion is already in progress, do nothing
-    if (isDeletingInProgress) {
-        return;
-    }
-
-    // Log performance start time
-    const startTime = performance.now();
-    console.log(`[PERF] Starting pipeline deletion from dialog for ID: ${id}`);
-
-    // Set deletion in progress - use setTimeout to make it non-blocking
-    setTimeout(() => {
+        // Set deletion in progress
         setIsDeletingInProgress(true);
-        console.log(`[PERF] Set deletion in progress in ${performance.now() - startTime}ms`);
-    }, 0);
 
-    // Close the dialog first to prevent UI freezing - use setTimeout to make it non-blocking
-    setTimeout(() => {
-        setTableState((prev) => ({
-            ...prev,
-            deleteDialog: { ...prev.deleteDialog, open: false },
-        }));
-        console.log(`[PERF] Dialog closed in ${performance.now() - startTime}ms`);
-    }, 0);
+        // Close the dialog first to prevent UI freezing
+        setDeleteDialog(prev => ({ ...prev, open: false }));
 
-    // ** Show ApiStatusModal in "loading" state **
-    setTimeout(() => {
+        // Show ApiStatusModal in "loading" state
         setApiStatus({
             open: true,
             status: 'loading',
             action: 'Deleting pipeline...',
             message: '',
         });
-    }, 0);
 
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-            reject(new Error('Pipeline deletion timed out after 10 seconds'));
-        }, 10000); // 10-second timeout
+        try {
+            await deletePipeline(id);
+            
+            // Show success modal
+            setApiStatus({
+                open: true,
+                status: 'success',
+                action: 'Pipeline deleted successfully',
+                message: 'The pipeline has been deleted.',
+            });
+
+            // Auto-close the modal after a few seconds
+            setTimeout(() => {
+                setApiStatus(prev => ({ ...prev, open: false }));
+            }, 2000);
+        } catch (error) {
+            // Show error modal
+            setApiStatus({
+                open: true,
+                status: 'error',
+                action: 'Error deleting pipeline',
+                message: error instanceof Error ? error.message : 'An unknown error occurred',
+            });
+        } finally {
+            // Reset deletion in progress
+            setIsDeletingInProgress(false);
+        }
+    };
+
+    // Open delete dialog
+    const openDeleteDialog = (id: string, name: string) => {
+        setDeleteDialog({
+            open: true,
+            pipelineId: id,
+            pipelineName: name,
+            userInput: '',
+        });
+    };
+
+    // Close delete dialog
+    const closeDeleteDialog = () => {
+        setDeleteDialog(prev => ({ ...prev, open: false }));
+    };
+
+    // Handle delete confirmation
+    const handleDeleteConfirm = () => {
+        const pipelineId = deleteDialog.pipelineId;
+        if (!pipelineId) {
+            console.error('No pipeline ID found in delete dialog state');
+            return;
+        }
+        
+        handleDeletePipeline(pipelineId);
+    };
+
+    // Handle filter column
+    const handleFilterColumn = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
+        setActiveFilterColumn(columnId);
+        setFilterMenuAnchor(event.currentTarget);
+    };
+
+    // Handle filter menu close
+    const handleFilterMenuClose = () => {
+        setFilterMenuAnchor(null);
+        setActiveFilterColumn(null);
+    };
+
+    // Handle column visibility changes with persistence
+    const handleColumnVisibilityChange = (updatedVisibility: Record<string, boolean>) => {
+        if (!updatedVisibility) return;
+        setColumnVisibility(updatedVisibility);
+        try {
+            if (Object.keys(updatedVisibility).length > 0) {
+                localStorage.setItem('pipelineTableColumns', JSON.stringify(updatedVisibility));
+            }
+        } catch (error) {
+            console.error('Error saving column visibility to localStorage:', error);
+        }
+    };
+
+    // Handle snackbar close
+    const handleCloseSnackbar = () => {
+        setSnackbar(prev => ({ ...prev, open: false }));
+    };
+
+    // Set delete dialog input
+    const setDeleteDialogInput = (input: string) => {
+        setDeleteDialog(prev => ({ ...prev, userInput: input }));
+    };
+
+    // Create table filters context value
+    const tableFiltersValue = useMemo(() => ({
+        activeFilters: columnFilters.map(f => ({ columnId: f.id, value: f.value as string })),
+        activeSorting: sorting.map(s => ({ columnId: s.id, desc: s.desc })),
+        onRemoveFilter: (columnId: string) => {
+            setColumnFilters(prev => prev.filter(f => f.id !== columnId));
+        },
+        onRemoveSort: (columnId: string) => {
+            setSorting(prev => prev.filter(s => s.id !== columnId));
+        },
+        onFilterChange: (columnId: string, value: string) => {
+            setColumnFilters(prev => {
+                const existing = prev.find(f => f.id === columnId);
+                if (existing) {
+                    return prev.map(f => f.id === columnId ? { ...f, value } : f);
+                }
+                return [...prev, { id: columnId, value }];
+            });
+        },
+        onSortChange: (columnId: string, desc: boolean) => {
+            setSorting(prev => {
+                const existing = prev.find(s => s.id === columnId);
+                if (existing) {
+                    return prev.map(s => s.id === columnId ? { ...s, desc } : s);
+                }
+                return [...prev, { id: columnId, desc }];
+            });
+        },
+    }), [columnFilters, sorting]);
+
+    // Create columns
+    const columns = usePipelineColumns({
+        onEdit: handleEdit,
+        onDelete: openDeleteDialog,
+        onStart: startPipeline,
+        onStop: stopPipeline
     });
 
-    // Start deletion in the background but don't await it
-    Promise.race([deletePipeline(id), timeoutPromise])
-        .then(() => {
-            const endTime = performance.now();
-            console.log(`[PERF] Pipeline deletion completed successfully in ${endTime - startTime}ms`);
-
-            // ** Show ApiStatusModal in "success" state **
-            setTimeout(() => {
-                setApiStatus({
-                    open: true,
-                    status: 'success',
-                    action: 'Pipeline deleted successfully',
-                    message: 'The pipeline has been deleted.',
-                });
-
-                // Optionally auto-close the modal after a few seconds:
-                setTimeout(() => {
-                    setApiStatus((prev) => ({ ...prev, open: false }));
-                }, 2000);
-            }, 0);
-        })
-        .catch((error) => {
-            console.error(`[PERF] Pipeline deletion error after ${performance.now() - startTime}ms:`, error);
-
-            // ** Show ApiStatusModal in "error" state **
-            setTimeout(() => {
-                setApiStatus({
-                    open: true,
-                    status: 'error',
-                    action: 'Error deleting pipeline',
-                    message: error instanceof Error ? error.message : 'An unknown error occurred',
-                });
-            }, 0);
-        })
-        .finally(() => {
-            // Reset deletion in progress - use setTimeout to make it non-blocking
-            setTimeout(() => {
-                setIsDeletingInProgress(false);
-                console.log(`[PERF] Delete dialog operation UI flow completed in ${performance.now() - startTime}ms`);
-            }, 0);
-        });
-}, [deletePipeline, isDeletingInProgress]);
-
-
-    // Create a dedicated non-blocking callback for the delete confirmation
-    const handleDeleteConfirm = useCallback(() => {
-        // Log performance start time
-        const startTime = performance.now();
-        console.log(`[PERF] Starting delete confirmation`);
-        
-        // Use setTimeout to make this operation non-blocking
-        setTimeout(() => {
-            // Get the pipeline ID from the current state
-            const pipelineId = tableState.deleteDialog.pipelineId;
-            if (!pipelineId) {
-                console.error('No pipeline ID found in delete dialog state');
-                return;
+    // Create table
+    const table = useReactTable({
+        data: pipelines || [],
+        columns,
+        state: {
+            sorting,
+            columnFilters,
+            columnVisibility,
+            columnSizing,
+            globalFilter,
+        },
+        enableSorting: true,
+        enableColumnFilters: true,
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: handleColumnVisibilityChange,
+        onColumnSizingChange: setColumnSizing,
+        onGlobalFilterChange: setGlobalFilter,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        filterFns: {
+            includesString: (row, columnId, filterValue) => {
+                const value = String(row.getValue(columnId) || '').toLowerCase();
+                return value.includes(String(filterValue).toLowerCase());
             }
-            
-            console.log(`[PERF] Delete confirmation processing in ${performance.now() - startTime}ms`);
-            
-            // Call the non-blocking delete function
-            handleDeletePipeline(pipelineId);
-        }, 0);
-    }, [tableState.deleteDialog.pipelineId, handleDeletePipeline]);
-
-    // Now create the tableActions object with the memoized callbacks
-    const tableActions: TableActions = useMemo(() => ({
-        setPagination,
-        setGlobalFilter,
-        setColumnFilters,
-        setColumnVisibility,
-        handleCloseSnackbar,
-        handleEdit,
-        openDeleteDialog,
-        closeDeleteDialog,
-        handleDirectDelete,
-        handleColumnMenuOpen,
-        handleColumnMenuClose,
-        handleFilterMenuOpen,
-        handleFilterMenuClose,
-        setDeleteDialogInput,
-        handleDeleteConfirm,
-    }), [
-        setPagination,
-        setGlobalFilter,
-        setColumnFilters,
-        setColumnVisibility,
-        handleCloseSnackbar,
-        handleEdit,
-        openDeleteDialog,
-        closeDeleteDialog,
-        handleDirectDelete,
-        handleColumnMenuOpen,
-        handleColumnMenuClose,
-        handleFilterMenuOpen,
-        handleFilterMenuClose,
-        setDeleteDialogInput,
-        handleDeleteConfirm,
-    ]);
-
+        },
+    });
 
     return (
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -556,68 +318,80 @@ const handleDeletePipeline = useCallback((id: string) => {
                 }
             />
 
-            
+            <TableFiltersProvider {...tableFiltersValue}>
+                <BaseTableToolbar
+                    globalFilter={globalFilter}
+                    onGlobalFilterChange={setGlobalFilter}
+                    onColumnMenuOpen={(event) => setColumnMenuAnchor(event.currentTarget)}
+                    activeFilters={tableFiltersValue.activeFilters}
+                    activeSorting={tableFiltersValue.activeSorting}
+                    onRemoveFilter={tableFiltersValue.onRemoveFilter}
+                    onRemoveSort={tableFiltersValue.onRemoveSort}
+                    searchPlaceholder={t('pipelines.searchPlaceholder')}
+                />
+
                 <PageContent
                     isLoading={isLoading}
                     error={error as Error}
                 >
-                    <PipelineTable
-                        data={pipelines}
-                        isLoading={isLoading}
-                        tableState={tableState}
-                        tableActions={tableActions}
-                        onStartPipeline={startPipeline}
-                        onStopPipeline={stopPipeline}
+                    <PipelineList
+                        table={table}
+                        onFilterColumn={handleFilterColumn}
                     />
                 </PageContent>
 
+                <BaseFilterPopover
+                    anchorEl={filterMenuAnchor}
+                    column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
+                    onClose={handleFilterMenuClose}
+                    data={pipelines || []}
+                    getUniqueValues={(columnId, data) => {
+                        return Array.from(new Set(data.map(item => {
+                            const value = item[columnId as keyof typeof item];
+                            return value ? String(value) : '';
+                        }))).filter(Boolean);
+                    }}
+                />
+
+                <ColumnVisibilityMenu
+                    anchorEl={columnMenuAnchor}
+                    onClose={() => setColumnMenuAnchor(null)}
+                    columns={table.getAllColumns()}
+                />
+
                 <PipelineDeleteDialog
-                    open={tableState.deleteDialog.open}
-                    pipelineName={tableState.deleteDialog.pipelineName}
-                    userInput={tableState.deleteDialog.userInput}
-                    onClose={tableActions.closeDeleteDialog}
+                    open={deleteDialog.open}
+                    pipelineName={deleteDialog.pipelineName}
+                    userInput={deleteDialog.userInput}
+                    onClose={closeDeleteDialog}
                     onConfirm={handleDeleteConfirm}
-                    onUserInputChange={tableActions.setDeleteDialogInput}
+                    onUserInputChange={setDeleteDialogInput}
                     isDeleting={isDeleting || isDeletingInProgress}
                 />
-       
 
-            <PipelineColumnMenu
-                anchorEl={tableState.columnMenuAnchor}
-                onClose={tableActions.handleColumnMenuClose}
-                visibility={tableState.columnVisibility}
-                onVisibilityChange={tableActions.setColumnVisibility}
-            />
-
-            <PipelineFilterPopover
-                anchorEl={tableState.filterMenuAnchor}
-                column={tableState.activeFilterColumn}
-                onClose={tableActions.handleFilterMenuClose}
-                onFilterChange={tableActions.setColumnFilters}
-            />
-
-            <Snackbar
-                open={tableState.snackbar.open}
-                autoHideDuration={6000}
-                onClose={tableActions.handleCloseSnackbar}
-            >
-                <Alert
-                    onClose={tableActions.handleCloseSnackbar}
-                    severity={tableState.snackbar.severity}
-                    sx={{ width: '100%' }}
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={handleCloseSnackbar}
                 >
-                    {tableState.snackbar.message}
-                </Alert>
-            </Snackbar>
+                    <Alert
+                        onClose={handleCloseSnackbar}
+                        severity={snackbar.severity}
+                        sx={{ width: '100%' }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
 
-            {/* API Status Modal */}
-            <ApiStatusModal
-                open={apiStatus.open}
-                onClose={handleCloseApiStatus}
-                status={apiStatus.status}
-                action={apiStatus.action}
-                message={apiStatus.message}
-            />
+                {/* API Status Modal */}
+                <ApiStatusModal
+                    open={apiStatus.open}
+                    onClose={handleCloseApiStatus}
+                    status={apiStatus.status}
+                    action={apiStatus.action}
+                    message={apiStatus.message}
+                />
+            </TableFiltersProvider>
         </Box>
     );
 };
