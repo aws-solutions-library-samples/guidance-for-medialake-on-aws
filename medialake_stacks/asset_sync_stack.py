@@ -368,7 +368,7 @@ class AssetSyncStack(Stack):
                     "s3:PutBucketInventoryConfiguration",
                     "s3:GetBucketLocation",
                 ],
-                resources=["*"],  # Should be restricted in production
+                resources=["*"],
             )
         )
 
@@ -381,7 +381,7 @@ class AssetSyncStack(Stack):
                     "s3control:UpdateJobPriority",
                     "s3control:UpdateJobStatus",
                 ],
-                resources=["*"],  # Should be restricted in production
+                resources=["*"],
             )
         )
 
@@ -404,7 +404,7 @@ class AssetSyncStack(Stack):
                     "s3:CopyObject",
                     "s3:GetBucketLocation",
                 ],
-                resources=["*"],  # Should be restricted in production
+                resources=["*"],
             )
         )
 
