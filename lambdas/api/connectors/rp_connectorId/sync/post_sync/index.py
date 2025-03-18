@@ -1,54 +1,36 @@
-# lambda/api_handler/handler.py
 import os
 import json
 import boto3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.validation.exceptions import SchemaValidationError
 
-# Import common utilities
-import sys
-sys.path.append('/opt/python')
-from common import (
-    AssetProcessor, JobStatus, ErrorType, logger, tracer, metrics,
-    get_optimized_client, DecimalEncoder
-)
+from common import logger, AssetProcessor, JobStatus, ErrorType, DecimalEncoder
 
-# Initialize AWS Lambda Powertools with proper namespace
-logger = Logger(service="connector_sync")
-tracer = Tracer(service="connector_sync")
-metrics = Metrics(namespace="MediaLake", service="connector_sync")
+# Initialize powertools
+tracer = Tracer()
+metrics = Metrics(namespace="MedialakeConnectorSync")
 
-# JSON Schema for API validation - now all properties are optional
-REQUEST_SCHEMA = {
+# Define JSON schema for input validation
+INPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        "concurrencyLimit": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "jobId": {"type": "string"},
+        "objectPrefix": {"type": ["string", "null"]},
+        "concurrencyLimit": {"type": "integer", "minimum": 1, "maximum": 100},
         "batchSize": {"type": "integer", "minimum": 1, "maximum": 10000},
-        "maxPartitions": {"type": "integer", "minimum": 1, "maximum": 50},
-        "objectPrefix": {"type": "string"}
+        "continuationToken": {"type": ["string", "null"]}
     },
-    "additionalProperties": False
+    "additionalProperties": True
 }
 
 def api_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Format API Gateway response
-    
-    Args:
-        status_code: HTTP status code
-        body: Response body
-        
-    Returns:
-        API Gateway response object
-    """
+    """Format API Gateway response"""
     return {
         "statusCode": status_code,
         "headers": {
@@ -59,62 +41,55 @@ def api_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 @tracer.capture_method
-def get_connector_details(connector_id: str) -> Dict[str, Any]:
-    """
-    Get connector details from DynamoDB
-    
-    Args:
-        connector_id: The connector ID
-        
-    Returns:
-        Connector details or None if not found
-    """
-    dynamodb = boto3.resource('dynamodb')
-    table_name = os.environ.get('MEDIALAKE_CONNECTOR_TABLE')
-    if not table_name:
-        raise ValueError("MEDIALAKE_CONNECTOR_TABLE environment variable is not set")
-    
-    table = dynamodb.Table(table_name)
-    
+def get_bucket_name_for_connector(connector_id: str) -> Optional[str]:
+    """Get S3 bucket name associated with a connector ID"""
+    logger.info(f"Retrieving bucket name for connector ID: {connector_id}")
     try:
-        response = table.get_item(Key={"id": connector_id})
-    except ClientError as e:
-        logger.error(f"Error retrieving connector details: {str(e)}")
-        raise
-    
-    if "Item" not in response:
+        # Log environment variables for debugging
+        logger.info(f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={os.environ.get('MEDIALAKE_CONNECTOR_TABLE', 'NOT_SET')}")
+        
+        # Use DynamoDB to look up the connector details
+        if 'MEDIALAKE_CONNECTOR_TABLE' in os.environ:
+            dynamodb = boto3.resource('dynamodb')
+            table_name = os.environ['MEDIALAKE_CONNECTOR_TABLE']
+            connector_table = dynamodb.Table(table_name)
+            
+            logger.info(f"Looking up connector {connector_id} in table {table_name}")
+            response = connector_table.get_item(Key={'id': connector_id})
+            
+            logger.info(f"DynamoDB response: {json.dumps(response, default=str)}")
+            
+            if 'Item' in response:
+                # Get the storage identifier which is used as the bucket name
+                storage_id = response['Item'].get('storageIdentifier')
+                logger.info(f"Found storage identifier '{storage_id}' for connector {connector_id}")
+                return storage_id
+            else:
+                logger.error(f"Connector {connector_id} not found in DynamoDB table {table_name}")
+                return None
+        else:
+            logger.error("MEDIALAKE_CONNECTOR_TABLE environment variable is not set")
+            return None
+        
+    except Exception as e:
+        logger.error(f"Error getting bucket name for connector {connector_id}: {str(e)}", exc_info=True)
         return None
-    
-    return response["Item"]
 
 @tracer.capture_method
-def initialize_job(
-    connector_id: str,
-    bucket_name: str, 
-    concurrency_limit: int = 100,
-    batch_size: int = 1000,
-    max_partitions: int = 10,
-    object_prefix: str = None
-) -> Dict[str, Any]:
-    """
-    Initialize a new sync job
-    
-    Args:
-        connector_id: The connector ID
-        bucket_name: S3 bucket name
-        concurrency_limit: Maximum concurrent Lambda executions
-        batch_size: Number of objects per batch
-        max_partitions: Maximum number of partitions
-        object_prefix: Optional prefix to filter objects
-        
-    Returns:
-        Job details dict
-    """
+def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[str], body: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Initialize a new sync job"""
     # Generate a unique job ID
-    job_id = str(uuid.uuid4())
+    job_id = body.get('jobId') or str(uuid.uuid4())
+    
+    # Extract optional parameters from request body
+    if body is None:
+        body = {}
+    
+    concurrency_limit = min(int(body.get('concurrencyLimit', 20)), 100)
+    batch_size = min(int(body.get('batchSize', 1000)), 10000)
     
     # Calculate TTL for job record (30 days)
-    ttl = int((datetime.utcnow() + timedelta(days=30)).timestamp())
+    ttl = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
     
     # Create job record
     job_record = {
@@ -124,159 +99,203 @@ def initialize_job(
         'objectPrefix': object_prefix,
         'concurrencyLimit': concurrency_limit,
         'batchSize': batch_size,
-        'maxPartitions': max_partitions,
         'status': JobStatus.INITIALIZING.value,
-        'createTime': datetime.utcnow().isoformat(),
-        'lastUpdated': datetime.utcnow().isoformat(),
+        'createTime': datetime.now(timezone.utc).isoformat(),
+        'lastUpdated': datetime.now(timezone.utc).isoformat(),
         'ttl': ttl,
+        'metadata': {
+            'chunksCount': 0,
+            'chunksProcessed': 0,
+            'objectsCount': 0
+        },
         'stats': {
             'totalObjectsScanned': 0,
             'totalObjectsToProcess': 0,
             'totalObjectsProcessed': 0,
-            'partitionsCreated': 0,
-            'partitionsCompleted': 0,
             'errors': 0
         }
     }
     
-    # Save job record to DynamoDB
-    dynamodb = boto3.resource('dynamodb')
-    job_table = dynamodb.Table(os.environ.get('MEDIALAKE_ASSET_SYNC_JOB_TABLE_ARN', '').split('/')[-1])
-    job_table.put_item(Item=job_record)
+    # Log job record
+    logger.info(f"Created job record: {json.dumps(job_record, default=str)}")
     
-    logger.info(f"Initialized sync job {job_id} for connector {connector_id} (bucket {bucket_name})")
+    # Log environment variables for debugging
+    logger.info(f"Environment variables: JOB_TABLE_NAME={os.environ.get('JOB_TABLE_NAME', 'NOT_SET')}")
+    
+    # Save job record to DynamoDB
+    try:
+        dynamodb = boto3.resource('dynamodb')
+        job_table = dynamodb.Table(os.environ['JOB_TABLE_NAME'])
+        
+        logger.info(f"Attempting to write job record to table {os.environ['JOB_TABLE_NAME']}")
+        job_table.put_item(Item=job_record)
+        logger.info(f"Successfully saved job record to DynamoDB")
+    except Exception as e:
+        logger.error(f"Error saving job record to DynamoDB: {str(e)}", exc_info=True)
+        raise
+    
+    logger.info(f"Initialized sync job {job_id} for connector {connector_id}, bucket {bucket_name}")
     metrics.add_metric(name="JobsInitialized", unit=MetricUnit.Count, value=1)
     
-    # Start the state machine execution
-    sfn = boto3.client('stepfunctions')
-    sfn.start_execution(
-        stateMachineArn=os.environ['MEDIALAKE_ASSET_SYNC_STATE_MACHINE_ARN'],
-        name=f"sync-job-{job_id}",
-        input=json.dumps({
+    # Get the engine Lambda ARN
+    engine_function_arn = os.environ.get('ENGINE_FUNCTION_ARN')
+    logger.info(f"ENGINE_FUNCTION_ARN environment variable: {engine_function_arn}")
+    
+    # If the engine function ARN is not set, try to find it using the function name
+    if not engine_function_arn and 'ENGINE_FUNCTION_NAME' in os.environ:
+        try:
+            engine_function_name = os.environ['ENGINE_FUNCTION_NAME']
+            logger.info(f"Using ENGINE_FUNCTION_NAME environment variable: {engine_function_name}")
+            
+            lambda_client = boto3.client('lambda')
+            response = lambda_client.get_function(FunctionName=engine_function_name)
+            engine_function_arn = response['Configuration']['FunctionArn']
+            logger.info(f"Retrieved engine function ARN: {engine_function_arn}")
+        except Exception as e:
+            logger.error(f"Error retrieving engine function ARN: {str(e)}", exc_info=True)
+    
+    # If asset-sync-engine is in the list of functions, try to use that
+    if not engine_function_arn:
+        try:
+            lambda_client = boto3.client('lambda')
+            response = lambda_client.list_functions(MaxItems=100)
+            for function in response.get('Functions', []):
+                if 'asset-sync-engine' in function['FunctionName'].lower():
+                    engine_function_arn = function['FunctionArn']
+                    logger.info(f"Found engine function ARN by name pattern: {engine_function_arn}")
+                    break
+        except Exception as e:
+            logger.error(f"Error listing Lambda functions: {str(e)}", exc_info=True)
+    
+    # Start the sync process by invoking the engine lambda directly
+    if engine_function_arn:
+        lambda_client = boto3.client('lambda')
+        
+        # Prepare payload
+        payload = {
             'jobId': job_id,
-            'connectorId': connector_id,
             'bucketName': bucket_name,
-            'objectPrefix': object_prefix,
-            'operation': 'DISCOVER_PARTITIONS',
-            'maxPartitions': max_partitions,
-            'batchSize': batch_size,
-            'concurrencyLimit': concurrency_limit
-        })
-    )
+            'objectPrefix': object_prefix
+        }
+        logger.info(f"Preparing to invoke engine Lambda with payload: {json.dumps(payload)}")
+        
+        # Invoke the engine lambda to start the sync process
+        try:
+            logger.info(f"Invoking engine Lambda: {engine_function_arn}")
+            response = lambda_client.invoke(
+                FunctionName=engine_function_arn,
+                InvocationType='Event',  # Asynchronous invocation
+                Payload=json.dumps(payload)
+            )
+            
+            status_code = response.get('StatusCode')
+            logger.info(f"Engine Lambda invocation response: StatusCode={status_code}")
+            
+            if status_code == 202:  # 202 Accepted
+                logger.info(f"Successfully invoked engine Lambda for job {job_id}")
+            else:
+                logger.warning(f"Engine Lambda invocation returned unexpected status code: {status_code}")
+                
+            # Log the full response for debugging
+            logger.info(f"Full Lambda invoke response: {json.dumps(response, default=str)}")
+            
+        except Exception as e:
+            logger.error(f"Error invoking engine Lambda: {str(e)}", exc_info=True)
+            
+            # Don't raise the exception - we want to return the job record even if the Lambda invocation fails
+            # The job is created in DynamoDB and can be processed later
+    else:
+        logger.warning(f"ENGINE_FUNCTION_ARN not set, sync will not start automatically for job {job_id}")
+        logger.info("Available environment variables:")
+        for key, value in os.environ.items():
+            # Mask sensitive values
+            if 'key' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+                logger.info(f"  {key}=*****")
+            else:
+                logger.info(f"  {key}={value}")
     
     return job_record
 
 @metrics.log_metrics
 @tracer.capture_lambda_handler
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler for API requests
-    
-    Args:
-        event: API Gateway event
-        context: Lambda context
-        
-    Returns:
-        API Gateway response
-    """
-    # Parse API Gateway event
+def lambda_handler(event, context):
+    """Lambda handler for API requests"""
     try:
-        api_event = APIGatewayProxyEvent(event)
+        logger.info(f"Received API request: {json.dumps(event, default=str)}")
+        logger.info(f"Lambda context: {context.function_name}, {context.function_version}, {context.memory_limit_in_mb}")
         
-        # Extract connector_id from path parameters
-        connector_id = api_event.get("pathParameters", {}).get("connector_id")
+        # Extract path parameters - connector ID is in the path
+        path_params = event.get('pathParameters', {}) or {}
+        connector_id = path_params.get('connectorId')
+        
+        # For compatibility with the URL format:
+        # https://dmu2q37ivmztq.cloudfront.net/prod/connectors/31ab3ecb-a714-470a-b009-e6f046f9aa4e/sync
         if not connector_id:
-            logger.error("No connector_id provided in path parameters")
+            # Extract from path if not in path parameters
+            path = event.get('path', "")
+            parts = path.split('/')
+            for i, part in enumerate(parts):
+                if part == "connectors" and i + 1 < len(parts):
+                    connector_id = parts[i + 1]
+                    logger.info(f"Extracted connector ID {connector_id} from path: {path}")
+                    break
+        
+        logger.info(f"Parsed connector ID: {connector_id}")
+        
+        if not connector_id:
+            logger.error("Missing required parameter: connectorId")
             return api_response(400, {
-                "error": "Missing connector ID",
-                "message": "Connector ID is required in the path"
+                "error": "Missing required parameter",
+                "message": "connectorId must be provided in the path"
             })
-        
-        # Get connector details from DynamoDB
-        connector = get_connector_details(connector_id)
-        if not connector:
-            logger.error(f"Connector not found with ID: {connector_id}")
-            return api_response(404, {
-                "error": "Connector not found",
-                "message": f"No connector found with ID: {connector_id}"
+            
+        # Parse request body for optional parameters
+        try:
+            body = json.loads(event.get('body', '{}')) if event.get('body') else {}
+            logger.info(f"Parsed request body: {json.dumps(body)}")
+            
+            # Validate input against schema
+            validate(event=body, schema=INPUT_SCHEMA)
+            logger.info("Request body validation successful")
+        except SchemaValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
+            return api_response(400, {
+                "error": "Invalid request",
+                "message": str(e)
             })
+        except Exception as e:
+            logger.error(f"Error parsing request body: {str(e)}", exc_info=True)
+            body = {}
+            
+        # Get bucket name for this connector
+        logger.info(f"Getting bucket name for connector: {connector_id}")
+        bucket_name = get_bucket_name_for_connector(connector_id)
         
-        # Extract bucket name from connector
-        bucket_name = connector.get("storageIdentifier")
         if not bucket_name:
-            logger.error(f"Invalid connector configuration for ID: {connector_id}")
-            return api_response(400, {
-                "error": "Invalid connector configuration",
-                "message": "Connector does not have a valid bucket name"
+            logger.error(f"No bucket found for connector ID: {connector_id}")
+            return api_response(404, {
+                "error": f"Connector {connector_id} not found or has no associated bucket"
             })
+            
+        logger.info(f"Found bucket name: {bucket_name}")
         
-        # Parse request body if provided, otherwise use empty dict
-        body = {}
-        if api_event.body:
-            try:
-                body = json.loads(api_event.body)
-                # Validate if body is provided
-                validate(event=body, schema=REQUEST_SCHEMA)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid JSON in request body: {str(e)}")
-                return api_response(400, {
-                    "error": "Invalid JSON",
-                    "message": "Request body contains invalid JSON"
-                })
-            except SchemaValidationError as e:
-                logger.warning(f"Invalid request: {str(e)}")
-                return api_response(400, {
-                    "error": "Invalid request parameters",
-                    "details": str(e)
-                })
-        
-        # Set default values from connector configuration if available
-        default_concurrency_limit = 100
-        default_batch_size = 1000
-        default_max_partitions = 10
-        default_object_prefix = connector.get('objectPrefix')
-        
-        # Check if connector has any sync configuration
-        if 'syncConfig' in connector:
-            sync_config = connector.get('syncConfig', {})
-            default_concurrency_limit = sync_config.get('concurrencyLimit', default_concurrency_limit)
-            default_batch_size = sync_config.get('batchSize', default_batch_size)
-            default_max_partitions = sync_config.get('maxPartitions', default_max_partitions)
-        
-        # Extract parameters with defaults
-        concurrency_limit = min(int(body.get('concurrencyLimit', default_concurrency_limit)), 1000)
-        batch_size = min(int(body.get('batchSize', default_batch_size)), 10000)
-        max_partitions = min(int(body.get('maxPartitions', default_max_partitions)), 50)
-        object_prefix = body.get('objectPrefix', default_object_prefix)
-        
-        # Log the configuration being used
-        logger.info(f"Starting sync job for connector {connector_id} with configuration: "
-                   f"concurrencyLimit={concurrency_limit}, batchSize={batch_size}, "
-                   f"maxPartitions={max_partitions}, objectPrefix={object_prefix}")
+        # Extract prefix for partial sync
+        object_prefix = body.get('objectPrefix')
+        logger.info(f"Object prefix from request: {object_prefix}")
         
         # Initialize the job
-        job = initialize_job(
-            connector_id=connector_id,
-            bucket_name=bucket_name,
-            concurrency_limit=concurrency_limit,
-            batch_size=batch_size,
-            max_partitions=max_partitions,
-            object_prefix=object_prefix
-        )
+        logger.info(f"Initializing job for connector {connector_id}, bucket {bucket_name}")
+        job = initialize_job(connector_id, bucket_name, object_prefix, body)
         
-        # Return success response with configuration details
+        # Return success response
+        logger.info(f"Successfully initialized job {job['jobId']}, returning response")
         return api_response(202, {
             "message": "Sync job started successfully",
             "jobId": job['jobId'],
             "status": job['status'],
             "connectorId": connector_id,
             "bucketName": bucket_name,
-            "configuration": {
-                "concurrencyLimit": concurrency_limit,
-                "batchSize": batch_size,
-                "maxPartitions": max_partitions,
-                "objectPrefix": object_prefix
-            }
+            "objectPrefix": object_prefix
         })
         
     except Exception as e:

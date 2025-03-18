@@ -22,7 +22,7 @@ from medialake_stacks.pipeline_nodes_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
-import os
+# from medialake_stacks.monitoring_stack import MonitoringStack
 
 # Initialize global logger configuration
 if hasattr(config, 'logging') and hasattr(config.logging, 'level'):
@@ -49,6 +49,8 @@ if config.lambda_tail_warming:
 base_infrastructure = BaseInfrastructureStack(
     app, "MediaLakeBaseInfrastructure", env=env
 )
+
+
 
 # Create nodes stack
 nodes_stack = NodesStack(
@@ -103,7 +105,6 @@ api_gateway_stack = ApiGatewayStack(
         image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
         pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
         node_table=nodes_stack.pipelines_nodes_table,
-        asset_sync_state_machine=asset_sync_stack.asset_sync_state_machine,
         asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
     ),
     env=env,
@@ -132,6 +133,24 @@ pipeline_stack = PipelineStack(
     env=env,
 )
 
+# Create the monitoring stack
+# monitoring_stack = MonitoringStack(
+#     app,
+#     "MediaLakeMonitoringStack",
+#     config_path="config.json",
+#     env=env,
+# )
+
+# Add dependencies to the monitoring stack
+# monitoring_stack.add_dependency(base_infrastructure)
+# monitoring_stack.add_dependency(nodes_stack)
+# monitoring_stack.add_dependency(pipeline_nodes_stack)
+# monitoring_stack.add_dependency(asset_sync_stack)
+# monitoring_stack.add_dependency(api_gateway_stack)
+# monitoring_stack.add_dependency(pipeline_stack)
+# if lambda_warmer:
+#     monitoring_stack.add_dependency(lambda_warmer)
+
 cleanup_stack = CleanupStack(
     app,
     "MediaLakeCleanupStack",
@@ -149,6 +168,7 @@ cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
 cleanup_stack.add_dependency(nodes_stack)
+# cleanup_stack.add_dependency(monitoring_stack)
 
 if lambda_warmer:
     cleanup_stack.add_dependency(lambda_warmer)
@@ -165,5 +185,12 @@ cdk.CfnOutput(
     value=api_gateway_stack.user_interface_url,
     description="URL for the MediaLake User Interface",
 )
+
+# cdk.CfnOutput(
+#     monitoring_stack,
+#     "MonitoringDashboardUrl",
+#     value=f"https://{app.region}.console.aws.amazon.com/cloudwatch/home?region={app.region}#dashboards:name={monitoring_stack.dashboard.dashboard_name}",
+#     description="URL for the MediaLake Monitoring Dashboard",
+# )
 
 app.synth()

@@ -16,13 +16,8 @@ from aws_cdk import (
     aws_sns as sns,
     aws_sns_subscriptions as sns_subs,
     aws_s3 as s3,
-    aws_cloudwatch as cloudwatch,
-    aws_cloudwatch_actions as cloudwatch_actions,
-    aws_secretsmanager as secretsmanager,
     aws_stepfunctions as sfn,
-    aws_stepfunctions_tasks as sfn_tasks,
     aws_iam as iam,
-    aws_apigateway as apigateway,
     RemovalPolicy,
 )
 from constructs import Construct
@@ -44,6 +39,7 @@ class AssetSyncStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Create DynamoDB tables - reusing existing constructs
         self._asset_sync_job_table = DynamoDB(
             self,
             "AssetSyncJobTable",
@@ -54,27 +50,16 @@ class AssetSyncStack(Stack):
             ),
         )
 
-        self._asset_sync_partition_table = DynamoDB(
+        self._asset_sync_chunk_table = DynamoDB(
             self,
-            "AssetSyncPartitionTable",
+            "AssetSyncChunkTable",
             props=DynamoDBProps(
-                name=f"{config.resource_prefix}-asset-sync-partition-table",
+                name=f"{config.resource_prefix}-asset-sync-chunk-table",
                 partition_key_name="jobId",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="partitionId",
+                sort_key_name="chunkId",
                 sort_key_type=dynamodb.AttributeType.STRING,
             ),
-        )
-
-        self._asset_sync_partition_table.table.add_global_secondary_index(
-            index_name="status-index",
-            partition_key=dynamodb.Attribute(
-                name="jobId", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="status", type=dynamodb.AttributeType.STRING
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
         )
 
         self._asset_sync_error_table = DynamoDB(
@@ -82,376 +67,182 @@ class AssetSyncStack(Stack):
             "AssetSyncErrorTable",
             props=DynamoDBProps(
                 name=f"{config.resource_prefix}-asset-sync-error-table",
-                partition_key_name="jobId",
+                partition_key_name="errorId",
                 partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="errorId",
-                sort_key_type=dynamodb.AttributeType.STRING,
             ),
         )
 
-        # SQS Queues
-        self.dlq = sqs.Queue(
-            self,
-            "AssetSyncDLQ",
-            retention_period=Duration.days(14),
-            encryption=sqs.QueueEncryption.SQS_MANAGED,
-        )
-        self.status_topic = self._create_status_topic()
-
-        # Create SQS Queues for each processing stage
-        queues = self._create_queues()
-        self.scanner_queue = queues["scanner_queue"]
-        self.query_queue = queues["query_queue"]
-        self.processing_queue = queues["processing_queue"]
-        self.dlq = queues["dlq"]
-
-        self.processing_queue = sqs.Queue(
-            self,
-            "AssetSyncProcessingQueue",
-            visibility_timeout=Duration.minutes(15),
-            dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=self.dlq),
-            encryption=sqs.QueueEncryption.SQS_MANAGED,
-        )
-
-        # CloudWatch Log Group for centralized logging
-        self.log_group = logs.LogGroup(
-            self,
-            "AssetSyncLogGroup",
-            retention=logs.RetentionDays.TWO_WEEKS,
-            removal_policy=RemovalPolicy.DESTROY,
-        )
-
-        # Create S3 bucket for intermediate results
+        # Create S3 bucket for manifests and results
         self.results_bucket = self._create_results_bucket()
 
+        # SQS Queues
+        queues = self._create_queues()
+        self.processor_queue = queues["processor_queue"]
+        self.dlq = queues["dlq"]
+        
+        # SNS topic for status notifications
+        self.status_topic = self._create_status_topic()
 
-        # Common Lambda configuration
+        # Create IAM role for S3 batch operations
+        self.batch_operations_role = iam.Role(
+            self,
+            "AssetSyncBatchOperationsRole",
+            assumed_by=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
+        )
+        
+        # Grant necessary permissions to the batch operations role
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:GetObjectTagging",
+                    "s3:PutObjectTagging",
+                    "s3:PutObjectVersionTagging",
+                    "s3:GetBucketLocation",
+                ],
+                resources=["*"],  # Should be restricted in production
+            )
+        )
+        
+        # Lambda invocation permissions for batch operations
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=["*"],
+            )
+        )
+
+        # Common Lambda environment variables
         asset_sync_lambda_env = {
             "ASSETS_TABLE_NAME": props.asset_table.table_name,
-            "JOB_TABLE_NAME": self._asset_sync_job_table.table_name,
-            "LOG_GROUP_NAME": self.log_group.log_group_name,
-            "PROCESSING_QUEUE_URL": self.processing_queue.queue_url,
-            "PARTITION_TABLE_NAME": self._asset_sync_partition_table.table.table_name,
+            "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
+            "CHUNK_TABLE_NAME": self._asset_sync_chunk_table.table.table_name,
             "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
+            "PROCESSOR_QUEUE_URL": self.processor_queue.queue_url,
             "DLQ_URL": self.dlq.queue_url,
             "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
-            "SCANNER_QUEUE_URL": self.scanner_queue.queue_url,
-            "QUERY_QUEUE_URL": self.query_queue.queue_url,
-            "PROCESSING_QUEUE_URL": self.processing_queue.queue_url,
-            "DLQ_URL": self.dlq.queue_url,
             "STATUS_TOPIC_ARN": self.status_topic.topic_arn,
             "POWERTOOLS_SERVICE_NAME": "asset-management",
             "POWERTOOLS_METRICS_NAMESPACE": "AssetManagement",
             "LOG_LEVEL": "INFO",
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
+            "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,
         }
 
-        self._initialize_job_lambda = Lambda(
+        # Create Lambda functions using existing construct
+        self._storage_sync_post_lambda = Lambda(
             self,
-            "InitializeJobLambda",
+            "StorageSyncPostLambda",
             LambdaConfig(
-                name=f"{config.resource_prefix}-initialize-job-{config.environment}",
-                entry="lambdas/back_end/asset_sync/initialize_job",
-                environment_variables=asset_sync_lambda_env,
-            ),
-        )
-
-        self._scanner_lambda = Lambda(
-            self,
-            "ScannerLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-scanner-{config.environment}",
-                entry="lambdas/back_end/asset_sync/scanner",
-                environment_variables=asset_sync_lambda_env,
+                name="storage-sync-post",
+                entry="lambdas/api/storage/s3/sync/post_sync",
                 memory_size=1024,
                 timeout_minutes=15,
-            ),
-        )
-
-        self._query_lambda = Lambda(
-            self,
-            "QueryLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-query-{config.environment}",
-                entry="lambdas/back_end/asset_sync/query",
                 environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
             ),
         )
 
-        self._batch_processor_lambda = Lambda(
+        # Create the Asset Sync Engine Lambda
+        self._asset_sync_engine_lambda = Lambda(
             self,
-            "BatchProcessorLambda",
+            "AssetSyncEngineLambda",
             LambdaConfig(
-                name=f"{config.resource_prefix}-batch-processor-{config.environment}",
-                entry="lambdas/back_end/asset_sync/batch_processor",
+                name="asset-sync-engine",
+                entry="lambdas/back_end/asset_sync/engine",
+                memory_size=10240,
+                timeout_minutes=15,
                 environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
             ),
         )
 
-        self._processor_lambda = Lambda(
+        # Create the Asset Sync Processor Lambda
+        self._asset_sync_processor_lambda = Lambda(
             self,
-            "ProcessorLambda",
+            "AssetSyncProcessorLambda",
             LambdaConfig(
-                name=f"{config.resource_prefix}-processor-{config.environment}",
+                name="asset-sync-processor",
                 entry="lambdas/back_end/asset_sync/processor",
-                environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
+                memory_size=10240,
                 timeout_minutes=15,
+                environment_variables={
+                    **asset_sync_lambda_env,
+                    "PROCESSOR_FUNCTION_ARN": "",  # Will update after creation
+                },
             ),
         )
 
-        self._dlq_processor_lambda = Lambda(
-            self,
-            "DLQProcessorLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-dlq-processor-{config.environment}",
-                entry="lambdas/back_end/asset_sync/dlq_processor",
-                environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
-            ),
+        # Update the engine with the processor ARN
+        self._asset_sync_engine_lambda.function.add_environment(
+            "PROCESSOR_FUNCTION_ARN", 
+            self._asset_sync_processor_lambda.function.function_arn
         )
 
-        self._job_status_lambda = Lambda(
-            self,
-            "JobStatusLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-job-status-{config.environment}",
-                entry="lambdas/back_end/asset_sync/job_status",
-                environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
-            ),
-        )
-
-        self._aggregator_lambda = Lambda(
-            self,
-            "AggregatorLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-aggregator-{config.environment}",
-                entry="lambdas/back_end/asset_sync/aggregator",
-                environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
-            ),
-        )
-
-        self._worker_lambda = Lambda(
-            self,
-            "WorkerLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-worker-{config.environment}",
-                entry="lambdas/back_end/asset_sync/worker",
-                environment_variables=asset_sync_lambda_env,
-                memory_size=1024,
-                timeout_minutes=15,
-            ),
-        )
-
-        self._partition_discovery_lambda = Lambda(
-            self,
-            "PartitionDiscoveryLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-partition-discovery-{config.environment}",
-                entry="lambdas/back_end/asset_sync/partition_discovery",
-                memory_size=1024,
-                timeout_minutes=15,
-                environment_variables=asset_sync_lambda_env,
-            ),
-        )
-
-        # Add SQS event source to worker lambda
-        self._worker_lambda.function.add_event_source(
+        # Add SQS event source to processor lambda
+        self._asset_sync_processor_lambda.function.add_event_source(
             lambda_event_sources.SqsEventSource(
-                self.processing_queue,
+                self.processor_queue,
                 batch_size=10,
                 max_batching_window=Duration.seconds(30),
                 report_batch_item_failures=True,
             )
         )
+        
+        # Add permission for S3 batch operations to invoke processor
+        self._asset_sync_processor_lambda.function.add_permission(
+            "AllowS3BatchOperations",
+            principal=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
+            action="lambda:InvokeFunction",
+        )
 
-        # Set up Lambda Event Sources
+        # Update batch operations role with specific Lambda ARN
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[self._asset_sync_processor_lambda.function.function_arn],
+            )
+        )
+
+        # Setup event source for starting sync jobs
         self._setup_event_sources()
 
-        # Grant permissions
-        self._grant_permissions()
+        # Grant necessary permissions
+        self._grant_permissions(props)
 
-        # Grant permissions
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._initialize_job_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._scanner_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._query_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._batch_processor_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._worker_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_data(
-            self._job_status_lambda.function
-        )
-
-        props.asset_table.grant_read_data(self._query_lambda.function)
-        props.asset_table.grant_read_write_data(self._worker_lambda.function)
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._worker_lambda.function
-        )
-
-        self.processing_queue.grant_send_messages(self._batch_processor_lambda.function)
-        self.processing_queue.grant_consume_messages(self._worker_lambda.function)
-        self.dlq.grant_send_messages(self._worker_lambda.function)
-
-        # Add S3 cross-region permissions to scanner lambda
-        self._scanner_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:ListBucket",
-                    "s3:GetObject",
-                    "s3:GetObjectTagging",
-                    "s3:PutObjectTagging",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add S3 permissions to worker lambda
-        self._worker_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:GetObjectTagging",
-                    "s3:PutObjectTagging",
-                    "s3:PutObject",
-                ],
-                resources=["*"],
-            )
-        )
-
-        props.ingest_event_bus.grant_put_events_to(self._worker_lambda.function)
-        props.asset_table.grant_read_write_data(self._worker_lambda.function)
-
-        # Step Functions Definition - using error handling and retries
-        initialize_job_task = sfn_tasks.LambdaInvoke(
+        # Outputs
+        CfnOutput(
             self,
-            "InitializeJob",
-            lambda_function=self._initialize_job_lambda.function,
-            retry_on_service_exceptions=True,
-            result_path="$.jobInfo",
-            result_selector={
-                "jobId.$": "$.Payload.jobId",
-                "concurrencyLimit.$": "$.Payload.concurrencyLimit",
-                "batchSize.$": "$.Payload.batchSize",
-                "bucketName.$": "$.Payload.bucketName",
-            },
+            "AssetSyncJobTableName",
+            value=self._asset_sync_job_table.table.table_name,
+            description="Asset Sync Job Table",
         )
-
-        scanner_task = sfn_tasks.LambdaInvoke(
+        
+        CfnOutput(
             self,
-            "ScanS3",
-            lambda_function=self._scanner_lambda.function,
-            retry_on_service_exceptions=True,
-            result_path="$.scanResult",
-            # payload=sfn.TaskInput.from_object({
-            #     "jobId.$": "$.jobInfo.jobId",
-            #     "bucketName.$": "$.jobInfo.bucketName",
-            #     "batchSize.$": "$.jobInfo.batchSize",
-            #     "continuationToken.$": "$.continuationToken"
-            # })
+            "AssetSyncResultsBucketName",
+            value=self.results_bucket.bucket_name,
+            description="Asset Sync Results Bucket",
         )
-
-        query_task = sfn_tasks.LambdaInvoke(
+        
+        CfnOutput(
             self,
-            "QueryAssets",
-            lambda_function=self._query_lambda.function,
-            retry_on_service_exceptions=True,
-            result_path="$.queryResult",
-            payload=sfn.TaskInput.from_object(
-                {
-                    "jobId.$": "$.jobInfo.jobId",
-                    "bucketName.$": "$.jobInfo.bucketName",
-                    "scanResult.$": "$.scanResult.Payload",
-                }
-            ),
+            "AssetSyncProcessorQueueUrl",
+            value=self.processor_queue.queue_url,
+            description="Asset Sync Processor Queue URL",
         )
-
-        process_batch_task = sfn_tasks.LambdaInvoke(
+        
+        CfnOutput(
             self,
-            "ProcessBatch",
-            lambda_function=self._batch_processor_lambda.function,
-            retry_on_service_exceptions=True,
-            result_path="$.processResult",
-            payload=sfn.TaskInput.from_object(
-                {
-                    "jobId.$": "$.jobInfo.jobId",
-                    "bucketName.$": "$.jobInfo.bucketName",
-                    "concurrencyLimit.$": "$.jobInfo.concurrencyLimit",
-                    "queryResult.$": "$.queryResult.Payload",
-                }
-            ),
+            "AssetSyncEngineLambdaArn",
+            value=self._asset_sync_engine_lambda.function.function_arn,
+            description="Asset Sync Engine Lambda ARN",
         )
-
-        # Check if there's more data to scan
-        check_more_data = sfn.Choice(self, "MoreDataToScan")
-
-        # Define success and complete states
-        job_complete = sfn.Succeed(self, "JobComplete")
-
-        # Define the Step Function workflow
-        self.state_machine = sfn.StateMachine(
+        
+        CfnOutput(
             self,
-            "AssetResyncStateMachine",
-            definition_body=sfn.DefinitionBody.from_chainable(
-                initialize_job_task.next(
-                    scanner_task.next(
-                        query_task.next(
-                            process_batch_task.next(
-                                check_more_data.when(
-                                    sfn.Condition.boolean_equals(
-                                        "$.scanResult.Payload.isTruncated", True
-                                    ),
-                                    scanner_task,
-                                ).otherwise(job_complete)
-                            )
-                        )
-                    )
-                )
-            ),
-            timeout=Duration.hours(24),
-            logs=sfn.LogOptions(
-                destination=self.log_group,
-                level=sfn.LogLevel.ALL,
-                include_execution_data=True,
-            ),
-            tracing_enabled=True,
+            "AssetSyncProcessorLambdaArn",
+            value=self._asset_sync_processor_lambda.function.function_arn,
+            description="Asset Sync Processor Lambda ARN",
         )
-
-        self._storage_sync_post_lambda = Lambda(
-            self,
-            "StorageSyncPostLambda",
-            LambdaConfig(
-                name=f"{config.resource_prefix}-storage-sync-post-{config.environment}",
-                entry="lambdas/api/storage/s3/sync/post_sync",
-                memory_size=1024,
-                timeout_minutes=15,
-                environment_variables={
-                    **asset_sync_lambda_env,
-                    "STATE_MACHINE_ARN": self.state_machine.state_machine_arn,
-                },
-            ),
-        )
-
-        # Asset Table permissions
-        props.asset_table.grant_read_data(self._query_lambda.function)
-        props.asset_table.grant_read_write_data(self._processor_lambda.function)
 
     def _create_status_topic(self) -> sns.Topic:
         return sns.Topic(
@@ -461,217 +252,149 @@ class AssetSyncStack(Stack):
         )
 
     def _create_queues(self) -> Dict[str, sqs.Queue]:
-        """Create SQS queues for each processing stage"""
+        """Create SQS queues for processing"""
         # Dead Letter Queue
         dlq = sqs.Queue(
             self,
-            "AssetDLQ",
+            "AssetSyncDLQ",
             retention_period=Duration.days(14),
             encryption=sqs.QueueEncryption.SQS_MANAGED,
             visibility_timeout=Duration.minutes(15),
         )
 
-        # Scanner Queue - Standard for high throughput
-        scanner_queue = sqs.Queue(
+        # Processor Queue - High throughput
+        processor_queue = sqs.Queue(
             self,
-            "ScannerQueue",
-            visibility_timeout=Duration.minutes(15),
-            encryption=sqs.QueueEncryption.SQS_MANAGED,
-            dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=dlq),
-        )
-        # Query Queue - Standard for high throughput
-        query_queue = sqs.Queue(
-            self,
-            "QueryQueue",
-            visibility_timeout=Duration.minutes(15),
-            encryption=sqs.QueueEncryption.SQS_MANAGED,
-            dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=dlq),
-        )
-
-        # Processing Queue - High throughput FIFO
-        processing_queue = sqs.Queue(
-            self,
-            "ProcessingQueue.fifo",
-            # fifo=True,
-            # content_based_deduplication=True,
+            "ProcessorQueue",
             visibility_timeout=Duration.minutes(15),
             encryption=sqs.QueueEncryption.SQS_MANAGED,
             dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=dlq),
         )
 
         return {
-            "scanner_queue": scanner_queue,
-            "query_queue": query_queue,
-            "processing_queue": processing_queue,
+            "processor_queue": processor_queue,
             "dlq": dlq,
-        }
-
-    def _get_lambda_environment(self) -> Dict[str, str]:
-        """Get common Lambda environment variables"""
-        return {
-            "POWERTOOLS_SERVICE_NAME": "asset-management",
-            "POWERTOOLS_METRICS_NAMESPACE": "AssetManagement",
-            "LOG_LEVEL": "INFO",
-            # "ASSETS_TABLE_NAME": self._asset_table.table.table_name,
-            "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
-            "PARTITION_TABLE_NAME": self._asset_sync_partition_table.table.table_name,
-            "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
-            "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
-            "SCANNER_QUEUE_URL": self.scanner_queue.queue_url,
-            "QUERY_QUEUE_URL": self.query_queue.queue_url,
-            "PROCESSING_QUEUE_URL": self.processing_queue.queue_url,
-            "DLQ_URL": self.dlq.queue_url,
-            "STATUS_TOPIC_ARN": self.status_topic.topic_arn,
         }
 
     def _setup_event_sources(self) -> None:
         """Set up event sources for Lambda functions"""
-        # SQS Event Sources
-        self._scanner_lambda.function.add_event_source(
-            lambda_events.SqsEventSource(
-                self.scanner_queue,
-                batch_size=10,
-                max_batching_window=Duration.seconds(0),  # Process immediately
-                report_batch_item_failures=True,
+        # Create EventBridge rule to detect S3 batch job completion
+        batch_job_complete_rule = events.Rule(
+            self,
+            "BatchJobCompleteRule",
+            event_pattern=events.EventPattern(
+                source=["aws.s3"],
+                detail_type=["S3 Batch Operations Job State Change"],
+                detail={
+                    "status": ["Complete", "Failed", "Cancelled"],
+                },
+            ),
+        )
+        
+        batch_job_complete_rule.add_target(
+            events_targets.LambdaFunction(self._asset_sync_engine_lambda.function)
+        )
+
+        # Create scheduled rule to check for stuck jobs
+        stuck_jobs_rule = events.Rule(
+            self,
+            "StuckJobsCheckRule",
+            schedule=events.Schedule.rate(Duration.minutes(5)),
+        )
+        
+        stuck_jobs_rule.add_target(
+            events_targets.LambdaFunction(
+                self._asset_sync_engine_lambda.function,
+                event=events.RuleTargetInput.from_object({"CHECK_STUCK_JOBS": True})
             )
         )
 
-        self._query_lambda.function.add_event_source(
-            lambda_events.SqsEventSource(
-                self.query_queue,
-                batch_size=10,
-                max_batching_window=Duration.seconds(0),  # Process immediately
-                report_batch_item_failures=True,
-            )
-        )
-
-        self._processor_lambda.function.add_event_source(
-            lambda_events.SqsEventSource(
-                self.processing_queue,
-                batch_size=10,
-                max_batching_window=Duration.seconds(0),  # Process immediately
-                report_batch_item_failures=True,
-            )
-        )
-
-        self._dlq_processor_lambda.function.add_event_source(
-            lambda_events.SqsEventSource(
-                self.dlq,
-                batch_size=10,
-                max_batching_window=Duration.seconds(30),  # Allow batching for DLQ
-                report_batch_item_failures=True,
-            )
-        )
-
-        # SNS Subscription for aggregator
-        self.status_topic.add_subscription(
-            sns_subs.LambdaSubscription(self._aggregator_lambda.function)
-        )
-
-        # Schedule for aggregator to run periodically
-        # Using CloudWatch Events Rule
-        aggregator_rule = events.Rule(
-            self, "AggregatorRule", schedule=events.Schedule.rate(Duration.minutes(1))
-        )
-        aggregator_rule.add_target(
-            events_targets.LambdaFunction(self._aggregator_lambda.function)
-        )
-
-    def _grant_permissions(self) -> None:
+    def _grant_permissions(self, props: AssetSyncStackProps) -> None:
         """Grant necessary permissions to Lambda functions"""
-        # Job Table permissions
+        # Job table permissions
         self._asset_sync_job_table.table.grant_read_write_data(
-            self._initialize_job_lambda.function
+            self._storage_sync_post_lambda.function
         )
         self._asset_sync_job_table.table.grant_read_write_data(
-            self._scanner_lambda.function
+            self._asset_sync_engine_lambda.function
         )
         self._asset_sync_job_table.table.grant_read_write_data(
-            self._query_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._batch_processor_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._worker_lambda.function
-        )
-        self._asset_sync_job_table.table.grant_read_data(
-            self._job_status_lambda.function
+            self._asset_sync_processor_lambda.function
         )
 
-        # Partition Table permissions
-        self._asset_sync_partition_table.table.grant_read_write_data(
-            self._partition_discovery_lambda.function
+        # Chunk table permissions
+        self._asset_sync_chunk_table.table.grant_read_write_data(
+            self._asset_sync_engine_lambda.function
         )
-        self._asset_sync_partition_table.table.grant_read_write_data(
-            self._scanner_lambda.function
-        )
-        self._asset_sync_partition_table.table.grant_read_write_data(
-            self._query_lambda.function
-        )
-        self._asset_sync_partition_table.table.grant_read_write_data(
-            self._processor_lambda.function
-        )
-        self._asset_sync_partition_table.table.grant_read_write_data(
-            self._aggregator_lambda.function
+        self._asset_sync_chunk_table.table.grant_read_write_data(
+            self._asset_sync_processor_lambda.function
         )
 
-        # Error Table permissions
+        # Error table permissions
         self._asset_sync_error_table.table.grant_read_write_data(
-            self._partition_discovery_lambda.function
+            self._asset_sync_engine_lambda.function
         )
         self._asset_sync_error_table.table.grant_read_write_data(
-            self._scanner_lambda.function
-        )
-        self._asset_sync_error_table.table.grant_read_write_data(
-            self._query_lambda.function
-        )
-        self._asset_sync_error_table.table.grant_read_write_data(
-            self._processor_lambda.function
-        )
-        self._asset_sync_error_table.table.grant_read_write_data(
-            self._dlq_processor_lambda.function
-        )
-        self._asset_sync_error_table.table.grant_read_data(
-            self._job_status_lambda.function
+            self._asset_sync_processor_lambda.function
         )
 
-        # Results Bucket permissions
-        self.results_bucket.grant_read_write(self._partition_discovery_lambda.function)
-        self.results_bucket.grant_read_write(self._scanner_lambda.function)
-        self.results_bucket.grant_read_write(self._query_lambda.function)
-        self.results_bucket.grant_read_write(self._processor_lambda.function)
+        # Results bucket permissions
+        self.results_bucket.grant_read_write(self._asset_sync_engine_lambda.function)
+        self.results_bucket.grant_read_write(self._asset_sync_processor_lambda.function)
 
         # Queue permissions
-        self.scanner_queue.grant_send_messages(
-            self._partition_discovery_lambda.function
-        )
-        self.query_queue.grant_send_messages(self._scanner_lambda.function)
-        self.processing_queue.grant_send_messages(self._query_lambda.function)
+        self.processor_queue.grant_send_messages(self._asset_sync_engine_lambda.function)
+        self.processor_queue.grant_consume_messages(self._asset_sync_processor_lambda.function)
 
         # SNS permissions
-        self.status_topic.grant_publish(self._partition_discovery_lambda.function)
-        self.status_topic.grant_publish(self._scanner_lambda.function)
-        self.status_topic.grant_publish(self._query_lambda.function)
-        self.status_topic.grant_publish(self._processor_lambda.function)
-        self.status_topic.grant_publish(self._dlq_processor_lambda.function)
+        self.status_topic.grant_publish(self._asset_sync_engine_lambda.function)
+        self.status_topic.grant_publish(self._asset_sync_processor_lambda.function)
 
-        # S3 cross-region permissions
-        self._partition_discovery_lambda.function.add_to_role_policy(
+        # Asset table permissions
+        props.asset_table.grant_read_data(self._asset_sync_engine_lambda.function)
+        props.asset_table.grant_read_write_data(self._asset_sync_processor_lambda.function)
+
+        # Ingest event bus permissions
+        props.ingest_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
+
+        # S3 cross-region permissions for engine
+        self._asset_sync_engine_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["s3:ListBucket", "s3:GetBucketLocation", "s3:GetObject"],
+                actions=[
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                    "s3:GetObjectTagging",
+                    "s3:PutObject",
+                    "s3:PutBucketInventoryConfiguration",
+                    "s3:GetBucketLocation",
+                ],
+                resources=["*"],  # Should be restricted in production
+            )
+        )
+
+        # Add S3 control permissions for batch operations
+        self._asset_sync_engine_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3control:CreateJob",
+                    "s3control:DescribeJob",
+                    "s3control:UpdateJobPriority",
+                    "s3control:UpdateJobStatus",
+                ],
+                resources=["*"],  # Should be restricted in production
+            )
+        )
+
+        # Add STS permission to get caller identity
+        self._asset_sync_engine_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["sts:GetCallerIdentity"],
                 resources=["*"],
             )
         )
 
-        self._scanner_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:ListBucket", "s3:GetObject", "s3:GetObjectTagging"],
-                resources=["*"],
-            )
-        )
-
-        self._processor_lambda.function.add_to_role_policy(
+        # S3 permissions for processor
+        self._asset_sync_processor_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "s3:GetObject",
@@ -679,20 +402,36 @@ class AssetSyncStack(Stack):
                     "s3:PutObjectTagging",
                     "s3:PutObject",
                     "s3:CopyObject",
+                    "s3:GetBucketLocation",
                 ],
-                resources=["*"],
+                resources=["*"],  # Should be restricted in production
             )
         )
 
     def _create_results_bucket(self) -> s3.Bucket:
-        """Create S3 bucket for intermediate results"""
+        """Create S3 bucket for manifests and results"""
         return s3.Bucket(
             self,
             "ResultsBucket",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             lifecycle_rules=[
-                s3.LifecycleRule(expiration=Duration.days(7), prefix="job-results/")
+                s3.LifecycleRule(
+                    expiration=Duration.days(7),
+                    prefix="job-results/"
+                ),
+                s3.LifecycleRule(
+                    expiration=Duration.days(7),
+                    prefix="job-manifests/"
+                ),
+                s3.LifecycleRule(
+                    expiration=Duration.days(7),
+                    prefix="job-chunks/"
+                ),
+                s3.LifecycleRule(
+                    expiration=Duration.days(30),
+                    prefix="job-reports/"
+                ),
             ],
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -702,7 +441,3 @@ class AssetSyncStack(Stack):
     @property
     def asset_sync_job_table(self) -> dynamodb.TableV2:
         return self._asset_sync_job_table.table
-
-    @property
-    def asset_sync_state_machine(self) -> sfn.StateMachine:
-        return self.state_machine

@@ -141,18 +141,169 @@ class AssetProcessor:
             existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
-            if "AssetID" in tags:
-                logger.info(f"Asset already processed: {tags['AssetID']}")
+            # Check existing tags first
+            if "InventoryID" in tags and "AssetID" in tags:
+                logger.info(f"Asset already fully processed: {tags['AssetID']}")
+                
+                # Add logging to check if the record exists in DynamoDB
+                try:
+                    existing_record = self.dynamodb.get_item(
+                        Key={
+                            "InventoryID": tags["InventoryID"]
+                        }
+                    )
+                    if "Item" in existing_record:
+                        logger.info(f"Found existing record in DynamoDB: {json.dumps(existing_record['Item'])}")
+                    else:
+                        logger.warning(f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}")
+                        
+                        # Recreate the record if it doesn't exist in DynamoDB
+                        logger.info(f"Recreating DynamoDB record for tagged asset: {key}")
+                        
+                        # Calculate MD5 hash for the file
+                        md5_hash = self._calculate_md5(bucket, key)
+                        
+                        # Create metadata structure
+                        metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                        
+                        # Create DynamoDB entry using existing InventoryID and AssetID
+                        asset_id = tags["AssetID"]
+                        inventory_id = tags["InventoryID"]
+                        
+                        # Extract asset type from AssetID or content type
+                        if ":" in asset_id:
+                            parts = asset_id.split(":")
+                            if len(parts) >= 2:
+                                type_abbrev = parts[1]
+                                asset_type_map = {"img": "Image", "vid": "Video", "aud": "Audio"}
+                                asset_type = asset_type_map.get(type_abbrev, "Image")
+                            else:
+                                content_type = response.get("ContentType", "")
+                                asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                        else:
+                            content_type = response.get("ContentType", "")
+                            asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                        
+                        # Create the item structure
+                        item = {
+                            "InventoryID": inventory_id,
+                            "FileHash": md5_hash,
+                            "DigitalSourceAsset": {
+                                "ID": asset_id,
+                                "Type": asset_type,
+                                "CreateDate": datetime.utcnow().isoformat(),
+                                "IngestedAt": datetime.utcnow().isoformat(),
+                                "MainRepresentation": {
+                                    "ID": f"{asset_id}:master",
+                                    "Type": asset_type,
+                                    "Format": key.split(".")[-1].upper() if "." in key else "",
+                                    "Purpose": "master",
+                                    "StorageInfo": metadata["StorageInfo"],
+                                },
+                            },
+                            "DerivedRepresentations": [],
+                            "Metadata": metadata.get("Metadata"),
+                        }
+                        
+                        # Log the item we're about to write
+                        logger.info(f"Recreating DynamoDB item: {json.dumps(item)}")
+                        
+                        # Write to DynamoDB
+                        try:
+                            self.dynamodb.put_item(Item=item)
+                            logger.info(f"Successfully recreated DynamoDB record for {inventory_id}")
+                            
+                            # Verify the write
+                            verification = self.dynamodb.get_item(
+                                Key={
+                                    "InventoryID": inventory_id
+                                }
+                            )
+                            if "Item" in verification:
+                                logger.info(f"Verification successful - recreated item exists in DynamoDB")
+                            else:
+                                logger.warning(f"Verification failed - recreated item not found in DynamoDB")
+                                
+                            # Publish event for the recreated record
+                            self.publish_event(
+                                inventory_id,
+                                asset_id,
+                                metadata,
+                            )
+                            
+                            return item
+                        except Exception as e:
+                            logger.exception(f"Error recreating DynamoDB record: {str(e)}")
+                except Exception as e:
+                    logger.exception(f"Error checking existing record in DynamoDB: {str(e)}")
+                
                 return None
-
-            # Calculate MD5 hash and check for duplicates
+            
+            # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
+            
+            # Check if file with same hash exists in DynamoDB
             existing_file = self._check_existing_file(md5_hash)
-
+            
             if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
-
-                # Check if the object key matches
+                
+                # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
+                if "InventoryID" in tags and "AssetID" not in tags:
+                    logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
+                    
+                    # Extract asset type from content type
+                    content_type = response.get("ContentType", "")
+                    asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                    type_abbreviations = {"Image": "img", "Video": "vid", "Audio": "aud"}
+                    type_abbrev = type_abbreviations.get(asset_type, "img")
+                    
+                    # Generate new AssetID
+                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
+                    
+                    # Tag with existing InventoryID and new AssetID
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {"Key": "InventoryID", "Value": tags["InventoryID"]},
+                                {"Key": "AssetID", "Value": new_asset_id},
+                                {"Key": "FileHash", "Value": md5_hash},
+                            ]
+                        },
+                    )
+                    
+                    # Create new asset entry with existing inventory ID
+                    metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"])
+                    
+                    self.publish_event(
+                        dynamo_entry["InventoryID"],
+                        dynamo_entry["DigitalSourceAsset"]["ID"],
+                        metadata,
+                    )
+                    
+                    return dynamo_entry
+                
+                # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
+                if "InventoryID" not in tags and "AssetID" not in tags:
+                    logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
+                                {"Key": "FileHash", "Value": md5_hash},
+                                {"Key": "DuplicateHash", "Value": "true"},
+                            ]
+                        },
+                    )
+                    return None
+                
+                # Handle other cases from existing code
                 existing_object_key = (
                     existing_file.get("DigitalSourceAsset", {})
                     .get("MainRepresentation", {})
@@ -190,7 +341,13 @@ class AssetProcessor:
                     logger.info(
                         "Same hash but different key. Tagging with same InventoryID but new AssetID"
                     )
-                    new_asset_id = f"asset:img:{str(uuid.uuid4())}"
+                    # Extract asset type from content type
+                    content_type = response.get("ContentType", "")
+                    asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                    type_abbreviations = {"Image": "img", "Video": "vid", "Audio": "aud"}
+                    type_abbrev = type_abbreviations.get(asset_type, "img")
+                    
+                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
                     self.s3.put_object_tagging(
                         Bucket=bucket,
                         Key=key,
@@ -216,7 +373,14 @@ class AssetProcessor:
 
             # Process new unique file...
             metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
-            dynamo_entry = self.create_dynamo_entry(metadata)
+            
+            # If we have InventoryID tag but no AssetID tag, use existing inventory
+            if "InventoryID" in tags and "AssetID" not in tags:
+                logger.info(f"Using existing InventoryID: {tags['InventoryID']}")
+                dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"])
+            else:
+                # Normal processing for new file
+                dynamo_entry = self.create_dynamo_entry(metadata)
 
             # Add tags to S3 object
             self.s3.put_object_tagging(
@@ -285,9 +449,15 @@ class AssetProcessor:
         }
 
     @tracer.capture_method
-    def create_dynamo_entry(self, metadata: StorageInfo) -> AssetRecord:
+    def create_dynamo_entry(self, metadata: StorageInfo, inventory_id: str = None) -> AssetRecord:
         """Create DynamoDB entry for the asset"""
-        inventory_id = str(uuid.uuid4())
+        if not inventory_id:
+            inventory_id = f"asset:uuid:{str(uuid.uuid4())}"
+        else:
+            # Use the provided inventory_id if it exists
+            if not inventory_id.startswith("asset:uuid:"):
+                inventory_id = f"asset:uuid:{inventory_id}"
+        
         asset_id = str(uuid.uuid4())
 
         # Extract and capitalize the first part of the MIME type
@@ -310,7 +480,7 @@ class AssetProcessor:
         type_abbrev = type_abbreviations.get(asset_type, "img")  # Default to "img" if type not found
 
         item: AssetRecord = {
-            "InventoryID": f"asset:uuid:{inventory_id}",
+            "InventoryID": inventory_id,
             "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
                 "MD5Hash"
             ],
@@ -335,7 +505,30 @@ class AssetProcessor:
             "Metadata": metadata.get("Metadata"),
         }
 
-        self.dynamodb.put_item(Item=item)
+        # Add detailed logging before DynamoDB operation
+        logger.info(f"Attempting to write to DynamoDB table: {os.environ['ASSETS_TABLE']}")
+        logger.info(f"Item to be written: {json.dumps(item)}")
+        
+        try:
+            response = self.dynamodb.put_item(Item=item)
+            logger.info(f"DynamoDB put_item response: {json.dumps(response)}")
+            
+            # Verify the item was written by doing a get_item
+            verification_response = self.dynamodb.get_item(
+                Key={
+                    "InventoryID": inventory_id
+                }
+            )
+            
+            if "Item" in verification_response:
+                logger.info(f"Verification successful - item exists in DynamoDB")
+            else:
+                logger.warning(f"Verification failed - item not found in DynamoDB after put_item")
+            
+        except Exception as e:
+            logger.exception(f"Error writing to DynamoDB: {str(e)}")
+            raise
+        
         return item
 
     @tracer.capture_method
@@ -470,6 +663,20 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
     """Handle S3 events via SQS from either direct S3 notifications or EventBridge Pipes"""
     processor = AssetProcessor()
 
+    # Log environment variables for debugging
+    logger.info(f"Environment variables: ASSETS_TABLE={os.environ.get('ASSETS_TABLE')}, EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME')}")
+    
+    # Check DynamoDB table exists and is accessible
+    try:
+        # Fix: Use the boto3 client directly instead of trying to access through the Table object
+        dynamodb_client = boto3.client('dynamodb')
+        table_info = dynamodb_client.describe_table(
+            TableName=os.environ["ASSETS_TABLE"]
+        )
+        logger.info(f"DynamoDB table info: {json.dumps(table_info)}")
+    except Exception as e:
+        logger.exception(f"Error accessing DynamoDB table: {str(e)}")
+    
     try:
         # Process each record directly since event is already a list
         for record in event:
@@ -482,15 +689,21 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                     logger.warning("No body found in SQS record")
                     continue
 
-                body = json.loads(record["body"])
+                # Try to parse the body as JSON
+                try:
+                    body = json.loads(record["body"])
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, use the raw body
+                    logger.warning("Failed to parse body as JSON, using raw body")
+                    body = record["body"]
 
                 # Check if this is a test event
-                if body.get("Event") == "s3:TestEvent":
+                if isinstance(body, dict) and body.get("Event") == "s3:TestEvent":
                     logger.info("Received S3 test event - skipping processing")
                     continue
 
                 # Handle both direct S3 events and EventBridge events
-                if "Records" in body:
+                if isinstance(body, dict) and "Records" in body:
                     # Direct S3 event format
                     for s3_record in body["Records"]:
                         if "s3" not in s3_record:
@@ -503,34 +716,110 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
 
                         process_s3_event(processor, bucket, key, event_name)
 
-                elif "detail-type" in body:
+                elif isinstance(body, dict) and "detail-type" in body:
                     # EventBridge event format
+                    logger.info(f"Processing EventBridge event: {json.dumps(body)}")
+                    
                     if body.get("source") != "aws.s3":
                         logger.warning(f"Unexpected event source: {body.get('source')}")
                         continue
 
                     detail = body.get("detail", {})
+                    
+                    # Extract bucket and key information based on EventBridge S3 event structure
                     bucket = detail.get("bucket", {}).get("name")
-                    key = detail.get("object", {}).get("key")
+                    
+                    # Handle different object key locations in EventBridge events
+                    key = None
+                    if "object" in detail and isinstance(detail["object"], dict):
+                        key = detail["object"].get("key")
+                    elif "object" in detail and isinstance(detail["object"], str):
+                        key = detail["object"]
+                    
+                    # If key is still None, try other possible locations
+                    if key is None and "key" in detail:
+                        key = detail["key"]
                     
                     # Map EventBridge detail-type to S3 event name
+                    detail_type = body.get("detail-type", "")
                     event_type_mapping = {
                         "Object Created": "ObjectCreated:",
                         "Object Deleted": "ObjectRemoved:",
                         "Object Restored": "ObjectRestore:",
-                        "Object Tagged": "ObjectTagging:"
+                        "Object Tagged": "ObjectTagging:",
+                        "PutObject": "ObjectCreated:Put",
+                        "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
+                        "DeleteObject": "ObjectRemoved:Delete"
                     }
                     
-                    event_name = event_type_mapping.get(body.get("detail-type", ""), "")
+                    event_name = event_type_mapping.get(detail_type, "")
                     
-                    if not all([bucket, key, event_name]):
-                        logger.warning("Missing required fields in EventBridge event")
+                    # If we couldn't map the detail-type, try to infer from the event name
+                    if not event_name and "name" in detail:
+                        event_detail_name = detail["name"]
+                        if "Created" in event_detail_name or "Put" in event_detail_name:
+                            event_name = "ObjectCreated:"
+                        elif "Deleted" in event_detail_name or "Remove" in event_detail_name:
+                            event_name = "ObjectRemoved:"
+                    
+                    # Log the extracted information
+                    logger.info(f"Extracted from EventBridge: bucket={bucket}, key={key}, event_name={event_name}")
+                    
+                    if not bucket or not key:
+                        logger.warning(f"Missing required fields in EventBridge event. Detail: {json.dumps(detail)}")
+                        continue
+
+                    process_s3_event(processor, bucket, key, event_name)
+                
+                # Handle raw EventBridge events (not wrapped in SQS)
+                elif isinstance(record, dict) and "detail-type" in record and "source" in record:
+                    logger.info(f"Processing direct EventBridge event: {json.dumps(record)}")
+                    
+                    if record.get("source") != "aws.s3":
+                        logger.warning(f"Unexpected event source: {record.get('source')}")
+                        continue
+                        
+                    detail = record.get("detail", {})
+                    
+                    # Extract bucket and key information
+                    bucket = detail.get("bucket", {}).get("name")
+                    
+                    # Handle different object key locations
+                    key = None
+                    if "object" in detail and isinstance(detail["object"], dict):
+                        key = detail["object"].get("key")
+                    elif "object" in detail and isinstance(detail["object"], str):
+                        key = detail["object"]
+                    
+                    # If key is still None, try other possible locations
+                    if key is None and "key" in detail:
+                        key = detail["key"]
+                    
+                    # Map EventBridge detail-type to S3 event name
+                    detail_type = record.get("detail-type", "")
+                    event_type_mapping = {
+                        "Object Created": "ObjectCreated:",
+                        "Object Deleted": "ObjectRemoved:",
+                        "Object Restored": "ObjectRestore:",
+                        "Object Tagged": "ObjectTagging:",
+                        "PutObject": "ObjectCreated:Put",
+                        "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
+                        "DeleteObject": "ObjectRemoved:Delete"
+                    }
+                    
+                    event_name = event_type_mapping.get(detail_type, "")
+                    
+                    # Log the extracted information
+                    logger.info(f"Extracted from direct EventBridge: bucket={bucket}, key={key}, event_name={event_name}")
+                    
+                    if not bucket or not key:
+                        logger.warning(f"Missing required fields in direct EventBridge event. Detail: {json.dumps(detail)}")
                         continue
 
                     process_s3_event(processor, bucket, key, event_name)
 
                 else:
-                    logger.warning("Unrecognized event format in message body")
+                    logger.warning(f"Unrecognized event format: {json.dumps(body) if isinstance(body, dict) else body}")
 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse SQS message body: {e}")
@@ -560,9 +849,26 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
         logger.info(f"Asset deletion processed: {key}")
     else:
         # Handle creation/modification
-        result = processor.process_asset(bucket, key)
-        if result:
-            metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
-            logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
-        else:
-            logger.info(f"Asset already processed: {key}")
+        try:
+            result = processor.process_asset(bucket, key)
+            if result:
+                metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
+                logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
+                
+                # Verify the item exists in DynamoDB
+                try:
+                    verification = processor.dynamodb.get_item(
+                        Key={
+                            "InventoryID": result["InventoryID"]
+                        }
+                    )
+                    if "Item" in verification:
+                        logger.info(f"Verified item exists in DynamoDB with InventoryID: {result['InventoryID']}")
+                    else:
+                        logger.warning(f"Item not found in DynamoDB after processing with InventoryID: {result['InventoryID']}")
+                except Exception as e:
+                    logger.exception(f"Error verifying item in DynamoDB: {str(e)}")
+            else:
+                logger.info(f"Asset already processed or skipped: {key}")
+        except Exception as e:
+            logger.exception(f"Error in process_asset for {bucket}/{key}: {str(e)}")

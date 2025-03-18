@@ -97,7 +97,6 @@ class ApiGatewayStackProps:
     image_proxy_lambda: lambda_.Function
     pipelines_nodes_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
-    asset_sync_state_machine: sfn.StateMachine
     asset_sync_job_table: dynamodb.TableV2
 
 
@@ -169,7 +168,6 @@ class ApiGatewayStack(Stack):
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 ingest_event_bus=props.ingest_event_bus,
-                asset_sync_state_machine=props.asset_sync_state_machine,
                 asset_sync_job_table=props.asset_sync_job_table,
             ),
         )
@@ -438,6 +436,10 @@ class ApiGatewayStack(Stack):
     @property
     def pipelines_create_handler(self) -> lambda_.Function:
         return self._pipeline_stack.pipelines_create_handler
+    
+    @property
+    def connector_sync_lambda(self) -> lambda_.Function:
+        return self._connectors_api_gateway.connector_sync_lambda
 
     def get_functions(self) -> list[lambda_.Function]:
         """Return all Lambda functions in this stack that need warming."""

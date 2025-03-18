@@ -48,20 +48,34 @@ class CleanupStack(Stack):
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
-         
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
                     "pipes:ListPipes",
-          
                     "pipes:StopPipe",
-              
-            
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
                 resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
             )
         )
+
+        # Ensure IAM permissions for role deletion are complete
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "iam:GetRole",
+                    "iam:ListRoles",
+                    "iam:DeleteRole",
+                    "iam:ListRolePolicies",
+                    "iam:ListAttachedRolePolicies",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                ],
+                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/*"],
+            )
+        )
+
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -139,22 +153,6 @@ class CleanupStack(Stack):
                     "s3:PutBucketNotification",
                 ],
                 resources=["arn:aws:s3:::*"],
-            )
-        )
-
-        self._clean_up_lambda.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "iam:GetRole",
-                    "iam:ListRoles",
-                    "iam:DeleteRole",
-                    "iam:ListRolePolicies",
-                    "iam:ListAttachedRolePolicies",
-                    "iam:DetachRolePolicy",
-                    "iam:DeleteRolePolicy",
-                ],
-                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/*"],
             )
         )
 
