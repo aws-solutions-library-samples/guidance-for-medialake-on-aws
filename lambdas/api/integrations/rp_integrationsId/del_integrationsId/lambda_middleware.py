@@ -146,9 +146,10 @@ class LambdaMiddleware:
         event["metadata"].update({"timestamp": int(time.time()), "service": self.service_name})
         return event
 
-    def standardize_output(self, result: Any) -> Dict[str, Any]:
+    def standardize_output(self, result: Any, original_event: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Wraps the handler result in the standardized output format.
+        If InventoryID exists in the event, adds it to the assets array.
         """
         if not self.standardize_payloads:
             return result
@@ -170,6 +171,53 @@ class LambdaMiddleware:
             "stepResult": "",                          # Optional result details
             "stepDuration": ""                         # Optional duration info
         }
+
+        # Preserve existing assets array if it exists, or initialize a new one
+        # existing_assets = []
+        
+        # # Check if there's an existing assets array in the result
+        # if "assets" in payload_content:
+        #     existing_assets = payload_content["assets"]
+        #     self.logger.info(f"Found existing assets in result: {existing_assets}")
+        
+        # # Initialize assets array if it doesn't exist
+        # payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
+
+        # Preserve existing assets array if it exists, or initialize a new one
+        existing_assets = []
+
+        # Check if there's an existing assets array in the result
+        if "assets" in payload_content:
+            existing_assets = payload_content["assets"]
+            self.logger.info(f"Found existing assets in result: {existing_assets}")
+        # If not in the result, check if there's an assets array in the original event's payload
+        elif original_event and "payload" in original_event and "assets" in original_event["payload"]:
+            existing_assets = original_event["payload"]["assets"]
+            self.logger.info(f"Found existing assets in original event: {existing_assets}")
+
+        # Initialize assets array if it doesn't exist
+        payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
+        
+        # Check if InventoryID exists in the original event and add it to assets array
+        if original_event and "detail" in original_event:
+            detail = original_event.get("detail", {})
+            outputs = detail.get("outputs", {})
+            input_data = outputs.get("input", {})
+            
+            inventory_id = input_data.get("InventoryID")
+            if inventory_id:
+                self.logger.info(f"Found InventoryID in event: {inventory_id}")
+                # Add InventoryID to assets array if not already present
+                if inventory_id not in payload_content["assets"]:
+                    payload_content["assets"].append(inventory_id)
+                    self.logger.info(f"Added InventoryID to assets array: {inventory_id}")
+                else:
+                    self.logger.info(f"InventoryID already exists in assets array: {inventory_id}")
+        
+        # Ensure all asset IDs in the array are unique
+        if payload_content["assets"]:
+            payload_content["assets"] = list(set(payload_content["assets"]))
+            self.logger.info(f"Final assets array after deduplication: {payload_content['assets']}")
 
         output = {
             "metadata": metadata,
@@ -295,7 +343,7 @@ class LambdaMiddleware:
                     for error_type in self.retry_errors:
                         self.metrics.add_metric(name=f"RetryErrors_{error_type}", unit=MetricUnit.Count, value=1)
 
-                processed_result = self.standardize_output(result)
+                processed_result = self.standardize_output(result, event)
                 execution_time = (time.time() - start_time) * 1000
 
                 self.metrics.add_metric(name="Invocations", unit=MetricUnit.Count, value=1)

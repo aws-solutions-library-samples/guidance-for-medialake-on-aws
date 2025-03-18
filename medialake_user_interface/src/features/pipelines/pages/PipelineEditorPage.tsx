@@ -550,9 +550,9 @@ const PipelineEditorContent = () => {
             // Convert configuration nodes to ReactFlow nodes
             const reactFlowNodes = pipeline.configuration.nodes.map(node => {
                 console.log('[PipelineEditorPage] Processing node:', node);
-
                 // Create a ReactFlow node from the pipeline node
-                const nodeIcon = useMemo(() => getNodeIcon(node.data.type), [node.data.type]);
+                // Direct call to getNodeIcon instead of using useMemo inside map function
+                const nodeIcon = getNodeIcon(node.data.type);
                 return {
                     id: node.id,
                     type: node.type || 'custom',

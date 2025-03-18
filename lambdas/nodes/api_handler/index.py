@@ -244,12 +244,12 @@ def create_custom_url(s3_templates, api_template_bucket, event):
     custom_url = query_template.render(variables=mapping)
     return custom_url
 
-def create_response_output(s3_templates, api_template_bucket, response_body):
+def create_response_output(s3_templates, api_template_bucket, response_body, event):
     function_name = "translate_event_to_request"
     response_template_path = f"api_templates/{s3_templates['response_template']}"
     response_mapping_path = s3_templates["response_mapping_file"]
     response_template = download_s3_object(api_template_bucket, response_template_path)
-    response_mapping = load_and_execute_function_from_s3(api_template_bucket, response_mapping_path, function_name, response_body)
+    response_mapping = load_and_execute_function_from_s3(api_template_bucket, response_mapping_path, function_name, {"response_body":response_body,"event":event} )
     env = Environment(loader=FileSystemLoader("/tmp/"))
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(response_template)
@@ -353,7 +353,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             except Exception as e:
                 return {"statusCode": 500, "body": f"Error executing custom code: {str(e)}"}
         else:
-            response_output = create_response_output(s3_templates, api_template_bucket, response_body)
+            response_output = create_response_output(s3_templates, api_template_bucket, response_body, event)
 
         logger.info(f"Response output is {response_body} {response_output}")
 

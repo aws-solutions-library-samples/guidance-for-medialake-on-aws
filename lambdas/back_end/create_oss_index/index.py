@@ -7,6 +7,7 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 import time
 
+VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
 
 def create_index_with_retry(
     host, index_name, payload, headers, credentials, service, region, max_retries=5
@@ -68,7 +69,51 @@ def handler(event, context):
             "content-type": "application/json",
             "accept": "application/json",
         }
-        payload = {"settings": {"index.knn": True, "number_of_shards": 2}}
+
+        payload = {
+                "settings": {
+                    "index": {
+                        "knn": True,
+                        "number_of_shards": 2,
+                        "knn.algo_param.ef_search": 100
+                    }
+                },
+                "mappings": {
+                    "properties": {
+                        "type": {
+                            "type": "keyword"
+                        },
+                        "document_id": {
+                            "type": "keyword"
+                        },
+                        "asset_id": {
+                            "type": "keyword"
+                        },
+                        "start_offset_sec": {
+                            "type": "float"
+                        },
+                        "end_offset_sec": {
+                            "type": "float"
+                        },
+                        "embedding_scope": {
+                            "type": "keyword"
+                        },
+                        "embedding": {
+                            "type": "knn_vector",
+                            "dimension": VECTOR_DIMENSION,
+                            "method": {
+                                "name": "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine": "nmslib",
+                                "parameters": {
+                                    "ef_construction": 128,
+                                    "m": 16
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
         region = os.environ["REGION"]
         service = os.environ["SCOPE"]

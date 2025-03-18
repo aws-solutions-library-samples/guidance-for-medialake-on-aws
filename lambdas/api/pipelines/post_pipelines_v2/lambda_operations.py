@@ -396,7 +396,7 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     create_function_params["Environment"] = {"Variables": env_vars}
                 if node.data.type.lower() == "utility" and node.data.id == 'embedding_store':
                     # Extract Index Name and Content Type from node configuration
-                    index_name = node.data.configuration.get("Index Name", "embeddings")
+                    index_name = node.data.configuration.get("Index Name", "media")
                     content_type = node.data.configuration.get("Content Type", "text")
                     
                     env_vars = {
