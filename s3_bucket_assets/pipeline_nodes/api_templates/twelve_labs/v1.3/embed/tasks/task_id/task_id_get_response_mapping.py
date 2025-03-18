@@ -25,6 +25,7 @@ def translate_event_to_request(response_body_and_event):
     if asset_id and segments:
         for segment in segments:
             segment["assetId"] = asset_id
+            segment["embeddingScope"] = "clip" 
 
     return {
         "task_id": response_body.get("_id"),

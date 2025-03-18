@@ -73,6 +73,14 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": "Missing asset_id in embedding item"})
             }
         
+        scope = item.get("embeddingScope", None)
+        if scope is None:
+            logger.warning("Missing scope in embedding item")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing scope in embedding item"})
+            }
+        
         embedding_vector = item.get("float", [])
         if not embedding_vector or not isinstance(embedding_vector, list):
             logger.warning("Invalid embedding vector")
@@ -98,13 +106,14 @@ def lambda_handler(event, context):
             "document_id": asset_id,
             "asset_id": asset_id,
             "embedding": embedding_vector,
-            "embedding_scope": item.get("embedding_scope", "clip"),
-            "start_offset_sec": item.get("start_offset_sec", 0),
-            "end_offset_sec": item.get("end_offset_sec", 0),
+            "embedding_scope": scope,
+            # "start_offset_sec": item.get("start_offset_sec", 0),
+            # "end_offset_sec": item.get("end_offset_sec", 0),
             "timestamp": datetime.utcnow().isoformat()
         }
-        logger.info(INDEX_NAME)
-        logger.info(document)
+        if scope == "clip":
+            logger.info("TODO add offsets")
+
         
         # Wait for the document to exist in the index before updating
         max_wait_time = 60  # maximum wait time in seconds
@@ -134,7 +143,8 @@ def lambda_handler(event, context):
                 "doc": document,
                 # Uncomment the line below if you want to upsert in case the document doesn't exist
                 # "doc_as_upsert": True
-            }
+            },
+            refresh=True
         )
         
         logger.info(f"Successfully updated document wow: {response}")

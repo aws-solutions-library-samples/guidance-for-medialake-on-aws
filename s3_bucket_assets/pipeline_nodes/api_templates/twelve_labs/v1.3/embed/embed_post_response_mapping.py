@@ -1,12 +1,12 @@
 def translate_event_to_request(response_body_and_event):
 
-    # Determine prefix based on the keys in the response
+    # Determine scope based on the keys in the response
     response_body = response_body_and_event["response_body"]
     event = response_body_and_event["event"]
 
-    prefix = "image" if "image_embedding" in response_body else "audio"
+    scope = "image" if "image_embedding" in response_body else "audio"
 
-    segments = response_body.get(f"{prefix}_embedding", {}).get("segments", [])
+    segments = response_body.get(f"{scope}_embedding", {}).get("segments", [])
     
     # Extract asset ID from the event
     asset_id = None
@@ -27,7 +27,7 @@ def translate_event_to_request(response_body_and_event):
     if asset_id and segments:
         for segment in segments:
             segment["assetId"] = asset_id
-    
+            segment["embeddingScope"] = scope    
 
     return {
         "task_id": response_body.get("_id"),
