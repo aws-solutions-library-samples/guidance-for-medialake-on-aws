@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import {
     Box,
     Paper,
@@ -137,9 +138,12 @@ const ExecutionDetailsPage: React.FC = () => {
 
     const formatDuration = (startDate: string, stopDate?: string) => {
         if (!stopDate) return 'In Progress';
+        
+        // Parse ISO dates and calculate duration
         const start = new Date(startDate).getTime();
         const end = new Date(stopDate).getTime();
         const seconds = Math.floor((end - start) / 1000);
+        
         return `${seconds} seconds`;
     };
 
@@ -277,7 +281,7 @@ const ExecutionDetailsPage: React.FC = () => {
                                                 {event.type}
                                             </Typography>
                                             <Typography variant="caption" color="textSecondary">
-                                                {new Date(event.timestamp).toLocaleString()}
+                                                {formatLocalDateTime(event.timestamp, { showSeconds: true })}
                                             </Typography>
                                         </Box>
                                     </StepLabel>

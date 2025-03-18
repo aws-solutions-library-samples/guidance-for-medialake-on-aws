@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Environment } from '@/types/environment';
-import { format } from 'date-fns';
 import { Box, Tooltip } from '@mui/material';
 import { TableCellContent } from '@/components/common/table';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 
 const columnHelper = createColumnHelper<Environment>();
 
@@ -47,10 +47,10 @@ export const useEnvironmentColumns = () => {
                 cell: ({ getValue }) => {
                     const dateValue = getValue();
                     return (
-                        <Tooltip title={format(new Date(dateValue), 'MMM dd, yyyy HH:mm')} placement="top">
+                        <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
                             <Box>
                                 <TableCellContent variant="secondary">
-                                    {format(new Date(dateValue), 'MMM dd, yyyy')}
+                                    {formatLocalDateTime(dateValue, { showSeconds: false })}
                                 </TableCellContent>
                             </Box>
                         </Tooltip>
@@ -64,10 +64,10 @@ export const useEnvironmentColumns = () => {
                 cell: ({ getValue }) => {
                     const dateValue = getValue();
                     return (
-                        <Tooltip title={format(new Date(dateValue), 'MMM dd, yyyy HH:mm')} placement="top">
+                        <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
                             <Box>
                                 <TableCellContent variant="secondary">
-                                    {format(new Date(dateValue), 'MMM dd, yyyy')}
+                                    {formatLocalDateTime(dateValue, { showSeconds: false })}
                                 </TableCellContent>
                             </Box>
                         </Tooltip>

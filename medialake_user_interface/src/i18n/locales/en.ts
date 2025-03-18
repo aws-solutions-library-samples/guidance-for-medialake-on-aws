@@ -156,50 +156,62 @@ export default {
                             required: 'Email is required',
                             invalid: 'Invalid email address'
                         },
-                    email_verified: {
-                        label: 'Email Verified',
-                        tooltip: 'Indicate if the user\'s email has been verified',
-                        errors: {
-                            required: 'Email verification is required'
-                        }
                     },
                     enabled: {
                         label: 'Enabled',
                         tooltip: 'Enable or disable the user',
                         errors: {
                             required: 'Enabled is required'
+                        },
+                    },
+                    roles: {
+                        label: 'Roles',
+                        tooltip: 'Select the roles for the user',
+                        errors: {
+                            required: 'Roles are required'
+                        }
+                    },
+                    email_verified: {
+                        label: 'Email Verified',
+                        tooltip: 'Indicate if the user\'s email has been verified',
+                        errors: {
+                            required: 'Email verification is required'
                         }
                     }
                 }
             }
-            },
-            columns: {
-                username: 'Username',
-                firstName: 'First Name',
-                lastName: 'Last Name',
-                email: 'Email',
-                status: 'Status',
-                groups: 'Groups',
-                created: 'Created',
-                modified: 'Modified',
-                actions: 'Actions',
-            },
-            actions: {
-                addUser: 'Add User',
-                edit: 'Edit User',
-                delete: 'Delete User',
-                activate: 'Activate User',
-                deactivate: 'Deactivate User'
-            },
-            status: {
-                active: 'Active',
-                inactive: 'Inactive'
-            },
-            errors: {
-                loadFailed: 'Failed to load users',
-                saveFailed: 'Failed to save user',
-                deleteFailed: 'Failed to delete user'
-            }
+        },
+        roles: {
+            admin: 'Admin',
+            editor: 'Editor',
+            viewer: 'Viewer'
+        },
+        columns: {
+            username: 'Username',
+            firstName: 'First Name',
+            lastName: 'Last Name',
+            email: 'Email',
+            status: 'Status',
+            groups: 'Groups',
+            created: 'Created',
+            modified: 'Modified',
+            actions: 'Actions',
+        },
+        actions: {
+            addUser: 'Add User',
+            edit: 'Edit User',
+            delete: 'Delete User',
+            activate: 'Activate User',
+            deactivate: 'Deactivate User'
+        },
+        status: {
+            active: 'Active',
+            inactive: 'Inactive'
+        },
+        errors: {
+            loadFailed: 'Failed to load users',
+            saveFailed: 'Failed to save user',
+            deleteFailed: 'Failed to delete user'
         },
         navigation: {
             home: 'Home',

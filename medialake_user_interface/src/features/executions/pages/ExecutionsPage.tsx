@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, useTheme, alpha, Chip, Popover } from '@mui/material';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import {
     useReactTable,
     getCoreRowModel,
@@ -90,15 +91,7 @@ const ExecutionsPage: React.FC = () => {
     }, [theme]);
 
     const formatDate = useCallback((dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleString(undefined, {
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        return formatLocalDateTime(dateString, { showSeconds: true });
     }, []);
 
     const formatDuration = useCallback((seconds: string | null | undefined) => {
