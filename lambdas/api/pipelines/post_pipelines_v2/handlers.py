@@ -11,7 +11,8 @@ from aws_lambda_powertools.event_handler.api_gateway import (
 
 from models import PipelineDefinition
 from lambda_operations import create_lambda_function
-from step_functions import build_step_function_definition, create_step_function
+from step_functions_builder import build_step_function_definition, create_step_function
+
 from eventbridge import create_eventbridge_rule, delete_eventbridge_rule
 from dynamodb_operations import get_pipeline_by_name, store_pipeline_info
 

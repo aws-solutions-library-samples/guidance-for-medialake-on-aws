@@ -91,6 +91,14 @@ class NodesStack(Stack):
             code_path=["lambdas", "nodes", "api_handler"],
         )
 
+        self.embedding_store_lambda_deployment = LambdaDeployment(
+            self,
+            "EmbeddingStoreLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "embedding_store"],
+        )
+
         self.pre_signed_url_lambda_deployment = LambdaDeployment(
             self,
             "PreSignedUrlLambdaDeployment",

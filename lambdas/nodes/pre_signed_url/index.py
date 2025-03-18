@@ -3,7 +3,9 @@ import json
 import os
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from botocore.config import Config  # Import Config to set signature version
+from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
+from botocore.config import Config 
+from lambda_middleware import lambda_middleware
 
 # Initialize Powertools
 logger = Logger()
@@ -13,6 +15,10 @@ tracer = Tracer()
 s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 
+@lambda_middleware(
+    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
+    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
+)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
@@ -20,28 +26,67 @@ def lambda_handler(event, context):
         # Retrieve configuration from the input section if needed
         input_data = event.get("detail", {}).get("outputs", {}).get("input", {})
 
-        # Extract S3 object information from CheckMediaConvertStatusResult
+        # Initialize variables for S3 bucket, key, and media type
+        s3_bucket = None
+        s3_key = None
+        media_type = None
+        
+        # Try to extract media type from input data
+        digital_source_asset = input_data.get("DigitalSourceAsset", {})
+        if digital_source_asset:
+            media_type = digital_source_asset.get("Type")
+            logger.info(f"Found media type in DigitalSourceAsset: {media_type}")
+
+        # Extract S3 object information from CheckMediaConvertStatusResult (for video)
         check_media_convert = (
             event.get("detail", {})
             .get("outputs", {})
             .get("CheckMediaConvertStatusResult", {})
         )
-        payload = check_media_convert.get("Payload", {})
-        proxy_file = payload.get("proxy", {})
-
-        s3_bucket = (
-            proxy_file.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
-        )
-        s3_key = (
-            proxy_file.get("StorageInfo", {})
-            .get("PrimaryLocation", {})
-            .get("ObjectKey", {})
-            .get("FullPath")
-        )
+        
+        if check_media_convert:
+            payload = check_media_convert.get("Payload", {})
+            proxy_file = payload.get("proxy", {})
+            
+            s3_bucket = (
+                proxy_file.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
+            )
+            s3_key = (
+                proxy_file.get("StorageInfo", {})
+                .get("PrimaryLocation", {})
+                .get("ObjectKey", {})
+                .get("FullPath")
+            )
+            
+            logger.info("Found video proxy information in CheckMediaConvertStatusResult")
+        
+        # If not found, try to extract from ImageProxyResult (for image)
+        if not s3_bucket or not s3_key:
+            image_proxy_result = (
+                event.get("detail", {})
+                .get("outputs", {})
+                .get("ImageProxyResult", {})
+            )
+            
+            if image_proxy_result:
+                payload = image_proxy_result.get("Payload", {})
+                body = payload.get("body", {})
+                
+                s3_bucket = (
+                    body.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
+                )
+                s3_key = (
+                    body.get("StorageInfo", {})
+                    .get("PrimaryLocation", {})
+                    .get("ObjectKey", {})
+                    .get("FullPath")
+                )
+                
+                logger.info("Found image proxy information in ImageProxyResult")
 
         # Validate required parameters
         if not s3_bucket or not s3_key:
-            error_message = "Missing required S3 bucket or key information in CheckMediaConvertStatusResult"
+            error_message = "Missing required S3 bucket or key information in event"
             logger.error(error_message)
             return {"statusCode": 400, "body": json.dumps({"error": error_message})}
 
@@ -58,7 +103,7 @@ def lambda_handler(event, context):
             logger.error(error_message)
             return {"statusCode": 400, "body": json.dumps({"error": error_message})}
 
-        # Generate pre-signed URL for the file from CheckMediaConvertStatusResult
+        # Generate pre-signed URL for the file
         presigned_url = s3_client.generate_presigned_url(
             "get_object",
             Params={"Bucket": s3_bucket, "Key": s3_key},
@@ -69,18 +114,13 @@ def lambda_handler(event, context):
             f"Generated pre-signed URL for {s3_bucket}/{s3_key} valid for {url_validity_duration} seconds"
         )
 
-        # Return success response with pre-signed URL
+        # Return success response with pre-signed URL and media type
         return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "message": "Pre-signed URL generated successfully",
-                    "presignedUrl": presigned_url,
-                    "expiresIn": url_validity_duration,
-                    "bucket": s3_bucket,
-                    "key": s3_key,
-                }
-            ),
+            "presignedUrl": presigned_url,
+            "expiresIn": url_validity_duration,
+            "bucket": s3_bucket,
+            "key": s3_key,
+            "mediaType": media_type,
         }
 
     except Exception as e:

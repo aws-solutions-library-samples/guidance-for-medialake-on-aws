@@ -178,31 +178,80 @@ def clean_up_connector(item, table):
 
 
 def clean_up_pipeline(item, table):
+    errors = []
+    
     if "dependentResources" in item:
         for resource in item["dependentResources"]:
-            resource_type = resource[0]
-            resource_identifier = resource[1]
-
-            if resource_type == "sqs":
-                delete_sqs_queue(resource_identifier)
-            elif resource_type == "eventbridge_rule":
-                delete_eventbridge_rule(
-                    resource_identifier["rule_name"],
-                    resource_identifier["eventbus_name"],
-                )
-
-            elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role"]:
-                delete_iam_role(resource_identifier)
-            elif resource_type == "step_function":
-                delete_step_function(resource_identifier)
-            elif resource_type == "lambda":
-                delete_lambda_function(resource_identifier)
-            elif resource_type == "event_source_mapping":
-                delete_event_source_mapping(resource_identifier)
+            try:
+                # Check if resource is a sequence (list or tuple) with at least 2 elements
+                if not isinstance(resource, (list, tuple)) or len(resource) < 2:
+                    logger.warning(f"Invalid resource format: {resource}. Expected [type, identifier]")
+                    continue
+                
+                resource_type = resource[0]
+                resource_identifier = resource[1]
+                
+                logger.info(f"Cleaning up resource of type {resource_type}: {resource_identifier}")
+                
+                if resource_type == "sqs":
+                    delete_sqs_queue(resource_identifier)
+                elif resource_type == "eventbridge_rule":
+                    # Handle the new format where resource_identifier is an ARN string
+                    # Format: arn:aws:events:region:account-id:rule/event-bus-name/rule-name
+                    if isinstance(resource_identifier, str) and resource_identifier.startswith("arn:aws:events:"):
+                        # Parse the ARN to extract rule name and event bus name
+                        parts = resource_identifier.split(":")
+                        if len(parts) >= 6:
+                            rule_path = parts[5]
+                            if rule_path.startswith("rule/"):
+                                path_parts = rule_path[5:].split("/", 1)  # Remove 'rule/' prefix and split
+                                if len(path_parts) == 2:
+                                    event_bus_name = path_parts[0]
+                                    rule_name = path_parts[1]
+                                    delete_eventbridge_rule(rule_name, event_bus_name)
+                                else:
+                                    # Default event bus
+                                    rule_name = path_parts[0]
+                                    delete_eventbridge_rule(rule_name, "default")
+                            else:
+                                logger.warning(f"Invalid EventBridge rule ARN format: {resource_identifier}")
+                    # Handle the old format where resource_identifier is a dictionary
+                    elif isinstance(resource_identifier, dict) and "rule_name" in resource_identifier and "eventbus_name" in resource_identifier:
+                        delete_eventbridge_rule(
+                            resource_identifier["rule_name"],
+                            resource_identifier["eventbus_name"],
+                        )
+                    else:
+                        logger.warning(f"Unrecognized EventBridge rule format: {resource_identifier}")
+                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role"]:
+                    delete_iam_role(resource_identifier)
+                elif resource_type == "step_function":
+                    delete_step_function(resource_identifier)
+                elif resource_type == "lambda":
+                    delete_lambda_function(resource_identifier)
+                elif resource_type == "event_source_mapping":
+                    delete_event_source_mapping(resource_identifier)
+                else:
+                    logger.warning(f"Unknown resource type: {resource_type}")
+            except Exception as e:
+                error_msg = f"Error cleaning up {resource_type} resource {resource_identifier}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+                continue
 
     # Delete the pipeline record
-    table.delete_item(Key={"id": item["id"]})
-    logger.info(f"Deleted pipeline record {item['id']}")
+    try:
+        table.delete_item(Key={"id": item["id"]})
+        logger.info(f"Deleted pipeline record {item['id']}")
+    except Exception as e:
+        error_msg = f"Error deleting pipeline record: {str(e)}"
+        logger.error(error_msg)
+        errors.append(error_msg)
+    
+    if errors:
+        logger.error(f"Errors occurred while cleaning up pipeline {item['id']}: {errors}")
+    else:
+        logger.info(f"Successfully cleaned up pipeline {item['id']}")
 
 
 def delete_sqs_queue(queue_url):

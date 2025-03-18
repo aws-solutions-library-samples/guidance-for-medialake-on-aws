@@ -10,7 +10,7 @@ from aws_lambda_powertools import Logger
 
 from config import (
     MEDIA_ASSETS_BUCKET_NAME,
-    MEDIA_ASSETS_BUCKET_ARN_KMS_KEY,
+    OPENSEARCH_ENDPOINT,
     MEDIALAKE_ASSET_TABLE,
     INGEST_EVENT_BUS_NAME,
 )
@@ -424,7 +424,7 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Resource": [
                     f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{INGEST_EVENT_BUS_NAME}",
                 ],
-            },
+            }
         ],
     }
 
@@ -628,6 +628,39 @@ def create_lambda_role(
                     RoleName=role_name,
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
                 )
+                
+                # For embedding_store utility node, also attach VPC access policy and OpenSearch permissions
+                if node_id == 'embedding_store':
+                    logger.info(f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for embedding_store")
+                    iam.attach_role_policy(
+                        RoleName=role_name,
+                        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                    )
+                    
+                    # Add managed OpenSearch permissions
+                    opensearch_policy = {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "es:ESHttpGet",
+                                    "es:ESHttpPut",
+                                    "es:ESHttpPost",
+                                    "es:ESHttpHead",
+                                    "es:ESHttpDelete"
+                                ],
+                                "Resource": "*"
+                            }
+                        ]
+                    }
+                    
+                    logger.info(f"Adding OpenSearch permissions to {role_name} for embedding_store")
+                    iam.put_role_policy(
+                        RoleName=role_name,
+                        PolicyName="OpenSearchAccess",
+                        PolicyDocument=json.dumps(opensearch_policy)
+                    )
 
                 # Create and attach our custom execution policy
                 logger.info(

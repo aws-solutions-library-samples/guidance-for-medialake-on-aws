@@ -146,31 +146,35 @@ const SidebarContent: React.FC = () => {
                 path: methodWithConfig?.config?.path,
                 operationId: methodWithConfig?.config?.operationId,
             };
-            console.log('[Sidebar] Integration node methodConfig:', methodConfig);
+            // console.log('[Sidebar] Integration node methodConfig:', methodConfig);
         }
 
         // Check if this node has multiple output types in its connections
         let outputTypes = node.info.outputTypes || [];
+        let inputTypes = node.info.inputTypes || [];
 
-        console.log('[Sidebar] Node ID:', node.nodeId);
-        console.log('[Sidebar] Node type:', node.info.nodeType);
-        console.log('[Sidebar] Initial outputTypes:', outputTypes);
-        console.log('[Sidebar] Node connections:', node.connections);
+        // console.log('[Sidebar] Node ID:', node.nodeId);
+        // console.log('[Sidebar] Node type:', node.info.nodeType);
+        // console.log('[Sidebar] Initial outputTypes:', outputTypes);
+        // console.log('[Sidebar] Initial inputTypes:', inputTypes);
+        // console.log('[Sidebar] Node connections:', node.connections);
 
-        // For nodes with multiple outputs like Choice, extract the output types from connections
-        console.log('[Sidebar] Checking for multiple outputs in node:', node.nodeId);
+        // // For nodes with multiple outputs like Choice, extract the output types from connections
+        // console.log('[Sidebar] Checking for multiple outputs in node:', node.nodeId);
 
         // Log all connections for debugging
-        if (node.connections) {
-            console.log('[Sidebar] Node connections structure:', JSON.stringify(node.connections, null, 2));
-        }
+        // if (node.connections) {
+        //     console.log('[Sidebar] Node connections structure:', JSON.stringify(node.connections, null, 2));
+        // }
 
         // Try to find the output types in different possible locations
         let outputTypesConfig;
-
-        // Check in the standard location first
-        if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.types) {
-            outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.types;
+        let inputTypesConfig;
+        
+      
+        // Check for output types in the standard location first
+        if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.type) {
+            outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.type;
             console.log('[Sidebar] Found output types in standard location:', outputTypesConfig);
         }
         // If not found, try to look in all outgoing connections
@@ -179,22 +183,87 @@ const SidebarContent: React.FC = () => {
             Object.entries(node.connections.outgoing).forEach(([method, connections]) => {
                 if (Array.isArray(connections) && connections.length > 0) {
                     connections.forEach((connection: any) => {
-                        if (connection.connectionConfig?.types) {
-                            outputTypesConfig = connection.connectionConfig.types;
+                        if (connection.connectionConfig?.type) {
+                            outputTypesConfig = connection.connectionConfig.type;
                             console.log('[Sidebar] Found output types in method:', method, outputTypesConfig);
                         }
                     });
                 }
             });
         }
+        
+        // Check for input types in the standard location first
+        if (node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig?.type) {
+            inputTypesConfig = node.connections.incoming[actualMethodName][0].connectionConfig.type;
+            console.log('[Sidebar] Found input types in standard location:', inputTypesConfig);
+        }
+        // If not found, try to look in all incoming connections
+        else if (node.connections?.incoming) {
+            // Look through all methods in incoming connections
+            Object.entries(node.connections.incoming).forEach(([method, connections]) => {
+                if (Array.isArray(connections) && connections.length > 0) {
+                    connections.forEach((connection: any) => {
+                        if (connection.connectionConfig?.type) {
+                            inputTypesConfig = connection.connectionConfig.type;
+                            console.log('[Sidebar] Found input types in method:', method, inputTypesConfig);
+                        }
+                    });
+                }
+            });
+        }
+        
 
         // If we found output types, use them
         if (outputTypesConfig) {
-            outputTypes = outputTypesConfig.map((type: any) => ({
-                name: type.name,
-                description: type.description
-            }));
+            // Check if outputTypesConfig is an array of strings or objects
+            if (Array.isArray(outputTypesConfig) && outputTypesConfig.length > 0) {
+                if (typeof outputTypesConfig[0] === 'string') {
+                    // If it's an array of strings, convert each string to an object with name property
+                    outputTypes = outputTypesConfig.map((type: string) => ({
+                        name: type,
+                        description: `Output type: ${type}`
+                    }));
+                } else if (typeof outputTypesConfig[0] === 'object' && outputTypesConfig[0] !== null) {
+                    // If it's already an array of objects, use as is if they have name property
+                    // or create objects with name property if they don't
+                    outputTypes = outputTypesConfig.map((type: any) => {
+                        if (type.name) {
+                            return {
+                                name: type.name,
+                                description: type.description
+                            };
+                        } else {
+                            // If the object doesn't have a name property, use a default
+                            return {
+                                name: 'output',
+                                description: 'Default output type'
+                            };
+                        }
+                    });
+                }
+            }
             console.log('[Sidebar] Node has multiple output types:', outputTypes);
+        }
+        
+        // If we found input types, use them
+        if (inputTypesConfig) {
+            // For inputTypes, we need to keep it as a string array
+            if (Array.isArray(inputTypesConfig) && inputTypesConfig.length > 0) {
+                if (typeof inputTypesConfig[0] === 'string') {
+                    // If it's already an array of strings, use it directly
+                    inputTypes = inputTypesConfig;
+                } else if (typeof inputTypesConfig[0] === 'object' && inputTypesConfig[0] !== null) {
+                    // If it's an array of objects, extract the name property
+                    inputTypes = inputTypesConfig.map((type: any) => {
+                        if (type.name) {
+                            return type.name;
+                        } else {
+                            return 'input';
+                        }
+                    });
+                }
+            }
+            console.log('[Sidebar] Node has multiple input types:', inputTypes);
         }
 
         const nodeData = {
@@ -202,7 +271,7 @@ const SidebarContent: React.FC = () => {
             type: node.info.nodeType,
             label: node.info.title,
             description: method?.description || node.info.description,
-            inputTypes: node.info.inputTypes || [],
+            inputTypes: inputTypes,
             outputTypes: outputTypes,
             methods: node.methods || {},
             icon: node.info.iconUrl,

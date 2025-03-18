@@ -1,21 +1,10 @@
-{% raw %}-----011000010111000001101001
-Content-Disposition: form-data; name="engine_name"
-
-Marengo-retrieval-2.6
------011000010111000001101001
-Content-Disposition: form-data; name="video_embedding_scope"
-
-clip
------011000010111000001101001
-Content-Disposition: form-data; name="video_embedding_scope"
-
-video
------011000010111000001101001
-Content-Disposition: form-data; name="video_clip_length"
-
-10
------011000010111000001101001
-Content-Disposition: form-data; name="video_url"
-
-{% endraw %}{{ variables.video_url }}{% raw %}
------011000010111000001101001--{% endraw %}
+{
+"model_name": (None, "{{ model_name|default('Marengo-retrieval-2.7') }}"),
+{% if variables.video_url is defined and variables.video_url %}
+"video_url": ("", "{{ variables.video_url }}")
+{% elif variables.image_url is defined and variables.image_url %}
+"image_url": ("", "{{ variables.image_url }}")
+{% elif variables.audio_url is defined and variables.audio_url %}
+"audio_url": ("", "{{ variables.audio_url }}")
+{% endif %}
+}

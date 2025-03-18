@@ -1,9 +1,120 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { FaCog, FaTrash } from 'react-icons/fa';
 
 const HANDLE_CONNECT_RADIUS = 50;
+
+// Component for expandable description with see more/less functionality
+const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
+    const textRef = useRef<HTMLParagraphElement>(null);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    // Check if text is overflowing on mount and window resize
+    React.useEffect(() => {
+        const checkOverflow = () => {
+            if (textRef.current) {
+                // For multi-line text with line clamp, check if scrollHeight > clientHeight
+                const isTextOverflowing = textRef.current.scrollHeight > textRef.current.clientHeight;
+                setIsOverflowing(isTextOverflowing);
+            }
+        };
+        
+        checkOverflow();
+        window.addEventListener('resize', checkOverflow);
+        return () => window.removeEventListener('resize', checkOverflow);
+    }, [text]);
+    
+    const toggleExpand = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent node click event
+        setIsExpanded(!isExpanded);
+    };
+    
+    return (
+        <Box>
+            <Typography
+                ref={textRef}
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                    lineHeight: 1.2,
+                    overflow: isExpanded ? 'visible' : 'hidden',
+                    textOverflow: 'ellipsis',
+                    WebkitLineClamp: isExpanded ? 'unset' : 2,
+                    WebkitBoxOrient: 'vertical',
+                    display: isExpanded ? 'block' : '-webkit-box',
+                    transition: 'all 0.2s ease-in-out'
+                }}
+            >
+                {text}
+            </Typography>
+            {(isOverflowing || isExpanded) && (
+                <Typography
+                    variant="caption"
+                    color="primary"
+                    onClick={toggleExpand}
+                    sx={{
+                        cursor: 'pointer',
+                        display: 'block',
+                        textAlign: 'right',
+                        mt: 0.5,
+                        fontWeight: 'medium',
+                        '&:hover': {
+                            textDecoration: 'underline'
+                        }
+                    }}
+                >
+                    {isExpanded ? 'See less' : 'See more'}
+                </Typography>
+            )}
+        </Box>
+    );
+};
+
+const LabelWithTooltip: React.FC<{ text: string }> = ({ text }) => {
+    const textRef = useRef<HTMLSpanElement>(null);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+    
+    // Check if text is overflowing on mount and window resize
+    React.useEffect(() => {
+        const checkOverflow = () => {
+            if (textRef.current) {
+                const isTextOverflowing = textRef.current.scrollWidth > textRef.current.clientWidth;
+                setIsOverflowing(isTextOverflowing);
+            }
+        };
+        
+        checkOverflow();
+        window.addEventListener('resize', checkOverflow);
+        return () => window.removeEventListener('resize', checkOverflow);
+    }, [text]);
+    
+    return (
+        <Tooltip title={text} disableHoverListener={!isOverflowing}>
+            <Typography
+                ref={textRef}
+                variant="subtitle1"
+                sx={{
+                    lineHeight: 1.2,
+                    fontWeight: 'medium',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', // Keep on single line
+                    marginBottom: '10px',
+                    width: '100%'
+                }}
+            >
+                {text}
+            </Typography>
+        </Tooltip>
+    );
+};
+
+export interface InputType {
+    name: string;
+    description?: string;
+}
 
 export interface OutputType {
     name: string;
@@ -13,8 +124,8 @@ export interface OutputType {
 export interface CustomNodeData {
     label: string;
     icon: React.ReactNode;
-    inputTypes: string[];
-    outputTypes: string[] | OutputType[]; // Can be either simple strings or objects with name/description
+    inputTypes: string[]| InputType[];
+    outputTypes: string[] | OutputType[];
     nodeId: string; // Original node ID from the API
     description: string; // Node description
     configuration?: any; // Node configuration
@@ -25,18 +136,11 @@ export interface CustomNodeData {
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
     const { project } = useReactFlow();
-
+    
     // Debug logging
-    // console.log('[CustomNode] Rendering node:', id);
-    // console.log('[CustomNode] Node data:', data);
+    // console.log('[CustomNode] Input types:', data.inputTypes);
     // console.log('[CustomNode] Output types:', data.outputTypes);
-    // console.log('[CustomNode] Is array of objects?',
-    //     Array.isArray(data.outputTypes) &&
-    //     data.outputTypes.length > 0 &&
-    //     typeof data.outputTypes[0] === 'object' &&
-    //     'name' in (data.outputTypes[0] as any)
-    // );
-
+    
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
         data.onDelete?.(id);
@@ -82,6 +186,17 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
     }, [id, project]);
 
     const isTriggerNode = data.type?.includes('TRIGGER');
+    const isIntegrationNode = data.type === 'INTEGRATION';
+    
+    // For INTEGRATION nodes, ensure we have at least one input and one output
+    const inputTypes = isIntegrationNode && (!data.inputTypes || data.inputTypes.length === 0)
+        ? [{ name: 'default' } as InputType]
+        : data.inputTypes;
+        
+    const outputTypes = isIntegrationNode && (!data.outputTypes || data.outputTypes.length === 0)
+        ? [{ name: 'default' } as OutputType]
+        : data.outputTypes;
+
 
     return (
         <Box
@@ -92,63 +207,94 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 backgroundColor: 'background.paper',
                 border: 1,
                 borderColor: data.configuration ? 'primary.main' : 'divider',
-                width: '200px', // Set fixed width to half of original
-                maxWidth: '200px',
+                width: '200px', // Increased width from 200px to 240px
+                maxWidth: '200px', // Increased max width from 200px to 240px
                 minHeight: '100px',
                 position: 'relative',
                 boxShadow: 2,
                 cursor: 'pointer',
                 '&:hover': {
-                    boxShadow: 3
+                    boxShadow: 3,
+                    '& .node-actions': {
+                        opacity: 1, // Show buttons on hover
+                        width: 'auto', // Allow buttons to take their natural width
+                        marginLeft: '8px' // Add some spacing
+                    },
+                    '& .label-container': {
+                        width: 'calc(100% - 60px)' // Reduce width to make room for buttons
+                    }
                 }
             }}
         >
+            {/* Input handles */}
             {!isTriggerNode && (
-                <Handle
-                    type="target"
-                    position={Position.Left}
-                    isConnectable={isConnectable}
-                    style={{
-                        background: '#555',
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid #fff',
-                        borderRadius: '6px'
-                    }}
-                />
+                <Box sx={{
+                    position: 'absolute',
+                    left: 3,
+                    top: 0,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: inputTypes.length === 1 ? 'center' : 'space-evenly'
+                }}>
+                    {inputTypes.map((inputType, index) => (
+                        <Box
+                            key={`input-${index}`}
+                            sx={{
+                                position: 'relative',
+                                height: '24px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                ml: '-6px'
+                            }}
+                        >
+                            <Tooltip title={typeof inputType === 'string' ? inputType : (inputType as InputType).name}>
+                                <Handle
+                                    type="target"
+                                    position={Position.Left}
+                                    id={`input-${typeof inputType === 'string' ? inputType : (inputType as InputType).name}`}
+                                    isConnectable={isConnectable}
+                                    style={{
+                                        background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#555',
+                                        width: '12px',
+                                        height: '12px',
+                                        border: '2px solid #fff',
+                                        borderRadius: '6px'
+                                    }}
+                                />
+                            </Tooltip>
+                        </Box>
+                    ))}
+                </Box>
             )}
 
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, position: 'relative' }}>
                 {data.icon}
-                <Box sx={{ flex: 1, minWidth: 0 }}> {/* Add minWidth: 0 to enable text wrapping */}
-                    <Typography
-                        variant="subtitle1"
-                        sx={{
-                            lineHeight: 1.2,
-                            fontWeight: 'medium',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                        }}
-                    >
-                        {data.label}
-                    </Typography>
-                    <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                            lineHeight: 1.2,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            display: '-webkit-box'
-                        }}
-                    >
-                        {data.description}
-                    </Typography>
+                <Box
+                    className="label-container"
+                    sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        width: '100%',
+                        transition: 'all 0.2s ease-in-out' // Smooth transition for container
+                    }}
+                >
+                    {/* Label with tooltip that only shows when text is truncated */}
+                    <LabelWithTooltip text={data.label} />
+                   
                 </Box>
-                <Box sx={{ display: 'flex', gap: 0.5, ml: 0.5 }}>
+                <Box
+                    className="node-actions"
+                    sx={{
+                        display: 'flex',
+                        gap: 0.5,
+                        ml: 0.5,
+                        opacity: 0, // Hide by default
+                        width: 0, // Take up no space when hidden
+                        overflow: 'hidden', // Hide overflow when width is 0
+                        transition: 'all 0.2s ease-in-out' // Smooth transition for all properties
+                    }}
+                >
                     <IconButton
                         size="small"
                         onClick={handleConfigure}
@@ -164,22 +310,24 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                         <FaTrash size={14} />
                     </IconButton>
                 </Box>
+                
             </Box>
-
+            {/* Expandable description with see more/less functionality */}
+            <ExpandableDescription text={data.description} />
             {/* Check if we have multiple output types or a single output */}
-            {Array.isArray(data.outputTypes) && data.outputTypes.length > 0 &&
-                typeof data.outputTypes[0] === 'object' && 'name' in (data.outputTypes[0] as any) ? (
+            {Array.isArray(outputTypes) && outputTypes.length > 0 &&
+                typeof outputTypes[0] === 'object' && 'name' in (outputTypes[0] as any) ? (
                 // Multiple output types as objects with name/description
                 <Box sx={{
                     position: 'absolute',
                     right: 3,
-                    top: '25%',
-                    height: '75%',
+                    top: 0,
+                    height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'start'
+                    justifyContent: (outputTypes as OutputType[]).length === 1 ? 'center' : 'space-evenly'
                 }}>
-                    {(data.outputTypes as OutputType[]).map((output, index) => (
+                    {(outputTypes as OutputType[]).map((output, index) => (
                         <Box
                             key={output.name}
                             sx={{
@@ -201,7 +349,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                                 id={output.name}
                                 isConnectable={isConnectable}
                                 style={{
-                                    background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#F44336',
+                                    background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#555',
                                     width: '12px',
                                     height: '12px',
                                     border: '2px solid #fff',
@@ -214,18 +362,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 </Box>
             ) : (
                 // Single output handle (default behavior)
-                <Handle
-                    type="source"
-                    position={Position.Right}
-                    isConnectable={isConnectable}
-                    style={{
-                        background: '#555',
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid #fff',
-                        borderRadius: '6px'
-                    }}
-                />
+                null
             )}
         </Box>
     );

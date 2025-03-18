@@ -486,7 +486,7 @@ class Lambda(Construct):
                 bundling=bundling_options,
                 **props,
             )
-        logger.info(f"Created Python Lambda: {self.function_name}")
+        logger.info(f"Created Python Lambda: {config.name}")
 
     def _generate_source_hash(self, entry_path: Path, common_libs: dict) -> str:
         """Generate MD5 hash of all source files in the entry directory"""

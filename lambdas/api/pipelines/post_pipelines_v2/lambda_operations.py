@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME
+from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID
 from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name
 from dynamodb_operations import (
     get_node_info,
@@ -329,69 +329,7 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
         logger.info(f"Creating new Lambda function: {function_name}")
         for attempt in range(max_retries):
             try:
-                # response = lambda_client.create_function(
-                #     FunctionName=function_name,
-                #     Runtime=runtime,
-                #     Timeout=300,
-                #     Role=role_arn,
-                #     Handler="index.lambda_handler",
-                #     Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
-                #     Environment={
-                #         "Variables": {
-                #             # Core workflow variables
-                #             "WORKFLOW_STEP_NAME": function_name,
-                #             "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
-                #             # API Service Configuration
-                #             "REQUEST_TEMPLATES_PATH": request_templates_path,
-                #             "RESPONSE_TEMPLATES_PATH": response_templates_path,
-                #             "API_SERVICE_URL": api_service_url,
-                #             "API_SERVICE_RESOURCE": (
-                #                 node.data.configuration.get("path", "")
-                #                 if node.data.type.lower() == "integration"
-                #                 else os.environ.get("API_SERVICE_RESOURCE", "")
-                #             ),
-                #             "API_SERVICE_PATH": api_path,
-                #             # Extract API_SERVICE_METHOD from node configuration if it's an integration node
-                #             "API_SERVICE_METHOD": (
-                #                 node.data.configuration.get("method", "")
-                #                 if node.data.type.lower() == "integration"
-                #                 else os.environ.get("API_SERVICE_METHOD", "")
-                #             ),
-                #             "API_AUTH_TYPE": (
-                #                 get_auth_type_for_node(node.data.id)
-                #                 if node.data.type.lower() == "integration"
-                #                 else os.environ.get("API_AUTH_TYPE", "")
-                #             ),
-                #             "API_SERVICE_NAME": node.data.id,
-                #             "API_TEMPLATE_BUCKET": os.environ.get(
-                #                 "NODE_TEMPLATES_BUCKET"
-                #             ),
-                #             "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
-                #             "API_CUSTOM_CODE": os.environ.get(
-                #                 "API_CUSTOM_CODE", "false"
-                #             ),
-                #             # For integration nodes, add the secret ARN if available
-                #             **(
-                #                 {
-                #                     "API_KEY_SECRET_ARN": get_integration_secret_arn(
-                #                         node.data.configuration.get("integrationId", "")
-                #                     )
-                #                     or ""
-                #                 }
-                #                 if node.data.type.lower() == "integration"
-                #                 and node.data.configuration.get("integrationId")
-                #                 else {}
-                #             ),
-                #             # S3 Configuration
-                #             "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
-                #                 "EXTERNAL_PAYLOAD_BUCKET"
-                #             ),
-                #             # Custom Headers (defaults to empty JSON object)
-                #             "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
-                #         }
-                #     },
-                #     Publish=True,
-                # )
+               
 
                 # Build common parameters for the Lambda function creation
                 create_function_params = {
@@ -404,13 +342,16 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     "Publish": True,
                 }
 
-                # Only include Environment variables if the node type is "integration"
+                # Common environment variables for all Lambda functions
+                common_env_vars = {
+                    "LARGE_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
+                    "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                }
+
+                # Only include additional Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":
                     env_vars = {
-                        "LARGE_PAYLOAD_BUCKET":os.environ.get(
-                            "EXTERNAL_PAYLOAD_BUCKET"
-                        ),
-                        "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                        **common_env_vars,  # Include common env vars
                         "WORKFLOW_STEP_NAME": function_name,
                         "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
                         "REQUEST_TEMPLATES_PATH": request_templates_path,
@@ -453,7 +394,35 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                         "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
-
+                if node.data.type.lower() == "utility" and node.data.id == 'embedding_store':
+                    # Extract Index Name and Content Type from node configuration
+                    index_name = node.data.configuration.get("Index Name", "embeddings")
+                    content_type = node.data.configuration.get("Content Type", "text")
+                    
+                    env_vars = {
+                        **common_env_vars,  # Include common env vars
+                        "OPENSEARCH_ENDPOINT": os.environ.get(
+                            "OPENSEARCH_ENDPOINT"
+                        ),
+                        "INDEX_NAME": index_name,
+                        "CONTENT_TYPE": content_type
+                    }
+                    create_function_params["Environment"] = {"Variables": env_vars}
+                    
+                    logger.info(f"Added environment variables for embedding_store Lambda: INDEX_NAME={index_name}, CONTENT_TYPE={content_type}")
+                    
+                    # Add VPC configuration for the embedding_store Lambda to access OpenSearch
+                    # OPENSEARCH_VPC_SUBNET_IDS contains a comma-separated list of subnet IDs
+                    subnet_ids = OPENSEARCH_VPC_SUBNET_IDS.split(',') if OPENSEARCH_VPC_SUBNET_IDS else []
+                    create_function_params["VpcConfig"] = {
+                        "SubnetIds": subnet_ids,
+                        "SecurityGroupIds": [OPENSEARCH_SECURITY_GROUP_ID]
+                    }
+                    logger.info(f"Added VPC configuration to embedding_store Lambda: Subnets={subnet_ids}, SecurityGroup={OPENSEARCH_SECURITY_GROUP_ID}")
+                # For all other node types, just add the common environment variables
+                elif node.data.type.lower() != "integration":  # Integration nodes already handled above
+                    create_function_params["Environment"] = {"Variables": common_env_vars}
+                    logger.info(f"Added common environment variables to {node.data.type} Lambda function: {function_name}")
                 # Create the Lambda function with the appropriate parameters
                 response = lambda_client.create_function(**create_function_params)
 

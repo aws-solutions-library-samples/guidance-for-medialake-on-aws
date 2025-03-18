@@ -28,6 +28,4 @@ actions:
     x-responseMapping: utility/debug_input/debug/
     connections:
       incoming:
-        type: [video, image, audio, document, any]
-      outgoing:
-        type: [debug_output]
+        type: [any]
