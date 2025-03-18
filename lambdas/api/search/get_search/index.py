@@ -191,7 +191,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
     endpoint = get_endpoint()
     
     # Initialize the Twelve Labs client
-    twelve_labs_client = TwelveLabs(api_key=api_key, base_url=endpoint)
+    twelve_labs_client = TwelveLabs(api_key=api_key)
     
     try:
         # Create embedding for the search query

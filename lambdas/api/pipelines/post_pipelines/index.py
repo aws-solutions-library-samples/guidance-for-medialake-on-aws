@@ -436,9 +436,9 @@ def create_eventbridge_rule(
                 {
                     "Id": f"{rule_name}-target",
                     "Arn": queue_arn,
-                    "SqsParameters": {
-                        "MessageGroupId": "default",  # Required for FIFO queues
-                    },
+                    # "SqsParameters": {
+                    #     "MessageGroupId": "default",  # Required for FIFO queues
+                    # },
                     "InputTransformer": {
                         "InputPathsMap": {"detail": "$.detail"},
                         "InputTemplate": f'{{"Asset": <detail>, "StateMachineArn": "{state_machine_arn}"}}',
@@ -643,16 +643,16 @@ def check_resource_exists(
     """Check if any of the resources already exist"""
     try:
         # Check SQS Queue
-        try:
-            sqs_client.get_queue_url(QueueName=f"{queue_name}.fifo")
-            return True, f"SQS Queue {queue_name}.fifo already exists"
-        except sqs_client.exceptions.QueueDoesNotExist:
-            pass
         # try:
-        #     sqs_client.get_queue_url(QueueName=queue_name)
-        #     return True, f"SQS Queue {queue_name} already exists"
+        #     sqs_client.get_queue_url(QueueName=f"{queue_name}.fifo")
+        #     return True, f"SQS Queue {queue_name}.fifo already exists"
         # except sqs_client.exceptions.QueueDoesNotExist:
         #     pass
+        try:
+            sqs_client.get_queue_url(QueueName=queue_name)
+            return True, f"SQS Queue {queue_name} already exists"
+        except sqs_client.exceptions.QueueDoesNotExist:
+            pass
 
         # Check EventBridge Rule
         try:
@@ -967,27 +967,28 @@ def create_pipeline(createpipeline: S3Pipeline) -> dict:
             }
             logger.info(f"Resource tags: {tags}")
 
-            # Create SQS FIFO Queue
+            # Create SQS Sandard Queue
             queue_name = f"medialake-pipeline-{pipeline_suffix}"
             try:
-                logger.info(f"Creating SQS FIFO queue: {queue_name}")
-                # logger.info(f"Creating SQS standard queue: {queue_name}")
-                queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+                # logger.info(f"Creating SQS FIFO queue: {queue_name}")
+                logger.info(f"Creating SQS standard queue: {queue_name}")
+                # queue_url, queue_arn = create_sqs_fifo_queue(queue_name, tags)
+                queue_url, queue_arn = create_sqs_standard_queue(queue_name, tags)
                 resources_to_delete.append(("sqs", queue_url))
             except sqs_client.exceptions.QueueDeletedRecently as e:
                 logger.error(f"Failed to create pipeline: {str(e)}")
-                return {
-                    "status": "400",
-                    "message": "SQS FIFO queue creation failed: 60-second wait required after deletion before reusing name.",
-                    "data": {
-                        "error": "You must wait 60 seconds after deleting a queue before you can create another with the same name."
-                    },
-                }
                 # return {
                 #     "status": "400",
-                #     "message": "SQS standard queue creation failed.",
-                #     "data": {"error": str(e)},
+                #     "message": "SQS FIFO queue creation failed: 60-second wait required after deletion before reusing name.",
+                #     "data": {
+                #         "error": "You must wait 60 seconds after deleting a queue before you can create another with the same name."
+                #     },
                 # }
+                return {
+                    "status": "400",
+                    "message": "SQS standard queue creation failed.",
+                    "data": {"error": str(e)},
+                }
 
             # Create IAM Role for Lambda and Step Functions
             state_machine_name = f"medialake-pipeline-{pipeline_suffix}"
