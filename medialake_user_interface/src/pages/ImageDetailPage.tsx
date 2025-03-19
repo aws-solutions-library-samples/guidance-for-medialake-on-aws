@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, CircularProgress, Typography, List, ListItem, Paper, Button, Divider } from '@mui/material';
+import { Box, CircularProgress, Typography, List, ListItem, Paper, Button, Divider, Tabs, Tab } from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
@@ -12,9 +12,14 @@ import ImageViewer from '../components/common/ImageViewer';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
 import AssetSidebar from '../components/asset/AssetSidebar';
 import CommentPopper from '../components/common/CommentPopper';
+import MetadataSection from '../components/common/MetadataSection';
+import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const categoryMapping = {
     exif: 'EXIF',
@@ -74,6 +79,121 @@ interface MetadataContentProps {
     showAll: boolean;
     category?: string;
 }
+
+// Tab content components
+const SummaryTab: React.FC<{ assetData: any }> = ({ assetData }) => {
+    // Create summary data from asset data
+    const summaryData = [
+        { label: 'Title', value: assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown' },
+        { label: 'Type', value: assetData?.data?.asset?.DigitalSourceAsset?.Type || 'Image' },
+        { label: 'Size', value: formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size) },
+        { label: 'Format', value: assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown' },
+        { label: 'Created Date', value: assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.LastModified || 'Unknown' }
+    ];
+
+    // Add dimensions if available
+    const resolution = assetData?.data?.asset?.DerivedRepresentations?.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution;
+    if (resolution) {
+        summaryData.push({ label: 'Dimensions', value: `${resolution.Width}x${resolution.Height}` });
+    }
+
+    return (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+            {summaryData.map((field, index) => (
+                <Box key={index}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {field.label}:
+                    </Typography>
+                    <Typography variant="body2">{field.value}</Typography>
+                </Box>
+            ))}
+        </Box>
+    );
+};
+
+const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
+    return (
+        <Box>
+            <SimpleTreeView
+                sx={{ flexGrow: 1, overflowY: 'auto' }}
+                slots={{
+                    collapseIcon: ExpandMoreIcon,
+                    expandIcon: ChevronRightIcon
+                }}
+            >
+                {metadataAccordions.map((parentAccordion, parentIndex) => (
+                    <TreeItem
+                        key={parentIndex}
+                        itemId={`parent-${parentIndex}`}
+                        label={`${parentAccordion.category} (${parentAccordion.count})`}
+                    >
+                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
+                            <TreeItem
+                                key={`${parentIndex}-${subIndex}`}
+                                itemId={`${parentIndex}-${subIndex}`}
+                                label={`${subCategory.category} (${subCategory.count})`}
+                            >
+                                <Box sx={{ p: 2 }}>
+                                    <MetadataContent
+                                        data={subCategory.data}
+                                        showAll={true}
+                                        category={subCategory.category}
+                                    />
+                                </Box>
+                            </TreeItem>
+                        ))}
+                    </TreeItem>
+                ))}
+            </SimpleTreeView>
+        </Box>
+    );
+};
+
+const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
+    // This would typically contain descriptive metadata like who/what is in the image
+    // For now, we'll use placeholder data
+    const descriptiveData = [
+        { label: 'Description', value: 'High-resolution image from the collection' },
+        { label: 'Keywords', value: 'nature, landscape, photography' },
+        { label: 'Location', value: 'Unknown' },
+        { label: 'People', value: 'None identified' },
+        { label: 'Objects', value: 'Various natural elements' }
+    ];
+
+    return (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+            {descriptiveData.map((field, index) => (
+                <Box key={index}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {field.label}:
+                    </Typography>
+                    <Typography variant="body2">{field.value}</Typography>
+                </Box>
+            ))}
+        </Box>
+    );
+};
+
+const RelatedItemsTab: React.FC = () => {
+    // This would typically fetch related items from an API
+    // For now, we'll use placeholder data
+    const relatedItems = [
+        { id: '1', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb1.jpg' },
+        { id: '2', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb2.jpg' },
+        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
+    ];
+
+    return (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+            {relatedItems.map((item) => (
+                <Paper key={item.id} elevation={2} sx={{ p: 2 }}>
+                    <Typography variant="subtitle1">{item.title}</Typography>
+                    <Typography variant="body2">Type: {item.type}</Typography>
+                </Paper>
+            ))}
+        </Box>
+    );
+};
 
 const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
     const sortEntries = (entries: [string, any][]): [string, any][] => {
@@ -137,6 +257,21 @@ const ImageDetailContent: React.FC = () => {
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
     const [newComment, setNewComment] = useState('');
+    const [activeTab, setActiveTab] = useState<string>('summary');
+
+    // Handle keyboard navigation for tabs
+    const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
+        const tabs = ['summary', 'technical', 'descriptor', 'related'];
+        const currentIndex = tabs.indexOf(activeTab);
+        
+        if (event.key === 'ArrowRight') {
+            const nextIndex = (currentIndex + 1) % tabs.length;
+            setActiveTab(tabs[nextIndex]);
+        } else if (event.key === 'ArrowLeft') {
+            const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            setActiveTab(tabs[prevIndex]);
+        }
+    }, [activeTab]);
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
         { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
@@ -338,10 +473,7 @@ const ImageDetailContent: React.FC = () => {
             <Box sx={{
                 position: 'sticky',
                 top: 0,
-                zIndex: 1200,
-                bgcolor: 'background.default',
-                borderBottom: 1,
-                borderColor: 'divider'
+                zIndex: 1200
             }}>
                 <Box sx={{ px: 3, py: 2 }}>
                     <BreadcrumbNavigation
@@ -381,33 +513,55 @@ const ImageDetailContent: React.FC = () => {
 
                     <Box>
                         <Paper elevation={3} sx={{ p: 2 }}>
-                            <Typography variant="h6">Metadata</Typography>
-                            <Divider sx={{ my: 1 }} />
-                            {metadataAccordions.map((parentAccordion, parentIndex) => (
-                                <Paper key={parentAccordion.category} elevation={1} sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold' }}>
-                                        {parentAccordion.category} ({parentAccordion.count})
-                                    </Typography>
-                                    {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                                        <Box key={subCategory.category} sx={{ p: 2 }}>
-                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                {subCategory.category} ({subCategory.count})
-                                            </Typography>
-                                            <MetadataContent
-                                                data={subCategory.data}
-                                                showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
-                                                category={subCategory.category}
-                                            />
-                                            <Button
-                                                onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
-                                                sx={{ mt: 1 }}
-                                            >
-                                                {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
-                                            </Button>
-                                        </Box>
-                                    ))}
-                                </Paper>
-                            ))}
+                            <Tabs
+                                value={activeTab}
+                                onChange={(e, newValue) => setActiveTab(newValue)}
+                                onKeyDown={handleTabKeyDown}
+                                textColor="secondary"
+                                indicatorColor="secondary"
+                                aria-label="metadata tabs"
+                            >
+                                <Tab
+                                    value="summary"
+                                    label="Summary"
+                                    id="tab-summary"
+                                    aria-controls="tabpanel-summary"
+                                />
+                                <Tab
+                                    value="technical"
+                                    label="Technical Metadata"
+                                    id="tab-technical"
+                                    aria-controls="tabpanel-technical"
+                                />
+                                <Tab
+                                    value="descriptor"
+                                    label="Descriptor Metadata"
+                                    id="tab-descriptor"
+                                    aria-controls="tabpanel-descriptor"
+                                />
+                                <Tab
+                                    value="related"
+                                    label="Related Items"
+                                    id="tab-related"
+                                    aria-controls="tabpanel-related"
+                                />
+                            </Tabs>
+                            <Box
+                                sx={{
+                                    mt: 3,
+                                    pt: 2,
+                                    outline: 'none' // Remove outline when focused but keep it accessible
+                                }}
+                                role="tabpanel"
+                                id={`tabpanel-${activeTab}`}
+                                aria-labelledby={`tab-${activeTab}`}
+                                tabIndex={0} // Make the panel focusable
+                            >
+                                {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
+                                {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
+                                {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
+                                {activeTab === 'related' && <RelatedItemsTab />}
+                            </Box>
                         </Paper>
                     </Box>
                 </Box>
