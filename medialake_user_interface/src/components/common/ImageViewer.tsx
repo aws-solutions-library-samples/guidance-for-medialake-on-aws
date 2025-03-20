@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Box, IconButton, Tooltip, useTheme } from '@mui/material';
 import Rotate90DegreesCwIcon from '@mui/icons-material/Rotate90DegreesCw';
 import HomeIcon from '@mui/icons-material/Home';
 import LockIcon from '@mui/icons-material/Lock';
@@ -20,6 +20,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     maxHeight = '70vh',
     filename = 'image_download',
 }) => {
+    const theme = useTheme();
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [rotate, setRotate] = useState(0);
@@ -28,7 +29,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
     // The "base" scale that makes the image fully fit in the container
     const [scaleSize, setScaleSize] = useState(1);
-    // Track whether we’ve done the first “real” drawing yet
+    // Track whether we've done the first "real" drawing yet
     const [isFirstDrawComplete, setIsFirstDrawComplete] = useState(false);
     // Show a "Loading..." overlay until image is ready + initial draw is done
     const [isImageReady, setIsImageReady] = useState(false);
@@ -44,7 +45,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const divRef = useRef<HTMLDivElement>(null);
     const touch = useRef({ x: 0, y: 0 });
 
-    // We’ll clamp zoom between half and 5x the "base" scale
+    // We'll clamp zoom between half and 5x the "base" scale
     const MIN_ZOOM = scaleSize * 0.5;
     const MAX_ZOOM = scaleSize * 5;
 
@@ -111,10 +112,17 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         // Reset transform & adjust for dpr
         context.resetTransform();
         context.scale(dpr, dpr);
-        context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        
+        // Set background color based on theme - use a color that contrasts with the main background
+        const bgColor = theme.palette.mode === 'dark' 
+            ? theme.palette.background.paper  // Dark mode - slightly lighter than background
+            : '#ffffff';                      // Light mode - pure white for contrast
+        
+        context.fillStyle = bgColor;
+        context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
         // Set image smoothing properties for clarity
-        context.imageSmoothingEnabled = true;  // Try false if you need a sharper (non-blurred) image
+        context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
 
         context.save();
@@ -129,45 +137,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
         context.drawImage(background, 0, 0);
         context.restore();
-    }, [background, zoom, offset, rotate]);
-
-    // const draw = useCallback(() => {
-    //     const canvas = canvasRef.current;
-    //     if (!canvas || !background) return;
-
-    //     const context = canvas.getContext('2d');
-    //     if (!context) return;
-
-    //     // Disable smoothing for crisp pixels (especially useful for pixel art)
-    //     context.imageSmoothingEnabled = true;
-    //     context.imageSmoothingQuality = 'high';
-
-    //     const dpr = window.devicePixelRatio || 1;
-
-
-    //     const { width: imgWidth, height: imgHeight } = background;
-
-    //     // Scale the canvas to the device pixel ratio
-    //     canvas.width = canvas.clientWidth * dpr;
-    //     canvas.height = canvas.clientHeight * dpr;
-
-    //     context.resetTransform();
-    //     context.scale(dpr, dpr);
-    //     context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-
-    //     context.save();
-    //     // Center on canvas
-    //     context.translate(canvas.width / (2 * dpr), canvas.height / (2 * dpr));
-    //     // Apply rotation
-    //     context.rotate((rotate * Math.PI) / 180);
-    //     // Apply zoom
-    //     context.scale(zoom, zoom);
-    //     // Apply pan offset
-    //     context.translate(-imgWidth / 2 - offset.x, -imgHeight / 2 - offset.y);
-
-    //     context.drawImage(background, 0, 0);
-    //     context.restore();
-    // }, [background, zoom, offset, rotate]);
+    }, [background, zoom, offset, rotate, theme.palette.mode, theme.palette.background.paper]);
 
     /**
      * 1) Load the image from `imageSrc`.
@@ -237,7 +207,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         },
         [isCanvasLocked, MIN_ZOOM, MAX_ZOOM]
     );
-
 
     // Add or remove the wheel listener
     useEffect(() => {
@@ -405,6 +374,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 gridTemplateRows: '1fr',
                 position: 'relative',
                 overflow: 'hidden',
+                background: 'transparent',
+                backgroundColor: 'transparent !important',
             }}
         >
             {/**
@@ -425,6 +396,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     gridRow: '1 / -1',
                     opacity: isFirstDrawComplete ? 1 : 0,
                     transition: 'opacity 0.3s ease-in-out',
+                    background: 'transparent',
                 }}
             />
 
@@ -451,12 +423,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             <Box
                 sx={{
                     position: 'absolute',
-                    top: 8,
+                    bottom: 8,
                     right: 8,
                     display: 'flex',
                     flexDirection: 'row',
                     gap: '8px',
                     zIndex: 1000,
+                    bgcolor: 'transparent', // Semi-transparent background for better visibility
+                    borderRadius: 1,
+                    p: 0.5,
                 }}
             >
                 {toolButtons.map((item, i) => (
