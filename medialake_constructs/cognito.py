@@ -265,6 +265,10 @@ class CognitoConstruct(Construct):
     @property
     def user_pool_id(self) -> str:
         return self._user_pool.user_pool_id
+    
+    @property
+    def user_pool_arn(self) -> str:
+        return self._user_pool.user_pool_arn
 
     @property
     def user_pool_client(self) -> str:

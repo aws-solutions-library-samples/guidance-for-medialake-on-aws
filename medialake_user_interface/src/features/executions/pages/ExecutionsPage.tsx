@@ -1,8 +1,13 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, useTheme, alpha, Chip, Popover } from '@mui/material';
+import { Box, Button, useTheme, alpha, Chip, Popover, IconButton } from '@mui/material';
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
+import {
+    Visibility as VisibilityIcon,
+    RestartAlt as RestartIcon,
+    Replay as ReplayIcon
+} from '@mui/icons-material';
 import {
     useReactTable,
     getCoreRowModel,
@@ -22,6 +27,7 @@ import { TableCellContent } from '@/components/common/table';
 import { BaseFilterPopover } from '@/components/common/table/BaseFilterPopover';
 import { usePipelineExecutions } from '../api/hooks/usePipelineExecutions';
 import type { PipelineExecution, PipelineExecutionFilters } from '../types/pipelineExecutions.types';
+import ExecutionSideBar from '../components/ExecutionSideBar';
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +36,7 @@ const ExecutionsPage: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
 
+    // State declarations
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState({});
@@ -37,7 +44,10 @@ const ExecutionsPage: React.FC = () => {
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
     const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+    const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+    const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
 
+ 
     const filters = useMemo<PipelineExecutionFilters>(() => ({
         sortBy: sorting[0]?.id || 'start_time',
         sortOrder: sorting[0]?.desc ? 'desc' as const : 'asc' as const,
@@ -46,8 +56,14 @@ const ExecutionsPage: React.FC = () => {
             [filter.id]: filter.value
         }), {})
     }), [sorting, columnFilters]);
-
+       
+    // Data fetching and memoization
     const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipelineExecutions(PAGE_SIZE, filters);
+
+    const executions = useMemo(() => {
+        if (!data?.pages) return [];
+        return data.pages.flatMap(page => page.data.executions);
+    }, [data]);
 
     const handleSortingChange = useCallback((newSorting: SortingState) => {
         setSorting(newSorting);
@@ -116,9 +132,26 @@ const ExecutionsPage: React.FC = () => {
         console.log('Retry from start:', executionId);
     }, []);
 
-    const handleViewDetails = useCallback((executionId: string) => {
-        navigate(`/executions/${executionId}`);
-    }, [navigate]);
+    // const handleViewDetails = useCallback((executionId: string) => {
+    //     navigate(`/executions/${executionId}`);
+    // }, [navigate]);
+
+    const handleViewDetails = useCallback((execution: PipelineExecution) => {
+        console.log('handleViewDetails:', execution);
+        
+        console.log('Found execution:', execution); // Add this log
+        if (execution) {
+            console.log('Setting execution:', execution);
+            console.log('Opening panel');
+            setSelectedExecution(execution);
+            setIsSidePanelOpen(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        console.log('isSidePanelOpen changed:', isSidePanelOpen);
+        console.log('selectedExecution:', selectedExecution);
+    }, [isSidePanelOpen, selectedExecution]);
 
     const columns = useMemo<ColumnDef<PipelineExecution>[]>(
         () => [
@@ -182,6 +215,20 @@ const ExecutionsPage: React.FC = () => {
                 ),
             },
             {
+                header: t('executions.columns.endTime'),
+                accessorKey: 'end_time',
+                minSize: 150,
+                size: 180,
+                enableResizing: true,
+                enableSorting: true,
+                enableFiltering: true,
+                cell: ({ getValue }) => (
+                    <TableCellContent variant="secondary">
+                        {formatDate(getValue() as string)}
+                    </TableCellContent>
+                ),
+            },
+            {
                 header: t('executions.columns.duration'),
                 accessorKey: 'duration_seconds',
                 minSize: 100,
@@ -197,64 +244,69 @@ const ExecutionsPage: React.FC = () => {
             },
             {
                 id: 'actions',
-                header: () => (
-                    <Box sx={{ width: '100%', textAlign: 'center' }}>
-                        {t('executions.columns.actions')}
-                    </Box>
-                ),
+                header: t('executions.columns.actions'),
                 minSize: 100,
                 size: 120,
                 enableResizing: true,
                 enableSorting: false,
                 cell: ({ row }) => (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        {row.original.status === 'FAILED' && (
+                    <TableCellContent>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        {row.original.status === 'SUCCEEDED' && (
                             <>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleRetryFromCurrent(row.original.execution_id)}
-                                    sx={{
-                                        minWidth: 0,
-                                        p: 1,
-                                        borderRadius: '8px',
-                                        borderColor: alpha(theme.palette.primary.main, 0.1),
-                                        '&:hover': {
-                                            borderColor: alpha(theme.palette.primary.main, 0.2),
-                                        },
-                                    }}
-                                >
-                                    {t('executions.actions.retryFromCurrent')}
-                                </Button>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleRetryFromStart(row.original.execution_id)}
-                                    sx={{
-                                        minWidth: 0,
-                                        p: 1,
-                                        borderRadius: '8px',
-                                        borderColor: alpha(theme.palette.primary.main, 0.1),
-                                        '&:hover': {
-                                            borderColor: alpha(theme.palette.primary.main, 0.2),
-                                        },
-                                    }}
-                                >
-                                    {t('executions.actions.retryFromStart')}
-                                </Button>
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                title="View Details"
+                                onClick={() => handleViewDetails(row.original)}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <VisibilityIcon fontSize="small" />
+                            </IconButton>
+
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                title= {t('executions.actions.retryFromCurrent')}
+                                onClick={() => handleRetryFromCurrent(row.original.execution_id)}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <ReplayIcon fontSize="small"  />
+                            </IconButton>
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                title= {t('executions.actions.retryFromStart')}
+                                onClick={() => handleRetryFromStart(row.original.execution_id)}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    },
+                                }}
+                            >
+                                <RestartIcon fontSize="small"  />
+                            </IconButton>
                             </>
                         )}
                     </Box>
+                    </TableCellContent> 
                 ),
             },
         ],
         [theme, t, getStatusColor, formatDate, formatDuration, handleRetryFromCurrent, handleRetryFromStart]
     );
 
-    const executions = useMemo(() => {
-        if (!data?.pages) return [];
-        return data.pages.flatMap(page => page.data.executions);
-    }, [data]);
 
     const table = useReactTable({
         data: executions,
@@ -291,38 +343,17 @@ const ExecutionsPage: React.FC = () => {
 
     return (
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <PageHeader
-                title={t('executions.title')}
-                description={t('executions.description')}
-            />
+            {/* Main content */}
+        
 
-            <BaseTableToolbar
-                globalFilter={globalFilter}
-                onGlobalFilterChange={setGlobalFilter}
-                onColumnMenuOpen={(event) => setColumnMenuAnchor(event.currentTarget)}
-                activeFilters={columnFilters.map(f => ({ columnId: f.id, value: f.value as string }))}
-                activeSorting={sorting.map(s => ({ columnId: s.id, desc: s.desc }))}
-                onRemoveFilter={(columnId) => {
-                    setColumnFilters(prev => prev.filter(f => f.id !== columnId));
-                }}
-                onRemoveSort={(columnId) => {
-                    setSorting(prev => prev.filter(s => s.id !== columnId));
-                }}
-                searchPlaceholder={t('executions.searchPlaceholder')}
-            />
-
-            <PageContent
-                isLoading={isLoading}
-                error={error as Error}
-            >
-                <ExecutionsTable
-                    table={table}
-                    isLoading={isLoading}
-                    data={executions}
-                    onViewDetails={handleViewDetails}
-                    onRetryFromCurrent={handleRetryFromCurrent}
-                    onRetryFromStart={handleRetryFromStart}
-                    onFilterColumn={handleFilterColumn}
+                <PageHeader
+                    title={t('executions.title')}
+                    description={t('executions.description')}
+                />
+                <BaseTableToolbar
+                    globalFilter={globalFilter}
+                    onGlobalFilterChange={setGlobalFilter}
+                    onColumnMenuOpen={(event) => setColumnMenuAnchor(event.currentTarget)}
                     activeFilters={columnFilters.map(f => ({ columnId: f.id, value: f.value as string }))}
                     activeSorting={sorting.map(s => ({ columnId: s.id, desc: s.desc }))}
                     onRemoveFilter={(columnId) => {
@@ -331,58 +362,112 @@ const ExecutionsPage: React.FC = () => {
                     onRemoveSort={(columnId) => {
                         setSorting(prev => prev.filter(s => s.id !== columnId));
                     }}
+                    searchPlaceholder={t('executions.searchPlaceholder')}
                 />
 
-                <BaseFilterPopover
-                    anchorEl={columnMenuAnchor}
-                    column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
-                    onClose={handleFilterMenuClose}
-                    data={executions}
-                    getUniqueValues={(columnId, data) => {
-                        return Array.from(new Set(data.map(item => {
-                            const value = item[columnId as keyof PipelineExecution];
-                            return value ? String(value) : '';
-                        }))).filter(Boolean);
-                    }}
-                    formatValue={(columnId, value) => {
-                        switch (columnId) {
-                            case 'start_time':
-                                return formatDate(value);
-                            case 'duration_seconds':
-                                return formatDuration(value);
-                            default:
-                                return value;
-                        }
-                    }}
-                />
-
-                {hasNextPage && (
-                    <Box sx={{
-                        p: 2,
+                <PageContent
+                    isLoading={isLoading}
+                    error={error as Error}
+                >
+                   {/* Container for table and sidebar */}
+                    <Box sx={{ 
+                        position: 'relative',
                         display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
+                        flex: 1,
+                        overflow: 'hidden',
+                        gap: 1
                     }}>
-                        <Button
-                            onClick={() => fetchNextPage()}
-                            disabled={!hasNextPage || isFetchingNextPage}
-                            sx={{
-                                textTransform: 'none',
-                                borderRadius: '8px',
-                                color: theme.palette.text.secondary,
-                                '&:hover': {
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                },
-                            }}
-                        >
-                            {isFetchingNextPage
-                                ? t('common.loading')
-                                : t('common.loadMore')}
-                        </Button>
+                        {/* Table wrapper */}
+                        <Box sx={{ 
+                            flex: 1,
+                            overflow: 'auto',
+                            transition: theme => theme.transitions.create('width', {
+                                easing: theme.transitions.easing.sharp,
+                                duration: theme.transitions.duration.leavingScreen,
+                            }),
+                            ...(isSidePanelOpen && {
+                                width: 'calc(100% - 500px)',
+                            })
+                        }}>
+                            <ExecutionsTable
+                                table={table}
+                                isLoading={isLoading}
+                                data={executions}
+                                onViewDetails={handleViewDetails}
+                                onRetryFromCurrent={handleRetryFromCurrent}
+                                onRetryFromStart={handleRetryFromStart}
+                                onFilterColumn={handleFilterColumn}
+                                activeFilters={columnFilters.map(f => ({ columnId: f.id, value: f.value as string }))}
+                                activeSorting={sorting.map(s => ({ columnId: s.id, desc: s.desc }))}
+                                onRemoveFilter={(columnId) => {
+                                    setColumnFilters(prev => prev.filter(f => f.id !== columnId));
+                                }}
+                                onRemoveSort={(columnId) => {
+                                    setSorting(prev => prev.filter(s => s.id !== columnId));
+                                }}
+                            />
+                        </Box>
+                            {/* Sidebar panel */}
+                            <ExecutionSideBar
+                                isOpen={isSidePanelOpen}
+                                execution={selectedExecution}
+                                onClose={() => {
+                                    setIsSidePanelOpen(false);
+                                    setSelectedExecution(null);
+                                }}
+                            />
                     </Box>
-                )}
-            </PageContent>
-        </Box>
+                    
+                    {hasNextPage && (
+                        <Box sx={{
+                            p: 2,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                        }}>
+                            <Button
+                                onClick={() => fetchNextPage()}
+                                disabled={!hasNextPage || isFetchingNextPage}
+                                sx={{
+                                    textTransform: 'none',
+                                    borderRadius: '8px',
+                                    color: theme.palette.text.secondary,
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    },
+                                }}
+                            >
+                                {isFetchingNextPage
+                                    ? t('common.loading')
+                                    : t('common.loadMore')}
+                            </Button>
+                        </Box>
+                    )}
+                </PageContent>
+                <BaseFilterPopover
+                        anchorEl={columnMenuAnchor}
+                        column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
+                        onClose={handleFilterMenuClose}
+                        data={executions}
+                        getUniqueValues={(columnId, data) => {
+                            return Array.from(new Set(data.map(item => {
+                                const value = item[columnId as keyof PipelineExecution];
+                                return value ? String(value) : '';
+                            }))).filter(Boolean);
+                        }}
+                        formatValue={(columnId, value) => {
+                            switch (columnId) {
+                                case 'start_time':
+                                    return formatDate(value);
+                                case 'duration_seconds':
+                                    return formatDuration(value);
+                                default:
+                                    return value;
+                            }
+                        }}
+                    />
+            </Box>
+        
     );
 };
 

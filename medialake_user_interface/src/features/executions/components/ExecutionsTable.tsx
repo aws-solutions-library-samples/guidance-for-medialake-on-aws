@@ -9,7 +9,7 @@ interface ExecutionsTableProps {
     table: TanStackTable<PipelineExecution>;
     isLoading: boolean;
     data: PipelineExecution[];
-    onViewDetails: (executionId: string) => void;
+    onViewDetails: (execution: PipelineExecution) => void;
     onRetryFromCurrent: (executionId: string) => void;
     onRetryFromStart: (executionId: string) => void;
     onFilterColumn: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
