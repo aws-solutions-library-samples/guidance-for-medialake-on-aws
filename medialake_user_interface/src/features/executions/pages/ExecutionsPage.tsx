@@ -250,10 +250,8 @@ const ExecutionsPage: React.FC = () => {
                 enableResizing: true,
                 enableSorting: false,
                 cell: ({ row }) => (
-                    <TableCellContent>
+                    <TableCellContent>   
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                        {row.original.status === 'SUCCEEDED' && (
-                            <>
                             <IconButton
                                 size="small"
                                 color="primary"
@@ -268,7 +266,8 @@ const ExecutionsPage: React.FC = () => {
                             >
                                 <VisibilityIcon fontSize="small" />
                             </IconButton>
-
+			                {row.original.status === 'FAILED' && (
+                            <>
                             <IconButton
                                 size="small"
                                 color="primary"
