@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState, useEffect, useRef } from 'react';
 import { Box, Button } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import { useRightSidebar } from './SidebarContext';
@@ -9,26 +9,98 @@ interface RightSidebarProps {
     children: ReactNode;
 }
 
+// Default width is now 375px (25% wider than previous 300px)
+const DEFAULT_WIDTH = 375;
+const MIN_WIDTH = 275;
+const MAX_WIDTH = 600;
+const COLLAPSED_WIDTH = 8;
+
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-    const { isExpanded, setIsExpanded } = useRightSidebar();
+    const { isExpanded, setIsExpanded, setCurrentWidth } = useRightSidebar();
     const location = useLocation();
+    const [width, setWidth] = useState(DEFAULT_WIDTH);
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeHandleRef = useRef<HTMLDivElement | null>(null);
+
+    // Load saved width on mount
+    useEffect(() => {
+        const savedWidth = localStorage.getItem('rightSidebarWidth');
+        if (savedWidth) {
+            const parsedWidth = parseInt(savedWidth, 10);
+            if (!isNaN(parsedWidth) && parsedWidth >= MIN_WIDTH && parsedWidth <= MAX_WIDTH) {
+                setWidth(parsedWidth);
+            }
+        }
+    }, []);
+
+    // Update context with current effective width
+    useEffect(() => {
+        const effectiveWidth = isExpanded ? width : COLLAPSED_WIDTH;
+        setCurrentWidth(effectiveWidth);
+    }, [isExpanded, width, setCurrentWidth]);
+
+    // Save width to localStorage when it changes
+    useEffect(() => {
+        if (width !== COLLAPSED_WIDTH) {
+            localStorage.setItem('rightSidebarWidth', width.toString());
+        }
+    }, [width]);
 
     // Auto-close on search page
-    React.useEffect(() => {
+    useEffect(() => {
         if (location.pathname === '/search') {
             setIsExpanded(false);
         }
     }, [location.pathname, setIsExpanded]);
 
+    // Handle resize start
+    const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsResizing(true);
+        document.body.style.cursor = 'col-resize';
+    };
+
+    // Handle resizing
+    useEffect(() => {
+        const handleResize = (e: MouseEvent) => {
+            if (isResizing && isExpanded) {
+                // Calculate new width based on mouse position
+                const newWidth = window.innerWidth - e.clientX;
+                
+                // Apply constraints
+                if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
+                    setWidth(newWidth);
+                }
+            }
+        };
+
+        const handleResizeEnd = () => {
+            setIsResizing(false);
+            document.body.style.cursor = '';
+        };
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleResize);
+            document.addEventListener('mouseup', handleResizeEnd);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleResize);
+            document.removeEventListener('mouseup', handleResizeEnd);
+            document.body.style.cursor = '';
+        };
+    }, [isResizing, isExpanded]);
+
     return (
         <>
+            {/* Main sidebar container */}
             <Box
                 sx={{
-                    width: isExpanded ? 300 : 8,
+                    width: isExpanded ? width : COLLAPSED_WIDTH,
                     flexShrink: 0,
                     borderLeft: '1px solid',
                     borderColor: 'divider',
-                    transition: theme => theme.transitions.create(['width', 'border-radius'], {
+                    transition: isResizing ? 'none' : theme => theme.transitions.create(['width', 'border-radius'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
                     }),
@@ -46,6 +118,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                     overflow: 'hidden',
                 }}
             >
+                {/* Resize handle */}
+                {isExpanded && (
+                    <Box
+                        ref={resizeHandleRef}
+                        onMouseDown={handleResizeStart}
+                        sx={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '5px',
+                            cursor: 'col-resize',
+                            zIndex: 1,
+                            '&:hover': {
+                                backgroundColor: theme => alpha(theme.palette.primary.main, 0.1),
+                            },
+                            ...(isResizing && {
+                                backgroundColor: theme => alpha(theme.palette.primary.main, 0.2),
+                            })
+                        }}
+                    />
+                )}
+
                 <Box
                     sx={{
                         position: 'absolute',
@@ -67,11 +162,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                 </Box>
             </Box>
 
+            {/* Toggle button - positioned outside the main container to avoid being clipped */}
             <Button
                 onClick={() => setIsExpanded(!isExpanded)}
                 sx={{
                     position: 'fixed',
-                    right: isExpanded ? 300 - 12 : 8 - 12,
+                    right: isExpanded ? width - 12 : COLLAPSED_WIDTH - 12,
                     top: 'calc(50vh - 12px)',
                     minWidth: '24px',
                     width: '24px',
@@ -86,7 +182,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                     borderColor: 'divider',
                     zIndex: 1201,
                     padding: 0,
-                    transition: theme => theme.transitions.create(['right'], {
+                    transition: isResizing ? 'none' : theme => theme.transitions.create(['right'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
                     }),
@@ -103,7 +199,30 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                 )}
             </Button>
 
-            <Box sx={{ width: isExpanded ? 300 : 8, flexShrink: 0 }} />
+            {/* Responsive spacer that adjusts layout in real-time */}
+            <Box 
+                sx={{ 
+                    width: isExpanded ? width : COLLAPSED_WIDTH, 
+                    flexShrink: 0,
+                    transition: isResizing ? 'none' : 'width 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms',
+                }} 
+            />
+
+            {/* Optional overlay for better UX during resizing */}
+            {isResizing && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1199,
+                        cursor: 'col-resize',
+                        pointerEvents: 'none', // Allow clicking through
+                    }}
+                />
+            )}
         </>
     );
 };
