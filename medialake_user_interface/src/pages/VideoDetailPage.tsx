@@ -10,6 +10,7 @@ import AssetHeader from '../components/asset/AssetHeader';
 import AssetVideo from '../components/asset/AssetVideo';
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 
 
 const outputFilters = {
@@ -182,16 +183,8 @@ const VideoDetailContent: React.FC = () => {
     }, [assetData]);
 
     const handleAddComment = (comment: string) => {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
+        const now = new Date().toISOString();
+        const formattedTimestamp = formatLocalDateTime(now, { showSeconds: true });
 
         const newComment = {
             user: "Current User",

@@ -7,6 +7,7 @@ import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/Rece
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
 import { formatFileSize } from '../utils/imageUtils';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import ImageViewer from '../components/common/ImageViewer';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
 import AssetSidebar from '../components/asset/AssetSidebar';
@@ -166,16 +167,8 @@ const ImageDetailContent: React.FC = () => {
 
     const handleCommentSubmit = useCallback(() => {
         if (newComment.trim()) {
-            const now = new Date();
-            const formattedTimestamp = now.toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2');
+            const now = new Date().toISOString();
+            const formattedTimestamp = formatLocalDateTime(now, { showSeconds: true });
 
             const newCommentObj = {
                 user: "Current User",

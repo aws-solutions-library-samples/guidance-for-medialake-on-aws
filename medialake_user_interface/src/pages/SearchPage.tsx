@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatDate } from '@/utils/dateFormat';
 import {
     Box,
     Typography,
@@ -219,8 +220,7 @@ const SearchPage: React.FC = () => {
             minWidth: 150,
             accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
             cell: (info: CellContext<AssetItem, unknown>) => {
-                const date = new Date(info.getValue() as string);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                return formatDate(info.getValue() as string);
             },
             sortable: true,
             sortingFn: (rowA, rowB) => {
@@ -255,10 +255,11 @@ const SearchPage: React.FC = () => {
         // Time-based filtering
         const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
         const now = new Date();
-        const isRecent = filters.time.recent && (now.getTime() - createdAt.getTime() <= 24 * 60 * 60 * 1000);
-        const isLastWeek = filters.time.lastWeek && (now.getTime() - createdAt.getTime() <= 7 * 24 * 60 * 60 * 1000);
-        const isLastMonth = filters.time.lastMonth && (now.getTime() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000);
-        const isLastYear = filters.time.lastYear && (now.getTime() - createdAt.getTime() <= 365 * 24 * 60 * 60 * 1000);
+        const timeDiff = now.getTime() - createdAt.getTime();
+        const isRecent = filters.time.recent && (timeDiff <= 24 * 60 * 60 * 1000);
+        const isLastWeek = filters.time.lastWeek && (timeDiff <= 7 * 24 * 60 * 60 * 1000);
+        const isLastMonth = filters.time.lastMonth && (timeDiff <= 30 * 24 * 60 * 60 * 1000);
+        const isLastYear = filters.time.lastYear && (timeDiff <= 365 * 24 * 60 * 60 * 1000);
 
         const passesTimeFilter = !filters.time.recent && !filters.time.lastWeek && !filters.time.lastMonth && !filters.time.lastYear ||
             isRecent || isLastWeek || isLastMonth || isLastYear;

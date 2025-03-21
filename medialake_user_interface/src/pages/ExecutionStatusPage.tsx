@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import {
     Box,
     Typography,
@@ -80,14 +81,7 @@ const ExecutionStatusPage: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString(undefined, {
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        return formatLocalDateTime(dateString, { showSeconds: true });
     };
 
     const formatDuration = (seconds: string) => {
