@@ -47,7 +47,7 @@ def get_event_pattern_for_rule(
     elif rule_name == "pipeline_execution_completed":
         # Determine asset type and format based on node configuration
         asset_type = "Video"  # Default asset type
-        asset_format = "MP4"  # Default format
+        asset_format = None # Default format
         
         # Get parameters from node configuration
         parameters = node.data.configuration.get("parameters", {})
@@ -56,24 +56,48 @@ def get_event_pattern_for_rule(
         # Check for different asset type parameters in configuration
         if "Image Type" in parameters:
             asset_type = "Image"
-            asset_format = parameters.get("Image Type", "PNG")
+            asset_format = parameters.get("Image Type")
             logger.info(f"Using Image asset type with format: {asset_format}")
         elif "Video Type" in parameters:
             asset_type = "Video"
-            asset_format = parameters.get("Video Type", "MP4")
+            asset_format = parameters.get("Video Type")
             logger.info(f"Using Video asset type with format: {asset_format}")
         elif "Audio Type" in parameters:
             asset_type = "Audio"
-            asset_format = parameters.get("Audio Type", "MP3")
+            asset_format = parameters.get("Audio Type")
             logger.info(f"Using Audio asset type with format: {asset_format}")
         else:
             logger.warning(f"No specific asset type found in parameters, defaulting to Video/MP4")
+            
+        # Check if a prefix is specified
+        asset_prefix = parameters.get("Prefix")
+        if asset_prefix:
+            logger.info(f"Using prefix path: {asset_prefix}")
         
         # Create the base pattern with appropriate asset type and format
         digital_source_asset = {
             "Type": [asset_type],
-            "MainRepresentation": {"Format": [asset_format.upper()]},
         }
+        
+        # Only include MainRepresentation if asset_format is not empty
+        if asset_format and asset_format.strip():
+            digital_source_asset["MainRepresentation"] = {"Format": [asset_format.upper()]}
+        
+        # Add StorageInfo path if prefix is specified
+        if asset_prefix and asset_prefix.strip():
+            # Create MainRepresentation if it doesn't exist yet
+            if "MainRepresentation" not in digital_source_asset:
+                digital_source_asset["MainRepresentation"] = {}
+            
+            # Initialize nested structure if it doesn't exist
+            if "StorageInfo" not in digital_source_asset["MainRepresentation"]:
+                digital_source_asset["MainRepresentation"]["StorageInfo"] = {}
+            
+            if "PrimaryLocation" not in digital_source_asset["MainRepresentation"]["StorageInfo"]:
+                digital_source_asset["MainRepresentation"]["StorageInfo"]["PrimaryLocation"] = {}
+            
+            digital_source_asset["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]["ObjectKey"] = {"Path": [asset_prefix]}
+            logger.info(f"Added StorageInfo path: {asset_prefix}")
         
         logger.info(f"Created digital source asset pattern: {digital_source_asset}")
         

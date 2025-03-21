@@ -1,8 +1,6 @@
 import json
 import os
-import time
 import boto3
-import uuid
 from urllib.parse import urlparse
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
@@ -10,6 +8,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
 from lambda_middleware import lambda_middleware
+from nodes_utils import seconds_to_smpte
 
 # Initialize Powertools
 logger = Logger()
@@ -73,7 +72,7 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": "Missing asset_id in embedding item"})
             }
         
-        scope = item.get("embeddingScope", None)
+        scope = item.get("embedding_scope", None)
         if scope is None:
             logger.warning("Missing scope in embedding item")
             return {
@@ -103,58 +102,63 @@ def lambda_handler(event, context):
         
         document = {
             "type": CONTENT_TYPE,
-            "document_id": asset_id,
-            "asset_id": asset_id,
             "embedding": embedding_vector,
             "embedding_scope": scope,
-            # "start_offset_sec": item.get("start_offset_sec", 0),
-            # "end_offset_sec": item.get("end_offset_sec", 0),
             "timestamp": datetime.utcnow().isoformat()
         }
-        if scope == "clip":
-            logger.info("TODO add offsets")
 
-        
-        # Wait for the document to exist in the index before updating
-        max_wait_time = 60  # maximum wait time in seconds
-        poll_interval = 5   # check every 1 second
-        start_time = time.time()
-        while not client.exists(index=INDEX_NAME, id=asset_id):
-            if time.time() - start_time > max_wait_time:
-                error_msg = f"Document with id {asset_id} not found in index {INDEX_NAME} after {max_wait_time} seconds"
+        if scope == "clip":
+            # Store the original asset_id inside an object called DigitalSourceAsset with a key called ID
+            document["DigitalSourceAsset"] = {"ID": asset_id}
+            document["start_timecode"] = seconds_to_smpte(item.get("start_offset_sec", None))
+            document["end_timecode"] = seconds_to_smpte(item.get("end_offset_sec", None))
+
+            # Index the document and let OpenSearch generate the ID
+            response = client.index(index=INDEX_NAME, body=document, refresh=True)
+            document_id = response.get("_id", "unknown")
+            logger.info(f"Successfully created new document for clip: {response}")
+
+        else:
+            # Search for an existing document by DigitalSourceAsset.ID
+            search_query = {
+                "query": {
+                    "term": {
+                        "DigitalSourceAsset.ID.keyword": asset_id
+                    }
+                }
+            }
+            search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
+
+            if search_response["hits"]["total"]["value"] == 0:
+                error_msg = f"No existing document found with DigitalSourceAsset.ID={asset_id} in index {INDEX_NAME}"
                 logger.error(error_msg)
                 return {
-                    "statusCode": 500,
+                    "statusCode": 404,
                     "body": json.dumps({"error": error_msg})
                 }
-            time.sleep(poll_interval)
 
-        # Retrieve and log the existing document for debugging purposes
-        existing_doc = client.get(index=INDEX_NAME, id=asset_id)
-        logger.info("Existing document in OpenSearch before update: %s", json.dumps(existing_doc, indent=2))
-        logger.info("New document content to update: %s", json.dumps(document, indent=2))
+            # Extract document ID from search response
+            existing_doc_id = search_response["hits"]["hits"][0]["_id"]
+            logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
 
+            # Update the existing document
+            document["asset_id"] = asset_id
+            response = client.update(
+                index=INDEX_NAME,
+                id=existing_doc_id,
+                body={"doc": document},
+                refresh=True
+            )
+            document_id = existing_doc_id
+            logger.info(f"Successfully updated document: {response}")
         
-        # Once the document exists, update it
-        response = client.update(
-            index=INDEX_NAME,
-            id=asset_id,
-            body={
-                "doc": document,
-                # Uncomment the line below if you want to upsert in case the document doesn't exist
-                # "doc_as_upsert": True
-            },
-            refresh=True
-        )
-        
-        logger.info(f"Successfully updated document wow: {response}")
         return {
             "statusCode": 200,
             "body": json.dumps({
                 "message": "Embedding stored successfully",
                 "index": INDEX_NAME,
-                "document_id": response.get("_id"),
-                "asset_id": asset_id
+                "document_id": document_id,
+                "asset_id": asset_id if scope != "clip" else "Generated by OpenSearch"
             })
         }
         

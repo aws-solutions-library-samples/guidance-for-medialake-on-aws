@@ -21,6 +21,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 from medialake_constructs.shared_constructs.lambda_layers import (
     FFProbeLayer,
     PyMediaInfo,
+    CairoSvgLayer
 )
 
 from medialake_constructs.shared_constructs.mediaconvert import (
@@ -84,6 +85,10 @@ class PipelineNodesStack(Stack):
         pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
 
         layer_objects = [ffprobe_layer.layer, pymediainfo_layer.layer]
+
+        cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+
+        image_proxy_layer_objects = [cairosvg_layer.layer]
 
         self._trigger_node_lambda = Lambda(
             self,
@@ -155,6 +160,7 @@ class PipelineNodesStack(Stack):
                 memory_size=10240,
                 timeout_minutes=15,
                 entry="lambdas/nodes/image_proxy",
+                layers=image_proxy_layer_objects,
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 },

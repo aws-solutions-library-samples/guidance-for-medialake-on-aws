@@ -27,7 +27,12 @@ actions:
     parameters:
       - in: body
         name: Video Type
-        required: true
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Prefix
+        required: false
         schema:
           type: string
     connections:

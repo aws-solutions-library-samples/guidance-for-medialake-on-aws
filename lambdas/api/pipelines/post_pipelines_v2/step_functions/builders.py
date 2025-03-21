@@ -61,23 +61,25 @@ class StateMachineBuilder:
         # Step 2: Identify the root node and determine start state
         root_node_id = self.graph_analyzer.get_root_node()
         
-        # Step 3: Create state definitions for each node
+        # Step 3: Find special edge types
+        choice_true_targets, choice_false_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
+        
+        # Step 4: Create state definitions for each node
         self.states = self.state_factory.create_state_definitions(
-            self.pipeline.configuration.nodes, 
-            self.node_id_to_state_name
+            self.pipeline.configuration.nodes,
+            self.node_id_to_state_name,
+            map_processor_chains
         )
         
-        # Step 4: Determine the start state
+        # Step 5: Determine the start state
         self.start_at = self._determine_start_state(root_node_id)
-        
-        # Step 5: Find special edge types
-        choice_true_targets, choice_false_targets, map_processor_targets = self.graph_analyzer.find_special_edges()
         
         # Step 6: Connect states based on edges
         state_connector = StateConnector(
-            self.states, 
-            self.node_id_to_state_name, 
-            self.graph_analyzer.node_id_to_node
+            self.states,
+            self.node_id_to_state_name,
+            self.graph_analyzer.node_id_to_node,
+            map_processor_chains
         )
         state_connector.connect_states(
             self.pipeline.configuration.edges,
@@ -87,7 +89,7 @@ class StateMachineBuilder:
         
         # Step 7: Find execution path
         execution_path = self.graph_analyzer.find_execution_path(
-            root_node_id, 
+            root_node_id,
             self.node_id_to_state_name
         )
         

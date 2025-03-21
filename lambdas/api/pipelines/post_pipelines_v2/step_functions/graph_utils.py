@@ -167,17 +167,20 @@ class GraphAnalyzer:
         dfs(start_node)
         return path
         
-    def find_special_edges(self) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str]]:
+    def find_special_edges(self) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, List[str]]]:
         """
         Find special edge types in the pipeline.
         
         Returns:
-            Tuple of (choice_true_targets, choice_false_targets, map_processor_targets)
-            where each is a dictionary mapping from source node ID to target node ID
+            Tuple of (choice_true_targets, choice_false_targets, map_processor_chains)
+            where map_processor_chains maps Map node IDs to lists of node IDs in their processor chains
         """
         choice_true_targets = {}  # Maps Choice node ID to its "true" target node ID
         choice_false_targets = {}  # Maps Choice node ID to its "false" target node ID
-        map_processor_targets = {}  # Maps Map node ID to its processor node ID
+        map_processor_chains = {}  # Maps Map node ID to a list of node IDs in its processor chain
+        
+        # First identify the initial processor nodes for each Map
+        initial_processor_targets = {}  # Maps Map node ID to its initial processor node ID
         
         for edge in self.edges:
             # Extract source, target, and sourceHandle
@@ -206,7 +209,21 @@ class GraphAnalyzer:
             # Handle Map node edges
             if source_node.data.type.lower() == "flow" and source_node.data.id == "map":
                 if source_handle == "Processor":
-                    map_processor_targets[source_id] = target_id
-                    logger.info(f"Identified Map processor: {source_id} -> {target_id}")
-                    
-        return choice_true_targets, choice_false_targets, map_processor_targets
+                    initial_processor_targets[source_id] = target_id
+                    logger.info(f"Identified initial Map processor: {source_id} -> {target_id}")
+        
+        # Now build the complete processor chains
+        for map_id, initial_target in initial_processor_targets.items():
+            chain = [initial_target]
+            current_node = initial_target
+            
+            # Follow the chain of nodes connected to the initial processor
+            while current_node in self.graph and self.graph[current_node]:
+                next_node = self.graph[current_node][0]  # Take the first outgoing edge
+                chain.append(next_node)
+                current_node = next_node
+                
+            map_processor_chains[map_id] = chain
+            logger.info(f"Built processor chain for Map {map_id}: {chain}")
+            
+        return choice_true_targets, choice_false_targets, map_processor_chains

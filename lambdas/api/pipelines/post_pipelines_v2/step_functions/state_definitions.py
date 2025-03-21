@@ -2,7 +2,7 @@
 State definition creation for Step Functions state machines.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from aws_lambda_powertools import Logger
 
 # Import from lambda_operations for reading YAML files
@@ -78,13 +78,15 @@ class StateDefinitionFactory:
         logger.info(f"Using $.payload.externalTaskResults as ItemsPath for Map node {node.id}")
         return "$.payload.externalTaskResults"
         
-    def create_state_definitions(self, nodes: list, node_id_to_state_name: Dict[str, str]) -> Dict[str, Any]:
+    def create_state_definitions(self, nodes: list, node_id_to_state_name: Dict[str, str],
+                                map_processor_chains: Dict[str, List[str]]) -> Dict[str, Any]:
         """
         Create state definitions for all nodes.
         
         Args:
             nodes: List of nodes from the pipeline
             node_id_to_state_name: Mapping from node IDs to state names
+            map_processor_chains: Mapping from Map node IDs to lists of node IDs in their processor chains
             
         Returns:
             Dictionary of state definitions
@@ -97,19 +99,11 @@ class StateDefinitionFactory:
         # Track nodes that are used as Map processors to avoid duplicate states
         map_processor_nodes = set()
         
-        # First pass: identify Map processor nodes
-        for node in nodes:
-            if node.data.type.lower() == "flow" and node.data.id == "map":
-                # Find edges where this Map node is the source with a "Processor" handle
-                for edge in self.pipeline.configuration.edges:
-                    source_id = edge.source if hasattr(edge, 'source') else edge.get('source')
-                    source_handle = edge.sourceHandle if hasattr(edge, 'sourceHandle') else edge.get('sourceHandle')
-                    target_id = edge.target if hasattr(edge, 'target') else edge.get('target')
-                    
-                    if source_id == node.id and source_handle == "Processor":
-                        # This target node is used as a Map processor
-                        map_processor_nodes.add(target_id)
-                        logger.info(f"Identified node {target_id} as a Map processor, will skip creating it in main state machine")
+        # First pass: identify Map processor nodes from the chains
+        for map_id, processor_chain in map_processor_chains.items():
+            for node_id in processor_chain:
+                map_processor_nodes.add(node_id)
+                logger.info(f"Identified node {node_id} as part of a Map processor chain, will skip creating it in main state machine")
         
         # Create state definitions for each node
         for node in nodes:
@@ -133,7 +127,7 @@ class StateDefinitionFactory:
             if node.data.type.lower() == "flow":
                 # Handle flow-type nodes
                 try:
-                    state_def = self.create_flow_state_definition(node)
+                    state_def = self.create_flow_state_definition(node, map_processor_chains)
                     # Remove End: true if it exists, we'll set it later if needed
                     if "End" in state_def:
                         del state_def["End"]
@@ -193,7 +187,7 @@ class StateDefinitionFactory:
                         lambda_key = f"{lambda_key}_{node.data.configuration['operationId']}"
                 self.node_id_to_lambda_key[node.id] = lambda_key
                 
-    def create_flow_state_definition(self, node: Any) -> Dict[str, Any]:
+    def create_flow_state_definition(self, node: Any, map_processor_chains: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Create a Step Function state definition for a flow-type node.
         
@@ -275,72 +269,88 @@ class StateDefinitionFactory:
             # Map state
             iterator = node.data.configuration.get("iterator", {})
             
-            # For Map states, we need to check if there's a processor node connected to it
-            processor_node_id = None
-            processor_lambda_arn = None
+            # Check if this Map node has a processor chain
+            processor_chain = []
+            if map_processor_chains and node.id in map_processor_chains:
+                processor_chain = map_processor_chains[node.id]
+                logger.info(f"Found processor chain for Map node {node.id}: {processor_chain}")
             
-            # Look for edges where this Map node is the source with a "Processor" handle
-            for edge in self.pipeline.configuration.edges:
-                source_id = edge.source if hasattr(edge, 'source') else edge.get('source')
-                source_handle = edge.sourceHandle if hasattr(edge, 'sourceHandle') else edge.get('sourceHandle')
-                target_id = edge.target if hasattr(edge, 'target') else edge.get('target')
+            if processor_chain:
+                # Build a complete iterator with all nodes in the processor chain
+                iterator_states = {}
+                previous_state_name = None
+                first_state_name = None
                 
-                if source_id == node.id and source_handle == "Processor":
-                    processor_node_id = target_id
-                    logger.info(f"Found processor node {processor_node_id} for Map node {node.id}")
-                    break
-            
-            # If we found a processor node, get its Lambda ARN
-            if processor_node_id:
-                # Find the target node in the pipeline nodes
-                processor_node = next((n for n in self.pipeline.configuration.nodes if n.id == processor_node_id), None)
-                if processor_node:
-                    # Get the Lambda ARN for this node
-                    lambda_key = processor_node.data.id
-                    if processor_node.data.type.lower() == "integration" and "method" in processor_node.data.configuration:
-                        lambda_key = f"{processor_node.data.id}_{processor_node.data.configuration['method']}"
-                        if "operationId" in processor_node.data.configuration and processor_node.data.configuration["operationId"]:
-                            lambda_key = f"{lambda_key}_{processor_node.data.configuration['operationId']}"
+                for i, processor_id in enumerate(processor_chain):
+                    # Find the processor node
+                    processor_node = next((n for n in self.pipeline.configuration.nodes if n.id == processor_id), None)
+                    if not processor_node:
+                        logger.warning(f"Processor node {processor_id} not found in pipeline nodes")
+                        continue
                     
+                    # Get the Lambda ARN for this processor node
+                    lambda_key = self.node_id_to_lambda_key.get(processor_id, processor_node.data.id)
                     processor_lambda_arn = self.lambda_arns.get(lambda_key)
-                    logger.info(f"Found Lambda ARN for processor node: {processor_lambda_arn}")
-            
-            # Create a custom Iterator with the processor node if found
-            if processor_lambda_arn:
-                # Create a more descriptive state name based on the processor node's label or ID
-                if processor_node:
-                    # Use the processor node's label if available, otherwise use its ID
+                    
+                    if not processor_lambda_arn:
+                        logger.warning(f"No Lambda ARN found for processor node {processor_id} with key {lambda_key}")
+                        continue
+                    
+                    # Create a state name for this processor
                     processor_label = processor_node.data.label if hasattr(processor_node.data, 'label') and processor_node.data.label else processor_node.data.id
-                    # Sanitize the label to create a valid state name
-                    processor_state_name = "".join(c if c.isalnum() else "_" for c in processor_label)
-                    # Ensure it starts with a letter
-                    if not processor_state_name[0].isalpha():
-                        processor_state_name = f"Processor_{processor_state_name}"
-                else:
-                    # Fallback to a generic name if processor_node is not available
-                    processor_state_name = "ProcessorState"
+                    processor_state_name = f"Processor_{i}_{processor_label}"
+                    processor_state_name = "".join(c if c.isalnum() else "_" for c in processor_state_name)
+                    
+                    # Store the first state name for the StartAt property
+                    if i == 0:
+                        first_state_name = processor_state_name
+                    
+                    # Create the processor state
+                    processor_state = {
+                        "Type": "Task",
+                        "Resource": processor_lambda_arn,
+                        "Retry": [
+                            {
+                                "ErrorEquals": ["States.ALL"],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
+                                "BackoffRate": 2.0
+                            }
+                        ]
+                    }
+                    
+                    # Connect to the previous state if this isn't the first one
+                    if previous_state_name:
+                        iterator_states[previous_state_name]["Next"] = processor_state_name
+                    
+                    # Only mark the last state as End: true
+                    if i == len(processor_chain) - 1:
+                        processor_state["End"] = True
+                    
+                    iterator_states[processor_state_name] = processor_state
+                    previous_state_name = processor_state_name
                 
-                iterator = {
-                    "StartAt": processor_state_name,
-                    "States": {
-                        processor_state_name: {
-                            "Type": "Task",
-                            "Resource": processor_lambda_arn,
-                            "Retry": [
-                                {
-                                    "ErrorEquals": ["States.ALL"],
-                                    "IntervalSeconds": 2,
-                                    "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
-                                    "BackoffRate": 2.0
-                                }
-                            ],
-                            "End": True
+                # Create the iterator with all the states
+                if iterator_states and first_state_name:
+                    iterator = {
+                        "StartAt": first_state_name,
+                        "States": iterator_states
+                    }
+                    logger.info(f"Created complete iterator for Map node {node.id} with {len(iterator_states)} states")
+                else:
+                    # Fallback to default iterator if we couldn't build the chain
+                    iterator = {
+                        "StartAt": "PassState",
+                        "States": {
+                            "PassState": {
+                                "Type": "Pass",
+                                "End": True
+                            }
                         }
                     }
-                }
-                logger.info(f"Created custom Iterator with processor '{processor_state_name}' for Map node {node.id}")
+                    logger.info(f"Created default iterator for Map node {node.id} (no valid processor chain)")
             else:
-                # Create a minimal valid Iterator if no processor node found
+                # No processor chain found, create a minimal valid Iterator
                 iterator = {
                     "StartAt": "PassState",
                     "States": {
@@ -350,7 +360,7 @@ class StateDefinitionFactory:
                         }
                     }
                 }
-                logger.info(f"Created default Iterator for Map node {node.id}")
+                logger.info(f"Created default Iterator for Map node {node.id} (no processor chain)")
             
             # Identify previous nodes and determine appropriate ItemsPath
             previous_nodes = self._get_previous_nodes(node.id)

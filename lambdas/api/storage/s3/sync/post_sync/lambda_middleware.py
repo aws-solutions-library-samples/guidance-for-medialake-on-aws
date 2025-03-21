@@ -198,21 +198,21 @@ class LambdaMiddleware:
         # Initialize assets array if it doesn't exist
         payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
         
-        # Check if InventoryID exists in the original event and add it to assets array
+        # Check if DigitalSourceAsset ID exists in the original event and add it to assets array
         if original_event and "detail" in original_event:
             detail = original_event.get("detail", {})
             outputs = detail.get("outputs", {})
             input_data = outputs.get("input", {})
             
-            inventory_id = input_data.get("InventoryID")
-            if inventory_id:
-                self.logger.info(f"Found InventoryID in event: {inventory_id}")
-                # Add InventoryID to assets array if not already present
-                if inventory_id not in payload_content["assets"]:
-                    payload_content["assets"].append(inventory_id)
-                    self.logger.info(f"Added InventoryID to assets array: {inventory_id}")
+            asset_id = input_data.get("DigitalSourceAsset").get("ID")
+            if asset_id:
+                self.logger.info(f"Found DigitalSourceAsset ID in event: {asset_id}")
+                # Add DigitalSourceAsset ID to assets array if not already present
+                if asset_id not in payload_content["assets"]:
+                    payload_content["assets"].append(asset_id)
+                    self.logger.info(f"Added DigitalSourceAsset Id to assets array: {asset_id}")
                 else:
-                    self.logger.info(f"InventoryID already exists in assets array: {inventory_id}")
+                    self.logger.info(f"DigitalSourceAsset ID already exists in assets array: {asset_id}")
         
         # Ensure all asset IDs in the array are unique
         if payload_content["assets"]:

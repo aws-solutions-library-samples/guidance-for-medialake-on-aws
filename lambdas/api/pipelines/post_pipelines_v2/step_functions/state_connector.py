@@ -2,7 +2,7 @@
 State connector for Step Functions state machines.
 """
 
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, Any, List, Set, Optional, Tuple
 from aws_lambda_powertools import Logger
 
 logger = Logger()
@@ -13,7 +13,8 @@ class StateConnector:
     Handles connecting states in a Step Functions state machine based on pipeline edges.
     """
     
-    def __init__(self, states: Dict[str, Any], node_id_to_state_name: Dict[str, str], node_id_to_node: Dict[str, Any]):
+    def __init__(self, states: Dict[str, Any], node_id_to_state_name: Dict[str, str],
+                node_id_to_node: Dict[str, Any], map_processor_chains: Optional[Dict[str, List[str]]] = None):
         """
         Initialize the StateConnector.
         
@@ -26,6 +27,7 @@ class StateConnector:
         self.node_id_to_state_name = node_id_to_state_name
         self.node_id_to_node = node_id_to_node
         self.choice_branch_targets = {}  # Map from target state name to source Choice state name
+        self.map_processor_chains = map_processor_chains or {}  # Map from Map node ID to list of processor node IDs
         
     def connect_states(self, edges: List[Any], choice_true_targets: Dict[str, str], choice_false_targets: Dict[str, str]) -> None:
         """
@@ -189,61 +191,10 @@ class StateConnector:
                 source_state["Next"] = target_state_name
                 logger.info(f"Connected Map state {source_state_name} Next to {target_state_name}")
             
-            # For "Processor" handle, modify the Map's Iterator to use a unique processor state
+            # For "Processor" handle, we don't need to do anything here
+            # The processor chain is now handled in the state definition creation
             elif source_handle == "Processor":
-                logger.info(f"Map state {source_state_name} has processor {target_state_name}")
-                
-                # Get the target node from the node_id_to_node mapping
-                target_node = self.node_id_to_node.get(target_id)
-                if not target_node:
-                    logger.warning(f"Target node {target_id} not found in node_id_to_node mapping")
-                    return
-                
-                # Get the Lambda ARN for the target node
-                target_node_id = target_node.data.id
-                lambda_arn = None
-                
-                # Look for the Lambda ARN in the states dictionary
-                if target_state_name in self.states and self.states[target_state_name].get("Type") == "Task":
-                    lambda_arn = self.states[target_state_name].get("Resource")
-                
-                if not lambda_arn:
-                    logger.warning(f"No Lambda ARN found for target node {target_id}")
-                    return
-                
-                # Create a processor state for the Map Iterator
-                processor_state = {
-                    "Type": "Task",
-                    "Resource": lambda_arn,
-                    "Retry": [
-                        {
-                            "ErrorEquals": ["States.ALL"],
-                            "IntervalSeconds": 2,
-                            "MaxAttempts": 3,
-                            "BackoffRate": 2.0
-                        }
-                    ],
-                    "End": True
-                }
-                
-                # Ensure the Iterator exists and has a States object
-                if "Iterator" not in source_state:
-                    source_state["Iterator"] = {
-                        "StartAt": "ProcessorState",
-                        "States": {}
-                    }
-                elif "States" not in source_state["Iterator"]:
-                    source_state["Iterator"]["States"] = {}
-                
-                # Add the processor state to the Iterator
-                source_state["Iterator"]["States"]["ProcessorState"] = processor_state
-                source_state["Iterator"]["StartAt"] = "ProcessorState"
-                
-                # Remove the PassState if it exists
-                if "PassState" in source_state["Iterator"]["States"]:
-                    del source_state["Iterator"]["States"]["PassState"]
-                
-                logger.info(f"Added processor state for {target_node_id} to Map state {source_state_name} Iterator")
+                logger.info(f"Map state {source_state_name} processor chain is handled in state definitions")
         else:
             # For regular connections, just connect normally
             # Remove End: true if it exists

@@ -89,11 +89,11 @@ def handler(event, context):
                         "asset_id": {
                             "type": "keyword"
                         },
-                        "start_offset_sec": {
-                            "type": "float"
+                        "start_timecode": {
+                            "type": "keyword"
                         },
-                        "end_offset_sec": {
-                            "type": "float"
+                        "end_timecode": {
+                            "type": "keyword"
                         },
                         "embedding_scope": {
                             "type": "keyword"

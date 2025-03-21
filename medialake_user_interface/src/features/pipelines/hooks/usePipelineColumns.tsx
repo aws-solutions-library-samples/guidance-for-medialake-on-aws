@@ -110,7 +110,7 @@ export const usePipelineColumns = ({
                             <IconButton
                                 size="small"
                                 onClick={() => onEdit(info.row.original.id)}
-                                disabled={info.row.original.system}
+                                // disabled={info.row.original.system}
                             >
                                 <EditIcon fontSize="small" />
                             </IconButton>

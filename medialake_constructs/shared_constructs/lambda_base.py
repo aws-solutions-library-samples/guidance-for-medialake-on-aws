@@ -429,7 +429,7 @@ class Lambda(Construct):
                 self,
                 "StandardNodeJSLambda",
                 bundling=NodeJSBundlingOptions(
-                    node_modules=["exifr", "aws-sdk"],
+                    node_modules=["exifr", "aws-sdk", "xml2js"],
                     force_docker_bundling=True,
                 ),
                 **props,

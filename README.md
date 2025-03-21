@@ -419,6 +419,10 @@ medialake/
 - **AWS X-Ray** - Distributed tracing and performance monitoring
 - **Amazon CloudTrail** - API activity and resource change tracking
 
+### Others
+
+- **MediaConvert** - Video & Audio for transcoding.
+
 ### Development & Deployment
 
 - **AWS CDK** - Infrastructure as code

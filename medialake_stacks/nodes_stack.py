@@ -9,17 +9,14 @@ from aws_cdk import (
     RemovalPolicy,
     CustomResource,
 )
-import time
-import os
-import zipfile
-import tempfile
-import base64
+
 from constructs import Construct
 from dataclasses import dataclass
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+
 from config import config
 
 
@@ -113,6 +110,18 @@ class NodesStack(Stack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "debug_input"],
+        )
+
+
+        
+        # Add FFmpeg layer to the audio splitter Lambda
+        self.audio_splitter_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioSplitterLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_splitter"],
+            
         )
 
         # Create DynamoDB table for nodes

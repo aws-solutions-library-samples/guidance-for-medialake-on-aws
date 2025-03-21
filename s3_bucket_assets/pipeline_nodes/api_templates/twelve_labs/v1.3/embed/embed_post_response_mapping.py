@@ -16,10 +16,10 @@ def translate_event_to_request(response_body_and_event):
         asset_id = event["payload"]["assets"][0]  # Use the first asset ID in the array
         print(f"Found asset ID in payload.assets: {asset_id}")
     
-    # Fallback: try to get InventoryID from the detail.outputs.input path (original implementation)
+    # Fallback: try to get DigitalSourceAsset from the detail.outputs.input path (original implementation)
     if not asset_id and event and "detail" in event and "outputs" in event["detail"] and "input" in event["detail"]["outputs"]:
-        asset_id = event["detail"]["outputs"]["input"].get("InventoryID")
-        print(f"Found asset ID in detail.outputs.input.InventoryID: {asset_id}")
+        asset_id = event["detail"]["outputs"]["input"].get("DigitalSourceAsset").get("ID")
+        print(f"Found asset ID in detail.outputs.input.DigitalSourceAsset.ID: {asset_id}")
     
     print(f"Final asset ID: {asset_id}")
     
@@ -27,7 +27,8 @@ def translate_event_to_request(response_body_and_event):
     if asset_id and segments:
         for segment in segments:
             segment["assetId"] = asset_id
-            segment["embeddingScope"] = scope    
+            if scope == "audio" or scope == "image":
+                segment["embedding_scope"] = scope    
 
     return {
         "task_id": response_body.get("_id"),

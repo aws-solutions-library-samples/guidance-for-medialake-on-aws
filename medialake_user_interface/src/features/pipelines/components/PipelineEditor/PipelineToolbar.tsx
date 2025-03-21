@@ -1,11 +1,19 @@
 import React, { useRef, ChangeEvent } from 'react';
-import { Stack, Button, IconButton,Tooltip } from '@mui/material';
+import { Stack, Button, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { PipelineNameInput } from './';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ButtonGroup from '@mui/material/ButtonGroup';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Grow from '@mui/material/Grow';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
 import { FaFileVideo } from 'react-icons/fa';
 import type { Node, Edge, ReactFlowInstance } from 'reactflow';
 
@@ -130,6 +138,35 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     }
   };
 
+  // Split button functionality
+  const [open, setOpen] = React.useState(false);
+  const anchorRef = React.useRef<HTMLDivElement>(null);
+
+  const handleToggle = () => {
+    setOpen((prevOpen) => !prevOpen);
+  };
+
+  const handleClose = (event: Event) => {
+    if (
+      anchorRef.current &&
+      anchorRef.current.contains(event.target as HTMLElement)
+    ) {
+      return;
+    }
+
+    setOpen(false);
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+    setOpen(false);
+  };
+
+  const handleExport = () => {
+    onExport();
+    setOpen(false);
+  };
+
   return (
     <>
       <Stack
@@ -172,37 +209,74 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
           '& .MuiButton-root': commonStyles,
         }}
       >
-        {/* <Tooltip title="Export Pipeline">
-        <IconButton onClick={onExport} aria-label="export">
-          <FileDownloadIcon />
-        </IconButton>
-        </Tooltip>
-        <Tooltip title="Import Pipeline">
-        <IconButton
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="import"
-        >
-          <FileUploadIcon />
-        </IconButton>
-        </Tooltip>
         <input
           type="file"
           accept="application/json"
           ref={fileInputRef}
           style={{ display: 'none' }}
           onChange={handleLoadFlow}
-        /> */}
+        />
         <Button variant="outlined" color="inherit" onClick={handleCancel}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={onSave}
-          disabled={isLoading || !pipelineName.trim()}
-        >
-          {isLoading ? 'Saving...' : 'Save'}
-        </Button>
+        
+        <React.Fragment>
+          <ButtonGroup
+            variant="contained"
+            ref={anchorRef}
+            aria-label="Pipeline actions"
+          >
+            <Button
+              color="primary"
+              onClick={onSave}
+              disabled={isLoading || !pipelineName.trim()}
+            >
+              {isLoading ? 'Saving...' : 'Save'}
+            </Button>
+            <Button
+              size="small"
+              color="primary"
+              aria-controls={open ? 'split-button-menu' : undefined}
+              aria-expanded={open ? 'true' : undefined}
+              aria-label="select pipeline action"
+              aria-haspopup="menu"
+              onClick={handleToggle}
+            >
+              <ArrowDropDownIcon />
+            </Button>
+          </ButtonGroup>
+          <Popper
+            sx={{ zIndex: 1200 }}
+            open={open}
+            anchorEl={anchorRef.current}
+            role={undefined}
+            transition
+            disablePortal
+          >
+            {({ TransitionProps, placement }) => (
+              <Grow
+                {...TransitionProps}
+                style={{
+                  transformOrigin:
+                    placement === 'bottom' ? 'center top' : 'center bottom',
+                }}
+              >
+                <Paper>
+                  <ClickAwayListener onClickAway={handleClose}>
+                    <MenuList id="split-button-menu" autoFocusItem>
+                      <MenuItem onClick={handleImport}>
+                        <FileUploadIcon sx={{ mr: 1 }} /> Import Pipeline
+                      </MenuItem>
+                      <MenuItem onClick={handleExport}>
+                        <FileDownloadIcon sx={{ mr: 1 }} /> Export Pipeline
+                      </MenuItem>
+                    </MenuList>
+                  </ClickAwayListener>
+                </Paper>
+              </Grow>
+            )}
+          </Popper>
+        </React.Fragment>
       </Stack>
     </>
   );

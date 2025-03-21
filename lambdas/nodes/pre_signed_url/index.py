@@ -61,17 +61,18 @@ def lambda_handler(event, context):
             logger.info("Found video proxy information in CheckMediaConvertStatusResult")
         
         # If not found, try to extract from ImageProxyResult (for image)
+        
         if not s3_bucket or not s3_key:
             image_proxy_result = (
                 event.get("detail", {})
                 .get("outputs", {})
                 .get("ImageProxyResult", {})
             )
-            
+
             if image_proxy_result:
                 payload = image_proxy_result.get("Payload", {})
                 body = payload.get("body", {})
-                
+
                 s3_bucket = (
                     body.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
                 )
@@ -81,8 +82,17 @@ def lambda_handler(event, context):
                     .get("ObjectKey", {})
                     .get("FullPath")
                 )
-                
+
                 logger.info("Found image proxy information in ImageProxyResult")
+
+        # ✅ If still not found, check for 'item' key (for audio chunks, etc.)
+        if not s3_bucket or not s3_key:
+            item = event.get("item", {})
+            s3_bucket = item.get("bucket")
+            s3_key = item.get("key")
+        
+        if s3_bucket and s3_key:
+            logger.info("Found S3 info in event['item']")
 
         # Validate required parameters
         if not s3_bucket or not s3_key:

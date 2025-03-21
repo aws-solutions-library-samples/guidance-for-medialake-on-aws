@@ -3,8 +3,6 @@ import json
 import subprocess
 import os
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 
 from pymediainfo import MediaInfo
 
@@ -323,10 +321,8 @@ def sanitize_metadata(metadata):
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
-    error = False
     steps_messages = {}
     error_message = ""
-    print(event)
 
     try:
         input_data = event["input"]
@@ -368,37 +364,45 @@ def lambda_handler(event, context):
         merged_output = merge_metadata(ff_data, mi_data)
 
         # Create new representation for proxy
-        output_bucket = os.environ.get("OUTPUT_BUCKET")
-        output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
-        asset_id = f"{clean_inventory_id}:proxy"
+        # output_bucket = os.environ.get("OUTPUT_BUCKET")
+        # output_key = f"{s3_source_bucket}/{s3_source_key.rsplit('.', 1)[0]}_proxy.mp4"
+        # asset_id = f"{clean_inventory_id}:proxy"
 
-        new_representation = {
-            "ID": asset_id,
-            "Type": "Video",
-            "Format": "MP4",
-            "Purpose": "proxy",
-            "StorageInfo": {
-                "PrimaryLocation": {
-                    "StorageType": "s3",
-                    "Provider": "aws",
-                    "Bucket": output_bucket,
-                    "ObjectKey": {
-                        "FullPath": output_key,
-                    },
-                    "Status": "active",
-                    "FileInfo": {
-                        "Size": os.path.getsize(
-                            local_path
-                        ),  # Approximate size, as proxy might be smaller
-                    },
-                }
-            },
-            "AudioSpec": {
-                "Codec": merged_output["audio"][0].get("codec_name"),
-                "SampleRate": merged_output["audio"][0].get("sample_rate"),
-                "Channels": merged_output["audio"][0].get("channels"),
-            },
+        # new_representation = {
+        #     "ID": asset_id,
+        #     "Type": "Video",
+        #     "Format": "MP4",
+        #     "Purpose": "proxy",
+        #     "StorageInfo": {
+        #         "PrimaryLocation": {
+        #             "StorageType": "s3",
+        #             "Provider": "aws",
+        #             "Bucket": output_bucket,
+        #             "ObjectKey": {
+        #                 "FullPath": output_key,
+        #             },
+        #             "Status": "active",
+        #             "FileInfo": {
+        #                 "Size": os.path.getsize(
+        #                     local_path
+        #                 ),  # Approximate size, as proxy might be smaller
+        #             },
+        #         }
+        #     },
+        #     "AudioSpec": {
+        #         "Codec": merged_output["audio"][0].get("codec_name"),
+        #         "SampleRate": merged_output["audio"][0].get("sample_rate"),
+        #         "Channels": merged_output["audio"][0].get("channels"),
+        #     },
+        # }
+        # print(json.dumps(merged_output))
+        AudioSpec= {
+            "Duration": merged_output["audio"][0].get("duration"),
+            "Codec": merged_output["audio"][0].get("codec_name"),
+            "SampleRate": merged_output["audio"][0].get("sample_rate"),
+            "Channels": merged_output["audio"][0].get("channels"),
         }
+        merged_output.pop("video")
 
         existing_item = asset_table.get_item(
             Key={"InventoryID": clean_inventory_id}
@@ -429,7 +433,7 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps(
-                {"message": "Process completed successfully", "steps": steps_messages}
+                {"message": "Process completed successfully", "steps": steps_messages, "video_spec":AudioSpec}
             ),
         }
 

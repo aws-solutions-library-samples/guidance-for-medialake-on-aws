@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID
+from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID, MEDIA_ASSETS_BUCKET_NAME
 from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name
 from dynamodb_operations import (
     get_node_info,
@@ -342,10 +342,13 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     "Publish": True,
                 }
 
+
+
                 # Common environment variables for all Lambda functions
                 common_env_vars = {
                     "LARGE_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
                     "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                    "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
                 }
 
                 # Only include additional Environment variables if the node type is "integration"
@@ -396,20 +399,20 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     create_function_params["Environment"] = {"Variables": env_vars}
                 if node.data.type.lower() == "utility" and node.data.id == 'embedding_store':
                     # Extract Index Name and Content Type from node configuration
-                    index_name = node.data.configuration.get("Index Name", "media")
-                    content_type = node.data.configuration.get("Content Type", "text")
+                    # index_name = node.data.configuration.get("Index Name", "media")
+                    # content_type = node.data.configuration.get("Content Type", "text")
                     
                     env_vars = {
                         **common_env_vars,  # Include common env vars
                         "OPENSEARCH_ENDPOINT": os.environ.get(
                             "OPENSEARCH_ENDPOINT"
                         ),
-                        "INDEX_NAME": index_name,
-                        "CONTENT_TYPE": content_type
+                        # "INDEX_NAME": index_name,
+                        # "CONTENT_TYPE": content_type
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
                     
-                    logger.info(f"Added environment variables for embedding_store Lambda: INDEX_NAME={index_name}, CONTENT_TYPE={content_type}")
+                    # logger.info(f"Added environment variables for embedding_store Lambda: INDEX_NAME={index_name}, CONTENT_TYPE={content_type}")
                     
                     # Add VPC configuration for the embedding_store Lambda to access OpenSearch
                     # OPENSEARCH_VPC_SUBNET_IDS contains a comma-separated list of subnet IDs
@@ -423,6 +426,38 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                 elif node.data.type.lower() != "integration":  # Integration nodes already handled above
                     create_function_params["Environment"] = {"Variables": common_env_vars}
                     logger.info(f"Added common environment variables to {node.data.type} Lambda function: {function_name}")
+                
+                # Add any parameters from node.data.configuration as environment variables
+                if hasattr(node.data, 'configuration') and 'parameters' in node.data.configuration:
+                    # Ensure we have an Environment.Variables dictionary
+                    if "Environment" not in create_function_params:
+                        create_function_params["Environment"] = {"Variables": common_env_vars}
+                    
+                    # Loop through all parameters
+                    for param_key, param_value in node.data.configuration['parameters'].items():
+                        # Skip numeric keys as they are just parameter definitions
+                        if param_key.isdigit():
+                            continue
+                        
+                        # Create sanitized environment variable name (replace spaces with underscores)
+                        env_var_name = param_key.replace(' ', '_').upper()
+                        
+                        # Get the parameter value or default if not available
+                        if param_value:
+                            env_var_value = str(param_value)
+                        else:
+                            # Find the parameter definition to get the default value
+                            for def_key, def_value in node.data.configuration['parameters'].items():
+                                if def_key.isdigit() and def_value.get('name') == param_key:
+                                    env_var_value = str(def_value.get('default', ''))
+                                    break
+                            else:
+                                env_var_value = ''
+                        
+                        # Add the environment variable
+                        create_function_params["Environment"]["Variables"][env_var_name] = env_var_value
+                        logger.info(f"Added parameter as environment variable: {env_var_name}={env_var_value}")
+                
                 # Create the Lambda function with the appropriate parameters
                 response = lambda_client.create_function(**create_function_params)
 
