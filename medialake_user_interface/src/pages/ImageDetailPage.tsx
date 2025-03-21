@@ -1,6 +1,31 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, CircularProgress, Typography, List, ListItem, Paper, Button, Divider } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  Typography,
+  List,
+  ListItem,
+  Paper,
+  Button,
+  Tabs,
+  Tab,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  useTheme,
+  alpha,
+  TextField,
+  InputAdornment,
+  FormControl,
+  Select,
+  MenuItem,
+  IconButton,
+  CardHeader,
+  ListItemText,
+  LinearProgress
+} from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
@@ -12,9 +37,25 @@ import ImageViewer from '../components/common/ImageViewer';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
 import AssetSidebar from '../components/asset/AssetSidebar';
 import CommentPopper from '../components/common/CommentPopper';
+import MetadataSection from '../components/common/MetadataSection';
+import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
+import { Chip as MuiChip } from '@mui/material';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
+import SearchIcon from '@mui/icons-material/Search';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 
 const categoryMapping = {
     exif: 'EXIF',
@@ -75,7 +116,551 @@ interface MetadataContentProps {
     category?: string;
 }
 
+// Color coding for metadata categories
+const getMetadataCategoryColor = (category: string, theme: any) => {
+    const categoryColors: Record<string, string> = {
+        'EXIF': theme.palette.primary.main,
+        'GPS': theme.palette.success.main,
+        'XMP': theme.palette.warning.main,
+        'IPTC': theme.palette.info.main,
+        'ICC': theme.palette.secondary.main,
+        'general': theme.palette.grey[600],
+        'technical': theme.palette.primary.light,
+        'descriptive': theme.palette.secondary.light
+    };
+    
+    // Try to find an exact match
+    if (categoryColors[category]) return categoryColors[category];
+    
+    // Try to find a partial match
+    const foundKey = Object.keys(categoryColors).find(key => 
+        category.toLowerCase().includes(key.toLowerCase())
+    );
+    
+    return foundKey ? categoryColors[foundKey] : categoryColors.general;
+};
+
+// Add this component for tag input
+const TagInput: React.FC<{
+    tags: string[];
+    onChange: (newTags: string[]) => void;
+}> = ({ tags, onChange }) => {
+    const [inputValue, setInputValue] = useState('');
+    
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInputValue(e.target.value);
+    };
+    
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if ((e.key === ' ' || e.key === 'Enter') && inputValue.trim()) {
+            e.preventDefault();
+            const newTag = inputValue.trim();
+            
+            // Only add if it's not a duplicate
+            if (!tags.includes(newTag)) {
+                onChange([...tags, newTag]);
+            }
+            
+            setInputValue('');
+        } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+            // Remove the last tag when backspace is pressed in an empty input
+            onChange(tags.slice(0, -1));
+        }
+    };
+    
+    const handleDeleteTag = (tagToDelete: string) => {
+        onChange(tags.filter(tag => tag !== tagToDelete));
+    };
+    
+    return (
+        <Box 
+            sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 0.5, 
+                alignItems: 'center',
+                p: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                minHeight: 32
+            }}
+        >
+            {tags.map(tag => (
+                <MuiChip
+                    key={tag}
+                    label={tag}
+                    size="small"
+                    onDelete={() => handleDeleteTag(tag)}
+                    sx={{ height: 24 }}
+                />
+            ))}
+            <input
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                placeholder={tags.length > 0 ? '' : 'Type and press space to add tags'}
+                style={{
+                    flex: '1 0 50px',
+                    minWidth: 60,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    padding: '4px 0',
+                    fontSize: '0.9rem'
+                }}
+            />
+        </Box>
+    );
+};
+
+const SummaryTab = ({ assetData }: { assetData: any }) => {
+    const theme = useTheme();
+    const asset = assetData?.data?.asset;
+    const metadata = asset?.DigitalSourceAsset?.MainRepresentation?.Metadata || {};
+    const filename = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
+    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.Size || 0;
+    const fileType = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.AssetType || 'Unknown';
+    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.Format || 'Unknown';
+    const dimensions = metadata?.Common?.VisualInfo?.Dimensions 
+        ? `${metadata.Common.VisualInfo.Dimensions.Width}x${metadata.Common.VisualInfo.Dimensions.Height}`
+        : 'Unknown';
+    const createdDate = metadata?.Common?.CreationDate || 'Unknown';
+    const description = metadata?.Common?.Description || 'High resolution landscape image';
+    
+    // Extract keywords/tags
+    const keywords = metadata?.Common?.Keywords || ['nature', 'landscape'];
+    
+    // Colors matching the image exactly
+    const fileInfoColor = '#4299E1';      // Blue
+    const techDetailsColor = '#68D391';   // Green/teal
+    const descKeywordsColor = '#F6AD55';  // Orange
+    
+    return (
+        <Box>
+            {/* File Information Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: fileInfoColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    File Information
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: fileInfoColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Title:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{filename}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileType}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{formatFileSize(fileSize)}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileFormat}</Typography>
+                </Box>
+            </Box>
+            
+            {/* Technical Details Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: techDetailsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Technical Details
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: techDetailsColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Dimensions:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{dimensions}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {typeof createdDate === 'string' ? createdDate : formatLocalDateTime(createdDate)}
+                    </Typography>
+                </Box>
+            </Box>
+            
+            {/* Description & Keywords Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: descKeywordsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Description & Keywords
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: descKeywordsColor,
+                    mb: 2
+                }} />
+                
+                <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
+                    {description}
+                </Typography>
+                
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: 0.75
+                }}>
+                    {keywords.map((keyword, index) => (
+                        <Chip
+                            key={index}
+                            label={keyword}
+                            size="small"
+                            sx={{
+                                bgcolor: '#1E2732',
+                                color: '#fff',
+                                borderRadius: '16px',
+                                fontSize: '0.75rem'
+                            }}
+                        />
+                    ))}
+                </Box>
+            </Box>
+        </Box>
+    );
+};
+
+const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
+    const theme = useTheme();
+    
+    return (
+        <Box sx={{
+            maxHeight: '600px',
+            overflowY: 'auto',
+            borderRadius: 1,
+            '&::-webkit-scrollbar': {
+                width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.05),
+            },
+            '&::-webkit-scrollbar-thumb': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                borderRadius: '4px',
+                '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
+                }
+            }
+        }}>
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <TextField
+                    placeholder="Filter metadata..." 
+                    size="small"
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon fontSize="small" />
+                            </InputAdornment>
+                        ),
+                    }}
+                    onChange={(e) => {
+                        // Implement filtering logic here
+                    }}
+                    sx={{ flex: 1 }}
+                />
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <Select
+                        value="all"
+                        onChange={(e) => {/* Category filter logic */}}
+                        displayEmpty
+                    >
+                        <MenuItem value="all">All Categories</MenuItem>
+                        {Object.keys(categoryMapping).map(category => (
+                            <MenuItem key={category} value={category}>{categoryMapping[category]}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Box>
+            <SimpleTreeView
+                sx={{
+                    flexGrow: 1,
+                    '& .MuiTreeItem-root': {
+                        padding: '4px 0',
+                    },
+                    '& .MuiTreeItem-content': {
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                        },
+                    },
+                    '& .MuiTreeItem-label': {
+                        fontWeight: 500,
+                    },
+                    '& .MuiTreeItem-group': {
+                        marginLeft: '24px',
+                        borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
+                        paddingLeft: '8px',
+                    }
+                }}
+                slots={{
+                    collapseIcon: ExpandMoreIcon,
+                    expandIcon: ChevronRightIcon
+                }}
+            >
+                {metadataAccordions.map((parentAccordion, parentIndex) => (
+                    <TreeItem
+                        key={parentIndex}
+                        itemId={`parent-${parentIndex}`}
+                        label={
+                            <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                py: 0.5,
+                                pl: 1,
+                                borderLeft: `3px solid ${getMetadataCategoryColor(parentAccordion.category, theme)}`,
+                                borderRadius: '4px 0 0 4px',
+                            }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                    {parentAccordion.category}
+                                </Typography>
+                                <Chip
+                                    size="small"
+                                    label={parentAccordion.count}
+                                    sx={{
+                                        ml: 1,
+                                        height: '20px',
+                                        fontSize: '0.7rem',
+                                        backgroundColor: alpha(getMetadataCategoryColor(parentAccordion.category, theme), 0.1),
+                                        color: getMetadataCategoryColor(parentAccordion.category, theme)
+                                    }}
+                                />
+                            </Box>
+                        }
+                    >
+                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
+                            <TreeItem
+                                key={`${parentIndex}-${subIndex}`}
+                                itemId={`${parentIndex}-${subIndex}`}
+                                label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Typography variant="body2">
+                                            {subCategory.category}
+                                        </Typography>
+                                        <Chip
+                                            size="small"
+                                            label={subCategory.count}
+                                            sx={{
+                                                ml: 1,
+                                                height: '18px',
+                                                fontSize: '0.65rem',
+                                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                                color: theme.palette.secondary.main
+                                            }}
+                                        />
+                                    </Box>
+                                }
+                            >
+                                <Box sx={{
+                                    p: 2,
+                                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                                    borderRadius: 1,
+                                    mt: 1
+                                }}>
+                                    <MetadataContent
+                                        data={subCategory.data}
+                                        showAll={true}
+                                        category={subCategory.category}
+                                    />
+                                </Box>
+                            </TreeItem>
+                        ))}
+                    </TreeItem>
+                ))}
+            </SimpleTreeView>
+        </Box>
+    );
+};
+
+const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
+    const theme = useTheme();
+    
+    // This would typically contain descriptive metadata like who/what is in the image
+    // For now, we'll use placeholder data
+    const descriptiveData = [
+        {
+            label: 'Description',
+            value: 'High-resolution image from the collection',
+            icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+        },
+        {
+            label: 'Keywords',
+            value: 'nature, landscape, photography',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+        },
+        {
+            label: 'Location',
+            value: 'Unknown',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+        },
+        {
+            label: 'People',
+            value: 'None identified',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+        },
+        {
+            label: 'Objects',
+            value: 'Various natural elements',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+        }
+    ];
+
+    return (
+        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
+            <Grid container spacing={2}>
+                {descriptiveData.map((field, index) => (
+                    <Grid item xs={12} key={index}>
+                        <Card variant="outlined" sx={{
+                            p: 2,
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                                boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
+                            }
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                <Box sx={{
+                                    mr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                    borderRadius: '50%',
+                                    p: 1
+                                }}>
+                                    {field.icon}
+                                </Box>
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        {field.label}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                                        {field.value}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
+    );
+};
+
+const RelatedItemsTab: React.FC = () => {
+    const theme = useTheme();
+    
+    // This would typically fetch related items from an API
+    // For now, we'll use placeholder data
+    const relatedItems = [
+        { id: '1', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb1.jpg' },
+        { id: '2', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb2.jpg' },
+        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
+    ];
+
+    // Get icon based on item type
+    const getItemIcon = (type: string) => {
+        switch (type) {
+            case 'image':
+                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            case 'video':
+                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            case 'audio':
+                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            default:
+                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+        }
+    };
+
+    return (
+        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
+            <Grid container spacing={3}>
+                {relatedItems.map((item) => (
+                    <Grid item xs={12} sm={6} md={4} key={item.id}>
+                        <Card
+                            variant="outlined"
+                            sx={{
+                                height: '100%',
+                                transition: 'all 0.2s ease-in-out',
+                                '&:hover': {
+                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
+                                    transform: 'translateY(-2px)'
+                                },
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                    {getItemIcon(item.type)}
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                            ml: 1,
+                                            fontWeight: 600,
+                                            color: theme.palette.text.primary
+                                        }}
+                                    >
+                                        {item.title}
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    size="small"
+                                    label={item.type.toUpperCase()}
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        color: theme.palette.primary.main,
+                                        fontWeight: 500,
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
+    );
+};
+
 const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const theme = useTheme();
+    
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -104,13 +689,37 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
         const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
 
         return (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+            <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    md: 'repeat(auto-fill, minmax(200px, 1fr))'
+                }, 
+                gap: 2 
+            }}>
                 {displayEntries.map(([key, value]) => (
-                    <Box key={key}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {formatCamelCase(key)}:
-                        </Typography>
-                        <Box sx={{ pl: 2 }}>
+                    <Box key={key} sx={{
+                        backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                        p: 1.5,
+                        borderRadius: 1,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                    }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
+                                {formatCamelCase(key)}:
+                            </Typography>
+                            <IconButton 
+                                size="small" 
+                                onClick={() => navigator.clipboard.writeText(
+                                    typeof value === 'object' ? JSON.stringify(value) : String(value)
+                                )}
+                                sx={{ opacity: 0.6, '&:hover': { opacity: 1 }, ml: 0.5, p: 0.3 }}
+                            >
+                                <ContentCopyIcon fontSize="small" sx={{ fontSize: '0.9rem' }} />
+                            </IconButton>
+                        </Box>
+                        <Box sx={{ pl: 0 }}>
                             <MetadataContent
                                 data={value}
                                 depth={depth + 1}
@@ -123,7 +732,19 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
             </Box>
         );
     } else {
-        return <TruncatedTextWithTooltip text={String(data)} />;
+        return (
+            <Typography 
+                variant="body2" 
+                sx={{ 
+                    color: data === null || data === undefined 
+                        ? theme.palette.text.disabled 
+                        : theme.palette.text.primary,
+                    fontStyle: data === null || data === undefined ? 'italic' : 'normal'
+                }}
+            >
+                <TruncatedTextWithTooltip text={String(data)} />
+            </Typography>
+        );
     }
 };
 
@@ -137,6 +758,7 @@ const ImageDetailContent: React.FC = () => {
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
     const [newComment, setNewComment] = useState('');
+    const [activeTab, setActiveTab] = useState<string>('summary');
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
         { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
@@ -305,6 +927,17 @@ const ImageDetailContent: React.FC = () => {
         location.pathname
     ]);
 
+    const handleAddComment = useCallback((content: string) => {
+        const newCommentObj = {
+            user: "Current User",
+            avatar: "https://mui.com/static/images/avatar/4.jpg",
+            content: content,
+            timestamp: new Date().toISOString()
+        };
+        setComments(prev => [...prev, newCommentObj]);
+        setNewComment('');
+    }, []);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -334,16 +967,15 @@ const ImageDetailContent: React.FC = () => {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.enteringScreen,
             }),
+            bgcolor: 'transparent',
         }}>
             <Box sx={{
                 position: 'sticky',
                 top: 0,
                 zIndex: 1200,
-                bgcolor: 'background.default',
-                borderBottom: 1,
-                borderColor: 'divider'
+                background: 'transparent'
             }}>
-                <Box sx={{ px: 3, py: 2 }}>
+                <Box sx={{ px: 0, py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
                         searchTerm={searchTerm}
                         currentResult={currentResult}
@@ -361,64 +993,156 @@ const ImageDetailContent: React.FC = () => {
                 flexDirection: 'column',
                 flex: 1,
                 overflow: 'auto',
-                gap: 3,
-                px: 3,
-                pb: 3,
-                mt: 2
+                gap: 1,
+                px: 0,
+                pb: 0,
+                mt: 0
             }}>
                 <Box sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 3
+                    gap: 1
                 }}>
                     <Box sx={{
                         position: 'relative',
-                        bgcolor: 'background.default',
-                        pt: 2
+                        bgcolor: 'transparent',
+                        pt: 0,
+                        pb: 0,
+                        mt: 0,
+                        mb: 0
                     }}>
-                        <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
+                        <Box
+                            sx={{
+                                overflow: 'hidden',
+                                borderRadius: 2,
+                                position: 'relative'
+                            }}
+                        >
+                            <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
+                            {/* <Box
+                                sx={{
+                                    position: 'absolute',
+                                    top: 8,
+                                    right: 8,
+                                    bgcolor: 'rgba(255,255,255,0.8)',
+                                    borderRadius: '50%',
+                                    p: 0.5,
+                                    cursor: 'pointer',
+                                    '&:hover': {
+                                        bgcolor: 'rgba(255,255,255,0.9)',
+                                    }
+                                }}
+                            >
+                                <ZoomOutMapIcon fontSize="small" color="primary" />
+                            </Box> */}
+                        </Box>
                     </Box>
 
                     <Box>
-                        <Paper elevation={3} sx={{ p: 2 }}>
-                            <Typography variant="h6">Metadata</Typography>
-                            <Divider sx={{ my: 1 }} />
-                            {metadataAccordions.map((parentAccordion, parentIndex) => (
-                                <Paper key={parentAccordion.category} elevation={1} sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold' }}>
-                                        {parentAccordion.category} ({parentAccordion.count})
-                                    </Typography>
-                                    {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                                        <Box key={subCategory.category} sx={{ p: 2 }}>
-                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                {subCategory.category} ({subCategory.count})
-                                            </Typography>
-                                            <MetadataContent
-                                                data={subCategory.data}
-                                                showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
-                                                category={subCategory.category}
-                                            />
-                                            <Button
-                                                onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
-                                                sx={{ mt: 1 }}
-                                            >
-                                                {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
-                                            </Button>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 0,
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                background: 'transparent'
+                            }}
+                        >
+                            <Tabs
+                                value={activeTab}
+                                onChange={(e, newValue) => setActiveTab(newValue)}
+                                textColor="secondary"
+                                indicatorColor="secondary"
+                                aria-label="metadata tabs"
+                                variant="scrollable"
+                                scrollButtons="auto"
+                                sx={{
+                                    px: 2,
+                                    pt: 1,
+                                    '& .MuiTab-root': {
+                                        minWidth: 'auto',
+                                        px: 2,
+                                        py: 1.5,
+                                        fontWeight: 500,
+                                        transition: 'all 0.2s',
+                                        '&:hover': {
+                                            backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
+                                        }
+                                    }
+                                }}
+                            >
+                                <Tab
+                                    value="summary"
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <InfoOutlinedIcon fontSize="small" />
+                                            <span>Summary</span>
                                         </Box>
-                                    ))}
-                                </Paper>
-                            ))}
+                                    }
+                                    id="tab-summary"
+                                    aria-controls="tabpanel-summary"
+                                />
+                                <Tab
+                                    value="technical"
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <CodeOutlinedIcon fontSize="small" />
+                                            <span>Technical</span>
+                                            {metadataAccordions.length > 0 && (
+                                                <Chip 
+                                                    size="small" 
+                                                    label={metadataAccordions.length} 
+                                                    sx={{ height: 20, ml: 0.5 }} 
+                                                />
+                                            )}
+                                        </Box>
+                                    }
+                                    id="tab-technical"
+                                    aria-controls="tabpanel-technical"
+                                />
+                                <Tab
+                                    value="descriptor"
+                                    label="Descriptor Metadata"
+                                    id="tab-descriptor"
+                                    aria-controls="tabpanel-descriptor"
+                                />
+                                <Tab
+                                    value="related"
+                                    label="Related Items"
+                                    id="tab-related"
+                                    aria-controls="tabpanel-related"
+                                />
+                            </Tabs>
+                            <Box
+                                sx={{
+                                    mt: { xs: 2, sm: 3 },
+                                    mx: { xs: 1, sm: 2, md: 3 },
+                                    mb: { xs: 2, sm: 3 },
+                                    pt: { xs: 1, sm: 2 },
+                                    outline: 'none',
+                                    borderRadius: 1,
+                                    backgroundColor: 'transparent'
+                                }}
+                                role="tabpanel"
+                                id={`tabpanel-${activeTab}`}
+                                aria-labelledby={`tab-${activeTab}`}
+                                tabIndex={0}
+                            >
+                                {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
+                                {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
+                                {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
+                                {activeTab === 'related' && <RelatedItemsTab />}
+                            </Box>
                         </Paper>
                     </Box>
                 </Box>
 
-
                 <AssetSidebar
                     versions={versions}
-                // comments={comments}
-                // onAddComment={handleAddComment}
+                    comments={comments}
+                    onAddComment={handleAddComment}
                 />
-
+                
                 {selectedComment !== null && (
                     <CommentPopper
                         id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}

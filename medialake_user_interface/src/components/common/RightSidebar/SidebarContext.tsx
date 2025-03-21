@@ -3,9 +3,16 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface RightSidebarContextType {
     isExpanded: boolean;
     setIsExpanded: (expanded: boolean) => void;
+    currentWidth: number;
+    setCurrentWidth: (width: number) => void;
 }
 
-const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
+const RightSidebarContext = createContext<RightSidebarContextType>({
+    isExpanded: true,
+    setIsExpanded: () => {},
+    currentWidth: 375,
+    setCurrentWidth: () => {},
+});
 
 interface RightSidebarProviderProps {
     children: ReactNode;
@@ -13,18 +20,13 @@ interface RightSidebarProviderProps {
 
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [currentWidth, setCurrentWidth] = useState(375);
 
     return (
-        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded }}>
+        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, currentWidth, setCurrentWidth }}>
             {children}
         </RightSidebarContext.Provider>
     );
 };
 
-export const useRightSidebar = () => {
-    const context = useContext(RightSidebarContext);
-    if (context === undefined) {
-        throw new Error('useRightSidebar must be used within a RightSidebarProvider');
-    }
-    return context;
-};
+export const useRightSidebar = () => useContext(RightSidebarContext);

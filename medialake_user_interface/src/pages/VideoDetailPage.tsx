@@ -1,6 +1,23 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, CircularProgress, Typography, Paper, List, ListItem, Divider, Button } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  Typography,
+  Paper,
+  List,
+  ListItem,
+  Divider,
+  Button,
+  Tabs,
+  Tab,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  useTheme,
+  alpha
+} from '@mui/material';
 import { useAsset } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
@@ -11,7 +28,16 @@ import AssetVideo from '../components/asset/AssetVideo';
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
+import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
 
+// MUI Icons
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 
 const outputFilters = {
     'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
@@ -98,12 +124,339 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
     }
 };
 
+// Tab content components
+const SummaryTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
+    const theme = useTheme();
+    
+    // Create summary data from metadata fields
+    const summaryData = [
+        {
+            label: 'Title',
+            value: metadataFields.summary.find((item: any) => item.label === 'Title')?.value || 'Unknown',
+            icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        },
+        {
+            label: 'Type',
+            value: metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Video',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        },
+        {
+            label: 'Duration',
+            value: metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        },
+        {
+            label: 'Format',
+            value: metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown',
+            icon: <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        },
+        {
+            label: 'File Size',
+            value: metadataFields.technical.find((item: any) => item.label === 'File Size')?.value || 'Unknown',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        },
+        {
+            label: 'Created Date',
+            value: metadataFields.technical.find((item: any) => item.label === 'Created Date')?.value || 'Unknown',
+            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+        }
+    ];
+
+    return (
+        <Grid container spacing={3}>
+            {summaryData.map((field, index) => (
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Card
+                        variant="outlined"
+                        sx={{
+                            height: '100%',
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                                boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
+                                transform: 'translateY(-2px)'
+                            }
+                        }}
+                    >
+                        <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                {field.icon}
+                                <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                        ml: 1,
+                                        fontWeight: 600,
+                                        color: theme.palette.text.secondary
+                                    }}
+                                >
+                                    {field.label}
+                                </Typography>
+                            </Box>
+                            <Typography
+                                variant="body1"
+                                sx={{
+                                    fontWeight: 500,
+                                    wordBreak: 'break-word'
+                                }}
+                            >
+                                {field.value}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+            ))}
+        </Grid>
+    );
+};
+
+const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
+    const theme = useTheme();
+    
+    return (
+        <Box sx={{
+            maxHeight: '600px',
+            overflowY: 'auto',
+            borderRadius: 1,
+            '&::-webkit-scrollbar': {
+                width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.05),
+            },
+            '&::-webkit-scrollbar-thumb': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                borderRadius: '4px',
+                '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
+                }
+            }
+        }}>
+            <SimpleTreeView
+                sx={{
+                    flexGrow: 1,
+                    '& .MuiTreeItem-root': {
+                        padding: '4px 0',
+                    },
+                    '& .MuiTreeItem-content': {
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                        },
+                    },
+                    '& .MuiTreeItem-label': {
+                        fontWeight: 500,
+                    },
+                    '& .MuiTreeItem-group': {
+                        marginLeft: '24px',
+                        borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
+                        paddingLeft: '8px',
+                    }
+                }}
+                slots={{
+                    collapseIcon: ExpandMoreIcon,
+                    expandIcon: ChevronRightIcon
+                }}
+            >
+                {metadataAccordions.map((parentAccordion, parentIndex) => (
+                    <TreeItem
+                        key={parentIndex}
+                        itemId={`parent-${parentIndex}`}
+                        label={
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                    {parentAccordion.category}
+                                </Typography>
+                                <Chip
+                                    size="small"
+                                    label={parentAccordion.count}
+                                    sx={{
+                                        ml: 1,
+                                        height: '20px',
+                                        fontSize: '0.7rem',
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        color: theme.palette.primary.main
+                                    }}
+                                />
+                            </Box>
+                        }
+                    >
+                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
+                            <TreeItem
+                                key={`${parentIndex}-${subIndex}`}
+                                itemId={`${parentIndex}-${subIndex}`}
+                                label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Typography variant="body2">
+                                            {subCategory.category}
+                                        </Typography>
+                                        <Chip
+                                            size="small"
+                                            label={subCategory.count}
+                                            sx={{
+                                                ml: 1,
+                                                height: '18px',
+                                                fontSize: '0.65rem',
+                                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                                color: theme.palette.secondary.main
+                                            }}
+                                        />
+                                    </Box>
+                                }
+                            >
+                                <Box sx={{
+                                    p: 2,
+                                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                                    borderRadius: 1,
+                                    mt: 1
+                                }}>
+                                    <MetadataContent
+                                        data={subCategory.data}
+                                        showAll={true}
+                                        category={subCategory.category}
+                                    />
+                                </Box>
+                            </TreeItem>
+                        ))}
+                    </TreeItem>
+                ))}
+            </SimpleTreeView>
+        </Box>
+    );
+};
+
+const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
+    const theme = useTheme();
+    
+    // Create descriptive data from metadata fields
+    const descriptiveData = metadataFields.descriptive.map((item: any) => ({
+        label: item.label,
+        value: item.value,
+        icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+    }));
+
+    return (
+        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
+            <Grid container spacing={2}>
+                {descriptiveData.map((field, index) => (
+                    <Grid item xs={12} key={index}>
+                        <Card variant="outlined" sx={{
+                            p: 2,
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                                boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
+                            }
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                <Box sx={{
+                                    mr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                    borderRadius: '50%',
+                                    p: 1
+                                }}>
+                                    {field.icon}
+                                </Box>
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        {field.label}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                                        {field.value}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
+    );
+};
+
+const RelatedItemsTab: React.FC = () => {
+    const theme = useTheme();
+    
+    // This would typically fetch related items from an API
+    // For now, we'll use placeholder data
+    const relatedItems = [
+        { id: '1', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb1.jpg' },
+        { id: '2', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb2.jpg' },
+        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
+    ];
+
+    // Get icon based on item type
+    const getItemIcon = (type: string) => {
+        switch (type) {
+            case 'image':
+                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            case 'video':
+                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            case 'audio':
+                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+            default:
+                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+        }
+    };
+
+    return (
+        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
+            <Grid container spacing={3}>
+                {relatedItems.map((item) => (
+                    <Grid item xs={12} sm={6} md={4} key={item.id}>
+                        <Card
+                            variant="outlined"
+                            sx={{
+                                height: '100%',
+                                transition: 'all 0.2s ease-in-out',
+                                '&:hover': {
+                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
+                                    transform: 'translateY(-2px)'
+                                },
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                    {getItemIcon(item.type)}
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                            ml: 1,
+                                            fontWeight: 600,
+                                            color: theme.palette.text.primary
+                                        }}
+                                    >
+                                        {item.title}
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    size="small"
+                                    label={item.type.toUpperCase()}
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        color: theme.palette.primary.main,
+                                        fontWeight: 500,
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
+    );
+};
+
 const VideoDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     const { isExpanded } = useRightSidebar();
     const { data: assetData, isLoading, error } = useAsset(id || '');
+    const [activeTab, setActiveTab] = useState<string>('summary');
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -222,6 +575,20 @@ const VideoDetailContent: React.FC = () => {
         } : null
     );
 
+    // Handle keyboard navigation for tabs
+    const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
+        const tabs = ['summary', 'technical', 'descriptor', 'related'];
+        const currentIndex = tabs.indexOf(activeTab);
+        
+        if (event.key === 'ArrowRight') {
+            const nextIndex = (currentIndex + 1) % tabs.length;
+            setActiveTab(tabs[nextIndex]);
+        } else if (event.key === 'ArrowLeft') {
+            const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            setActiveTab(tabs[prevIndex]);
+        }
+    }, [activeTab]);
+
     const handleBack = useCallback(() => {
         // If we came from a specific location with state, go back to that location
         if (location.state && (location.state.searchTerm || location.state.preserveSearch)) {
@@ -273,62 +640,124 @@ const VideoDetailContent: React.FC = () => {
             }),
             height: '100vh',
             overflow: 'auto',
+            bgcolor: 'transparent',
         }}>
-            <Box sx={{ position: 'sticky', top: 0, zIndex: 1200, bgcolor: 'background.default' }}>
-                <BreadcrumbNavigation
-                    searchTerm={searchTerm}
-                    currentResult={48}
-                    totalResults={156}
-                    onBack={handleBack}
-                    onPrevious={() => navigate(-1)}
-                    onNext={() => navigate(1)}
-                    assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
-                    assetId={assetData.data.asset.InventoryID}
-                    assetType="Video"
-                />
+            <Box sx={{ position: 'sticky', top: 0, zIndex: 1200, background: 'transparent' }}>
+                <Box sx={{ py: 0, mb: 0 }}>
+                    <BreadcrumbNavigation
+                        searchTerm={searchTerm}
+                        currentResult={48}
+                        totalResults={156}
+                        onBack={handleBack}
+                        onPrevious={() => navigate(-1)}
+                        onNext={() => navigate(1)}
+                        assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                        assetId={assetData.data.asset.InventoryID}
+                        assetType="Video"
+                    />
+                </Box>
             </Box>
 
-            <Box sx={{ px: 3, pt: 2 }}>
+            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, mb: 0 }}>
                 <AssetHeader />
             </Box>
 
-            <Box sx={{ px: 3, pt: 2, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
-                <AssetVideo
-                    src={proxyUrl}
-                    alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
-                />
+            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        overflow: 'hidden',
+                        borderRadius: 2,
+                        background: 'transparent',
+                        position: 'relative',
+                        height: '100%'
+                    }}
+                >
+                    <AssetVideo
+                        src={proxyUrl}
+                        alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
+                    />
+                </Paper>
             </Box>
 
             <Box sx={{ px: 3, pb: 3 }}>
-                <Box sx={{ mt: 2 }}>
-                    <Paper elevation={3} sx={{ p: 2 }}>
-                        <Typography variant="h6">Metadata</Typography>
-                        <Divider sx={{ my: 1 }} />
-                        {metadataAccordions.map((parentAccordion, parentIndex) => (
-                            <Paper key={parentAccordion.category} elevation={1} sx={{ mb: 2 }}>
-                                <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold' }}>
-                                    {parentAccordion.category} ({parentAccordion.count})
-                                </Typography>
-                                {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                                    <Box key={subCategory.category} sx={{ p: 2 }}>
-                                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            {subCategory.category} ({subCategory.count})
-                                        </Typography>
-                                        <MetadataContent
-                                            data={subCategory.data}
-                                            showAll={expandedMetadata[`${parentIndex}-${subIndex}`]}
-                                            category={subCategory.category}
-                                        />
-                                        <Button
-                                            onClick={() => toggleMetadataExpansion(`${parentIndex}-${subIndex}`)}
-                                            sx={{ mt: 1 }}
-                                        >
-                                            {expandedMetadata[`${parentIndex}-${subIndex}`] ? 'Show Less' : 'Show More'}
-                                        </Button>
-                                    </Box>
-                                ))}
-                            </Paper>
-                        ))}
+                <Box sx={{ mt: 1 }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 0,
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            background: 'transparent'
+                        }}
+                    >
+                        <Tabs
+                            value={activeTab}
+                            onChange={(e, newValue) => setActiveTab(newValue)}
+                            onKeyDown={handleTabKeyDown}
+                            textColor="secondary"
+                            indicatorColor="secondary"
+                            aria-label="metadata tabs"
+                            sx={{
+                                px: 2,
+                                pt: 1,
+                                '& .MuiTab-root': {
+                                    minWidth: 'auto',
+                                    px: 2,
+                                    py: 1.5,
+                                    fontWeight: 500,
+                                    transition: 'all 0.2s',
+                                    '&:hover': {
+                                        backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
+                                    }
+                                }
+                            }}
+                        >
+                            <Tab
+                                value="summary"
+                                label="Summary"
+                                id="tab-summary"
+                                aria-controls="tabpanel-summary"
+                            />
+                            <Tab
+                                value="technical"
+                                label="Technical Metadata"
+                                id="tab-technical"
+                                aria-controls="tabpanel-technical"
+                            />
+                            <Tab
+                                value="descriptor"
+                                label="Descriptor Metadata"
+                                id="tab-descriptor"
+                                aria-controls="tabpanel-descriptor"
+                            />
+                            <Tab
+                                value="related"
+                                label="Related Items"
+                                id="tab-related"
+                                aria-controls="tabpanel-related"
+                            />
+                        </Tabs>
+                        <Box
+                            sx={{
+                                mt: 3,
+                                mx: 3,
+                                mb: 3,
+                                pt: 2,
+                                outline: 'none', // Remove outline when focused but keep it accessible
+                                borderRadius: 1,
+                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.5)
+                            }}
+                            role="tabpanel"
+                            id={`tabpanel-${activeTab}`}
+                            aria-labelledby={`tab-${activeTab}`}
+                            tabIndex={0} // Make the panel focusable
+                        >
+                            {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} />}
+                            {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
+                            {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
+                            {activeTab === 'related' && <RelatedItemsTab />}
+                        </Box>
                     </Paper>
                 </Box>
             </Box>

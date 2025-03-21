@@ -28,7 +28,7 @@ const AssetImage: React.FC<AssetImageProps> = ({ src, alt }) => {
                     justifyContent: 'center',
                     alignItems: 'center',
                     overflow: 'hidden',
-                    bgcolor: 'background.paper',
+                    bgcolor: 'transparent',
                     '& img': {
                         maxWidth: '100%',
                         maxHeight: '100%',
