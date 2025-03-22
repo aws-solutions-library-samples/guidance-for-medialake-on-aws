@@ -9,6 +9,7 @@ from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from config import config
 
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
+from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack
@@ -133,6 +134,19 @@ pipeline_stack = PipelineStack(
     env=env,
 )
 
+user_interface_stack = UserInterfaceStack(
+    app,
+    "MediaLakeUserInterface",
+    props=UserInterfaceStackProps(
+        cognito_user_pool_id=api_gateway_stack.user_pool_id,
+        cognito_user_pool_client_id=api_gateway_stack.user_pool_client,
+        cognito_identity_pool=api_gateway_stack.identity_pool,
+        cognito_user_pool_arn=api_gateway_stack.user_pool_arn,
+        api_gateway_rest_id=api_gateway_stack.rest_api.rest_api_id,
+        access_log_bucket=base_infrastructure.access_log_bucket
+),
+    env=env,
+)
 # Create the monitoring stack
 # monitoring_stack = MonitoringStack(
 #     app,
@@ -163,12 +177,15 @@ cleanup_stack = CleanupStack(
 )
 
 api_gateway_stack.add_dependency(asset_sync_stack)
+user_interface_stack.add_dependency(api_gateway_stack)
+
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
 cleanup_stack.add_dependency(nodes_stack)
 # cleanup_stack.add_dependency(monitoring_stack)
+cleanup_stack.add_dependency(user_interface_stack)
 
 if lambda_warmer:
     cleanup_stack.add_dependency(lambda_warmer)
@@ -180,9 +197,9 @@ if config.resource_application_tag:
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
 cdk.CfnOutput(
-    api_gateway_stack,
+    user_interface_stack,
     "UserInterfaceUrl",
-    value=api_gateway_stack.user_interface_url,
+    value=user_interface_stack.user_interface_url,
     description="URL for the MediaLake User Interface",
 )
 

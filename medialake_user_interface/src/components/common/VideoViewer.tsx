@@ -8,7 +8,8 @@ import React, {
     SyntheticEvent,
     useMemo,
 } from 'react';
-import { OmakasePlayer } from '@byomakase/omakase-player';
+import {MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker} from '@byomakase/omakase-player';
+import {SCRUBBER_LANE_STYLE, SCRUBBER_LANE_STYLE_DARK, TIMELINE_LANE_STYLE, TIMELINE_LANE_STYLE_DARK, TIMELINE_STYLE, TIMELINE_STYLE_DARK,PERIOD_MARKER_STYLE} from './OmakaseTimeLineConstants';
 import { Tooltip, IconButton, Stack, Slider, Box, Typography, Paper } from '@mui/material'
 
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -17,6 +18,11 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import "./VideoViewer.css";
+
+import {filter} from 'rxjs';
+import {randomHexColor} from './utils';
+
+
 
 export interface VideoViewerProps {
     videoSrc: string;
@@ -59,8 +65,21 @@ const useOmakasePlayer = (
 
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    //Define functions for omakase timeline
+    let createTimelineLanes = () => {
+        markerLane1();
+        }
+    let markerLane1 = () => {
+        let markerLane = new MarkerLane({
+            style: {
+                ...TIMELINE_STYLE_DARK
+            },
+        });
+        console.log("markerLane1");
+    }
 
     const initializePlayer = useCallback(() => {
+
         if (!containerRef.current) return;
 
         // Create the OmakasePlayer only once per videoSrc/containerRef change:
@@ -69,6 +88,19 @@ const useOmakasePlayer = (
             // mediaChrome: 'disabled'
         });
         playerRef.current = player;
+        player.createTimeline({
+            timelineHTMLElementId: 'omakase-timeline',
+            style:{
+                ...TIMELINE_STYLE_DARK
+            },
+            zoomWheelEnabled: false
+        }).subscribe((timelineApi) => {
+            console.log('Timeline criada');
+            let scrubberLane = timelineApi.getScrubberLane();
+            scrubberLane.style = {
+              ...SCRUBBER_LANE_STYLE_DARK
+            };
+          });
 
         const subscriptions = [
             player.loadVideo(videoSrc, 25).subscribe({
@@ -142,7 +174,47 @@ const useOmakasePlayer = (
                     callbacksRef.current.onError?.(error);
                 },
             }),
+
         ];
+        player.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
+            next: (video) => {
+              createTimelineLanes();
+            }
+          })
+            //Define functions for omakase timeline
+        let createTimelineLanes = () => {
+            markerLane1();
+            }
+        let markerLane1 = () => {
+            let markerLane = new MarkerLane({
+                style: {
+                    ...TIMELINE_STYLE_DARK
+                },
+            });
+            player.timeline!.addTimelineLane(markerLane)
+            let periodMarker = new PeriodMarker({
+                timeObservation: {
+                  start: 200,
+                  end: 200 + 100,
+                },
+                editable: true,
+                style:{
+                    ...PERIOD_MARKER_STYLE
+                }
+              })
+            markerLane.addMarker(periodMarker);
+            periodMarker.onChange$.subscribe({
+                next: (event) => {
+                  console.log('period marker changed', event);
+                }
+              })
+            periodMarker.onMouseEnter$.subscribe({
+            next: (event) => {
+                console.log('period marker Hover', event);
+            }
+            })
+        }
+
 
         return () => {
             // Clean up subscriptions and the player on unmount or when videoSrc changes
@@ -462,7 +534,7 @@ export const VideoViewer: FC<VideoViewerProps> = ({
                 id="omakase-player"
                 sx={{
                     width: '100%',
-                    height: 'calc(100% - 80px)',
+                    height: 'calc(100% - 300px)',
                     position: 'relative',
                     bgcolor: 'black',
                     '& > *': { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
@@ -631,6 +703,7 @@ export const VideoViewer: FC<VideoViewerProps> = ({
                     </IconButton>
                 </Stack>
             </Paper>
+            <Box id="omakase-timeline"/>
         </Stack>
     );
 };
