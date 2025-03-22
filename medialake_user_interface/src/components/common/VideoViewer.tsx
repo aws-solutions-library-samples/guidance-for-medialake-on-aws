@@ -454,6 +454,12 @@ export const VideoViewer: FC<VideoViewerProps> = ({
         setIsSmtpeFormat(!isSmtpeFormat);
     };
 
+    function Timeline(){
+        return(
+            <button> test</button>
+        );
+    }
+
     return (
         <Stack spacing={0} sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
             <Box
