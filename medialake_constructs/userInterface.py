@@ -2,21 +2,26 @@ import os
 import shutil
 import sys
 import subprocess
+import json
 
 from aws_cdk import (
     aws_s3 as s3,
+    aws_iam as iam,
     aws_logs as logs,
     aws_cloudfront as cloudfront,
     aws_s3_deployment as s3deploy,
     aws_secretsmanager as secretsmanager,
     aws_cloudfront_origins as origins,
     aws_wafv2 as wafv2,
+    aws_cognito as cognito,
     Duration,
     RemovalPolicy,
     ILocalBundling,
     BundlingOptions,
     DockerImage,
     Stack,
+    aws_lambda as lambda_,
+    custom_resources as cr,
 )
 from constructs import Construct
 
@@ -26,7 +31,6 @@ from typing import List, Dict, Optional
 from config import config
 import jsii
 from pathlib import Path
-
 
 @jsii.implements(ILocalBundling)
 class LocalBundling:
@@ -115,6 +119,7 @@ class UIConstructProps:
 
 
 class UIConstruct(Construct):
+    
     def __init__(
         self,
         scope: Construct,
@@ -482,54 +487,99 @@ class UIConstruct(Construct):
             ),
             None,
         )
-
-        # S3 Deployment
-        exports_asset = s3deploy.Source.json_data(
-            "aws-exports.json",
-            {
-                "region": scope.region,
-                "Auth": {
-                    "identity_providers": [
-                        {
-                            "identity_provider_method": provider.identity_provider_method,
-                            "identity_provider_name": getattr(
-                                provider, "identity_provider_name", ""
-                            ),
-                            "identity_provider_metadata_url": getattr(
-                                provider, "identity_provider_metadata_url", ""
-                            ),
+        
+        config_content = {
+            "region": stack.region,
+            "Auth": {
+                "identity_providers": [
+                    {
+                        "identity_provider_method": provider.identity_provider_method,
+                        "identity_provider_name": getattr(
+                            provider, "identity_provider_name", ""
+                        ),
+                        "identity_provider_metadata_url": getattr(
+                            provider, "identity_provider_metadata_url", ""
+                        ),
+                    }
+                    for provider in config.authZ.identity_providers
+                ],
+                "Cognito": {
+                    "userPoolClientId": props.cognito_user_pool_client_id,
+                    "userPoolId": props.cognito_user_pool_id,
+                    "identityPoolId": props.cognito_identity_pool,
+                    "domain": f"{config.resource_prefix}-{config.environment}.auth.{stack.region}.amazoncognito.com",
+                    "loginWith": {
+                        "username": True,
+                        "email": True,
+                        "oauth": {
+                            "domain": f"{config.resource_prefix}-{config.environment}.auth.{stack.region}.amazoncognito.com",
+                            "scopes": ["email", "openid", "profile"],
+                            "responseType": "code",
+                            "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
+                            "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in"
                         }
-                        for provider in config.authZ.identity_providers
-                    ],
-                    "Cognito": {
-                        "userPoolClientId": props.cognito_user_pool_client_id,
-                        "userPoolId": props.cognito_user_pool_id,
-                        "identityPoolId": props.cognito_identity_pool,
-                        "domain": f"{config.resource_prefix}-{config.environment}.auth.{scope.region}.amazoncognito.com",
-                        "loginWith": {
-                            "username": True,
-                            "email": True,
-                            "oauth": {
-                                "domain": f"{config.resource_prefix}-{config.environment}.auth.{scope.region}.amazoncognito.com",
-                                "scopes": ["email", "openid", "profile"],
-                                "responseType": "code",
-                                "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                                "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
-                            },
-                        },
-                    },
-                },
-                "API": {
-                    "REST": {
-                        "RestApi": {
-                            "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{config.api_path}",
-                        },
-                    },
-                },
+                    }
+                }
             },
+            "API": {
+                "REST": {
+                    "RestApi": {
+                        "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{config.api_path}"
+                    }
+                }
+            }
+        }
+        
+        
+         # Create custom resource using AwsCustomResource
+        config_resource = cr.AwsCustomResource(
+            self,
+            "ConfigResource",
+            on_create=cr.AwsSdkCall(
+                service='S3',
+                action='putObject',
+                parameters={
+                    'Bucket': medialake_ui_s3_bucket.bucket.bucket_name,
+                    'Key': 'aws-exports.json',
+                    'Body': json.dumps(config_content),
+                    'ContentType': 'application/json'
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-aws-exports-json")
+            ),
+            on_update=cr.AwsSdkCall(
+                service='S3',
+                action='putObject',
+                parameters={
+                    'Bucket': medialake_ui_s3_bucket.bucket.bucket_name,
+                    'Key': 'aws-exports.json',
+                    'Body': json.dumps(config_content),
+                    'ContentType': 'application/json'
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-aws-exports-json")
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements([
+                iam.PolicyStatement(
+                    actions=['s3:PutObject'],
+                    resources=[medialake_ui_s3_bucket.bucket.arn_for_objects('aws-exports.json')]
+                ),
+                # KMS permissions
+                iam.PolicyStatement(
+                    actions=[
+                        'kms:Decrypt',
+                        'kms:GenerateDataKey',
+                        'kms:GenerateDataKeyWithoutPlaintext',
+                        'kms:DescribeKey'
+                    ],
+                    resources=['*']
+                )
+            ])
         )
 
-        # deploy assets to S3
+        # Add dependencies
+        config_resource.node.add_dependency(self.cloudfront_distribution)
+        config_resource.node.add_dependency(medialake_ui_s3_bucket)
+
+                # deploy assets to S3
         if "CI" in os.environ and "CODEBUILD_BUILD_ID" in os.environ:
             dist_path = Path(props.app_path).parent / "assets/dist"
             asset = s3deploy.Source.asset(
@@ -548,11 +598,12 @@ class UIConstruct(Construct):
         s3deploy.BucketDeployment(
             self,
             "UserInterfaceDeployment",
-            sources=[asset, exports_asset],
+            sources=[asset],
             destination_bucket=medialake_ui_s3_bucket.bucket,
             distribution=self.cloudfront_distribution,
             distribution_paths=["/*"],
             memory_limit=1024,
+            exclude=["aws-exports.json"]
         )
 
     @property

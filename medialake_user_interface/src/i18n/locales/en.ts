@@ -250,6 +250,7 @@ export default {
                 pipelineName: 'Pipeline Name',
                 status: 'Status',
                 startTime: 'Start Time',
+                endTime: 'End Time',
                 duration: 'Duration',
                 actions: 'Actions'
             },
