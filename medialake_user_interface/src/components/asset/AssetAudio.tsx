@@ -1,0 +1,290 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  IconButton,
+  Slider,
+  Stack,
+  Paper,
+  useTheme,
+  alpha
+} from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
+
+interface AssetAudioProps {
+  src: string;
+  alt?: string;
+}
+
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+};
+
+const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt }) => {
+  const theme = useTheme();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleTimeChange = (_: Event, newValue: number | number[]) => {
+    if (!audioRef.current) return;
+    
+    const newTime = newValue as number;
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleVolumeChange = (_: Event, newValue: number | number[]) => {
+    if (!audioRef.current) return;
+    
+    const newVolume = newValue as number;
+    setVolume(newVolume);
+    audioRef.current.volume = newVolume / 100;
+    
+    if (newVolume === 0) {
+      setIsMuted(true);
+    } else if (isMuted) {
+      setIsMuted(false);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    
+    if (isMuted) {
+      audioRef.current.volume = volume / 100;
+      setIsMuted(false);
+    } else {
+      audioRef.current.volume = 0;
+      setIsMuted(true);
+    }
+  };
+
+  // Position indicator for the waveform, based on current time
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        backgroundColor: alpha(theme.palette.background.paper, 0.7),
+        borderRadius: 2,
+        p: 3
+      }}
+    >
+      <audio ref={audioRef} src={src} preload="metadata" />
+      
+      <Box 
+        sx={{
+          width: '100%',
+          maxWidth: 800,
+          height: '160px',
+          mb: 4,
+          position: 'relative',
+          borderRadius: 2,
+          p: 2,
+          backgroundColor: alpha(theme.palette.background.default, 0.3),
+          overflow: 'hidden'
+        }}
+      >
+        {/* Waveform Visualization */}
+        <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
+          {/* Colored bars representing waveform */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            height: '100%' 
+          }}>
+            {/* Generate bars dynamically */}
+            {Array.from({ length: 80 }).map((_, index) => {
+              // Create a pattern - higher in middle, lower at ends
+              const baseHeight = 20;
+              const middleBoost = Math.sin((index / 80) * Math.PI) * 80;
+              const randomVariation = Math.random() * 15;
+              const height = baseHeight + middleBoost + randomVariation;
+              
+              // If the bar is before the current playback position, show it in the highlight color
+              const isBeforePlayhead = (index / 80) * 100 <= progressPercentage;
+              
+              return (
+                <Box
+                  key={index}
+                  sx={{
+                    width: '4px',
+                    height: `${height}px`,
+                    backgroundColor: isBeforePlayhead 
+                      ? alpha(theme.palette.secondary.main, 0.8)
+                      : alpha(theme.palette.primary.main, 0.5),
+                    borderRadius: '2px',
+                    transition: 'height 0.1s ease, background-color 0.2s ease'
+                  }}
+                />
+              );
+            })}
+          </Box>
+          
+          {/* Playhead indicator */}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: `${progressPercentage}%`,
+              top: 0,
+              bottom: 0,
+              width: '2px',
+              backgroundColor: theme.palette.error.main,
+              transform: 'translateX(-50%)',
+              zIndex: 2,
+              transition: 'left 0.1s ease-out'
+            }}
+          />
+          
+          {/* Center line */}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '50%',
+              height: '1px',
+              backgroundColor: alpha(theme.palette.text.secondary, 0.3),
+              zIndex: 1
+            }}
+          />
+        </Box>
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          width: '100%',
+          maxWidth: 800,
+          p: 2,
+          borderRadius: 2,
+          backgroundColor: alpha(theme.palette.background.paper, 0.9),
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <Stack spacing={2}>
+          <Typography variant="h6" align="center" sx={{ fontWeight: 500 }}>
+            {alt || 'Audio Player'}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
+            <Typography variant="body2">{formatTime(currentTime)}</Typography>
+            <Slider
+              value={currentTime}
+              max={duration || 100}
+              onChange={handleTimeChange}
+              aria-label="time-slider"
+              color="secondary"
+              sx={{
+                mx: 2,
+                '& .MuiSlider-thumb': {
+                  width: 12,
+                  height: 12,
+                }
+              }}
+            />
+            <Typography variant="body2">{formatTime(duration)}</Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconButton aria-label="previous" sx={{ color: theme.palette.text.secondary }}>
+              <SkipPreviousIcon fontSize="large" />
+            </IconButton>
+            <IconButton 
+              aria-label={isPlaying ? 'pause' : 'play'} 
+              onClick={togglePlay}
+              sx={{
+                mx: 2,
+                color: theme.palette.primary.main,
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                }
+              }}
+            >
+              {isPlaying ? <PauseIcon fontSize="large" /> : <PlayArrowIcon fontSize="large" />}
+            </IconButton>
+            <IconButton aria-label="next" sx={{ color: theme.palette.text.secondary }}>
+              <SkipNextIcon fontSize="large" />
+            </IconButton>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+            <IconButton aria-label="toggle-mute" onClick={toggleMute} sx={{ color: theme.palette.text.secondary }}>
+              {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+            </IconButton>
+            <Slider
+              value={isMuted ? 0 : volume}
+              onChange={handleVolumeChange}
+              aria-label="volume-slider"
+              color="secondary"
+              size="small"
+              sx={{
+                ml: 2,
+                width: 100,
+                '& .MuiSlider-thumb': {
+                  width: 8,
+                  height: 8,
+                }
+              }}
+            />
+          </Box>
+        </Stack>
+      </Paper>
+
+      <Typography variant="caption" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+        Format: MP3 • Sample Rate: 44.1 kHz • Bit Rate: 320 kbps • Channels: Stereo
+      </Typography>
+    </Box>
+  );
+};
+
+export default AssetAudio; 

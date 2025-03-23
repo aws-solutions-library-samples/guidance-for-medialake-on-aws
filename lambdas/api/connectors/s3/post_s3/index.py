@@ -855,6 +855,9 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "dynamodb:DeleteItem",
                             "dynamodb:Query",
                             "dynamodb:Scan",
+                            "dynamodb:BatchWriteItem",
+                            "dynamodb:BatchGetItem",
+                            "dynamodb:DescribeTable"
                         ],
                         "Resource": [
                             medialake_asset_table,

@@ -29,7 +29,7 @@ interface AudioResultsProps {
 const defaultCardFields: CardFieldConfig[] = [
     { id: 'name', label: 'Object Name', visible: true },
     { id: 'format', label: 'Format', visible: true },
-    { id: 'createDate', label: 'Created Date', visible: true },
+    { id: 'createDate', label: 'Date Created', visible: true },
     { id: 'fileSize', label: 'File Size', visible: false },
 ];
 
@@ -52,7 +52,7 @@ const defaultColumns: AssetTableColumn<AudioItem>[] = [
     },
     {
         id: 'createDate',
-        label: 'Created',
+        label: 'Date Created',
         visible: true,
         minWidth: 160,
         accessorFn: (audio) => audio.DigitalSourceAsset.CreateDate,
@@ -69,7 +69,7 @@ const defaultColumns: AssetTableColumn<AudioItem>[] = [
 ];
 
 const sortOptions = [
-    { id: 'createDate', label: 'Created Date' },
+    { id: 'createDate', label: 'Date Created' },
     { id: 'name', label: 'Object Name' },
     { id: 'format', label: 'Format' },
     { id: 'fileSize', label: 'File Size' },

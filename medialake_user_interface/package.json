@@ -7,7 +7,7 @@
     "@aws-amplify/ui-react": "^6.5.5",
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@byomakase/omakase-player": "^0.14.0",
+    "@byomakase/omakase-player": "^0.15.1-SNAPSHOT.1741774199",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@hookform/resolvers": "^3.10.0",
@@ -40,6 +40,7 @@
     "react-intersection-observer": "^9.13.1",
     "react-router-dom": "^6.27.0",
     "reactflow": "^11.11.4",
+    "rxjs": "7.8.1",
     "web-vitals": "^2.1.4",
     "yup": "^1.6.1",
     "zod": "^3.24.1"

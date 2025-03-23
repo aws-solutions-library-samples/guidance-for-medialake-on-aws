@@ -11,6 +11,7 @@ import { ExecutionsPage } from '@/features/executions';
 import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
 import ImageDetailPage from '@/pages/ImageDetailPage';
 import VideoDetailPage from '@/pages/VideoDetailPage';
+import AudioDetailPage from '@/pages/AudioDetailPage';
 import ConnectorsPage from '@/pages/settings/ConnectorsPage';
 import ProfilePage from '@/pages/settings/ProfilePage';
 import UserManagement from '@/pages/settings/UserManagement';
@@ -72,6 +73,10 @@ export const router = createBrowserRouter([
             {
                 path: 'videos/:id',
                 element: <VideoDetailPage />
+            },
+            {
+                path: 'audios/:id',
+                element: <AudioDetailPage />
             },
             {
                 path: 'settings/profile',

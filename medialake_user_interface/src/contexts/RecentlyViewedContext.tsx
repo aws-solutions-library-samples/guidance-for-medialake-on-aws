@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 export interface RecentlyViewedItem {
     id: string;
     title: string;
-    type: 'video' | 'image';
+    type: 'video' | 'image' | 'audio';
     timestamp: Date;
     path: string;
     searchTerm: string;
@@ -62,7 +62,7 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
                     .filter((item: any) =>
                         item.id &&
                         item.title &&
-                        (item.type === 'video' || item.type === 'image') &&
+                        (item.type === 'video' || item.type === 'image' || item.type === 'audio') &&
                         item.path
                     )
                     .slice(0, MAX_ITEMS);

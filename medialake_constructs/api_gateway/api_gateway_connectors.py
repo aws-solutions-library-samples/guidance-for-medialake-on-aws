@@ -46,6 +46,7 @@ class ConnectorsProps:
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     asset_sync_job_table: dynamodb.TableV2
+    asset_sync_engine_lambda: lambda_.Function
     ingest_event_bus: str | None
     api_resource: str | None = None
     cognito_authorizer: str | None = None
@@ -206,7 +207,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ConnectorsTable",
             props=DynamoDBProps(
-                name=f"{config.resource_prefix}_connector_table_{constructor_id}",
+                name=f"{config.resource_prefix}_connector_table_{config.environment}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
@@ -222,7 +223,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ConnectorsGetLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_connectors_get_lambda",
+                name="connectors_get",
                 entry="lambdas/api/connectors/get_connectors",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -246,7 +247,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ConnectorsDelLambda",
             config=LambdaConfig(
-                name="connectors_del_lambda",
+                name="rp_connector_id_del",
                 entry="lambdas/api/connectors/rp_connectorId/del_connectorId",
                 # iam_role_boundary_policy=lambda_iam_boundry_policy,
                 environment_variables={
@@ -380,7 +381,7 @@ class ConnectorsConstruct(Construct):
             self,
             "ConnectorS3PostLambda",
             config=LambdaConfig(
-                name="connector_s3_post",
+                name="connectors_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
                 memory_size=256,
                 environment_variables={
@@ -601,11 +602,14 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIALAKE_ASSET_SYNC_JOB_TABLE_ARN": props.asset_sync_job_table.table_arn,
+                    "JOB_TABLE_NAME": props.asset_sync_job_table.table_name,
+                    "ENGINE_FUNCTION_ARN": props.asset_sync_engine_lambda.function_arn,
                 },
             ),
         )   
-        # props.asset_sync_job_table.grant_read_write_data(s3_sync_lambda.function)
         self.connectors_table.table.grant_read_data(self._connector_sync_lambda.function)
+        props.asset_sync_job_table.grant_read_write_data(self._connector_sync_lambda.function)
+        props.asset_sync_engine_lambda.grant_invoke(self._connector_sync_lambda.function)
         
         s3_sync_connector_resource.add_method(
             "POST",

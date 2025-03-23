@@ -24,7 +24,7 @@ import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/Rece
 import AssetSidebar from '../components/asset/AssetSidebar';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
 import AssetHeader from '../components/asset/AssetHeader';
-import AssetVideo from '../components/asset/AssetVideo';
+import AssetAudio from '../components/asset/AssetAudio';
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
@@ -40,28 +40,28 @@ import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 
 const outputFilters = {
-    'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
-    'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
-    'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
-    'Thumbnail (IFD1)': ['ImageWidth', 'ImageHeight', 'ThumbnailLength'],
+    'ID3v2': ['Title', 'Artist', 'Album', 'Year', 'Genre', 'Track'],
+    'MP3 Info': ['Bitrate', 'SampleRate', 'Channels', 'Duration'],
+    'FLAC': ['StreamInfo', 'VorbisComment', 'Channels', 'BitsPerSample'],
+    'WAV': ['Format', 'AudioFormat', 'NumChannels', 'SampleRate', 'ByteRate'],
+    'Ogg Vorbis': ['Vendor', 'Comments', 'BitrateNominal', 'Version'],
+    'Audio Metadata': ['Album', 'Artist', 'Composer', 'Genre', 'Year', 'TrackNumber'],
+    'Technical': ['Format', 'Duration', 'BitRate', 'SampleRate', 'Channels'],
+    'MusicBrainz': ['ReleaseID', 'ArtistID', 'ReleaseGroupID'],
+    'Encoding': ['EncodedBy', 'EncoderSettings', 'EncodingTime'],
+    'Rights': ['Copyright', 'License', 'Owner'],
     'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
     'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
     'XMP': ['Creator', 'Title', 'Description', 'Rights'],
-    'JFIF (JPEG only)': ['JFIFVersion', 'ResolutionUnit', 'XResolution', 'YResolution'],
-    'IHDR (PNG only)': ['Width', 'Height', 'BitDepth', 'ColorType', 'CompressionMethod', 'FilterMethod', 'InterlaceMethod'],
     'Maker Note': [],
     'User Comment': [],
-    'Rights': ['UsageTerms', 'CopyrightNotice', 'WebStatement'],
     'IPTC Core': ['CreatorContactInfo', 'Scene'],
     'IPTC Extension': ['PersonInImage', 'LocationCreated'],
-    'Photoshop': ['Category', 'SupplementalCategories', 'AuthorsPosition'],
     'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
     'Dublin Core': ['Format', 'Type', 'Identifier'],
     'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
-    'Auxiliary': ['Lens', 'SerialNumber'],
-    'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
-    'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
-    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
+    'Auxiliary': ['SerialNumber'],
+    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'Duration', 'StartTimeScale'],
     'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
 };
 
@@ -137,7 +137,7 @@ const SummaryTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
         },
         {
             label: 'Type',
-            value: metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Video',
+            value: metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Audio',
             icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
         },
         {
@@ -381,9 +381,9 @@ const RelatedItemsTab: React.FC = () => {
     // This would typically fetch related items from an API
     // For now, we'll use placeholder data
     const relatedItems = [
-        { id: '1', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb1.jpg' },
+        { id: '1', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb1.jpg' },
         { id: '2', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb2.jpg' },
-        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
+        { id: '3', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb3.jpg' },
     ];
 
     // Get icon based on item type
@@ -450,7 +450,7 @@ const RelatedItemsTab: React.FC = () => {
     );
 };
 
-const VideoDetailContent: React.FC = () => {
+const AudioDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
@@ -460,9 +460,9 @@ const VideoDetailContent: React.FC = () => {
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
-        { user: "John Doe", avatar: "https://mui.com/static/videos/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
-        { user: "Jane Smith", avatar: "https://mui.com/static/videos/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
-        { user: "Mike Johnson", avatar: "https://mui.com/static/videos/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
+        { user: "John Doe", avatar: "https://mui.com/static/videos/avatar/1.jpg", content: "Great audio quality!", timestamp: "2023-06-15 09:30:22" },
+        { user: "Jane Smith", avatar: "https://mui.com/static/videos/avatar/2.jpg", content: "The mix is perfect", timestamp: "2023-06-15 10:15:43" },
+        { user: "Mike Johnson", avatar: "https://mui.com/static/videos/avatar/3.jpg", content: "Can we adjust the levels?", timestamp: "2023-06-15 11:22:17" },
     ]);
 
     const searchParams = new URLSearchParams(location.search);
@@ -499,14 +499,14 @@ const VideoDetailContent: React.FC = () => {
 
         return {
             summary: [
-                { label: 'Title', value: 'Winter Expedition Base Camp' },
-                { label: 'Type', value: 'Video' },
-                { label: 'Duration', value: '00:15' }
+                { label: 'Title', value: 'Mountain Stream Ambience' },
+                { label: 'Type', value: 'Audio' },
+                { label: 'Duration', value: '03:45' }
             ],
             descriptive: [
-                { label: 'Description', value: 'Base camp footage from winter expedition' },
-                { label: 'Keywords', value: 'winter, expedition, base camp' },
-                { label: 'Location', value: 'Mount Everest' }
+                { label: 'Description', value: 'Ambient audio recording of a mountain stream' },
+                { label: 'Keywords', value: 'mountain, stream, ambient, nature, water' },
+                { label: 'Location', value: 'Blue Ridge Mountains' }
             ],
             technical: [
                 { label: 'Format', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format },
@@ -553,7 +553,7 @@ const VideoDetailContent: React.FC = () => {
         setExpandedMetadata(prev => ({ ...prev, [key]: !prev[key] }));
     };
     const activityLog = [
-        { user: "John Doe", action: "Uploaded video", timestamp: "2024-01-07 09:30:22" },
+        { user: "John Doe", action: "Uploaded audio", timestamp: "2024-01-07 09:30:22" },
         { user: "AI Pipeline", action: "Generated metadata", timestamp: "2024-01-07 09:31:05" },
         { user: "Jane Smith", action: "Added tags", timestamp: "2024-01-07 10:15:43" }
     ];
@@ -563,13 +563,12 @@ const VideoDetailContent: React.FC = () => {
         assetData ? {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
             title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video",
+            type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "audio",
             path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
             searchTerm: searchTerm,
             metadata: {
-                duration: '00:15',
+                duration: '03:45',
                 fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
-                dimensions: '1920x1080',
                 creator: 'John Doe'
             }
         } : null
@@ -627,8 +626,6 @@ const VideoDetailContent: React.FC = () => {
         return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
     })();
 
-
-
     return (
         <Box sx={{
             display: 'flex',
@@ -653,7 +650,7 @@ const VideoDetailContent: React.FC = () => {
                         onNext={() => navigate(1)}
                         assetName={assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                         assetId={assetData.data.asset.InventoryID}
-                        assetType="Video"
+                        assetType="Audio"
                     />
                 </Box>
             </Box>
@@ -673,7 +670,7 @@ const VideoDetailContent: React.FC = () => {
                         height: '100%'
                     }}
                 >
-                    <AssetVideo
+                    <AssetAudio
                         src={proxyUrl}
                         alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
                     />
@@ -771,14 +768,14 @@ const VideoDetailContent: React.FC = () => {
     );
 };
 
-const VideoDetailPage: React.FC = () => {
+const AudioDetailPage: React.FC = () => {
     return (
         <RecentlyViewedProvider>
             <RightSidebarProvider>
-                <VideoDetailContent />
+                <AudioDetailContent />
             </RightSidebarProvider>
         </RecentlyViewedProvider>
     );
 };
 
-export default VideoDetailPage;
+export default AudioDetailPage; 

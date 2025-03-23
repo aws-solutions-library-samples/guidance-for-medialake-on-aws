@@ -64,7 +64,7 @@ class AssetsConstruct(Construct):
             self,
             "GetAssetsLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}-get-assets-{config.environment}",
+                name="assets-get",
                 entry="lambdas/api/assets/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -107,7 +107,7 @@ class AssetsConstruct(Construct):
             self,
             "GetAssetLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_get_asset_{config.environment}",
+                name="rp_asset_id_get",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -136,7 +136,7 @@ class AssetsConstruct(Construct):
             self,
             "DeleteAssetLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_delete_asset_{config.environment}",
+                name="rp_asset_id_delete",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
                 layers=[search_layer.layer],
                 environment_variables={
@@ -237,7 +237,7 @@ class AssetsConstruct(Construct):
             self,
             "GeneratePresignedUrlLambda",
             config=LambdaConfig(
-                name=f"generate_presigned_url",
+                name="generate_presigned_url",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/generate_presigned_url",
                 environment_variables={
