@@ -98,6 +98,7 @@ class ApiGatewayStackProps:
     pipelines_nodes_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     asset_sync_job_table: dynamodb.TableV2
+    asset_sync_engine_lambda: lambda_.Function
 
 
 class ApiGatewayStack(Stack):
@@ -146,6 +147,7 @@ class ApiGatewayStack(Stack):
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 ingest_event_bus=props.ingest_event_bus,
                 asset_sync_job_table=props.asset_sync_job_table,
+                asset_sync_engine_lambda=props.asset_sync_engine_lambda,
             ),
         )
 

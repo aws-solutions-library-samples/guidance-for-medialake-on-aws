@@ -107,6 +107,7 @@ api_gateway_stack = ApiGatewayStack(
         pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
         node_table=nodes_stack.pipelines_nodes_table,
         asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
+        asset_sync_engine_lambda=asset_sync_stack.asset_sync_engine_lambda,
     ),
     env=env,
 )

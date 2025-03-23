@@ -108,7 +108,7 @@ class PipelineNodesStack(Stack):
             self,
             "VideoMetadataExtractorNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_video_metadata_extractor_node",
+                name=f"video_metadata_extractor_node",
                 timeout_minutes=15,
                 memory_size=10240,
                 architecture=lambda_.Architecture.X86_64,
@@ -124,7 +124,7 @@ class PipelineNodesStack(Stack):
             self,
             "AudioMetadataExtractorNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_audio_metadata_extractor_node",
+                name="audio_metadata_extractor_node",
                 timeout_minutes=15,
                 memory_size=10240,
                 architecture=lambda_.Architecture.X86_64,
@@ -140,7 +140,7 @@ class PipelineNodesStack(Stack):
             self,
             "ImageMetadataExtractorNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_image_metadata_extractor_node",
+                name=f"image_metadata_extractor_node",
                 runtime=lambda_.Runtime.NODEJS_18_X,
                 timeout_minutes=15,
                 memory_size=10240,
@@ -156,7 +156,7 @@ class PipelineNodesStack(Stack):
             self,
             "ImageProxyNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_image_proxy_node",
+                name=f"image_proxy_node",
                 memory_size=10240,
                 timeout_minutes=15,
                 entry="lambdas/nodes/image_proxy",
@@ -171,7 +171,7 @@ class PipelineNodesStack(Stack):
             self,
             "VideoProxyThumbnailNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_video_proxy_thumbnail_node",
+                name=f"video_proxy_thumbnail_node",
                 timeout_minutes=15,
                 entry="lambdas/nodes/video_proxy_video_thumbnail",
                 environment_variables={
@@ -186,7 +186,7 @@ class PipelineNodesStack(Stack):
             self,
             "AudioProxyThumbnailNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_audio_proxy_thumbnail_node",
+                name="audio_proxy_thumbnail_node",
                 timeout_minutes=15,
                 entry="lambdas/nodes/audio_proxy_audio_thumbnail",
                 environment_variables={

@@ -89,7 +89,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
         
         return <InfoOutlinedIcon fontSize="small" color="action" sx={{ mr: 1 }} />;
     };
-    
+
     return (
         <List disablePadding sx={{ p: 1 }}>
             {versions.length === 0 ? (
@@ -509,7 +509,7 @@ const AssetSidebar: React.FC<AssetSidebarProps> = ({
                         }}
                     >
                         Asset Console
-                    </Typography>
+                </Typography>
                     <Tooltip title="Sidebar settings">
                         <IconButton size="small">
                             <SettingsIcon fontSize="small" />

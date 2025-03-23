@@ -89,7 +89,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "AccessLogsBucket",
                 props=S3BucketProps(
-                    # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                    bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
                     destroy_on_delete=config.environment != "prod",
                     intelligent_tiering_configurations=[
                         s3.IntelligentTieringConfiguration(
@@ -138,7 +138,6 @@ class BaseInfrastructureStack(Stack):
             self,
             "DynamodbExportBucket",
             props=S3BucketProps(
-                # bucket_name=f"{config.resource_prefix}-ddb-export-{config.account_id}-{self.region}-{config.environment}".lower(),
                 destroy_on_delete=True,
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
@@ -358,7 +357,7 @@ class BaseInfrastructureStack(Stack):
             self,
             "PipelinesTable",
             props=DynamoDBProps(
-                name=f"{config.resource_prefix}_pipeline_table",
+                name=f"{config.resource_prefix}_pipeline_table_{config.environment}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 removal_policy=RemovalPolicy.DESTROY,
@@ -378,7 +377,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "MediaLakeAssetTable",
                 props=DynamoDBProps(
-                    name=f"{config.resource_prefix}-asset-table",
+                    name=f"{config.resource_prefix}-asset-table-{config.environment}",
                     partition_key_name="InventoryID",
                     partition_key_type=dynamodb.AttributeType.STRING,
                     pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
@@ -415,6 +414,14 @@ class BaseInfrastructureStack(Stack):
                 projection_type=dynamodb.ProjectionType.ALL,
             )
 
+            self._asset_table.add_global_secondary_index(
+                index_name="S3PathIndex",
+                partition_key=dynamodb.Attribute(
+                    name="StoragePath", type=dynamodb.AttributeType.STRING
+                ),
+                projection_type=dynamodb.ProjectionType.ALL,
+            )
+
         # Asset V2 table
         if config.db.use_existing_tables:
             self._assetv2_table = dynamodb.Table.from_table_arn(
@@ -427,7 +434,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "MediaLakeAssetTableV2",
                 props=DynamoDBProps(
-                    name=f"{config.resource_prefix}-asset-table-v2",
+                    name=f"{config.resource_prefix}-asset-table-v2-{config.environment}",
                     partition_key_name="PK",
                     partition_key_type=dynamodb.AttributeType.STRING,
                     point_in_time_recovery=True,
@@ -576,7 +583,7 @@ class BaseInfrastructureStack(Stack):
         CfnOutput(
             self,
             "RetainedAssetTableGSIs",
-            value="AssetIDIndex,FileHashIndex",
+            value="AssetIDIndex,FileHashIndex,S3PathIndex",
             description="Retained Asset Table GSIs",
         )
 

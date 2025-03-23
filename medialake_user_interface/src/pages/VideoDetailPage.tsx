@@ -156,8 +156,8 @@ const SummaryTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
             icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
         },
         {
-            label: 'Created Date',
-            value: metadataFields.technical.find((item: any) => item.label === 'Created Date')?.value || 'Unknown',
+            label: 'Date Created',
+            value: metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown',
             icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
         }
     ];
@@ -511,7 +511,7 @@ const VideoDetailContent: React.FC = () => {
             technical: [
                 { label: 'Format', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format },
                 { label: 'File Size', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size },
-                { label: 'Created Date', value: '2024-01-07' }
+                { label: 'Date Created', value: '2024-01-07' }
             ]
         };
     }, [assetData]);

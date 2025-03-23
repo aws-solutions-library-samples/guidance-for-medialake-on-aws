@@ -380,6 +380,23 @@ class AssetSyncStack(Stack):
                     "s3control:DescribeJob",
                     "s3control:UpdateJobPriority",
                     "s3control:UpdateJobStatus",
+                    "s3:CreateJob",
+                    "s3:GetBucketLocation",
+                    "s3:UpdateJobStatus",
+                    "s3control:ListJobs",
+                    "s3control:GetJobTagging",
+                    "s3control:PutJobTagging",
+                    "s3control:GetJob",
+                    "s3control:GetJobStatus",
+                    "s3control:GetJobOutput",
+                    "s3control:GetJobOutputLocation",
+                    "s3control:GetJobProgress",
+                    "s3control:GetJobReport",
+                    "s3control:GetJobReportLocation",
+                    "s3control:GetJobReportStatus",
+                    "s3control:GetJobReportOutput",
+                    "s3control:GetJobReportOutputLocation",
+                    
                 ],
                 resources=["*"],
             )
@@ -390,6 +407,14 @@ class AssetSyncStack(Stack):
             iam.PolicyStatement(
                 actions=["sts:GetCallerIdentity"],
                 resources=["*"],
+            )
+        )
+
+        # Add IAM PassRole permission for batch operations
+        self._asset_sync_engine_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[self.batch_operations_role.role_arn],
             )
         )
 
@@ -410,7 +435,7 @@ class AssetSyncStack(Stack):
 
     def _create_results_bucket(self) -> s3.Bucket:
         """Create S3 bucket for manifests and results"""
-        return s3.Bucket(
+        self._results_bucket = s3.Bucket(
             self,
             "ResultsBucket",
             removal_policy=RemovalPolicy.DESTROY,
@@ -437,7 +462,27 @@ class AssetSyncStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
         )
+        return self._results_bucket
 
     @property
     def asset_sync_job_table(self) -> dynamodb.TableV2:
         return self._asset_sync_job_table.table
+    @property
+    def asset_sync_chunk_table(self) -> dynamodb.TableV2:
+        return self._asset_sync_chunk_table.table
+    @property
+    def asset_sync_error_table(self) -> dynamodb.TableV2:
+        return self._asset_sync_error_table.table
+    @property
+    def results_bucket(self) -> s3.Bucket:
+        return self._results_bucket
+    @property
+    def asset_sync_engine_lambda(self) -> lambda_.Function:
+        return self._asset_sync_engine_lambda.function
+    @property
+    def asset_sync_processor_lambda(self) -> lambda_.Function:
+        return self._asset_sync_processor_lambda.function
+    @property
+    def storage_sync_post_lambda(self) -> lambda_.Function:
+        return self._storage_sync_post_lambda.function
+    
