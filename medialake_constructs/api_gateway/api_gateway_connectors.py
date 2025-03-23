@@ -607,10 +607,9 @@ class ConnectorsConstruct(Construct):
                 },
             ),
         )   
-        # props.asset_sync_job_table.grant_read_write_data(s3_sync_lambda.function)
         self.connectors_table.table.grant_read_data(self._connector_sync_lambda.function)
         props.asset_sync_job_table.grant_read_write_data(self._connector_sync_lambda.function)
-        props.asset_sync_engine_lambda.grant_invoke_permission(self._connector_sync_lambda.function)
+        props.asset_sync_engine_lambda.grant_invoke(self._connector_sync_lambda.function)
         
         s3_sync_connector_resource.add_method(
             "POST",
