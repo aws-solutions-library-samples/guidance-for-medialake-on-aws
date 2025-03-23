@@ -75,7 +75,7 @@ export const router = createBrowserRouter([
                 element: <VideoDetailPage />
             },
             {
-                path: 'audios/:id',
+                path: 'audio/:id',
                 element: <AudioDetailPage />
             },
             {

@@ -73,6 +73,71 @@ def get_type_abbreviation(asset_type: str) -> str:
     }
     return type_abbreviations.get(asset_type, "img")
 
+@functools.lru_cache(maxsize=200)
+def determine_asset_type(content_type: str, file_extension: str) -> str:
+    """
+    Determine the asset type using content type and file extension.
+    Uses a more comprehensive classification based on mime types and extensions.
+    
+    Args:
+        content_type: The MIME type from S3 metadata
+        file_extension: The file extension (without the dot)
+    
+    Returns:
+        One of: "Image", "Video", "Audio", or "Other"
+    """
+    # Default to Image if we can't determine
+    if not content_type and not file_extension:
+        return "Image"
+    
+    # Convert to lowercase for comparison
+    content_type = content_type.lower() if content_type else ""
+    file_extension = file_extension.lower() if file_extension else ""
+    
+    # Image classification
+    image_mimes = ["image/", "application/photoshop", "application/illustrator"]
+    image_extensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "webp", "heic", "heif", "raw", "psd", "ai", "eps"]
+    
+    # Video classification
+    video_mimes = ["video/"]
+    video_extensions = ["mp4", "mov", "avi", "wmv", "webm", "flv", "mkv", "m4v", "mpg", "mpeg", "3gp"]
+    
+    # Audio classification
+    audio_mimes = ["audio/"]
+    audio_extensions = ["mp3", "wav", "aac", "flac", "ogg", "wma", "m4a", "aiff", "opus"]
+    
+    # Check MIME type first as it's more reliable
+    for prefix in image_mimes:
+        if content_type.startswith(prefix):
+            return "Image"
+    
+    for prefix in video_mimes:
+        if content_type.startswith(prefix):
+            return "Video"
+    
+    for prefix in audio_mimes:
+        if content_type.startswith(prefix):
+            return "Audio"
+    
+    # If MIME type doesn't give us a clear answer, check file extension
+    if file_extension in image_extensions:
+        return "Image"
+    
+    if file_extension in video_extensions:
+        return "Video"
+    
+    if file_extension in audio_extensions:
+        return "Audio"
+    
+    # Fall back to looking at the first part of the MIME type
+    if content_type:
+        mime_main_type = content_type.split('/')[0].capitalize()
+        if mime_main_type in ["Image", "Video", "Audio"]:
+            return mime_main_type
+    
+    # Default fallback
+    return "Image"
+
 # Event filtering optimization
 def is_relevant_event(event_name: str, allowed_prefixes=("ObjectCreated:", "ObjectRemoved:")) -> bool:
     """Quick check if event should be processed"""
@@ -282,10 +347,12 @@ class AssetProcessor:
                                 asset_type = asset_type_map.get(type_abbrev, "Image")
                             else:
                                 content_type = response.get("ContentType", "")
-                                asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                                file_ext = key.split(".")[-1] if "." in key else ""
+                                asset_type = determine_asset_type(content_type, file_ext)
                         else:
                             content_type = response.get("ContentType", "")
-                            asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                            file_ext = key.split(".")[-1] if "." in key else ""
+                            asset_type = determine_asset_type(content_type, file_ext)
                         
                         # Create the item structure
                         item = {
@@ -355,7 +422,8 @@ class AssetProcessor:
                     
                     # Extract asset type from content type
                     content_type = response.get("ContentType", "")
-                    asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                    file_ext = key.split(".")[-1] if "." in key else ""
+                    asset_type = determine_asset_type(content_type, file_ext)
                     type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
                     
                     # Generate new AssetID
@@ -443,7 +511,8 @@ class AssetProcessor:
                     )
                     # Extract asset type from content type
                     content_type = response.get("ContentType", "")
-                    asset_type = content_type.split("/")[0].capitalize() if content_type else "Image"
+                    file_ext = key.split(".")[-1] if "." in key else ""
+                    asset_type = determine_asset_type(content_type, file_ext)
                     type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
                     
                     new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
@@ -580,16 +649,17 @@ class AssetProcessor:
             bucket = metadata["StorageInfo"]["PrimaryLocation"]["Bucket"]
             key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
             
-            # Extract and capitalize the first part of the MIME type
+            # Extract content type and file extension for type determination
             content_type = (
                 metadata.get("Metadata", {})
                 .get("Embedded", {})
                 .get("S3", {})
                 .get("ContentType", "")
             )
-            asset_type = (
-                content_type.split("/")[0].capitalize() if content_type else "Image"
-            )
+            file_ext = key.split(".")[-1] if "." in key else ""
+            
+            # Use more accurate asset type detection
+            asset_type = determine_asset_type(content_type, file_ext)
 
             # Use cached type abbreviation lookup
             type_abbrev = get_type_abbreviation(asset_type)
@@ -696,9 +766,12 @@ class AssetProcessor:
                 .get("S3", {})
                 .get("ContentType", "")
             )
-            asset_type = (
-                content_type.split("/")[0].capitalize() if content_type else "Image"
-            )
+            # Get file extension from the object key
+            object_key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+            file_ext = object_key.split(".")[-1] if "." in object_key else ""
+            
+            # Use more accurate asset type detection
+            asset_type = determine_asset_type(content_type, file_ext)
 
             # Get timestamp once for reuse
             timestamp = datetime.utcnow().isoformat()

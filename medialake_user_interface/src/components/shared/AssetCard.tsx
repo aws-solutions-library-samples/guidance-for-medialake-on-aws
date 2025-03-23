@@ -3,6 +3,7 @@ import { Box, Typography, IconButton, TextField, Button, CircularProgress } from
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
+import { AssetAudio } from '../asset';
 
 export interface AssetField {
     id: string;
@@ -144,7 +145,7 @@ console.log("isRenaming",isRenaming)
                     },
                 }}
             >
-                {/* Image or Video */}
+                {/* Render appropriate content based on asset type */}
                 {assetType === 'Video' ? (
                     <video
                         onClick={(event) => {
@@ -160,6 +161,26 @@ console.log("isRenaming",isRenaming)
                         controls
                         src={proxyUrl}
                     />
+                ) : assetType === 'Audio' ? (
+                    <Box
+                        onClick={onAssetClick}
+                        sx={{
+                            cursor: 'pointer',
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <AssetAudio 
+                            src={proxyUrl || ''} 
+                            alt={name}
+                            compact={true}
+                        />
+                    </Box>
                 ) : (
                     <Box
                         onClick={onAssetClick}

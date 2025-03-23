@@ -24,7 +24,7 @@ import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/Rece
 import AssetSidebar from '../components/asset/AssetSidebar';
 import BreadcrumbNavigation from '../components/common/BreadcrumbNavigation';
 import AssetHeader from '../components/asset/AssetHeader';
-import AssetAudio from '../components/asset/AssetAudio';
+import { AssetAudio } from '../components/asset';
 import { formatCamelCase } from '../utils/stringUtils';
 import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWithTooltip';
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
@@ -564,7 +564,7 @@ const AudioDetailContent: React.FC = () => {
             id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
             title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "audio",
-            path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
+            path: `/audio/${assetData.data.asset.InventoryID}`,
             searchTerm: searchTerm,
             metadata: {
                 duration: '03:45',

@@ -329,6 +329,7 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                     getThumbnailUrl={(asset) => asset.thumbnailUrl || ''}
                                     getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                                     getId={(asset) => asset.InventoryID}
+                                    getAssetType={(asset) => asset.DigitalSourceAsset.Type}
                                     editingId={editingAssetId}
                                     editedName={editedName}
                                     onEditNameChange={onEditNameChange}
@@ -354,6 +355,7 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 getThumbnailUrl={(asset) => asset.thumbnailUrl || ''}
                 getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                 getId={(asset) => asset.InventoryID}
+                getAssetType={(asset) => asset.DigitalSourceAsset.Type}
                 editingId={editingAssetId}
                 editedName={editedName}
                 onEditNameChange={onEditNameChange}
