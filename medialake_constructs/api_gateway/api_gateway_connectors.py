@@ -596,7 +596,7 @@ class ConnectorsConstruct(Construct):
             "ConnectorSyncLambda",
             config=LambdaConfig(
                 name="post_connector_sync",
-                entry="lambdas/api/connectors/rp_connectorid/sync/post_sync",
+                entry="lambdas/api/connectors/rp_connectorId/sync/post_sync",
                 environment_variables={
                     "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
