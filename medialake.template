@@ -394,6 +394,10 @@ Resources:
                 - python3 .cicd/build_lambdas.py build
                 - echo "Building FFprobe"
                 - bash .cicd/build_ffprobe.sh
+                - echo "Building FFmpeg"
+                - bash .cicd/build_ffmpeg.sh
+                - echo "Building CairoSVG"
+                - bash .cicd/build_cairosvg.sh
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
