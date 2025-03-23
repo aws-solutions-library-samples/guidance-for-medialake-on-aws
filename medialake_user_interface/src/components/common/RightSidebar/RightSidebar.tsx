@@ -16,7 +16,7 @@ const MAX_WIDTH = 600;
 const COLLAPSED_WIDTH = 8;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-    const { isExpanded, setIsExpanded, setCurrentWidth } = useRightSidebar();
+    const { isExpanded, setIsExpanded } = useRightSidebar();
     const location = useLocation();
     const [width, setWidth] = useState(DEFAULT_WIDTH);
     const [isResizing, setIsResizing] = useState(false);
@@ -32,12 +32,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
             }
         }
     }, []);
-
-    // Update context with current effective width
-    useEffect(() => {
-        const effectiveWidth = isExpanded ? width : COLLAPSED_WIDTH;
-        setCurrentWidth(effectiveWidth);
-    }, [isExpanded, width, setCurrentWidth]);
 
     // Save width to localStorage when it changes
     useEffect(() => {
@@ -57,7 +51,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
     const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
         e.preventDefault();
         setIsResizing(true);
-        document.body.style.cursor = 'col-resize';
     };
 
     // Handle resizing
@@ -76,7 +69,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
 
         const handleResizeEnd = () => {
             setIsResizing(false);
-            document.body.style.cursor = '';
         };
 
         if (isResizing) {
@@ -87,7 +79,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
         return () => {
             document.removeEventListener('mousemove', handleResize);
             document.removeEventListener('mouseup', handleResizeEnd);
-            document.body.style.cursor = '';
         };
     }, [isResizing, isExpanded]);
 
@@ -125,18 +116,26 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                         onMouseDown={handleResizeStart}
                         sx={{
                             position: 'absolute',
-                            left: 0,
                             top: 0,
-                            bottom: 0,
-                            width: '5px',
+                            left: 0,
+                            width: '8px',
+                            height: '100%',
                             cursor: 'col-resize',
-                            zIndex: 1,
+                            zIndex: 1300,
                             '&:hover': {
                                 backgroundColor: theme => alpha(theme.palette.primary.main, 0.1),
                             },
-                            ...(isResizing && {
-                                backgroundColor: theme => alpha(theme.palette.primary.main, 0.2),
-                            })
+                            '&::after': {
+                                content: '""',
+                                position: 'absolute',
+                                top: '50%',
+                                left: '3px',
+                                width: '2px',
+                                height: '40px',
+                                backgroundColor: theme => alpha(theme.palette.primary.main, 0.3),
+                                borderRadius: '2px',
+                                transform: 'translateY(-50%)',
+                            }
                         }}
                     />
                 )}
@@ -199,14 +198,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                 )}
             </Button>
 
-            {/* Responsive spacer that adjusts layout in real-time */}
-            <Box 
-                sx={{ 
-                    width: isExpanded ? width : COLLAPSED_WIDTH, 
-                    flexShrink: 0,
-                    transition: isResizing ? 'none' : 'width 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms',
-                }} 
-            />
+            {/* Spacer to maintain layout */}
+            <Box sx={{ width: isExpanded ? width : COLLAPSED_WIDTH, flexShrink: 0 }} />
 
             {/* Optional overlay for better UX during resizing */}
             {isResizing && (
@@ -219,7 +212,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                         bottom: 0,
                         zIndex: 1199,
                         cursor: 'col-resize',
-                        pointerEvents: 'none', // Allow clicking through
                     }}
                 />
             )}

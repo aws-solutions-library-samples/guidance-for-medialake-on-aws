@@ -50,13 +50,7 @@ class NodesStack(Stack):
         )
 
         # Node Lambda Deployments
-        # self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
-        #     self,
-        #     "ImageMetadataExtractorLambdaDeployment",
-        #     destination_bucket=props.iac_bucket.bucket,
-        #     parent_folder="nodes",
-        #     code_path=["lambdas", "nodes", "image_metadata_extractor"],
-        # )
+
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "ImageMetadataExtractorLambdaDeployment",

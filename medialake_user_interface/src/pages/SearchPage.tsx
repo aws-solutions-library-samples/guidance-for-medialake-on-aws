@@ -162,10 +162,10 @@ const SearchPage: React.FC = () => {
     };
 
     const [cardFields, setCardFields] = useState([
-        { id: 'name', label: 'Name', visible: true },
+        { id: 'name', label: 'Object Name', visible: true },
         { id: 'type', label: 'Type', visible: true },
         { id: 'format', label: 'Format', visible: true },
-        { id: 'size', label: 'Size', visible: true },
+        { id: 'createdAt', label: 'Date Created', visible: true },
     ]);
 
     const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
@@ -215,7 +215,7 @@ const SearchPage: React.FC = () => {
         },
         {
             id: 'date',
-            label: 'Date',
+            label: 'Date Created',
             visible: true,
             minWidth: 150,
             accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,

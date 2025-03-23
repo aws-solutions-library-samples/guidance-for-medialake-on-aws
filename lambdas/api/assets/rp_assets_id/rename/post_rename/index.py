@@ -69,9 +69,10 @@ def validate_name(name: str) -> None:
         raise AssetRenameError("Invalid name format", HTTPStatus.BAD_REQUEST)
 
     # Add additional name validation rules as needed
-    if not re.match(r"^[a-zA-Z0-9_\-\.\/]+$", name):
+    if not re.match(r"^[a-zA-Z0-9_\-\.\/\!\*\'\(\) ]+$", name):
         raise AssetRenameError(
-            "Name can only contain alphanumeric characters, underscores, hyphens, dots, and forward slashes",
+            "Name can only contain alphanumeric characters, underscores, hyphens, dots, "
+            "forward slashes, exclamation points, asterisks, single quotes, parentheses, and spaces",
             HTTPStatus.BAD_REQUEST,
         )
 

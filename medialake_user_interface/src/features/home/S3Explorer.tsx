@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Box,
@@ -25,6 +25,13 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useS3Explorer } from '../../api/hooks/useS3Explorer';
 import { formatFileSize } from '../../common/helpers/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { useErrorModal } from '../../hooks/useErrorModal';
+import { QUERY_KEYS } from '../../api/queryKeys';
+import { API_ENDPOINTS } from '../../api/endpoints';
+import { apiClient } from '../../api/apiClient';
+import { logger } from '../../common/helpers/logger';
+import type { ApiResponse, S3ListObjectsResponse, S3Object } from '../../api/types/api.types';
 
 interface S3ExplorerProps {
     connectorId: string;
@@ -38,18 +45,39 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
     const [nameFilter, setNameFilter] = useState<string>('');
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedObject, setSelectedObject] = useState<string | null>(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const queryClient = useQueryClient();
 
     const breadcrumbPaths = useMemo(() => {
         const paths = currentPath.split('/').filter(Boolean);
         return ['', ...paths];
     }, [currentPath]);
 
-    const { data, isLoading, error } = useS3Explorer({
+    const { 
+        data, 
+        isLoading, 
+        error 
+    } = useS3Explorer({
         connectorId,
         prefix: currentPath,
         delimiter: '/',
         continuationToken
     });
+
+    const s3Data = data ? (data as ApiResponse<S3ListObjectsResponse>).data : undefined;
+
+    useEffect(() => {
+        const startTime = performance.now();
+        return () => {
+            logger.debug(`S3Explorer component mounted for ${performance.now() - startTime}ms`);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (data && isInitialLoad) {
+            setIsInitialLoad(false);
+        }
+    }, [data, isInitialLoad]);
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleString(undefined, {
@@ -68,10 +96,10 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
     }, []);
 
     const handleLoadMore = useCallback(() => {
-        if (data?.data.nextContinuationToken) {
-            setContinuationToken(data.data.nextContinuationToken);
+        if (s3Data?.nextContinuationToken) {
+            setContinuationToken(s3Data.nextContinuationToken);
         }
-    }, [data?.data.nextContinuationToken]);
+    }, [s3Data?.nextContinuationToken]);
 
     const handleMenuClick = (event: React.MouseEvent<HTMLElement>, objectKey: string) => {
         event.stopPropagation();
@@ -84,37 +112,39 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
         setSelectedObject(null);
     };
 
-    // const handleRename = () => {
-    //     // TODO: Implement rename functionality
-    //     console.log('Rename:', selectedObject);
-    //     handleMenuClose();
-    // };
-
-    // const handleDelete = () => {
-    //     // TODO: Implement delete functionality
-    //     console.log('Delete:', selectedObject);
-    //     handleMenuClose();
-    // };
+    const handleFolderHover = useCallback((prefix: string) => {
+        queryClient.prefetchQuery({
+            queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
+            queryFn: async () => {
+                const response = await apiClient.get(
+                    `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
+                    { params: { prefix, delimiter: '/' } }
+                );
+                return response.data;
+            }
+        });
+    }, [connectorId, queryClient]);
 
     const filteredObjects = useMemo(() => {
-        if (!data?.data.objects) return [];
-        return data.data.objects.filter(obj =>
+        if (!s3Data?.objects) return [];
+        return s3Data.objects.filter(obj =>
             obj.Key.toLowerCase().includes(nameFilter.toLowerCase())
         );
-    }, [data?.data.objects, nameFilter]);
+    }, [s3Data?.objects, nameFilter]);
 
     const filteredPrefixes = useMemo(() => {
-        if (!data?.data.commonPrefixes) return [];
-        return data.data.commonPrefixes.filter(prefix =>
+        if (!s3Data?.commonPrefixes) return [];
+        return s3Data.commonPrefixes.filter(prefix =>
             prefix.toLowerCase().includes(nameFilter.toLowerCase())
         );
-    }, [data?.data.commonPrefixes, nameFilter]);
+    }, [s3Data?.commonPrefixes, nameFilter]);
 
     const renderFolders = () => {
         return filteredPrefixes.map((prefix) => (
             <ListItem
                 key={prefix}
                 onClick={() => handlePathClick(prefix)}
+                onMouseEnter={() => handleFolderHover(prefix)}
                 sx={{
                     cursor: 'pointer',
                     borderRadius: '8px',
@@ -140,18 +170,6 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                         </Typography>
                     }
                 />
-                {/* <IconButton
-                    onClick={(e) => handleMenuClick(e, prefix)}
-                    size="small"
-                    sx={{
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                        },
-                    }}
-                >
-                    <MoreVertIcon fontSize="small" />
-                </IconButton> */}
             </ListItem>
         ));
     };
@@ -188,26 +206,19 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                         </Typography>
                     }
                 />
-                {/* <IconButton
-                    onClick={(e) => handleMenuClick(e, object.Key)}
-                    size="small"
-                    sx={{
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                        },
-                    }}
-                >
-                    <MoreVertIcon fontSize="small" />
-                </IconButton> */}
             </ListItem>
         ));
     };
 
     if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+            <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" minHeight="200px">
                 <CircularProgress />
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                    {isInitialLoad 
+                        ? t('s3Explorer.loading.initializing', 'Loading...')
+                        : t('s3Explorer.loading.fetchingContents', 'Fetching contents...')}
+                </Typography>
             </Box>
         );
     }
@@ -286,7 +297,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                 </List>
             </Paper>
 
-            {data?.data.isTruncated && (
+            {s3Data?.isTruncated && (
                 <Box mt={2} display="flex" justifyContent="center">
                     <Button
                         variant="contained"
@@ -305,44 +316,6 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({ connectorId }) => {
                     </Button>
                 </Box>
             )}
-
-            {/* <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                PaperProps={{
-                    elevation: 0,
-                    sx: {
-                        borderRadius: '8px',
-                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                        backgroundColor: theme.palette.background.paper,
-                        overflow: 'visible',
-                        mt: 1,
-                    },
-                }}
-            >
-                <MenuItem
-                    onClick={handleRename}
-                    sx={{
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                        },
-                    }}
-                >
-                    {t('s3Explorer.menu.rename')}
-                </MenuItem>
-                <MenuItem
-                    onClick={handleDelete}
-                    sx={{
-                        color: theme.palette.error.main,
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.error.main, 0.1),
-                        },
-                    }}
-                >
-                    {t('s3Explorer.menu.delete')}
-                </MenuItem>
-            </Menu> */}
         </Box>
     );
 };
