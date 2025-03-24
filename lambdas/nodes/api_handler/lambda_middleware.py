@@ -63,6 +63,8 @@ class LambdaMiddleware:
         large_payload_bucket: Optional[str] = None,
         max_retries: int = 3,
         standardize_payloads: bool = True,
+        external_payload_bucket: Optional[str] = None,
+        max_response_size: int = 240 * 1024,  # 240KB in bytes
     ):
         # Initialize EventBridge and S3 clients
         self.event_bus = boto3.client("events")
@@ -71,12 +73,20 @@ class LambdaMiddleware:
         self.cleanup_s3 = cleanup_s3
         self.max_retries = max_retries
         self.s3 = boto3.client("s3")
+        self.max_response_size = max_response_size
 
         # Set up large payload handling
         self.large_payload_bucket = large_payload_bucket or os.environ.get("LARGE_PAYLOAD_BUCKET")
         if not self.large_payload_bucket:
             raise ValueError(
                 "large_payload_bucket must be provided or LARGE_PAYLOAD_BUCKET environment variable must be set"
+            )
+            
+        # Set up external payload handling
+        self.external_payload_bucket = external_payload_bucket or os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
+        if not self.external_payload_bucket:
+            raise ValueError(
+                "external_payload_bucket must be provided or EXTERNAL_PAYLOAD_BUCKET environment variable must be set"
             )
 
         # Initialize Powertools utilities
@@ -133,12 +143,35 @@ class LambdaMiddleware:
         if not self.standardize_payloads:
             return event
 
+        # Check if this is an event with S3 payload reference
         if "s3_bucket" in event and "s3_key" in event:
             try:
                 response = self.s3.get_object(Bucket=event["s3_bucket"], Key=event["s3_key"])
                 event = json.loads(response["Body"].read().decode("utf-8"))
             except Exception as e:
                 self.logger.error(f"Failed to fetch payload from S3: {str(e)}")
+                raise
+
+        # Check if this event has an external payload stored in S3
+        if event.get("metadata", {}).get("externalPayload", False):
+            try:
+                self.logger.info("Detected external payload flag, retrieving payload from S3")
+                if "payload" in event and "externalPayloadLocation" in event["payload"]:
+                    bucket = event["payload"]["externalPayloadLocation"]["bucket"]
+                    key = event["payload"]["externalPayloadLocation"]["key"]
+                    
+                    self.logger.info(f"Retrieving external payload from S3: bucket={bucket}, key={key}")
+                    response = self.s3.get_object(Bucket=bucket, Key=key)
+                    payload_data = response["Body"].read().decode("utf-8")
+                    
+                    # Replace the reference with the actual payload
+                    event["payload"] = json.loads(payload_data)
+                    event["metadata"]["externalPayload"] = False
+                    self.logger.info("Successfully retrieved external payload from S3")
+                else:
+                    self.logger.error("External payload flag is set but payload location is missing")
+            except Exception as e:
+                self.logger.error(f"Failed to retrieve external payload from S3: {str(e)}")
                 raise
 
         if "metadata" not in event:
@@ -150,6 +183,7 @@ class LambdaMiddleware:
         """
         Wraps the handler result in the standardized output format.
         If InventoryID exists in the event, adds it to the assets array.
+        If the payload is too large, stores it in S3 and returns a reference.
         """
         if not self.standardize_payloads:
             return result
@@ -165,8 +199,8 @@ class LambdaMiddleware:
             "stepId": str(uuid.uuid4()),               # Generate a unique ID
             "externalTaskId": "",                      # Optional: set if applicable
             "externalTaskStatus": "",                  # Optional: e.g., "completed", "inProgress", "Started"
-            "externalPayload": "False",                # Mandatory: "True" or "False" (as a string)
-            "externalPayloadLocation": None,           # Optional: must be filled if externalPayload is "True"
+            "externalPayload": False,                  # Mandatory: True or False
+            "externalPayloadLocation": None,           # Optional: must be filled if externalPayload is True
             "stepCost": "",                            # Optional cost information
             "stepResult": "",                          # Optional result details
             "stepDuration": ""                         # Optional duration info
@@ -204,7 +238,7 @@ class LambdaMiddleware:
             outputs = detail.get("outputs", {})
             input_data = outputs.get("input", {})
             
-            asset_id = input_data.get("DigitalSourceAsset").get("ID")
+            asset_id = input_data.get("DigitalSourceAsset", {}).get("ID")
             if asset_id:
                 self.logger.info(f"Found DigitalSourceAsset ID in event: {asset_id}")
                 # Add DigitalSourceAsset ID to assets array if not already present
@@ -223,6 +257,41 @@ class LambdaMiddleware:
             "metadata": metadata,
             "payload": payload_content
         }
+        
+        # Check if the output size exceeds the maximum allowed size
+        output_size = len(json.dumps(output).encode("utf-8"))
+        self.logger.info(f"Output size: {output_size} bytes")
+        
+        if output_size > self.max_response_size:
+            self.logger.info(f"Output size {output_size} exceeds limit {self.max_response_size}, storing payload in S3")
+            
+            # Generate a unique key for the S3 object
+            workflow_id = original_event.get("metadata", {}).get("workflowId", "unknown")
+            execution_id = original_event.get("metadata", {}).get("executionId", "unknown")
+            step_id = metadata["stepId"]
+            s3_key = f"{workflow_id}/{execution_id}/{step_id}-payload.json"
+            
+            try:
+                # Store the payload in S3
+                self.s3.put_object(
+                    Bucket=self.external_payload_bucket,
+                    Key=s3_key,
+                    Body=json.dumps(output["payload"])
+                )
+                self.logger.info(f"Large payload written to S3: {s3_key}")
+                
+                # Update the output to include a reference to the S3 location
+                output["metadata"]["externalPayload"] = True
+                output["payload"] = {
+                    "externalPayloadLocation": {
+                        "bucket": self.external_payload_bucket,
+                        "key": s3_key
+                    }
+                }
+            except Exception as e:
+                self.logger.error(f"Failed to write payload to S3: {str(e)}")
+                raise
+        
         return output
 
     def emit_event(
@@ -305,6 +374,8 @@ class LambdaMiddleware:
 
                 self.retry_count = 0
                 self.retry_errors.clear()
+                
+                self.logger.info(f"Middleware before handler execution - function: {context.function_name}, request_id: {context.aws_request_id}")
 
                 while True:
                     try:
@@ -342,6 +413,8 @@ class LambdaMiddleware:
                     self.metrics.add_metric(name="RetryAttempts", unit=MetricUnit.Count, value=self.retry_count)
                     for error_type in self.retry_errors:
                         self.metrics.add_metric(name=f"RetryErrors_{error_type}", unit=MetricUnit.Count, value=1)
+                
+                self.logger.info(f"Middleware after handler execution - function: {context.function_name}, request_id: {context.aws_request_id}")
 
                 processed_result = self.standardize_output(result, event)
                 execution_time = (time.time() - start_time) * 1000
@@ -385,6 +458,8 @@ def lambda_middleware(
     large_payload_bucket: Optional[str] = None,
     max_retries: int = 3,
     standardize_payloads: bool = True,
+    external_payload_bucket: Optional[str] = None,
+    max_response_size: int = 240 * 1024,  # 240KB in bytes
 ) -> Callable[[Callable[..., R]], Callable[..., R]]:
     middleware = LambdaMiddleware(
         event_bus_name=event_bus_name,
@@ -394,5 +469,7 @@ def lambda_middleware(
         large_payload_bucket=large_payload_bucket,
         max_retries=max_retries,
         standardize_payloads=standardize_payloads,
+        external_payload_bucket=external_payload_bucket,
+        max_response_size=max_response_size,
     )
     return middleware
