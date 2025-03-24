@@ -130,16 +130,17 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const handleRenameConfirm = async (newName: string) => {
         if (editingAssetId) {
             try {
-
-                await renameAsset.mutateAsync({
+                const response = await renameAsset.mutateAsync({
                     inventoryId: editingAssetId,
                     newName
                 });
-                setEditedName(null)
+                
+                // The actual update to the UI will now happen automatically through React Query cache updates
+                
+                setEditedName('');
                 setIsRenameDialogOpen(false);
                 setSelectedAsset(null);
-                setEditingAssetId(null)
-
+                setEditingAssetId(null);
             } catch (error) {
                 // Error handling is done in the mutation
             }

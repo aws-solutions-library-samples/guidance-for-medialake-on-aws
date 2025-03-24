@@ -261,15 +261,22 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
         source_bucket = main_storage["Bucket"]
         source_path = main_storage["ObjectKey"]["FullPath"]
 
+        # Extract the object name from the new_name (in case it contains path elements)
+        new_object_name = get_object_name_from_path(new_name)
+        
         # Update object name in DynamoDB
-        main_rep["Name"] = get_object_name_from_path(new_name)
+        main_rep["Name"] = new_object_name
 
-        new_path = f"{get_object_path(source_path)}/{new_name}"
+        # Get the directory path without including the object name
+        base_directory = get_object_path(source_path)
+        
+        # Create new path with just the parent directory and new filename
+        new_path = f"{base_directory}/{new_object_name}"
 
         # Check if main representation already exists
         if check_object_exists(source_bucket, new_path):
             raise AssetRenameError(
-                f"An object with the name {new_name} already exists",
+                f"An object with the name {new_object_name} already exists",
                 HTTPStatus.CONFLICT,
             )
 
@@ -309,10 +316,29 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
             storage = derived["StorageInfo"]["PrimaryLocation"]
             derived_bucket = storage["Bucket"]
             derived_path = storage["ObjectKey"]["FullPath"]
-            new_derived_path = derived_path.replace(source_path, new_path)
+            
+            # Get derived name possibly with the same naming pattern as main object
+            derived_name = get_object_name_from_path(derived_path)
+            derived_name_parts = derived_name.split(".")
+            base_name_parts = get_object_name_from_path(source_path).split(".")
+            
+            # Create new derived name with the same extension and pattern
+            if len(derived_name_parts) > 1 and len(base_name_parts) > 1:
+                # If there are extensions, preserve them
+                new_derived_name = new_object_name
+                # If the derived name has a different extension, keep it
+                if derived_name_parts[-1] != base_name_parts[-1]:
+                    # Split by extensions
+                    derived_ext = ".".join(derived_name_parts[-(len(derived_name_parts)-len(base_name_parts)+1):])
+                    new_derived_base = ".".join(new_object_name.split(".")[:-1])
+                    new_derived_name = f"{new_derived_base}.{derived_ext}"
+            else:
+                new_derived_name = derived_name.replace(get_object_name_from_path(source_path), new_object_name)
+                
+            new_derived_path = f"{get_object_path(derived_path)}/{new_derived_name}"
 
             # Update object name in DynamoDB
-            derived["Name"] = get_object_name_from_path(new_derived_path)
+            derived["Name"] = new_derived_name
 
             logger.info(
                 f"Copying derived representation {idx + 1}",
@@ -474,17 +500,22 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
             derived_path = derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
                 "FullPath"
             ]
-            new_derived_path = derived_path.replace(old_path, new_name)
+            # Get the parent directory path without the filename
+            derived_base_path = get_object_path(derived_path)
+            
+            # Use the derived name that was set in copy_s3_objects
+            new_derived_name = derived["Name"]
+            
+            # Construct the new path properly
+            new_derived_path = f"{derived_base_path}/{new_derived_name}"
+            
             derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
                 "FullPath"
             ] = new_derived_path
 
-            new_derived_name = get_object_name_from_path(new_derived_path)
             derived["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
                 "Name"
             ] = new_derived_name
-            if "Name" in derived:
-                derived["Name"] = new_derived_name
 
         # DynamoDB put_item operation
         table.put_item(Item=asset)

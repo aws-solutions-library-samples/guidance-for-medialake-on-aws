@@ -163,13 +163,47 @@ export const useRenameAsset = () => {
                 throw error;
             }
         },
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({
-                queryKey: QUERY_KEYS.ASSETS.detail(variables.inventoryId),
+        onSuccess: (data, variables) => {
+            // Update the specific asset cache
+            queryClient.setQueryData(
+                QUERY_KEYS.ASSETS.detail(variables.inventoryId),
+                data
+            );
+
+            // Update asset in any search results cache
+            queryClient.getQueriesData({ queryKey: QUERY_KEYS.SEARCH.all }).forEach(([queryKey, queryData]: any) => {
+                if (queryData?.data?.results) {
+                    // Filter out any possible duplicates by InventoryID and update the target asset
+                    const updatedResults = queryData.data.results
+                        .filter((asset: any) => 
+                            // Keep only one instance of the renamed asset
+                            // (in case there's a duplicate with the same ID)
+                            asset.InventoryID !== variables.inventoryId || 
+                            asset === queryData.data.results.find((a: any) => a.InventoryID === variables.inventoryId)
+                        )
+                        .map((asset: any) => {
+                            if (asset.InventoryID === variables.inventoryId) {
+                                // Create a deep copy of the asset
+                                const updatedAsset = JSON.parse(JSON.stringify(asset));
+                                // Update the name property
+                                updatedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name = variables.newName;
+                                return updatedAsset;
+                            }
+                            return asset;
+                        });
+                    
+                    // Update the cache with the modified results
+                    queryClient.setQueryData(queryKey, {
+                        ...queryData,
+                        data: {
+                            ...queryData.data,
+                            results: updatedResults
+                        }
+                    });
+                }
             });
-            queryClient.invalidateQueries({
-                queryKey: QUERY_KEYS.SEARCH.all,
-            });
+
+            // Removed invalidation to avoid eventual consistency issues
         },
         onError: (error) => {
             logger.error('Error in rename mutation:', error);
