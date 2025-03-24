@@ -15,10 +15,12 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
 
 interface AssetAudioProps {
   src: string;
   alt?: string;
+  compact?: boolean;
 }
 
 const formatTime = (seconds: number): string => {
@@ -27,7 +29,7 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt }) => {
+const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) => {
   const theme = useTheme();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -103,6 +105,85 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt }) => {
   // Position indicator for the waveform, based on current time
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Render compact version for card and table views
+  if (compact) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          position: 'relative',
+          backgroundColor: alpha(theme.palette.background.paper, 0.6),
+          borderRadius: 1,
+          overflow: 'hidden',
+        }}
+      >
+        <audio ref={audioRef} src={src} preload="metadata" />
+        
+        {/* Audio icon and play button overlay */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          <MusicNoteIcon 
+            sx={{ 
+              fontSize: 32, 
+              color: alpha(theme.palette.primary.main, 0.8),
+              mb: 1
+            }} 
+          />
+          
+          <IconButton
+            onClick={togglePlay}
+            size="small"
+            sx={{
+              backgroundColor: alpha(theme.palette.primary.main, 0.1),
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.2),
+              }
+            }}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+          </IconButton>
+          
+          {/* Mini progress bar */}
+          {duration > 0 && (
+            <Box 
+              sx={{ 
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                width: '100%',
+                height: 3,
+              }}
+            >
+              <Box 
+                sx={{ 
+                  width: `${progressPercentage}%`, 
+                  height: '100%', 
+                  backgroundColor: theme.palette.secondary.main,
+                  transition: 'width 0.1s linear'
+                }} 
+              />
+            </Box>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  // Original full version
   return (
     <Box
       sx={{

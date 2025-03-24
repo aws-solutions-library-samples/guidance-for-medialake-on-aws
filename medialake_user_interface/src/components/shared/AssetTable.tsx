@@ -16,6 +16,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
+import { AssetAudio } from '../asset';
 
 export interface AssetTableProps<T> {
     data: T[];
@@ -29,6 +30,7 @@ export interface AssetTableProps<T> {
     getThumbnailUrl: (item: T) => string;
     getName: (item: T) => string;
     getId: (item: T) => string;
+    getAssetType?: (item: T) => string;
     editingId?: string;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -50,6 +52,7 @@ export function AssetTable<T>({
     getThumbnailUrl,
     getName,
     getId,
+    getAssetType = () => 'Image', // Default to Image if not provided
     editingId,
     editedName,
     onEditNameChange,
@@ -70,22 +73,47 @@ export function AssetTable<T>({
                 header: 'Preview',
                 size: 100,
                 enableSorting: false,
-                cell: info => (
-                    <Box sx={{ p: 1 }}>
-                        <Box
-                            component="img"
-                            src={info.getValue()}
-                            alt={getName(info.row.original)}
-                            sx={{
-                                width: 60,
-                                height: 60,
-                                objectFit: 'cover',
-                                borderRadius: 1,
-                                display: 'block'
-                            }}
-                        />
-                    </Box>
-                )
+                cell: info => {
+                    const assetType = getAssetType(info.row.original);
+                    
+                    if (assetType === 'Audio') {
+                        return (
+                            <Box sx={{ p: 1 }}>
+                                <Box
+                                    sx={{
+                                        width: 150,
+                                        height: 60,
+                                        borderRadius: 1,
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    <AssetAudio 
+                                        src={info.getValue()} 
+                                        alt={getName(info.row.original)}
+                                        compact={true}
+                                    />
+                                </Box>
+                            </Box>
+                        );
+                    }
+                    
+                    return (
+                        <Box sx={{ p: 1 }}>
+                            <Box
+                                component="img"
+                                src={info.getValue()}
+                                alt={getName(info.row.original)}
+                                sx={{
+                                    width: 60,
+                                    height: 60,
+                                    objectFit: 'cover',
+                                    borderRadius: 1,
+                                    display: 'block'
+                                }}
+                            />
+                        </Box>
+                    );
+                }
             }),
             ...visibleColumns.map(col => columnHelper.accessor(
                 row => col.accessorFn ? col.accessorFn(row) : (row as any)[col.id],

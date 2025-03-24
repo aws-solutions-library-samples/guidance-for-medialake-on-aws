@@ -137,7 +137,9 @@ const SearchPage: React.FC = () => {
 
     const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
-        navigate(`/${assetType}s/${asset.InventoryID}`, {
+        // Special case for audio to use singular form
+        const pathPrefix = assetType === 'audio' ? '/audio/' : `/${assetType}s/`;
+        navigate(`${pathPrefix}${asset.InventoryID}`, {
             state: { 
                 assetType: asset.DigitalSourceAsset.Type,
                 searchTerm: currentQuery
