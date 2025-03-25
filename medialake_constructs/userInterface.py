@@ -171,6 +171,7 @@ class UIConstruct(Construct):
                 "cloudWatchMetricsEnabled": True,
                 "metricName": "CloudFrontWAFMetrics",
             },
+            region="us-east-1",
             rules=[
                 {
                     "name": "AWSManagedRulesCommonRuleSet",

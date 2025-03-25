@@ -86,7 +86,8 @@ export default {
                 edit: 'Edit',
                 delete: 'Delete',
                 activate: 'Activate',
-                deactivate: 'Deactivate'
+                deactivate: 'Deactivate',
+                create: 'Create'
             },
             tableDensity: "Table Density",
             theme: "Theme",
@@ -127,7 +128,8 @@ export default {
             clearFilter: 'Clear Filter',
             columns: 'Columns',
             noGroups: 'No Groups',
-            create: 'Create'
+            select: 'Select',
+            moreInfo: 'More information'
         },
         users: {
             title: 'User Management',
@@ -182,9 +184,14 @@ export default {
             }
         },
         roles: {
+            title: 'Role Management',
+            description: 'Manage system roles and their permissions',
             admin: 'Admin',
             editor: 'Editor',
-            viewer: 'Viewer'
+            viewer: 'Viewer',
+            actions: {
+                addRole: 'Add Role'
+            }
         },
         columns: {
             username: 'Username',
@@ -386,6 +393,7 @@ export default {
             description: 'Manage your integrations and connections',
             addIntegration: 'Add Integration',
             selectIntegration: 'Select Integration',
+            selectProvider: 'Select Provider',
             configureIntegration: 'Configure Integration',
             columns: {
                 nodeName: 'Node Name',
@@ -397,13 +405,6 @@ export default {
             form: {
                 title: 'Add Integration',
                 fields: {
-                    enabled: {
-                        label: 'Enabled',
-                        tooltip: 'Enable or disable this integration',
-                        errors: {
-                            required: 'Enabled is required'
-                        }
-                    },
                     nodeId: {
                         label: 'Integration',
                         tooltip: 'Select an integration provider',
@@ -423,6 +424,13 @@ export default {
                         tooltip: 'Select the environment for this integration',
                         errors: {
                             required: 'Environment selection is required'
+                        }
+                    },
+                    enabled: {
+                        label: 'Enabled',
+                        tooltip: 'Enable or disable this integration',
+                        errors: {
+                            required: 'Enabled is required'
                         }
                     },
                     auth: {
@@ -470,7 +478,6 @@ export default {
                 delete: 'Delete Integration'
             },
             search: 'Search integrations...',
-            selectProvider: 'Select Provider',
             status: {
                 creating: 'Creating integration...',
                 created: 'Integration Created',
