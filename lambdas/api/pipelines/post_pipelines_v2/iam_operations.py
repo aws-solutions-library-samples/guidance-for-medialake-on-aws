@@ -34,46 +34,6 @@ def sanitize_role_name(name: str) -> str:
     return sanitized[:64]
 
 
-def create_iam_lambda_s3_dynamo_rw_policy():
-    """Create a policy document for Lambda to access S3 and DynamoDB."""
-    iam_lambda_s3_dynamo_rw_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "dynamodb:UpdateItem",
-                    "dynamodb:GetItem",
-                    "dynamodb:PutItem",
-                ],
-                "Resource": [f"{MEDIALAKE_ASSET_TABLE}"],
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["s3:GetObject", "s3:PutObject", "s3:PutObjectAcl"],
-                "Resource": [
-                    f"arn:aws:s3:::{MEDIA_ASSETS_BUCKET_NAME}/*",
-                    f"arn:aws:s3:::{MEDIA_ASSETS_BUCKET_NAME}",
-                ],
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["s3:GetObject"],
-                "Resource": [
-                    f"arn:aws:s3:::*",
-                    f"arn:aws:s3:::*/*",
-                ],
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "kms:Decrypt",
-                ],
-                "Resource": ["*"],
-            },
-        ],
-    }
-    return iam_lambda_s3_dynamo_rw_policy
 
 
 def wait_for_role_deletion(role_name: str, max_attempts: int = 40) -> None:
@@ -401,6 +361,7 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Resource": [
                     f"arn:aws:s3:::{os.environ['NODE_TEMPLATES_BUCKET']}/*",
                     f"arn:aws:s3:::{os.environ['IAC_ASSETS_BUCKET']}/*",
+                    f"arn:aws:s3:::{os.environ['EXTERNAL_PAYLOAD_BUCKET']}/*",
                 ],
             },
             {
@@ -424,7 +385,15 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Resource": [
                     f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{INGEST_EVENT_BUS_NAME}",
                 ],
-            }
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "kms:Decrypt",
+                    "kms:GenerateDataKey",
+                ],
+                "Resource": ["*"],
+            },
         ],
     }
 

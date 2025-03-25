@@ -73,10 +73,10 @@ class LambdaMiddleware:
         self.s3 = boto3.client("s3")
 
         # Set up large payload handling
-        self.large_payload_bucket = large_payload_bucket or os.environ.get("LARGE_PAYLOAD_BUCKET")
+        self.large_payload_bucket = large_payload_bucket or os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
         if not self.large_payload_bucket:
             raise ValueError(
-                "large_payload_bucket must be provided or LARGE_PAYLOAD_BUCKET environment variable must be set"
+                "large_payload_bucket must be provided or EXTERNAL_PAYLOAD_BUCKET environment variable must be set"
             )
 
         # Initialize Powertools utilities

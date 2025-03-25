@@ -346,7 +346,7 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
 
                 # Common environment variables for all Lambda functions
                 common_env_vars = {
-                    "LARGE_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
+                    "EXTERNAL_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
                     "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
                     "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
                 }

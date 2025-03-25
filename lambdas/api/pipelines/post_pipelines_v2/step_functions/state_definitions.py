@@ -72,10 +72,11 @@ class StateDefinitionFactory:
             configured_path = node.data.configuration["itemsPath"]
             logger.info(f"Using explicitly configured ItemsPath: {configured_path}")
             return configured_path
-            
-        # Always use $.payload.externalTaskResults for Map states
-        # This ensures compatibility with 12Labs and similar integrations
-        logger.info(f"Using $.payload.externalTaskResults as ItemsPath for Map node {node.id}")
+        
+        # We need to check for both externalPayloadLocation and externalTaskResults
+        # Since we can't use intrinsic functions directly in ItemsPath, we'll use a simple approach
+        # that works with Step Functions' limitations
+        logger.info(f"Using $.payload.externalTaskResults as default ItemsPath for Map node {node.id}")
         return "$.payload.externalTaskResults"
         
     def create_state_definitions(self, nodes: list, node_id_to_state_name: Dict[str, str],
@@ -131,8 +132,22 @@ class StateDefinitionFactory:
                     # Remove End: true if it exists, we'll set it later if needed
                     if "End" in state_def:
                         del state_def["End"]
+                    # Check if this state has additional states in metadata
+                    additional_states = {}
+                    if "__metadata__" in state_def and "additionalStates" in state_def["__metadata__"]:
+                        additional_states = state_def["__metadata__"]["additionalStates"]
+                        # Remove the metadata from the state definition
+                        del state_def["__metadata__"]
+                        logger.info(f"Found additional states for {state_name}: {list(additional_states.keys())}")
+                    
+                    # Add the main state
                     states[state_name] = state_def
                     logger.info(f"Created flow state for {state_name}: {state_def}")
+                    
+                    # Add any additional states
+                    for additional_state_name, additional_state_def in additional_states.items():
+                        states[additional_state_name] = additional_state_def
+                        logger.info(f"Added additional state {additional_state_name} for {state_name}")
                 except Exception as e:
                     logger.error(f"Failed to create flow state for node {state_name}: {e}")
                     continue
@@ -322,14 +337,25 @@ class StateDefinitionFactory:
                     # Connect to the previous state if this isn't the first one
                     if previous_state_name:
                         iterator_states[previous_state_name]["Next"] = processor_state_name
-                    
                     # Only mark the last state as End: true
                     if i == len(processor_chain) - 1:
                         processor_state["End"] = True
+                        logger.info(f"Marked processor state {processor_state_name} as End: true (last in chain)")
                     
                     iterator_states[processor_state_name] = processor_state
                     previous_state_name = processor_state_name
                 
+                # After the loop, ensure the last state has End: true
+                if iterator_states and previous_state_name:
+                    if "Next" in iterator_states[previous_state_name]:
+                        logger.warning(f"Last state {previous_state_name} in Iterator has Next, removing it and setting End: true")
+                        del iterator_states[previous_state_name]["Next"]
+                    
+                    if "End" not in iterator_states[previous_state_name]:
+                        logger.warning(f"Last state {previous_state_name} in Iterator missing End: true, adding it")
+                        iterator_states[previous_state_name]["End"] = True
+                
+                # Create the iterator with all the states
                 # Create the iterator with all the states
                 if iterator_states and first_state_name:
                     iterator = {
@@ -367,17 +393,62 @@ class StateDefinitionFactory:
             items_path = self._determine_items_path(node, previous_nodes)
             logger.info(f"Using ItemsPath {items_path} for Map node {node.id}")
             
-            state_def = {
-                "Type": "Map",
-                "ItemsPath": items_path,
-                "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
-                "Iterator": iterator,
-                "End": True,
-                # Add Parameters with InputPath to handle potential path mismatches
-                "Parameters": {
-                    "item.$": "$$.Map.Item.Value"
+            # Check if we need to handle both externalPayloadLocation and externalTaskResults
+            if node.data.configuration.get("supportExternalPayload", False):
+                logger.info(f"Creating Map state with support for externalPayloadLocation for node {node.id}")
+                
+                # Create a state definition that includes a Choice state to check for externalTaskResults
+                state_def = {
+                    "Type": "Choice",
+                    "Choices": [
+                        {
+                            "Variable": "$.payload.externalTaskResults",
+                            "IsPresent": True,
+                            "Next": f"{node.id}_Map"
+                        }
+                    ],
+                    "Default": f"{node.id}_StandardMap"
                 }
-            }
+                
+                # We'll need to add these states to the state machine later
+                # Store them as metadata in the state definition
+                state_def["__metadata__"] = {
+                    "additionalStates": {
+                        f"{node.id}_Map": {
+                            "Type": "Map",
+                            "ItemsPath": "$.payload.externalTaskResults",
+                            "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
+                            "Iterator": iterator,
+                            "End": True,
+                            "Parameters": {
+                                "item.$": "$$.Map.Item.Value"
+                            }
+                        },
+                        f"{node.id}_StandardMap": {
+                            "Type": "Map",
+                            "ItemsPath": "$.payload.externalTaskResults",
+                            "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
+                            "Iterator": iterator,
+                            "End": True,
+                            "Parameters": {
+                                "item.$": "$$.Map.Item.Value"
+                            }
+                        }
+                    }
+                }
+            else:
+                # Standard Map state without support for externalPayloadLocation
+                state_def = {
+                    "Type": "Map",
+                    "ItemsPath": items_path,
+                    "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
+                    "Iterator": iterator,
+                    "End": True,
+                    # Add Parameters with InputPath to handle potential path mismatches
+                    "Parameters": {
+                        "item.$": "$$.Map.Item.Value"
+                    }
+                }
         elif step_name == "pass":
             # Pass state
             result = node.data.configuration.get("result", None)

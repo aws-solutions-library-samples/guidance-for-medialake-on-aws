@@ -17,7 +17,7 @@ s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
+    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -60,17 +60,17 @@ def lambda_handler(event, context):
             
             logger.info("Found video proxy information in CheckMediaConvertStatusResult")
         
-        # If not found, try to extract from ImageProxyResult (for image)
+        # If not found, try to extract from ImageThumbnailResult (for image)
         
         if not s3_bucket or not s3_key:
-            image_proxy_result = (
+            image_thumbnail_result = (
                 event.get("detail", {})
                 .get("outputs", {})
-                .get("ImageProxyResult", {})
+                .get("ImageThumbnailResult", {})
             )
 
-            if image_proxy_result:
-                payload = image_proxy_result.get("Payload", {})
+            if image_thumbnail_result:
+                payload = image_thumbnail_result.get("Payload", {})
                 body = payload.get("body", {})
 
                 s3_bucket = (
@@ -83,7 +83,7 @@ def lambda_handler(event, context):
                     .get("FullPath")
                 )
 
-                logger.info("Found image proxy information in ImageProxyResult")
+                logger.info("Found image thumbnail information in ImageThumbnailResult")
 
         # ✅ If still not found, check for 'item' key (for audio chunks, etc.)
         if not s3_bucket or not s3_key:

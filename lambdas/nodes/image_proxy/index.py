@@ -135,8 +135,8 @@ def lambda_handler(event, context: LambdaContext):
             width = int(width)
             height = int(height)
             processed_img = create_thumbnail(img, width, height, crop)
-            output_format = "WEBP"
-            output_extension = "webp"
+            output_format = "PNG"
+            output_extension = "png"
         elif mode == "proxy":
             processed_img = create_proxy(img)
             width, height = img.size
@@ -151,12 +151,12 @@ def lambda_handler(event, context: LambdaContext):
         output_data = output_buffer.getvalue()
 
         if mode == "thumbnail":
-            content_type = "image/webp"
+            content_type = "image/png"
             asset_id = f"{asset_id}:thumbnail"
             new_representation = {
                 "ID": asset_id,
                 "Type": "Image",
-                "Format": "WEBP",
+                "Format": "PNG",
                 "Purpose": mode,
                 "StorageInfo": {
                     "PrimaryLocation": {
@@ -219,7 +219,7 @@ def lambda_handler(event, context: LambdaContext):
             "body": {
                 "ID": asset_id,
                 "type": "image",
-                "format": "WEBP" if mode == "thumbnail" else "PNG",
+                "format": "PNG" if mode == "thumbnail" else "PNG",
                 "Purpose": mode,
                 "StorageInfo": {
                     "PrimaryLocation": {

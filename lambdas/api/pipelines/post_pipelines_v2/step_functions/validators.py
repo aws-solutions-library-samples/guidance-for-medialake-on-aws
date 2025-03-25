@@ -189,12 +189,17 @@ class StateMachineValidator:
             if "Type" not in iter_state:
                 logger.error(f"State {iter_state_name} in Iterator of Map state {state_name} has no Type")
                 return False
+                # Check if Next points to a valid state in the Iterator
+                if "Next" in iter_state and iter_state["Next"] not in iterator["States"]:
+                    logger.error(f"Next in state {iter_state_name} of Iterator in Map state {state_name} points to non-existent state {iter_state['Next']}")
+                    return False
                 
-            # Check if Next points to a valid state in the Iterator
-            if "Next" in iter_state and iter_state["Next"] not in iterator["States"]:
-                logger.error(f"Next in state {iter_state_name} of Iterator in Map state {state_name} points to non-existent state {iter_state['Next']}")
-                return False
-                
+                # Check if state has either Next or End property (unless it's a terminal state)
+                if iter_state.get("Type") not in ["Succeed", "Fail"] and "Next" not in iter_state and "End" not in iter_state:
+                    logger.warning(f"State {iter_state_name} in Iterator of Map state {state_name} has neither Next nor End property, adding End: true")
+                    iter_state["End"] = True
+                    
+            # Check if Next exists and points to a valid state
         # Check if Next exists and points to a valid state
         if "Next" in state and state["Next"] not in states:
             logger.error(f"Next in Map state {state_name} points to non-existent state {state['Next']}")
@@ -214,6 +219,29 @@ class StateMachineValidator:
             state["Parameters"] = {
                 "item.$": "$$.Map.Item.Value"
             }
+        
+        # Ensure the last state in the Iterator has End: true
+        if "States" in iterator:
+            # Find the last state in the execution path
+            current_state = iterator.get("StartAt")
+            last_state = None
+            
+            while current_state:
+                last_state = current_state
+                current_state_def = iterator["States"].get(current_state, {})
+                current_state = current_state_def.get("Next")
+            
+            # If we found a last state, ensure it has End: true
+            if last_state and last_state in iterator["States"]:
+                last_state_def = iterator["States"][last_state]
+                if "Type" not in last_state_def or last_state_def.get("Type") not in ["Succeed", "Fail"]:
+                    if "Next" in last_state_def:
+                        logger.warning(f"Last state {last_state} in Iterator of Map state {state_name} has Next, removing it")
+                        del last_state_def["Next"]
+                    
+                    if "End" not in last_state_def:
+                        logger.warning(f"Last state {last_state} in Iterator of Map state {state_name} missing End: true, adding it")
+                        last_state_def["End"] = True
             
         return True
         
