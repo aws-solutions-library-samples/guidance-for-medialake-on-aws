@@ -78,6 +78,7 @@ class UIConstructProps:
     api_gateway_rest_id: str
     cognito_user_pool_id: str
     cognito_user_pool_client_id: str
+    cloudfront_waf_acl_arn: str
     cognito_identity_pool: str
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
@@ -161,72 +162,74 @@ class UIConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        self.user_interface_waf_acl = wafv2.CfnWebACL(
-            self,
-            "CloudFrontWAF",
-            default_action={"allow": {}},
-            scope="CLOUDFRONT",
-            visibility_config={
-                "sampledRequestsEnabled": True,
-                "cloudWatchMetricsEnabled": True,
-                "metricName": "CloudFrontWAFMetrics",
-            },
-            rules=[
-                {
-                    "name": "AWSManagedRulesCommonRuleSet",
-                    "priority": 1,
-                    "overrideAction": {"none": {}},
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesCommonRuleSet",
-                        }
-                    },
-                    "visibilityConfig": {
-                        "sampledRequestsEnabled": True,
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "AWSManagedRulesCommonRuleSetMetric",
-                    },
-                },
-                {
-                    "name": "AWSManagedRulesKnownBadInputsRuleSet",
-                    "priority": 2,
-                    "overrideAction": {"none": {}},
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesKnownBadInputsRuleSet",
-                        }
-                    },
-                    "visibilityConfig": {
-                        "sampledRequestsEnabled": True,
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "KnownBadInputsRuleSetMetric",
-                    },
-                },
-                {
-                    "name": "AWSManagedRulesSQLiRuleSet",
-                    "priority": 3,
-                    "overrideAction": {"none": {}},
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesSQLiRuleSet",
-                        }
-                    },
-                    "visibilityConfig": {
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "SQLiRuleSetMetric",
-                        "sampledRequestsEnabled": True,
-                    },
-                },
-            ],
-        )
+        # self.user_interface_waf_acl = wafv2.CfnWebACL(
+        #     self,
+        #     "CloudFrontWAF",
+        #     default_action={"allow": {}},
+        #     scope="CLOUDFRONT",
+        #     visibility_config={
+        #         "sampledRequestsEnabled": True,
+        #         "cloudWatchMetricsEnabled": True,
+        #         "metricName": "CloudFrontWAFMetrics",
+        #     },
+        #     rules=[
+        #         {
+        #             "name": "AWSManagedRulesCommonRuleSet",
+        #             "priority": 1,
+        #             "overrideAction": {"none": {}},
+        #             "statement": {
+        #                 "managedRuleGroupStatement": {
+        #                     "vendorName": "AWS",
+        #                     "name": "AWSManagedRulesCommonRuleSet",
+        #                 }
+        #             },
+        #             "visibilityConfig": {
+        #                 "sampledRequestsEnabled": True,
+        #                 "cloudWatchMetricsEnabled": True,
+        #                 "metricName": "AWSManagedRulesCommonRuleSetMetric",
+        #             },
+        #         },
+        #         {
+        #             "name": "AWSManagedRulesKnownBadInputsRuleSet",
+        #             "priority": 2,
+        #             "overrideAction": {"none": {}},
+        #             "statement": {
+        #                 "managedRuleGroupStatement": {
+        #                     "vendorName": "AWS",
+        #                     "name": "AWSManagedRulesKnownBadInputsRuleSet",
+        #                 }
+        #             },
+        #             "visibilityConfig": {
+        #                 "sampledRequestsEnabled": True,
+        #                 "cloudWatchMetricsEnabled": True,
+        #                 "metricName": "KnownBadInputsRuleSetMetric",
+        #             },
+        #         },
+        #         {
+        #             "name": "AWSManagedRulesSQLiRuleSet",
+        #             "priority": 3,
+        #             "overrideAction": {"none": {}},
+        #             "statement": {
+        #                 "managedRuleGroupStatement": {
+        #                     "vendorName": "AWS",
+        #                     "name": "AWSManagedRulesSQLiRuleSet",
+        #                 }
+        #             },
+        #             "visibilityConfig": {
+        #                 "cloudWatchMetricsEnabled": True,
+        #                 "metricName": "SQLiRuleSetMetric",
+        #                 "sampledRequestsEnabled": True,
+        #             },
+        #         },
+        #     ],
+        # )
 
+        
+        # Create a logging configuration for the WAF ACL
         self.user_interface_waf_logging_config = wafv2.CfnLoggingConfiguration(
             self,
             "WafLoggingConfig",
-            resource_arn=self.user_interface_waf_acl.attr_arn,
+            resource_arn=props.cloudfront_waf_acl_arn,
             log_destination_configs=[self.user_interface_waf_log_group.log_group_arn],
         )
 
@@ -406,7 +409,7 @@ class UIConstruct(Construct):
         self.cloudfront_distribution = cloudfront.Distribution(
             self,
             "MediaLakeDistrubtion",
-            web_acl_id=self.user_interface_waf_acl.attr_arn,
+            web_acl_id=props.cloudfront_waf_acl_arn,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=s3_orig,
                 response_headers_policy=ui_response_headers_policy,

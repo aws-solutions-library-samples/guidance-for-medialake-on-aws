@@ -7,6 +7,7 @@ import aws_cdk as cdk
 from cdk_logger import CDKLogger, get_logger
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from config import config
+from aws_cdk import aws_ssm as ssm
 
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
@@ -23,6 +24,7 @@ from medialake_stacks.pipeline_nodes_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
+from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
 # from medialake_stacks.monitoring_stack import MonitoringStack
 
 # Initialize global logger configuration
@@ -41,6 +43,7 @@ if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
 else:
     env = cdk.Environment(account=app.account, region=app.region)
 
+env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
 # Create Lambda warmer stack if enabled
 lambda_warmer = None
 if config.lambda_tail_warming:
@@ -135,6 +138,20 @@ pipeline_stack = PipelineStack(
     env=env,
 )
 
+# Create the CloudFront WAF stack in us-east-1
+cloudfront_waf_stack = CloudFrontWafStack(
+    app,
+    "MediaLakeCloudFrontWAF",
+    env=env_us_east_1,
+)
+
+# Get the SSM parameter name for the WAF ACL ARN
+waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
+
+# Look up the WAF ACL ARN from SSM
+# We need to import this explicitly at the top of the file
+from aws_cdk import aws_ssm as ssm
+
 user_interface_stack = UserInterfaceStack(
     app,
     "MediaLakeUserInterface",
@@ -144,10 +161,12 @@ user_interface_stack = UserInterfaceStack(
         cognito_identity_pool=api_gateway_stack.identity_pool,
         cognito_user_pool_arn=api_gateway_stack.user_pool_arn,
         api_gateway_rest_id=api_gateway_stack.rest_api.rest_api_id,
-        access_log_bucket=base_infrastructure.access_log_bucket
-),
+        access_log_bucket=base_infrastructure.access_log_bucket,
+        cloudfront_waf_acl_arn=waf_acl_ssm_param_name,  # Pass the parameter name instead
+    ),
     env=env,
 )
+
 # Create the monitoring stack
 # monitoring_stack = MonitoringStack(
 #     app,
@@ -179,6 +198,7 @@ cleanup_stack = CleanupStack(
 
 api_gateway_stack.add_dependency(asset_sync_stack)
 user_interface_stack.add_dependency(api_gateway_stack)
+user_interface_stack.add_dependency(cloudfront_waf_stack)
 
 cleanup_stack.add_dependency(api_gateway_stack)
 cleanup_stack.add_dependency(base_infrastructure)

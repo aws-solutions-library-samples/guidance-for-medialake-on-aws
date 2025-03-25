@@ -33,11 +33,11 @@ Parameters:
   NodejsVersion:
     Description: Node.js version to use for frontend
     Type: String
-    Default: 18
+    Default: 20
     AllowedValues:
-      - 16
       - 18
       - 20
+      - 22
   
   InitialUserEmail:
     Description: Initial Cognito user email
@@ -189,6 +189,8 @@ Resources:
   # S3 Bucket for Artifacts
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       VersioningConfiguration:
         Status: Enabled
@@ -197,6 +199,13 @@ Resources:
           - Id: DeleteOldArtifacts
             Status: Enabled
             ExpirationInDays: 30
+          - Id: CleanupBeforeDeletion
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+            ExpiredObjectDeleteMarker: true
 
   # Initial source package for S3-based pipeline
   InitialSourcePackage:
@@ -448,7 +457,15 @@ Resources:
               commands:
                 - echo Deploying CDK stacks
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                # - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                # Bootstrap current region
+                - cdk bootstrap
+                # Also bootstrap us-east-1 if we're not already in that region
+                - |
+                  if [ "${AWS::Region}" != "us-east-1" ]; then
+                    echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"
+                    cdk bootstrap aws://${AWS::AccountId}/us-east-1
+                  fi
+                # Deploy all stacks
                 - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
             post_build:
               commands:
@@ -581,6 +598,102 @@ Resources:
                 ProjectName: !Ref DeployProject
               InputArtifacts:
                 - Name: BuildOutput
+
+  # Custom resource to empty the S3 bucket on deletion
+  S3BucketCleanup:
+    Type: Custom::S3BucketCleanup
+    Properties:
+      ServiceToken: !GetAtt S3BucketCleanupFunction.Arn
+      BucketName: !Ref ArtifactBucket
+
+  S3BucketCleanupFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ArtifactBucket
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt S3BucketCleanupRole.Arn
+      Runtime: python3.12
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          import logging
+          
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          def delete_bucket_contents(bucket_name):
+              """Delete all objects and object versions from the bucket"""
+              try:
+                  s3 = boto3.resource('s3')
+                  bucket = s3.Bucket(bucket_name)
+                  
+                  # Delete all object versions
+                  logger.info(f"Deleting all object versions from {bucket_name}")
+                  bucket.object_versions.all().delete()
+                  
+                  # Delete all objects (in case versioning is not enabled)
+                  logger.info(f"Deleting all objects from {bucket_name}")
+                  bucket.objects.all().delete()
+                  
+                  return True
+              except Exception as e:
+                  logger.error(f"Error emptying bucket {bucket_name}: {str(e)}")
+                  return False
+          
+          def handler(event, context):
+              logger.info(f"Received event: {json.dumps(event)}")
+              
+              # Extract the bucket name from the event
+              bucket_name = event['ResourceProperties']['BucketName']
+              response_data = {}
+              
+              if event['RequestType'] == 'Delete':
+                  logger.info(f"Emptying bucket {bucket_name}")
+                  success = delete_bucket_contents(bucket_name)
+                  
+                  if success:
+                      logger.info(f"Successfully emptied bucket {bucket_name}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  else:
+                      logger.error(f"Failed to empty bucket {bucket_name}")
+                      cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+              else:
+                  # For Create and Update events, just succeed
+                  logger.info(f"No action needed for {event['RequestType']} event")
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+  S3BucketCleanupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: S3BucketCleanupPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:ListBucket'
+                  - 's3:ListBucketVersions'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}'
+              - Effect: Allow
+                Action:
+                  - 's3:DeleteObject'
+                  - 's3:DeleteObjectVersion'
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
 Outputs:
   PipelineUrl:

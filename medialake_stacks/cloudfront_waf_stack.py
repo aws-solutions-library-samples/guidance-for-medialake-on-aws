@@ -1,0 +1,73 @@
+from aws_cdk import Stack, Environment, aws_wafv2 as wafv2, aws_ssm as ssm, CfnOutput
+from constructs import Construct
+
+
+class CloudFrontWafStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs):
+        # Always use us-east-1 for CloudFront WAF, regardless of the app's default region
+        # env = Environment(account=scope.account, region="us-east-1")
+        
+        super().__init__(scope, construct_id, **kwargs)
+
+        self.web_acl = wafv2.CfnWebACL(
+            self,
+            "CloudFrontWAF",
+            default_action={"allow": {}},
+            scope="CLOUDFRONT",
+            visibility_config={
+                "sampledRequestsEnabled": True,
+                "cloudWatchMetricsEnabled": True,
+                "metricName": "CloudFrontWAFMetrics",
+            },
+            rules=[
+                {
+                    "name": "AWSManagedRulesCommonRuleSet",
+                    "priority": 1,
+                    "overrideAction": {"none": {}},
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesCommonRuleSet",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "AWSManagedRulesCommonRuleSetMetric",
+                    },
+                },
+                {
+                    "name": "AWSManagedRulesKnownBadInputsRuleSet",
+                    "priority": 2,
+                    "overrideAction": {"none": {}},
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesKnownBadInputsRuleSet",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "KnownBadInputsRuleSetMetric",
+                    },
+                },
+            ],
+        ) 
+        
+        # Store WAF ACL ARN in SSM Parameter Store for cross-region access
+        self.waf_acl_parameter = ssm.StringParameter(
+            self,
+            "CloudFrontWafAclArnParam",
+            parameter_name="/medialake/cloudfront-waf-acl-arn",
+            string_value=self.web_acl.attr_arn,
+            description="ARN of the CloudFront WAF ACL"
+        )
+        
+        # Output the WAF ACL ARN for reference
+        CfnOutput(
+            self,
+            "CloudFrontWafAclArn",
+            value=self.web_acl.attr_arn,
+            description="ARN of the CloudFront WAF ACL",
+        ) 

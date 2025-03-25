@@ -312,7 +312,7 @@ class BaseInfrastructureStack(Stack):
             props=EventBusConfig(
                 bus_name=f"{config.resource_prefix}-ingest-{region}-{config.environment}",
                 description="event bus",
-                log_all=True,
+                log_all=False,
             ),
         )
 
@@ -323,7 +323,7 @@ class BaseInfrastructureStack(Stack):
             props=EventBusConfig(
                 bus_name=f"{config.resource_prefix}-application-service-events-internal-{region}-{config.environment}",
                 description=f"{config.resource_prefix} application service events for internal use",
-                log_all=True,
+                log_all=False,
             ),
         )
 
@@ -333,7 +333,7 @@ class BaseInfrastructureStack(Stack):
             props=EventBusConfig(
                 bus_name=f"{config.resource_prefix}-application-service-events-external-{region}-{config.environment}",
                 description=f"{config.resource_prefix} application service events for external use",
-                log_all=True,
+                log_all=False,
             ),
         )
         
