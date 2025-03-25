@@ -1,711 +1,711 @@
-// VideoViewer.tsx
-import React, {
-    useEffect,
-    useRef,
-    useCallback,
-    useState,
-    FC,
-    SyntheticEvent,
-    useMemo,
-} from 'react';
-import {MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker} from '@byomakase/omakase-player';
-import {SCRUBBER_LANE_STYLE, SCRUBBER_LANE_STYLE_DARK, TIMELINE_LANE_STYLE, TIMELINE_LANE_STYLE_DARK, TIMELINE_STYLE, TIMELINE_STYLE_DARK,PERIOD_MARKER_STYLE} from './OmakaseTimeLineConstants';
-import { Tooltip, IconButton, Stack, Slider, Box, Typography, Paper } from '@mui/material'
+// // VideoViewer.tsx
+// import React, {
+//     useEffect,
+//     useRef,
+//     useCallback,
+//     useState,
+//     FC,
+//     SyntheticEvent,
+//     useMemo,
+// } from 'react';
+// import {MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker} from '@byomakase/omakase-player';
+// import {SCRUBBER_LANE_STYLE, SCRUBBER_LANE_STYLE_DARK, TIMELINE_LANE_STYLE, TIMELINE_LANE_STYLE_DARK, TIMELINE_STYLE, TIMELINE_STYLE_DARK,PERIOD_MARKER_STYLE} from './OmakaseTimeLineConstants';
+// import { Tooltip, IconButton, Stack, Slider, Box, Typography, Paper } from '@mui/material'
 
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import "./VideoViewer.css";
+// import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+// import PauseIcon from '@mui/icons-material/Pause';
+// import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+// import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+// import FullscreenIcon from '@mui/icons-material/Fullscreen';
+// import "./VideoViewer.css";
 
-import {filter} from 'rxjs';
-import {randomHexColor} from './utils';
-
-
-
-export interface VideoViewerProps {
-    videoSrc: string;
-    onClickEvent?: () => void;
-    onPlay?: () => void;
-    onPause?: () => void;
-    onSeek?: (time: number) => void;
-    onVolumeChange?: (volume: number) => void;
-    onMute?: () => void;
-    onUnmute?: () => void;
-    onPlaybackRateChange?: (rate: number) => void;
-    onFullscreenChange?: (isFullscreen: boolean) => void;
-    onRemoveSafeZone?: (id: string) => void;
-    onClearSafeZones?: () => void;
-    onBuffering?: () => void;
-    onEnded?: () => void;
-    onError?: (error: any) => void;
-    onTimeUpdate?: (time: number) => void;
-    showThumbnails?: boolean;
-}
-
-/**
- * A custom hook that creates and manages the OmakasePlayer instance.
- * (Here we also add local state for currentTime and duration.)
- */
-const useOmakasePlayer = (
-    videoSrc: string,
-    containerRef: React.RefObject<HTMLDivElement>,
-    callbacks: Partial<VideoViewerProps>
-) => {
-    const playerRef = useRef<OmakasePlayer | null>(null);
-    const [playerVolume, setPlayerVolume] = useState(1); // 1 is full volume
-
-    // We'll store the incoming callbacks in a ref so that changes to these
-    // callbacks do NOT trigger re-initialization of the player:
-    const callbacksRef = useRef(callbacks);
-    useEffect(() => {
-        callbacksRef.current = callbacks;
-    }, [callbacks]);
-
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
-    //Define functions for omakase timeline
-    let createTimelineLanes = () => {
-        markerLane1();
-        }
-    let markerLane1 = () => {
-        let markerLane = new MarkerLane({
-            style: {
-                ...TIMELINE_STYLE_DARK
-            },
-        });
-        console.log("markerLane1");
-    }
-
-    const initializePlayer = useCallback(() => {
-
-        if (!containerRef.current) return;
-
-        // Create the OmakasePlayer only once per videoSrc/containerRef change:
-        const player = new OmakasePlayer({
-            playerHTMLElementId: containerRef.current.id,
-            // mediaChrome: 'disabled'
-        });
-        playerRef.current = player;
-        player.createTimeline({
-            timelineHTMLElementId: 'omakase-timeline',
-            style:{
-                ...TIMELINE_STYLE_DARK
-            },
-            zoomWheelEnabled: false
-        }).subscribe((timelineApi) => {
-            console.log('Timeline criada');
-            let scrubberLane = timelineApi.getScrubberLane();
-            scrubberLane.style = {
-              ...SCRUBBER_LANE_STYLE_DARK
-            };
-          });
-
-        const subscriptions = [
-            player.loadVideo(videoSrc, 25).subscribe({
-                next: (video) => {
-                    console.log(
-                        `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`
-                    );
-                    setDuration(video.duration);
-                },
-                error: (error) => {
-                    console.error('Error loading video:', error);
-                    callbacksRef.current.onError?.(error);
-                },
-                complete: () => {
-                    console.log('Video loading completed');
-                },
-            }),
-            player.video.onPlay$.subscribe({
-                next: (event) => {
-                    console.log(`Video play. Timestamp: ${event.currentTime}`);
-                    callbacksRef.current.onPlay?.();
-                },
-            }),
-            player.video.onPause$.subscribe({
-                next: (event) => {
-                    console.log(`Video pause. Timestamp: ${event.currentTime}`);
-                    callbacksRef.current.onPause?.();
-                },
-            }),
-            player.video.onSeeked$.subscribe({
-                next: (event) => {
-                    console.log(`Video seeked. Timestamp: ${event.currentTime}`);
-                    callbacksRef.current.onSeek?.(event.currentTime);
-                },
-            }),
-            player.video.onBuffering$.subscribe({
-                next: () => {
-                    console.log('Video buffering');
-                    callbacksRef.current.onBuffering?.();
-                },
-            }),
-            player.video.onEnded$.subscribe({
-                next: () => {
-                    console.log('Video ended');
-                    callbacksRef.current.onEnded?.();
-                },
-            }),
-            player.video.onFullscreenChange$.subscribe({
-                next: (event) => {
-                    // If you wish, forward fullscreen changes:
-                    // callbacksRef.current.onFullscreenChange?.(event.isFullscreen);
-                },
-            }),
-            player.video.onVolumeChange$.subscribe({
-                next: (event) => {
-                    const newVolume = Math.round(event.volume * 100);
-                    console.log(`Volume changed: ${newVolume}`);
-                    setPlayerVolume(event.volume);
-                    callbacksRef.current.onVolumeChange?.(newVolume);
-                },
-            }),
-            player.video.onVideoTimeChange$.subscribe({
-                next: (event) => {
-                    setCurrentTime(event.currentTime);
-                    callbacksRef.current.onTimeUpdate?.(event.currentTime);
-                },
-            }),
-            player.video.onVideoError$.subscribe({
-                next: (error) => {
-                    console.error('Video error:', error);
-                    callbacksRef.current.onError?.(error);
-                },
-            }),
-
-        ];
-        player.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
-            next: (video) => {
-              createTimelineLanes();
-            }
-          })
-            //Define functions for omakase timeline
-        let createTimelineLanes = () => {
-            markerLane1();
-            }
-        let markerLane1 = () => {
-            let markerLane = new MarkerLane({
-                style: {
-                    ...TIMELINE_STYLE_DARK
-                },
-            });
-            player.timeline!.addTimelineLane(markerLane)
-            let periodMarker = new PeriodMarker({
-                timeObservation: {
-                  start: 200,
-                  end: 200 + 100,
-                },
-                editable: true,
-                style:{
-                    ...PERIOD_MARKER_STYLE
-                }
-              })
-            markerLane.addMarker(periodMarker);
-            periodMarker.onChange$.subscribe({
-                next: (event) => {
-                  console.log('period marker changed', event);
-                }
-              })
-            periodMarker.onMouseEnter$.subscribe({
-            next: (event) => {
-                console.log('period marker Hover', event);
-            }
-            })
-        }
+// import {filter} from 'rxjs';
+// import {randomHexColor} from './utils';
 
 
-        return () => {
-            // Clean up subscriptions and the player on unmount or when videoSrc changes
-            subscriptions.forEach((subscription) => subscription.unsubscribe());
-            // If you need to fully remove the player from the DOM, do:
-            // player.destroy();
-            playerRef.current = null;
-        };
-    }, [videoSrc, containerRef]);
-    // Note: We do NOT include `callbacks` in dependency array, to avoid re-init.
 
-    useEffect(() => {
-        const cleanup = initializePlayer();
-        return cleanup;
-    }, [initializePlayer]);
+// export interface VideoViewerProps {
+//     videoSrc: string;
+//     onClickEvent?: () => void;
+//     onPlay?: () => void;
+//     onPause?: () => void;
+//     onSeek?: (time: number) => void;
+//     onVolumeChange?: (volume: number) => void;
+//     onMute?: () => void;
+//     onUnmute?: () => void;
+//     onPlaybackRateChange?: (rate: number) => void;
+//     onFullscreenChange?: (isFullscreen: boolean) => void;
+//     onRemoveSafeZone?: (id: string) => void;
+//     onClearSafeZones?: () => void;
+//     onBuffering?: () => void;
+//     onEnded?: () => void;
+//     onError?: (error: any) => void;
+//     onTimeUpdate?: (time: number) => void;
+//     showThumbnails?: boolean;
+// }
 
-    // Player control methods:
-    const play = useCallback(() => {
-        playerRef.current?.video.play();
-    }, []);
+// /**
+//  * A custom hook that creates and manages the OmakasePlayer instance.
+//  * (Here we also add local state for currentTime and duration.)
+//  */
+// const useOmakasePlayer = (
+//     videoSrc: string,
+//     containerRef: React.RefObject<HTMLDivElement>,
+//     callbacks: Partial<VideoViewerProps>
+// ) => {
+//     const playerRef = useRef<OmakasePlayer | null>(null);
+//     const [playerVolume, setPlayerVolume] = useState(1); // 1 is full volume
 
-    const pause = useCallback(() => {
-        playerRef.current?.video.pause();
-    }, []);
+//     // We'll store the incoming callbacks in a ref so that changes to these
+//     // callbacks do NOT trigger re-initialization of the player:
+//     const callbacksRef = useRef(callbacks);
+//     useEffect(() => {
+//         callbacksRef.current = callbacks;
+//     }, [callbacks]);
 
-    const seek = useCallback((time: number) => {
-        playerRef.current?.video.seekToTime(time);
-    }, []);
+//     const [duration, setDuration] = useState(0);
+//     const [currentTime, setCurrentTime] = useState(0);
+//     //Define functions for omakase timeline
+//     let createTimelineLanes = () => {
+//         markerLane1();
+//         }
+//     let markerLane1 = () => {
+//         let markerLane = new MarkerLane({
+//             style: {
+//                 ...TIMELINE_STYLE_DARK
+//             },
+//         });
+//         console.log("markerLane1");
+//     }
 
-    const setVolume = useCallback((volume: number) => {
-        const newVolume = volume / 100;
-        playerRef.current?.video.setVolume(newVolume);
-        setPlayerVolume(newVolume);
-    }, []);
+//     const initializePlayer = useCallback(() => {
 
-    const mute = useCallback(() => {
-        playerRef.current?.video.mute();
-    }, []);
+//         if (!containerRef.current) return;
 
-    const unmute = useCallback(() => {
-        playerRef.current?.video.unmute();
-    }, []);
+//         // Create the OmakasePlayer only once per videoSrc/containerRef change:
+//         const player = new OmakasePlayer({
+//             playerHTMLElementId: containerRef.current.id,
+//             // mediaChrome: 'disabled'
+//         });
+//         playerRef.current = player;
+//         player.createTimeline({
+//             timelineHTMLElementId: 'omakase-timeline',
+//             style:{
+//                 ...TIMELINE_STYLE_DARK
+//             },
+//             zoomWheelEnabled: false
+//         }).subscribe((timelineApi) => {
+//             console.log('Timeline criada');
+//             let scrubberLane = timelineApi.getScrubberLane();
+//             scrubberLane.style = {
+//               ...SCRUBBER_LANE_STYLE_DARK
+//             };
+//           });
 
-    const setPlaybackRate = useCallback((rate: number) => {
-        playerRef.current?.video.setPlaybackRate(rate);
-    }, []);
+//         const subscriptions = [
+//             player.loadVideo(videoSrc, 25).subscribe({
+//                 next: (video) => {
+//                     console.log(
+//                         `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`
+//                     );
+//                     setDuration(video.duration);
+//                 },
+//                 error: (error) => {
+//                     console.error('Error loading video:', error);
+//                     callbacksRef.current.onError?.(error);
+//                 },
+//                 complete: () => {
+//                     console.log('Video loading completed');
+//                 },
+//             }),
+//             player.video.onPlay$.subscribe({
+//                 next: (event) => {
+//                     console.log(`Video play. Timestamp: ${event.currentTime}`);
+//                     callbacksRef.current.onPlay?.();
+//                 },
+//             }),
+//             player.video.onPause$.subscribe({
+//                 next: (event) => {
+//                     console.log(`Video pause. Timestamp: ${event.currentTime}`);
+//                     callbacksRef.current.onPause?.();
+//                 },
+//             }),
+//             player.video.onSeeked$.subscribe({
+//                 next: (event) => {
+//                     console.log(`Video seeked. Timestamp: ${event.currentTime}`);
+//                     callbacksRef.current.onSeek?.(event.currentTime);
+//                 },
+//             }),
+//             player.video.onBuffering$.subscribe({
+//                 next: () => {
+//                     console.log('Video buffering');
+//                     callbacksRef.current.onBuffering?.();
+//                 },
+//             }),
+//             player.video.onEnded$.subscribe({
+//                 next: () => {
+//                     console.log('Video ended');
+//                     callbacksRef.current.onEnded?.();
+//                 },
+//             }),
+//             player.video.onFullscreenChange$.subscribe({
+//                 next: (event) => {
+//                     // If you wish, forward fullscreen changes:
+//                     // callbacksRef.current.onFullscreenChange?.(event.isFullscreen);
+//                 },
+//             }),
+//             player.video.onVolumeChange$.subscribe({
+//                 next: (event) => {
+//                     const newVolume = Math.round(event.volume * 100);
+//                     console.log(`Volume changed: ${newVolume}`);
+//                     setPlayerVolume(event.volume);
+//                     callbacksRef.current.onVolumeChange?.(newVolume);
+//                 },
+//             }),
+//             player.video.onVideoTimeChange$.subscribe({
+//                 next: (event) => {
+//                     setCurrentTime(event.currentTime);
+//                     callbacksRef.current.onTimeUpdate?.(event.currentTime);
+//                 },
+//             }),
+//             player.video.onVideoError$.subscribe({
+//                 next: (error) => {
+//                     console.error('Video error:', error);
+//                     callbacksRef.current.onError?.(error);
+//                 },
+//             }),
 
-    const toggleFullscreen = useCallback(() => {
-        playerRef.current?.video.toggleFullscreen();
-    }, []);
+//         ];
+//         player.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
+//             next: (video) => {
+//               createTimelineLanes();
+//             }
+//           })
+//             //Define functions for omakase timeline
+//         let createTimelineLanes = () => {
+//             markerLane1();
+//             }
+//         let markerLane1 = () => {
+//             let markerLane = new MarkerLane({
+//                 style: {
+//                     ...TIMELINE_STYLE_DARK
+//                 },
+//             });
+//             player.timeline!.addTimelineLane(markerLane)
+//             let periodMarker = new PeriodMarker({
+//                 timeObservation: {
+//                   start: 200,
+//                   end: 200 + 100,
+//                 },
+//                 editable: true,
+//                 style:{
+//                     ...PERIOD_MARKER_STYLE
+//                 }
+//               })
+//             markerLane.addMarker(periodMarker);
+//             periodMarker.onChange$.subscribe({
+//                 next: (event) => {
+//                   console.log('period marker changed', event);
+//                 }
+//               })
+//             periodMarker.onMouseEnter$.subscribe({
+//             next: (event) => {
+//                 console.log('period marker Hover', event);
+//             }
+//             })
+//         }
 
 
-    const removeSafeZone = useCallback(
-        (id: string) => {
-            playerRef.current?.video.removeSafeZone(id).subscribe({
-                next: () => {
-                    console.log('Safe zone removed:', id);
-                    callbacksRef.current.onRemoveSafeZone?.(id);
-                },
-                error: (error) => {
-                    console.error('Error removing safe zone:', error);
-                },
-            });
-        },
-        []
-    );
+//         return () => {
+//             // Clean up subscriptions and the player on unmount or when videoSrc changes
+//             subscriptions.forEach((subscription) => subscription.unsubscribe());
+//             // If you need to fully remove the player from the DOM, do:
+//             // player.destroy();
+//             playerRef.current = null;
+//         };
+//     }, [videoSrc, containerRef]);
+//     // Note: We do NOT include `callbacks` in dependency array, to avoid re-init.
 
-    const clearSafeZones = useCallback(() => {
-        playerRef.current?.video.clearSafeZones().subscribe({
-            next: () => {
-                console.log('All safe zones cleared');
-                callbacksRef.current.onClearSafeZones?.();
-            },
-            error: (error) => {
-                console.error('Error clearing safe zones:', error);
-            },
-        });
-    }, []);
+//     useEffect(() => {
+//         const cleanup = initializePlayer();
+//         return cleanup;
+//     }, [initializePlayer]);
 
-    return {
-        play,
-        pause,
-        seek,
-        setVolume,
-        mute,
-        unmute,
-        setPlaybackRate,
-        toggleFullscreen,
-        removeSafeZone,
-        clearSafeZones,
-        currentTime,
-        duration,
-        setCurrentTime,
-    };
-};
+//     // Player control methods:
+//     const play = useCallback(() => {
+//         playerRef.current?.video.play();
+//     }, []);
 
-/**
- * A custom value label component for the seek slider.
- * It shows a thumbnail image based on the current slider value.
- */
-function ThumbLabel(props: any) {
-    const { children, open, value, showThumbnails = true } = props;
-    const lastValueRef = useRef(value);
-    const [thumbnailUrl, setThumbnailUrl] = useState(() => getThumbnailForTime(value));
-    const timeoutRef = useRef<NodeJS.Timeout>();
+//     const pause = useCallback(() => {
+//         playerRef.current?.video.pause();
+//     }, []);
 
-    useEffect(() => {
-        lastValueRef.current = value;
+//     const seek = useCallback((time: number) => {
+//         playerRef.current?.video.seekToTime(time);
+//     }, []);
 
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
+//     const setVolume = useCallback((volume: number) => {
+//         const newVolume = volume / 100;
+//         playerRef.current?.video.setVolume(newVolume);
+//         setPlayerVolume(newVolume);
+//     }, []);
 
-        timeoutRef.current = setTimeout(() => {
-            if (lastValueRef.current === value) {
-                setThumbnailUrl(getThumbnailForTime(value));
-            }
-        }, 50); // 50ms debounce for smoother updates
+//     const mute = useCallback(() => {
+//         playerRef.current?.video.mute();
+//     }, []);
 
-        return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
-        };
-    }, [value]);
+//     const unmute = useCallback(() => {
+//         playerRef.current?.video.unmute();
+//     }, []);
 
-    return (
-        <Tooltip
-            open={open && showThumbnails}
-            title={
-                showThumbnails ? (
-                    <img
-                        src={thumbnailUrl}
-                        alt={`Thumbnail at ${value}`}
-                        style={{ width: 100, display: 'block' }}
-                    />
-                ) : value.toFixed(1)
-            }
-            placement="top"
-        >
-            {children}
-        </Tooltip>
-    );
-}
+//     const setPlaybackRate = useCallback((rate: number) => {
+//         playerRef.current?.video.setPlaybackRate(rate);
+//     }, []);
 
-/**
- * A dummy function to simulate obtaining a thumbnail URL for a given time.
- * Replace this with your real thumbnail extraction from a VTT file.
- */
-function getThumbnailForTime(time: number): string {
-    const hours = Math.floor(time / 3600);
-    const minutes = Math.floor((time % 3600) / 60);
-    const seconds = Math.floor(time % 60);
-    const frames = Math.floor((time % 1) * 25); // Using 25 fps as per loadVideo config
+//     const toggleFullscreen = useCallback(() => {
+//         playerRef.current?.video.toggleFullscreen();
+//     }, []);
 
-    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-    return `https://placehold.co/100x56/black/white?text=${timeString}`;
-}
 
-/**
- * The VideoViewer component renders the video container (which OmakasePlayer uses)
- * and a custom control bar below it.
- */
-export const VideoViewer: FC<VideoViewerProps> = ({
-    videoSrc,
-    onClickEvent,
-    onPlay,
-    onPause,
-    onSeek,
-    onVolumeChange,
-    onMute,
-    onUnmute,
-    onPlaybackRateChange,
-    onFullscreenChange,
-    onRemoveSafeZone,
-    onClearSafeZones,
-    onBuffering,
-    onEnded,
-    onError,
-    onTimeUpdate,
-    showThumbnails = false,
-}) => {
-    const playerContainerRef = useRef<HTMLDivElement>(null);
+//     const removeSafeZone = useCallback(
+//         (id: string) => {
+//             playerRef.current?.video.removeSafeZone(id).subscribe({
+//                 next: () => {
+//                     console.log('Safe zone removed:', id);
+//                     callbacksRef.current.onRemoveSafeZone?.(id);
+//                 },
+//                 error: (error) => {
+//                     console.error('Error removing safe zone:', error);
+//                 },
+//             });
+//         },
+//         []
+//     );
 
-    // Local state to track whether the video is playing, the volume level, and mute status.
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [volume, setVolumeState] = useState(100);
-    const [muted, setMuted] = useState(false);
-    const [isSmtpeFormat, setIsSmtpeFormat] = useState(true);
-    const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+//     const clearSafeZones = useCallback(() => {
+//         playerRef.current?.video.clearSafeZones().subscribe({
+//             next: () => {
+//                 console.log('All safe zones cleared');
+//                 callbacksRef.current.onClearSafeZones?.();
+//             },
+//             error: (error) => {
+//                 console.error('Error clearing safe zones:', error);
+//             },
+//         });
+//     }, []);
 
-    // Define callbacks that update local state, then call the parent props:
-    const customCallbacks = useMemo<Partial<VideoViewerProps>>(
-        () => ({
-            onPlay: () => {
-                setIsPlaying(true);
-                onPlay?.();
-            },
-            onPause: () => {
-                setIsPlaying(false);
-                onPause?.();
-            },
-            onSeek,
-            onVolumeChange: (vol: number) => {
-                setVolumeState(vol);
-                onVolumeChange?.(vol);
-            },
-            onBuffering,
-            onEnded,
-            onError,
-            onTimeUpdate: (time: number) => {
-                onTimeUpdate?.(time);
-            },
-        }),
-        [
-            onPlay,
-            onPause,
-            onSeek,
-            onVolumeChange,
-            onBuffering,
-            onEnded,
-            onError,
-            onTimeUpdate,
-        ]
-    );
+//     return {
+//         play,
+//         pause,
+//         seek,
+//         setVolume,
+//         mute,
+//         unmute,
+//         setPlaybackRate,
+//         toggleFullscreen,
+//         removeSafeZone,
+//         clearSafeZones,
+//         currentTime,
+//         duration,
+//         setCurrentTime,
+//     };
+// };
 
-    // Hook that manages the OmakasePlayer lifecycle
-    const {
-        play,
-        pause,
-        seek,
-        setVolume: setPlayerVolume,
-        mute,
-        unmute,
-        toggleFullscreen,
-        removeSafeZone,
-        clearSafeZones,
-        currentTime,
-        duration,
-        setCurrentTime,
-    } = useOmakasePlayer(videoSrc, playerContainerRef, customCallbacks);
+// /**
+//  * A custom value label component for the seek slider.
+//  * It shows a thumbnail image based on the current slider value.
+//  */
+// function ThumbLabel(props: any) {
+//     const { children, open, value, showThumbnails = true } = props;
+//     const lastValueRef = useRef(value);
+//     const [thumbnailUrl, setThumbnailUrl] = useState(() => getThumbnailForTime(value));
+//     const timeoutRef = useRef<NodeJS.Timeout>();
 
-    // Handlers for UI controls:
-    const handlePlayPause = () => {
-        if (isPlaying) {
-            pause();
-        } else {
-            play();
-        }
-    };
+//     useEffect(() => {
+//         lastValueRef.current = value;
 
-    const handleSeekChange = (_: Event, newValue: number | number[]) => {
-        if (typeof newValue === 'number') {
-            setCurrentTime(newValue);
-        }
-    };
+//         if (timeoutRef.current) {
+//             clearTimeout(timeoutRef.current);
+//         }
 
-    const handleSeekCommitted = (
-        _: Event | SyntheticEvent,
-        newValue: number | number[]
-    ) => {
-        if (typeof newValue === 'number') {
-            seek(newValue);
-        }
-    };
-    const handleVolumeChange = (event: Event, newValue: number | number[]) => {
-        if (typeof newValue === 'number') {
-            setPlayerVolume(newValue);
-            setVolumeState(newValue);
-            setMuted(newValue === 0);
-        }
-    };
+//         timeoutRef.current = setTimeout(() => {
+//             if (lastValueRef.current === value) {
+//                 setThumbnailUrl(getThumbnailForTime(value));
+//             }
+//         }, 50); // 50ms debounce for smoother updates
 
-    const handleMuteToggle = () => {
-        if (muted) {
-            unmute();
-            setPlayerVolume(volume);
-            setMuted(false);
-            onUnmute?.();
-        } else {
-            mute();
-            setPlayerVolume(0);
-            setMuted(true);
-            onMute?.();
-        }
-    };
+//         return () => {
+//             if (timeoutRef.current) {
+//                 clearTimeout(timeoutRef.current);
+//             }
+//         };
+//     }, [value]);
 
-    const handleFullscreenToggle = () => {
-        toggleFullscreen();
-        // If you'd like to track actual fullscreen state, you'd do it in onFullscreenChange:
-        onFullscreenChange?.(true);
-    };
+//     return (
+//         <Tooltip
+//             open={open && showThumbnails}
+//             title={
+//                 showThumbnails ? (
+//                     <img
+//                         src={thumbnailUrl}
+//                         alt={`Thumbnail at ${value}`}
+//                         style={{ width: 100, display: 'block' }}
+//                     />
+//                 ) : value.toFixed(1)
+//             }
+//             placement="top"
+//         >
+//             {children}
+//         </Tooltip>
+//     );
+// }
 
-    // A helper to format seconds into either SMPTE timecode (HH:MM:SS:FF) or HH:MM:SS
-    const formatTime = (time: number): string => {
-        const hours = Math.floor(time / 3600);
-        const minutes = Math.floor((time % 3600) / 60);
-        const seconds = Math.floor(time % 60);
+// /**
+//  * A dummy function to simulate obtaining a thumbnail URL for a given time.
+//  * Replace this with your real thumbnail extraction from a VTT file.
+//  */
+// function getThumbnailForTime(time: number): string {
+//     const hours = Math.floor(time / 3600);
+//     const minutes = Math.floor((time % 3600) / 60);
+//     const seconds = Math.floor(time % 60);
+//     const frames = Math.floor((time % 1) * 25); // Using 25 fps as per loadVideo config
 
-        if (isSmtpeFormat) {
-            const frames = Math.floor((time % 1) * 25); // Using 25 fps as per loadVideo config
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-        } else {
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
-    };
+//     const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+//     return `https://placehold.co/100x56/black/white?text=${timeString}`;
+// }
 
-    const handleTimeFormatToggle = () => {
-        setIsSmtpeFormat(!isSmtpeFormat);
-    };
+// /**
+//  * The VideoViewer component renders the video container (which OmakasePlayer uses)
+//  * and a custom control bar below it.
+//  */
+// export const VideoViewer: FC<VideoViewerProps> = ({
+//     videoSrc,
+//     onClickEvent,
+//     onPlay,
+//     onPause,
+//     onSeek,
+//     onVolumeChange,
+//     onMute,
+//     onUnmute,
+//     onPlaybackRateChange,
+//     onFullscreenChange,
+//     onRemoveSafeZone,
+//     onClearSafeZones,
+//     onBuffering,
+//     onEnded,
+//     onError,
+//     onTimeUpdate,
+//     showThumbnails = false,
+// }) => {
+//     const playerContainerRef = useRef<HTMLDivElement>(null);
 
-    return (
-        <Stack spacing={0} sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-            <Box
-                onClick={onClickEvent}
-                ref={playerContainerRef}
-                id="omakase-player"
-                sx={{
-                    width: '100%',
-                    height: 'calc(100% - 300px)',
-                    position: 'relative',
-                    bgcolor: 'black',
-                    '& > *': { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-                }}
-            />
+//     // Local state to track whether the video is playing, the volume level, and mute status.
+//     const [isPlaying, setIsPlaying] = useState(false);
+//     const [volume, setVolumeState] = useState(100);
+//     const [muted, setMuted] = useState(false);
+//     const [isSmtpeFormat, setIsSmtpeFormat] = useState(true);
+//     const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-            <Paper
-                elevation={0}
-                sx={{
-                    bgcolor: 'rgba(0, 0, 0, 0.85)',
-                    height: '85px',
-                    borderRadius: 0,
-                    width: '100%'
-                }}
-            >
-                <Box sx={{ px: 2, pt: 1 }}>
-                    <Slider
-                        value={currentTime}
+//     // Define callbacks that update local state, then call the parent props:
+//     const customCallbacks = useMemo<Partial<VideoViewerProps>>(
+//         () => ({
+//             onPlay: () => {
+//                 setIsPlaying(true);
+//                 onPlay?.();
+//             },
+//             onPause: () => {
+//                 setIsPlaying(false);
+//                 onPause?.();
+//             },
+//             onSeek,
+//             onVolumeChange: (vol: number) => {
+//                 setVolumeState(vol);
+//                 onVolumeChange?.(vol);
+//             },
+//             onBuffering,
+//             onEnded,
+//             onError,
+//             onTimeUpdate: (time: number) => {
+//                 onTimeUpdate?.(time);
+//             },
+//         }),
+//         [
+//             onPlay,
+//             onPause,
+//             onSeek,
+//             onVolumeChange,
+//             onBuffering,
+//             onEnded,
+//             onError,
+//             onTimeUpdate,
+//         ]
+//     );
 
-                        min={0}
-                        max={duration}
-                        step={0.1}
-                        onChange={handleSeekChange}
-                        onChangeCommitted={handleSeekCommitted}
-                        valueLabelDisplay="auto"
-                        components={{
-                            ValueLabel: (props) => ThumbLabel({ ...props, showThumbnails })
-                        }}
-                        size="small"
-                        sx={{
-                            '& .MuiSlider-thumb': {
-                                width: 12,
-                                height: 12,
-                                transition: 'none'
-                            },
-                            '& .MuiSlider-rail': {
-                                opacity: 0.3
-                            },
-                            '& .MuiSlider-track': {
-                                border: 'none',
-                                transition: 'none'
-                            }
-                        }}
-                    />
-                </Box>
+//     // Hook that manages the OmakasePlayer lifecycle
+//     const {
+//         play,
+//         pause,
+//         seek,
+//         setVolume: setPlayerVolume,
+//         mute,
+//         unmute,
+//         toggleFullscreen,
+//         removeSafeZone,
+//         clearSafeZones,
+//         currentTime,
+//         duration,
+//         setCurrentTime,
+//     } = useOmakasePlayer(videoSrc, playerContainerRef, customCallbacks);
 
-                <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    sx={{ px: 2, pb: 1 }}
-                >
-                    <IconButton
-                        onClick={handlePlayPause}
-                        size="small"
-                        sx={{
-                            color: 'white',
-                            '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.1)'
-                            }
-                        }}
-                    >
-                        {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-                    </IconButton>
+//     // Handlers for UI controls:
+//     const handlePlayPause = () => {
+//         if (isPlaying) {
+//             pause();
+//         } else {
+//             play();
+//         }
+//     };
 
-                    <Typography
-                        variant="caption"
-                        onClick={handleTimeFormatToggle}
-                        sx={{
-                            color: 'white',
-                            minWidth: 100,
-                            userSelect: 'none',
-                            cursor: 'pointer',
-                            '&:hover': {
-                                opacity: 0.8
-                            }
-                        }}
-                    >
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                    </Typography>
+//     const handleSeekChange = (_: Event, newValue: number | number[]) => {
+//         if (typeof newValue === 'number') {
+//             setCurrentTime(newValue);
+//         }
+//     };
 
-                    <Box sx={{ flexGrow: 1 }} />
+//     const handleSeekCommitted = (
+//         _: Event | SyntheticEvent,
+//         newValue: number | number[]
+//     ) => {
+//         if (typeof newValue === 'number') {
+//             seek(newValue);
+//         }
+//     };
+//     const handleVolumeChange = (event: Event, newValue: number | number[]) => {
+//         if (typeof newValue === 'number') {
+//             setPlayerVolume(newValue);
+//             setVolumeState(newValue);
+//             setMuted(newValue === 0);
+//         }
+//     };
 
-                    <Box
-                        sx={{
-                            position: 'relative',
-                            '&:hover .volume-slider': {
-                                opacity: 1,
-                                visibility: 'visible'
-                            }
-                        }}
-                        onMouseEnter={() => setIsVolumeHovered(true)}
-                        onMouseLeave={() => setIsVolumeHovered(false)}
-                    >
-                        <IconButton
-                            onClick={handleMuteToggle}
-                            size="small"
-                            sx={{
-                                color: 'white',
-                                '&:hover': {
-                                    bgcolor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }}
-                        >
-                            {muted || volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
-                        </IconButton>
-                        <Paper
-                            className="volume-slider"
-                            elevation={4}
-                            sx={{
-                                position: 'absolute',
-                                bottom: '100%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                visibility: 'hidden',
-                                opacity: 0,
-                                transition: 'opacity 0.2s, visibility 0.2s',
-                                p: 1,
-                                bgcolor: 'rgba(0, 0, 0, 0.9)',
-                                mb: 1
-                            }}
-                        >
-                            <Tooltip
-                                open={isVolumeHovered}
-                                title={`${volume}%`}
-                                placement="top"
-                                arrow
-                            >
-                                <Slider
-                                    orientation="vertical"
-                                    value={volume}
-                                    min={0}
-                                    max={100}
-                                    onChange={handleVolumeChange}
-                                    onChangeCommitted={(_, newValue) => {
-                                        if (typeof newValue === 'number') {
-                                            setPlayerVolume(newValue);
-                                        }
-                                    }}
-                                    sx={{
-                                        height: 100,
-                                        '& .MuiSlider-rail': {
-                                            opacity: 0.3
-                                        },
-                                        '& .MuiSlider-track': {
-                                            border: 'none'
-                                        }
-                                    }}
-                                />
+//     const handleMuteToggle = () => {
+//         if (muted) {
+//             unmute();
+//             setPlayerVolume(volume);
+//             setMuted(false);
+//             onUnmute?.();
+//         } else {
+//             mute();
+//             setPlayerVolume(0);
+//             setMuted(true);
+//             onMute?.();
+//         }
+//     };
 
-                            </Tooltip>
-                        </Paper>
-                    </Box>
+//     const handleFullscreenToggle = () => {
+//         toggleFullscreen();
+//         // If you'd like to track actual fullscreen state, you'd do it in onFullscreenChange:
+//         onFullscreenChange?.(true);
+//     };
 
-                    <IconButton
-                        onClick={handleFullscreenToggle}
-                        size="small"
-                        sx={{
-                            color: 'white',
-                            '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.1)'
-                            }
-                        }}
-                    >
-                        <FullscreenIcon />
-                    </IconButton>
-                </Stack>
-            </Paper>
-            <Box id="omakase-timeline"/>
-        </Stack>
-    );
-};
+//     // A helper to format seconds into either SMPTE timecode (HH:MM:SS:FF) or HH:MM:SS
+//     const formatTime = (time: number): string => {
+//         const hours = Math.floor(time / 3600);
+//         const minutes = Math.floor((time % 3600) / 60);
+//         const seconds = Math.floor(time % 60);
 
-export default VideoViewer;
+//         if (isSmtpeFormat) {
+//             const frames = Math.floor((time % 1) * 25); // Using 25 fps as per loadVideo config
+//             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+//         } else {
+//             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+//         }
+//     };
+
+//     const handleTimeFormatToggle = () => {
+//         setIsSmtpeFormat(!isSmtpeFormat);
+//     };
+
+//     return (
+//         <Stack spacing={0} sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+//             <Box
+//                 onClick={onClickEvent}
+//                 ref={playerContainerRef}
+//                 id="omakase-player"
+//                 sx={{
+//                     width: '100%',
+//                     height: 'calc(100% - 300px)',
+//                     position: 'relative',
+//                     bgcolor: 'black',
+//                     '& > *': { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+//                 }}
+//             />
+
+//             <Paper
+//                 elevation={0}
+//                 sx={{
+//                     bgcolor: 'rgba(0, 0, 0, 0.85)',
+//                     height: '85px',
+//                     borderRadius: 0,
+//                     width: '100%'
+//                 }}
+//             >
+//                 <Box sx={{ px: 2, pt: 1 }}>
+//                     <Slider
+//                         value={currentTime}
+
+//                         min={0}
+//                         max={duration}
+//                         step={0.1}
+//                         onChange={handleSeekChange}
+//                         onChangeCommitted={handleSeekCommitted}
+//                         valueLabelDisplay="auto"
+//                         components={{
+//                             ValueLabel: (props) => ThumbLabel({ ...props, showThumbnails })
+//                         }}
+//                         size="small"
+//                         sx={{
+//                             '& .MuiSlider-thumb': {
+//                                 width: 12,
+//                                 height: 12,
+//                                 transition: 'none'
+//                             },
+//                             '& .MuiSlider-rail': {
+//                                 opacity: 0.3
+//                             },
+//                             '& .MuiSlider-track': {
+//                                 border: 'none',
+//                                 transition: 'none'
+//                             }
+//                         }}
+//                     />
+//                 </Box>
+
+//                 <Stack
+//                     direction="row"
+//                     alignItems="center"
+//                     spacing={1}
+//                     sx={{ px: 2, pb: 1 }}
+//                 >
+//                     <IconButton
+//                         onClick={handlePlayPause}
+//                         size="small"
+//                         sx={{
+//                             color: 'white',
+//                             '&:hover': {
+//                                 bgcolor: 'rgba(255, 255, 255, 0.1)'
+//                             }
+//                         }}
+//                     >
+//                         {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+//                     </IconButton>
+
+//                     <Typography
+//                         variant="caption"
+//                         onClick={handleTimeFormatToggle}
+//                         sx={{
+//                             color: 'white',
+//                             minWidth: 100,
+//                             userSelect: 'none',
+//                             cursor: 'pointer',
+//                             '&:hover': {
+//                                 opacity: 0.8
+//                             }
+//                         }}
+//                     >
+//                         {formatTime(currentTime)} / {formatTime(duration)}
+//                     </Typography>
+
+//                     <Box sx={{ flexGrow: 1 }} />
+
+//                     <Box
+//                         sx={{
+//                             position: 'relative',
+//                             '&:hover .volume-slider': {
+//                                 opacity: 1,
+//                                 visibility: 'visible'
+//                             }
+//                         }}
+//                         onMouseEnter={() => setIsVolumeHovered(true)}
+//                         onMouseLeave={() => setIsVolumeHovered(false)}
+//                     >
+//                         <IconButton
+//                             onClick={handleMuteToggle}
+//                             size="small"
+//                             sx={{
+//                                 color: 'white',
+//                                 '&:hover': {
+//                                     bgcolor: 'rgba(255, 255, 255, 0.1)'
+//                                 }
+//                             }}
+//                         >
+//                             {muted || volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
+//                         </IconButton>
+//                         <Paper
+//                             className="volume-slider"
+//                             elevation={4}
+//                             sx={{
+//                                 position: 'absolute',
+//                                 bottom: '100%',
+//                                 left: '50%',
+//                                 transform: 'translateX(-50%)',
+//                                 visibility: 'hidden',
+//                                 opacity: 0,
+//                                 transition: 'opacity 0.2s, visibility 0.2s',
+//                                 p: 1,
+//                                 bgcolor: 'rgba(0, 0, 0, 0.9)',
+//                                 mb: 1
+//                             }}
+//                         >
+//                             <Tooltip
+//                                 open={isVolumeHovered}
+//                                 title={`${volume}%`}
+//                                 placement="top"
+//                                 arrow
+//                             >
+//                                 <Slider
+//                                     orientation="vertical"
+//                                     value={volume}
+//                                     min={0}
+//                                     max={100}
+//                                     onChange={handleVolumeChange}
+//                                     onChangeCommitted={(_, newValue) => {
+//                                         if (typeof newValue === 'number') {
+//                                             setPlayerVolume(newValue);
+//                                         }
+//                                     }}
+//                                     sx={{
+//                                         height: 100,
+//                                         '& .MuiSlider-rail': {
+//                                             opacity: 0.3
+//                                         },
+//                                         '& .MuiSlider-track': {
+//                                             border: 'none'
+//                                         }
+//                                     }}
+//                                 />
+
+//                             </Tooltip>
+//                         </Paper>
+//                     </Box>
+
+//                     <IconButton
+//                         onClick={handleFullscreenToggle}
+//                         size="small"
+//                         sx={{
+//                             color: 'white',
+//                             '&:hover': {
+//                                 bgcolor: 'rgba(255, 255, 255, 0.1)'
+//                             }
+//                         }}
+//                     >
+//                         <FullscreenIcon />
+//                     </IconButton>
+//                 </Stack>
+//             </Paper>
+//             <Box id="omakase-timeline"/>
+//         </Stack>
+//     );
+// };
+
+// export default VideoViewer;
