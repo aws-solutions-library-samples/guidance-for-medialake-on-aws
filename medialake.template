@@ -457,8 +457,15 @@ Resources:
               commands:
                 - echo Deploying CDK stacks
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                # - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
+                # Bootstrap current region
                 - cdk bootstrap
+                # Also bootstrap us-east-1 if we're not already in that region
+                - |
+                  if [ "${AWS::Region}" != "us-east-1" ]; then
+                    echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"
+                    cdk bootstrap aws://${AWS::AccountId}/us-east-1
+                  fi
+                # Deploy all stacks
                 - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
             post_build:
               commands:

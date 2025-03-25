@@ -12,6 +12,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_cognito_identitypool_alpha as cognito_identity,
     Token,
+    aws_ssm as ssm,
 )
 from config import config
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
@@ -25,6 +26,7 @@ class UserInterfaceStackProps:
     cognito_user_pool_client_id: str
     cognito_identity_pool: str
     cognito_user_pool_arn: str
+    cloudfront_waf_acl_arn: str
 
 def generate_random_password(length=16):
     # Ensure at least one of each required character type
@@ -57,7 +59,31 @@ class UserInterfaceStack(Stack):
     ):
         super().__init__(scope, construct_id, **kwargs)
         
-
+        # Look up the WAF ACL ARN from SSM Parameter Store
+        # If props.cloudfront_waf_acl_arn starts with '/', assume it's an SSM parameter path
+        waf_acl_arn = props.cloudfront_waf_acl_arn
+        if props.cloudfront_waf_acl_arn.startswith('/'):
+            # Use a custom resource to get the parameter from us-east-1
+            waf_acl_param = cr.AwsCustomResource(
+                self,
+                "GetWafAclArnFromSsm",
+                on_update={
+                    "service": "SSM",
+                    "action": "getParameter",
+                    "parameters": {
+                        "Name": props.cloudfront_waf_acl_arn
+                    },
+                    "region": "us-east-1",  # Important: specify us-east-1 region
+                    "physical_resource_id": cr.PhysicalResourceId.of("waf-acl-arn-param-" + props.cloudfront_waf_acl_arn),
+                },
+                policy=cr.AwsCustomResourcePolicy.from_statements([
+                    iam.PolicyStatement(
+                        actions=["ssm:GetParameter"],
+                        resources=["*"],  # You can restrict this further if needed
+                    )
+                ])
+            )
+            waf_acl_arn = waf_acl_param.get_response_field("Parameter.Value")
         
         self._ui = UIConstruct(
             self,
@@ -68,6 +94,7 @@ class UserInterfaceStack(Stack):
                 cognito_identity_pool=props.cognito_identity_pool,
                 api_gateway_rest_id=props.api_gateway_rest_id,
                 access_log_bucket=props.access_log_bucket,
+                cloudfront_waf_acl_arn=waf_acl_arn,  # Use the looked-up ARN
             ),
         )
         
