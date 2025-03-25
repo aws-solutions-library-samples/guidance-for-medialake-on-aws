@@ -48,6 +48,7 @@ export interface PipelineNode {
         id?: string;
         label: string;
         type: string;
+        description?: string;
         seconds?: string;
         cause?: string;
         width?: string;

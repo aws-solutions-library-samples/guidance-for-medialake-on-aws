@@ -381,14 +381,23 @@ class Lambda(Construct):
         Copy common libraries to the target directory, flattening the structure.
         """
         import shutil
+        logger = Logger()
 
-        # Create the  directory if it doesn't exist
+        logger.debug(f"Ensuring target directory exists: {target_dir}")
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy each file
         for rel_path, source_path in common_libs.items():
-            target_path = target_dir / Path(rel_path).name
-            shutil.copy2(source_path, target_path)
+            target_file = Path(rel_path).name
+            target_path = target_dir / target_file
+            logger.debug(f"Copying common library file from {source_path} to {target_path}")
+            try:
+                shutil.copy2(source_path, target_path)
+                logger.debug(f"Successfully copied {source_path} to {target_path}")
+            except Exception as e:
+                logger.error(f"Error copying {source_path} to {target_path}: {e}")
+                raise
+
 
     def _create_nodejs_function(self, props: dict, common_libs: dict):
         logger = Logger()

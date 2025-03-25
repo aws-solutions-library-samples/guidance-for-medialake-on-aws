@@ -74,6 +74,7 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
         id: node.data.nodeId,
         type: node.data.type,
         label: node.data.label,
+        description: node.data.description || '',
         icon: {
             props: {
                 size: 20
@@ -563,7 +564,7 @@ const PipelineEditorContent = () => {
                     data: {
                         nodeId: node.data.id,
                         label: node.data.label,
-                        description: '',  // Use empty string for description
+                        description: node.data.description || '',  // Use node description if available
                         icon: nodeIcon,
                         inputTypes: node.data.inputTypes || [],
                         outputTypes: node.data.outputTypes || [],
