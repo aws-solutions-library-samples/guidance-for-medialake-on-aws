@@ -22,11 +22,11 @@ fetch('/aws-exports.json')
     });
 
     ReactDOM.createRoot(document.getElementById('root')).render(
-      <React.StrictMode>
+
         <Suspense fallback="Loading...">
           <AppConfigured />
         </Suspense>
-      </React.StrictMode>
+
     )
   })
   .catch(error => {
