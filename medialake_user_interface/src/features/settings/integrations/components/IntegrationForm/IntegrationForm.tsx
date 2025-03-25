@@ -37,13 +37,18 @@ const steps = ['integrations.selectIntegration', 'integrations.configureIntegrat
 export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     open,
     onClose,
+    filteredNodes,
 }) => {
     const { t } = useTranslation();
     const [activeStep, setActiveStep] = React.useState(0);
     const [selectedNodeId, setSelectedNodeId] = React.useState<string>('');
     const [searchTerm, setSearchTerm] = React.useState('');
     const createIntegration = useCreateIntegration();
-    const { nodes: rawNodes = [], isLoading: isLoadingNodes } = IntegrationsNodesService.useNodes();
+    
+    // Use filteredNodes if provided, otherwise fetch all nodes
+    const { nodes: fetchedNodes = [], isLoading: isLoadingNodes } = IntegrationsNodesService.useNodes();
+    const rawNodes = filteredNodes || fetchedNodes;
+    
     const { environments = [], isLoading: isLoadingEnvironments } = IntegrationsEnvironmentsService.useEnvironments();
 
     const defaultFormValues: IntegrationFormData = {

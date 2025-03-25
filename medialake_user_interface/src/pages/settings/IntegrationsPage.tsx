@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import {
     useCreateIntegration,
     integrationsController
 } from '@/features/settings/integrations/api/integrations.controller';
+import { IntegrationsNodesService } from '@/features/settings/integrations/services/integrations-nodes.service';
 
 const IntegrationsPage = () => {
     const { t } = useTranslation();
@@ -22,9 +23,33 @@ const IntegrationsPage = () => {
     const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
     const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
 
+    // Fetch nodes using React Query
+    const { nodes, isLoading: isLoadingNodes, error: nodesError } = IntegrationsNodesService.useNodes();
+    
+    // Filter nodes to only include those with nodeType === "INTEGRATION"
+    // and transform them to the expected IntegrationNode format
+    const integrationNodes = useMemo(() => {
+        return nodes
+            .filter(node => node.info?.nodeType === "INTEGRATION")
+            .map(node => ({
+                nodeId: node.nodeId || '',
+                info: {
+                    title: node.info?.title || '',
+                    description: node.info?.description || '',
+                },
+                auth: node.auth ? {
+                    authMethod: node.auth.authMethod as 'awsIam' | 'apiKey'
+                } : undefined
+            }));
+    }, [nodes]);
+    
     // Fetch integrations using React Query
-    const { data: integrationsData, isLoading, error } = useGetIntegrations();
+    const { data: integrationsData, isLoading: isLoadingIntegrations, error: integrationsError } = useGetIntegrations();
     const createIntegration = useCreateIntegration();
+    
+    // Combine loading and error states
+    const isLoading = isLoadingNodes || isLoadingIntegrations;
+    const error = nodesError || integrationsError;
 
     const handleAddIntegration = () => {
         setOpenIntegrationForm(true);
@@ -122,6 +147,7 @@ const IntegrationsPage = () => {
             <IntegrationForm
                 open={openIntegrationForm}
                 onClose={handleCloseIntegrationForm}
+                filteredNodes={integrationNodes}
             />
         </Box>
     );

@@ -14,6 +14,7 @@ export interface IntegrationNode {
 export interface IntegrationFormProps {
     open: boolean;
     onClose: () => void;
+    filteredNodes?: IntegrationNode[];
 }
 
 export interface IntegrationFormData {
