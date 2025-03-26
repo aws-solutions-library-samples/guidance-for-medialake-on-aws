@@ -45,7 +45,7 @@ interface AssetSidebarProps {
     versions?: any[];
     comments?: any[];
     onAddComment?: (comment: string) => void;
-    videoViewerRef: RefObject<VideoViewerRef>;
+    videoViewerRef?: RefObject<VideoViewerRef>;
 }
 
 interface AssetVersionProps {
