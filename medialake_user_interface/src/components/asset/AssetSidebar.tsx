@@ -183,22 +183,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                 Add time markers to highlight important moments in your media.
             </Typography>
             
-            <Paper 
-                variant="outlined" 
-                sx={{ 
-                    p: 2, 
-                    mb: 2, 
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                    borderColor: alpha(theme.palette.primary.main, 0.2),
-                    borderRadius: theme.shape.borderRadius,
-                }}
-            >
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>No markers added yet</Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Create your first marker by clicking the "Add Marker" button below.
-                </Typography>
-            </Paper>
-            
             <Tooltip title="Create a new time marker">
                 <Button 
                     variant="contained" 
