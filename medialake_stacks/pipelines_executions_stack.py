@@ -41,7 +41,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PipelineExecutionsEventBus",
             props=EventBusConfig(
-                bus_name="medialake-pipelines-executions",
+                bus_name=f"{config.resource_prefix}-pipelines-executions",
                 log_all=True,
             ),
         )
@@ -125,7 +125,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "GetPipelinesExecutionsHandler",
             config=LambdaConfig(
-                name=f"get_executions",
+                name="get_executions",
                 entry="lambdas/api/pipelines/executions/get_executions",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,

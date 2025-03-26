@@ -162,76 +162,80 @@ class UIConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # self.user_interface_waf_acl = wafv2.CfnWebACL(
-        #     self,
-        #     "CloudFrontWAF",
-        #     default_action={"allow": {}},
-        #     scope="CLOUDFRONT",
-        #     visibility_config={
-        #         "sampledRequestsEnabled": True,
-        #         "cloudWatchMetricsEnabled": True,
-        #         "metricName": "CloudFrontWAFMetrics",
-        #     },
-        #     rules=[
-        #         {
-        #             "name": "AWSManagedRulesCommonRuleSet",
-        #             "priority": 1,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesCommonRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "sampledRequestsEnabled": True,
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "AWSManagedRulesCommonRuleSetMetric",
-        #             },
-        #         },
-        #         {
-        #             "name": "AWSManagedRulesKnownBadInputsRuleSet",
-        #             "priority": 2,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesKnownBadInputsRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "sampledRequestsEnabled": True,
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "KnownBadInputsRuleSetMetric",
-        #             },
-        #         },
-        #         {
-        #             "name": "AWSManagedRulesSQLiRuleSet",
-        #             "priority": 3,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesSQLiRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "SQLiRuleSetMetric",
-        #                 "sampledRequestsEnabled": True,
-        #             },
-        #         },
-        #     ],
-        # )
+        self.user_interface_waf_acl = wafv2.CfnWebACL(
+            self,
+            "CloudFrontWAF",
+            default_action={"allow": {}},
+            scope="CLOUDFRONT",
+            visibility_config={
+                "sampledRequestsEnabled": True,
+                "cloudWatchMetricsEnabled": True,
+                "metricName": "CloudFrontWAFMetrics",
+            },
+            rules=[
+                {
+                    "name": "AWSManagedRulesCommonRuleSet",
+                    "priority": 1,
+                    "overrideAction": {"none": {}},
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesCommonRuleSet",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "AWSManagedRulesCommonRuleSetMetric",
+                    },
+                },
+                {
+                    "name": "AWSManagedRulesKnownBadInputsRuleSet",
+                    "priority": 2,
+                    "overrideAction": {"none": {}},
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesKnownBadInputsRuleSet",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "KnownBadInputsRuleSetMetric",
+                    },
+                },
+                {
+                    "name": "AWSManagedRulesSQLiRuleSet",
+                    "priority": 3,
+                    "overrideAction": {"none": {}},
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesSQLiRuleSet",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "SQLiRuleSetMetric",
+                        "sampledRequestsEnabled": True,
+                    },
+                },
+            ],
+        )
 
-        
-        # Create a logging configuration for the WAF ACL
-        self.user_interface_waf_logging_config = wafv2.CfnLoggingConfiguration(
+        self.waf_logging = wafv2.CfnLoggingConfiguration(
             self,
             "WafLoggingConfig",
-            resource_arn=props.cloudfront_waf_acl_arn,
-            log_destination_configs=[self.user_interface_waf_log_group.log_group_arn],
+            resource_arn=f"arn:aws:wafv2:us-east-1:{Stack.of(self).account}:global/webacl/{self.user_interface_waf_acl.attr_name}/{self.user_interface_waf_acl.attr_id}",
+            log_destination_configs=[
+                props.access_log_bucket.bucket_arn + "/waf-logs"
+            ],
+            redacted_fields=[
+            ],
         )
+
+        self.waf_logging.add_dependency(self.user_interface_waf_acl)
 
         # Enhanced security headers policy
         ui_response_headers_policy = cloudfront.ResponseHeadersPolicy(
