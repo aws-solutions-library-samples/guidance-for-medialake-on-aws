@@ -22,6 +22,7 @@ from aws_cdk import (
     Stack,
     aws_lambda as lambda_,
     custom_resources as cr,
+    Fn,
 )
 from constructs import Construct
 
@@ -227,15 +228,53 @@ class UIConstruct(Construct):
         self.waf_logging = wafv2.CfnLoggingConfiguration(
             self,
             "WafLoggingConfig",
-            resource_arn=f"arn:aws:wafv2:us-east-1:{Stack.of(self).account}:global/webacl/{self.user_interface_waf_acl.attr_name}/{self.user_interface_waf_acl.attr_id}",
+            resource_arn=Fn.join("", [
+                "arn:aws:wafv2:us-east-1:",
+                Stack.of(self).account,
+                ":global/webacl/",
+                self.user_interface_waf_acl.ref,
+                "/",
+                self.user_interface_waf_acl.attr_id
+            ]),
             log_destination_configs=[
-                props.access_log_bucket.bucket_arn + "/waf-logs"
-            ],
-            redacted_fields=[
+                f"{props.access_log_bucket.bucket_arn}/AWSLogs/{Stack.of(self).account}/waf/cloudfront"
             ],
         )
 
-        self.waf_logging.add_dependency(self.user_interface_waf_acl)
+        self.waf_logging.node.add_dependency(self.user_interface_waf_acl)
+
+        # Add necessary bucket permissions
+        props.access_log_bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="AllowWAFLogDelivery",
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("delivery.logs.amazonaws.com")],
+                actions=["s3:PutObject"],
+                resources=[f"{props.access_log_bucket.bucket_arn}/AWSLogs/{Stack.of(self).account}/waf/cloudfront/*"],
+                conditions={
+                    "StringEquals": {
+                        "aws:SourceAccount": Stack.of(self).account,
+                        "aws:SourceArn": f"arn:aws:wafv2:us-east-1:{Stack.of(self).account}:global/webacl/{self.user_interface_waf_acl.ref}/{self.user_interface_waf_acl.attr_id}"
+                    }
+                }
+            )
+        )
+
+        props.access_log_bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="AllowWAFLogDeliveryList",
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("delivery.logs.amazonaws.com")],
+                actions=["s3:GetBucketLocation", "s3:ListBucket"],
+                resources=[props.access_log_bucket.bucket_arn],
+                conditions={
+                    "StringEquals": {
+                        "aws:SourceAccount": Stack.of(self).account,
+                        "aws:SourceArn": f"arn:aws:wafv2:us-east-1:{Stack.of(self).account}:global/webacl/{self.user_interface_waf_acl.ref}/{self.user_interface_waf_acl.attr_id}"
+                    }
+                }
+            )
+        )
 
         # Enhanced security headers policy
         ui_response_headers_policy = cloudfront.ResponseHeadersPolicy(
