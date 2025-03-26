@@ -1,5 +1,5 @@
-import { FC, useEffect, useRef } from 'react';
-import { MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker } from '@byomakase/omakase-player';
+import { FC, useEffect, useRef,useState, forwardRef, useImperativeHandle } from 'react';
+import { MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker, Timeline } from '@byomakase/omakase-player';
 import { filter } from 'rxjs';
 import { SCRUBBER_LANE_STYLE, SCRUBBER_LANE_STYLE_DARK, TIMELINE_LANE_STYLE, TIMELINE_LANE_STYLE_DARK, TIMELINE_STYLE, TIMELINE_STYLE_DARK } from './OmakaseTimeLineConstants';
 import { randomHexColor } from './utils';
@@ -10,89 +10,70 @@ interface VideoViewerProps {
     videoSrc: string;
 }
 
-export const VideoViewer: FC<VideoViewerProps> = ({ videoSrc }) => {
-    //create the OmakasePlayer just after changing 
-    useEffect(() => {
-        console.log("rendered")
-        //ininitalize Player
-        let omp = new OmakasePlayer({
-            playerHTMLElementId: 'omakase-player',
-            mediaChrome: 'enabled',
-        });
+export interface VideoViewerRef {
+    hello: () => void;
+}
 
-        //loadVideo
-        omp.loadVideo(videoSrc, 60)
-            .subscribe({
-                next: (video) => {
-                    console.log('Video loaded', video);
-                    omp.createTimeline({               //Creating timeline only after loading video
-                        style: {
-                            ...TIMELINE_STYLE_DARK,
-                        },
-                        zoomWheelEnabled: false
-                    }).subscribe((timelineApi) => { // After Timeline, create a lane
-                        console.log('create timeline!');
-                        let scrubberLane = timelineApi.getScrubberLane();
-                        scrubberLane.style = {
-                            ...SCRUBBER_LANE_STYLE_DARK
-                        };
-                    });
-                }
-            });
-        
-        omp.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
-            next: (video) => {
-                console.log("video criado.")
-                console.log(video);
+interface VideoViewerProps {
+    videoSrc: string;
+}
+
+export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(({ videoSrc }, ref) => {
+    const ompRef = useRef<OmakasePlayer | null>(null);
+    const markerLaneRef = useRef<any>(null);
+    useImperativeHandle(ref, () => ({
+        hello: () => {
+            console.log("Hello from VideoViewer!");
+            // You can access ompRef.current here if needed
+            if (markerLaneRef.current && ompRef.current.video) {
+                let periodMarker = new PeriodMarker({
+                    timeObservation: {
+                      start: ompRef.current.video.getCurrentTime(),
+                      end: ompRef.current.video.getCurrentTime() + 20,
+                    },
+                    editable: true,
+                    style: {
+                      renderType: 'spanning',
+                      symbolSize: 12,
+                      symbolType: 'triangle',
+                      color: randomHexColor(),
+                    }
+                  })
+                markerLaneRef.current.addMarker(periodMarker);
             }
-            })
+        }
+    }));
 
-        // omp.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
-        //     next: (video) => {
-        //         createTimelineLanes();
-        //     }
-        //     })
-        
-        
-        //     let createTimelineLanes = () => {
-        //     markerLane1();
-        
-        //     }
-        
-        //     let markerLane1 = () => {
-        //     let markerLane = new MarkerLane({
-        //         style: {
-        //         ...TIMELINE_LANE_STYLE_DARK
-        //         },
-        //     });
-        
-        //     omp.timeline!.addTimelineLane(markerLane)
-        
-        //     let periodMarker = new PeriodMarker({
-        //         timeObservation: {
-        //         start: 0,
-        //         end: 0 + 5,
-        //         },
-        //         editable: true,
-        //         style: {
-        //         renderType: 'spanning',
-        //         symbolSize: 12,
-        //         symbolType: 'triangle'
-        //         }
-        //     })
-        
-        //     markerLane.addMarker(periodMarker)
-        
-        //     periodMarker.onChange$.subscribe({
-        //         next: (event) => {
-        //         console.log('period marker changed', event);
-        //         }
-        //     })
-        //     }
-
-    }, []);
-
-
+    useEffect(()=>{
+        ompRef.current = new OmakasePlayer({
+            playerHTMLElementId: 'omakase-player',
+            mediaChrome: 'enabled'
+          });
+          ompRef.current.loadVideo(videoSrc, 60)
+          ompRef.current.createTimeline({
+            style: {
+                // @ts-ignore
+                ...TIMELINE_STYLE_DARK
+            },
+            zoomWheelEnabled : true
+        }).subscribe((timelineApi)=>{
+            let scrubberLane = timelineApi.getScrubberLane();
+            scrubberLane.style = {
+              ...SCRUBBER_LANE_STYLE_DARK
+            };
+        });
+        ompRef.current.video.onVideoLoaded$.pipe(filter(video => !!video)).subscribe({
+            next: (video) => {
+                let markerLane = new MarkerLane({
+                    style: {
+                      ...TIMELINE_LANE_STYLE_DARK
+                    },
+                  });
+                const mainLane = ompRef.current.timeline!.addTimelineLane(markerLane)
+                markerLaneRef.current = mainLane
+            }
+          })
+    },[])
     return (
         <div
             style={{
@@ -115,10 +96,13 @@ export const VideoViewer: FC<VideoViewerProps> = ({ videoSrc }) => {
                 </div>
                 <div style={{ margin: "20px 0 0 0" }}>
                     <div id="omakase-timeline" />
+
                 </div>
             </div>
         </div>
     );
-};
+});
 
 export default VideoViewer;
+
+VideoViewer.displayName = 'VideoViewer';

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback,useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -38,6 +38,10 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
+
+
+
+import { VideoViewer, VideoViewerRef } from '../components/common/VideoViewer'; // Adjust path
 
 const outputFilters = {
     'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
@@ -451,6 +455,8 @@ const RelatedItemsTab: React.FC = () => {
 };
 
 const VideoDetailContent: React.FC = () => {
+    const videoViewerRef = useRef<VideoViewerRef>(null);
+    console.log("Parent videoViewerRef:", videoViewerRef); // Debug log
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
@@ -674,6 +680,7 @@ const VideoDetailContent: React.FC = () => {
                     }}
                 >
                     <AssetVideo
+                        ref={videoViewerRef}
                         src={proxyUrl}
                         alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
                     />
@@ -766,6 +773,7 @@ const VideoDetailContent: React.FC = () => {
                 versions={versions}
                 comments={comments}
                 onAddComment={handleAddComment}
+                videoViewerRef={videoViewerRef}      
             />
         </Box>
     );
