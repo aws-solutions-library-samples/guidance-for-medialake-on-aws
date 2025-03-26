@@ -84,3 +84,15 @@ media-controller {
     height: 100%;
 
 }
+
+.omakase-timeline-canvas {
+    /*border-radius: 0 0px 20px 20px;*/
+    border-radius: 0 0px 0px 0px;
+    overflow: auto;
+}
+
+/*Used to remove timecode above the timeline*/
+.omakase-timeline-timecode { 
+    display: none;
+  }
+  
