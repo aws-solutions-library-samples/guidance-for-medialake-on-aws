@@ -8,10 +8,8 @@ export const QUERY_KEYS = {
         s3: {
             all: ['connectors', 's3'] as const,
             buckets: () => [...QUERY_KEYS.CONNECTORS.s3.all, 'buckets'] as const,
-            explorer: (connectorId: string, prefix: string = '', continuationToken: string | null = null) => {
-                console.log('[queryKeys] Creating query key with:', { connectorId, prefix, continuationToken });
-                return [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, { prefix, continuationToken }] as const;
-            },
+            explorer: (connectorId: string, prefix: string, continuationToken: string | null) =>
+                [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, prefix, continuationToken] as const,
         },
     },
     PIPELINES: {
@@ -42,8 +40,6 @@ export const QUERY_KEYS = {
         list: (filters: string) => [...QUERY_KEYS.ASSETS.lists(), { filters }] as const,
         details: () => [...QUERY_KEYS.ASSETS.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.ASSETS.details(), id] as const,
-        explorer: (storageIdentifier: string = '', page: number = 1, pageSize: number = 25) => 
-            [...QUERY_KEYS.ASSETS.all, 'explorer', { storageIdentifier, page, pageSize }] as const,
     },
     USERS: {
         all: ['users'] as const,

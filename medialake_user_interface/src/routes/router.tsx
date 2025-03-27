@@ -1,11 +1,12 @@
 import React from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import AuthPage from '@/components/AuthPage';
 import AppLayout from '@/components/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import Home from '@/pages/Home';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
+import { S3Explorer } from '@/features/home/S3Explorer';
 import { ExecutionsPage } from '@/features/executions';
 import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
 import ImageDetailPage from '@/pages/ImageDetailPage';
@@ -18,6 +19,11 @@ import RoleManagement from '@/pages/settings/RoleManagement';
 import IntegrationsPage from '@/pages/settings/IntegrationsPage';
 import EnvironmentsPage from '@/pages/settings/EnvironmentsPage';
 import SystemSettingsPage from '@/pages/settings/SystemSettingsPage';
+
+const S3ExplorerWrapper = () => {
+    const { connectorId } = useParams<{ connectorId: string }>();
+    return <S3Explorer connectorId={connectorId!} />;
+};
 
 export const router = createBrowserRouter([
     {
@@ -39,6 +45,10 @@ export const router = createBrowserRouter([
             {
                 path: 'search',
                 element: <SearchPage />
+            },
+            {
+                path: 's3/explorer/:connectorId',
+                element: <S3ExplorerWrapper />
             },
             {
                 path: 'assets',

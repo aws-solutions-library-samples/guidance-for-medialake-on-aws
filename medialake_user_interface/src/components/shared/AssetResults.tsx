@@ -4,15 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
 import { type AssetBase, type CardFieldConfig } from '@/types/search/searchResults';
-import { type AssetTableColumn, type AssetField, type AssetViewControlsProps } from '@/types/shared/assetComponents';
+import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetCard from './AssetCard';
-import { AssetTable } from './AssetTable';
+import AssetTable from './AssetTable';
 import AssetViewControls from './AssetViewControls';
 import AssetPagination from './AssetPagination';
 import AssetActionsMenu from './AssetActionsMenu';
 import { useAssetResults } from '@/hooks/useAssetResults';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { sortAssets } from '@/utils/sortAssets';
+import { type AssetViewControlsProps } from '@/types/shared/assetComponents';
 
 export interface AssetResultsConfig<T extends AssetBase> {
     assetType: string;
@@ -109,7 +110,7 @@ function AssetResults<T extends AssetBase>({
         let result = [...assets];
 
         // Apply sorting first
-        result = sortAssets(result, sorting, columns);
+        result = sortAssets(result, sorting);
         
         // Apply grouping if enabled
         if (groupByType) {
@@ -130,7 +131,7 @@ function AssetResults<T extends AssetBase>({
         }
         
         return result;
-    }, [assets, groupByType, sorting, columns]);
+    }, [assets, groupByType, sorting]);
 
     // Add section headers for grouped view
     const assetsWithHeaders = useMemo(() => {
@@ -159,7 +160,6 @@ function AssetResults<T extends AssetBase>({
         editingAssetId,
         editedName,
         isRenameDialogOpen,
-        isLoading,
         handleMenuOpen,
         handleMenuClose,
         handleAction,
@@ -171,6 +171,7 @@ function AssetResults<T extends AssetBase>({
         handleRenameConfirm,
         handleDeleteCancel,
         handleRenameCancel,
+        isLoading,
     } = useAssetOperations<T>();
 
     const handleNavigationPageChange = (newPage: number) => {
@@ -213,10 +214,6 @@ function AssetResults<T extends AssetBase>({
                 editedName={editedName}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
-                cardSize={cardSize}
-                aspectRatio={aspectRatio}
-                thumbnailScale={thumbnailScale}
-                showMetadata={showMetadata}
             />
         </Grid>
     );
@@ -279,7 +276,11 @@ function AssetResults<T extends AssetBase>({
                                         </Box>
                                     );
                                 }
-                                return renderAsset(item as T);
+                                return (
+                                    <Grid container spacing={3} key={item.InventoryID}>
+                                        {renderAsset(item)}
+                                    </Grid>
+                                );
                             })
                         ) : (
                             <Grid container spacing={3}>
@@ -323,12 +324,7 @@ function AssetResults<T extends AssetBase>({
                     selectedAsset={selectedAsset}
                     onClose={handleMenuClose}
                     onAction={handleAction}
-                    actions={[
-                        { id: 'rename', label: 'Rename' },
-                        { id: 'share', label: 'Share' },
-                        { id: 'download', label: 'Download' },
-                        { id: 'delete', label: 'Delete' }
-                    ]}
+                    actions={actions}
                     isLoading={isLoading}
                 />
 
