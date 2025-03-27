@@ -2,6 +2,7 @@ import boto3
 import os
 import subprocess
 import json
+import re
 import requests
 from aws_lambda_powertools import Logger, Tracer
 from lambda_middleware import lambda_middleware
@@ -32,9 +33,52 @@ def create_output_directory():
         os.makedirs(output_dir)
     return output_dir
 
+def get_audio_duration(file_path: str) -> float:
+    """
+    Uses ffmpeg to get the duration of the audio file.
+    Parses the stderr output to extract the Duration.
+    """
+    try:
+        # ffmpeg outputs metadata (including duration) to stderr
+        command = ["./ffmpeg", "-i", file_path]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        output = result.stderr
+        logger.info(f"ffmpeg output: {output}")
+        
+        # Use regex to extract the duration from the ffmpeg output
+        match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", output)
+        if match:
+            hours = int(match.group(1))
+            minutes = int(match.group(2))
+            seconds = float(match.group(3))
+            total_duration = hours * 3600 + minutes * 60 + seconds
+            logger.info(f"Parsed duration: {total_duration} seconds")
+            return total_duration
+        else:
+            logger.error("Could not parse duration from ffmpeg output")
+            return 0.0
+    except Exception as e:
+        logger.error(f"Failed to get audio duration using ffmpeg: {e}")
+        return 0.0
+    
+# def get_audio_duration(file_path: str) -> float:
+#     """
+#     Uses ffprobe to get the duration of the audio file.
+#     """
+#     try:
+#         result = subprocess.run(
+#             ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+#              '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+#             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+#         )
+#         return float(result.stdout.strip())
+#     except Exception as e:
+#         logger.error(f"Failed to get audio duration: {e}")
+#         return 0.0
+
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
+    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -68,15 +112,21 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": "Missing required S3 bucket or key information"})
             }
         
+        # Check for assets in payload; if missing, attempt to retrieve from metadata.pipelineAssets
         assets = payload.get("assets")
-        if not assets or not isinstance(assets, list):
-            logger.warning("No assets provided in payload")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "No assets provided in payload"})
-            }
+        pipeline_assets = event.get("metadata", {}).get("pipelineAssets", [])
+        if not assets or not isinstance(assets, list) or len(assets) == 0:
+            if pipeline_assets and isinstance(pipeline_assets, list) and len(pipeline_assets) > 0:
+                assets = [pipeline_assets[0].get("assetId")]
+                logger.info("No assets provided in payload. Using asset from pipelineAssets", extra={"asset": assets[0]})
+            else:
+                logger.warning("No assets provided in payload and no pipeline assets found")
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "No assets provided in payload"})
+                }
         clean_inventory_id = clean_asset_id(assets[0])
-        
+
         # Get chunk duration from node configuration (default to 10 seconds if not provided)
         chunk_duration = event.get("CHUNK_DURATION", 10)
         try:
@@ -106,6 +156,10 @@ def lambda_handler(event, context):
                 "statusCode": 500,
                 "body": json.dumps({"error": error_msg})
             }
+        
+        # Determine the total duration of the audio file
+        total_duration = get_audio_duration(input_file_path)
+        logger.info(f"Total audio duration: {total_duration} seconds")
         
         # Set the ffmpeg binary path in the current directory and build the output pattern including the base name
         ffmpeg_path = "./ffmpeg"
@@ -143,21 +197,21 @@ def lambda_handler(event, context):
         # Get file info for the original audio file
         original_file_size = os.path.getsize(input_file_path)
         
-        # Skip ffprobe validation: overall duration not calculated
-        total_duration = None
-        
-        # Process each segment file that matches the new naming pattern
         segment_index = 0
         for filename in sorted(os.listdir(output_dir)):
             if filename.startswith(f"{base_name}_segment_") and filename.endswith('.mp3'):
                 file_path = os.path.join(output_dir, filename)
                 segment_index += 1
                 
-                # Use the chunk_duration as the segment duration
-                segment_duration = chunk_duration
-                
-                # Calculate start and end times
+                # Calculate start time for this segment
                 start_time = (segment_index - 1) * chunk_duration
+                
+                # Adjust segment duration if this is the last segment (or if it goes beyond the total duration)
+                if start_time + chunk_duration > total_duration:
+                    segment_duration = total_duration - start_time
+                else:
+                    segment_duration = chunk_duration
+                
                 end_time = start_time + segment_duration
                 
                 # Create an output key to organize the segments in S3
@@ -183,7 +237,9 @@ def lambda_handler(event, context):
                         "end_time_formatted": format_duration(end_time),
                         "duration": segment_duration,
                         "duration_formatted": format_duration(segment_duration),
-                        "size_bytes": segment_size
+                        "size_bytes": segment_size,
+                        "mediaType": "Audio",
+                        "pipelineAssets": pipeline_assets
                     })
                 except Exception as e:
                     error_msg = f"Error uploading segment {segment_index} to S3: {str(e)}"
@@ -197,7 +253,7 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "message": f"Successfully processed {s3_source_key} into {len(chunk_locations)} chunks of {format_duration(chunk_duration)} each",
+                "message": f"Successfully processed {s3_source_key} into {len(chunk_locations)} chunks",
                 "asset_id": clean_inventory_id,
                 "source": {
                     "bucket": s3_source_bucket,
@@ -210,8 +266,8 @@ def lambda_handler(event, context):
                     "target_chunk_duration": chunk_duration,
                     "target_chunk_duration_formatted": format_duration(chunk_duration),
                     "chunk_count": len(chunk_locations),
-                    "total_duration": chunk_duration * len(chunk_locations),
-                    "total_duration_formatted": format_duration(chunk_duration * len(chunk_locations))
+                    "total_duration": total_duration,
+                    "total_duration_formatted": format_duration(total_duration)
                 }
             }),
             "externalTaskResults": chunk_locations

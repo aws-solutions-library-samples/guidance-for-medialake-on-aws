@@ -17,7 +17,7 @@ s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
+    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -36,7 +36,12 @@ def lambda_handler(event, context):
         if digital_source_asset:
             media_type = digital_source_asset.get("Type")
             logger.info(f"Found media type in DigitalSourceAsset: {media_type}")
-
+        if media_type == None:
+            media_type = event.get("item", {}).get("mediaType", None)
+        if media_type == None:
+            media_type = event.get("payload", {}).get("mediaType", None)
+            
+        
         # Extract S3 object information from CheckMediaConvertStatusResult (for video)
         check_media_convert = (
             event.get("detail", {})
@@ -63,14 +68,14 @@ def lambda_handler(event, context):
         # If not found, try to extract from ImageThumbnailResult (for image)
         
         if not s3_bucket or not s3_key:
-            image_thumbnail_result = (
+            image_proxy_result = (
                 event.get("detail", {})
                 .get("outputs", {})
                 .get("ImageThumbnailResult", {})
             )
 
-            if image_thumbnail_result:
-                payload = image_thumbnail_result.get("Payload", {})
+            if image_proxy_result:
+                payload = image_proxy_result.get("Payload", {})
                 body = payload.get("body", {})
 
                 s3_bucket = (
@@ -83,7 +88,7 @@ def lambda_handler(event, context):
                     .get("FullPath")
                 )
 
-                logger.info("Found image thumbnail information in ImageThumbnailResult")
+                logger.info("Found image proxy information in ImageProxyResult")
 
         # ✅ If still not found, check for 'item' key (for audio chunks, etc.)
         if not s3_bucket or not s3_key:
@@ -93,6 +98,13 @@ def lambda_handler(event, context):
         
         if s3_bucket and s3_key:
             logger.info("Found S3 info in event['item']")
+
+        if not s3_bucket or not s3_key:
+            payload = event.get("payload", {})
+            s3_bucket = payload.get("bucket")
+            s3_key = payload.get("key")
+            if s3_bucket and s3_key:
+                logger.info("Found S3 info in event['payload']")
 
         # Validate required parameters
         if not s3_bucket or not s3_key:

@@ -32,7 +32,7 @@ node:
                 - '*'
                 
 actions:
-  debug:
+  split:
     summary: Audio Splitter
     description: Splits audio files into MP3 chunks of configurable duration
     operationId: audioSplitter

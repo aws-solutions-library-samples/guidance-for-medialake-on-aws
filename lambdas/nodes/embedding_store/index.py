@@ -58,35 +58,50 @@ def lambda_handler(event, context):
         logger.info("Received event", extra={"event": event})
         item = event.get("item", {})
         if not item:
-            logger.warning("No embedding item found in event")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "No embedding item found in event"})
-            }
+           
+            item = event.get("payload", {})
+            if not item:
+                logger.warning("No embedding item found in event")
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "No embedding item found in event"})
+                }
         
-        asset_id = item.get("assetId", None)
+
+        asset_id = item.get("assetId")
         if asset_id is None:
-            logger.warning("Missing asset_id in embedding item")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Missing asset_id in embedding item"})
-            }
+            # Attempt to get asset_id from metadata.pipelineAssets
+            metadata = item.get("metadata", {})
+            pipeline_assets = metadata.get("pipelineAssets", [])
+            if pipeline_assets and isinstance(pipeline_assets, list):
+                asset_id = pipeline_assets[0].get("assetId")
+
+            # If still not found, try payload.externalTaskResults
+            if asset_id is None:
+               
+                
+                external_results = item.get("externalTaskResults", [])
+                if external_results and isinstance(external_results, list):
+                    asset_id = external_results[0].get("assetId")
         
-        scope = item.get("embedding_scope", None)
+        scope = item.get("embedding_scope")
         if scope is None:
-            logger.warning("Missing scope in embedding item")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Missing scope in embedding item"})
-            }
+            # Attempt to get embedding_scope from externalTaskResults if available
+            external_results = item.get("externalTaskResults", [])
+            if isinstance(external_results, list):
+                for result in external_results:
+                    scope = result.get("embedding_scope")
+                    if scope is not None:
+                        break
         
-        embedding_vector = item.get("float", [])
+        embedding_vector = item.get("float")
         if not embedding_vector or not isinstance(embedding_vector, list):
-            logger.warning("Invalid embedding vector")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Invalid embedding vector"})
-            }
+            external_results = item.get("externalTaskResults", [])
+            if isinstance(external_results, list):
+                for result in external_results:
+                    embedding_vector = result.get("float")
+                    if embedding_vector and isinstance(embedding_vector, list):
+                        break
         
         client = get_opensearch_client()
         if not client:
@@ -119,6 +134,7 @@ def lambda_handler(event, context):
             logger.info(f"Successfully created new document for clip: {response}")
 
         else:
+           
             # Search for an existing document by DigitalSourceAsset.ID
             search_query = {
                 "query": {
@@ -140,7 +156,7 @@ def lambda_handler(event, context):
             # Extract document ID from search response
             existing_doc_id = search_response["hits"]["hits"][0]["_id"]
             logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
-
+   
             # Update the existing document
             document["asset_id"] = asset_id
             response = client.update(

@@ -42,7 +42,7 @@ def make_api_call(
 ) -> Dict[str, Any]:
     try:
         logger.info(f"Making {method} API call to: {url}")
-        logger.info(f"Headers: {headers}")
+        
         logger.info(f"Data: {data}")
         logger.info(f"API Auth Type: {api_auth_type}")
         logger.info(f"Region: {region}")

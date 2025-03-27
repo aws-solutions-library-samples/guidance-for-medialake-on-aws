@@ -4,6 +4,7 @@ import time
 import yaml
 import traceback
 from typing import Dict, Any, Optional
+import shortuuid
 
 import boto3
 from aws_lambda_powertools import Logger
@@ -36,7 +37,8 @@ def sanitize_function_name(pipeline_name, node_label, version):
         A sanitized function name suitable for AWS Lambda
     """
     # Combine the components
-    raw_name = f"{resource_prefix}_{pipeline_name}_{node_label}_{version}".lower()
+    uuid = shortuuid.uuid()
+    raw_name = f"{resource_prefix}_{uuid}_{node_label}_{version}".lower()
 
     # Replace spaces with hyphens
     raw_name = raw_name.replace(" ", "-")
@@ -226,11 +228,8 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
     base_name = f"{node.data.label}{method_suffix}"
     
     # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
-    if operation_id:
-        # We'll create the function name with the operation_id and let sanitize_function_name handle the truncation
-        function_name = sanitize_function_name(pipeline_name, f"{base_name}_{operation_id}", version)
-    else:
-        function_name = sanitize_function_name(pipeline_name, base_name, version)
+    candidate = f"{base_name}_{operation_id}" if operation_id and operation_id not in base_name else base_name
+    function_name = sanitize_function_name(pipeline_name, candidate, version)
     logger.debug(f"Lambda function name generated: {function_name}")
 
     # Read YAML file from S3

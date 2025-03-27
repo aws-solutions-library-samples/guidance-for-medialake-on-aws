@@ -157,7 +157,7 @@ class StateConnector:
             # If Choices is empty or Default is not set, set them with the target
             if "Choices" not in source_state or not source_state["Choices"]:
                 source_state["Choices"] = [{
-                    "Variable": "$.payload.externalTaskStatus",
+                    "Variable": "$.metadata.externalTaskStatus",
                     "StringEquals": "ready",
                     "Next": target_state_name
                 }]
