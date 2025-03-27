@@ -319,6 +319,7 @@ export function AssetDisplay<T extends AssetBase>({
                                     getThumbnailUrl={getThumbnailUrl}
                                     getName={getName}
                                     getId={getId}
+                                    getAssetType={getType}
                                     editingId={editingAssetId}
                                     editedName={editedName}
                                     onEditNameChange={handleNameChange}
@@ -344,6 +345,7 @@ export function AssetDisplay<T extends AssetBase>({
                 getThumbnailUrl={getThumbnailUrl}
                 getName={getName}
                 getId={getId}
+                getAssetType={getType}
                 editingId={editingAssetId}
                 editedName={editedName}
                 onEditNameChange={handleNameChange}

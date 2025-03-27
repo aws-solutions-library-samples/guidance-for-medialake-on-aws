@@ -43,6 +43,7 @@ export interface AssetTableProps<T> {
   getThumbnailUrl: (asset: T) => string | undefined;
   getName: (asset: T) => string;
   getId: (asset: T) => string;
+  getAssetType: (asset: T) => string;
   editingId?: string | null;
   editedName?: string;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -64,6 +65,7 @@ export function AssetTable<T>({
   getThumbnailUrl,
   getName,
   getId,
+  getAssetType,
   editingId,
   editedName,
   onEditNameChange,
