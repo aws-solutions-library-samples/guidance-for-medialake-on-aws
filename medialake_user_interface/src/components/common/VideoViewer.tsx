@@ -219,7 +219,7 @@ import React, {
     useEffect(() => {
       const cleanup = initializePlayer();
       return cleanup;
-    }, [initializePlayer]);
+    }, [/*initializePlayer*/]); //Not using UseEffect dependency array due to player inicializing everytime someone changes tabs
   
     // Responsive timeline: Listen for window resize events and trigger a timeline resize.
     // useEffect(() => {
