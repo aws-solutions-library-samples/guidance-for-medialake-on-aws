@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import {
   Edit as EditIcon,
+  Share as ShareIcon,
   Download as DownloadIcon
 } from '@mui/icons-material';
 
@@ -24,6 +25,7 @@ interface AssetActionsMenuProps<T> {
   }>;
   isLoading: {
     rename: boolean;
+    share: boolean;
     download: boolean;
     delete: boolean;
   };
@@ -36,6 +38,7 @@ function AssetActionsMenu<T>({
   onAction,
   actions = [
     { id: 'rename', label: 'Rename' },
+    { id: 'share', label: 'Share' },
     { id: 'download', label: 'Download' }
   ],
   isLoading
@@ -46,6 +49,8 @@ function AssetActionsMenu<T>({
     switch (actionId) {
       case 'rename':
         return <EditIcon fontSize="small" />;
+      case 'share':
+        return <ShareIcon fontSize="small" />;
       case 'download':
         return <DownloadIcon fontSize="small" />;
       default:
@@ -57,6 +62,8 @@ function AssetActionsMenu<T>({
     switch (actionId) {
       case 'rename':
         return isLoading.rename;
+      case 'share':
+        return isLoading.share;
       case 'download':
         return isLoading.download;
       default:
