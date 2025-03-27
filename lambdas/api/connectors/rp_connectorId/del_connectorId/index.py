@@ -1,7 +1,7 @@
 import json
 import boto3
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -190,10 +190,20 @@ def remove_event_notification_by_name(s3: Any, bucket_name: str, notification_na
         # Process all configuration types except EventBridgeConfiguration
         for config_type, configs in current_config.items():
             if config_type != 'EventBridgeConfiguration':
-                filtered_configs = [
-                    config for config in configs
-                    if config.get('Id', '') != notification_name
-                ]
+                # Check if configs is a list (expected) or a string (causing the error)
+                if isinstance(configs, str):
+                    logger.warning(f"Unexpected string value for config_type {config_type}: {configs}")
+                    continue
+                
+                filtered_configs = []
+                for config in configs:
+                    # Ensure config is a dictionary before using .get()
+                    if isinstance(config, dict):
+                        if config.get('Id', '') != notification_name:
+                            filtered_configs.append(config)
+                    else:
+                        logger.warning(f"Skipping non-dictionary config: {config}")
+                
                 if filtered_configs:  # Only add if there are remaining configurations
                     new_config[config_type] = filtered_configs
         
@@ -216,6 +226,7 @@ def remove_event_notification_by_name(s3: Any, bucket_name: str, notification_na
         errors.append(error_msg)
     
     return errors
+
 def remove_eventbridge_rule(
     eventbridge: Any, connector_id: str, region: str
 ) -> List[str]:
