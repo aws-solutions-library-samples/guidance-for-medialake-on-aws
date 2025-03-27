@@ -22,6 +22,14 @@ actions:
         schema:
           type: string
           description: JSONPath that identifies the array to iterate over
+      - in: body
+        name: ConcurrencyLimit
+        label: Concurrency Limit
+        required: false
+        default: 0
+        schema:
+          type: number
+          description: JSONPath that identifies the array to iterate over
     connections:
       incoming:
         type: [any]

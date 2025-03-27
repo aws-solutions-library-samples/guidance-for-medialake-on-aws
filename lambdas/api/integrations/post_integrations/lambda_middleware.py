@@ -3,7 +3,7 @@ import json
 import time
 import uuid
 from functools import wraps
-from typing import Any, Dict, Optional, Callable, TypeVar, Union
+from typing import Any, Dict, Optional, Callable, TypeVar
 from typing_extensions import ParamSpec
 
 import boto3
@@ -31,13 +31,13 @@ class LambdaMiddleware:
     {
         "metadata": {
             "service": "S3EventIngest",           # Mandatory
-            "stepName": "assetRegistration",      # Mandatory
-            "stepStatus": "Completed",            # Mandatory - ENUM (Started, InProgress, Completed)
+            "stepName": "assetRegistration",      # Mandatory - will be replaced with Lambda function name if available
+            "stepStatus": "Completed",            # Mandatory - reflects the Step Function step status
             "stepId": "",                         # Mandatory - UID Generated and logged
             "externalTaskId": "",                 # Optional
-            "externalTaskStatus": "",             # Optional enum (completed, inProgress, Started)
-            "externalPayload": "",                # Mandatory  (True or False)
-            "externalPayloadLocation": {          # Optional, mandatory if externalPayload is set to True
+            "externalTaskStatus": "",             # Optional
+            "externalPayload": false,             # Mandatory (True or False)
+            "externalPayloadLocation": {          # Optional, mandatory if externalPayload is True
                 "bucket": "bucket-name",
                 "key": "object-key"
             },
@@ -81,7 +81,7 @@ class LambdaMiddleware:
             raise ValueError(
                 "large_payload_bucket must be provided or EXTERNAL_PAYLOAD_BUCKET environment variable must be set"
             )
-            
+
         # Set up external payload handling
         self.external_payload_bucket = external_payload_bucket or os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
         if not self.external_payload_bucket:
@@ -143,7 +143,7 @@ class LambdaMiddleware:
         if not self.standardize_payloads:
             return event
 
-        # Check if this is an event with S3 payload reference
+        # Existing logic to handle S3 payload references, etc.
         if "s3_bucket" in event and "s3_key" in event:
             try:
                 response = self.s3.get_object(Bucket=event["s3_bucket"], Key=event["s3_key"])
@@ -152,27 +152,21 @@ class LambdaMiddleware:
                 self.logger.error(f"Failed to fetch payload from S3: {str(e)}")
                 raise
 
-        # Check if the event has an item property with S3 bucket and key information
         if "item" in event and isinstance(event["item"], dict) and "item" in event["item"] and "iteration" in event["item"]:
             try:
                 self.logger.info("Detected item with S3 reference and iteration")
                 bucket = event["item"]["item"]["bucket"]
                 key = event["item"]["item"]["key"]
                 iteration = event["item"]["iteration"]
-                
+
                 self.logger.info(f"Retrieving payload from S3: bucket={bucket}, key={key}, iteration={iteration}")
-                
-                # Retrieve the payload from S3
                 response = self.s3.get_object(Bucket=bucket, Key=key)
                 payload_data = response["Body"].read().decode("utf-8")
                 payload_json = json.loads(payload_data)
-                
-                # Check if the payload has an array that we can index into
+
                 if "externalTaskResults" in payload_json and isinstance(payload_json["externalTaskResults"], list):
                     array_data = payload_json["externalTaskResults"]
                     self.logger.info(f"Found array with {len(array_data)} items in payload")
-                    
-                    # Use the iteration value to index into the array
                     if 0 <= iteration < len(array_data):
                         self.logger.info(f"Using item at index {iteration} from array")
                         event["item"] = array_data[iteration]
@@ -181,31 +175,24 @@ class LambdaMiddleware:
                 else:
                     self.logger.info("No array found in payload, using the entire payload as the item")
                     event["item"] = payload_json
-                
+
                 self.logger.info("Successfully processed item with S3 reference and iteration")
             except Exception as e:
                 self.logger.error(f"Failed to process item with S3 reference: {str(e)}")
                 raise
 
-        # Check if this event has an external payload stored in S3
         if event.get("metadata", {}).get("externalPayload", False):
             try:
                 self.logger.info("Detected external payload flag, retrieving payload from S3")
-                
-                # Check for externalTaskResults first (new format)
                 if "payload" in event and "externalTaskResults" in event["payload"] and isinstance(event["payload"]["externalTaskResults"], list) and len(event["payload"]["externalTaskResults"]) > 0:
-                    # Handle the new format with item and iteration properties
                     if "item" in event["payload"]["externalTaskResults"][0]:
                         bucket = event["payload"]["externalTaskResults"][0]["item"]["bucket"]
                         key = event["payload"]["externalTaskResults"][0]["item"]["key"]
-                    # Handle the old format with direct bucket and key properties
                     else:
                         bucket = event["payload"]["externalTaskResults"][0]["bucket"]
                         key = event["payload"]["externalTaskResults"][0]["key"]
                     self.logger.info(f"Retrieving external payload from externalTaskResults: bucket={bucket}, key={key}")
-                # Fall back to externalPayloadLocation (old format)
                 elif "payload" in event and "externalPayloadLocation" in event["payload"]:
-                    # Handle both array and object formats for backward compatibility
                     if isinstance(event["payload"]["externalPayloadLocation"], list) and len(event["payload"]["externalPayloadLocation"]) > 0:
                         bucket = event["payload"]["externalPayloadLocation"][0]["bucket"]
                         key = event["payload"]["externalPayloadLocation"][0]["key"]
@@ -216,12 +203,9 @@ class LambdaMiddleware:
                 else:
                     self.logger.error("External payload flag is set but payload location is missing")
                     raise ValueError("External payload flag is set but payload location is missing")
-                
-                # Retrieve and process the payload
+
                 response = self.s3.get_object(Bucket=bucket, Key=key)
                 payload_data = response["Body"].read().decode("utf-8")
-                
-                # Replace the reference with the actual payload
                 event["payload"] = json.loads(payload_data)
                 event["metadata"]["externalPayload"] = False
                 self.logger.info("Successfully retrieved external payload from S3")
@@ -229,10 +213,18 @@ class LambdaMiddleware:
                 self.logger.error(f"Failed to retrieve external payload from S3: {str(e)}")
                 raise
 
+        # Ensure metadata exists and add common information.
         if "metadata" not in event:
             event["metadata"] = {}
         event["metadata"].update({"timestamp": int(time.time()), "service": self.service_name})
+
+        # --- New Code: Promote 'item' to 'payload' if not already standardized ---
+        if "payload" not in event and "item" in event:
+            # If pipelineAssets exist in item, they will now be part of the payload and later extracted
+            event["payload"] = event.pop("item")
+
         return event
+
 
     def standardize_output(self, result: Any, original_event: Dict[str, Any] = None) -> Dict[str, Any]:
         """
@@ -246,129 +238,132 @@ class LambdaMiddleware:
         # Ensure the handler's result is a dict; otherwise, wrap it.
         payload_content = result if isinstance(result, dict) else {"data": result}
 
-        # Build metadata according to the required standard.
+        # Determine the incoming stepStatus from the event metadata.
+        incoming_status = (original_event.get("metadata", {}).get("stepStatus")
+                        if original_event and "stepStatus" in original_event.get("metadata", {})
+                        else "InProgress")
+        updated_status = "Completed" if incoming_status == "InProgress" else incoming_status
+
+        # Build new metadata according to the required standard.
         metadata = {
-            "service": self.service_name,             # e.g., "S3EventIngest"
-            "stepName": "assetRegistration",           # Mandatory step name
-            "stepStatus": "Completed",                 # Expected to be one of: Started, InProgress, Completed
-            "stepId": str(uuid.uuid4()),               # Generate a unique ID
-            "externalTaskId": "",                      # Optional: set if applicable
-            "externalTaskStatus": "",                  # Optional: e.g., "completed", "inProgress", "Started"
-            "externalPayload": False,                  # Mandatory: True or False
-            "externalPayloadLocation": None,           # Optional: must be filled if externalPayload is True
-            "stepCost": "",                            # Optional cost information
-            "stepResult": "",                          # Optional result details
-            "stepDuration": ""                         # Optional duration info
+            "service": self.service_name,
+            "stepName": original_event.get("metadata", {}).get("stepName", "assetRegistration") if original_event else "assetRegistration",
+            "stepStatus": updated_status,
+            "stepId": str(uuid.uuid4()),
+            "externalTaskId": "",
+            "externalTaskStatus": "",
+            "externalPayload": False,
+            "externalPayloadLocation": None,
+            "stepCost": "",
+            "stepResult": "",
+            "stepDuration": "",
+            "pipelineAssets": []
         }
 
-        # Preserve existing assets array if it exists, or initialize a new one
-        # existing_assets = []
-        
-        # # Check if there's an existing assets array in the result
-        # if "assets" in payload_content:
-        #     existing_assets = payload_content["assets"]
-        #     self.logger.info(f"Found existing assets in result: {existing_assets}")
-        
-        # # Initialize assets array if it doesn't exist
-        # payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
+        # Carry over existing pipelineAssets if present.
+        existing_pipeline_assets = []
+        if "pipelineAssets" in payload_content:
+            existing_pipeline_assets = payload_content.pop("pipelineAssets")
+            self.logger.info("Found pipelineAssets at top level of payload_content")
+        elif "metadata" in payload_content and "pipelineAssets" in payload_content["metadata"]:
+            existing_pipeline_assets = payload_content["metadata"].pop("pipelineAssets")
+            self.logger.info("Found pipelineAssets inside payload_content['metadata']")
+        elif original_event and "metadata" in original_event and "pipelineAssets" in original_event["metadata"]:
+            existing_pipeline_assets = original_event["metadata"]["pipelineAssets"]
+            self.logger.info("Found pipelineAssets in original_event['metadata']")
+        elif original_event and "payload" in original_event and "pipelineAssets" in original_event["payload"]:
+            existing_pipeline_assets = original_event["payload"].pop("pipelineAssets")
+            self.logger.info("Found pipelineAssets in original_event['payload']")
 
-        # Preserve existing assets array if it exists, or initialize a new one
+
+        if isinstance(existing_pipeline_assets, list):
+            metadata["pipelineAssets"].extend(existing_pipeline_assets)
+        else:
+            self.logger.warning("pipelineAssets found but not a list; ignoring.")
+
+        # Preserve existing assets array if it exists.
         existing_assets = []
-
-        # Check if there's an existing assets array in the result
         if "assets" in payload_content:
             existing_assets = payload_content["assets"]
             self.logger.info(f"Found existing assets in result: {existing_assets}")
-        # If not in the result, check if there's an assets array in the original event's payload
         elif original_event and "payload" in original_event and "assets" in original_event["payload"]:
             existing_assets = original_event["payload"]["assets"]
             self.logger.info(f"Found existing assets in original event: {existing_assets}")
-
-        # Initialize assets array if it doesn't exist
         payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
-        
-        # Check if DigitalSourceAsset ID exists in the original event and add it to assets array
+
+        # --- New Code: Check for DigitalSourceAsset in original event detail ---
         if original_event and "detail" in original_event:
             detail = original_event.get("detail", {})
             outputs = detail.get("outputs", {})
             input_data = outputs.get("input", {})
-            
-            asset_id = input_data.get("DigitalSourceAsset", {}).get("ID")
+            digital_source_asset = input_data.get("DigitalSourceAsset", {})
+            asset_id = digital_source_asset.get("ID")
+            asset_location = ""
+            main_representation = digital_source_asset.get("MainRepresentation", {})
+            storage_info = main_representation.get("StorageInfo", None)
+            if storage_info:
+                primary_location = storage_info.get("PrimaryLocation", {})
+                asset_location = primary_location if primary_location else ""
             if asset_id:
                 self.logger.info(f"Found DigitalSourceAsset ID in event: {asset_id}")
-                # Add DigitalSourceAsset ID to assets array if not already present
-                if asset_id not in payload_content["assets"]:
-                    payload_content["assets"].append(asset_id)
-                    self.logger.info(f"Added DigitalSourceAsset Id to assets array: {asset_id}")
+                self.logger.info(f"Asset location: {asset_location}")
+                asset_exists = any(asset.get("assetId") == asset_id for asset in metadata["pipelineAssets"])
+                if not asset_exists:
+                    metadata["pipelineAssets"].append({
+                        "assetId": asset_id,
+                        "assetLocation": asset_location
+                    })
+                    self.logger.info(f"Added asset to pipelineAssets array: {asset_id}")
                 else:
-                    self.logger.info(f"DigitalSourceAsset ID already exists in assets array: {asset_id}")
-        
-        # Ensure all asset IDs in the array are unique
-        if payload_content["assets"]:
-            payload_content["assets"] = list(set(payload_content["assets"]))
-            self.logger.info(f"Final assets array after deduplication: {payload_content['assets']}")
+                    self.logger.info(f"Asset ID already exists in pipelineAssets array: {asset_id}")
 
-        output = {
-            "metadata": metadata,
-            "payload": payload_content
-        }
-        
-        # Check if the output size exceeds the maximum allowed size
+        output = {"metadata": metadata, "payload": payload_content}
+
+        # Check if the output size exceeds the maximum allowed size.
         output_size = len(json.dumps(output).encode("utf-8"))
         self.logger.info(f"Output size: {output_size} bytes")
-        
         if output_size > self.max_response_size:
             self.logger.info(f"Output size {output_size} exceeds limit {self.max_response_size}, storing payload in S3")
-            
-            # Generate a unique key for the S3 object
             workflow_id = original_event.get("metadata", {}).get("workflowId", "unknown")
             execution_id = original_event.get("metadata", {}).get("executionId", "unknown")
             step_id = metadata["stepId"]
             s3_key = f"{workflow_id}/{execution_id}/{step_id}-payload.json"
-            
             try:
-                # Store the payload in S3
                 self.s3.put_object(
                     Bucket=self.external_payload_bucket,
                     Key=s3_key,
                     Body=json.dumps(output["payload"])
                 )
                 self.logger.info(f"Large payload written to S3: {s3_key}")
-                
-                # Update the output to include a reference to the S3 location
-                # Use externalTaskResults to be consistent with the Map state expectations
                 output["metadata"]["externalPayload"] = True
-                
-                # Count the number of items in the payload array if it exists
-                item_count = 0
+
                 if isinstance(output["payload"], dict) and "externalTaskResults" in output["payload"] and isinstance(output["payload"]["externalTaskResults"], list):
                     item_count = len(output["payload"]["externalTaskResults"])
                     self.logger.info(f"Found {item_count} items in externalTaskResults array")
                 else:
-                    # Default to 1 item if we can't determine the count
                     item_count = 1
                     self.logger.info("Could not determine item count, defaulting to 1")
-                
-                # Create an array of references, one for each item in the original array
+
                 references = []
                 for i in range(item_count):
                     references.append({
-                        "item": {
-                            "bucket": self.external_payload_bucket,
-                            "key": s3_key
-                        },
+                        "item": {"bucket": self.external_payload_bucket, "key": s3_key},
                         "iteration": i
                     })
-                
-                output["payload"] = {
-                    "externalTaskResults": references
-                }
-                
+                output["payload"] = {"externalTaskResults": references}
                 self.logger.info(f"Created {len(references)} references to S3 object")
             except Exception as e:
                 self.logger.error(f"Failed to write payload to S3: {str(e)}")
                 raise
-        
+
+        # --- New Code: Move externalTaskId and externalTaskStatus from payload to metadata if present ---
+        if "externalTaskId" in payload_content:
+            metadata["externalTaskId"] = payload_content.pop("externalTaskId")
+            self.logger.info(f"Carried over externalTaskId: {metadata['externalTaskId']}")
+        if "externalTaskStatus" in payload_content:
+            metadata["externalTaskStatus"] = payload_content.pop("externalTaskStatus")
+            self.logger.info(f"Carried over externalTaskStatus: {metadata['externalTaskStatus']}")
+
         return output
 
     def emit_event(
@@ -445,13 +440,21 @@ class LambdaMiddleware:
                 self.metrics.add_dimension(name="Environment", value=os.getenv("ENVIRONMENT", "undefined"))
 
                 processed_event = self.standardize_input(event)
+                # Inject the Lambda function name into the metadata so that it can be used as stepName
+                if "metadata" not in processed_event:
+                    processed_event["metadata"] = {}
+                processed_event["metadata"]["stepName"] = context.function_name
+                # If stepStatus is not provided, inject a default status ("InProgress")
+                if "stepStatus" not in processed_event["metadata"]:
+                    processed_event["metadata"]["stepStatus"] = "InProgress"
+
                 context.emit_progress = lambda progress, status, detail=None: self.emit_progress(
                     context, progress, status, detail
                 )
 
                 self.retry_count = 0
                 self.retry_errors.clear()
-                
+
                 self.logger.info(f"Middleware before handler execution - function: {context.function_name}, request_id: {context.aws_request_id}")
 
                 while True:
@@ -490,7 +493,7 @@ class LambdaMiddleware:
                     self.metrics.add_metric(name="RetryAttempts", unit=MetricUnit.Count, value=self.retry_count)
                     for error_type in self.retry_errors:
                         self.metrics.add_metric(name=f"RetryErrors_{error_type}", unit=MetricUnit.Count, value=1)
-                
+
                 self.logger.info(f"Middleware after handler execution - function: {context.function_name}, request_id: {context.aws_request_id}")
 
                 processed_result = self.standardize_output(result, event)

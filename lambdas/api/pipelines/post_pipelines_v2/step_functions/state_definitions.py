@@ -260,7 +260,7 @@ class StateDefinitionFactory:
             
             # Ensure we have at least one choice in the Choices array
             if not choices:
-                choices = [{"variable": "$.payload.externalTaskStatus", "value": "ready"}]
+                choices = [{"variable": "$.metadata.externalTaskStatus", "value": "ready"}]
             
             # For Choice states, we'll set placeholder Next values that will be updated later
             # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
@@ -268,7 +268,7 @@ class StateDefinitionFactory:
                 "Type": "Choice",
                 "Choices": [
                     {
-                        "Variable": choice.get("variable", "$.payload.externalTaskStatus"),
+                        "Variable": choice.get("variable", "$.metadata.externalTaskStatus"),
                         "StringEquals": choice.get("value", "ready"),
                         "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
                     }
@@ -410,38 +410,58 @@ class StateDefinitionFactory:
                     "Default": f"{node.id}_StandardMap"
                 }
                 
+                # Get concurrency limit from parameters in configuration, default to 0
+                parameters = node.data.configuration.get("parameters", {})
+                concurrency_limit = parameters.get("ConcurrencyLimit", 0)
+                # Cap at maximum of 40
+                if concurrency_limit > 40:
+                    concurrency_limit = 40
+                    logger.info(f"Capped concurrency limit to maximum value of 40 for Map node {node.id}")
+                
+                logger.info(f"Using concurrency limit: {concurrency_limit} for Map node {node.id} with external payload support")
+                
                 # We'll need to add these states to the state machine later
                 # Store them as metadata in the state definition
+                map_state = {
+                    "Type": "Map",
+                    "ItemsPath": "$.payload.externalTaskResults",
+                    "Iterator": iterator,
+                    "End": True,
+                    "Parameters": {
+                        "item.$": "$$.Map.Item.Value"
+                    }
+                }
+                
+                # Only add MaxConcurrency if it's not zero
+                if concurrency_limit > 0:
+                    map_state["MaxConcurrency"] = concurrency_limit
+                    logger.info(f"Set MaxConcurrency to {concurrency_limit} for Map node {node.id}")
+                
+                # Create both Map states with the same configuration
                 state_def["__metadata__"] = {
                     "additionalStates": {
-                        f"{node.id}_Map": {
-                            "Type": "Map",
-                            "ItemsPath": "$.payload.externalTaskResults",
-                            "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
-                            "Iterator": iterator,
-                            "End": True,
-                            "Parameters": {
-                                "item.$": "$$.Map.Item.Value"
-                            }
-                        },
+                        f"{node.id}_Map": map_state,
                         f"{node.id}_StandardMap": {
-                            "Type": "Map",
-                            "ItemsPath": "$.payload.externalTaskResults",
-                            "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
-                            "Iterator": iterator,
-                            "End": True,
-                            "Parameters": {
-                                "item.$": "$$.Map.Item.Value"
-                            }
+                            **map_state  # Use the same configuration
                         }
                     }
                 }
             else:
                 # Standard Map state without support for externalPayloadLocation
+                # Get concurrency limit from parameters in configuration, default to 0
+                parameters = node.data.configuration.get("parameters", {})
+                concurrency_limit = parameters.get("ConcurrencyLimit", 0)
+                # Cap at maximum of 40
+                if concurrency_limit > 40:
+                    concurrency_limit = 40
+                    logger.info(f"Capped concurrency limit to maximum value of 40 for Map node {node.id}")
+                
+                logger.info(f"Using concurrency limit: {concurrency_limit} for Map node {node.id}")
+                
+                # Create base state definition
                 state_def = {
                     "Type": "Map",
                     "ItemsPath": items_path,
-                    "MaxConcurrency": node.data.configuration.get("maxConcurrency", 0),
                     "Iterator": iterator,
                     "End": True,
                     # Add Parameters with InputPath to handle potential path mismatches
@@ -449,6 +469,11 @@ class StateDefinitionFactory:
                         "item.$": "$$.Map.Item.Value"
                     }
                 }
+                
+                # Only add MaxConcurrency if it's not zero
+                if concurrency_limit > 0:
+                    state_def["MaxConcurrency"] = concurrency_limit
+                    logger.info(f"Set MaxConcurrency to {concurrency_limit} for Map node {node.id}")
         elif step_name == "pass":
             # Pass state
             result = node.data.configuration.get("result", None)

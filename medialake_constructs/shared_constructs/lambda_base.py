@@ -328,7 +328,7 @@ class Lambda(Construct):
             common_lambda_props["security_groups"] = config.security_groups
 
         # Create the Lambda function based on runtime
-        logger.debug(
+        logger.info(
             f"Creating {config.runtime.family} Lambda function with properties"
         )
         # Collect common libraries
@@ -382,7 +382,7 @@ class Lambda(Construct):
         """
         import shutil
         logger = Logger()
-
+  
         logger.debug(f"Ensuring target directory exists: {target_dir}")
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -467,6 +467,7 @@ class Lambda(Construct):
         )
 
         # Copy common libraries
+
         if common_libs:
             self._copy_common_libraries(common_libs, entry_path)
 

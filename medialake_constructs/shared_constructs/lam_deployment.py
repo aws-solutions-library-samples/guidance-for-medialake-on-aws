@@ -27,7 +27,8 @@ class LambdaDeployment(Construct):
     3. Simplifying deployment by bundling everything into a single package
 
     Example:
-    ```python
+    
+python
     # Create a Lambda deployment with layers
     lambda_deployment = LambdaDeployment(
         self,
@@ -49,7 +50,7 @@ class LambdaDeployment(Construct):
         runtime=lambda_.Runtime.PYTHON_3_12,
         # No need to specify layers here as they're already baked into the deployment
     )
-    ```
+
     """
 
     def __init__(
@@ -140,11 +141,24 @@ class LambdaDeployment(Construct):
                 check=True,
             )
 
+        # Copy source files to package directory
         for item in os.listdir(source_path):
             s = os.path.join(source_path, item)
             d = os.path.join(package_path, item)
             if os.path.isfile(s):
                 shutil.copy2(s, d)
+        
+        # Copy common libraries to package directory
+        common_libraries_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "lambdas", "common_libraries")
+        )
+        if os.path.exists(common_libraries_path):
+            for item in os.listdir(common_libraries_path):
+                s = os.path.join(common_libraries_path, item)
+                d = os.path.join(package_path, item)
+                if os.path.isfile(s):
+                    shutil.copy2(s, d)
+                    print(f"Copied common library: {item} to {package_path}")
 
         shutil.make_archive(zip_path.replace(".zip", ""), "zip", package_path)
 
