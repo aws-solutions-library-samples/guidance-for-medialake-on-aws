@@ -3,9 +3,7 @@ import { Triangle } from 'lucide-react';
 import {randomHexColor} from './utils'
 
 export const TIMELINE_STYLE: Partial<TimelineStyle> = {
-  stageMinWidth: 700,
-  stageMinHeight: 100,
-
+  stageMinHeight:100,
   rightPaneMarginLeft: 10,
   rightPaneMarginRight: 10,
   rightPaneClipPadding: 10,
@@ -55,7 +53,6 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
 }
 
 export const TIMELINE_LANE_STYLE: Partial<TimelineLaneStyle> = {
-  height: 30,
   marginBottom: 0,
   backgroundFill: '#edefee',
 }
