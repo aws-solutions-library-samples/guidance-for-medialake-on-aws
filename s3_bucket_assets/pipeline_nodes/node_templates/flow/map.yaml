@@ -18,7 +18,7 @@ actions:
       - in: body
         name: ItemsPath
         required: true
-        default: $.payload.externalTaskStatus
+        default: $.metadata.externalTaskStatus
         schema:
           type: string
           description: JSONPath that identifies the array to iterate over
