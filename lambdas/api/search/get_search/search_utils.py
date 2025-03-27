@@ -17,7 +17,10 @@ KEYWORDS = {
     'format': r'format:(\w+)',
     'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
     'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
-    'metadata': r'metadata:(\w+:\w+)'
+    'metadata': r'metadata:(\w+:\w+)',
+    'sort': r'sort:(asc|desc):([a-zA-Z0-9._]+)',
+    'ObjectKey.FullPath': r'ObjectKey\.FullPath:([a-zA-Z0-9._\-*/]+)',
+    'connector': r'connector:([a-zA-Z0-9._\-*/]+)'
 }
 
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
@@ -78,6 +81,22 @@ def parse_metadata_value(metadata_str: str) -> Optional[Dict]:
         logger.warning(f"Error parsing metadata value: {str(e)}")
         return None
 
+def parse_sort_value(sort_str: str) -> Optional[Dict]:
+    """Parse sort directive (e.g., 'asc:DigitalSourceAsset.CreateDate')"""
+    try:
+        direction, field = sort_str.split(':')
+        if direction not in ['asc', 'desc']:
+            logger.warning(f"Invalid sort direction: {direction}")
+            return None
+            
+        return {
+            'field': field,
+            'direction': direction
+        }
+    except Exception as e:
+        logger.warning(f"Error parsing sort value: {str(e)}")
+        return None
+
 def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
     """
     Parse search query to extract filters and clean search term
@@ -92,7 +111,11 @@ def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
         keyword_values = []
         
         for match in matches:
-            value = match.group(1)
+            if keyword == 'sort':
+                # Special handling for sort which has two capture groups
+                value = match.group(1) + ':' + match.group(2)
+            else:
+                value = match.group(1)
             
             # Process value based on keyword type
             if keyword == 'size':
@@ -101,6 +124,8 @@ def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
                 parsed_value = parse_date_value(value)
             elif keyword == 'metadata':
                 parsed_value = parse_metadata_value(value)
+            elif keyword == 'sort':
+                parsed_value = parse_sort_value(value)
             else:
                 parsed_value = value
                 
@@ -153,14 +178,10 @@ def generate_presigned_url(
     try:
         url = s3_client.generate_presigned_url(
             "get_object",
-            Params={
-                "Bucket": bucket,
-                "Key": key,
-                "ResponseContentDisposition": "inline",
-            },
+            Params={"Bucket": bucket, "Key": key},
             ExpiresIn=expiration,
         )
         return url
     except Exception as e:
-        logger.error(f"Error generating presigned URL: {str(e)}")
+        logger.warning(f"Error generating presigned URL: {str(e)}")
         return None

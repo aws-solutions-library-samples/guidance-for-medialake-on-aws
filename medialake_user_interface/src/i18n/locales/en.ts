@@ -308,7 +308,12 @@ export default {
             menu: {
                 rename: 'Rename',
                 delete: 'Delete'
-            }
+            },
+            choosePrefix: 'Choose Prefix',
+            currentPrefix: 'Current Prefix',
+            prefixPlaceholder: 'Select a prefix',
+            prefixRequired: 'Please select a prefix to view contents',
+            noObjects: 'No objects found in this location'
         },
         assets: {
             title: 'Assets',

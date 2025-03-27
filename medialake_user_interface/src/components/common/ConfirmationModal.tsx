@@ -1,80 +1,63 @@
 import React from 'react';
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Typography,
-    IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  CircularProgress
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import { ActionButton } from './button/ActionButton';
 
 interface ConfirmationModalProps {
-    open: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-    onCancel: () => void;
-    confirmText?: string;
-    cancelText?: string;
-    isLoading?: boolean;
+  open: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  isLoading?: boolean;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
-    open,
-    title,
-    message,
-    onConfirm,
-    onCancel,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
-    isLoading = false,
+  open,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  isLoading = false
 }) => {
-    return (
-        <Dialog
-            open={open}
-            onClose={onCancel}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{
-                sx: {
-                    borderRadius: 2,
-                    p: 1
-                }
-            }}
+  return (
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      aria-labelledby="confirmation-dialog-title"
+      aria-describedby="confirmation-dialog-description"
+    >
+      <DialogTitle id="confirmation-dialog-title">{title}</DialogTitle>
+      <DialogContent>
+        <DialogContentText id="confirmation-dialog-description">
+          {message}
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel} disabled={isLoading}>
+          {cancelText}
+        </Button>
+        <Button 
+          onClick={onConfirm} 
+          color="primary" 
+          variant="contained" 
+          autoFocus
+          disabled={isLoading}
+          startIcon={isLoading ? <CircularProgress size={16} color="inherit" /> : null}
         >
-            <DialogTitle sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                p: 2
-            }}>
-                <Typography variant="h6">{title}</Typography>
-                <IconButton onClick={onCancel} size="small">
-                    <CloseIcon />
-                </IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ p: 2 }}>
-                <Typography>{message}</Typography>
-            </DialogContent>
-            <DialogActions sx={{ p: 2, pt: 0 }}>
-                <ActionButton
-                    variant="outlined"
-                    onClick={onCancel}
-                    disabled={isLoading}
-                >
-                    {cancelText}
-                </ActionButton>
-                <ActionButton
-                    variant="contained"
-                    color="error"
-                    onClick={onConfirm}
-                    loading={isLoading}
-                >
-                    {confirmText}
-                </ActionButton>
-            </DialogActions>
-        </Dialog>
-    );
-}; 
+          {confirmText}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};

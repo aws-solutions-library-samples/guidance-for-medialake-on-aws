@@ -1,286 +1,298 @@
-import React, { useRef, useState } from 'react';
-import { Box, Typography, IconButton, TextField, Button, TableContainer } from '@mui/material';
+import React from 'react';
 import {
-    useReactTable,
-    getCoreRowModel,
-    getSortedRowModel,
-    getFilteredRowModel,
-    createColumnHelper,
-    type SortingState,
-    type ColumnFiltersState,
-    type Row,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { ResizableTable } from '../common/table';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { AssetAudio } from '../asset';
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Box,
+  TextField,
+  InputAdornment,
+  Avatar,
+  Typography,
+  useTheme,
+  alpha,
+  Tooltip,
+  Chip
+} from '@mui/material';
+import {
+  Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
+  Edit as EditIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  FilterList as FilterListIcon
+} from '@mui/icons-material';
+import { SortingState } from '@tanstack/react-table';
+import { AssetTableColumn } from '@/types/shared/assetComponents';
 
 export interface AssetTableProps<T> {
-    data: T[];
-    columns: AssetTableColumn<T>[];
-    sorting: SortingState;
-    onSortingChange: (sorting: SortingState) => void;
-    onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-    onMenuClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-    onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-    onAssetClick: (item: T) => void;
-    getThumbnailUrl: (item: T) => string;
-    getName: (item: T) => string;
-    getId: (item: T) => string;
-    getAssetType?: (item: T) => string;
-    editingId?: string;
-    editedName?: string;
-    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (item: T, save: boolean) => void;
-    onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
-    activeFilters?: Array<{ columnId: string; value: string }>;
-    onRemoveFilter?: (columnId: string) => void;
+  data: T[];
+  columns: AssetTableColumn<T>[];
+  sorting: SortingState;
+  onSortingChange: (sorting: SortingState) => void;
+  onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onMenuClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAssetClick: (asset: T) => void;
+  getThumbnailUrl: (asset: T) => string | undefined;
+  getName: (asset: T) => string;
+  getId: (asset: T) => string;
+  editingId?: string | null;
+  editedName?: string;
+  onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onEditNameComplete: (asset: T) => void;
+  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+  activeFilters?: Array<{ columnId: string; value: string }>;
+  onRemoveFilter?: (columnId: string) => void;
 }
 
 export function AssetTable<T>({
-    data,
-    columns,
-    sorting,
-    onSortingChange,
-    onDeleteClick,
-    onMenuClick,
-    onEditClick,
-    onAssetClick,
-    getThumbnailUrl,
-    getName,
-    getId,
-    getAssetType = () => 'Image', // Default to Image if not provided
-    editingId,
-    editedName,
-    onEditNameChange,
-    onEditNameComplete,
-    onFilterClick,
-    activeFilters = [],
-    onRemoveFilter,
-}: AssetTableProps<T>): React.ReactElement {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const columnHelper = createColumnHelper<T>();
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  data,
+  columns,
+  sorting,
+  onSortingChange,
+  onDeleteClick,
+  onMenuClick,
+  onEditClick,
+  onAssetClick,
+  getThumbnailUrl,
+  getName,
+  getId,
+  editingId,
+  editedName,
+  onEditNameChange,
+  onEditNameComplete,
+  onFilterClick,
+  activeFilters = [],
+  onRemoveFilter
+}: AssetTableProps<T>) {
+  const theme = useTheme();
 
-    const tableColumns = React.useMemo(() => {
-        const visibleColumns = columns.filter(col => col.visible);
-        return [
-            columnHelper.accessor(row => getThumbnailUrl(row), {
-                id: 'preview',
-                header: 'Preview',
-                size: 100,
-                enableSorting: false,
-                cell: info => {
-                    const assetType = getAssetType(info.row.original);
-                    
-                    if (assetType === 'Audio') {
-                        return (
-                            <Box sx={{ p: 1 }}>
-                                <Box
-                                    sx={{
-                                        width: 150,
-                                        height: 60,
-                                        borderRadius: 1,
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    <AssetAudio 
-                                        src={info.getValue()} 
-                                        alt={getName(info.row.original)}
-                                        compact={true}
-                                    />
-                                </Box>
-                            </Box>
-                        );
-                    }
-                    
-                    return (
-                        <Box sx={{ p: 1 }}>
-                            <Box
-                                component="img"
-                                src={info.getValue()}
-                                alt={getName(info.row.original)}
-                                sx={{
-                                    width: 60,
-                                    height: 60,
-                                    objectFit: 'cover',
-                                    borderRadius: 1,
-                                    display: 'block'
-                                }}
+  const handleSort = (columnId: string) => {
+    const currentSort = sorting[0];
+    const desc = currentSort?.id === columnId ? !currentSort.desc : false;
+    onSortingChange([{ id: columnId, desc }]);
+  };
+
+  const handleKeyDown = (asset: T, event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      onEditNameComplete(asset);
+    } else if (event.key === 'Escape') {
+      onEditNameComplete(asset);
+    }
+  };
+
+  return (
+    <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2 }}>
+      <Table sx={{ minWidth: 650 }} aria-label="assets table">
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ width: 60 }}></TableCell>
+            {columns
+              .filter((column) => column.visible)
+              .map((column) => (
+                <TableCell
+                  key={column.id}
+                  sx={{
+                    minWidth: column.minWidth,
+                    cursor: column.sortable ? 'pointer' : 'default',
+                    userSelect: 'none',
+                    '&:hover': {
+                      backgroundColor: column.sortable
+                        ? alpha(theme.palette.primary.main, 0.05)
+                        : 'inherit',
+                    },
+                  }}
+                  onClick={() => column.sortable && handleSort(column.id)}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                    }}
+                  >
+                    {column.label}
+                    {column.sortable &&
+                      sorting.some((sort) => sort.id === column.id) && (
+                        <Box component="span" sx={{ display: 'inline-flex' }}>
+                          {sorting.find((sort) => sort.id === column.id)
+                            ?.desc ? (
+                            <ArrowDownwardIcon
+                              fontSize="small"
+                              sx={{ fontSize: '0.85rem' }}
                             />
+                          ) : (
+                            <ArrowUpwardIcon
+                              fontSize="small"
+                              sx={{ fontSize: '0.85rem' }}
+                            />
+                          )}
                         </Box>
-                    );
-                }
-            }),
-            ...visibleColumns.map(col => columnHelper.accessor(
-                row => col.accessorFn ? col.accessorFn(row) : (row as any)[col.id],
-                {
-                    id: col.id,
-                    header: col.label,
-                    size: col.minWidth,
-                    enableSorting: true,
-                    cell: info => {
-                        if (col.id === 'name' && onEditClick) {
-                            const isEditing = editingId === getId(info.row.original);
-                            return (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
-                                    {isEditing ? (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                                            <TextField
-                                                value={editedName}
-                                                onChange={onEditNameChange}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    } else if (e.key === 'Escape') {
-                                                        onEditNameComplete?.(info.row.original, false);
-                                                    }
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                autoFocus
-                                                size="small"
-                                                sx={{ flex: 1 }}
-                                            />
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                                <Button
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    }}
-                                                    variant="contained"
-                                                >
-                                                    Save
-                                                </Button>
-                                                <Button
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, false);
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </Box>
-                                        </Box>
-                                    ) : (
-                                        <>
-                                            <Typography>{info.getValue()}</Typography>
-                                            <IconButton
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onEditClick(info.row.original, e);
-                                                }}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </>
-                                    )}
-                                </Box>
-                            );
-                        }
-                        return (
-                            <Box sx={{ p: 1 }}>
-                                {col.cell ? col.cell(info) : info.getValue()}
-                            </Box>
-                        );
-                    }
-                }
-            )),
-            columnHelper.display({
-                id: 'actions',
-                header: 'Actions',
-                size: 100,
-                cell: info => (
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', p: 1 }}>
-                        <IconButton
+                      )}
+                    
+                    {onFilterClick && (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onFilterClick(e, column.id);
+                        }}
+                        sx={{ ml: 0.5, p: 0.25 }}
+                      >
+                        <FilterListIcon fontSize="small" sx={{ fontSize: '0.85rem' }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                  
+                  {activeFilters && activeFilters.some(f => f.columnId === column.id) && (
+                    <Box sx={{ mt: 0.5 }}>
+                      {activeFilters
+                        .filter(f => f.columnId === column.id)
+                        .map((filter, index) => (
+                          <Chip
+                            key={index}
+                            label={filter.value}
                             size="small"
-                            onClick={(e) => onDeleteClick(info.row.original, e)}
-                        >
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            size="small"
-                            onClick={(e) => onMenuClick(info.row.original, e)}
-                            id={`asset-menu-button-${getId(info.row.original)}`}
-                            aria-haspopup="true"
-                            sx={{
-                                position: 'relative',
-                                zIndex: 1
-                            }}
-                        >
-                            <MoreVertIcon fontSize="small" />
-                        </IconButton>
+                            onDelete={() => onRemoveFilter && onRemoveFilter(filter.columnId)}
+                            sx={{ mr: 0.5, height: 20, fontSize: '0.7rem' }}
+                          />
+                        ))}
                     </Box>
-                )
-            })
-        ];
-    }, [columns, editingId, editedName]);
-
-    const table = useReactTable({
-        data,
-        columns: tableColumns,
-        state: {
-            sorting,
-            columnFilters,
-        },
-        onSortingChange,
-        onColumnFiltersChange: setColumnFilters,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        filterFns: {
-            includesString: (row, columnId, filterValue) => {
-                const value = String(row.getValue(columnId) || '').toLowerCase();
-                return value.includes(String(filterValue).toLowerCase());
-            }
-        },
-    });
-
-    const { rows } = table.getRowModel();
-    const rowVirtualizer = useVirtualizer({
-        count: rows.length,
-        getScrollElement: () => containerRef.current,
-        estimateSize: () => 53,
-        overscan: 20,
-    });
-
-    const handleRowClick = (row: Row<T>) => {
-        if (!editingId) {
-            onAssetClick(row.original);
-        }
-    };
-
-    return (
-        <TableContainer 
-            sx={{ 
-                maxHeight: '100%',
-                overflowY: 'visible',
-                width: '100%',
-                border: 'none',
-                '& .MuiTable-root': {
-                    borderCollapse: 'separate',
-                    borderSpacing: 0,
-                }
-            }}
-        >
-            <ResizableTable
-                table={table}
-                containerRef={containerRef}
-                virtualizer={rowVirtualizer}
-                rows={rows}
-                onRowClick={handleRowClick}
-                maxHeight="none"
-                onFilterClick={onFilterClick}
-                activeFilters={activeFilters}
-                onRemoveFilter={onRemoveFilter}
-            />
-        </TableContainer>
-    );
+                  )}
+                </TableCell>
+              ))}
+            <TableCell align="right" sx={{ width: 120 }}>
+              Actions
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {data.map((row) => (
+            <TableRow
+              key={getId(row)}
+              sx={{
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                },
+                cursor: 'pointer',
+              }}
+              onClick={() => onAssetClick(row)}
+            >
+              <TableCell
+                sx={{ width: 60, p: 1 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Avatar
+                  variant="rounded"
+                  src={getThumbnailUrl(row)}
+                  alt={getName(row)}
+                  sx={{ width: 40, height: 40 }}
+                >
+                  {getName(row).charAt(0).toUpperCase()}
+                </Avatar>
+              </TableCell>
+              {columns
+                .filter((column) => column.visible)
+                .map((column) => (
+                  <TableCell key={column.id}>
+                    {column.id === 'name' && editingId === getId(row) ? (
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        value={editedName}
+                        onChange={onEditNameChange}
+                        onKeyDown={(e) => handleKeyDown(row, e)}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditNameComplete(row);
+                                }}
+                                edge="end"
+                              >
+                                <CheckIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditNameComplete(row);
+                                }}
+                                edge="end"
+                              >
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    ) : column.cell ? (
+                      column.cell({
+                        getValue: () => column.accessorFn?.(row),
+                        row: { original: row },
+                      } as any)
+                    ) : (
+                      <Typography variant="body2">
+                        {column.accessorFn?.(row)?.toString() || ''}
+                      </Typography>
+                    )}
+                  </TableCell>
+                ))}
+              <TableCell
+                align="right"
+                sx={{ width: 120 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Tooltip title="Edit">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => onEditClick(row, e)}
+                      sx={{ color: theme.palette.text.secondary }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => onDeleteClick(row, e)}
+                      sx={{ color: theme.palette.error.main }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="More">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => onMenuClick(row, e)}
+                      id={`asset-menu-button-${getId(row)}`}
+                      aria-controls={`asset-menu-${getId(row)}`}
+                      aria-haspopup="true"
+                      sx={{ color: theme.palette.text.secondary }}
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 }
-
-export default AssetTable;

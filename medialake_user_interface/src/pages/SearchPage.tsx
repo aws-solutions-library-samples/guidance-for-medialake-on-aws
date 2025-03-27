@@ -1,33 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { formatDate } from '@/utils/dateFormat';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
     LinearProgress,
     Paper,
-    Menu,
-    MenuItem,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogContentText,
-    DialogActions,
-    Button
+    useTheme,
+    alpha
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
-import UnifiedResultsView from '../components/search/UnifiedResultsView';
 import { useSearch } from '../api/hooks/useSearch';
-import { useAssetOperations } from '@/hooks/useAssetOperations';
-import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
-import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
+import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
-
-type AssetItem = ImageItem | VideoItem | AudioItem;
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
-import { alpha } from '@mui/material/styles';
+import { formatFileSize } from '@/utils/fileSize';
+import { formatDate } from '@/utils/dateFormat';
+import AssetDisplay from '../components/shared/AssetDisplay';
+
+type AssetItem = any;
 
 interface LocationState {
     query?: string;
@@ -58,6 +50,7 @@ interface Filters {
 const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
+    const theme = useTheme();
     const location = useLocation();
     const { query, isSemantic } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
@@ -115,61 +108,17 @@ const SearchPage: React.FC = () => {
     );
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [editingAssetId, setEditingAssetId] = useState<string>();
-    const [editedName, setEditedName] = useState<string>();
 
-    const {
-        handleDeleteClick,
-        handleMenuOpen,
-        handleStartEditing,
-        handleNameChange,
-        handleNameEditComplete,
-        handleMenuClose,
-        handleAction,
-        handleDeleteConfirm,
-        handleDeleteCancel,
-        editingAssetId: currentEditingAssetId,
-        editedName: currentEditedName,
-        isDeleteModalOpen,
-        menuAnchorEl,
-        selectedAsset,
-    } = useAssetOperations<AssetItem>();
-
-    const handleAssetClick = useCallback((asset: AssetItem) => {
-        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
-        // Special case for audio to use singular form
-        const pathPrefix = assetType === 'audio' ? '/audio/' : `/${assetType}s/`;
-        navigate(`${pathPrefix}${asset.InventoryID}`, {
-            state: { 
-                assetType: asset.DigitalSourceAsset.Type,
-                searchTerm: currentQuery
-            }
-        });
-    }, [navigate, currentQuery]);
-
-    useEffect(() => {
-        setEditingAssetId(currentEditingAssetId || undefined);
-        setEditedName(currentEditedName);
-    }, [currentEditingAssetId, currentEditedName]);
-
-    const formatFileSize = (sizeInBytes: number) => {
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        let i = 0;
-        let size = sizeInBytes;
-        while (size >= 1024 && i < sizes.length - 1) {
-            size /= 1024;
-            i++;
-        }
-        return `${Math.round(size * 100) / 100} ${sizes[i]}`;
-    };
-
+    // Card fields configuration
     const [cardFields, setCardFields] = useState([
-        { id: 'name', label: 'Object Name', visible: true },
+        { id: 'name', label: 'Name', visible: true },
         { id: 'type', label: 'Type', visible: true },
         { id: 'format', label: 'Format', visible: true },
-        { id: 'createdAt', label: 'Date Created', visible: true },
+        { id: 'size', label: 'Size', visible: true },
+        { id: 'date', label: 'Date', visible: true },
     ]);
 
+    // Table columns configuration
     const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
         {
             id: 'name',
@@ -177,7 +126,7 @@ const SearchPage: React.FC = () => {
             visible: true,
             minWidth: 200,
             accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
+            cell: (info: any) => info.getValue(),
             sortable: true,
             sortingFn: (rowA, rowB) => rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
                 rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
@@ -207,7 +156,7 @@ const SearchPage: React.FC = () => {
             visible: true,
             minWidth: 100,
             accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            cell: (info: CellContext<AssetItem, unknown>) => formatFileSize(info.getValue() as number),
+            cell: (info: any) => formatFileSize(info.getValue()),
             sortable: true,
             sortingFn: (rowA, rowB) => {
                 const a = rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
@@ -217,13 +166,11 @@ const SearchPage: React.FC = () => {
         },
         {
             id: 'date',
-            label: 'Date Created',
+            label: 'Date',
             visible: true,
             minWidth: 150,
             accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
-            cell: (info: CellContext<AssetItem, unknown>) => {
-                return formatDate(info.getValue() as string);
-            },
+            cell: (info: any) => formatDate(info.getValue()),
             sortable: true,
             sortingFn: (rowA, rowB) => {
                 const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
@@ -249,35 +196,33 @@ const SearchPage: React.FC = () => {
         ));
     };
 
-    const filteredResults = searchResults?.data?.results?.filter(item => {
-        const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
-        const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
-        const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+    const handleAssetClick = (asset: AssetItem) => {
+        const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+        navigate(`/${assetType}s/${asset.InventoryID}`, {
+            state: { 
+                assetType: asset.DigitalSourceAsset.Type,
+                searchTerm: currentQuery
+            }
+        });
+    };
 
-        // Time-based filtering
-        const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
-        const now = new Date();
-        const timeDiff = now.getTime() - createdAt.getTime();
-        const isRecent = filters.time.recent && (timeDiff <= 24 * 60 * 60 * 1000);
-        const isLastWeek = filters.time.lastWeek && (timeDiff <= 7 * 24 * 60 * 60 * 1000);
-        const isLastMonth = filters.time.lastMonth && (timeDiff <= 30 * 24 * 60 * 60 * 1000);
-        const isLastYear = filters.time.lastYear && (timeDiff <= 365 * 24 * 60 * 60 * 1000);
-
-        const passesTimeFilter = !filters.time.recent && !filters.time.lastWeek && !filters.time.lastMonth && !filters.time.lastYear ||
-            isRecent || isLastWeek || isLastMonth || isLastYear;
-
-        return (isImage || isVideo || isAudio) && passesTimeFilter;
-    }) || [];
-
-    const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
-    const videoResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Video');
-    const audioResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Audio');
-
-    const [expandedSections, setExpandedSections] = useState({
-        mediaTypes: true,
-        time: true,
-        status: true,
-    });
+    // Get field value for card display
+    const getFieldValue = (fieldId: string, asset: AssetItem) => {
+        switch (fieldId) {
+            case 'name':
+                return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+            case 'type':
+                return asset.DigitalSourceAsset.Type;
+            case 'format':
+                return asset.DigitalSourceAsset.MainRepresentation.Format;
+            case 'size':
+                return formatFileSize(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size);
+            case 'date':
+                return formatDate(asset.DigitalSourceAsset.CreateDate);
+            default:
+                return '';
+        }
+    };
 
     useEffect(() => {
         if ((query && !searchParams.has('q')) || (isSemantic !== undefined && !searchParams.has('semantic'))) {
@@ -310,6 +255,12 @@ const SearchPage: React.FC = () => {
             return newFilters;
         });
     };
+
+    const [expandedSections, setExpandedSections] = useState({
+        mediaTypes: true,
+        time: true,
+        status: true,
+    });
 
     const handleSectionToggle = (section: string) => {
         setExpandedSections(prev => ({
@@ -350,6 +301,47 @@ const SearchPage: React.FC = () => {
             return prev;
         });
     };
+
+    // Filter results based on selected filters
+    const filteredResults = searchResults?.data?.results?.filter(item => {
+        const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
+        const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
+        const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+
+        // Time-based filtering
+        const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
+        const now = new Date();
+        const timeDiff = now.getTime() - createdAt.getTime();
+        const isRecent = filters.time.recent && (timeDiff <= 24 * 60 * 60 * 1000);
+        const isLastWeek = filters.time.lastWeek && (timeDiff <= 7 * 24 * 60 * 60 * 1000);
+        const isLastMonth = filters.time.lastMonth && (timeDiff <= 30 * 24 * 60 * 60 * 1000);
+        const isLastYear = filters.time.lastYear && (timeDiff <= 365 * 24 * 60 * 60 * 1000);
+
+        const passesTimeFilter = !filters.time.recent && !filters.time.lastWeek && !filters.time.lastMonth && !filters.time.lastYear ||
+            isRecent || isLastWeek || isLastMonth || isLastYear;
+
+        return (isImage || isVideo || isAudio) && passesTimeFilter;
+    }) || [];
+
+    // Create the search results title with count
+    const searchResultsTitle = (
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <Typography variant="h5" sx={{
+                fontWeight: 700,
+                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+            }}>
+                Search Results
+            </Typography>
+            {searchResults?.data?.searchMetadata?.totalResults !== undefined && (
+                <Typography component="span" variant="body2" sx={{ color: 'text.secondary' }}>
+                    ({searchResults.data.searchMetadata.totalResults} items)
+                </Typography>
+            )}
+        </Box>
+    );
 
     return (
         <RightSidebarProvider>
@@ -429,87 +421,86 @@ const SearchPage: React.FC = () => {
                         )}
 
                         {filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error && (
-                            <UnifiedResultsView
-                                results={filteredResults}
-                                searchMetadata={{
-                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
-                                    page: currentPage,
-                                    pageSize: pageSize,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                onPageSizeChange={handlePageSizeChange}
-                                searchTerm={currentQuery}
-                                groupByType={groupByType}
-                                onGroupByTypeChange={setGroupByType}
+                            <AssetDisplay
+                                assets={filteredResults}
+                                totalCount={searchResults.data.searchMetadata.totalResults || 0}
+                                page={currentPage}
+                                pageSize={pageSize}
                                 viewMode={viewMode}
-                                onViewModeChange={handleViewModeChange}
                                 cardSize={cardSize}
-                                onCardSizeChange={setCardSize}
                                 aspectRatio={aspectRatio}
-                                onAspectRatioChange={setAspectRatio}
                                 thumbnailScale={thumbnailScale}
-                                onThumbnailScaleChange={setThumbnailScale}
                                 showMetadata={showMetadata}
-                                onShowMetadataChange={setShowMetadata}
-                                sorting={sorting}
-                                onSortChange={setSorting}
+                                groupByType={groupByType}
                                 cardFields={cardFields}
-                                onCardFieldToggle={handleCardFieldToggle}
                                 columns={columns}
-                                onColumnToggle={handleColumnToggle}
+                                sorting={sorting}
+                                getId={(asset) => asset.InventoryID}
+                                getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                getType={(asset) => asset.DigitalSourceAsset.Type}
+                                getThumbnailUrl={(asset) => asset.thumbnailUrl}
+                                getProxyUrl={(asset) => asset.proxyUrl}
+                                getField={getFieldValue}
                                 onAssetClick={handleAssetClick}
-                                onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleMenuOpen}
-                                onEditClick={handleStartEditing}
-                                onEditNameChange={handleNameChange}
-                                onEditNameComplete={handleNameEditComplete}
-                                editingAssetId={editingAssetId}
-                                editedName={editedName}
+                                onPageChange={(page) => handleSearch({ page })}
+                                onPageSizeChange={handlePageSizeChange}
+                                onViewModeChange={handleViewModeChange}
+                                onCardSizeChange={setCardSize}
+                                onAspectRatioChange={setAspectRatio}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                onShowMetadataChange={setShowMetadata}
+                                onGroupByTypeChange={setGroupByType}
+                                onCardFieldToggle={handleCardFieldToggle}
+                                onColumnToggle={handleColumnToggle}
+                                onSortChange={setSorting}
+                                title={searchResultsTitle}
+                                error={error ? { 
+                                    status: (error as SearchError).apiResponse?.status || error.name, 
+                                    message: (error as SearchError).apiResponse?.message || error.message 
+                                } : null}
+                                isLoading={isLoading}
                             />
                         )}
 
-                        {error && (
-                            <UnifiedResultsView
-                                results={[]}
-                                searchMetadata={{
-                                    totalResults: 0,
-                                    page: currentPage,
-                                    pageSize: pageSize,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                onPageSizeChange={handlePageSizeChange}
-                                searchTerm={currentQuery}
-                                groupByType={groupByType}
-                                onGroupByTypeChange={setGroupByType}
+                        {error && !filteredResults.length && (
+                            <AssetDisplay
+                                assets={[]}
+                                totalCount={0}
+                                page={currentPage}
+                                pageSize={pageSize}
                                 viewMode={viewMode}
-                                onViewModeChange={handleViewModeChange}
                                 cardSize={cardSize}
-                                onCardSizeChange={setCardSize}
                                 aspectRatio={aspectRatio}
-                                onAspectRatioChange={setAspectRatio}
                                 thumbnailScale={thumbnailScale}
-                                onThumbnailScaleChange={setThumbnailScale}
                                 showMetadata={showMetadata}
-                                onShowMetadataChange={setShowMetadata}
-                                sorting={sorting}
-                                onSortChange={setSorting}
+                                groupByType={groupByType}
                                 cardFields={cardFields}
-                                onCardFieldToggle={handleCardFieldToggle}
                                 columns={columns}
-                                onColumnToggle={handleColumnToggle}
+                                sorting={sorting}
+                                getId={(asset) => asset.InventoryID}
+                                getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+                                getType={(asset) => asset.DigitalSourceAsset.Type}
+                                getThumbnailUrl={(asset) => asset.thumbnailUrl}
+                                getProxyUrl={(asset) => asset.proxyUrl}
+                                getField={getFieldValue}
                                 onAssetClick={handleAssetClick}
-                                onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleMenuOpen}
-                                onEditClick={handleStartEditing}
-                                onEditNameChange={handleNameChange}
-                                onEditNameComplete={handleNameEditComplete}
-                                editingAssetId={editingAssetId}
-                                editedName={editedName}
-                                error={{
-                                    status: (error as SearchError).apiResponse?.status || error.name,
-                                    message: (error as SearchError).apiResponse?.message || error.message
+                                onPageChange={(page) => handleSearch({ page })}
+                                onPageSizeChange={handlePageSizeChange}
+                                onViewModeChange={handleViewModeChange}
+                                onCardSizeChange={setCardSize}
+                                onAspectRatioChange={setAspectRatio}
+                                onThumbnailScaleChange={setThumbnailScale}
+                                onShowMetadataChange={setShowMetadata}
+                                onGroupByTypeChange={setGroupByType}
+                                onCardFieldToggle={handleCardFieldToggle}
+                                onColumnToggle={handleColumnToggle}
+                                onSortChange={setSorting}
+                                title={searchResultsTitle}
+                                error={{ 
+                                    status: (error as SearchError).apiResponse?.status || error.name, 
+                                    message: (error as SearchError).apiResponse?.message || error.message 
                                 }}
-                                isLoading={isLoading || isFetching}
+                                isLoading={isLoading}
                             />
                         )}
                     </Box>
@@ -525,72 +516,6 @@ const SearchPage: React.FC = () => {
                         />
                     </RightSidebar>
                 </Box>
-
-                {/* Asset Menu */}
-                <Menu
-                    anchorEl={menuAnchorEl}
-                    open={Boolean(menuAnchorEl)}
-                    onClose={handleMenuClose}
-                    MenuListProps={{
-                        'aria-labelledby': selectedAsset ? `asset-menu-button-${selectedAsset.InventoryID}` : undefined
-                    }}
-                    anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            borderRadius: '8px',
-                            minWidth: 200,
-                            mt: 1,
-                            border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            backgroundColor: theme => theme.palette.background.paper,
-                            overflow: 'visible',
-                            position: 'fixed',
-                            zIndex: 1400,
-                        },
-                    }}
-                    slotProps={{
-                        paper: {
-                            sx: {
-                                overflow: 'visible',
-                                position: 'fixed',
-                            }
-                        }
-                    }}
-                >
-                    <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
-                    <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
-                    <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
-                </Menu>
-
-                {/* Delete Confirmation Dialog */}
-                <Dialog
-                    open={isDeleteModalOpen}
-                    onClose={handleDeleteCancel}
-                    aria-labelledby="delete-dialog-title"
-                    aria-describedby="delete-dialog-description"
-                >
-                    <DialogTitle id="delete-dialog-title">
-                        Confirm Delete
-                    </DialogTitle>
-                    <DialogContent>
-                        <DialogContentText id="delete-dialog-description">
-                            Are you sure you want to delete this asset? This action cannot be undone.
-                        </DialogContentText>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleDeleteCancel}>Cancel</Button>
-                        <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-                            Delete
-                        </Button>
-                    </DialogActions>
-                </Dialog>
             </>
         </RightSidebarProvider>
     );
