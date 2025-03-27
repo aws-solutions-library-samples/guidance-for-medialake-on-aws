@@ -3,8 +3,8 @@ import { MarkerLane, MomentMarker, OmakasePlayer, PeriodMarker, Timeline } from 
 import { filter } from 'rxjs';
 import { SCRUBBER_LANE_STYLE, SCRUBBER_LANE_STYLE_DARK, TIMELINE_LANE_STYLE, TIMELINE_LANE_STYLE_DARK, TIMELINE_STYLE, TIMELINE_STYLE_DARK } from './OmakaseTimeLineConstants';
 import { randomHexColor } from './utils';
-import './VideoViewer.css';
 import { Box, Stack, Paper } from '@mui/material';
+import './OmakasePlayer.css'
 
 interface VideoViewerProps {
     videoSrc: string;
@@ -29,7 +29,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(({ video
                 let periodMarker = new PeriodMarker({
                     timeObservation: {
                       start: ompRef.current.video.getCurrentTime(),
-                      end: ompRef.current.video.getCurrentTime() + 20,
+                      end: ompRef.current.video.getCurrentTime() + 5,
                     },
                     editable: true,
                     style: {
@@ -47,7 +47,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(({ video
     useEffect(()=>{
         ompRef.current = new OmakasePlayer({
             playerHTMLElementId: 'omakase-player',
-            mediaChrome: 'enabled'
+            mediaChrome: 'enabled',
+            
           });
           ompRef.current.loadVideo(videoSrc, 60)
           ompRef.current.createTimeline({
