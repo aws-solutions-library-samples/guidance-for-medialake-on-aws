@@ -300,7 +300,6 @@ function AssetResults<T extends AssetBase>({
                         getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}
                         getName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
                         getId={(asset) => asset.InventoryID}
-                        getAssetType={(asset) => asset.DigitalSourceAsset.Type}
                         editingId={editingAssetId}
                         editedName={editedName}
                         onEditNameChange={handleNameChange}
@@ -326,14 +325,11 @@ function AssetResults<T extends AssetBase>({
                     onAction={handleAction}
                     actions={[
                         { id: 'rename', label: 'Rename' },
+                        { id: 'share', label: 'Share' },
                         { id: 'download', label: 'Download' },
                         { id: 'delete', label: 'Delete' }
                     ]}
-                    isLoading={{
-                        rename: isLoading.rename,
-                        download: isLoading.download,
-                        delete: isLoading.delete
-                    }}
+                    isLoading={isLoading}
                 />
 
                 <ConfirmationModal
