@@ -98,9 +98,108 @@ Conditions:
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
 
 Resources:
-  # IAM Roles
+  # Add the Service Linked Role Manager resources first
+  ServiceLinkedRoleFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt ServiceLinkedRoleManagerRole.Arn
+      Runtime: python3.12
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+          
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          def check_and_create_role(service_name):
+              """Check if service-linked role exists and create if it doesn't"""
+              iam = boto3.client('iam')
+              role_name = f"AWSServiceRoleFor{service_name.split('.')[0].upper()}"
+              
+              try:
+                  # Check if role exists
+                  iam.get_role(RoleName=role_name)
+                  logger.info(f"Role {role_name} already exists")
+                  return True
+              except iam.exceptions.NoSuchEntityException:
+                  try:
+                      # Create service-linked role
+                      iam.create_service_linked_role(AWSServiceName=service_name)
+                      logger.info(f"Created service-linked role for {service_name}")
+                      return True
+                  except Exception as e:
+                      if 'Role already exists' in str(e):
+                          logger.info(f"Role already exists for {service_name}")
+                          return True
+                      logger.error(f"Error creating role for {service_name}: {str(e)}")
+                      return False
+              except Exception as e:
+                  logger.error(f"Error checking role {role_name}: {str(e)}")
+                  return False
+          
+          def handler(event, context):
+              logger.info(f"Received event: {event}")
+              
+              # List of services that need service-linked roles
+              services = [
+                  'es.amazonaws.com',
+                  'opensearchservice.amazonaws.com',
+                  'osis.amazonaws.com'
+              ]
+              
+              response_data = {}
+              
+              if event['RequestType'] in ['Create', 'Update']:
+                  success = True
+                  for service in services:
+                      if not check_and_create_role(service):
+                          success = False
+                          response_data['Error'] = f"Failed to create role for {service}"
+                          break
+                  
+                  status = cfnresponse.SUCCESS if success else cfnresponse.FAILED
+                  cfnresponse.send(event, context, status, response_data)
+              else:
+                  # Delete event - nothing to clean up as service-linked roles are managed by AWS
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+  ServiceLinkedRoleManagerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: ServiceLinkedRoleManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:CreateServiceLinkedRole'
+                  - 'iam:GetRole'
+                Resource: '*'
+
+  ServiceLinkedRoleManager:
+    Type: Custom::ServiceLinkedRoleManager
+    DependsOn: ServiceLinkedRoleFunction
+    Properties:
+      ServiceToken: !GetAtt ServiceLinkedRoleFunction.Arn
+
+  # Modify existing IAM roles to depend on ServiceLinkedRoleManager
   CodeBuildServiceRole:
     Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -147,6 +246,7 @@ Resources:
 
   CDKDeployRole:
     Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -160,6 +260,7 @@ Resources:
 
   CodePipelineServiceRole:
     Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -337,6 +438,7 @@ Resources:
 
   BuildProject:
     Type: 'AWS::CodeBuild::Project'
+    DependsOn: ServiceLinkedRoleManager
     Properties:
       Name: !Sub '${PipelineName}-BuildProject'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
@@ -420,6 +522,7 @@ Resources:
 
   DeployProject:
     Type: 'AWS::CodeBuild::Project'
+    DependsOn: ServiceLinkedRoleManager
     Properties:
       Name: !Sub '${PipelineName}-DeployProject'
       ServiceRole: !GetAtt CDKDeployRole.Arn

@@ -38,18 +38,23 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PreviewIcon from '@mui/icons-material/Preview';
 import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { RefObject } from 'react';
+import { VideoViewer, VideoViewerRef } from '../common/VideoViewer';
 
 interface AssetSidebarProps {
     versions?: any[];
     comments?: any[];
     onAddComment?: (comment: string) => void;
+    videoViewerRef?: RefObject<VideoViewerRef>;
 }
 
 interface AssetVersionProps {
     versions: any[];
 }
 
-interface AssetMarkersProps {}
+interface AssetMarkersProps {
+    onMarkerAdd?: () => void;  // Add this
+}
 
 interface AssetCollaborationProps {
     comments?: any[];
@@ -169,7 +174,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 };
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = () => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
     const theme = useTheme();
     
     return (
@@ -178,28 +183,13 @@ const AssetMarkers: React.FC<AssetMarkersProps> = () => {
                 Add time markers to highlight important moments in your media.
             </Typography>
             
-            <Paper 
-                variant="outlined" 
-                sx={{ 
-                    p: 2, 
-                    mb: 2, 
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                    borderColor: alpha(theme.palette.primary.main, 0.2),
-                    borderRadius: theme.shape.borderRadius,
-                }}
-            >
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>No markers added yet</Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Create your first marker by clicking the "Add Marker" button below.
-                </Typography>
-            </Paper>
-            
             <Tooltip title="Create a new time marker">
                 <Button 
                     variant="contained" 
                     fullWidth 
                     sx={{ mt: 1 }}
                     startIcon={<BookmarkIcon />}
+                    onClick={onMarkerAdd}
                 >
                     Add Marker
                 </Button>
@@ -471,17 +461,23 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
         </Box>
     );
 };
-
-const AssetSidebar: React.FC<AssetSidebarProps> = ({
-    versions = [],
-    comments = [],
-    onAddComment
-}) => {
+export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versions = [],comments = [],onAddComment }) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
+    };
+    // Add this handler
+    const handleAddMarker = () => {
+        console.log("handleAddMarker called"); // Debug log
+        console.log("videoViewerRef:", videoViewerRef); // Debug log
+        if (videoViewerRef?.current) {
+            console.log("Calling hello function"); // Debug log
+            videoViewerRef.current.hello();
+        } else {
+            console.log("videoViewerRef.current is null"); // Debug log
+        }
     };
 
     return (
@@ -629,7 +625,14 @@ const AssetSidebar: React.FC<AssetSidebarProps> = ({
                         aria-labelledby="sidebar-tab-0"
                         sx={{ height: '100%', overflow: 'auto' }}
                     >
-                        {currentTab === 0 && <AssetMarkers />}
+                                        {currentTab === 0 && (
+                    <AssetMarkers 
+                        onMarkerAdd={() => {
+                            console.log("AssetMarkers onMarkerAdd called"); // Debug log
+                            handleAddMarker();
+                        }} 
+                    />
+                )}
                     </Box>
                     
                     <Box

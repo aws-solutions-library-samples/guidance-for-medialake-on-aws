@@ -99,6 +99,7 @@ class AssetSyncStack(Stack):
                     "s3:PutObjectTagging",
                     "s3:PutObjectVersionTagging",
                     "s3:GetBucketLocation",
+                    "s3:PutObject",
                 ],
                 resources=["*"],  # Should be restricted in production
             )
