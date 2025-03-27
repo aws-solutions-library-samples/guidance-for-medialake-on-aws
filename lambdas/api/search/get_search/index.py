@@ -129,7 +129,7 @@ class AssetSearchResult(BaseModelWithConfig):
     DerivedRepresentations: List[Dict[str, Any]]
     FileHash: str
     Metadata: Dict[str, Any]
-    score: Optional[float] = None  # Make score optional
+    score: float
     thumbnailUrl: Optional[str] = None
     proxyUrl: Optional[str] = None
 
@@ -324,22 +324,6 @@ def build_search_query(params: SearchParams) -> Dict:
             query["bool"]["filter"].append({
                 "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
             })
-            
-        # connector filter
-        if 'connector' in parsed_filters:
-            path_value = parsed_filters['connector']
-            # Add wildcard if not already present
-            if isinstance(path_value, str) and not path_value.endswith('*'):
-                path_value = f"{path_value}*"
-                
-            logger.info(f"Applying Connector Bucket filter: {path_value}")
-            query["bool"]["filter"].append({
-                "wildcard": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket.keyword": {
-                        "value": path_value[0]
-                    }
-                }
-            })
 
         # Size filter
         if 'size' in parsed_filters:
@@ -386,9 +370,7 @@ def build_search_query(params: SearchParams) -> Dict:
                     {"range": {filter_item["field"]: filter_item["value"]}}
                 )
 
-
-    # Build the search query
-    search_query = {
+    return {
         "query": query,
         "min_score": params.min_score,
         "size": params.size,
@@ -416,30 +398,12 @@ def build_search_query(params: SearchParams) -> Dict:
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
                 "DigitalSourceAsset.CreateDate",
                 "DerivedRepresentations.Purpose",
-                "DerivedRepresentations.StorageInfo.PrimaryLocation.ObjectKey",
-                "DerivedRepresentations.StorageInfo.PrimaryLocation.Bucket",
-                "DerivedRepresentations.StorageInfo.PrimaryLocation.StorageType",
-                "Metadata.Consolidated",
-                "Metadata.Embedded.S3.ContentType",
-                "Metadata.Embedded.Exif"
+                "DerivedRepresentations.StorageInfo.PrimaryLocation",
+                "FileHash",
+                "Metadata.Consolidated.type"
             ]
         }
     }
-    
-
-    # Add sort from parsed keywords
-    if 'sort' in parsed_filters and parsed_filters['sort']:
-        sort_config = []
-        for sort_item in parsed_filters['sort']:
-            sort_config.append({
-                sort_item['field']: {
-                    "order": sort_item['direction']
-                }
-            })
-        search_query["sort"] = sort_config
-        logger.info(f"Applied sort configuration: {sort_config}")
-    
-    return search_query
 
 
 def process_search_hit(hit: Dict) -> AssetSearchResult:
@@ -459,7 +423,6 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         storage_info = representation.get("StorageInfo", {}).get("PrimaryLocation", {})
 
         if storage_info.get("StorageType") == "s3":
-          
             presigned_url = generate_presigned_url(
                 bucket=storage_info.get("Bucket", ""),
                 key=storage_info.get("ObjectKey", {}).get("FullPath", ""),

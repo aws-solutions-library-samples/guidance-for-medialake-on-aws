@@ -1,104 +1,110 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  CircularProgress
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    IconButton,
+    Box,
+    Typography,
 } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
+import { ActionButton } from './button/ActionButton';
 
 interface RenameDialogProps {
-  open: boolean;
-  title: string;
-  currentName: string;
-  onConfirm: (newName: string) => void;
-  onCancel: () => void;
-  isLoading?: boolean;
+    open: boolean;
+    title: string;
+    currentName: string;
+    onConfirm: (newName: string) => void;
+    onCancel: () => void;
+    isLoading?: boolean;
 }
 
 export const RenameDialog: React.FC<RenameDialogProps> = ({
-  open,
-  title,
-  currentName,
-  onConfirm,
-  onCancel,
-  isLoading = false
+    open,
+    title,
+    currentName,
+    onConfirm,
+    onCancel,
+    isLoading = false,
 }) => {
-  const [newName, setNewName] = useState(currentName);
-  const [error, setError] = useState('');
+    const [newName, setNewName] = useState(currentName);
 
-  // Reset state when dialog opens
-  useEffect(() => {
-    if (open) {
-      setNewName(currentName);
-      setError('');
-    }
-  }, [open, currentName]);
+    useEffect(() => {
+        if (open) {
+            setNewName(currentName);
+        }
+    }, [currentName, open]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewName(e.target.value);
-    if (!e.target.value.trim()) {
-      setError('Name cannot be empty');
-    } else {
-      setError('');
-    }
-  };
+    const handleConfirm = () => {
 
-  const handleConfirm = () => {
-    if (!newName.trim()) {
-      setError('Name cannot be empty');
-      return;
-    }
-    onConfirm(newName);
-  };
+        onConfirm(newName);
+        setNewName(currentName);
+    };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !error && !isLoading) {
-      handleConfirm();
-    }
-  };
+    const handleCancel = () => {
+        setNewName(currentName);
+        onCancel();
+    };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onCancel}
-      aria-labelledby="rename-dialog-title"
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle id="rename-dialog-title">{title}</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin="dense"
-          label="New Name"
-          type="text"
-          fullWidth
-          value={newName}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          error={!!error}
-          helperText={error}
-          disabled={isLoading}
-          variant="outlined"
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleConfirm} 
-          color="primary" 
-          variant="contained"
-          disabled={!!error || isLoading}
-          startIcon={isLoading ? <CircularProgress size={16} color="inherit" /> : null}
+    return (
+        <Dialog
+            open={open}
+            onClose={handleCancel}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 2,
+                    p: 1
+                }
+            }}
         >
-          Rename
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+            <DialogTitle sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                p: 2
+            }}>
+                <Typography variant="h6">{title}</Typography>
+                <IconButton onClick={handleCancel} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    {/* <TextField
+                        label="Current Name"
+                        value={currentName}
+                        disabled
+                        fullWidth
+                    /> */}
+                    <TextField
+                        label="New Name"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        fullWidth
+                        autoFocus
+                    />
+                </Box>
+            </DialogContent>
+            <DialogActions sx={{ p: 2, pt: 0 }}>
+                <ActionButton
+                    variant="outlined"
+                    onClick={handleCancel}
+                    disabled={isLoading}
+                >
+                    Cancel
+                </ActionButton>
+                <ActionButton
+                    variant="contained"
+                    onClick={handleConfirm}
+                    loading={isLoading}
+                >
+                    Rename
+                </ActionButton>
+            </DialogActions>
+        </Dialog>
+    );
+}; 

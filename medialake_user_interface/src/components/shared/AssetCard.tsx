@@ -1,353 +1,336 @@
-import React, { useState } from 'react';
-import {
-  Card,
-  CardMedia,
-  CardContent,
-  Typography,
-  Box,
-  IconButton,
-  TextField,
-  InputAdornment,
-  Tooltip,
-  useTheme,
-  alpha,
-  Chip,
-  Stack
-} from '@mui/material';
-import {
-  Delete as DeleteIcon,
-  MoreVert as MoreVertIcon,
-  Edit as EditIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
-  Image as ImageIcon,
-  VideoFile as VideoFileIcon,
-  AudioFile as AudioFileIcon,
-  Description as DescriptionIcon
-} from '@mui/icons-material';
+import React from 'react';
+import { Box, Typography, IconButton, TextField, Button, CircularProgress } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
+import { AssetAudio } from '../asset';
 
-interface AssetCardProps {
-  id: string;
-  name: string;
-  thumbnailUrl?: string;
-  proxyUrl?: string;
-  assetType: string;
-  fields: { id: string; label: string; visible: boolean }[];
-  renderField: (fieldId: string) => React.ReactNode;
-  onAssetClick: () => void;
-  onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
-  onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
-  onEditClick: (event: React.MouseEvent<HTMLElement>) => void;
-  isEditing: boolean;
-  editedName?: string;
-  onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (save: boolean) => void;
-  cardSize: 'small' | 'medium' | 'large';
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale: 'fit' | 'fill';
-  showMetadata: boolean;
-  onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
-  isRenaming?: boolean;
+export interface AssetField {
+    id: string;
+    label: string;
+    visible: boolean;
+}
+
+export interface AssetCardProps {
+    id: string;
+    name: string;
+    thumbnailUrl?: string;
+    proxyUrl?: string;
+    assetType?: string;
+    fields: AssetField[];
+    isRenaming?: boolean;
+    renderField: (fieldId: string) => string | React.ReactNode;
+    onAssetClick: () => void;
+    onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
+    onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
+    onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
+    placeholderImage?: string;
+    onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+    isEditing?: boolean;
+    editedName?: string;
+    onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onEditNameComplete?: (save: boolean) => void;
+    cardSize?: 'small' | 'medium' | 'large';
+    aspectRatio?: 'vertical' | 'square' | 'horizontal';
+    thumbnailScale?: 'fit' | 'fill';
+    showMetadata?: boolean;
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
-  id,
-  name,
-  thumbnailUrl,
-  proxyUrl,
-  assetType,
-  fields,
-  renderField,
-  onAssetClick,
-  onDeleteClick,
-  onMenuClick,
-  onEditClick,
-  isEditing,
-  editedName,
-  onEditNameChange,
-  onEditNameComplete,
-  cardSize,
-  aspectRatio,
-  thumbnailScale,
-  showMetadata,
-  onImageError,
-  isRenaming = false
+    id,
+    name,
+    thumbnailUrl,
+    proxyUrl,
+    assetType,
+    fields,
+    renderField,
+    onAssetClick,
+    onDeleteClick,
+    onMenuClick,
+    onEditClick,
+    placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
+    onImageError,
+    isRenaming = false,
+    isEditing,
+    editedName,
+    onEditNameChange,
+    onEditNameComplete,
+    cardSize = 'medium',
+    aspectRatio = 'square',
+    thumbnailScale = 'fill',
+    showMetadata = true,
 }) => {
-  const theme = useTheme();
-  const [isHovered, setIsHovered] = useState(false);
+ 
+    const [selectionRange, setSelectionRange] = React.useState<[number, number] | null>(null);
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // Get aspect ratio based on setting
-  const getAspectRatio = () => {
-    switch (aspectRatio) {
-      case 'vertical':
-        return '2/3';
-      case 'horizontal':
-        return '16/9';
-      case 'square':
-      default:
-        return '1/1';
-    }
-  };
+    // Determine the card dimensions based on props
+    const getCardDimensions = () => {
+        const baseHeight = aspectRatio === 'vertical' ? 300
+            : aspectRatio === 'square' ? 200
+            : aspectRatio === 'horizontal' ? 150
+            : 200;
 
-  // Get thumbnail height based on card size
-  const getThumbnailHeight = () => {
-    switch (cardSize) {
-      case 'small':
-        return 120;
-      case 'large':
-        return 240;
-      case 'medium':
-      default:
-        return 180;
-    }
-  };
+        const sizeMultiplier = cardSize === 'small' ? 0.8
+            : cardSize === 'large' ? 1.2
+            : 1;
 
-  // Get asset type icon
-  const getAssetTypeIcon = () => {
-    switch (assetType.toLowerCase()) {
-      case 'image':
-        return <ImageIcon />;
-      case 'video':
-        return <VideoFileIcon />;
-      case 'audio':
-        return <AudioFileIcon />;
-      default:
-        return <DescriptionIcon />;
-    }
-  };
+        return {
+            height: baseHeight * sizeMultiplier,
+            width: '100%',
+        };
+    };
+    const dimensions = getCardDimensions();
 
-  // Handle key down in edit mode
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      onEditNameComplete(true);
-    } else if (event.key === 'Escape') {
-      onEditNameComplete(false);
-    }
-  };
+    // Fallback image error
+    const defaultImageErrorHandler = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        event.currentTarget.src = placeholderImage;
+    };
 
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: '12px',
-        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        transition: 'all 0.2s ease-in-out',
-        '&:hover': {
-          borderColor: theme.palette.primary.main,
-          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.1)}`,
-          transform: 'translateY(-2px)',
-          zIndex: 10, // Add higher z-index when hovered
-        },
-        position: 'relative',
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Thumbnail */}
-      <Box
-        onClick={onAssetClick}
-        sx={{
-          position: 'relative',
-          aspectRatio: getAspectRatio(),
-          cursor: 'pointer',
-          backgroundColor: alpha(theme.palette.common.black, 0.03),
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          overflow: 'hidden',
-          borderTopLeftRadius: '12px',
-          borderTopRightRadius: '12px',
-        }}
-      >
-        {thumbnailUrl ? (
-          <CardMedia
-            component="img"
-            image={thumbnailUrl}
-            alt={name}
-            sx={{
-              height: '100%',
-              width: '100%',
-              objectFit: thumbnailScale === 'fill' ? 'cover' : 'contain',
-            }}
-            onError={(e) => {
-              console.error('Image load error:', e);
-              if (onImageError) onImageError(e);
-              // Set a default placeholder based on asset type
-              (e.target as HTMLImageElement).src = `/placeholder-${assetType.toLowerCase()}.png`;
-            }}
-            data-image-id={id}
-          />
-        ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100%',
-              width: '100%',
-              color: alpha(theme.palette.text.primary, 0.5),
-              fontSize: '3rem',
-            }}
-          >
-            {getAssetTypeIcon()}
-          </Box>
-        )}
+    const handleDeleteClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+        onDeleteClick(event);
+    };
 
-        {/* Overlay with actions */}
-        {isHovered && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              p: 0.5,
-              display: 'flex',
-              gap: 0.5,
-              backgroundColor: alpha(theme.palette.background.paper, 0.8),
-              borderBottomLeftRadius: '12px',
-            }}
-          >
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={onEditClick}
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <IconButton
-                size="small"
-                onClick={onDeleteClick}
-                sx={{ color: theme.palette.error.main }}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="More">
-              <IconButton
-                size="small"
-                onClick={onMenuClick}
-                id={`asset-menu-button-${id}`}
-                aria-controls={`asset-menu-${id}`}
-                aria-haspopup="true"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        )}
+    const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+        onMenuClick(event);
+    };
 
-        {/* Asset type badge */}
+console.log("isRenaming",isRenaming)
+    React.useEffect(() => {
+        if (isEditing && inputRef.current) {
+            // Move caret to the beginning of the string
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(0, 0);
+            setSelectionRange([0, 0]);
+        }
+    }, [isEditing]);
+
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Remember where the user was typing
+        const start = e.target.selectionStart ?? 0;
+        const end = e.target.selectionEnd ?? start;
+        onEditNameChange?.(e);
+        setSelectionRange([start, end]);
+    };
+
+
+    React.useEffect(() => {
+        if (isEditing && inputRef.current && selectionRange) {
+            // After the new value is in place, reset selection
+            inputRef.current.setSelectionRange(selectionRange[0], selectionRange[1]);
+        }
+    }, [isEditing, editedName, selectionRange]);
+
+    return (
         <Box
-          sx={{
-            position: 'absolute',
-            bottom: 8,
-            left: 8,
-            backgroundColor: alpha(theme.palette.background.paper, 0.8),
-            borderRadius: '8px',
-            px: 1,
-            py: 0.5,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.5,
-          }}
-        >
-          {getAssetTypeIcon()}
-          <Typography variant="caption" fontWeight="medium">
-            {assetType}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Content */}
-      <CardContent sx={{ flexGrow: 1, p: 1.5, pt: 1 }}>
-        {isEditing ? (
-          <TextField
-            fullWidth
-            variant="outlined"
-            size="small"
-            value={editedName}
-            onChange={onEditNameChange}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            disabled={isRenaming}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEditNameComplete(true)}
-                    edge="end"
-                    disabled={isRenaming}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => onEditNameComplete(false)}
-                    edge="end"
-                    disabled={isRenaming}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
+            sx={{
+                position: 'relative',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                    transform: 'translateY(-4px)',
+                },
             }}
-          />
-        ) : (
-          <Tooltip title={name}>
-            <Typography
-              variant="subtitle2"
-              noWrap
-              sx={{
-                mb: 1,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-              onClick={onAssetClick}
+        >
+            <Box
+                sx={{
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    bgcolor: 'background.paper',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    '&:hover': {
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                    },
+                }}
             >
-              {name}
-            </Typography>
-          </Tooltip>
-        )}
-
-        {showMetadata && fields.length > 0 && (
-          <Stack spacing={0.5} mt={1}>
-            {fields.map(
-              (field) =>
-                field.visible && (
-                  <Box
-                    key={field.id}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ fontWeight: 500 }}
+                {/* Render appropriate content based on asset type */}
+                {assetType === 'Video' ? (
+                    <video
+                        onClick={(event) => {
+                            event.preventDefault();
+                            onAssetClick();
+                        }}
+                        style={{
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            objectFit: 'cover',
+                        }}
+                        controls
+                        src={proxyUrl}
+                    />
+                ) : assetType === 'Audio' ? (
+                    <Box
+                        onClick={onAssetClick}
+                        sx={{
+                            cursor: 'pointer',
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                        }}
                     >
-                      {field.label}:
-                    </Typography>
-                    <Typography variant="caption" noWrap>
-                      {renderField(field.id)}
-                    </Typography>
-                  </Box>
-                )
-            )}
-          </Stack>
-        )}
-      </CardContent>
-    </Card>
-  );
+                        <AssetAudio 
+                            src={proxyUrl || ''} 
+                            alt={name}
+                            compact={true}
+                        />
+                    </Box>
+                ) : (
+                    <Box
+                        onClick={onAssetClick}
+                        component="img"
+                        src={thumbnailUrl || placeholderImage}
+                        alt={name}
+                        onError={onImageError || defaultImageErrorHandler}
+                        data-image-id={id}
+                        sx={{
+                            cursor: 'pointer',
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            backgroundColor: 'rgba(0,0,0,0.03)',
+                            objectFit: thumbnailScale === 'fit' ? 'contain' : 'cover',
+                            transition: 'all 0.2s ease-in-out',
+                        }}
+                    />
+                )}
+
+                {/* Metadata (non-clickable) */}
+                {showMetadata ? (
+                    <Box sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {fields.map((field) =>
+                                field.visible && (
+                                    <Box key={field.id}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {field.label}:
+                                        </Typography>
+                                        {field.id === 'name' && onEditClick ? (
+                                            isEditing ? (
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                    <TextField
+                                                        inputRef={inputRef}
+                                                        value={editedName}
+                                                        disabled={isRenaming}
+                                                        onChange={handleInputChange}
+                                                        onKeyPress={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                onEditNameComplete?.(true);
+                                                            } else if (e.key === 'Escape') {
+                                                                onEditNameComplete?.(false);
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        autoFocus
+                                                        size="small"
+                                                        fullWidth
+                                                        InputProps={{
+                                                            endAdornment: isRenaming && (
+                                                              <CircularProgress size={16} />
+                                                            )
+                                                          }}
+                                                    />
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <Button
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditNameComplete?.(true);
+                                                            }}
+                                                            variant="contained"
+                                                            disabled={isRenaming}
+                                                        >
+                                                            Save
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            disabled={isRenaming}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditNameComplete?.(false);
+                                                            }}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </Box>
+                                                </Box>
+                                            ) : (
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Typography
+                                                        sx={{
+                                                            wordBreak: 'break-word',
+                                                            userSelect: 'text', // Allow text selection
+                                                        }}
+                                                        display="inline"
+                                                        variant="body2"
+                                                    >
+                                                        {renderField(field.id)}
+                                                    </Typography>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEditClick(e);
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Box>
+                                            )
+                                        ) : (
+                                            <Typography variant="body2" sx={{ userSelect: 'text' }}>
+                                                {renderField(field.id)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )
+                            )}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    gap: 1,
+                                    mt: 1,
+                                }}
+                            >
+                                <IconButton size="small" onClick={handleDeleteClick}>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={handleMenuClick}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </Box>
+                        </Box>
+                    </Box>
+                ) : (
+                    // If showMetadata = false, place action buttons as overlay
+                    <Box
+                        sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}
+                    >
+                        <IconButton
+                            size="small"
+                            onClick={handleDeleteClick}
+                            sx={{ bgcolor: 'rgba(255,255,255,0.8)' }}
+                        >
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                            size="small"
+                            onClick={handleMenuClick}
+                            sx={{ bgcolor: 'rgba(255,255,255,0.8)' }}
+                        >
+                            <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
+                )}
+            </Box>
+        </Box>
+    );
 };
 
 export default AssetCard;

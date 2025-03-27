@@ -259,40 +259,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         </Typography>
                     )}
                     {connector.objectPrefix && (
-                        typeof connector.objectPrefix === 'string' ? (
-                            <Typography variant="body2">
-                                <strong>Prefix:</strong> {connector.objectPrefix}
-                            </Typography>
-                        ) : Array.isArray(connector.objectPrefix) && connector.objectPrefix.length > 0 ? (
-                            <>
-                                <Typography variant="body2">
-                                    <strong>Prefixes:</strong>
-                                </Typography>
-                                {connector.objectPrefix.map((prefix, index) => (
-                                    <Typography key={index} variant="body2" sx={{ pl: 2 }}>
-                                        • {prefix}
-                                    </Typography>
-                                ))}
-                            </>
-                        ) : null
-                    )}
-                    {connector.configuration?.objectPrefix && !connector.objectPrefix && (
-                        typeof connector.configuration.objectPrefix === 'string' ? (
-                            <Typography variant="body2">
-                                <strong>Prefix:</strong> {connector.configuration.objectPrefix}
-                            </Typography>
-                        ) : Array.isArray(connector.configuration.objectPrefix) && connector.configuration.objectPrefix.length > 0 ? (
-                            <>
-                                <Typography variant="body2">
-                                    <strong>Prefixes:</strong>
-                                </Typography>
-                                {connector.configuration.objectPrefix.map((prefix, index) => (
-                                    <Typography key={index} variant="body2" sx={{ pl: 2 }}>
-                                        • {prefix}
-                                    </Typography>
-                                ))}
-                            </>
-                        ) : null
+                        <Typography variant="body2" >
+                            <strong>Prefix:</strong> {connector.objectPrefix}
+                        </Typography>
                     )}
                     {connector.usage?.total !== undefined && (
                         <Typography variant="body2" >
