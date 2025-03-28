@@ -666,3 +666,68 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"Error in lambda handler: {str(e)}", exc_info=True)
         return {"error": f"Error in lambda handler: {str(e)}"}
+
+def determine_asset_type(content_type: str, file_extension: str) -> str:
+    """
+    Determine the asset type using content type and file extension.
+    Uses a more comprehensive classification based on mime types and extensions.
+    
+    Args:
+        content_type: The MIME type from S3 metadata
+        file_extension: The file extension (without the dot)
+    
+    Returns:
+        One of: "Image", "Video", "Audio", or "Other"
+    """
+    logger.info(f"Determining asset type for content_type: {content_type}, extension: {file_extension}")
+    
+    # Convert to lowercase for comparison
+    content_type = content_type.lower() if content_type else ""
+    file_extension = file_extension.lower() if file_extension else ""
+    
+    # Track what criteria matched
+    matched_criteria = []
+    
+    # Check MIME type first as it's more reliable
+    for prefix in image_mimes:
+        if content_type.startswith(prefix):
+            matched_criteria.append(f"MIME type {content_type} matched image prefix {prefix}")
+            return "Image"
+    
+    for prefix in video_mimes:
+        if content_type.startswith(prefix):
+            matched_criteria.append(f"MIME type {content_type} matched video prefix {prefix}")
+            return "Video"
+    
+    for prefix in audio_mimes:
+        if content_type.startswith(prefix):
+            matched_criteria.append(f"MIME type {content_type} matched audio prefix {prefix}")
+            return "Audio"
+    
+    # If MIME type doesn't give us a clear answer, check file extension
+    if file_extension in image_extensions:
+        matched_criteria.append(f"File extension {file_extension} matched image extension")
+        return "Image"
+    
+    if file_extension in video_extensions:
+        matched_criteria.append(f"File extension {file_extension} matched video extension")
+        return "Video"
+    
+    if file_extension in audio_extensions:
+        matched_criteria.append(f"File extension {file_extension} matched audio extension")
+        return "Audio"
+    
+    # Fall back to looking at the first part of the MIME type
+    if content_type:
+        mime_main_type = content_type.split('/')[0].capitalize()
+        if mime_main_type in ["Image", "Video", "Audio"]:
+            matched_criteria.append(f"MIME main type {mime_main_type} matched")
+            return mime_main_type
+    
+    logger.warning(
+        f"Could not definitively determine asset type. Content-Type: {content_type}, "
+        f"Extension: {file_extension}, Matched criteria: {matched_criteria}"
+    )
+    
+    # Return Other instead of defaulting to Image
+    return "Other"
