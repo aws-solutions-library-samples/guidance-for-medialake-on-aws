@@ -4,9 +4,7 @@ from constructs import Construct
 
 class CloudFrontWafStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
-        # Always use us-east-1 for CloudFront WAF, regardless of the app's default region
-        # env = Environment(account=scope.account, region="us-east-1")
-        
+
         super().__init__(scope, construct_id, **kwargs)
 
         self.web_acl = wafv2.CfnWebACL(
