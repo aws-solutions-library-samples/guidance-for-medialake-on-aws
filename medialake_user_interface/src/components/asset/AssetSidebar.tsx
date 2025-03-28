@@ -176,7 +176,13 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 // Markers content component
 const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
     const theme = useTheme();
-    
+    const [markers, setMarkers] = useState<string[]>([]); // Add this state
+
+    // Add this function
+    const addMarker = () => {
+        onMarkerAdd?.();
+        setMarkers(prev => [...prev, `Marker ${prev.length + 1}`]);
+    };
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -189,11 +195,27 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                     fullWidth 
                     sx={{ mt: 1 }}
                     startIcon={<BookmarkIcon />}
-                    onClick={onMarkerAdd}
+                    // onClick={onMarkerAdd}
+                    onClick = {addMarker}
                 >
                     Add Marker
                 </Button>
             </Tooltip>
+           {/* Add this section to render markers */}
+           {markers.map((marker, index) => (
+                <Box
+                    key={index}
+                    sx={{
+                        mt: 2,
+                        p: 2,
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        borderRadius: 1,
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                    }}
+                >
+                    <Typography variant="body2">{marker}</Typography>
+                </Box>
+            ))}
         </Box>
     );
 };

@@ -57,6 +57,7 @@ import React, {
     onError?: (error: any) => void;
     onTimeUpdate?: (time: number) => void;
     showThumbnails?: boolean;
+    onMarkerAdd?: (time: number) => void;
   }
   
   export interface VideoViewerRef {
@@ -408,6 +409,7 @@ import React, {
         onError,
         onTimeUpdate,
         showThumbnails = false,
+        onMarkerAdd
       },
       ref
     ) => {
@@ -441,8 +443,11 @@ import React, {
           onTimeUpdate: (time: number) => {
             onTimeUpdate?.(time);
           },
+          onMarkerAdd: (time: number) => {
+            onMarkerAdd?.(time);
+          },
         }),
-        [onPlay, onPause, onSeek, onVolumeChange, onBuffering, onEnded, onError, onTimeUpdate]
+        [onPlay, onPause, onSeek, onVolumeChange, onBuffering, onEnded, onError, onTimeUpdate, onMarkerAdd]
       );
   
       const {
@@ -478,12 +483,14 @@ import React, {
                 },
               });
               markerLaneRef.current.addMarker(periodMarker);
+              
+              // Add this line to trigger the callback
+              customCallbacks.onMarkerAdd?.(currentTime);
             }
           },
         }),
-        [currentTime]
+        [currentTime, customCallbacks]
       );
-  
       const handlePlayPause = () => {
         if (isPlaying) {
           pause();
