@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Box, Tooltip, IconButton, Typography, Chip } from '@mui/material';
+import { Box, Tooltip, IconButton, Typography, Chip, Switch, FormControlLabel } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
@@ -16,6 +16,7 @@ interface UsePipelineColumnsProps {
     onDelete: (id: string, name: string) => void;
     onStart: (id: string) => void;
     onStop: (id: string) => void;
+    onToggleActive: (id: string, active: boolean) => void;
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
@@ -24,7 +25,8 @@ export const usePipelineColumns = ({
     onEdit,
     onDelete,
     onStart,
-    onStop
+    onStop,
+    onToggleActive
 }: UsePipelineColumnsProps) => {
     return useMemo(
         () => [
@@ -68,10 +70,11 @@ export const usePipelineColumns = ({
             }),
             columnHelper.accessor('deploymentStatus', {
                 header: 'Status',
-                size: 120,
+                size: 150, // Increased size to accommodate the switch
                 enableSorting: true,
                 cell: info => {
                     const status = info.getValue();
+                    const pipeline = info.row.original;
                     let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
                     
                     if (status === 'DEPLOYED') {
@@ -84,15 +87,32 @@ export const usePipelineColumns = ({
                     
                     return (
                         <TableCellContent variant="secondary">
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    color: color,
-                                    fontWeight: 'medium'
-                                }}
-                            >
-                                {status || 'N/A'}
-                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        color: color,
+                                        fontWeight: 'medium'
+                                    }}
+                                >
+                                    {status || 'N/A'}
+                                </Typography>
+                                
+                                {status === 'DEPLOYED' && (
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                size="small"
+                                                checked={pipeline.active !== false}
+                                                onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
+                                                disabled={pipeline.system}
+                                            />
+                                        }
+                                        label={pipeline.active !== false ? "Active" : "Inactive"}
+                                        sx={{ mt: 1, ml: 0 }}
+                                    />
+                                )}
+                            </Box>
                         </TableCellContent>
                     );
                 },
@@ -198,7 +218,7 @@ export const usePipelineColumns = ({
                 ),
             }),
         ],
-        [onEdit, onDelete, onStart, onStop]
+        [onEdit, onDelete, onStart, onStop, onToggleActive]
     );
 };
 

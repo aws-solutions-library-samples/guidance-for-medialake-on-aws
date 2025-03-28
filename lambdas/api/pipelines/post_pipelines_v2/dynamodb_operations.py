@@ -302,11 +302,11 @@ def get_pipeline_by_id(pipeline_id: str) -> Optional[Dict[str, Any]]:
         logger.error(f"Error looking up pipeline: {e}")
         return None
 
-
 def create_pipeline_record(
     pipeline: Any,
     execution_arn: Optional[str] = None,
-    deployment_status: str = "CREATING"
+    deployment_status: str = "CREATING",
+    active: bool = True  # Default to active
 ) -> str:
     """
     Create a new pipeline record in DynamoDB with initial status.
@@ -315,11 +315,12 @@ def create_pipeline_record(
         pipeline: Pipeline definition object
         execution_arn: Optional ARN of the Step Function execution
         deployment_status: Initial deployment status
+        active: Whether the pipeline is active
         
     Returns:
         ID of the created pipeline record
     """
-    logger.info(f"Creating pipeline record with status: {deployment_status}")
+    logger.info(f"Creating pipeline record with status: {deployment_status}, active: {active}")
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(PIPELINES_TABLE)
     
@@ -336,7 +337,8 @@ def create_pipeline_record(
         "stateMachineArn": "",  # Will be populated later
         "type": "Ingest Triggered",
         "system": False,
-        "deploymentStatus": deployment_status
+        "deploymentStatus": deployment_status,
+        "active": active  # Add active field
     }
     
     if execution_arn:
@@ -349,6 +351,11 @@ def create_pipeline_record(
     except Exception as e:
         logger.exception(f"Failed to create pipeline record: {e}")
         raise
+        logger.info(f"Successfully created pipeline record with id {pipeline_id}")
+        return pipeline_id
+    except Exception as e:
+        logger.exception(f"Failed to create pipeline record: {e}")
+        raise
 
 
 def update_pipeline_status(
@@ -356,7 +363,8 @@ def update_pipeline_status(
     deployment_status: str,
     state_machine_arn: Optional[str] = None,
     lambda_arns: Optional[Dict[str, str]] = None,
-    eventbridge_rule_arns: Optional[Dict[str, str]] = None
+    eventbridge_rule_arns: Optional[Dict[str, str]] = None,
+    active: Optional[bool] = None  # New parameter
 ) -> None:
     """
     Update the deployment status and optionally resources of a pipeline.
@@ -367,6 +375,7 @@ def update_pipeline_status(
         state_machine_arn: Optional ARN of the state machine
         lambda_arns: Optional dictionary mapping node IDs to Lambda ARNs
         eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
+        active: Optional boolean indicating whether the pipeline is active
     """
     logger.info(f"Updating pipeline {pipeline_id} status to {deployment_status}")
     dynamodb = boto3.resource("dynamodb")
@@ -383,6 +392,12 @@ def update_pipeline_status(
         "#status": "deploymentStatus",
         "#up": "updatedAt"
     }
+    
+    # Add active state if provided
+    if active is not None:
+        update_expr += ", #active = :active"
+        expr_values[":active"] = active
+        expr_names["#active"] = "active"
     
     # Add resources if provided
     dependent_resources = []
@@ -455,7 +470,8 @@ def store_pipeline_info(
     state_machine_arn: str,
     lambda_arns: Dict[str, str],
     eventbridge_rule_arns: Optional[Dict[str, str]] = None,
-    pipeline_id: Optional[str] = None
+    pipeline_id: Optional[str] = None,
+    active: bool = True  # Default to active
 ) -> str:
     """
     Store or update pipeline information in DynamoDB.
@@ -466,6 +482,7 @@ def store_pipeline_info(
         lambda_arns: Dictionary mapping node IDs to Lambda ARNs
         eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
         pipeline_id: Optional ID of an existing pipeline record
+        active: Whether the pipeline is active
         
     Returns:
         ID of the created or updated pipeline
@@ -479,7 +496,8 @@ def store_pipeline_info(
             "DEPLOYED",
             state_machine_arn,
             lambda_arns,
-            eventbridge_rule_arns
+            eventbridge_rule_arns,
+            active=active
         )
         return pipeline_id
     else:
@@ -492,12 +510,13 @@ def store_pipeline_info(
                 "DEPLOYED",
                 state_machine_arn,
                 lambda_arns,
-                eventbridge_rule_arns
+                eventbridge_rule_arns,
+                active=active
             )
             return pipeline_id
         else:
             # Create new pipeline with DEPLOYED status
-            pipeline_id = create_pipeline_record(pipeline, None, "DEPLOYED")
+            pipeline_id = create_pipeline_record(pipeline, None, "DEPLOYED", active=active)
             update_pipeline_status(
                 pipeline_id,
                 "DEPLOYED",

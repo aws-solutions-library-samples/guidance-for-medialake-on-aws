@@ -1,5 +1,5 @@
 import React, { useRef, ChangeEvent } from 'react';
-import { Stack, Button, Tooltip } from '@mui/material';
+import { Stack, Button, Tooltip, Switch, FormControlLabel } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { PipelineNameInput } from './';
 import { useSidebar } from '@/contexts/SidebarContext';
@@ -26,6 +26,8 @@ export interface PipelineToolbarProps {
   // New props to update the flow state
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+  active: boolean; // New prop for pipeline active state
+  onActiveChange: (active: boolean) => void; // New prop for handling active state changes
 }
 
 const DRAWER_WIDTH = 260;
@@ -41,6 +43,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   reactFlowInstance,
   setNodes,
   setEdges,
+  active,
+  onActiveChange,
 }) => {
   const navigate = useNavigate();
   const { isCollapsed: isLeftSidebarCollapsed } = useSidebar();
@@ -215,6 +219,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
           ref={fileInputRef}
           style={{ display: 'none' }}
           onChange={handleLoadFlow}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={active}
+              onChange={(e) => onActiveChange(e.target.checked)}
+              color="primary"
+            />
+          }
+          label={active ? "Active" : "Inactive"}
+          sx={{ mr: 1 }}
         />
         <Button variant="outlined" color="inherit" onClick={handleCancel}>
           Cancel

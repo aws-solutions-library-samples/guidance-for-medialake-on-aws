@@ -152,7 +152,14 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                         logger.error(f"Failed to create EventBridge rule for node {node.data.id}: {e}")
 
             # Update pipeline info in DynamoDB with DEPLOYED status
-            pipeline_id = store_pipeline_info(pipeline, state_machine_arn, lambda_arns, eventbridge_rule_arns, pipeline_id)
+            pipeline_id = store_pipeline_info(
+                pipeline,
+                state_machine_arn,
+                lambda_arns,
+                eventbridge_rule_arns,
+                pipeline_id,
+                active=pipeline.active  # Pass the active field from the pipeline definition
+            )
 
             response_body = {
                 "message": "Pipeline created successfully",

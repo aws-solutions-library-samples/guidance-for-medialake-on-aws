@@ -5,7 +5,9 @@ import {
     CircularProgress,
     Tooltip,
     Typography,
-    Chip
+    Chip,
+    Switch,
+    FormControlLabel
 } from '@mui/material';
 import {
     Edit as EditIcon,
@@ -36,6 +38,7 @@ interface PipelineTableProps {
     tableActions: TableActions;
     onStartPipeline: (id: string) => void;
     onStopPipeline: (id: string) => void;
+    onToggleActive: (id: string, active: boolean) => void;
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
@@ -46,7 +49,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     tableState,
     tableActions,
     onStartPipeline,
-    onStopPipeline
+    onStopPipeline,
+    onToggleActive
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +97,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             header: 'Status',
             cell: info => {
                 const status = info.getValue();
+                const pipeline = info.row.original;
                 let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
                 
                 if (status === 'DEPLOYED') {
@@ -105,20 +110,37 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                 
                 return (
                     <TableCellContent variant="secondary">
-                        <Typography
-                            variant="body2"
-                            sx={{
-                                color: color,
-                                fontWeight: 'medium'
-                            }}
-                        >
-                            {status || 'N/A'}
-                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: color,
+                                    fontWeight: 'medium'
+                                }}
+                            >
+                                {status || 'N/A'}
+                            </Typography>
+                            
+                            {status === 'DEPLOYED' && (
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={pipeline.active !== false}
+                                            onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
+                                            disabled={pipeline.system}
+                                        />
+                                    }
+                                    label={pipeline.active !== false ? "Active" : "Inactive"}
+                                    sx={{ mt: 1, ml: 0 }}
+                                />
+                            )}
+                        </Box>
                     </TableCellContent>
                 );
             },
             enableSorting: true,
-            size: 120
+            size: 150  // Increased size to accommodate the switch
         }),
         columnHelper.accessor('createdAt', {
             header: 'Created',
@@ -185,7 +207,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             ),
             size: 200
         })
-    ], [tableActions, onStartPipeline, onStopPipeline]);
+    ], [tableActions, onStartPipeline, onStopPipeline, onToggleActive]);
 
     const table = useReactTable({
         data,

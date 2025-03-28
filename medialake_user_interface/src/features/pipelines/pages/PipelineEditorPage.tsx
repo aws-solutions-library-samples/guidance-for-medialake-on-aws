@@ -423,6 +423,7 @@ const PipelineEditorContent = () => {
     const [formData, setFormData] = React.useState<CreatePipelineDto>({
         name: '',
         description: '',
+        active: true, // Default to active
         configuration: {
             nodes: [],
             edges: [],
@@ -570,6 +571,7 @@ const PipelineEditorContent = () => {
             setFormData({
                 name: pipeline.name,
                 description: pipeline.description || '',
+                active: pipeline.active !== false, // Use pipeline active state or default to true
                 configuration: pipeline.configuration || {
                     nodes: [],
                     edges: [],
@@ -582,6 +584,14 @@ const PipelineEditorContent = () => {
             });
         }
     }, [pipeline]);
+
+    // Add handler for active state change
+    const handleActiveChange = (active: boolean) => {
+        setFormData(prev => ({
+            ...prev,
+            active
+        }));
+    };
 
     const handleSave = async () => {
         console.log('[PipelineEditorPage] Saving pipeline with form data:', formData);
@@ -1084,6 +1094,8 @@ const PipelineEditorContent = () => {
                 reactFlowInstance={reactFlowInstance}
                 setNodes={setNodes}
                 setEdges={setEdges}
+                active={formData.active !== undefined ? formData.active : true}
+                onActiveChange={handleActiveChange}
             />
             <Box sx={{
                 position: 'fixed',

@@ -15,6 +15,7 @@ export interface Pipeline {
     dependentResources: [string, string | { rule_name: string; eventbus_name: string }][];
     deploymentStatus?: 'CREATING' | 'DEPLOYED' | 'FAILED' | string;
     executionArn?: string;
+    active?: boolean; // New field to track if the pipeline is active
     definition: {
         nodes: PipelineNode[];
         edges: PipelineEdge[];
@@ -103,12 +104,14 @@ export interface CreatePipelineDto {
     name: string;
     description?: string;
     configuration: PipelineConfiguration;
+    active?: boolean; // New optional field
 }
 
 export interface UpdatePipelineDto {
     name?: string;
     description?: string;
     configuration?: PipelineConfiguration;
+    active?: boolean; // New optional field
 }
 
 export interface SearchMetadata {

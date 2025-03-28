@@ -271,6 +271,34 @@ def create_eventbridge_rule(
         return None
 
 
+def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
+    """
+    Enable or disable an EventBridge rule.
+    
+    Args:
+        rule_name: Name of the rule
+        enabled: True to enable, False to disable
+    """
+    events_client = boto3.client("events")
+    event_bus_name = INGEST_EVENT_BUS_NAME
+    
+    try:
+        if enabled:
+            events_client.enable_rule(
+                Name=rule_name,
+                EventBusName=event_bus_name
+            )
+            logger.info(f"Enabled EventBridge rule: {rule_name}")
+        else:
+            events_client.disable_rule(
+                Name=rule_name,
+                EventBusName=event_bus_name
+            )
+            logger.info(f"Disabled EventBridge rule: {rule_name}")
+    except Exception as e:
+        logger.error(f"Error updating EventBridge rule state for {rule_name}: {e}")
+
+
 def delete_eventbridge_rule(rule_name: str) -> None:
     """
     Delete an EventBridge rule and its targets.

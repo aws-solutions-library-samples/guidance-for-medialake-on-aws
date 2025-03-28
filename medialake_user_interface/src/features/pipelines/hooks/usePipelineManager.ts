@@ -5,7 +5,7 @@ import {
     ColumnFiltersState,
     PaginationState,
 } from '@tanstack/react-table';
-import { useGetPipelines, useDeletePipeline, useStartPipeline, useStopPipeline } from '../api/pipelinesController';
+import { useGetPipelines, useDeletePipeline, useStartPipeline, useStopPipeline, useUpdatePipeline } from '../api/pipelinesController';
 import type { Pipeline, PipelinesResponse } from '../types/pipelines.types';
 
 const PAGE_SIZE = 20;
@@ -56,6 +56,7 @@ export const usePipelineManager = () => {
     const deletePipelineMutation = useDeletePipeline();
     const startPipelineMutation = useStartPipeline();
     const stopPipelineMutation = useStopPipeline();
+    const updatePipelineMutation = useUpdatePipeline();
 
     // Keyboard shortcut effect for delete button
     useEffect(() => {
@@ -215,6 +216,21 @@ export const usePipelineManager = () => {
         },
         startPipeline: startPipelineMutation.mutate,
         stopPipeline: stopPipelineMutation.mutate,
+        toggleActive: (id: string, active: boolean) => {
+            console.log(`[usePipelineManager] Toggling pipeline ${id} active state to ${active}`);
+            return updatePipelineMutation.mutateAsync({
+                id,
+                data: { active }
+            })
+            .then(() => {
+                console.log(`[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`);
+                refetch();
+            })
+            .catch(error => {
+                console.error(`[usePipelineManager] Error toggling pipeline ${id} active state:`, error);
+                throw error;
+            });
+        },
         refetch,
 
         // Actions
