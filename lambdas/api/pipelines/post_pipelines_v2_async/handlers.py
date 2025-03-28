@@ -150,7 +150,8 @@ def update_pipeline_status(
     deployment_status: str,
     state_machine_arn: str = None,
     lambda_arns: Dict[str, str] = None,
-    eventbridge_rule_arns: Dict[str, str] = None
+    eventbridge_rule_arns: Dict[str, str] = None,
+    execution_arn: str = None
 ) -> None:
     """
     Update the deployment status and optionally resources of a pipeline.
@@ -184,6 +185,12 @@ def update_pipeline_status(
         "#status": "deploymentStatus",
         "#up": "updatedAt"
     }
+    
+    # Add executionArn if provided
+    if execution_arn:
+        update_expr += ", #exec = :exec"
+        expr_values[":exec"] = execution_arn
+        expr_names["#exec"] = "executionArn"
     
     # Add resources if provided
     dependent_resources = []
@@ -239,6 +246,10 @@ def update_pipeline_status(
                 dependent_resources.append(["eventbridge_rule", arn])
     
     try:
+        logger.info(f"Updating pipeline {pipeline_id} with expression: {update_expr}")
+        logger.info(f"Expression values: {expr_values}")
+        logger.info(f"Expression names: {expr_names}")
+        
         table.update_item(
             Key={"id": pipeline_id},
             UpdateExpression=update_expr,
@@ -246,6 +257,10 @@ def update_pipeline_status(
             ExpressionAttributeNames=expr_names
         )
         logger.info(f"Successfully updated pipeline {pipeline_id} status to {deployment_status}")
+        
+        # Verify the update
+        updated_pipeline = get_pipeline_by_id(pipeline_id)
+        logger.info(f"Verified pipeline status after update: {updated_pipeline.get('deploymentStatus', 'unknown')}")
     except Exception as e:
         logger.exception(f"Failed to update pipeline status: {e}")
         raise
@@ -294,6 +309,12 @@ def create_pipeline() -> Dict[str, Any]:
                 "body": json.dumps(error_body),
             }
         
+        # Create pipeline record with initial status and execution ARN
+        pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
+        
+        # Add pipeline_id to the request data
+        request_data["pipeline_id"] = pipeline_id
+        
         # Start the Step Function execution
         sfn_client = boto3.client("stepfunctions")
         response = sfn_client.start_execution(
@@ -305,8 +326,8 @@ def create_pipeline() -> Dict[str, Any]:
         logger.info(f"Started Step Function execution: {execution_arn}")
         
         try:
-            # Create pipeline record with initial status and execution ARN
-            pipeline_id = create_pipeline_record(pipeline, execution_arn, "CREATING")
+            # Update the pipeline record with the execution ARN
+            update_pipeline_status(pipeline_id, "CREATING", None, None, None, execution_arn)
             
             # Return a response to the client
             response_body = {
@@ -375,6 +396,9 @@ def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
         status = sfn_response["status"]
         output = json.loads(sfn_response.get("output", "{}")) if "output" in sfn_response else {}
         
+        logger.info(f"Step Function status: {status}")
+        logger.info(f"Step Function output: {output}")
+        
         # Find the pipeline record by execution ARN
         pipeline_record = None
         try:
@@ -385,36 +409,53 @@ def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
             dynamodb = boto3.resource("dynamodb")
             table = dynamodb.Table(PIPELINES_TABLE)
             
+            logger.info(f"Scanning for pipeline with executionArn: {executionArn}")
             pipeline_response = table.scan(
                 FilterExpression=boto3.dynamodb.conditions.Attr("executionArn").eq(executionArn)
             )
             
+            logger.info(f"Scan result: {pipeline_response}")
+            
             if pipeline_response.get("Items"):
                 pipeline_record = pipeline_response["Items"][0]
+                logger.info(f"Found pipeline record: {pipeline_record}")
                 
                 # Update pipeline status based on Step Function status if needed
                 current_status = pipeline_record.get("deploymentStatus", "CREATING")
                 new_status = current_status
+                logger.info(f"Current status: {current_status}")
                 
+                logger.info(f"Step Function status: {status}, determining new pipeline status")
                 if status == "RUNNING":
                     # Keep the current status, which should be more specific
+                    logger.info("Step Function is RUNNING, keeping current status")
                     pass
                 elif status == "SUCCEEDED":
                     new_status = "DEPLOYED"
+                    logger.info("Step Function SUCCEEDED, setting status to DEPLOYED")
                 elif status == "FAILED":
                     new_status = "FAILED"
+                    logger.info("Step Function FAILED, setting status to FAILED")
                 elif status == "TIMED_OUT":
                     new_status = "FAILED"
+                    logger.info("Step Function TIMED_OUT, setting status to FAILED")
                 elif status == "ABORTED":
                     new_status = "FAILED"
+                    logger.info("Step Function ABORTED, setting status to FAILED")
+                
+                logger.info(f"New status determined: {new_status}")
                 
                 # Update the status if it changed
                 if new_status != current_status:
+                    logger.info(f"Status changed from {current_status} to {new_status}, updating database")
                     try:
                         update_pipeline_status(pipeline_record["id"], new_status)
                         pipeline_record["deploymentStatus"] = new_status
+                        logger.info(f"Updated pipeline record with new status: {new_status}")
                     except ValueError as ve2:
                         logger.error(f"Failed to update pipeline status: {ve2}")
+                else:
+                    logger.info(f"Status unchanged ({current_status}), no update needed")
         except ValueError as ve:
             logger.error(f"Configuration error: {ve}")
         

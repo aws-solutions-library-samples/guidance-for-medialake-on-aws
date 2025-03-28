@@ -64,36 +64,45 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
 
         pipeline_name = pipeline.name
         logger.info(f"Processing pipeline: {pipeline_name} - {pipeline.description}")
-
-        # Check if a pipeline with this name already exists
-        existing_pipeline = get_pipeline_by_name(pipeline_name)
-        if existing_pipeline:
-            # Clean up existing EventBridge rules if updating a pipeline
-            for resource_type, resource_arn in existing_pipeline.get("dependentResources", []):
-                if resource_type == "eventbridge_rule":
-                    rule_name = resource_arn.split("/")[-1]  # Extract rule name from ARN
-                    try:
-                        delete_eventbridge_rule(rule_name)
-                        logger.info(f"Deleted existing EventBridge rule: {rule_name}")
-                    except Exception as e:
-                        logger.error(f"Failed to delete EventBridge rule {rule_name}: {e}")
-
-            error_body = {
-                "error": "Pipeline name already exists",
-                "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name.",
-            }
-            logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
-            return {
-                "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-                "body": json.dumps(error_body),
-            }
         
-        # Create pipeline record with initial status
-        pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
+        # Check if pipeline_id is provided in the event
+        pipeline_id = event.get("pipeline_id")
+        
+        # If pipeline_id is not provided, check if a pipeline with this name already exists
+        if not pipeline_id:
+            existing_pipeline = get_pipeline_by_name(pipeline_name)
+            if existing_pipeline:
+                # Clean up existing EventBridge rules if updating a pipeline
+                for resource_type, resource_arn in existing_pipeline.get("dependentResources", []):
+                    if resource_type == "eventbridge_rule":
+                        rule_name = resource_arn.split("/")[-1]  # Extract rule name from ARN
+                        try:
+                            delete_eventbridge_rule(rule_name)
+                            logger.info(f"Deleted existing EventBridge rule: {rule_name}")
+                        except Exception as e:
+                            logger.error(f"Failed to delete EventBridge rule {rule_name}: {e}")
+
+                error_body = {
+                    "error": "Pipeline name already exists",
+                    "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name.",
+                }
+                logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
+                return {
+                    "statusCode": 400,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps(error_body),
+                }
+        else:
+            logger.info(f"Using provided pipeline_id: {pipeline_id}, skipping name check")
+        
+        # If pipeline_id is not provided, create a new pipeline record
+        if not pipeline_id:
+            # Create new pipeline record with initial status
+            pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
+            logger.info(f"Created new pipeline record with ID: {pipeline_id}")
         
         try:
             # Create/update Lambda functions for each node

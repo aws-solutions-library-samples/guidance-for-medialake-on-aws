@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Box, Tooltip, IconButton, Chip } from '@mui/material';
+import { Box, Tooltip, IconButton, Typography, Chip } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
@@ -66,6 +66,37 @@ export const usePipelineColumns = ({
                     </TableCellContent>
                 ),
             }),
+            columnHelper.accessor('deploymentStatus', {
+                header: 'Status',
+                size: 120,
+                enableSorting: true,
+                cell: info => {
+                    const status = info.getValue();
+                    let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
+                    
+                    if (status === 'DEPLOYED') {
+                        color = 'success.main';
+                    } else if (status === 'CREATING') {
+                        color = 'info.main';
+                    } else if (status === 'FAILED') {
+                        color = 'error.main';
+                    }
+                    
+                    return (
+                        <TableCellContent variant="secondary">
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: color,
+                                    fontWeight: 'medium'
+                                }}
+                            >
+                                {status || 'N/A'}
+                            </Typography>
+                        </TableCellContent>
+                    );
+                },
+            }),
             columnHelper.accessor('createdAt', {
                 header: 'Created',
                 size: 180,
@@ -106,23 +137,44 @@ export const usePipelineColumns = ({
                 size: 200,
                 cell: info => (
                     <Box sx={{ display: 'flex', gap: 1 }} className="action-buttons">
-                        <Tooltip title="Edit Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onEdit(info.row.original.id)}
-                                // disabled={info.row.original.system}
-                            >
-                                <EditIcon fontSize="small" />
-                            </IconButton>
+                        <Tooltip title={
+                            info.row.original.deploymentStatus &&
+                            !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                ? "Cannot edit pipeline while it's being created"
+                                : "Edit Pipeline"
+                        }>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => onEdit(info.row.original.id)}
+                                    disabled={
+                                        info.row.original.deploymentStatus &&
+                                        !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                    }
+                                >
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            </span>
                         </Tooltip>
-                        <Tooltip title="Delete Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onDelete(info.row.original.id, info.row.original.name)}
-                                disabled={info.row.original.system}
-                            >
+                        <Tooltip title={
+                            info.row.original.deploymentStatus &&
+                            !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                ? "Cannot delete pipeline while it's being created"
+                                : "Delete Pipeline"
+                        }>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => onDelete(info.row.original.id, info.row.original.name)}
+                                    disabled={
+                                        info.row.original.system ||
+                                        (info.row.original.deploymentStatus &&
+                                        !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus))
+                                    }
+                                >
                                 <DeleteIcon fontSize="small" />
                             </IconButton>
+                            </span>
                         </Tooltip>
                         <Tooltip title="Start Pipeline">
                             <IconButton
@@ -154,6 +206,7 @@ export const defaultColumnVisibility = {
     name: true,
     type: true,
     system: true,
+    deploymentStatus: true,
     createdAt: true,
     updatedAt: true,
     actions: true,

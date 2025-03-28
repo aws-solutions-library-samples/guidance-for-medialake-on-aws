@@ -13,6 +13,8 @@ export interface Pipeline {
     sfnRoleArn: string;
     triggerLambdaArn: string;
     dependentResources: [string, string | { rule_name: string; eventbus_name: string }][];
+    deploymentStatus?: 'CREATING' | 'DEPLOYED' | 'FAILED' | string;
+    executionArn?: string;
     definition: {
         nodes: PipelineNode[];
         edges: PipelineEdge[];

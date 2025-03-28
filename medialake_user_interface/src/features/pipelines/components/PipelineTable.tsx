@@ -89,6 +89,37 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             enableSorting: true,
             size: 100
         }),
+        columnHelper.accessor('deploymentStatus', {
+            header: 'Status',
+            cell: info => {
+                const status = info.getValue();
+                let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
+                
+                if (status === 'DEPLOYED') {
+                    color = 'success.main';
+                } else if (status === 'CREATING') {
+                    color = 'info.main';
+                } else if (status === 'FAILED') {
+                    color = 'error.main';
+                }
+                
+                return (
+                    <TableCellContent variant="secondary">
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                color: color,
+                                fontWeight: 'medium'
+                            }}
+                        >
+                            {status || 'N/A'}
+                        </Typography>
+                    </TableCellContent>
+                );
+            },
+            enableSorting: true,
+            size: 120
+        }),
         columnHelper.accessor('createdAt', {
             header: 'Created',
             cell: info => (
