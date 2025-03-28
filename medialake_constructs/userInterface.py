@@ -153,28 +153,6 @@ class UIConstruct(Construct):
                 secret_string_template="{}",
             ),
         )
-
-        waf_logs_bucket = S3Bucket(
-            self,
-            "WafLogsBucket",
-            props=S3BucketProps(
-                bucket_name=f"aws-waf-logs-{config.resource_prefix}-{stack.region}",
-                # Enable access logs since this is a logging bucket
-                access_logs=True,
-                # Add lifecycle rules to manage log retention
-                lifecycle_rules=[
-                    s3.LifecycleRule(
-                        transitions=[
-                            s3.Transition(
-                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
-                                transition_after=Duration.days(30)
-                            )
-                        ],
-                        expiration=Duration.days(90)  # Delete logs after 90 days
-                    )
-                ]
-            )
-        )
         
         self.user_interface_waf_log_group = logs.LogGroup(
             self,
@@ -184,83 +162,6 @@ class UIConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # self.user_interface_waf_acl = wafv2.CfnWebACL(
-        #     self,
-        #     "CloudFrontWAF",
-        #     default_action={"allow": {}},
-        #     scope="CLOUDFRONT",
-        #     visibility_config={
-        #         "sampledRequestsEnabled": True,
-        #         "cloudWatchMetricsEnabled": True,
-        #         "metricName": "CloudFrontWAFMetrics",
-        #     },
-        #     rules=[
-        #         {
-        #             "name": "AWSManagedRulesCommonRuleSet",
-        #             "priority": 1,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesCommonRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "sampledRequestsEnabled": True,
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "AWSManagedRulesCommonRuleSetMetric",
-        #             },
-        #         },
-        #         {
-        #             "name": "AWSManagedRulesKnownBadInputsRuleSet",
-        #             "priority": 2,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesKnownBadInputsRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "sampledRequestsEnabled": True,
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "KnownBadInputsRuleSetMetric",
-        #             },
-        #         },
-        #         {
-        #             "name": "AWSManagedRulesSQLiRuleSet",
-        #             "priority": 3,
-        #             "overrideAction": {"none": {}},
-        #             "statement": {
-        #                 "managedRuleGroupStatement": {
-        #                     "vendorName": "AWS",
-        #                     "name": "AWSManagedRulesSQLiRuleSet",
-        #                 }
-        #             },
-        #             "visibilityConfig": {
-        #                 "cloudWatchMetricsEnabled": True,
-        #                 "metricName": "SQLiRuleSetMetric",
-        #                 "sampledRequestsEnabled": True,
-        #             },
-        #         },
-        #     ],
-        # )
-
-        # self.waf_logging = wafv2.CfnLoggingConfiguration(
-        #     self,
-        #     "WafLoggingConfig",
-        #     # resource_arn=f"arn:aws:wafv2:us-east-1:{Stack.of(self).account}:global/webacl/{self.user_interface_waf_acl.name}/{self.user_interface_waf_acl.attr_id}",
-        #     resource_arn=self.user_interface_waf_acl.attr_arn,
-        #     log_destination_configs=[
-        #         # waf_logs_bucket.bucket_arn + "/waf-logs"
-        #         # props.access_log_bucket.bucket_arn + "/waf-logs"
-        #         self.user_interface_waf_log_group.log_group_arn
-        #     ],
-        #     redacted_fields=[
-        #     ],
-        # )
-
-        # self.waf_logging.add_dependency(self.user_interface_waf_acl)
 
         # Enhanced security headers policy
         ui_response_headers_policy = cloudfront.ResponseHeadersPolicy(
