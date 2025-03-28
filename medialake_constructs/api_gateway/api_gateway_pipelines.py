@@ -445,7 +445,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         
-         # Create a simple Step Function that just invokes the worker Lambda
+
        
         # Create a simple Step Function that just invokes the pipeline v2 Lambda
         pipeline_worker_task = tasks.LambdaInvoke(
@@ -482,16 +482,57 @@ class ApiGatewayPipelinesConstruct(Construct):
                 iam_role_boundary_policy=post_lambda_iam_boundary_policy,
                 environment_variables={
                     "PIPELINE_CREATION_STATE_MACHINE_ARN": self._pipeline_creation_state_machine.state_machine_arn,
+                    "PIPELINES_TABLE": props.pipeline_table.table_name,
                 },
             ),
         )
 
         # Grant the front-end Lambda permission to start the Step Function
         self._pipeline_creation_state_machine.grant_start_execution(self._post_pipelines_async_handler.function)
+        
+        # Grant the front-end Lambda permission to access the DynamoDB table
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Scan",
+                ],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+        
+        # Grant the front-end Lambda permission to describe Step Functions executions
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:DescribeExecution",
+                ],
+                resources=["*"],
+            )
+        )
 
         pipelines_v2_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(self._post_pipelines_v2_handler.function),
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+        
+        # Add status endpoint
+        pipelines_v2_status_resource = pipelines_v2_resource.add_resource("status")
+        pipelines_v2_status_resource.add_resource("{executionArn}").add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+        
+        # Add get pipeline by ID endpoint - use a different name to avoid conflicts
+        pipelines_v2_resource.add_resource("pipeline").add_resource("{pipelineId}").add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )

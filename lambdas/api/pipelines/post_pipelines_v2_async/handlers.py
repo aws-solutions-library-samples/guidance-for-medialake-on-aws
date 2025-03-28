@@ -18,6 +18,238 @@ logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="PostPipelineAsyncHandler")
 
+# Import environment variables
+PIPELINES_TABLE = os.environ.get("PIPELINES_TABLE")
+if not PIPELINES_TABLE:
+    logger.error("PIPELINES_TABLE environment variable is not set")
+
+# DynamoDB operations
+def get_pipeline_by_name(pipeline_name: str) -> Dict[str, Any]:
+    """
+    Get pipeline record from DynamoDB by name.
+    
+    Args:
+        pipeline_name: Name of the pipeline to look up
+        
+    Returns:
+        Pipeline record if found, None otherwise
+    """
+    logger.info(f"Looking up pipeline with name: {pipeline_name}")
+    
+    if not PIPELINES_TABLE:
+        logger.error("PIPELINES_TABLE environment variable is not set")
+        return None
+        
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(PIPELINES_TABLE)
+        
+        # Scan for items with matching name
+        response = table.scan(
+            FilterExpression="#n = :name",
+            ExpressionAttributeNames={"#n": "name"},
+            ExpressionAttributeValues={":name": pipeline_name},
+        )
+        items = response.get("Items", [])
+        if items:
+            pipeline = items[0]
+            return pipeline
+        return None
+    except Exception as e:
+        logger.error(f"Error looking up pipeline: {e}")
+        return None
+
+def get_pipeline_by_id(pipeline_id: str) -> Dict[str, Any]:
+    """
+    Get pipeline record from DynamoDB by ID.
+    
+    Args:
+        pipeline_id: ID of the pipeline to look up
+        
+    Returns:
+        Pipeline record if found, None otherwise
+    """
+    logger.info(f"Looking up pipeline with ID: {pipeline_id}")
+    
+    if not PIPELINES_TABLE:
+        logger.error("PIPELINES_TABLE environment variable is not set")
+        return None
+        
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(PIPELINES_TABLE)
+        
+        response = table.get_item(Key={"id": pipeline_id})
+        pipeline = response.get("Item")
+        if pipeline:
+            logger.info(f"Found pipeline with ID: {pipeline_id}")
+            return pipeline
+        logger.info(f"No pipeline found with ID: {pipeline_id}")
+        return None
+    except Exception as e:
+        logger.error(f"Error looking up pipeline: {e}")
+        return None
+
+def create_pipeline_record(
+    pipeline: Any,
+    execution_arn: str = None,
+    deployment_status: str = "CREATING"
+) -> str:
+    """
+    Create a new pipeline record in DynamoDB with initial status.
+    
+    Args:
+        pipeline: Pipeline definition object
+        execution_arn: Optional ARN of the Step Function execution
+        deployment_status: Initial deployment status
+        
+    Returns:
+        ID of the created pipeline record
+    """
+    import uuid
+    from datetime import datetime
+    
+    logger.info(f"Creating pipeline record with status: {deployment_status}")
+    
+    if not PIPELINES_TABLE:
+        logger.error("PIPELINES_TABLE environment variable is not set")
+        raise ValueError("PIPELINES_TABLE environment variable is not set")
+        
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+    
+    pipeline_id = str(uuid.uuid4())
+    now_iso = datetime.utcnow().isoformat()
+    
+    item = {
+        "id": pipeline_id,
+        "createdAt": now_iso,
+        "updatedAt": now_iso,
+        "definition": pipeline.dict(),
+        "dependentResources": [],  # Will be populated later
+        "name": pipeline.name,
+        "stateMachineArn": "",  # Will be populated later
+        "type": "Ingest Triggered",
+        "system": False,
+        "deploymentStatus": deployment_status
+    }
+    
+    if execution_arn:
+        item["executionArn"] = execution_arn
+    
+    try:
+        table.put_item(Item=item)
+        logger.info(f"Successfully created pipeline record with id {pipeline_id}")
+        return pipeline_id
+    except Exception as e:
+        logger.exception(f"Failed to create pipeline record: {e}")
+        raise
+
+def update_pipeline_status(
+    pipeline_id: str,
+    deployment_status: str,
+    state_machine_arn: str = None,
+    lambda_arns: Dict[str, str] = None,
+    eventbridge_rule_arns: Dict[str, str] = None
+) -> None:
+    """
+    Update the deployment status and optionally resources of a pipeline.
+    
+    Args:
+        pipeline_id: ID of the pipeline to update
+        deployment_status: New deployment status
+        state_machine_arn: Optional ARN of the state machine
+        lambda_arns: Optional dictionary mapping node IDs to Lambda ARNs
+        eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
+    """
+    from datetime import datetime
+    
+    logger.info(f"Updating pipeline {pipeline_id} status to {deployment_status}")
+    
+    if not PIPELINES_TABLE:
+        logger.error("PIPELINES_TABLE environment variable is not set")
+        raise ValueError("PIPELINES_TABLE environment variable is not set")
+        
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+    
+    now_iso = datetime.utcnow().isoformat()
+    
+    update_expr = "SET #status = :status, #up = :updated"
+    expr_values = {
+        ":status": deployment_status,
+        ":updated": now_iso
+    }
+    expr_names = {
+        "#status": "deploymentStatus",
+        "#up": "updatedAt"
+    }
+    
+    # Add resources if provided
+    dependent_resources = []
+    if lambda_arns:
+        for node_id, arn in lambda_arns.items():
+            if arn:
+                dependent_resources.append(["lambda", arn])
+        
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
+    
+    if state_machine_arn:
+        if lambda_arns:
+            # Already added dependentResources, just append to it
+            dependent_resources.append(["step_function", state_machine_arn])
+        else:
+            # Need to get existing dependentResources first
+            pipeline = get_pipeline_by_id(pipeline_id)
+            if pipeline and "dependentResources" in pipeline:
+                dependent_resources = pipeline["dependentResources"]
+                dependent_resources.append(["step_function", state_machine_arn])
+                update_expr += ", #res = :res"
+                expr_values[":res"] = dependent_resources
+                expr_names["#res"] = "dependentResources"
+            else:
+                dependent_resources = [["step_function", state_machine_arn]]
+                update_expr += ", #res = :res"
+                expr_values[":res"] = dependent_resources
+                expr_names["#res"] = "dependentResources"
+        
+        update_expr += ", #arn = :arn"
+        expr_values[":arn"] = state_machine_arn
+        expr_names["#arn"] = "stateMachineArn"
+    
+    if eventbridge_rule_arns and not lambda_arns:
+        # Need to get existing dependentResources first if lambda_arns not provided
+        pipeline = get_pipeline_by_id(pipeline_id)
+        if pipeline and "dependentResources" in pipeline:
+            dependent_resources = pipeline["dependentResources"]
+        
+        for node_id, arn in eventbridge_rule_arns.items():
+            if arn:
+                dependent_resources.append(["eventbridge_rule", arn])
+        
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
+    elif eventbridge_rule_arns:
+        # lambda_arns was provided, so dependentResources is already set up
+        for node_id, arn in eventbridge_rule_arns.items():
+            if arn:
+                dependent_resources.append(["eventbridge_rule", arn])
+    
+    try:
+        table.update_item(
+            Key={"id": pipeline_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeValues=expr_values,
+            ExpressionAttributeNames=expr_names
+        )
+        logger.info(f"Successfully updated pipeline {pipeline_id} status to {deployment_status}")
+    except Exception as e:
+        logger.exception(f"Failed to update pipeline status: {e}")
+        raise
+
 # Configure CORS and API Gateway resolver
 cors_config = CORSConfig(allow_origin="*", allow_headers=["*"])
 app = APIGatewayRestResolver(cors=cors_config)
@@ -32,7 +264,7 @@ def create_pipeline() -> Dict[str, Any]:
     Start a pipeline creation process asynchronously.
     
     Returns:
-        API Gateway response with the execution ARN
+        API Gateway response with the execution ARN and pipeline ID
     """
     try:
         logger.info("Received request to create/update a pipeline")
@@ -45,6 +277,23 @@ def create_pipeline() -> Dict[str, Any]:
         pipeline_name = pipeline.name
         logger.info(f"Processing pipeline: {pipeline_name} - {pipeline.description}")
         
+        # Check if a pipeline with this name already exists
+        existing_pipeline = get_pipeline_by_name(pipeline_name)
+        if existing_pipeline:
+            error_body = {
+                "error": "Pipeline name already exists",
+                "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name.",
+            }
+            logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
+            return {
+                "statusCode": 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps(error_body),
+            }
+        
         # Start the Step Function execution
         sfn_client = boto3.client("stepfunctions")
         response = sfn_client.start_execution(
@@ -55,13 +304,30 @@ def create_pipeline() -> Dict[str, Any]:
         execution_arn = response["executionArn"]
         logger.info(f"Started Step Function execution: {execution_arn}")
         
-        # Return a response to the client
-        response_body = {
-            "message": f"Pipeline creation started for '{pipeline_name}'",
-            "execution_arn": execution_arn,
-            "status": "RUNNING",
-            "pipeline_name": pipeline_name
-        }
+        try:
+            # Create pipeline record with initial status and execution ARN
+            pipeline_id = create_pipeline_record(pipeline, execution_arn, "CREATING")
+            
+            # Return a response to the client
+            response_body = {
+                "message": f"Pipeline creation started for '{pipeline_name}'",
+                "pipeline_id": pipeline_id,
+                "execution_arn": execution_arn,
+                "status": "CREATING",
+                "pipeline_name": pipeline_name
+            }
+        except ValueError as ve:
+            # Handle the case when PIPELINES_TABLE is not set
+            error_body = {"error": "Configuration error", "details": str(ve)}
+            logger.error(f"Configuration error: {ve}")
+            return {
+                "statusCode": 500,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps(error_body),
+            }
         
         return {
             "statusCode": 202,  # Accepted
@@ -95,25 +361,69 @@ def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
         executionArn: ARN of the Step Function execution
         
     Returns:
-        API Gateway response with the execution status
+        API Gateway response with the execution status and pipeline record
     """
     try:
         logger.info(f"Checking status of execution: {executionArn}")
         
         # Get the execution status
         sfn_client = boto3.client("stepfunctions")
-        response = sfn_client.describe_execution(
+        sfn_response = sfn_client.describe_execution(
             executionArn=executionArn
         )
         
-        status = response["status"]
-        output = json.loads(response.get("output", "{}")) if "output" in response else {}
+        status = sfn_response["status"]
+        output = json.loads(sfn_response.get("output", "{}")) if "output" in sfn_response else {}
         
-        # Return the status to the client
+        # Find the pipeline record by execution ARN
+        pipeline_record = None
+        try:
+            if not PIPELINES_TABLE:
+                logger.error("PIPELINES_TABLE environment variable is not set")
+                raise ValueError("PIPELINES_TABLE environment variable is not set")
+                
+            dynamodb = boto3.resource("dynamodb")
+            table = dynamodb.Table(PIPELINES_TABLE)
+            
+            pipeline_response = table.scan(
+                FilterExpression=boto3.dynamodb.conditions.Attr("executionArn").eq(executionArn)
+            )
+            
+            if pipeline_response.get("Items"):
+                pipeline_record = pipeline_response["Items"][0]
+                
+                # Update pipeline status based on Step Function status if needed
+                current_status = pipeline_record.get("deploymentStatus", "CREATING")
+                new_status = current_status
+                
+                if status == "RUNNING":
+                    # Keep the current status, which should be more specific
+                    pass
+                elif status == "SUCCEEDED":
+                    new_status = "DEPLOYED"
+                elif status == "FAILED":
+                    new_status = "FAILED"
+                elif status == "TIMED_OUT":
+                    new_status = "FAILED"
+                elif status == "ABORTED":
+                    new_status = "FAILED"
+                
+                # Update the status if it changed
+                if new_status != current_status:
+                    try:
+                        update_pipeline_status(pipeline_record["id"], new_status)
+                        pipeline_record["deploymentStatus"] = new_status
+                    except ValueError as ve2:
+                        logger.error(f"Failed to update pipeline status: {ve2}")
+        except ValueError as ve:
+            logger.error(f"Configuration error: {ve}")
+        
+        # Return both the Step Function status and the pipeline record
         response_body = {
             "execution_arn": executionArn,
-            "status": status,
-            "output": output
+            "step_function_status": status,
+            "step_function_output": output,
+            "pipeline": pipeline_record
         }
         
         return {
@@ -128,6 +438,84 @@ def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
     except Exception as e:
         logger.exception("Error checking pipeline status")
         error_body = {"error": "Failed to check pipeline status", "details": str(e)}
+        
+        return {
+            "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
+            "body": json.dumps(error_body),
+        }
+
+@app.get("/pipelinesv2/pipeline/{pipelineId}")
+@tracer.capture_method
+def get_pipeline_by_id_handler(pipelineId: str) -> Dict[str, Any]:
+    """
+    Get a pipeline by ID.
+    
+    Args:
+        pipelineId: ID of the pipeline
+        
+    Returns:
+        API Gateway response with the pipeline record
+    """
+    try:
+        logger.info(f"Getting pipeline with ID: {pipelineId}")
+        
+        try:
+            pipeline = get_pipeline_by_id(pipelineId)
+            if not pipeline:
+                return {
+                    "statusCode": 404,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps({"error": "Pipeline not found"}),
+                }
+        except ValueError as ve:
+            # Handle the case when PIPELINES_TABLE is not set
+            error_body = {"error": "Configuration error", "details": str(ve)}
+            logger.error(f"Configuration error: {ve}")
+            return {
+                "statusCode": 500,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps(error_body),
+            }
+        
+        # If the pipeline has an execution ARN, get the Step Function status
+        execution_status = None
+        if "executionArn" in pipeline:
+            try:
+                sfn_client = boto3.client("stepfunctions")
+                sfn_response = sfn_client.describe_execution(
+                    executionArn=pipeline["executionArn"]
+                )
+                execution_status = sfn_response["status"]
+            except Exception as e:
+                logger.warning(f"Failed to get execution status: {e}")
+        
+        response_body = {
+            "pipeline": pipeline,
+            "execution_status": execution_status
+        }
+        
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
+            "body": json.dumps(response_body),
+        }
+        
+    except Exception as e:
+        logger.exception("Error getting pipeline")
+        error_body = {"error": "Failed to get pipeline", "details": str(e)}
         
         return {
             "statusCode": 500,
