@@ -6,7 +6,8 @@ import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import {
     Visibility as VisibilityIcon,
     RestartAlt as RestartIcon,
-    Replay as ReplayIcon
+    Replay as ReplayIcon,
+    Refresh as RefreshIcon
 } from '@mui/icons-material';
 import {
     useReactTable,
@@ -58,7 +59,7 @@ const ExecutionsPage: React.FC = () => {
     }), [sorting, columnFilters]);
        
     // Data fetching and memoization
-    const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = usePipelineExecutions(PAGE_SIZE, filters);
+    const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = usePipelineExecutions(PAGE_SIZE, filters);
 
     const executions = useMemo(() => {
         if (!data?.pages) return [];
@@ -152,6 +153,10 @@ const ExecutionsPage: React.FC = () => {
         console.log('isSidePanelOpen changed:', isSidePanelOpen);
         console.log('selectedExecution:', selectedExecution);
     }, [isSidePanelOpen, selectedExecution]);
+
+    const handleRefresh = useCallback(() => {
+        refetch();
+    }, [refetch]);
 
     const columns = useMemo<ColumnDef<PipelineExecution>[]>(
         () => [
@@ -348,6 +353,21 @@ const ExecutionsPage: React.FC = () => {
                 <PageHeader
                     title={t('executions.title')}
                     description={t('executions.description')}
+                    action={
+                        <IconButton
+                            onClick={handleRefresh}
+                            disabled={isLoading}
+                            sx={{
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                '&:hover': {
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                },
+                            }}
+                            title={t('common.refresh')}
+                        >
+                            <RefreshIcon />
+                        </IconButton>
+                    }
                 />
                 <BaseTableToolbar
                     globalFilter={globalFilter}
