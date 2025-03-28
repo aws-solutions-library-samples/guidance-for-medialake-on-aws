@@ -476,9 +476,7 @@ import React, {
                 timeObservation: { start: currentTime, end: currentTime + 20 },
                 editable: true,
                 style: {
-                  renderType: 'spanning',
-                  symbolSize: 12,
-                  symbolType: 'triangle',
+                  ...PERIOD_MARKER_STYLE,
                   color: randomHexColor(),
                 },
               });
