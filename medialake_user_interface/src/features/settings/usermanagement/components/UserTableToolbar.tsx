@@ -44,7 +44,7 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
             <SearchField
                 value={globalFilter ?? ''}
                 onChange={onGlobalFilterChange}
-                placeholder={t('users.search')}
+                placeholder={t('translation.common.search')}
             />
             <Box sx={{
                 flex: 1,

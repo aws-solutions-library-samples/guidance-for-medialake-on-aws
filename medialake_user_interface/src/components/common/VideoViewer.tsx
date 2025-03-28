@@ -57,6 +57,7 @@ import React, {
     onError?: (error: any) => void;
     onTimeUpdate?: (time: number) => void;
     showThumbnails?: boolean;
+    onMarkerAdd?: (time: number) => void;
   }
   
   export interface VideoViewerRef {
@@ -219,7 +220,7 @@ import React, {
     useEffect(() => {
       const cleanup = initializePlayer();
       return cleanup;
-    }, [initializePlayer]);
+    }, [/*initializePlayer*/]); //Not using UseEffect dependency array due to player inicializing everytime someone changes tabs
   
     // Responsive timeline: Listen for window resize events and trigger a timeline resize.
     // useEffect(() => {
@@ -408,6 +409,7 @@ import React, {
         onError,
         onTimeUpdate,
         showThumbnails = false,
+        onMarkerAdd
       },
       ref
     ) => {
@@ -441,8 +443,11 @@ import React, {
           onTimeUpdate: (time: number) => {
             onTimeUpdate?.(time);
           },
+          onMarkerAdd: (time: number) => {
+            onMarkerAdd?.(time);
+          },
         }),
-        [onPlay, onPause, onSeek, onVolumeChange, onBuffering, onEnded, onError, onTimeUpdate]
+        [onPlay, onPause, onSeek, onVolumeChange, onBuffering, onEnded, onError, onTimeUpdate, onMarkerAdd]
       );
   
       const {
@@ -471,19 +476,19 @@ import React, {
                 timeObservation: { start: currentTime, end: currentTime + 20 },
                 editable: true,
                 style: {
-                  renderType: 'spanning',
-                  symbolSize: 12,
-                  symbolType: 'triangle',
+                  ...PERIOD_MARKER_STYLE,
                   color: randomHexColor(),
                 },
               });
               markerLaneRef.current.addMarker(periodMarker);
+              
+              // Add this line to trigger the callback
+              customCallbacks.onMarkerAdd?.(currentTime);
             }
           },
         }),
-        [currentTime]
+        [currentTime, customCallbacks]
       );
-  
       const handlePlayPause = () => {
         if (isPlaying) {
           pause();

@@ -334,6 +334,10 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                 create_function_params = {
                     "FunctionName": function_name,
                     "Runtime": runtime,
+                    "MemorySize": 1024,
+                    "EphemeralStorage":{
+                        'Size': 10240
+                    },
                     "Timeout": 300,
                     "Role": role_arn,
                     "Handler": "index.lambda_handler",

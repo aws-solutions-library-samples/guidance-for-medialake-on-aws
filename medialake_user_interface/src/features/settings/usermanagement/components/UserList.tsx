@@ -149,7 +149,7 @@ const UserList: React.FC<UserListProps> = ({
         console.log('Theme in columns useMemo:', theme);
         return [
             {
-                header: t('users.columns.username'),
+                header: t('translation.common.columns.username'),
                 accessorKey: 'username',
                 minSize: 120,
                 size: 180,
@@ -166,7 +166,7 @@ const UserList: React.FC<UserListProps> = ({
                 },
             },
             {
-                header: t('users.columns.firstName'),
+                header: t('translation.common.columns.firstName'),
                 accessorKey: 'name',
                 minSize: 100,
                 size: 160,
@@ -180,7 +180,7 @@ const UserList: React.FC<UserListProps> = ({
                 ),
             },
             {
-                header: t('users.columns.lastName'),
+                header: t('translation.common.columns.lastName'),
                 accessorKey: 'family_name',
                 minSize: 120,
                 size: 160,
@@ -194,7 +194,7 @@ const UserList: React.FC<UserListProps> = ({
                 ),
             },
             {
-                header: t('users.columns.email'),
+                header: t('translation.common.columns.email'),
                 accessorKey: 'email',
                 minSize: 150,
                 size: 275,
@@ -208,7 +208,7 @@ const UserList: React.FC<UserListProps> = ({
                 ),
             },
             {
-                header: t('users.columns.status'),
+                header: t('translation.common.columns.status'),
                 accessorKey: 'enabled',
                 minSize: 100,
                 size: 100,
@@ -219,7 +219,7 @@ const UserList: React.FC<UserListProps> = ({
                     const enabled = getValue() as boolean;
                     return (
                         <Chip
-                            label={enabled ? t('users.status.active') : t('users.status.inactive')}
+                            label={enabled ? t('translation.common.status.active') : t('translation.common.status.inactive')}
                             size="small"
                             sx={{
                                 backgroundColor: enabled
@@ -240,7 +240,7 @@ const UserList: React.FC<UserListProps> = ({
                 },
             },
             {
-                header: t('users.columns.groups'),
+                header: t('translation.common.columns.groups'),
                 accessorKey: 'groups',
                 minSize: 120,
                 size: 160,
@@ -275,7 +275,7 @@ const UserList: React.FC<UserListProps> = ({
                                 ))
                             ) : (
                                 <TableCellContent variant="secondary">
-                                    {t('common.noGroups')}
+                                    {t('translation.common.noGroups')}
                                 </TableCellContent>
                             )}
                         </Box>
@@ -283,7 +283,7 @@ const UserList: React.FC<UserListProps> = ({
                 },
             },
             {
-                header: t('users.columns.created'),
+                header: t('translation.common.columns.created'),
                 accessorKey: 'created',
                 minSize: 120,
                 size: 120,
@@ -304,7 +304,7 @@ const UserList: React.FC<UserListProps> = ({
                 },
             },
             {
-                header: t('users.columns.modified'),
+                header: t('translation.common.columns.modified'),
                 accessorKey: 'modified',
                 minSize: 150,
                 size: 200,
@@ -328,7 +328,7 @@ const UserList: React.FC<UserListProps> = ({
                 id: 'actions',
                 header: () => (
                     <Box sx={{ width: '100%', textAlign: 'center' }}>
-                        {t('users.columns.actions')}
+                        {t('translation.common.columns.actions')}
                     </Box>
                 ),
                 minSize: 100,
@@ -337,7 +337,7 @@ const UserList: React.FC<UserListProps> = ({
                 enableSorting: false,
                 cell: ({ row }) => (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        <Tooltip title={t('users.actions.edit')}>
+                        <Tooltip title={t('translation.common.actions.edit')}>
                             <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -354,7 +354,7 @@ const UserList: React.FC<UserListProps> = ({
                                 <EditIcon fontSize="small" />
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title={row.original.enabled ? t('users.actions.deactivate') : t('users.actions.activate')}>
+                        <Tooltip title={row.original.enabled ? t('translation.common.actions.deactivate') : t('translation.common.actions.activate')}>
                             <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -375,7 +375,7 @@ const UserList: React.FC<UserListProps> = ({
                                 {row.original.enabled ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title={t('users.actions.delete')}>
+                        <Tooltip title={t('translation.common.actions.delete')}>
                             <IconButton
                                 size="small"
                                 onClick={(e) => {
