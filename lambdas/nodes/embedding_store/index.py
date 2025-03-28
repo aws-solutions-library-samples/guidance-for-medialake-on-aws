@@ -138,8 +138,13 @@ def lambda_handler(event, context):
             # Search for an existing document by DigitalSourceAsset.ID
             search_query = {
                 "query": {
-                    "term": {
-                        "DigitalSourceAsset.ID.keyword": asset_id
+                    "bool": {
+                        "must": [
+                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}}
+                        ],
+                        "filter": [
+                            {"exists": {"field": "InventoryID"}}
+                        ]
                     }
                 }
             }
@@ -158,7 +163,7 @@ def lambda_handler(event, context):
             logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
    
             # Update the existing document
-            document["asset_id"] = asset_id
+            document["DigitalSourceAsset"] = {"ID": asset_id}
             response = client.update(
                 index=INDEX_NAME,
                 id=existing_doc_id,
