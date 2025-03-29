@@ -37,7 +37,7 @@ pipes = boto3.client("pipes")
 class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
-    objectPrefix: str | None = None
+    objectPrefix: list[str] | None = None
 
 
 class S3Connector(BaseModel):
@@ -97,7 +97,7 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 def setup_eventbridge_notifications(
-    s3_bucket: str, bucket_region: str, created_resources: list, object_prefix: str
+    s3_bucket: str, bucket_region: str, created_resources: list, object_prefix: list[str] | None
 ) -> tuple[str, str]:
     """Set up EventBridge notifications and return queue URL and ARN"""
 
@@ -176,14 +176,15 @@ def setup_eventbridge_notifications(
     }
     
     # Add prefix filter if object_prefix is provided
-    if object_prefix:
-        # Ensure prefix ends with '/'
-        prefix = object_prefix if object_prefix.endswith('/') else f"{object_prefix}/"
-        event_pattern["detail"]["object"]["key"] = [
-            {
-                "prefix": prefix
-            }
-        ]
+    if object_prefix and len(object_prefix) > 0:
+        # Create prefix filters for each prefix in the list
+        prefixes = []
+        for prefix in object_prefix:
+            formatted_prefix = prefix if prefix.endswith('/') else f"{prefix}/"
+            prefixes.append({"prefix": formatted_prefix})
+        
+        if prefixes:
+            event_pattern["detail"]["object"]["key"] = prefixes
 
     eventbridge.put_rule(
         Name=rule_name,
@@ -390,7 +391,7 @@ def check_existing_s3_notifications(s3_client, bucket_name):
         logger.error(f"Error checking S3 notifications: {str(e)}")
         return False
     
-def update_bucket_notifications(s3: Any, s3_bucket: str, connector_id: str, queue_arn: str, object_prefix: str) -> List[str]:
+def update_bucket_notifications(s3: Any, s3_bucket: str, connector_id: str, queue_arn: str, object_prefix: list[str] | None) -> List[str]:
     errors: List[str] = []
     try:
         # Get existing configuration
@@ -405,39 +406,56 @@ def update_bucket_notifications(s3: Any, s3_bucket: str, connector_id: str, queu
             if k != 'ResponseMetadata'
         }
         
-        # Prepare new queue configuration
-        new_queue_config = {
-            "Id": f"{os.environ.get('RESOURCE_PREFIX')}_notifications_{connector_id}",
-            "QueueArn": queue_arn,
-            "Events": [
-                "s3:ObjectCreated:*",
-                "s3:ObjectRemoved:*",
-                "s3:ObjectRestore:*",
-                "s3:ObjectTagging:*",
-                "s3:ObjectAcl:Put",
-            ]
-        }
-
-        # Add filter if object_prefix is provided
-        if object_prefix:
-            new_queue_config["Filter"] = {
-                "Key": {
-                    "FilterRules": [
-                        {
-                            "Name": "prefix",
-                            "Value": object_prefix if object_prefix.endswith('/') else f"{object_prefix}/"
-                        }
-                    ]
-                }
-            }
-            
-        # Update QueueConfigurations
+        # Initialize QueueConfigurations if it doesn't exist
+        if 'QueueConfigurations' not in new_config:
+            new_config['QueueConfigurations'] = []
+        
+        # Remove any existing configurations with our prefix
+        prefix_id_base = f"{os.environ.get('RESOURCE_PREFIX')}_notifications_{connector_id}"
         new_config['QueueConfigurations'] = [
             config for config in new_config.get('QueueConfigurations', [])
-            if config.get('Id') != new_queue_config['Id']
+            if not config.get('Id', '').startswith(prefix_id_base)
         ]
-        new_config['QueueConfigurations'].append(new_queue_config)
-
+        
+        # Common events for all configurations
+        events = [
+            "s3:ObjectCreated:*",
+            "s3:ObjectRemoved:*",
+            "s3:ObjectRestore:*",
+            "s3:ObjectTagging:*",
+            "s3:ObjectAcl:Put",
+        ]
+        
+        # Add filter if object_prefix is provided
+        if object_prefix and len(object_prefix) > 0:
+            # Create a separate notification configuration for each prefix
+            for i, prefix in enumerate(object_prefix):
+                new_queue_config = {
+                    "Id": f"{prefix_id_base}_{i}",
+                    "QueueArn": queue_arn,
+                    "Events": events,
+                    "Filter": {
+                        "Key": {
+                            "FilterRules": [
+                                {
+                                    "Name": "prefix",
+                                    "Value": prefix if prefix.endswith('/') else f"{prefix}/"
+                                }
+                            ]
+                        }
+                    }
+                }
+                new_config['QueueConfigurations'].append(new_queue_config)
+            
+            logger.info(f"Created {len(object_prefix)} S3 notification configurations for different prefixes")
+        else:
+            # No prefix - create a configuration without filter
+            new_queue_config = {
+                "Id": prefix_id_base,
+                "QueueArn": queue_arn,
+                "Events": events
+            }
+            new_config['QueueConfigurations'].append(new_queue_config)
 
         # Apply the updated configuration
         s3.put_bucket_notification_configuration(
