@@ -29,6 +29,8 @@ import {
     Refresh as RefreshIcon,
     ExpandMore as ExpandMoreIcon,
     ExpandLess as ExpandLessIcon,
+    Add as AddIcon,
+    Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets } from '@/api/hooks/useConnectors';
@@ -40,7 +42,6 @@ interface ConnectorModalProps {
     editingConnector?: ConnectorResponse;
     onSave: (connectorData: CreateConnectorRequest) => Promise<void>;
     isCreating: boolean;
-
 }
 
 const CONNECTOR_TYPES = [
@@ -77,7 +78,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [type, setType] = useState('');
     const [bucketType, setBucketType] = useState('');
     const [s3ConnectorType, setS3ConnectorType] = useState('');
-    const [configuration, setConfiguration] = useState<Record<string, string>>({});
+    const [configuration, setConfiguration] = useState<Record<string, any>>({});
+    const [objectPrefixes, setObjectPrefixes] = useState<string[]>(['']);
     const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -89,12 +91,30 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             setName(editingConnector.name);
             setType(editingConnector.type);
             setConfiguration(editingConnector.configuration || {});
+            
+            // Handle object prefixes from existing configuration
+            if (editingConnector.objectPrefix) {
+                // Check if objectPrefix exists at the top level
+                if (typeof editingConnector.objectPrefix === 'string') {
+                    // Convert legacy string format to array format
+                    setObjectPrefixes([editingConnector.objectPrefix]);
+                } else if (Array.isArray(editingConnector.objectPrefix)) {
+                    // Use the array directly
+                    setObjectPrefixes(editingConnector.objectPrefix);
+                } else {
+                    setObjectPrefixes(['']);
+                }
+            } else {
+                setObjectPrefixes(['']);
+            }
+            
             setActiveStep(2);
         } else {
             setName('');
             setType('');
             setBucketType('');
             setConfiguration({});
+            setObjectPrefixes(['']);
             setActiveStep(0);
         }
     }, [editingConnector, open]);
@@ -106,6 +126,33 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const handleBack = () => {
         setActiveStep((prev) => prev - 1);
     };
+    
+    const handleAddPrefix = () => {
+        setObjectPrefixes([...objectPrefixes, '']);
+    };
+
+    const handleRemovePrefix = (index: number) => {
+        const newPrefixes = [...objectPrefixes];
+        newPrefixes.splice(index, 1);
+        if (newPrefixes.length === 0) {
+            newPrefixes.push(''); // Always keep at least one field
+        }
+        setObjectPrefixes(newPrefixes);
+    };
+
+    const handlePrefixChange = (index: number, value: string) => {
+        const newPrefixes = [...objectPrefixes];
+        newPrefixes[index] = value;
+        setObjectPrefixes(newPrefixes);
+    };
+
+    const handleInfoClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        setInfoAnchorEl(event.currentTarget);
+    };
+
+    const handleInfoClose = () => {
+        setInfoAnchorEl(null);
+    };
 
     const handleSaveInternal = async () => {
         if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket || !configuration.integrationMethod))) {
@@ -113,6 +160,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             return;
         }
 
+        // Filter out empty prefixes
+        const filteredPrefixes = objectPrefixes.filter(prefix => prefix.trim() !== '');
+        
         const connectorData: CreateConnectorRequest = {
             name,
             type,
@@ -121,6 +171,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 ...configuration,
                 connectorType: s3ConnectorType,
                 s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3Notifications',
+                objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
             },
         };
 
@@ -130,14 +181,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         } catch (err) {
             setError('Failed to create connector');
         }
-    };
-
-    const handleInfoClick = (event: React.MouseEvent<HTMLElement>) => {
-        setInfoAnchorEl(event.currentTarget);
-    };
-
-    const handleInfoClose = () => {
-        setInfoAnchorEl(null);
     };
 
     const renderS3BucketTypeSelection = () => (
@@ -352,13 +395,30 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
             <Collapse in={showAdvanced}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                    <TextField
-                        label="Object Prefix"
-                        value={configuration.objectPrefix || ''}
-                        onChange={(e) => setConfiguration({ ...configuration, objectPrefix: e.target.value })}
-                        fullWidth
-                        helperText="Optional prefix to filter objects (e.g., 'folder/')"
-                    />
+                    {objectPrefixes.map((prefix, index) => (
+                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TextField
+                                label={`Object Prefix ${objectPrefixes.length > 1 ? index + 1 : ''}`}
+                                value={prefix}
+                                onChange={(e) => handlePrefixChange(index, e.target.value)}
+                                fullWidth
+                                helperText="Optional prefix to filter objects (e.g., 'folder/')"
+                            />
+                            <IconButton 
+                                onClick={() => handleRemovePrefix(index)}
+                                sx={{ mt: index === 0 && objectPrefixes.length === 1 ? -3 : 0 }}
+                            >
+                                <DeleteIcon />
+                            </IconButton>
+                        </Box>
+                    ))}
+                    <Button
+                        startIcon={<AddIcon />}
+                        onClick={handleAddPrefix}
+                        sx={{ alignSelf: 'flex-start', mt: 1 }}
+                    >
+                        Add Prefix
+                    </Button>
                 </Box>
             </Collapse>
         </Box>
@@ -531,7 +591,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     </Box>
                 </Popover>
             </Dialog>
-
         </>
     );
 };

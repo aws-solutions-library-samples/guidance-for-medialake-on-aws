@@ -6,7 +6,12 @@ interface DateTimeFormatOptions {
   allowSecondsToggle?: boolean;
 }
 
-export const formatLocalDateTime = (isoString: string, options: DateTimeFormatOptions = {}): string => {
+export const formatLocalDateTime = (isoString: string | null | undefined, options: DateTimeFormatOptions = {}): string => {
+  // Return empty string if isoString is null or undefined
+  if (isoString == null) {
+    return '';
+  }
+  
   try {
     const { showSeconds = false } = options;
     // Parse the UTC date string

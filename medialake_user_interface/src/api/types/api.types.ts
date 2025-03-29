@@ -116,7 +116,8 @@ export interface CreateConnectorRequest {
     bucket?: string;
     s3IntegrationMethod?: 's3Notifications' | 'eventbridge';
     region?: string;
-    [key: string]: string | undefined;
+    objectPrefix?: string | string[];
+    [key: string]: string | string[] | undefined;
   };
 }
 
@@ -143,7 +144,7 @@ export interface ConnectorResponse {
   region: string;
   status?: string;
   integrationMethod?: string;
-  objectPrefix?: string;
+  objectPrefix?: string | string[];
   usage?: {
     total: number;
   };
@@ -155,6 +156,8 @@ export interface ConnectorResponse {
     queueUrl?: string;
     lambdaArn?: string;
     iamRoleArn?: string;
+    objectPrefix?: string | string[];
+    [key: string]: string | string[] | undefined;
   };
   settings?: {
     bucket: string;
