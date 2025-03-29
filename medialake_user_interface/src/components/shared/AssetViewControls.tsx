@@ -81,16 +81,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             mb: 3
         }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography
-                    variant="h5"
-                    component="h2"
-                    sx={{
-                        fontWeight: 600,
-                        color: 'text.primary',
-                    }}
-                >
-                    {title}
-                </Typography>
                 <ToggleButtonGroup
                     value={viewMode}
                     exclusive
