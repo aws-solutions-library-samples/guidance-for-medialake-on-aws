@@ -75,7 +75,8 @@ def handler(event, context):
                     "index": {
                         "knn": True,
                         "number_of_shards": 2,
-                        "knn.algo_param.ef_search": 100
+                        "knn.algo_param.ef_search": 100,
+                        "mapping.total_fields.limit": 2000
                     }
                 },
                 "mappings": {
