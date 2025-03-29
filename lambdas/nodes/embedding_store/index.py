@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth, exceptions
 
 from lambda_middleware import lambda_middleware
 from nodes_utils import seconds_to_smpte
@@ -111,6 +111,7 @@ def lambda_handler(event, context):
                 })
             }
         
+        # Build the document to be stored/updated.
         document = {
             "type": CONTENT_TYPE,
             "embedding": embedding_vector,
@@ -119,38 +120,46 @@ def lambda_handler(event, context):
         }
 
         if scope == "clip":
-            # For clips, store the original asset_id and add timecodes
+            # For clips, store the original asset_id and add timecodes.
             document["DigitalSourceAsset"] = {"ID": asset_id}
             document["start_timecode"] = seconds_to_smpte(item.get("start_offset_sec", None))
             document["end_timecode"] = seconds_to_smpte(item.get("end_offset_sec", None))
 
-            # Index the document without a forced refresh
+            # Index the document without a forced refresh.
             response = client.index(index=INDEX_NAME, body=document)
             document_id = response.get("_id", "unknown")
             logger.info(f"Successfully created new document for clip: {response}")
 
         else:
-            # Search for an existing document by DigitalSourceAsset.ID without forcing refresh
+            # Search for an existing document by DigitalSourceAsset.ID
             search_query = {
                 "query": {
                     "bool": {
-                        "must": [
-                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}}
-                        ],
-                        "filter": [
-                            {"exists": {"field": "InventoryID"}}
-                        ]
+                    "must": [
+                        {
+                        "term": {
+                            "DigitalSourceAsset.ID.keyword": asset_id
+                        }
+                        },
+                        {"exists": {"field": "InventoryID"}},
+                        {
+                        "exists": {
+                            "field": "DerivedRepresentations.ID"
+                        }
+                        }
+                    ]
                     }
                 }
             }
+
             
             start_time = time.time()
             search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            # If not found, refresh the index and retry up to 2 minutes
+            # Retry search for up to 2 minutes if the document is not found.
             while search_response["hits"]["total"]["value"] == 0 and (time.time() - start_time) < 120:
                 logger.info("Document not found, refreshing index and retrying search...")
                 client.indices.refresh(index=INDEX_NAME)
-                time.sleep(5)  # Wait before retrying
+                time.sleep(5)
                 search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
             
             if search_response["hits"]["total"]["value"] == 0:
@@ -161,20 +170,84 @@ def lambda_handler(event, context):
                     "statusCode": 404,
                     "body": json.dumps({"error": error_msg})
                 }
-
-            # Extract document ID from search response
+            
+            # Extract the document ID.
             existing_doc_id = search_response["hits"]["hits"][0]["_id"]
             logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
-            time.sleep(30)
-            # Update the existing document without a forced refresh
+            
+            # Retrieve current document for sequence number and primary term.
+            existing_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
+            current_seq_no = existing_doc.get("_seq_no")
+            current_primary_term = existing_doc.get("_primary_term")
+            
+            # Include DigitalSourceAsset in the document.
             document["DigitalSourceAsset"] = {"ID": asset_id}
-            response = client.update(
-                index=INDEX_NAME,
-                id=existing_doc_id,
-                body={"doc": document}
-            )
+            
+            # Log the document before update
+            logger.info("Document before update: %s", json.dumps(document))
+            
+            # Retry loop for update with conflict error handling
+            max_update_retries = 50
+            update_attempt = 0
+            while update_attempt < max_update_retries:
+                try:
+                    response = client.update(
+                        index=INDEX_NAME,
+                        id=existing_doc_id,
+                        body={"doc": document},
+                        if_seq_no=current_seq_no,
+                        if_primary_term=current_primary_term
+                    )
+                    logger.info(f"Successfully updated document with optimistic concurrency: {response}")
+                    break  # Exit the loop if the update succeeded
+                except exceptions.ConflictError as ce:
+                    update_attempt += 1
+                    logger.error(f"Conflict detected on attempt {update_attempt}: {ce}")
+                    # Get the latest sequence number and primary term before retrying
+                    updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
+                    current_seq_no = updated_doc.get("_seq_no")
+                    current_primary_term = updated_doc.get("_primary_term")
+                    time.sleep(1)  # Short delay before retrying
+
+            if update_attempt == max_update_retries:
+                error_msg = "Failed to update document due to conflict errors after 50 attempts"
+                logger.error(error_msg)
+                return {
+                    "statusCode": 409,
+                    "body": json.dumps({"error": error_msg})
+                }
+            
+            # Validation loop: ensure the updated document has the "embedding_scope" field.
+            max_validation_attempts = 50
+            validation_attempt = 0
+            while validation_attempt < max_validation_attempts:
+                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
+                source = updated_doc.get("_source", {})
+                if "embedding_scope" in source:
+                    logger.info("Validation succeeded: 'embedding_scope' field found in updated document.")
+                    break
+                else:
+                    logger.warning("Validation failed: 'embedding_scope' field not found. Re-updating document.")
+                    current_seq_no = updated_doc.get("_seq_no")
+                    current_primary_term = updated_doc.get("_primary_term")
+                    response = client.update(
+                        index=INDEX_NAME,
+                        id=existing_doc_id,
+                        body={"doc": document},
+                        if_seq_no=current_seq_no,
+                        if_primary_term=current_primary_term
+                    )
+                    validation_attempt += 1
+                    time.sleep(5)  # Pause briefly before checking again
+
+            if validation_attempt == max_validation_attempts:
+                error_msg = "Failed to validate the update after multiple attempts. 'embedding_scope' field missing."
+                logger.error(error_msg)
+                raise Exception(error_msg)
+            
+            # Log the final updated document after validation
+            logger.info("Document after update validation: %s", json.dumps(updated_doc))
             document_id = existing_doc_id
-            logger.info(f"Successfully updated document: {response}")
         
         return {
             "statusCode": 200,
