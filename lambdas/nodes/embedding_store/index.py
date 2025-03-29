@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import boto3
 from urllib.parse import urlparse
 from datetime import datetime
@@ -58,7 +59,6 @@ def lambda_handler(event, context):
         logger.info("Received event", extra={"event": event})
         item = event.get("item", {})
         if not item:
-           
             item = event.get("payload", {})
             if not item:
                 logger.warning("No embedding item found in event")
@@ -67,7 +67,6 @@ def lambda_handler(event, context):
                     "body": json.dumps({"error": "No embedding item found in event"})
                 }
         
-
         asset_id = item.get("assetId")
         if asset_id is None:
             # Attempt to get asset_id from metadata.pipelineAssets
@@ -75,11 +74,8 @@ def lambda_handler(event, context):
             pipeline_assets = metadata.get("pipelineAssets", [])
             if pipeline_assets and isinstance(pipeline_assets, list):
                 asset_id = pipeline_assets[0].get("assetId")
-
             # If still not found, try payload.externalTaskResults
             if asset_id is None:
-               
-                
                 external_results = item.get("externalTaskResults", [])
                 if external_results and isinstance(external_results, list):
                     asset_id = external_results[0].get("assetId")
@@ -123,19 +119,18 @@ def lambda_handler(event, context):
         }
 
         if scope == "clip":
-            # Store the original asset_id inside an object called DigitalSourceAsset with a key called ID
+            # For clips, store the original asset_id and add timecodes
             document["DigitalSourceAsset"] = {"ID": asset_id}
             document["start_timecode"] = seconds_to_smpte(item.get("start_offset_sec", None))
             document["end_timecode"] = seconds_to_smpte(item.get("end_offset_sec", None))
 
-            # Index the document and let OpenSearch generate the ID
-            response = client.index(index=INDEX_NAME, body=document, refresh=True)
+            # Index the document without a forced refresh
+            response = client.index(index=INDEX_NAME, body=document)
             document_id = response.get("_id", "unknown")
             logger.info(f"Successfully created new document for clip: {response}")
 
         else:
-           
-            # Search for an existing document by DigitalSourceAsset.ID
+            # Search for an existing document by DigitalSourceAsset.ID without forcing refresh
             search_query = {
                 "query": {
                     "bool": {
@@ -148,10 +143,19 @@ def lambda_handler(event, context):
                     }
                 }
             }
+            
+            start_time = time.time()
             search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-
+            # If not found, refresh the index and retry up to 2 minutes
+            while search_response["hits"]["total"]["value"] == 0 and (time.time() - start_time) < 120:
+                logger.info("Document not found, refreshing index and retrying search...")
+                client.indices.refresh(index=INDEX_NAME)
+                time.sleep(5)  # Wait before retrying
+                search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
+            
             if search_response["hits"]["total"]["value"] == 0:
-                error_msg = f"No existing document found with DigitalSourceAsset.ID={asset_id} in index {INDEX_NAME}"
+                error_msg = (f"No existing document found with DigitalSourceAsset.ID={asset_id} "
+                             f"in index {INDEX_NAME} after retrying for 2 minutes")
                 logger.error(error_msg)
                 return {
                     "statusCode": 404,
@@ -162,13 +166,12 @@ def lambda_handler(event, context):
             existing_doc_id = search_response["hits"]["hits"][0]["_id"]
             logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
    
-            # Update the existing document
+            # Update the existing document without a forced refresh
             document["DigitalSourceAsset"] = {"ID": asset_id}
             response = client.update(
                 index=INDEX_NAME,
                 id=existing_doc_id,
-                body={"doc": document},
-                refresh=True
+                body={"doc": document}
             )
             document_id = existing_doc_id
             logger.info(f"Successfully updated document: {response}")
