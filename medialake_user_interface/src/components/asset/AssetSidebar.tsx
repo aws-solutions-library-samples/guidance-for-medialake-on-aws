@@ -173,16 +173,26 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
     );
 };
 
+export const addMakerDiv = (time: number, markers,setMarkers) =>{
+    setMarkers(prev => [...prev, `Marker: ${prev.length + 1}
+        'Marker time : ${time}'`]);
+    console.log("time: ",time);
+    console.log("Acao 5: Marker adicionado")
+}
+
 // Markers content component
 const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
     const theme = useTheme();
     const [markers, setMarkers] = useState<string[]>([]); // Add this state
 
+
     // Add this function
     const addMarker = () => {
+        console.log("Acao 1: Botao apertado")
         onMarkerAdd?.();
-        setMarkers(prev => [...prev, `Marker ${prev.length + 1}`]);
+        addMakerDiv(13,markers,setMarkers)
     };
+
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -492,6 +502,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
     };
     // Add this handler
     const handleAddMarker = () => {
+        console.log("Acao 3: ")
         console.log("handleAddMarker called"); // Debug log
         console.log("videoViewerRef:", videoViewerRef); // Debug log
         if (videoViewerRef?.current) {
@@ -650,6 +661,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                         {currentTab === 0 && (
                     <AssetMarkers 
                         onMarkerAdd={() => {
+                            console.log("Acao 2:")
                             console.log("AssetMarkers onMarkerAdd called"); // Debug log
                             handleAddMarker();
                         }} 

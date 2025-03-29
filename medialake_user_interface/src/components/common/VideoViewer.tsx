@@ -35,6 +35,8 @@ import React, {
   import VolumeOffIcon from '@mui/icons-material/VolumeOff';
   import FullscreenIcon from '@mui/icons-material/Fullscreen';
   import './VideoViewer.css';
+
+  import addMakerDiv from '../asset/AssetSidebar'
   
   import { filter } from 'rxjs';
   import { randomHexColor } from './utils';
@@ -409,7 +411,7 @@ import React, {
         onError,
         onTimeUpdate,
         showThumbnails = false,
-        onMarkerAdd
+        onMarkerAdd,
       },
       ref
     ) => {
@@ -470,6 +472,7 @@ import React, {
         ref,
         () => ({
           hello: () => {
+            console.log('Acao 4: ')
             console.log('Hello from VideoViewer!');
             if (markerLaneRef.current) {
               const periodMarker = new PeriodMarker({
@@ -481,9 +484,7 @@ import React, {
                 },
               });
               markerLaneRef.current.addMarker(periodMarker);
-              
-              // Add this line to trigger the callback
-              customCallbacks.onMarkerAdd?.(currentTime);
+              customCallbacks.onMarkerAdd(currentTime)
             }
           },
         }),
