@@ -165,7 +165,7 @@ def lambda_handler(event, context):
             # Extract document ID from search response
             existing_doc_id = search_response["hits"]["hits"][0]["_id"]
             logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
-   
+            time.sleep(30)
             # Update the existing document without a forced refresh
             document["DigitalSourceAsset"] = {"ID": asset_id}
             response = client.update(
