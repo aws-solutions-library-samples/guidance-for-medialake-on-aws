@@ -172,10 +172,27 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     if (error) {
         return (
             <Box>
+                <Box sx={{ mb: 4 }}>
+                    <Typography
+                        variant="h4"
+                        component="h1"
+                        sx={{
+                            fontWeight: 700,
+                            mb: 1,
+                            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            color: 'transparent',
+                        }}
+                    >
+                        Results
+                    </Typography>
+                </Box>
+                
                 <AssetViewControls
                     viewMode={viewMode}
                     onViewModeChange={onViewModeChange}
-                    title="Results"
+                    title=""
                     sorting={sorting}
                     sortOptions={columns
                         .filter(col => col.sortable)
@@ -270,7 +287,15 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {sortedResults.map(({ type, assets }) => assets.length > 0 && (
                         <Box key={type}>
-                            <Typography variant="h6" sx={{ mb: 2, px: 1, color: 'text.secondary' }}>
+                            <Typography variant="h6" sx={{ 
+                                mb: 2, 
+                                px: 1, 
+                                background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                backgroundClip: 'text',
+                                WebkitBackgroundClip: 'text',
+                                color: 'transparent',
+                                fontWeight: 600
+                            }}>
                                 {type}
                             </Typography>
                             <Grid container spacing={3}>
@@ -365,11 +390,43 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     };
 
     return (
-        <Box>
+        <Box sx={{ mt: -2 }}>
+            <Box sx={{ mb: 2 }}>
+                <Typography
+                    variant="h4"
+                    component="h1"
+                    sx={{
+                        fontWeight: 700,
+                        background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        color: 'transparent',
+                        display: 'block', // Ensure the text is displayed
+                        visibility: 'visible', // Make sure it's visible
+                        position: 'relative', // Establish positioning context
+                        zIndex: 1, // Ensure it's above other elements
+                    }}
+                >
+                    Results {searchMetadata?.totalResults > 0 && (
+                        <Typography 
+                            component="span" 
+                            sx={{ 
+                                fontWeight: 300, 
+                                fontSize: '0.5em',
+                                color: 'text.secondary',
+                                opacity: 0.75
+                            }}
+                        >
+                            (Found {searchMetadata.totalResults} results for "{searchTerm}")
+                        </Typography>
+                    )}
+                </Typography>
+            </Box>
+            
             <AssetViewControls
                 viewMode={viewMode}
                 onViewModeChange={onViewModeChange}
-                title="Results"
+                title=""
                 sorting={sorting}
                 sortOptions={columns
                     .filter(col => col.sortable)

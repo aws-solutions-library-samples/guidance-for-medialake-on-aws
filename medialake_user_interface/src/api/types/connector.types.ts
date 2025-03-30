@@ -6,6 +6,8 @@ export interface Connector {
     created_at: string;
     updated_at: string;
     configuration: Record<string, any>;
+    storageIdentifier?: string;
+    objectPrefix?: string;
 }
 
 export interface ConnectorResponse {
@@ -16,4 +18,6 @@ export interface ConnectorResponse {
     created_at: string;
     updated_at: string;
     configuration: Record<string, any>;
+    storageIdentifier?: string;
+    objectPrefix?: string;
 } 
