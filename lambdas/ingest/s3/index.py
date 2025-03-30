@@ -307,6 +307,17 @@ class AssetProcessor:
                     logger.exception(f"Error getting S3 object tags: {str(e)}")
                     raise
             
+            # Early check for asset type
+            content_type = response.get("ContentType", "")
+            file_ext = key.split(".")[-1] if "." in key else ""
+            asset_type = determine_asset_type(content_type, file_ext)
+            
+            # Stop processing if asset type is not one of: "Image", "Video", "Audio"
+            if asset_type not in ["Image", "Video", "Audio"]:
+                logger.info(f"Skipping processing for unsupported asset type: {asset_type} for {bucket}/{key}")
+                metrics.add_metric(name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1)
+                return None
+
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
             # Check existing tags first - this is a fast path if object already processed
@@ -1179,14 +1190,15 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                     "Object Tagged": "ObjectTagging:",
                     "PutObject": "ObjectCreated:Put",
                     "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
-                    "DeleteObject": "ObjectRemoved:Delete"
+                    "DeleteObject": "ObjectRemoved:Delete",
+                    "CopyObject": "ObjectCreated:Copy"  # Add mapping for CopyObject events
                 }
                 
                 event_name = event_type_mapping.get(detail_type, "")
                 
                 # If we have valid bucket and key, process the event
                 if bucket and key:
-                    logger.info(f"Processing EventBridge event for {bucket}/{key}")
+                    logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
                     process_s3_event(processor, bucket, key, event_name)
                 else:
                     logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
@@ -1229,16 +1241,15 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
             logger.info(f"Asset deletion processed: {key}")
         else:
-            # Handle creation/modification/copy events
-            event_type_category = "Copy" if event_name == "ObjectCreated:Copy" else "Creation"
-            logger.info(f"Processing {event_type_category} event for {bucket}/{key}")
+            # Handle creation/modification/copy events - process all ObjectCreated events the same way
+            logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
             
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
             if result:
                 metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
-                metrics.add_metric(name=f"{event_type_category}Events", unit=MetricUnit.Count, value=1)
-                logger.info(f"Asset {event_type_category.lower()} processed successfully: {result['DigitalSourceAsset']['ID']}")
+                metrics.add_metric(name="CreationEvents", unit=MetricUnit.Count, value=1)
+                logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
             else:
                 logger.info(f"Asset already processed or skipped: {key}")
         

@@ -98,6 +98,11 @@ def extract_pipeline_name(execution_arn: str) -> str:
         raise ValueError(f"Invalid execution ARN format: {execution_arn}")
 
 
+def convert_to_unix_timestamp(time_ms: float) -> int:
+    """Convert milliseconds timestamp to unix timestamp (seconds)"""
+    return int(time_ms / 1000.0)
+
+
 @logger.inject_lambda_context(log_event=True)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
@@ -144,16 +149,15 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         if not status:
             raise ValueError("status is required but was not provided in the event")
 
-        # Convert startDate from milliseconds timestamp to ISO format
+        # Convert startDate from milliseconds to unix timestamp
         start_date_ms = detail.get("startDate")
         if not start_date_ms:
             raise ValueError("startDate is required but was not provided in the event")
 
-        try:
-            start_date = datetime.fromtimestamp(start_date_ms / 1000.0).isoformat()
-        except (ValueError, TypeError):
-            logger.error(f"Invalid start_date format: {start_date_ms}")
-            raise ValueError(f"Invalid start_date format: {start_date_ms}")
+        # Store as unix timestamp for sorting
+        start_date_unix = convert_to_unix_timestamp(start_date_ms)
+        # Keep ISO format for display
+        start_date_iso = datetime.fromtimestamp(start_date_unix).isoformat()
 
         current_time = datetime.utcnow().isoformat()
 
@@ -165,7 +169,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "execution_arn": execution_arn,
                 "state_machine_arn": state_machine_arn,
                 "status": status,
-                "start_date": start_date,
+                "start_date": start_date_iso,
             },
         )
 
@@ -182,8 +186,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Prepare DynamoDB item
         item = {
             "execution_id": execution_id,  # Partition key
-            "start_time": start_date,  # Sort key
-            "pipeline_name": pipeline_name,  # Add pipeline name
+            "start_time": start_date_unix,  # Sort key as unix timestamp
+            "start_time_iso": start_date_iso,  # ISO format for display
+            "pipeline_name": pipeline_name,
             "execution_arn": execution_arn,
             "state_machine_arn": state_machine_arn,
             "status": status,
@@ -197,10 +202,12 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         if status in ["SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"]:
             stop_date_ms = detail.get("stopDate")
             if stop_date_ms:
-                end_time = datetime.fromtimestamp(stop_date_ms / 1000.0).isoformat()
-                item["end_time"] = end_time
+                stop_date_unix = convert_to_unix_timestamp(stop_date_ms)
+                end_time_iso = datetime.fromtimestamp(stop_date_unix).isoformat()
+                item["end_time"] = stop_date_unix
+                item["end_time_iso"] = end_time_iso
                 item["duration_seconds"] = calculate_execution_duration(
-                    start_date, end_time
+                    start_date_iso, end_time_iso
                 )
 
             # Add failure details if applicable

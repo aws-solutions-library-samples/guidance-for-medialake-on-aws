@@ -26,7 +26,7 @@ import {
   ListItemText,
   LinearProgress
 } from '@mui/material';
-import { useAsset } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import { formatCamelCase } from '../utils/stringUtils';
@@ -583,16 +583,10 @@ const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
     );
 };
 
-const RelatedItemsTab: React.FC = () => {
+const RelatedItemsTab: React.FC<{ assetId: string }> = ({ assetId }) => {
     const theme = useTheme();
-    
-    // This would typically fetch related items from an API
-    // For now, we'll use placeholder data
-    const relatedItems = [
-        { id: '1', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb1.jpg' },
-        { id: '2', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb2.jpg' },
-        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
-    ];
+    const [page, setPage] = useState(1);
+    const { data: relatedVersionsData, isLoading } = useRelatedVersions(assetId, page);
 
     // Get icon based on item type
     const getItemIcon = (type: string) => {
@@ -607,6 +601,28 @@ const RelatedItemsTab: React.FC = () => {
                 return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
         }
     };
+    
+    const relatedItems = useMemo(() => {
+        if (!relatedVersionsData?.data?.hits) return [];
+        return relatedVersionsData.data.hits.map((hit) => ({
+            id: hit.InventoryID,
+            title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: hit.DigitalSourceAsset.Type.toLowerCase(),
+            thumbnail: hit.thumbnailUrl || hit.proxyUrl,
+            score: hit.score,
+            format: hit.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: hit.DigitalSourceAsset.CreateDate
+        }));
+    }, [relatedVersionsData]);
+
+    if (isLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
@@ -639,21 +655,51 @@ const RelatedItemsTab: React.FC = () => {
                                         {item.title}
                                     </Typography>
                                 </Box>
-                                <Chip
-                                    size="small"
-                                    label={item.type.toUpperCase()}
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main,
-                                        fontWeight: 500,
-                                        fontSize: '0.75rem'
-                                    }}
-                                />
+                                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                                    <Chip
+                                        size="small"
+                                        label={item.type.toUpperCase()}
+                                        sx={{
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                            color: theme.palette.primary.main,
+                                            fontWeight: 500,
+                                            fontSize: '0.75rem'
+                                        }}
+                                    />
+                                    <Chip
+                                        size="small"
+                                        label={`Similarity: ${(item.score * 100).toFixed(1)}%`}
+                                        sx={{
+                                            backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                            color: theme.palette.secondary.main,
+                                            fontWeight: 500,
+                                            fontSize: '0.75rem'
+                                        }}
+                                    />
+                                </Box>
+                                <Typography variant="body2" color="text.secondary">
+                                    {formatFileSize(item.fileSize)} • {item.format}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Created: {formatLocalDateTime(item.createDate)}
+                                </Typography>
                             </CardContent>
                         </Card>
                     </Grid>
                 ))}
             </Grid>
+            
+            {relatedVersionsData?.data?.totalResults > page * 50 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setPage(prev => prev + 1)}
+                        startIcon={<ExpandMoreIcon />}
+                    >
+                        Load More
+                    </Button>
+                </Box>
+            )}
         </Box>
     );
 };
@@ -1131,7 +1177,7 @@ const ImageDetailContent: React.FC = () => {
                                 {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
                                 {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                                 {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
-                                {activeTab === 'related' && <RelatedItemsTab />}
+                                {activeTab === 'related' && <RelatedItemsTab assetId={assetData.data.asset.DigitalSourceAsset.ID} />}
                             </Box>
                         </Paper>
                     </Box>

@@ -89,6 +89,42 @@ interface DeleteAssetResponse {
     };
 }
 
+interface RelatedVersionHit {
+    InventoryID: string;
+    DigitalSourceAsset: {
+        ID: string;
+        Type: string;
+        CreateDate: string;
+        MainRepresentation: {
+            Format: string;
+            StorageInfo: {
+                PrimaryLocation: {
+                    ObjectKey: {
+                        Name: string;
+                    };
+                    FileInfo: {
+                        Size: number;
+                    };
+                };
+            };
+        };
+    };
+    thumbnailUrl?: string;
+    proxyUrl?: string;
+    score: number;
+}
+
+interface RelatedVersionsResponse {
+    status: string;
+    message: string;
+    data: {
+        hits: RelatedVersionHit[];
+        totalResults: number;
+        page: number;
+        pageSize: number;
+    };
+}
+
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
     const { showError } = useErrorModal();
@@ -209,6 +245,24 @@ export const useRenameAsset = () => {
             logger.error('Error in rename mutation:', error);
             showError('Failed to rename asset');
         },
+    });
+};
+
+export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 50) => {
+    return useQuery<RelatedVersionsResponse, Error>({
+        queryKey: ['relatedVersions', assetId, page, pageSize],
+        queryFn: async (): Promise<RelatedVersionsResponse> => {
+            const response = await apiClient.get<RelatedVersionsResponse>(`/assets/${assetId}/relatedversions`, {
+                params: {
+                    page,
+                    pageSize,
+                    min_score: 0.01
+                }
+            });
+            return response.data;
+        },
+        enabled: !!assetId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 };
 

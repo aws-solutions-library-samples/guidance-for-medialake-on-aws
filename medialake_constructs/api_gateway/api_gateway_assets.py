@@ -5,6 +5,7 @@ This module defines the AssetsConstruct class which sets up API Gateway endpoint
 for managing assets, including:
 - GET /assets/{id} - Get asset details
 - DELETE /assets/{id} - Delete an asset
+- GET /assets/{id}/relatedversions - Get related versions of an asset
 """
 
 from dataclasses import dataclass
@@ -33,6 +34,8 @@ class AssetsProps:
     api_resource: api_gateway.IResource
     cognito_authorizer: api_gateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
+    open_search_endpoint: str
+    opensearch_index: str
 
 
 class AssetsConstruct(Construct):
@@ -53,6 +56,7 @@ class AssetsConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id)
 
+        region = Stack.of(self).region
         # Create assets resource and add {id} parameter
         assets_resource = props.api_resource.root.add_resource("assets")
         asset_resource = assets_resource.add_resource("{id}")
@@ -372,4 +376,69 @@ class AssetsConstruct(Construct):
                     },
                 )
             ],
+        )
+
+        # Add GET /assets/{id}/relatedversions endpoint
+        related_versions_resource = asset_resource.add_resource("relatedversions")
+        related_versions_lambda = Lambda(
+            self,
+            "RelatedVersionsLambda",
+            config=LambdaConfig(
+                name="related_versions",
+                layers=[search_layer.layer],
+                entry="lambdas/api/assets/rp_assets_id/related_versions",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    "OPEN_SEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_INDEX": props.opensearch_index,
+                },
+            ),
+        )
+
+        # Add DynamoDB and S3 permissions for rename Lambda
+        related_versions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                ],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+        related_versions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Update the policy to allow access to all S3 buckets
+        related_versions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:PutObjectTagging",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*", 
+                    "arn:aws:s3:::*",
+                ],
+            )
+        )
+        
+        related_versions_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(related_versions_lambda.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
         )

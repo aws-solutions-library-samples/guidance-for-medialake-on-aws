@@ -211,11 +211,24 @@ def build_semantic_query(params: SearchParams) -> Dict:
             return {
                 "size": params.pageSize,
                 "query": {
-                    "knn": {
-                        "embedding": {
-                            "vector": embedding,
-                            "k": params.pageSize
-                        }
+                    "bool": {
+                        "must": [
+                            {
+                                "knn": {
+                                    "embedding": {
+                                        "vector": embedding,
+                                        "k": params.pageSize * 3
+                                    }
+                                }
+                            }
+                        ],
+                        "must_not": [
+                            {
+                                "term": {
+                                    "embedding_scope": "clip"
+                                }
+                            }
+                        ]
                     }
                 },
                 "_source": {

@@ -240,6 +240,8 @@ class ApiGatewayStack(Stack):
                 api_resource=self._api_gateway.rest_api,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                open_search_endpoint=props.collection_endpoint,
+                opensearch_index="media",
             ),
         )
 

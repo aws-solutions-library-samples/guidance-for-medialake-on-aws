@@ -79,7 +79,7 @@ class PipelinesExecutionsStack(Stack):
                     partition_key_name="execution_id",
                     partition_key_type=dynamodb.AttributeType.STRING,
                     sort_key_name="start_time",
-                    sort_key_type=dynamodb.AttributeType.STRING,
+                    sort_key_type=dynamodb.AttributeType.NUMBER,
                 ),
             )
             self._pipelnes_executions_table = dynamodb_table.table

@@ -500,53 +500,18 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
-    // Add this handler
+
     const handleAddMarker = () => {
         console.log("Acao 3: ")
-        console.log("handleAddMarker called"); // Debug log
-        console.log("videoViewerRef:", videoViewerRef); // Debug log
         if (videoViewerRef?.current) {
-            console.log("Calling hello function"); // Debug log
             videoViewerRef.current.hello();
-        } else {
-            console.log("videoViewerRef.current is null"); // Debug log
         }
     };
 
     return (
         <RightSidebar>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Main header with badge showing number of items */}
-                <Box sx={{ 
-                    p: 2, 
-                    borderBottom: 1, 
-                    borderColor: 'divider',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: theme.palette.mode === 'dark' 
-                        ? `linear-gradient(to right, ${alpha(theme.palette.primary.dark, 0.2)}, transparent)`
-                        : `linear-gradient(to right, ${alpha(theme.palette.primary.light, 0.1)}, transparent)`,
-                }}>
-                    <Typography 
-                        variant="h6" 
-                        sx={{ 
-                            fontWeight: 600,
-                            color: theme.palette.mode === 'dark'
-                                ? theme.palette.primary.light
-                                : theme.palette.primary.main,
-                        }}
-                    >
-                        Asset Console
-                </Typography>
-                    <Tooltip title="Sidebar settings">
-                        <IconButton size="small">
-                            <SettingsIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-                
-                {/* Tabs navigation */}
+                {/* Tabs navigation - now with fixed height and no scroll */}
                 <Box sx={{ 
                     borderBottom: 1, 
                     borderColor: 'divider',
@@ -555,18 +520,19 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                     <Tabs 
                         value={currentTab} 
                         onChange={handleTabChange}
-                        variant="scrollable"
-                        scrollButtons="auto"
+                        variant="fullWidth"
                         aria-label="asset sidebar tabs"
                         sx={{
-                            minHeight: 48,
+                            minHeight: 40,
                             '& .MuiTab-root': {
-                                minHeight: 48,
+                                minHeight: 40,
                                 textTransform: 'none',
-                                fontSize: '0.875rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 500,
                                 opacity: 0.7,
                                 transition: 'all 0.2s',
+                                padding: '6px 8px',
+                                minWidth: 'auto',
                                 '&.Mui-selected': {
                                     opacity: 1,
                                     fontWeight: 600,
@@ -574,9 +540,9 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                 }
                             },
                             '& .MuiTabs-indicator': {
-                                height: 3,
-                                borderTopLeftRadius: 3,
-                                borderTopRightRadius: 3,
+                                height: 2,
+                                borderTopLeftRadius: 2,
+                                borderTopRightRadius: 2,
                             }
                         }}
                     >
@@ -596,9 +562,10 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                     sx={{ 
                                         pr: 1,
                                         '& .MuiBadge-badge': {
-                                            fontSize: '0.7rem',
-                                            height: 18,
-                                            minWidth: 18
+                                            fontSize: '0.65rem',
+                                            height: 16,
+                                            minWidth: 16,
+                                            padding: '0 4px'
                                         }
                                     }}
                                 >
@@ -607,43 +574,6 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                             }
                             id="sidebar-tab-1"
                             aria-controls="sidebar-tabpanel-1"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<GroupsIcon fontSize="small" />} 
-                            label={
-                                <Badge 
-                                    badgeContent={comments.length} 
-                                    color="secondary"
-                                    sx={{ 
-                                        pr: 1,
-                                        '& .MuiBadge-badge': {
-                                            fontSize: '0.7rem',
-                                            height: 18,
-                                            minWidth: 18,
-                                            display: comments.length ? 'flex' : 'none'
-                                        }
-                                    }}
-                                >
-                                    <span>Collab</span>
-                                </Badge>
-                            }
-                            id="sidebar-tab-2"
-                            aria-controls="sidebar-tabpanel-2"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<AccountTreeIcon fontSize="small" />} 
-                            label="Pipelines"
-                            id="sidebar-tab-3"
-                            aria-controls="sidebar-tabpanel-3"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<TimelineIcon fontSize="small" />} 
-                            label="Activity"
-                            id="sidebar-tab-4"
-                            aria-controls="sidebar-tabpanel-4"
                             iconPosition="start"
                         />
                     </Tabs>
@@ -677,41 +607,6 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                         sx={{ height: '100%', overflow: 'auto' }}
                     >
                         {currentTab === 1 && <AssetVersions versions={versions} />}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 2}
-                        id="sidebar-tabpanel-2"
-                        aria-labelledby="sidebar-tab-2"
-                        sx={{ height: '100%', overflow: 'hidden' }}
-                    >
-                        {currentTab === 2 && (
-                            <AssetCollaboration 
-                                comments={comments} 
-                                onAddComment={onAddComment}
-                            />
-                        )}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 3}
-                        id="sidebar-tabpanel-3"
-                        aria-labelledby="sidebar-tab-3"
-                        sx={{ height: '100%', overflow: 'auto' }}
-                    >
-                        {currentTab === 3 && <AssetPipelines />}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 4}
-                        id="sidebar-tabpanel-4"
-                        aria-labelledby="sidebar-tab-4"
-                        sx={{ height: '100%', overflow: 'auto' }}
-                    >
-                        {currentTab === 4 && <AssetActivity />}
                     </Box>
                 </Box>
             </Box>
