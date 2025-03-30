@@ -1,11 +1,14 @@
 import { useMemo } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Box, Tooltip, IconButton, Typography, Chip, Switch, FormControlLabel } from '@mui/material';
+import { Box, Tooltip, IconButton, Typography, Chip, FormControlLabel } from '@mui/material';
+import { IconSwitch } from '@/components/common';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon
+    Stop as StopIcon,
+    CheckCircle as CheckCircleIcon,
+    Cancel as CancelIcon
 } from '@mui/icons-material';
 import { TableCellContent } from '@/components/common/table';
 import { format } from 'date-fns';
@@ -88,27 +91,36 @@ export const usePipelineColumns = ({
                     return (
                         <TableCellContent variant="secondary">
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        color: color,
-                                        fontWeight: 'medium'
-                                    }}
-                                >
-                                    {status || 'N/A'}
-                                </Typography>
+                                {status !== 'DEPLOYED' && (
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            color: color,
+                                            fontWeight: 'medium'
+                                        }}
+                                    >
+                                        {status || 'N/A'}
+                                    </Typography>
+                                )}
                                 
                                 {status === 'DEPLOYED' && (
                                     <FormControlLabel
                                         control={
-                                            <Switch
+                                            <IconSwitch
                                                 size="small"
                                                 checked={pipeline.active !== false}
                                                 onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
                                                 disabled={pipeline.system}
+                                                onIcon={<CheckCircleIcon />}
+                                                offIcon={<CancelIcon />}
+                                                onColor="#2e7d32"
+                                                offColor="#757575"
+                                                trackOnColor="#b2ebf2"
+                                                trackOffColor="#cfd8dc"
                                             />
                                         }
-                                        label={pipeline.active !== false ? "Active" : "Inactive"}
+                                        // label={pipeline.active !== false ? "Active" : "Inactive"}
+                                        label=""
                                         sx={{ mt: 1, ml: 0 }}
                                     />
                                 )}

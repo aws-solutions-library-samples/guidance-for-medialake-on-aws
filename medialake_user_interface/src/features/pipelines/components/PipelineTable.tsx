@@ -6,14 +6,15 @@ import {
     Tooltip,
     Typography,
     Chip,
-    Switch,
     FormControlLabel
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon
+    Stop as StopIcon,
+    PowerSettingsNew as PowerOnIcon,
+    PowerOff as PowerOffIcon
 } from '@mui/icons-material';
 import {
     useReactTable,
@@ -28,8 +29,10 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
 import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
+import { IconSwitch } from '@/components/common';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
+
 
 interface PipelineTableProps {
     data: Pipeline[];
@@ -42,6 +45,7 @@ interface PipelineTableProps {
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
+
 
 export const PipelineTable: React.FC<PipelineTableProps> = ({
     data,
@@ -111,27 +115,37 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                 return (
                     <TableCellContent variant="secondary">
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    color: color,
-                                    fontWeight: 'medium'
-                                }}
-                            >
-                                {status || 'N/A'}
-                            </Typography>
+                            {status !== 'DEPLOYED' && (
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        color: color,
+                                        fontWeight: 'medium'
+                                    }}
+                                >
+                                    {status || 'N/A'}
+                                </Typography>
+                            )}
                             
                             {status === 'DEPLOYED' && (
                                 <FormControlLabel
                                     control={
-                                        <Switch
+                                        <IconSwitch
+                                            sx={{ m: 1 }}
                                             size="small"
                                             checked={pipeline.active !== false}
                                             onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
                                             disabled={pipeline.system}
+                                            onIcon={<PowerOnIcon />}
+                                            offIcon={<PowerOffIcon />}
+                                            onColor="#2e7d32"
+                                            offColor="#757575"
+                                            trackOnColor="#b2ebf2"
+                                            trackOffColor="#cfd8dc"
                                         />
                                     }
-                                    label={pipeline.active !== false ? "Active" : "Inactive"}
+                                    // label={pipeline.active !== false ? "Active" : "Inactive"}
+                                    label=""
                                     sx={{ mt: 1, ml: 0 }}
                                 />
                             )}

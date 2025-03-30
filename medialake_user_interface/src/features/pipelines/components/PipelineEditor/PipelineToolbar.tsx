@@ -1,9 +1,12 @@
 import React, { useRef, ChangeEvent } from 'react';
-import { Stack, Button, Tooltip, Switch, FormControlLabel } from '@mui/material';
+import { Stack, Button, Tooltip, FormControlLabel, Box } from '@mui/material';
+import { IconSwitch } from '@/components/common';
+import ToggleOnIcon from '@mui/icons-material/ToggleOn';
+import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import { useNavigate } from 'react-router-dom';
 import { PipelineNameInput } from './';
 import { useSidebar } from '@/contexts/SidebarContext';
-import { useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
+import { useRightSidebar, COLLAPSED_WIDTH } from '@/components/common/RightSidebar/SidebarContext';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -16,6 +19,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import { FaFileVideo } from 'react-icons/fa';
 import type { Node, Edge, ReactFlowInstance } from 'reactflow';
+import { drawerWidth, collapsedDrawerWidth } from '@/constants';
 
 export interface PipelineToolbarProps {
   onSave: () => Promise<void>;
@@ -30,11 +34,6 @@ export interface PipelineToolbarProps {
   onActiveChange: (active: boolean) => void; // New prop for handling active state changes
 }
 
-const DRAWER_WIDTH = 260;
-const COLLAPSED_DRAWER_WIDTH = 72;
-const RIGHT_SIDEBAR_WIDTH = 300;
-const RIGHT_SIDEBAR_COLLAPSED_WIDTH = 8;
-
 const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   onSave,
   isLoading,
@@ -48,7 +47,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isCollapsed: isLeftSidebarCollapsed } = useSidebar();
-  const { isExpanded: isRightSidebarExpanded } = useRightSidebar();
+  const { isExpanded: isRightSidebarExpanded, width } = useRightSidebar();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCancel = () => {
@@ -142,128 +141,123 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     }
   };
 
-  // Split button functionality
-  const [open, setOpen] = React.useState(false);
-  const anchorRef = React.useRef<HTMLDivElement>(null);
+  // Import/Export dropdown functionality
+  const [importExportOpen, setImportExportOpen] = React.useState(false);
+  const importExportRef = React.useRef<HTMLDivElement>(null);
 
-  const handleToggle = () => {
-    setOpen((prevOpen) => !prevOpen);
+  const handleImportExportToggle = () => {
+    setImportExportOpen((prevOpen) => !prevOpen);
   };
 
-  const handleClose = (event: Event) => {
+  const handleImportExportClose = (event: Event) => {
     if (
-      anchorRef.current &&
-      anchorRef.current.contains(event.target as HTMLElement)
+      importExportRef.current &&
+      importExportRef.current.contains(event.target as HTMLElement)
     ) {
       return;
     }
-
-    setOpen(false);
+    setImportExportOpen(false);
   };
 
   const handleImport = () => {
     fileInputRef.current?.click();
-    setOpen(false);
+    setImportExportOpen(false);
   };
 
   const handleExport = () => {
     onExport();
-    setOpen(false);
+    setImportExportOpen(false);
   };
 
   return (
     <>
-      <Stack
-        direction="row"
-        spacing={2}
+      {/* Container to calculate available space */}
+      <Box
         sx={{
           position: 'fixed',
           zIndex: 1100,
-          left:
-            (isLeftSidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH) +
-            16,
+          left: (isLeftSidebarCollapsed ? collapsedDrawerWidth : drawerWidth) + 16,
+          right: (isRightSidebarExpanded ? width : COLLAPSED_WIDTH) + 16,
           top: '72px',
-          '& .MuiInputBase-root': {
-            bgcolor: 'transparent',
-            '& input': {
-              ...commonStyles,
-              px: 2,
-              py: 1,
-              borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        {/* Left side - Pipeline Name */}
+        <Box
+          sx={{
+            '& .MuiInputBase-root': {
+              bgcolor: 'transparent',
+              '& input': {
+                ...commonStyles,
+                px: 2,
+                py: 1,
+                borderRadius: '4px',
+              },
             },
-          },
-        }}
-      >
-        <PipelineNameInput
-          value={pipelineName}
-          onChange={onPipelineNameChange}
-        />
-      </Stack>
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{
-          position: 'fixed',
-          zIndex: 1100,
-          right:
-            (isRightSidebarExpanded
-              ? RIGHT_SIDEBAR_WIDTH
-              : RIGHT_SIDEBAR_COLLAPSED_WIDTH) + 16,
-          top: '72px',
-          '& .MuiButton-root': commonStyles,
-        }}
-      >
-        <input
-          type="file"
-          accept="application/json"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          onChange={handleLoadFlow}
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={active}
-              onChange={(e) => onActiveChange(e.target.checked)}
-              color="primary"
-            />
-          }
-          label={active ? "Active" : "Inactive"}
-          sx={{ mr: 1 }}
-        />
-        <Button variant="outlined" color="inherit" onClick={handleCancel}>
-          Cancel
-        </Button>
-        
-        <React.Fragment>
+            maxWidth: {
+              // Responsive width based on available space
+              xs: '200px',
+              sm: '250px',
+              md: '300px',
+            },
+          }}
+        >
+          <PipelineNameInput
+            value={pipelineName}
+            onChange={onPipelineNameChange}
+          />
+        </Box>
+
+        {/* Right side - Controls */}
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            '& .MuiButton-root': commonStyles,
+          }}
+        >
+          {/* Hidden file input for import */}
+          <input
+            type="file"
+            accept="application/json"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={handleLoadFlow}
+          />
+
+          {/* Import/Export ButtonGroup */}
           <ButtonGroup
-            variant="contained"
-            ref={anchorRef}
-            aria-label="Pipeline actions"
+            variant="outlined"
+            ref={importExportRef}
+            aria-label="Pipeline file operations"
           >
             <Button
-              color="primary"
-              onClick={onSave}
-              disabled={isLoading || !pipelineName.trim()}
+              color="inherit"
+              onClick={handleImport}
+              startIcon={<FileUploadIcon />}
             >
-              {isLoading ? 'Saving...' : 'Save'}
+              Import
             </Button>
             <Button
               size="small"
-              color="primary"
-              aria-controls={open ? 'split-button-menu' : undefined}
-              aria-expanded={open ? 'true' : undefined}
-              aria-label="select pipeline action"
+              color="inherit"
+              aria-controls={importExportOpen ? 'import-export-menu' : undefined}
+              aria-expanded={importExportOpen ? 'true' : undefined}
+              aria-label="select import/export action"
               aria-haspopup="menu"
-              onClick={handleToggle}
+              onClick={handleImportExportToggle}
             >
               <ArrowDropDownIcon />
             </Button>
           </ButtonGroup>
+
+          {/* Import/Export Dropdown */}
           <Popper
             sx={{ zIndex: 1200 }}
-            open={open}
-            anchorEl={anchorRef.current}
+            open={importExportOpen}
+            anchorEl={importExportRef.current}
             role={undefined}
             transition
             disablePortal
@@ -277,11 +271,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
                 }}
               >
                 <Paper>
-                  <ClickAwayListener onClickAway={handleClose}>
-                    <MenuList id="split-button-menu" autoFocusItem>
-                      <MenuItem onClick={handleImport}>
-                        <FileUploadIcon sx={{ mr: 1 }} /> Import Pipeline
-                      </MenuItem>
+                  <ClickAwayListener onClickAway={handleImportExportClose}>
+                    <MenuList id="import-export-menu" autoFocusItem>
                       <MenuItem onClick={handleExport}>
                         <FileDownloadIcon sx={{ mr: 1 }} /> Export Pipeline
                       </MenuItem>
@@ -291,8 +282,41 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               </Grow>
             )}
           </Popper>
-        </React.Fragment>
-      </Stack>
+
+          {/* Active/Inactive Toggle */}
+          <FormControlLabel
+            control={
+              <IconSwitch
+                checked={active}
+                onChange={(e) => onActiveChange(e.target.checked)}
+                color="primary"
+                onIcon={<ToggleOnIcon fontSize="large" />}
+                offIcon={<ToggleOffIcon fontSize="large" />}
+                onColor="#2e7d32"
+                offColor="#757575"
+                trackOnColor="#b2ebf2"
+                trackOffColor="#cfd8dc"
+              />
+            }
+            label={active ? "Active" : "Inactive"}
+            sx={{ mx: 2 }}
+          />
+
+          {/* Action Buttons */}
+          <Button variant="outlined" color="inherit" onClick={handleCancel}>
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={onSave}
+            disabled={isLoading || !pipelineName.trim()}
+          >
+            {isLoading ? 'Saving...' : 'Save'}
+          </Button>
+        </Stack>
+      </Box>
     </>
   );
 };
