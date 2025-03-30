@@ -17,7 +17,7 @@ import {
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
-import UnifiedResultsView from '../components/search/UnifiedResultsView';
+import ModularUnifiedResultsView from '../components/search/ModularUnifiedResultsView';
 import { useSearch } from '../api/hooks/useSearch';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
@@ -429,11 +429,11 @@ const SearchPage: React.FC = () => {
                             </Box>
                         )}
 
-                        {filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error && (
-                            <UnifiedResultsView
-                                results={filteredResults}
+                        {(filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error) || error ? (
+                            <ModularUnifiedResultsView
+                                results={error ? [] : filteredResults}
                                 searchMetadata={{
-                                    totalResults: searchResults.data.searchMetadata.totalResults || 0,
+                                    totalResults: error ? 0 : (searchResults?.data?.searchMetadata?.totalResults || 0),
                                     page: currentPage,
                                     pageSize: pageSize,
                                 }}
@@ -466,53 +466,13 @@ const SearchPage: React.FC = () => {
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
-                            />
-                        )}
-
-                        {error && (
-                            <UnifiedResultsView
-                                results={[]}
-                                searchMetadata={{
-                                    totalResults: 0,
-                                    page: currentPage,
-                                    pageSize: pageSize,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                onPageSizeChange={handlePageSizeChange}
-                                searchTerm={currentQuery}
-                                groupByType={groupByType}
-                                onGroupByTypeChange={setGroupByType}
-                                viewMode={viewMode}
-                                onViewModeChange={handleViewModeChange}
-                                cardSize={cardSize}
-                                onCardSizeChange={setCardSize}
-                                aspectRatio={aspectRatio}
-                                onAspectRatioChange={setAspectRatio}
-                                thumbnailScale={thumbnailScale}
-                                onThumbnailScaleChange={setThumbnailScale}
-                                showMetadata={showMetadata}
-                                onShowMetadataChange={setShowMetadata}
-                                sorting={sorting}
-                                onSortChange={setSorting}
-                                cardFields={cardFields}
-                                onCardFieldToggle={handleCardFieldToggle}
-                                columns={columns}
-                                onColumnToggle={handleColumnToggle}
-                                onAssetClick={handleAssetClick}
-                                onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleMenuOpen}
-                                onEditClick={handleStartEditing}
-                                onEditNameChange={handleNameChange}
-                                onEditNameComplete={handleNameEditComplete}
-                                editingAssetId={editingAssetId}
-                                editedName={editedName}
-                                error={{
+                                error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
-                                }}
+                                } : undefined}
                                 isLoading={isLoading || isFetching}
                             />
-                        )}
+                        ) : null}
                     </Box>
 
                     <RightSidebar>
