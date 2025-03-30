@@ -242,6 +242,9 @@ class ApiGatewayStack(Stack):
                 x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 opensearch_index="media",
+                vpc=props.vpc,
+                security_group=props.security_group,
+                open_search_arn=props.collection_arn,
             ),
         )
 

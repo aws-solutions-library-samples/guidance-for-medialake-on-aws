@@ -83,12 +83,6 @@ class SearchConstruct(Construct):
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    # "aoss:ReadDocument",
-                    # "aoss:SearchDocument",
-                    # "aoss:BatchGetDocument",
-                    # "aoss:APIAccessAll",
-                    # "aoss:DescribeIndex",
-                    # "aoss:ListIndices",
                     "es:ESHttpGet",
                     "es:ESHttpPost",
                     "es:ESHttpPut",
@@ -128,7 +122,7 @@ class SearchConstruct(Construct):
                     "secretsmanager:GetSecretValue",
                     "secretsmanager:DescribeSecret",
                 ],
-                resources=["*"],  # You might want to restrict this to specific secrets
+                resources=["*"],
             )
         )
 

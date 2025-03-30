@@ -15,6 +15,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     Duration,
     aws_iam as iam,
+    aws_ec2 as ec2,
 )
 from aws_cdk import Fn, Stack
 from constructs import Construct
@@ -24,7 +25,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from config import config
-
+from typing import Optional
 
 @dataclass
 class AssetsProps:
@@ -36,6 +37,9 @@ class AssetsProps:
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     opensearch_index: str
+    open_search_arn: str
+    vpc: Optional[ec2.IVpc] = None
+    security_group: Optional[ec2.SecurityGroup] = None
 
 
 class AssetsConstruct(Construct):
@@ -384,18 +388,32 @@ class AssetsConstruct(Construct):
             self,
             "RelatedVersionsLambda",
             config=LambdaConfig(
-                name="related_versions",
+                name="related_versions_get",
+                vpc=props.vpc,
+                security_groups=[props.security_group],
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/rp_assets_id/related_versions",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
-                    "OPEN_SEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.opensearch_index,
+                    "SCOPE": "es",
                 },
             ),
         )
 
+        related_versions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
+        )
+        
         # Add DynamoDB and S3 permissions for rename Lambda
         related_versions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -406,6 +424,7 @@ class AssetsConstruct(Construct):
                 resources=[props.asset_table.table_arn],
             )
         )
+        
         related_versions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -441,4 +460,19 @@ class AssetsConstruct(Construct):
             api_gateway.LambdaIntegration(related_versions_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
+        )
+        
+        related_versions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpGet",
+                    "es:ESHttpPost",
+                    "es:ESHttpPut",
+                    "es:ESHttpDelete",
+                    "es:DescribeElasticsearchDomain",
+                    "es:ListDomainNames",
+                    "es:ESHttpHead",
+                ],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
         )

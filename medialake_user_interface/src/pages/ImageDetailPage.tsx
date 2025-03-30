@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -26,7 +26,7 @@ import {
   ListItemText,
   LinearProgress
 } from '@mui/material';
-import { useAsset, useRelatedVersions } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import { formatCamelCase } from '../utils/stringUtils';
@@ -583,10 +583,13 @@ const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
     );
 };
 
-const RelatedItemsTab: React.FC<{ assetId: string }> = ({ assetId }) => {
+const RelatedItemsTab: React.FC<{ 
+    assetId: string;
+    relatedVersionsData: RelatedVersionsResponse | undefined;
+    isLoading: boolean;
+    onLoadMore: () => void;
+}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
     const theme = useTheme();
-    const [page, setPage] = useState(1);
-    const { data: relatedVersionsData, isLoading } = useRelatedVersions(assetId, page);
 
     // Get icon based on item type
     const getItemIcon = (type: string) => {
@@ -689,11 +692,11 @@ const RelatedItemsTab: React.FC<{ assetId: string }> = ({ assetId }) => {
                 ))}
             </Grid>
             
-            {relatedVersionsData?.data?.totalResults > page * 50 && (
+            {relatedVersionsData?.data?.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                     <Button
                         variant="outlined"
-                        onClick={() => setPage(prev => prev + 1)}
+                        onClick={onLoadMore}
                         startIcon={<ExpandMoreIcon />}
                     >
                         Load More
@@ -796,20 +799,40 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
 
 const ImageDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
     const location = useLocation();
-    const { isExpanded } = useRightSidebar();
+    const theme = useTheme();
+    const [activeTab, setActiveTab] = useState('summary');
+    const [relatedPage, setRelatedPage] = useState(1);
+    const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || '');
+    const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const { isExpanded, openSidebar, closeSidebar } = useRightSidebar();
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
     const [newComment, setNewComment] = useState('');
-    const [activeTab, setActiveTab] = useState<string>('summary');
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
-        { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
-        { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
+        { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect!", timestamp: "2023-06-15 10:15:45" },
+        { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Love the color palette!", timestamp: "2023-06-15 11:00:12" }
     ]);
+
+    const recentlyViewedItem = useMemo(() => {
+        if (!id || !assetData?.data?.asset) return null;
+        const asset = assetData.data.asset;
+        return {
+            id,
+            title: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: asset.DigitalSourceAsset.Type.toLowerCase() as 'video' | 'image' | 'audio',
+            path: location.pathname,
+            searchTerm: '',
+            metadata: {
+                fileSize: formatFileSize(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size)
+            }
+        };
+    }, [id, assetData, location.pathname]);
+
+    useTrackRecentlyViewed(recentlyViewedItem);
 
     // Get all the search state from location.state
     const {
@@ -901,25 +924,6 @@ const ImageDetailContent: React.FC = () => {
         return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
     }, [assetData]);
 
-    useTrackRecentlyViewed(
-        useMemo(() => {
-            if (!assetData?.data?.asset) return null;
-            return {
-                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-                title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-                type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-                path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
-                searchTerm: searchTerm,
-                metadata: {
-                    fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
-                    dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
-                        ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
-                        : undefined
-                }
-            };
-        }, [assetData, searchTerm])
-    );
-
     const handleBack = useCallback(() => {
         // Construct query parameters
         const queryParams = new URLSearchParams();
@@ -984,7 +988,7 @@ const ImageDetailContent: React.FC = () => {
         setNewComment('');
     }, []);
 
-    if (isLoading) {
+    if (isLoadingAsset) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <CircularProgress />
@@ -992,7 +996,7 @@ const ImageDetailContent: React.FC = () => {
         );
     }
 
-    if (error || !assetData) {
+    if (!assetData) {
         return (
             <Box sx={{ p: 3 }}>
                 <Typography variant="h5" color="error">Error loading asset data</Typography>
@@ -1177,7 +1181,14 @@ const ImageDetailContent: React.FC = () => {
                                 {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
                                 {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                                 {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
-                                {activeTab === 'related' && <RelatedItemsTab assetId={assetData.data.asset.DigitalSourceAsset.ID} />}
+                                {activeTab === 'related' && (
+                                    <RelatedItemsTab 
+                                        assetId={assetData.data.asset.DigitalSourceAsset.ID}
+                                        relatedVersionsData={relatedVersionsData}
+                                        isLoading={isLoadingRelated}
+                                        onLoadMore={() => setRelatedPage(prev => prev + 1)}
+                                    />
+                                )}
                             </Box>
                         </Paper>
                     </Box>

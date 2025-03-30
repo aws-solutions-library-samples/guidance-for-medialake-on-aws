@@ -114,7 +114,7 @@ interface RelatedVersionHit {
     score: number;
 }
 
-interface RelatedVersionsResponse {
+export interface RelatedVersionsResponse {
     status: string;
     message: string;
     data: {

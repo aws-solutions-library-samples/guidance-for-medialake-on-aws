@@ -1,4 +1,4 @@
-from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -21,10 +21,9 @@ from opensearchpy import (
     helpers,
 )
 
-# Initialize AWS X-Ray, metrics, and logger
-tracer = Tracer(service="asset-service")
-metrics = Metrics(namespace="media-lake-asset-service", service="asset-api")
-logger = Logger(service="asset-api", level=os.getenv("LOG_LEVEL", "WARNING"))
+# Initialize metrics and logger only
+metrics = Metrics(namespace="medialake", service="related-versions")
+logger = Logger(service="related-versions", level=os.getenv("LOG_LEVEL", "INFO"))
 
 cors_config = CORSConfig(
     allow_origin="*",
@@ -113,7 +112,6 @@ class APIError(Exception):
         self.status_code = status_code
         super().__init__(self.message)
 
-@tracer.capture_method
 def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Optional[str]:
     """Generate a presigned URL for an S3 object"""
     try:
@@ -132,7 +130,6 @@ def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Opt
         logger.error(f"Error generating presigned URL: {str(e)}")
         return None
 
-@tracer.capture_method
 def process_search_hit(hit: Dict) -> AssetSearchResult:
     """Process a single search hit and add presigned URL if thumbnail representation exists"""
     source = hit["_source"]
@@ -174,24 +171,74 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         proxyUrl=proxy_url,
     )
 
-@tracer.capture_method
 def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
     """Perform vector similarity search operation in OpenSearch."""
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
 
     try:
-        # First, get the asset's embedding
-        asset_response = client.get(
+        logger.info(f"Starting vector search for asset_id: {asset_id}", extra={
+            "asset_id": asset_id,
+            "index_name": index_name,
+            "params": params.dict()
+        })
+
+        # First, get the asset's embedding using DigitalSourceAsset.ID.keyword
+        initial_query = {
+            "query": {
+                "term": {
+                    "DigitalSourceAsset.ID.keyword": asset_id
+                }
+            },
+            "_source": ["embedding"]
+        }
+        
+        # Log the full initial query with all details
+        logger.info("Initial asset lookup query details", extra={
+            "query_type": "initial_lookup",
+            "full_query": json.dumps(initial_query, indent=2),
+            "index": index_name,
+            "asset_id": asset_id
+        })
+
+        asset_response = client.search(
             index=index_name,
-            id=asset_id,
-            _source=["embedding"]
+            body=initial_query
         )
         
-        if "embedding" not in asset_response["_source"]:
-            raise APIError("Asset not found or no embedding available", 404)
+        # Log the full response from the initial query
+        logger.info("Initial asset lookup response details", extra={
+            "query_type": "initial_lookup",
+            "response": json.dumps(asset_response, indent=2),
+            "total_hits": asset_response.get("hits", {}).get("total", {}).get("value", 0),
+            "asset_id": asset_id
+        })
 
-        embedding = asset_response["_source"]["embedding"]
+        # Check if we found any matches
+        hits = asset_response.get("hits", {}).get("hits", [])
+        if not hits:
+            logger.warning("No hits found for asset lookup", extra={
+                "asset_id": asset_id,
+                "query_used": json.dumps(initial_query, indent=2),
+                "response": json.dumps(asset_response, indent=2)
+            })
+            raise APIError("Asset not found", 404)
+
+        if "embedding" not in hits[0]["_source"]:
+            logger.warning("No embedding found in asset document", extra={
+                "asset_id": asset_id,
+                "available_fields": list(hits[0]["_source"].keys()),
+                "query_used": json.dumps(initial_query, indent=2)
+            })
+            raise APIError("No embedding available for asset", 404)
+
+        embedding = hits[0]["_source"]["embedding"]
+        
+        logger.info("Retrieved embedding details", extra={
+            "embedding_exists": embedding is not None,
+            "embedding_type": type(embedding).__name__,
+            "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list"
+        })
 
         # Build the vector search query
         search_body = {
@@ -208,7 +255,7 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "post_filter": {
                 "bool": {
                     "must_not": [
-                        {"term": {"_id": asset_id}}
+                        {"term": {"DigitalSourceAsset.ID.keyword": asset_id}}
                     ]
                 }
             },
@@ -228,12 +275,25 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             }
         }
 
-        logger.info("OpenSearch query body:", extra={"query": search_body})
+        # Log the full KNN search query with all details
+        logger.info("KNN search query details", extra={
+            "query_type": "knn_search",
+            "full_query": json.dumps(search_body, indent=2),
+            "index": index_name,
+            "asset_id": asset_id,
+            "params": params.dict()
+        })
 
         response = client.search(body=search_body, index=index_name)
 
-        logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
-        logger.info("OpenSearch response:", extra={"response": response})
+        # Log the full KNN search response
+        logger.info("KNN search response details", extra={
+            "query_type": "knn_search",
+            "total_hits": response["hits"]["total"]["value"],
+            "actual_hits": len(response["hits"]["hits"]),
+            "response": json.dumps(response, indent=2),
+            "asset_id": asset_id
+        })
 
         hits = []
         for hit in response["hits"]["hits"]:
@@ -255,27 +315,46 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
 
         metrics.add_metric(name="RelatedVersionsRetrieved", value=len(hits), unit="Count")
 
-        return {
+        # Modify the response structure to include statusCode and serialize the body
+        response_data = {
             "statusCode": 200,
-            "body": {
-                "status": "success",
-                "message": "Related versions retrieved successfully",
+            "body": json.dumps({
+                "status": "200",
+                "message": "ok",
                 "data": {
-                    "hits": [hit.model_dump(by_alias=True) for hit in hits],
-                    "totalResults": search_metadata.totalResults,
-                    "page": search_metadata.page,
-                    "pageSize": search_metadata.pageSize
+                    "searchMetadata": {
+                        "totalResults": response["hits"]["total"]["value"],
+                        "page": params.page,
+                        "pageSize": params.pageSize,
+                        "searchTerm": asset_id
+                    },
+                    "results": [hit.model_dump(by_alias=True) for hit in hits]
                 }
+            }),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"  # Add CORS headers
             }
         }
+        
+        logger.info("Preparing to return response", extra={
+            "response_status": 200,
+            "total_hits": response["hits"]["total"]["value"],
+            "results_count": len(hits)
+        })
+
+        return response_data
 
     except NotFoundError:
+        logger.error("NotFoundError encountered")
         raise APIError("Asset not found", 404)
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error("Unexpected error in perform_vector_search", extra={
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
         raise APIError("An unexpected error occurred", 500)
 
-@tracer.capture_method
 def build_error_response(error: Exception, status_code: int, context: LambdaContext) -> Dict[str, Any]:
     """Build standardized error response."""
     runtime_id = (
@@ -289,14 +368,17 @@ def build_error_response(error: Exception, status_code: int, context: LambdaCont
 
     return {
         "statusCode": status_code,
-        "body": {
+        "body": json.dumps({
             "status": "error",
             "message": message
+        }),
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
         }
     }
 
 @metrics.log_metrics(capture_cold_start_metric=True)
-@tracer.capture_lambda_handler
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 def lambda_handler(
     event: APIGatewayProxyEvent, context: LambdaContext
@@ -314,15 +396,34 @@ def lambda_handler(
 
         logger.debug(f"Processed query parameters: {query_params.dict()}")
 
-        # Perform vector search
-        return perform_vector_search(asset_id, query_params)
+        # Log before calling perform_vector_search
+        logger.info("Calling perform_vector_search")
+        
+        response = perform_vector_search(asset_id, query_params)
+        
+        # Log successful response
+        logger.info("Successfully got response from perform_vector_search", extra={
+            "response_status_code": response["statusCode"]
+        })
+        
+        return response
 
     except APIError as e:
         logger.warning(f"API Error: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsClientErrors", value=1, unit="Count")
-        return build_error_response(e, e.status_code, context)
+        error_response = build_error_response(e, e.status_code, context)
+        logger.info("Returning error response", extra={
+            "status_code": error_response["statusCode"],
+            "message": error_response["body"]["message"]
+        })
+        return error_response
 
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsServerErrors", value=1, unit="Count")
-        return build_error_response(e, 500, context) 
+        error_response = build_error_response(e, 500, context)
+        logger.info("Returning error response", extra={
+            "status_code": error_response["statusCode"],
+            "message": error_response["body"]["message"]
+        })
+        return error_response 
