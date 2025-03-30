@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton, TextField, Button, CircularProgress } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -34,6 +34,7 @@ export interface AssetCardProps {
     aspectRatio?: 'vertical' | 'square' | 'horizontal';
     thumbnailScale?: 'fit' | 'fill';
     showMetadata?: boolean;
+    menuOpen?: boolean; // Add prop to track menu state from parent
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -59,10 +60,21 @@ const AssetCard: React.FC<AssetCardProps> = ({
     aspectRatio = 'square',
     thumbnailScale = 'fill',
     showMetadata = true,
+    menuOpen = false, // Default to false
 }) => {
  
-    const [selectionRange, setSelectionRange] = React.useState<[number, number] | null>(null);
-    const inputRef = React.useRef<HTMLInputElement | null>(null);
+    const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
+    const [isHovering, setIsHovering] = useState(false);
+    const [isMenuClicked, setIsMenuClicked] = useState(false);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    // Update when menuOpen prop changes
+    useEffect(() => {
+        if (menuOpen) {
+            setIsMenuClicked(true);
+        }
+    }, [menuOpen]);
 
     // Determine the card dimensions based on props
     const getCardDimensions = () => {
@@ -94,11 +106,33 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
     const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
+        setIsMenuClicked(true); // Set menu as clicked
         onMenuClick(event);
     };
 
-console.log("isRenaming",isRenaming)
-    React.useEffect(() => {
+    // Handle clicks outside to detect when menu should be considered closed
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            // If we click outside the card and the menu is open, consider it closed
+            if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
+                // This is a click outside the card
+                // We'll keep the menu clicked state for a short time to allow the menu to close gracefully
+                setTimeout(() => {
+                    setIsMenuClicked(false);
+                }, 300);
+            }
+        };
+
+        // Add event listener for clicks
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    useEffect(() => {
         if (isEditing && inputRef.current) {
             // Move caret to the beginning of the string
             inputRef.current.focus();
@@ -106,7 +140,6 @@ console.log("isRenaming",isRenaming)
             setSelectionRange([0, 0]);
         }
     }, [isEditing]);
-
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         // Remember where the user was typing
@@ -116,16 +149,19 @@ console.log("isRenaming",isRenaming)
         setSelectionRange([start, end]);
     };
 
-
-    React.useEffect(() => {
+    useEffect(() => {
         if (isEditing && inputRef.current && selectionRange) {
             // After the new value is in place, reset selection
             inputRef.current.setSelectionRange(selectionRange[0], selectionRange[1]);
         }
     }, [isEditing, editedName, selectionRange]);
 
+    // Determine if buttons should be visible
+    const shouldShowButtons = isHovering || isMenuClicked;
+
     return (
         <Box
+            ref={cardRef}
             sx={{
                 position: 'relative',
                 transition: 'all 0.2s ease-in-out',
@@ -133,6 +169,8 @@ console.log("isRenaming",isRenaming)
                     transform: 'translateY(-4px)',
                 },
             }}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
         >
             <Box
                 sx={{
@@ -140,6 +178,7 @@ console.log("isRenaming",isRenaming)
                     overflow: 'hidden',
                     bgcolor: 'background.paper',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    position: 'relative', // Ensure this is a positioning context
                     '&:hover': {
                         boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
                     },
@@ -200,8 +239,38 @@ console.log("isRenaming",isRenaming)
                     />
                 )}
 
-                {/* Metadata (non-clickable) */}
-                {showMetadata ? (
+                {/* Position buttons at the top right of the card, visible on hover or when menu is open */}
+                <Box
+                    sx={{ 
+                        position: 'absolute', 
+                        top: 8, 
+                        right: 8, 
+                        display: 'flex', 
+                        gap: 1, 
+                        zIndex: 2,
+                        opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
+                        transition: 'opacity 0.2s ease-in-out',
+                        pointerEvents: shouldShowButtons ? 'auto' : 'none', // Ensure buttons are clickable when visible
+                    }}
+                >
+                    <IconButton
+                        size="small"
+                        onClick={handleDeleteClick}
+                        sx={{ bgcolor: 'background.paper' }}
+                    >
+                        <DeleteIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        onClick={handleMenuClick}
+                        sx={{ bgcolor: 'background.paper' }}
+                    >
+                        <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                </Box>
+
+                {/* Metadata section */}
+                {showMetadata && (
                     <Box sx={{ p: 2 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {fields.map((field) =>
@@ -290,42 +359,7 @@ console.log("isRenaming",isRenaming)
                                     </Box>
                                 )
                             )}
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    justifyContent: 'flex-end',
-                                    gap: 1,
-                                    mt: 1,
-                                }}
-                            >
-                                <IconButton size="small" onClick={handleDeleteClick}>
-                                    <DeleteIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" onClick={handleMenuClick}>
-                                    <MoreVertIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
                         </Box>
-                    </Box>
-                ) : (
-                    // If showMetadata = false, place action buttons as overlay
-                    <Box
-                        sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}
-                    >
-                        <IconButton
-                            size="small"
-                            onClick={handleDeleteClick}
-                            sx={{ bgcolor: 'rgba(255,255,255,0.8)' }}
-                        >
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            size="small"
-                            onClick={handleMenuClick}
-                            sx={{ bgcolor: 'rgba(255,255,255,0.8)' }}
-                        >
-                            <MoreVertIcon fontSize="small" />
-                        </IconButton>
                     </Box>
                 )}
             </Box>
