@@ -384,22 +384,8 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     
     return (
         <Box sx={{
-            maxHeight: '600px',
-            overflowY: 'auto',
             borderRadius: 1,
-            '&::-webkit-scrollbar': {
-                width: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-            },
-            '&::-webkit-scrollbar-thumb': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                borderRadius: '4px',
-                '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-                }
-            }
+            width: '100%'
         }}>
             <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <TextField
@@ -433,6 +419,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
             <SimpleTreeView
                 sx={{
                     flexGrow: 1,
+                    width: '100%',
                     '& .MuiTreeItem-root': {
                         padding: '4px 0',
                     },
@@ -761,11 +748,44 @@ const ImageDetailContent: React.FC = () => {
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
     const [newComment, setNewComment] = useState('');
+    const [showHeader, setShowHeader] = useState(true);
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
         { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect!", timestamp: "2023-06-15 10:15:45" },
         { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Love the color palette!", timestamp: "2023-06-15 11:00:12" }
     ]);
+
+    // Track scroll position to hide/show header
+    useEffect(() => {
+        let lastScrollTop = 0;
+        
+        const handleScroll = () => {
+            // Get scrollTop from the parent scrollable container instead
+            const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
+            
+            if (currentScrollTop <= 10) {
+                setShowHeader(true);
+            } else if (currentScrollTop > lastScrollTop) {
+                setShowHeader(false);
+            } else if (currentScrollTop < lastScrollTop) {
+                setShowHeader(true);
+            }
+            
+            lastScrollTop = currentScrollTop;
+        };
+        
+        // Listen to scroll on the parent container
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.addEventListener('scroll', handleScroll, { passive: true });
+        }
+        
+        return () => {
+            if (container) {
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
 
     const recentlyViewedItem = useMemo(() => {
         if (!id || !assetData?.data?.asset) return null;
@@ -989,8 +1009,7 @@ const ImageDetailContent: React.FC = () => {
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100vh',
-            maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
+            maxWidth: isExpanded ? 'calc(100% - 300px)' : '100%',
             transition: theme => theme.transitions.create(['max-width'], {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.enteringScreen,
@@ -1001,7 +1020,12 @@ const ImageDetailContent: React.FC = () => {
                 position: 'sticky',
                 top: 0,
                 zIndex: 1200,
-                background: 'transparent'
+                background: theme => alpha(theme.palette.background.default, 0.8),
+                backdropFilter: 'blur(8px)',
+                transform: showHeader ? 'translateY(0)' : 'translateY(-100%)',
+                transition: 'transform 0.3s ease-in-out',
+                visibility: showHeader ? 'visible' : 'hidden',
+                opacity: showHeader ? 1 : 0,
             }}>
                 <Box sx={{ px: 0, py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
@@ -1016,171 +1040,135 @@ const ImageDetailContent: React.FC = () => {
                 </Box>
             </Box>
 
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                overflow: 'auto',
-                gap: 1,
-                px: 0,
-                pb: 0,
-                mt: 0
-            }}>
-                <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1
-                }}>
-                    <Box sx={{
-                        position: 'relative',
-                        bgcolor: 'transparent',
-                        pt: 0,
-                        pb: 0,
-                        mt: 0,
-                        mb: 0
-                    }}>
-                        <Box
-                            sx={{
-                                overflow: 'hidden',
-                                borderRadius: 2,
-                                position: 'relative'
-                            }}
-                        >
-                            <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
-                            {/* <Box
-                                sx={{
-                                    position: 'absolute',
-                                    top: 8,
-                                    right: 8,
-                                    bgcolor: 'rgba(255,255,255,0.8)',
-                                    borderRadius: '50%',
-                                    p: 0.5,
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        bgcolor: 'rgba(255,255,255,0.9)',
-                                    }
-                                }}
-                            >
-                                <ZoomOutMapIcon fontSize="small" color="primary" />
-                            </Box> */}
-                        </Box>
-                    </Box>
-
-                    <Box>
-                        <Paper
-                            elevation={0}
-                            sx={{
-                                p: 0,
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                                background: 'transparent'
-                            }}
-                        >
-                            <Tabs
-                                value={activeTab}
-                                onChange={(e, newValue) => setActiveTab(newValue)}
-                                textColor="secondary"
-                                indicatorColor="secondary"
-                                aria-label="metadata tabs"
-                                variant="scrollable"
-                                scrollButtons="auto"
-                                sx={{
-                                    px: 2,
-                                    pt: 1,
-                                    '& .MuiTab-root': {
-                                        minWidth: 'auto',
-                                        px: 2,
-                                        py: 1.5,
-                                        fontWeight: 500,
-                                        transition: 'all 0.2s',
-                                        '&:hover': {
-                                            backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
-                                        }
-                                    }
-                                }}
-                            >
-                                <Tab
-                                    value="summary"
-                                    label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <InfoOutlinedIcon fontSize="small" />
-                                            <span>Summary</span>
-                                        </Box>
-                                    }
-                                    id="tab-summary"
-                                    aria-controls="tabpanel-summary"
-                                />
-                                <Tab
-                                    value="technical"
-                                    label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <CodeOutlinedIcon fontSize="small" />
-                                            <span>Technical</span>
-                                            {metadataAccordions.length > 0 && (
-                                                <Chip 
-                                                    size="small" 
-                                                    label={metadataAccordions.length} 
-                                                    sx={{ height: 20, ml: 0.5 }} 
-                                                />
-                                            )}
-                                        </Box>
-                                    }
-                                    id="tab-technical"
-                                    aria-controls="tabpanel-technical"
-                                />
-                                <Tab
-                                    value="descriptor"
-                                    label="Descriptor Metadata"
-                                    id="tab-descriptor"
-                                    aria-controls="tabpanel-descriptor"
-                                />
-                                <Tab
-                                    value="related"
-                                    label="Related Items"
-                                    id="tab-related"
-                                    aria-controls="tabpanel-related"
-                                />
-                            </Tabs>
-                            <Box
-                                sx={{
-                                    mt: { xs: 2, sm: 3 },
-                                    mx: { xs: 1, sm: 2, md: 3 },
-                                    mb: { xs: 2, sm: 3 },
-                                    pt: { xs: 1, sm: 2 },
-                                    outline: 'none',
-                                    borderRadius: 1,
-                                    backgroundColor: 'transparent'
-                                }}
-                                role="tabpanel"
-                                id={`tabpanel-${activeTab}`}
-                                aria-labelledby={`tab-${activeTab}`}
-                                tabIndex={0}
-                            >
-                                {renderTabContent()}
-                            </Box>
-                        </Paper>
-                    </Box>
+            {/* Image viewer section */}
+            <Box sx={{ px: 3, pt: 0, pb: 3, minHeight: '60vh' }}>
+                <Box
+                    sx={{
+                        overflow: 'hidden',
+                        borderRadius: 2,
+                        position: 'relative'
+                    }}
+                >
+                    <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
                 </Box>
-
-                <AssetSidebar
-                    versions={versions}
-                    comments={comments}
-                    onAddComment={handleAddComment}
-                />
-                
-                {selectedComment !== null && (
-                    <CommentPopper
-                        id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
-                        open={Boolean(commentAnchorEl)}
-                        anchorEl={commentAnchorEl}
-                        comment={comments[selectedComment]}
-                        onClose={() => {
-                            setCommentAnchorEl(null);
-                            setSelectedComment(null);
-                        }}
-                    />
-                )}
             </Box>
+
+            {/* Metadata section */}
+            <Box sx={{ px: 3, pb: 3 }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 0,
+                        borderRadius: 2,
+                        overflow: 'visible',
+                        background: 'transparent'
+                    }}
+                >
+                    <Tabs
+                        value={activeTab}
+                        onChange={(e, newValue) => setActiveTab(newValue)}
+                        textColor="secondary"
+                        indicatorColor="secondary"
+                        aria-label="metadata tabs"
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        sx={{
+                            px: 2,
+                            pt: 1,
+                            '& .MuiTab-root': {
+                                minWidth: 'auto',
+                                px: 2,
+                                py: 1.5,
+                                fontWeight: 500,
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                    backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
+                                }
+                            }
+                        }}
+                    >
+                        <Tab
+                            value="summary"
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <InfoOutlinedIcon fontSize="small" />
+                                    <span>Summary</span>
+                                </Box>
+                            }
+                            id="tab-summary"
+                            aria-controls="tabpanel-summary"
+                        />
+                        <Tab
+                            value="technical"
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <CodeOutlinedIcon fontSize="small" />
+                                    <span>Technical</span>
+                                    {metadataAccordions.length > 0 && (
+                                        <Chip 
+                                            size="small" 
+                                            label={metadataAccordions.length} 
+                                            sx={{ height: 20, ml: 0.5 }} 
+                                        />
+                                    )}
+                                </Box>
+                            }
+                            id="tab-technical"
+                            aria-controls="tabpanel-technical"
+                        />
+                        <Tab
+                            value="descriptor"
+                            label="Descriptor Metadata"
+                            id="tab-descriptor"
+                            aria-controls="tabpanel-descriptor"
+                        />
+                        <Tab
+                            value="related"
+                            label="Related Items"
+                            id="tab-related"
+                            aria-controls="tabpanel-related"
+                        />
+                    </Tabs>
+                    <Box
+                        sx={{
+                            mt: { xs: 2, sm: 3 },
+                            mx: { xs: 1, sm: 2, md: 3 },
+                            mb: { xs: 2, sm: 3 },
+                            pt: { xs: 1, sm: 2 },
+                            outline: 'none',
+                            borderRadius: 1,
+                            backgroundColor: 'transparent',
+                            overflow: 'visible',
+                            maxHeight: 'none'
+                        }}
+                        role="tabpanel"
+                        id={`tabpanel-${activeTab}`}
+                        aria-labelledby={`tab-${activeTab}`}
+                        tabIndex={0}
+                    >
+                        {renderTabContent()}
+                    </Box>
+                </Paper>
+            </Box>
+
+            <AssetSidebar
+                versions={versions}
+                comments={comments}
+                onAddComment={handleAddComment}
+            />
+            
+            {selectedComment !== null && (
+                <CommentPopper
+                    id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
+                    open={Boolean(commentAnchorEl)}
+                    anchorEl={commentAnchorEl}
+                    comment={comments[selectedComment]}
+                    onClose={() => {
+                        setCommentAnchorEl(null);
+                        setSelectedComment(null);
+                    }}
+                />
+            )}
         </Box>
     );
 };

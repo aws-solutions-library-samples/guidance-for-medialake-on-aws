@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback,useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -290,26 +290,13 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     
     return (
         <Box sx={{
-            maxHeight: '600px',
-            overflowY: 'auto',
             borderRadius: 1,
-            '&::-webkit-scrollbar': {
-                width: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-            },
-            '&::-webkit-scrollbar-thumb': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                borderRadius: '4px',
-                '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-                }
-            }
+            width: '100%'
         }}>
             <SimpleTreeView
                 sx={{
                     flexGrow: 1,
+                    width: '100%',
                     '& .MuiTreeItem-root': {
                         padding: '4px 0',
                     },
@@ -515,6 +502,7 @@ const VideoDetailContent: React.FC = () => {
     const [activeTab, setActiveTab] = useState<string>('summary');
     const [relatedPage, setRelatedPage] = useState(1);
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const [showHeader, setShowHeader] = useState(true);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -657,6 +645,38 @@ const VideoDetailContent: React.FC = () => {
         }
     }, [navigate, location.state, searchTerm]);
 
+    // Track scroll position to hide/show header
+    useEffect(() => {
+        let lastScrollTop = 0;
+        
+        const handleScroll = () => {
+            // Get scrollTop from the parent scrollable container instead
+            const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
+            
+            if (currentScrollTop <= 10) {
+                setShowHeader(true);
+            } else if (currentScrollTop > lastScrollTop) {
+                setShowHeader(false);
+            } else if (currentScrollTop < lastScrollTop) {
+                setShowHeader(true);
+            }
+            
+            lastScrollTop = currentScrollTop;
+        };
+        
+        // Listen to scroll on the parent container
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.addEventListener('scroll', handleScroll, { passive: true });
+        }
+        
+        return () => {
+            if (container) {
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -688,19 +708,29 @@ const VideoDetailContent: React.FC = () => {
 
 
     return (
-        <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
-            transition: theme => theme.transitions.create(['max-width'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-            }),
-            height: '100vh',
-            overflow: 'auto',
-            bgcolor: 'transparent',
-        }}>
-            <Box sx={{ position: 'sticky', top: 0, zIndex: 1200, background: 'transparent' }}>
+        <Box 
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                maxWidth: isExpanded ? 'calc(100% - 300px)' : '100%',
+                transition: theme => theme.transitions.create(['max-width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+                bgcolor: 'transparent',
+            }}
+        >
+            <Box sx={{ 
+                position: 'sticky', 
+                top: 0, 
+                zIndex: 1200, 
+                background: theme => alpha(theme.palette.background.default, 0.8),
+                backdropFilter: 'blur(8px)',
+                transform: showHeader ? 'translateY(0)' : 'translateY(-100%)',
+                transition: 'transform 0.3s ease-in-out',
+                visibility: showHeader ? 'visible' : 'hidden',
+                opacity: showHeader ? 1 : 0,
+            }}>
                 <Box sx={{ py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
                         searchTerm={searchTerm}
@@ -716,11 +746,7 @@ const VideoDetailContent: React.FC = () => {
                 </Box>
             </Box>
 
-            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, mb: 0 }}>
-                <AssetHeader />
-            </Box>
-
-            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, height: '75vh', minHeight: '600px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                 <Paper
                     elevation={0}
                     sx={{
@@ -746,7 +772,7 @@ const VideoDetailContent: React.FC = () => {
                         sx={{
                             p: 0,
                             borderRadius: 2,
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             background: 'transparent'
                         }}
                     >
@@ -805,7 +831,9 @@ const VideoDetailContent: React.FC = () => {
                                 pt: 2,
                                 outline: 'none', // Remove outline when focused but keep it accessible
                                 borderRadius: 1,
-                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.5)
+                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.5),
+                                maxHeight: 'none',
+                                overflow: 'visible'
                             }}
                             role="tabpanel"
                             id={`tabpanel-${activeTab}`}
