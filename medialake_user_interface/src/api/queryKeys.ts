@@ -14,11 +14,7 @@ export const QUERY_KEYS = {
                 [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, prefix, continuationToken] as const,
         },
     },
-    BUCKETS: {
-        all: ['buckets'] as const,
-        assets: (bucketName: string, page: number, pageSize: number, sortBy: string, sortDirection: string, assetType?: string) =>
-            [...QUERY_KEYS.BUCKETS.all, 'assets', bucketName, { page, pageSize, sortBy, sortDirection, assetType }] as const,
-    },
+
     PIPELINES: {
         all: ['pipelines'] as const,
         lists: () => [...QUERY_KEYS.PIPELINES.all, 'list'] as const,
