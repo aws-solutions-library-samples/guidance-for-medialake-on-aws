@@ -43,6 +43,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
+import SubtitlesOutlinedIcon from '@mui/icons-material/SubtitlesOutlined';
 
 const outputFilters = {
     'ID3v2': ['Title', 'Artist', 'Album', 'Year', 'Genre', 'Track'],
@@ -436,6 +437,195 @@ const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFiel
     );
 };
 
+const TranscriptionTab: React.FC = () => {
+    const theme = useTheme();
+    
+    // Sample Amazon Transcribe data
+    const transcriptionData = {
+        jobName: "mountain-stream-transcription",
+        accountId: "123456789012",
+        results: {
+            transcripts: [
+                {
+                    transcript: "This is an ambient recording of a mountain stream in the Blue Ridge Mountains. You can hear the water flowing over rocks, birds chirping in the background, and a light breeze rustling through the trees."
+                }
+            ],
+            items: [
+                {
+                    start_time: "0.00",
+                    end_time: "2.35",
+                    alternatives: [{ confidence: "0.98", content: "This is an ambient recording of a mountain stream" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "2.35",
+                    end_time: "3.10",
+                    alternatives: [{ confidence: "0.96", content: "in the" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "3.10",
+                    end_time: "4.45",
+                    alternatives: [{ confidence: "0.99", content: "Blue Ridge Mountains" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "4.83",
+                    end_time: "5.21",
+                    alternatives: [{ confidence: "0.89", content: "You can hear" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "5.22",
+                    end_time: "7.78",
+                    alternatives: [{ confidence: "0.95", content: "the water flowing over rocks" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "8.12",
+                    end_time: "10.55",
+                    alternatives: [{ confidence: "0.97", content: "birds chirping in the background" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "10.89",
+                    end_time: "11.35",
+                    alternatives: [{ confidence: "0.85", content: "and a" }],
+                    type: "pronunciation"
+                },
+                {
+                    start_time: "11.36",
+                    end_time: "14.23",
+                    alternatives: [{ confidence: "0.94", content: "light breeze rustling through the trees" }],
+                    type: "pronunciation"
+                }
+            ],
+            status: "COMPLETED"
+        }
+    };
+
+    return (
+        <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                Audio Transcription
+            </Typography>
+            
+            <Paper elevation={0} sx={{ 
+                mb: 3, 
+                p: 2, 
+                backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                borderRadius: 1,
+                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+            }}>
+                <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', color: theme.palette.text.secondary }}>
+                    Full Transcript:
+                </Typography>
+                <Typography variant="body1" paragraph>
+                    {transcriptionData.results.transcripts[0].transcript}
+                </Typography>
+            </Paper>
+            
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                Time-Aligned Segments
+            </Typography>
+            
+            <Paper elevation={0} sx={{ 
+                backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                borderRadius: 1
+            }}>
+                {transcriptionData.results.items.map((item, index) => (
+                    <Box 
+                        key={index} 
+                        sx={{ 
+                            display: 'flex', 
+                            p: 1.5, 
+                            borderBottom: index < transcriptionData.results.items.length - 1 ? 
+                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
+                            '&:hover': {
+                                backgroundColor: alpha(theme.palette.primary.main, 0.03)
+                            }
+                        }}
+                    >
+                        <Box sx={{ 
+                            minWidth: '100px', 
+                            pr: 2, 
+                            borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                            display: 'flex',
+                            flexDirection: 'column'
+                        }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                {`${item.start_time}s - ${item.end_time}s`}
+                            </Typography>
+                            <Chip 
+                                size="small" 
+                                label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`} 
+                                sx={{ 
+                                    height: '18px', 
+                                    mt: 0.5,
+                                    fontSize: '0.65rem',
+                                    backgroundColor: (() => {
+                                        const conf = parseFloat(item.alternatives[0].confidence);
+                                        if (conf >= 0.95) return alpha(theme.palette.success.main, 0.1);
+                                        if (conf >= 0.85) return alpha(theme.palette.warning.main, 0.1);
+                                        return alpha(theme.palette.error.main, 0.1);
+                                    })(),
+                                    color: (() => {
+                                        const conf = parseFloat(item.alternatives[0].confidence);
+                                        if (conf >= 0.95) return theme.palette.success.main;
+                                        if (conf >= 0.85) return theme.palette.warning.main;
+                                        return theme.palette.error.main;
+                                    })()
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ pl: 2, flex: 1 }}>
+                            <Typography variant="body2">
+                                {item.alternatives[0].content}
+                            </Typography>
+                            {item.alternatives.length > 1 && (
+                                <Box sx={{ mt: 1 }}>
+                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                        Alternatives:
+                                    </Typography>
+                                    {item.alternatives.slice(1).map((alt, altIndex) => {
+                                        const confidenceValue = Math.round(parseFloat(alt.confidence) * 100);
+                                        return (
+                                            <Typography key={altIndex} variant="caption" sx={{ 
+                                                display: 'block',
+                                                color: theme.palette.text.secondary,
+                                                fontStyle: 'italic',
+                                                pl: 1
+                                            }}>
+                                                {alt.content} ({confidenceValue}%)
+                                            </Typography>
+                                        );
+                                    })}
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+                ))}
+            </Paper>
+            
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                <Button 
+                    variant="outlined" 
+                    startIcon={<SubtitlesOutlinedIcon />}
+                    sx={{ mr: 2 }}
+                >
+                    Export Transcript
+                </Button>
+                <Button 
+                    variant="outlined" 
+                    startIcon={<CodeOutlinedIcon />}
+                >
+                    Show Raw JSON
+                </Button>
+            </Box>
+        </Box>
+    );
+};
+
 const RelatedItemsTab: React.FC<{ 
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
@@ -649,7 +839,7 @@ const AudioDetailContent: React.FC = () => {
 
     // Handle keyboard navigation for tabs
     const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
-        const tabs = ['summary', 'technical', 'descriptor', 'related'];
+        const tabs = ['summary', 'technical', 'descriptor', 'transcription', 'related'];
         const currentIndex = tabs.indexOf(activeTab);
         
         if (event.key === 'ArrowRight') {
@@ -808,6 +998,12 @@ const AudioDetailContent: React.FC = () => {
                                 aria-controls="tabpanel-descriptor"
                             />
                             <Tab
+                                value="transcription"
+                                label="Transcription"
+                                id="tab-transcription"
+                                aria-controls="tabpanel-transcription"
+                            />
+                            <Tab
                                 value="related"
                                 label="Related Items"
                                 id="tab-related"
@@ -834,6 +1030,7 @@ const AudioDetailContent: React.FC = () => {
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
+                            {activeTab === 'transcription' && <TranscriptionTab />}
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 
