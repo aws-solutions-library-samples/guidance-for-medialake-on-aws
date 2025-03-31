@@ -118,10 +118,62 @@ export interface RelatedVersionsResponse {
     status: string;
     message: string;
     data: {
-        hits: RelatedVersionHit[];
-        totalResults: number;
-        page: number;
-        pageSize: number;
+        searchMetadata: {
+            totalResults: number;
+            page: number;
+            pageSize: number;
+            searchTerm: string;
+        };
+        results: Array<{
+            InventoryID: string;
+            DigitalSourceAsset: {
+                Type: string;
+                MainRepresentation: {
+                    Format: string;
+                    StorageInfo: {
+                        PrimaryLocation: {
+                            FileInfo: {
+                                Size: number;
+                                Hash?: {
+                                    Value: string;
+                                    MD5Hash: string;
+                                    Algorithm: string;
+                                };
+                                CreateDate: string;
+                            };
+                            ObjectKey: {
+                                Path: string;
+                                FullPath: string;
+                                Name: string;
+                            };
+                        };
+                    };
+                };
+                CreateDate: string;
+            };
+            DerivedRepresentations: Array<{
+                StorageInfo: {
+                    PrimaryLocation: {
+                        Status: string;
+                        StorageType: string;
+                        FileInfo: {
+                            Size: number;
+                        };
+                        Bucket: string;
+                        ObjectKey: {
+                            FullPath: string;
+                        };
+                        Provider: string;
+                    };
+                };
+                Purpose: string;
+            }>;
+            FileHash: string;
+            Metadata: Record<string, any>;
+            score: number;
+            thumbnailUrl: string;
+            proxyUrl: string;
+        }>;
     };
 }
 

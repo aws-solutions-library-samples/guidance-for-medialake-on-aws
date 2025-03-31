@@ -18,7 +18,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import { useAsset } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import AssetSidebar from '../components/asset/AssetSidebar';
@@ -32,7 +32,7 @@ import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
-import { RelatedVersionsResponse, AssetResponse } from '../api/types/asset.types';
+import { AssetResponse } from '../api/types/asset.types';
 
 // MUI Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -388,25 +388,42 @@ const RelatedItemsTab: React.FC<{
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+    console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
+    
     const items = useMemo(() => {
-        if (!relatedVersionsData?.data?.hits) return [];
-        return relatedVersionsData.data.hits.map((hit) => ({
-            id: hit.InventoryID,
-            title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: hit.DigitalSourceAsset.Type.toLowerCase(),
-            thumbnail: hit.thumbnailUrl || hit.proxyUrl,
-            score: hit.score,
-            format: hit.DigitalSourceAsset.MainRepresentation.Format,
-            fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            createDate: hit.DigitalSourceAsset.CreateDate
+        if (!relatedVersionsData?.data?.results) {
+            console.log('No results found in relatedVersionsData');
+            return [];
+        }
+
+        const mappedItems = relatedVersionsData.data.results.map((result) => ({
+            id: result.InventoryID,
+            title: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: result.DigitalSourceAsset.Type,
+            thumbnail: result.thumbnailUrl,
+            proxyUrl: result.proxyUrl,
+            score: result.score,
+            format: result.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: result.DigitalSourceAsset.CreateDate
         }));
+        console.log('Mapped items:', mappedItems);
+        return mappedItems;
     }, [relatedVersionsData]);
 
     const hasMore = useMemo(() => {
-        if (!relatedVersionsData?.data) return false;
-        return relatedVersionsData.data.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize;
+        if (!relatedVersionsData?.data?.searchMetadata) {
+            console.log('No searchMetadata found for hasMore calculation');
+            return false;
+        }
+
+        const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
+        const hasMoreItems = totalResults > page * pageSize;
+        console.log('Has more items:', hasMoreItems);
+        return hasMoreItems;
     }, [relatedVersionsData]);
 
+    console.log('Rendering RelatedItemsView with items:', items);
     return (
         <RelatedItemsView
             items={items}
@@ -426,6 +443,8 @@ const VideoDetailContent: React.FC = () => {
     const { isExpanded } = useRightSidebar();
     const { data: assetData, isLoading, error } = useAsset(id || '') as { data: AssetResponse | undefined; isLoading: boolean; error: any };
     const [activeTab, setActiveTab] = useState<string>('summary');
+    const [relatedPage, setRelatedPage] = useState(1);
+    const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -729,9 +748,9 @@ const VideoDetailContent: React.FC = () => {
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 
-                                    relatedVersionsData={assetData?.data?.asset?.relatedVersionsData} 
-                                    isLoading={isLoading} 
-                                    onLoadMore={() => {}} 
+                                    relatedVersionsData={relatedVersionsData}
+                                    isLoading={isLoadingRelated}
+                                    onLoadMore={() => setRelatedPage(prev => prev + 1)}
                                 />
                             )}
                         </Box>

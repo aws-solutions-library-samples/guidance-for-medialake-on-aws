@@ -598,15 +598,17 @@ const RelatedItemsTab: React.FC<{
             console.log('No results found in relatedVersionsData');
             return [];
         }
-        const mappedItems = relatedVersionsData.data.results.map((hit) => ({
-            id: hit.InventoryID,
-            title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: hit.DigitalSourceAsset.Type.toLowerCase(),
-            thumbnail: hit.thumbnailUrl || hit.proxyUrl,
-            score: hit.score,
-            format: hit.DigitalSourceAsset.MainRepresentation.Format,
-            fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            createDate: hit.DigitalSourceAsset.CreateDate
+
+        const mappedItems = relatedVersionsData.data.results.map((result) => ({
+            id: result.InventoryID,
+            title: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: result.DigitalSourceAsset.Type,
+            thumbnail: result.thumbnailUrl,
+            proxyUrl: result.proxyUrl,
+            score: result.score,
+            format: result.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: result.DigitalSourceAsset.CreateDate
         }));
         console.log('Mapped items:', mappedItems);
         return mappedItems;
@@ -617,8 +619,9 @@ const RelatedItemsTab: React.FC<{
             console.log('No searchMetadata found for hasMore calculation');
             return false;
         }
-        const hasMoreItems = relatedVersionsData.data.searchMetadata.totalResults > 
-            relatedVersionsData.data.searchMetadata.page * relatedVersionsData.data.searchMetadata.pageSize;
+
+        const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
+        const hasMoreItems = totalResults > page * pageSize;
         console.log('Has more items:', hasMoreItems);
         return hasMoreItems;
     }, [relatedVersionsData]);
