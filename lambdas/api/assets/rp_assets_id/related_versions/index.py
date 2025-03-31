@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import os
 import boto3
+from botocore.config import Config
 import json
 from pydantic import BaseModel, Field, conint, validator
 
@@ -113,9 +114,16 @@ class APIError(Exception):
         super().__init__(self.message)
 
 def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Optional[str]:
-    """Generate a presigned URL for an S3 object"""
+    """Generate a presigned URL for an S3 object with SSE-KMS support"""
     try:
-        s3_client = boto3.client("s3")
+        s3_client = boto3.client(
+            "s3",
+            config=Config(
+                signature_version="s3v4",
+                region_name=os.environ["AWS_REGION"]
+            )
+        )
+        
         url = s3_client.generate_presigned_url(
             "get_object",
             Params={
@@ -123,11 +131,15 @@ def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Opt
                 "Key": key,
                 "ResponseContentDisposition": "inline",
             },
-            ExpiresIn=expiration,
+            ExpiresIn=expiration
         )
         return url
     except Exception as e:
-        logger.error(f"Error generating presigned URL: {str(e)}")
+        logger.error(f"Error generating presigned URL: {str(e)}", extra={
+            "bucket": bucket,
+            "key": key,
+            "error": str(e)
+        })
         return None
 
 def process_search_hit(hit: Dict) -> AssetSearchResult:
@@ -188,15 +200,26 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
         })
 
         # Search for the UUID portion in DigitalSourceAsset.ID using match query
-        initial_query = {
+        initial_query = {        
             "query": {
-                "match": {
-                    "DigitalSourceAsset.ID": uuid
+                "bool": {
+                    "should": [
+                        {
+                            "match": {
+                                "DigitalSourceAsset.ID": uuid
+                            }
+                        },
+                        {
+                            "match": {
+                                "InventoryID": uuid
+                            }
+                        }
+                    ],
+                    "minimum_should_match": 1
                 }
             },
-            "_source": ["embedding"]
         }
-        
+
         # Log the full initial query with all details
         logger.info("Initial asset lookup query details", extra={
             "query_type": "initial_lookup",
@@ -348,6 +371,28 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "results_count": len(hits)
         })
 
+        # Before returning the response, let's log its structure
+        logger.info("Response structure details", extra={
+            "response_keys": list(response_data.keys()),
+            "body_type": type(response_data["body"]).__name__,
+            "body_length": len(response_data["body"]) if isinstance(response_data["body"], str) else "not_a_string",
+            "headers": response_data.get("headers", {}),
+            "status_code": response_data.get("statusCode")
+        })
+
+        # Verify the response structure matches API Gateway requirements
+        if not isinstance(response_data.get("body"), str):
+            logger.error("Response body is not a string", extra={
+                "body_type": type(response_data.get("body")).__name__
+            })
+            raise APIError("Invalid response format", 500)
+
+        if not response_data.get("statusCode"):
+            logger.error("Response missing statusCode", extra={
+                "response_keys": list(response_data.keys())
+            })
+            raise APIError("Invalid response format", 500)
+
         return response_data
 
     except NotFoundError:
@@ -406,31 +451,49 @@ def lambda_handler(
         
         response = perform_vector_search(asset_id, query_params)
         
-        # Log successful response
-        logger.info("Successfully got response from perform_vector_search", extra={
-            "response_status_code": response["statusCode"]
+        # Log the complete response structure
+        logger.info("Complete response structure", extra={
+            "response_keys": list(response.keys()),
+            "body_type": type(response.get("body")).__name__,
+            "headers": response.get("headers", {}),
+            "status_code": response.get("statusCode")
         })
-        
+
+        # Verify response structure before returning
+        if not isinstance(response.get("body"), str):
+            logger.error("Response body is not a string", extra={
+                "body_type": type(response.get("body")).__name__
+            })
+            raise APIError("Invalid response format", 500)
+
         return response
 
     except APIError as e:
         logger.warning(f"API Error: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsClientErrors", value=1, unit="Count")
         error_response = build_error_response(e, e.status_code, context)
-        # Log error response without trying to parse the JSON body
-        logger.info("Returning error response", extra={
-            "status_code": error_response["statusCode"],
-            "error_message": str(e)  # Use the exception message directly
+        
+        # Log the complete error response structure
+        logger.info("Complete error response structure", extra={
+            "error_response_keys": list(error_response.keys()),
+            "error_body_type": type(error_response.get("body")).__name__,
+            "error_headers": error_response.get("headers", {}),
+            "error_status_code": error_response.get("statusCode")
         })
+        
         return error_response
 
     except Exception as e:
         logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsServerErrors", value=1, unit="Count")
         error_response = build_error_response(e, 500, context)
-        # Log error response without trying to parse the JSON body
-        logger.info("Returning error response", extra={
-            "status_code": error_response["statusCode"],
-            "error_message": str(e)  # Use the exception message directly
+        
+        # Log the complete error response structure
+        logger.info("Complete error response structure", extra={
+            "error_response_keys": list(error_response.keys()),
+            "error_body_type": type(error_response.get("body")).__name__,
+            "error_headers": error_response.get("headers", {}),
+            "error_status_code": error_response.get("statusCode")
         })
+        
         return error_response 

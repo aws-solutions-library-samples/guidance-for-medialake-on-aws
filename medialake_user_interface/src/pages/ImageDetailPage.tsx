@@ -594,11 +594,11 @@ const RelatedItemsTab: React.FC<{
     console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
     
     const items = useMemo(() => {
-        if (!relatedVersionsData?.data?.hits) {
-            console.log('No hits found in relatedVersionsData');
+        if (!relatedVersionsData?.data?.results) {
+            console.log('No results found in relatedVersionsData');
             return [];
         }
-        const mappedItems = relatedVersionsData.data.hits.map((hit) => ({
+        const mappedItems = relatedVersionsData.data.results.map((hit) => ({
             id: hit.InventoryID,
             title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: hit.DigitalSourceAsset.Type.toLowerCase(),
@@ -613,11 +613,12 @@ const RelatedItemsTab: React.FC<{
     }, [relatedVersionsData]);
 
     const hasMore = useMemo(() => {
-        if (!relatedVersionsData?.data) {
-            console.log('No data found for hasMore calculation');
+        if (!relatedVersionsData?.data?.searchMetadata) {
+            console.log('No searchMetadata found for hasMore calculation');
             return false;
         }
-        const hasMoreItems = relatedVersionsData.data.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize;
+        const hasMoreItems = relatedVersionsData.data.searchMetadata.totalResults > 
+            relatedVersionsData.data.searchMetadata.page * relatedVersionsData.data.searchMetadata.pageSize;
         console.log('Has more items:', hasMoreItems);
         return hasMoreItems;
     }, [relatedVersionsData]);
