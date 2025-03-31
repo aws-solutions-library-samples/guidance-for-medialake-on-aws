@@ -30,6 +30,9 @@ import { TruncatedTextWithTooltip } from '../components/common/TruncatedTextWith
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
+import { Chip as MuiChip } from '@mui/material';
+import { RelatedItemsView } from '../components/shared/RelatedItemsView';
+import { RelatedVersionsResponse, AssetResponse } from '../api/types/asset.types';
 
 // MUI Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -41,7 +44,7 @@ import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 
 
 
-import { VideoViewer, VideoViewerRef } from '../components/common/VideoViewer'; // Adjust path
+import { VideoViewer, VideoViewerRef } from '../components/common/VideoViewer';
 
 const outputFilters = {
     'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
@@ -379,78 +382,38 @@ const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFiel
     );
 };
 
-const RelatedItemsTab: React.FC = () => {
-    const theme = useTheme();
-    
-    // This would typically fetch related items from an API
-    // For now, we'll use placeholder data
-    const relatedItems = [
-        { id: '1', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb1.jpg' },
-        { id: '2', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb2.jpg' },
-        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
-    ];
+const RelatedItemsTab: React.FC<{ 
+    assetId: string;
+    relatedVersionsData: RelatedVersionsResponse | undefined;
+    isLoading: boolean;
+    onLoadMore: () => void;
+}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+    const items = useMemo(() => {
+        if (!relatedVersionsData?.data?.hits) return [];
+        return relatedVersionsData.data.hits.map((hit) => ({
+            id: hit.InventoryID,
+            title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: hit.DigitalSourceAsset.Type.toLowerCase(),
+            thumbnail: hit.thumbnailUrl || hit.proxyUrl,
+            score: hit.score,
+            format: hit.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: hit.DigitalSourceAsset.CreateDate
+        }));
+    }, [relatedVersionsData]);
 
-    // Get icon based on item type
-    const getItemIcon = (type: string) => {
-        switch (type) {
-            case 'image':
-                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'video':
-                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'audio':
-                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            default:
-                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-        }
-    };
+    const hasMore = useMemo(() => {
+        if (!relatedVersionsData?.data) return false;
+        return relatedVersionsData.data.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize;
+    }, [relatedVersionsData]);
 
     return (
-        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
-            <Grid container spacing={3}>
-                {relatedItems.map((item) => (
-                    <Grid item xs={12} sm={6} md={4} key={item.id}>
-                        <Card
-                            variant="outlined"
-                            sx={{
-                                height: '100%',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                    transform: 'translateY(-2px)'
-                                },
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                    {getItemIcon(item.type)}
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            ml: 1,
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary
-                                        }}
-                                    >
-                                        {item.title}
-                                    </Typography>
-                                </Box>
-                                <Chip
-                                    size="small"
-                                    label={item.type.toUpperCase()}
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main,
-                                        fontWeight: 500,
-                                        fontSize: '0.75rem'
-                                    }}
-                                />
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-        </Box>
+        <RelatedItemsView
+            items={items}
+            isLoading={isLoading}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
+        />
     );
 };
 
@@ -461,7 +424,7 @@ const VideoDetailContent: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { isExpanded } = useRightSidebar();
-    const { data: assetData, isLoading, error } = useAsset(id || '');
+    const { data: assetData, isLoading, error } = useAsset(id || '') as { data: AssetResponse | undefined; isLoading: boolean; error: any };
     const [activeTab, setActiveTab] = useState<string>('summary');
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
@@ -763,7 +726,14 @@ const VideoDetailContent: React.FC = () => {
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
-                            {activeTab === 'related' && <RelatedItemsTab />}
+                            {activeTab === 'related' && (
+                                <RelatedItemsTab 
+                                    assetId={id || ''} 
+                                    relatedVersionsData={assetData?.data?.asset?.relatedVersionsData} 
+                                    isLoading={isLoading} 
+                                    onLoadMore={() => {}} 
+                                />
+                            )}
                         </Box>
                     </Paper>
                 </Box>

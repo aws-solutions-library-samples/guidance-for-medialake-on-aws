@@ -41,6 +41,8 @@ import MetadataSection from '../components/common/MetadataSection';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
+import { RelatedItemsView } from '../components/shared/RelatedItemsView';
+import { RelatedVersionsResponse as NewRelatedVersionsResponse } from '../api/types/asset.types';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -589,25 +591,14 @@ const RelatedItemsTab: React.FC<{
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
-    const theme = useTheme();
-
-    // Get icon based on item type
-    const getItemIcon = (type: string) => {
-        switch (type) {
-            case 'image':
-                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'video':
-                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'audio':
-                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            default:
-                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-        }
-    };
+    console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
     
-    const relatedItems = useMemo(() => {
-        if (!relatedVersionsData?.data?.hits) return [];
-        return relatedVersionsData.data.hits.map((hit) => ({
+    const items = useMemo(() => {
+        if (!relatedVersionsData?.data?.hits) {
+            console.log('No hits found in relatedVersionsData');
+            return [];
+        }
+        const mappedItems = relatedVersionsData.data.hits.map((hit) => ({
             id: hit.InventoryID,
             title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: hit.DigitalSourceAsset.Type.toLowerCase(),
@@ -617,93 +608,28 @@ const RelatedItemsTab: React.FC<{
             fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
             createDate: hit.DigitalSourceAsset.CreateDate
         }));
+        console.log('Mapped items:', mappedItems);
+        return mappedItems;
     }, [relatedVersionsData]);
 
-    if (isLoading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
+    const hasMore = useMemo(() => {
+        if (!relatedVersionsData?.data) {
+            console.log('No data found for hasMore calculation');
+            return false;
+        }
+        const hasMoreItems = relatedVersionsData.data.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize;
+        console.log('Has more items:', hasMoreItems);
+        return hasMoreItems;
+    }, [relatedVersionsData]);
 
+    console.log('Rendering RelatedItemsView with items:', items);
     return (
-        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
-            <Grid container spacing={3}>
-                {relatedItems.map((item) => (
-                    <Grid item xs={12} sm={6} md={4} key={item.id}>
-                        <Card
-                            variant="outlined"
-                            sx={{
-                                height: '100%',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                    transform: 'translateY(-2px)'
-                                },
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                    {getItemIcon(item.type)}
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            ml: 1,
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary
-                                        }}
-                                    >
-                                        {item.title}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                                    <Chip
-                                        size="small"
-                                        label={item.type.toUpperCase()}
-                                        sx={{
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                            color: theme.palette.primary.main,
-                                            fontWeight: 500,
-                                            fontSize: '0.75rem'
-                                        }}
-                                    />
-                                    <Chip
-                                        size="small"
-                                        label={`Similarity: ${(item.score * 100).toFixed(1)}%`}
-                                        sx={{
-                                            backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                            color: theme.palette.secondary.main,
-                                            fontWeight: 500,
-                                            fontSize: '0.75rem'
-                                        }}
-                                    />
-                                </Box>
-                                <Typography variant="body2" color="text.secondary">
-                                    {formatFileSize(item.fileSize)} • {item.format}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Created: {formatLocalDateTime(item.createDate)}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-            
-            {relatedVersionsData?.data?.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                    <Button
-                        variant="outlined"
-                        onClick={onLoadMore}
-                        startIcon={<ExpandMoreIcon />}
-                    >
-                        Load More
-                    </Button>
-                </Box>
-            )}
-        </Box>
+        <RelatedItemsView
+            items={items}
+            isLoading={isLoading}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
+        />
     );
 };
 
@@ -988,6 +914,34 @@ const ImageDetailContent: React.FC = () => {
         setNewComment('');
     }, []);
 
+    console.log('ImageDetailContent - activeTab:', activeTab);
+    console.log('ImageDetailContent - relatedVersionsData:', relatedVersionsData);
+    console.log('ImageDetailContent - isLoadingRelated:', isLoadingRelated);
+
+    const renderTabContent = () => {
+        console.log('renderTabContent - activeTab:', activeTab);
+        switch (activeTab) {
+            case 'summary':
+                return <SummaryTab assetData={assetData} />;
+            case 'technical':
+                return <TechnicalMetadataTab metadataAccordions={metadataAccordions} />;
+            case 'descriptor':
+                return <DescriptorMetadataTab assetData={assetData} />;
+            case 'related':
+                console.log('Rendering RelatedItemsTab');
+                return (
+                    <RelatedItemsTab 
+                        assetId={assetData.data.asset.DigitalSourceAsset.ID}
+                        relatedVersionsData={relatedVersionsData}
+                        isLoading={isLoadingRelated}
+                        onLoadMore={() => setRelatedPage(prev => prev + 1)}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
     if (isLoadingAsset) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -1178,17 +1132,7 @@ const ImageDetailContent: React.FC = () => {
                                 aria-labelledby={`tab-${activeTab}`}
                                 tabIndex={0}
                             >
-                                {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
-                                {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
-                                {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
-                                {activeTab === 'related' && (
-                                    <RelatedItemsTab 
-                                        assetId={assetData.data.asset.DigitalSourceAsset.ID}
-                                        relatedVersionsData={relatedVersionsData}
-                                        isLoading={isLoadingRelated}
-                                        onLoadMore={() => setRelatedPage(prev => prev + 1)}
-                                    />
-                                )}
+                                {renderTabContent()}
                             </Box>
                         </Paper>
                     </Box>

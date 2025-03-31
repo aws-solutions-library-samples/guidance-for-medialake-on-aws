@@ -249,9 +249,12 @@ export const useRenameAsset = () => {
 };
 
 export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 50) => {
+    console.log('useRelatedVersions - Called with assetId:', assetId, 'page:', page);
+    
     return useQuery<RelatedVersionsResponse, Error>({
         queryKey: ['relatedVersions', assetId, page, pageSize],
         queryFn: async (): Promise<RelatedVersionsResponse> => {
+            console.log('useRelatedVersions - Fetching data for assetId:', assetId);
             const response = await apiClient.get<RelatedVersionsResponse>(`/assets/${assetId}/relatedversions`, {
                 params: {
                     page,
@@ -259,6 +262,7 @@ export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: 
                     min_score: 0.01
                 }
             });
+            console.log('useRelatedVersions - Received response:', response.data);
             return response.data;
         },
         enabled: !!assetId,

@@ -177,17 +177,21 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
     index_name = os.environ["OPENSEARCH_INDEX"]
 
     try:
-        logger.info(f"Starting vector search for asset_id: {asset_id}", extra={
-            "asset_id": asset_id,
+        # Extract the UUID portion from the asset ID
+        uuid = asset_id.split(":")[-1]  # Gets the last part after the last colon
+        
+        logger.info(f"Starting vector search", extra={
+            "full_asset_id": asset_id,
+            "uuid": uuid,
             "index_name": index_name,
             "params": params.dict()
         })
 
-        # First, get the asset's embedding using DigitalSourceAsset.ID.keyword
+        # Search for the UUID portion in DigitalSourceAsset.ID using match query
         initial_query = {
             "query": {
-                "term": {
-                    "DigitalSourceAsset.ID.keyword": asset_id
+                "match": {
+                    "DigitalSourceAsset.ID": uuid
                 }
             },
             "_source": ["embedding"]
@@ -198,7 +202,7 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "query_type": "initial_lookup",
             "full_query": json.dumps(initial_query, indent=2),
             "index": index_name,
-            "asset_id": asset_id
+            "uuid": uuid
         })
 
         asset_response = client.search(
@@ -255,7 +259,8 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "post_filter": {
                 "bool": {
                     "must_not": [
-                        {"term": {"DigitalSourceAsset.ID.keyword": asset_id}}
+                        {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
+                        {"term": {"embedding_scope": "clip"}}
                     ]
                 }
             },
@@ -412,9 +417,10 @@ def lambda_handler(
         logger.warning(f"API Error: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsClientErrors", value=1, unit="Count")
         error_response = build_error_response(e, e.status_code, context)
+        # Log error response without trying to parse the JSON body
         logger.info("Returning error response", extra={
             "status_code": error_response["statusCode"],
-            "message": error_response["body"]["message"]
+            "error_message": str(e)  # Use the exception message directly
         })
         return error_response
 
@@ -422,8 +428,9 @@ def lambda_handler(
         logger.error(f"Unexpected error in lambda_handler: {str(e)}", exc_info=True)
         metrics.add_metric(name="RelatedVersionsServerErrors", value=1, unit="Count")
         error_response = build_error_response(e, 500, context)
+        # Log error response without trying to parse the JSON body
         logger.info("Returning error response", extra={
             "status_code": error_response["statusCode"],
-            "message": error_response["body"]["message"]
+            "error_message": str(e)  # Use the exception message directly
         })
         return error_response 
