@@ -260,23 +260,43 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 }} />
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Title:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{filename}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileType}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>Image</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{formatFileSize(fileSize)}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
+                    </Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileFormat}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {`s3://${assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket}/${assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath}` || 'Unknown'}
+                    </Typography>
                 </Box>
             </Box>
             

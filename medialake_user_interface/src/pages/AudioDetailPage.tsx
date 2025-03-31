@@ -34,6 +34,7 @@ import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
 import { AssetResponse } from '../api/types/asset.types';
 import type { RelatedVersionsResponse } from '../api/hooks/useAssets';
+import { formatFileSize } from '../utils/imageUtils';
 
 // MUI Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -129,86 +130,155 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
 };
 
 // Tab content components
-const SummaryTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
+const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
     const theme = useTheme();
+    const fileInfoColor = '#4299E1';      // Blue
+    const techDetailsColor = '#68D391';   // Green/teal
+    const descKeywordsColor = '#F6AD55';  // Orange
     
-    // Create summary data from metadata fields
-    const summaryData = [
-        {
-            label: 'Title',
-            value: metadataFields.summary.find((item: any) => item.label === 'Title')?.value || 'Unknown',
-            icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Type',
-            value: metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Audio',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Duration',
-            value: metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Format',
-            value: metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown',
-            icon: <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'File Size',
-            value: metadataFields.technical.find((item: any) => item.label === 'File Size')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Date Created',
-            value: metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        }
-    ];
+    const s3Bucket = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
+    const objectName = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
+    const fullPath = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
+    const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : 'Unknown';
 
     return (
-        <Grid container spacing={3}>
-            {summaryData.map((field, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Card
-                        variant="outlined"
-                        sx={{
-                            height: '100%',
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                transform: 'translateY(-2px)'
-                            }
-                        }}
-                    >
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                {field.icon}
-                                <Typography
-                                    variant="subtitle2"
-                                    sx={{
-                                        ml: 1,
-                                        fontWeight: 600,
-                                        color: theme.palette.text.secondary
-                                    }}
-                                >
-                                    {field.label}
-                                </Typography>
-                            </Box>
-                            <Typography
-                                variant="body1"
+        <Box>
+            {/* File Information Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: fileInfoColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    File Information
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: fileInfoColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Audio'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
+                    </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown'}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Bucket || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {objectName || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Uri}
+                    </Typography>
+                </Box>
+            </Box>
+            
+            {/* Technical Details Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: techDetailsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Technical Details
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: techDetailsColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Duration:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown'}
+                    </Typography>
+                </Box>
+            </Box>
+            
+            {/* Description & Keywords Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: descKeywordsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Description & Keywords
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: descKeywordsColor,
+                    mb: 2
+                }} />
+                
+                <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
+                    {metadataFields.descriptive.find((item: any) => item.label === 'Description')?.value || 'No description available'}
+                </Typography>
+                
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: 0.75
+                }}>
+                    {(metadataFields.descriptive.find((item: any) => item.label === 'Keywords')?.value || 'audio,sound')
+                        .split(',')
+                        .map((keyword: string, index: number) => (
+                            <Chip
+                                key={index}
+                                label={keyword.trim()}
+                                size="small"
                                 sx={{
-                                    fontWeight: 500,
-                                    wordBreak: 'break-word'
+                                    bgcolor: '#1E2732',
+                                    color: '#fff',
+                                    borderRadius: '16px',
+                                    fontSize: '0.75rem'
                                 }}
-                            >
-                                {field.value}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            ))}
-        </Grid>
+                            />
+                        ))}
+                </Box>
+            </Box>
+        </Box>
     );
 };
 
@@ -733,7 +803,7 @@ const AudioDetailContent: React.FC = () => {
                             aria-labelledby={`tab-${activeTab}`}
                             tabIndex={0}
                         >
-                            {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} />}
+                            {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
                             {activeTab === 'related' && (
