@@ -3,6 +3,7 @@ export * from './PipelineToolbar';
 export * from './PipelineDeleteDialog';
 export * from './PipelineColumnMenu';
 export * from './PipelineFilterPopover';
+export * from './TriggerTypeChips';
 export { default as CustomNode } from './PipelineEditor/CustomNode';
 export { default as CustomEdge } from './PipelineEditor/CustomEdge';
 export { default as Sidebar } from './PipelineEditor/Sidebar';

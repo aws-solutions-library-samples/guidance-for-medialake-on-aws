@@ -30,6 +30,7 @@ import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
 import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
 import { IconSwitch } from '@/components/common';
+import { TriggerTypeChips } from './TriggerTypeChips';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
 
@@ -71,15 +72,28 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         }),
         columnHelper.accessor('type', {
             header: 'Type',
-            cell: info => (
-                <TableCellContent variant="secondary">
-                    <Chip
-                        label={info.getValue()}
-                        size="small"
-                        color={info.getValue() === 'Ingest Triggered' ? 'primary' : 'default'}
-                    />
-                </TableCellContent>
-            ),
+            cell: info => {
+                // Get the pipeline object
+                const pipeline = info.row.original;
+                
+                // Parse the comma-separated list into an array
+                const triggerTypes = info.getValue().split(',');
+                
+                // For now, if the type is "Ingest Triggered", replace it with "Event Triggered"
+                const displayTypes = triggerTypes.map(type =>
+                    type === 'Ingest Triggered' ? 'Event Triggered' : type
+                );
+                
+                return (
+                    <TableCellContent variant="secondary">
+                        <TriggerTypeChips
+                            triggerTypes={displayTypes}
+                            eventRuleInfo={pipeline.eventRuleInfo}
+                            pipeline={pipeline}
+                        />
+                    </TableCellContent>
+                );
+            },
             enableSorting: true,
             size: 150
         }),

@@ -1,3 +1,17 @@
+export interface EventRule {
+    ruleName?: string;
+    eventBusName?: string;
+    ruleArn?: string;
+    description?: string;
+    fileTypes?: string[];
+    eventType?: string;
+}
+
+export interface EventRuleInfo {
+    triggerTypes: string[];
+    eventRules: EventRule[];
+}
+
 export interface Pipeline {
     id: string;
     name: string;
@@ -16,6 +30,7 @@ export interface Pipeline {
     deploymentStatus?: 'CREATING' | 'DEPLOYED' | 'FAILED' | string;
     executionArn?: string;
     active?: boolean; // New field to track if the pipeline is active
+    eventRuleInfo?: EventRuleInfo; // New field to store event rule information
     definition: {
         nodes: PipelineNode[];
         edges: PipelineEdge[];

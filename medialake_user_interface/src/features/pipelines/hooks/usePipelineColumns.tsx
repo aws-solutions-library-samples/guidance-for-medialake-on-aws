@@ -13,6 +13,7 @@ import {
 import { TableCellContent } from '@/components/common/table';
 import { format } from 'date-fns';
 import { Pipeline } from '../types/pipelines.types';
+import { TriggerTypeChips } from '../components';
 
 interface UsePipelineColumnsProps {
     onEdit: (id: string) => void;
@@ -47,15 +48,28 @@ export const usePipelineColumns = ({
                 header: 'Type',
                 size: 150,
                 enableSorting: true,
-                cell: info => (
-                    <TableCellContent variant="secondary">
-                        <Chip
-                            label={info.getValue()}
-                            size="small"
-                            color={info.getValue() === 'Ingest Triggered' ? 'primary' : 'default'}
-                        />
-                    </TableCellContent>
-                ),
+                cell: info => {
+                    // Get the pipeline object
+                    const pipeline = info.row.original;
+                    
+                    // Parse the comma-separated list into an array
+                    const triggerTypes = info.getValue().split(',');
+                    
+                    // For now, if the type is "Ingest Triggered", replace it with "Event Triggered"
+                    const displayTypes = triggerTypes.map(type =>
+                        type === 'Ingest Triggered' ? 'Event Triggered' : type
+                    );
+                    
+                    return (
+                        <TableCellContent variant="secondary">
+                            <TriggerTypeChips
+                                triggerTypes={displayTypes}
+                                eventRuleInfo={pipeline.eventRuleInfo}
+                                pipeline={pipeline}
+                            />
+                        </TableCellContent>
+                    );
+                },
             }),
             columnHelper.accessor('system', {
                 header: 'System',
