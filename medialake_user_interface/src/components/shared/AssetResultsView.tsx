@@ -173,7 +173,7 @@ function AssetResultsView<T>({
   }
 
   return (
-    <Box sx={{ mt: -2 }}>
+    <Box sx={{ mt: 1 }}>  {/* Changed from -2 to 1 to move the view controller down */}
       {isLoading && (
         <LinearProgress
           sx={{

@@ -27,6 +27,7 @@ import {
     ChevronRight,
 } from '@mui/icons-material';
 import { S3Explorer } from '../features/home/S3Explorer';
+import AssetExplorer from '../features/assets/AssetExplorer';
 import { useGetConnectors } from '../api/hooks/useConnectors';
 
 const DRAWER_WIDTH = 280;
@@ -41,6 +42,11 @@ const AssetsPage: React.FC = () => {
     const { data: connectorsResponse, isLoading } = useGetConnectors();
 
     const connectors = connectorsResponse?.data.connectors || [];
+    
+    // For debugging
+    console.log('AssetsPage connectors:', connectors);
+    console.log('Selected connector:', selectedConnector);
+    console.log('Selected bucket:', selectedConnector ? connectors.find(c => c.id === selectedConnector)?.storageIdentifier : null);
     
     // Filter connectors based on search text
     const filteredConnectors = connectors.filter(connector => 
@@ -243,14 +249,52 @@ const AssetsPage: React.FC = () => {
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{ minWidth: 36 }}>
-                                                        <StorageIcon 
-                                                            fontSize="small" 
-                                                            sx={{
-                                                                color: selectedConnector === connector.id
-                                                                    ? theme.palette.primary.main
-                                                                    : theme.palette.text.secondary
-                                                            }} 
-                                                        />
+                                                        {selectedConnector === connector.id ? (
+                                                            <Box 
+                                                                sx={{ 
+                                                                    width: 24, 
+                                                                    height: 24, 
+                                                                    borderRadius: '50%', 
+                                                                    bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center'
+                                                                }}
+                                                            >
+                                                                <Box 
+                                                                    component="span" 
+                                                                    sx={{ 
+                                                                        width: 16, 
+                                                                        height: 16, 
+                                                                        borderRadius: '50%', 
+                                                                        bgcolor: theme.palette.primary.main,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center'
+                                                                    }}
+                                                                >
+                                                                    <Box 
+                                                                        component="span" 
+                                                                        sx={{ 
+                                                                            color: 'white', 
+                                                                            fontSize: 14, 
+                                                                            fontWeight: 'bold',
+                                                                            lineHeight: 1,
+                                                                            mt: '-2px' // Fine-tune vertical alignment
+                                                                        }}
+                                                                    >
+                                                                        ✓
+                                                                    </Box>
+                                                                </Box>
+                                                            </Box>
+                                                        ) : (
+                                                            <StorageIcon 
+                                                                fontSize="small" 
+                                                                sx={{
+                                                                    color: theme.palette.text.secondary
+                                                                }} 
+                                                            />
+                                                        )}
                                                     </ListItemIcon>
                                                     <ListItemText 
                                                         primary={connector.name} 
@@ -284,25 +328,18 @@ const AssetsPage: React.FC = () => {
                     backgroundColor: alpha(theme.palette.background.default, 0.5),
                 }}>
                     {selectedConnector ? (
-                        <>
-                            <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-                                <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                                    {connectors.find(c => c.id === selectedConnector)?.name || ''}
-                                </Typography>
-                                <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
-                                    {connectors.find(c => c.id === selectedConnector)?.type.toUpperCase() || ''}
-                                </Typography>
-                            </Box>
-                            <Paper elevation={0} sx={{
-                                height: 'calc(100% - 60px)',
-                                borderRadius: '12px',
-                                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                                backgroundColor: theme.palette.background.paper,
-                                overflow: 'hidden',
-                            }}>
-                                <S3Explorer connectorId={selectedConnector} />
-                            </Paper>
-                        </>
+                        <Paper elevation={0} sx={{
+                            height: '100%',
+                            borderRadius: '12px',
+                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                            backgroundColor: theme.palette.background.paper,
+                            overflow: 'hidden',
+                        }}>
+                            <AssetExplorer 
+                                connectorId={selectedConnector} 
+                                bucketName={connectors.find(c => c.id === selectedConnector)?.storageIdentifier}
+                            />
+                        </Paper>
                     ) : (
                         <Box sx={{ 
                             display: 'flex', 
