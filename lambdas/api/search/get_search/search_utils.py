@@ -17,7 +17,8 @@ KEYWORDS = {
     'format': r'format:(\w+)',
     'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
     'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
-    'metadata': r'metadata:(\w+:\w+)'
+    'metadata': r'metadata:(\w+:\w+)',
+	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
 }
 
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:

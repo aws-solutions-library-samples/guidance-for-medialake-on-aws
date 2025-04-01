@@ -335,6 +335,22 @@ def build_search_query(params: SearchParams) -> Dict:
             query["bool"]["filter"].append({
                 "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
             })
+            
+        # connector filter
+        if 'storageIdentifier' in parsed_filters:
+            path_value = parsed_filters['storageIdentifier']
+            # Add wildcard if not already present
+            if isinstance(path_value, str) and not path_value.endswith('*'):
+                path_value = f"{path_value}*"
+                
+            logger.info(f"Applying Connector Bucket filter: {path_value}")
+            query["bool"]["filter"].append({
+                "wildcard": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket.keyword": {
+                        "value": path_value[0]
+                    }
+                }
+            })
 
         # Size filter
         if 'size' in parsed_filters:

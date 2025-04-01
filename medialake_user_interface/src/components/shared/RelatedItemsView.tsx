@@ -2,10 +2,7 @@ import React from 'react';
 import {
     Box,
     Grid,
-    Card,
-    CardContent,
     Typography,
-    Chip,
     CircularProgress,
     Button,
     useTheme,
@@ -14,11 +11,19 @@ import {
 import { formatFileSize } from '../../utils/imageUtils';
 import { formatLocalDateTime } from '../../shared/utils/dateUtils';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
-import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
-import { RelatedItem } from '../../api/types/asset.types';
+import AssetCard from './AssetCard';
+
+export interface RelatedItem {
+    id: string;
+    title: string;
+    type: string;
+    thumbnail?: string;
+    proxyUrl?: string;
+    score: number;
+    format: string;
+    fileSize: number;
+    createDate: string;
+}
 
 export interface RelatedItemsViewProps {
     items: RelatedItem[];
@@ -41,16 +46,28 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
     console.log('RelatedItemsView - Received items:', items);
     console.log('RelatedItemsView - isLoading:', isLoading);
 
-    const getItemIcon = (type: string) => {
-        switch (type.toLowerCase()) {
-            case 'image':
-                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'video':
-                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'audio':
-                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+    const defaultFields = [
+        { id: 'name', label: 'Name', visible: true },
+        { id: 'type', label: 'Type', visible: true },
+        { id: 'format', label: 'Format', visible: true },
+        { id: 'size', label: 'Size', visible: true },
+        { id: 'createdAt', label: 'Created', visible: true }
+    ];
+
+    const renderField = (fieldId: string, item: RelatedItem) => {
+        switch (fieldId) {
+            case 'name':
+                return item.title;
+            case 'type':
+                return item.type.toUpperCase();
+            case 'format':
+                return item.format;
+            case 'size':
+                return formatFileSize(item.fileSize);
+            case 'createdAt':
+                return formatLocalDateTime(item.createDate);
             default:
-                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+                return '';
         }
     };
 
@@ -78,63 +95,22 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
             <Grid container spacing={3}>
                 {items.map((item) => (
                     <Grid item xs={12} sm={6} md={4} key={item.id}>
-                        <Card
-                            variant="outlined"
-                            onClick={() => onItemClick?.(item)}
-                            sx={{
-                                height: '100%',
-                                transition: 'all 0.2s ease-in-out',
-                                cursor: 'pointer',
-                                '&:hover': {
-                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                    transform: 'translateY(-2px)'
-                                }
-                            }}
-                        >
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                    {getItemIcon(item.type)}
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            ml: 1,
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary
-                                        }}
-                                    >
-                                        {item.title}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                                    <Chip
-                                        size="small"
-                                        label={item.type.toUpperCase()}
-                                        sx={{
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                            color: theme.palette.primary.main,
-                                            fontWeight: 500,
-                                            fontSize: '0.75rem'
-                                        }}
-                                    />
-                                    <Chip
-                                        size="small"
-                                        label={`Similarity: ${(item.score * 100).toFixed(1)}%`}
-                                        sx={{
-                                            backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                            color: theme.palette.secondary.main,
-                                            fontWeight: 500,
-                                            fontSize: '0.75rem'
-                                        }}
-                                    />
-                                </Box>
-                                <Typography variant="body2" color="text.secondary">
-                                    {formatFileSize(item.fileSize)} • {item.format}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Created: {formatLocalDateTime(item.createDate)}
-                                </Typography>
-                            </CardContent>
-                        </Card>
+                        <AssetCard
+                            id={item.id}
+                            name={item.title}
+                            thumbnailUrl={item.thumbnail}
+                            proxyUrl={item.proxyUrl}
+                            assetType={item.type}
+                            fields={defaultFields}
+                            renderField={(fieldId) => renderField(fieldId, item)}
+                            onAssetClick={() => onItemClick?.(item)}
+                            onDeleteClick={() => {}} // Not needed for related items
+                            onMenuClick={() => {}} // Not needed for related items
+                            cardSize="medium"
+                            aspectRatio="square"
+                            thumbnailScale="fill"
+                            showMetadata={true}
+                        />
                     </Grid>
                 ))}
             </Grid>
@@ -144,10 +120,10 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                     <Button
                         variant="outlined"
                         onClick={onLoadMore}
-                        startIcon={<ExpandMoreIcon />}
                         disabled={isLoading}
+                        startIcon={isLoading ? <CircularProgress size={20} /> : <ExpandMoreIcon />}
                     >
-                        {isLoading ? 'Loading...' : 'Load More'}
+                        Load More
                     </Button>
                 </Box>
             )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback,useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -18,7 +18,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import { useAsset } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import AssetSidebar from '../components/asset/AssetSidebar';
@@ -32,7 +32,8 @@ import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
-import { RelatedVersionsResponse, AssetResponse } from '../api/types/asset.types';
+import { AssetResponse } from '../api/types/asset.types';
+import { formatFileSize } from '../utils/imageUtils';
 
 // MUI Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -132,86 +133,155 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
 };
 
 // Tab content components
-const SummaryTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
+const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
     const theme = useTheme();
+    const fileInfoColor = '#4299E1';      // Blue
+    const techDetailsColor = '#68D391';   // Green/teal
+    const descKeywordsColor = '#F6AD55';  // Orange
     
-    // Create summary data from metadata fields
-    const summaryData = [
-        {
-            label: 'Title',
-            value: metadataFields.summary.find((item: any) => item.label === 'Title')?.value || 'Unknown',
-            icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Type',
-            value: metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Video',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Duration',
-            value: metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Format',
-            value: metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown',
-            icon: <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'File Size',
-            value: metadataFields.technical.find((item: any) => item.label === 'File Size')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        },
-        {
-            label: 'Date Created',
-            value: metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-        }
-    ];
+    const s3Bucket = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
+    const objectName = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
+    const fullPath = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
+    const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : 'Unknown';
 
     return (
-        <Grid container spacing={3}>
-            {summaryData.map((field, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Card
-                        variant="outlined"
-                        sx={{
-                            height: '100%',
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                transform: 'translateY(-2px)'
-                            }
-                        }}
-                    >
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                {field.icon}
-                                <Typography
-                                    variant="subtitle2"
-                                    sx={{
-                                        ml: 1,
-                                        fontWeight: 600,
-                                        color: theme.palette.text.secondary
-                                    }}
-                                >
-                                    {field.label}
-                                </Typography>
-                            </Box>
-                            <Typography
-                                variant="body1"
+        <Box>
+            {/* File Information Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: fileInfoColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    File Information
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: fileInfoColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Video'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
+                    </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown'}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Bucket || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {objectName || 'Unknown'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Uri}
+                    </Typography>
+                </Box>
+            </Box>
+            
+            {/* Technical Details Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: techDetailsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Technical Details
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: techDetailsColor,
+                    mb: 2
+                }} />
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Duration:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown'}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown'}
+                    </Typography>
+                </Box>
+            </Box>
+            
+            {/* Description & Keywords Section */}
+            <Box sx={{ mb: 3 }}>
+                <Typography 
+                    sx={{ 
+                        color: descKeywordsColor,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        mb: 0.5
+                    }}
+                >
+                    Description & Keywords
+                </Typography>
+                <Box sx={{ 
+                    width: '100%', 
+                    height: '1px', 
+                    bgcolor: descKeywordsColor,
+                    mb: 2
+                }} />
+                
+                <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
+                    {metadataFields.descriptive.find((item: any) => item.label === 'Description')?.value || 'No description available'}
+                </Typography>
+                
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: 0.75
+                }}>
+                    {(metadataFields.descriptive.find((item: any) => item.label === 'Keywords')?.value || 'video,footage')
+                        .split(',')
+                        .map((keyword: string, index: number) => (
+                            <Chip
+                                key={index}
+                                label={keyword.trim()}
+                                size="small"
                                 sx={{
-                                    fontWeight: 500,
-                                    wordBreak: 'break-word'
+                                    bgcolor: '#1E2732',
+                                    color: '#fff',
+                                    borderRadius: '16px',
+                                    fontSize: '0.75rem'
                                 }}
-                            >
-                                {field.value}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            ))}
-        </Grid>
+                            />
+                        ))}
+                </Box>
+            </Box>
+        </Box>
     );
 };
 
@@ -220,26 +290,13 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     
     return (
         <Box sx={{
-            maxHeight: '600px',
-            overflowY: 'auto',
             borderRadius: 1,
-            '&::-webkit-scrollbar': {
-                width: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-            },
-            '&::-webkit-scrollbar-thumb': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                borderRadius: '4px',
-                '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-                }
-            }
+            width: '100%'
         }}>
             <SimpleTreeView
                 sx={{
                     flexGrow: 1,
+                    width: '100%',
                     '& .MuiTreeItem-root': {
                         padding: '4px 0',
                     },
@@ -388,25 +445,42 @@ const RelatedItemsTab: React.FC<{
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+    console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
+    
     const items = useMemo(() => {
-        if (!relatedVersionsData?.data?.hits) return [];
-        return relatedVersionsData.data.hits.map((hit) => ({
-            id: hit.InventoryID,
-            title: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: hit.DigitalSourceAsset.Type.toLowerCase(),
-            thumbnail: hit.thumbnailUrl || hit.proxyUrl,
-            score: hit.score,
-            format: hit.DigitalSourceAsset.MainRepresentation.Format,
-            fileSize: hit.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-            createDate: hit.DigitalSourceAsset.CreateDate
+        if (!relatedVersionsData?.data?.results) {
+            console.log('No results found in relatedVersionsData');
+            return [];
+        }
+
+        const mappedItems = relatedVersionsData.data.results.map((result) => ({
+            id: result.InventoryID,
+            title: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: result.DigitalSourceAsset.Type,
+            thumbnail: result.thumbnailUrl,
+            proxyUrl: result.proxyUrl,
+            score: result.score,
+            format: result.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: result.DigitalSourceAsset.CreateDate
         }));
+        console.log('Mapped items:', mappedItems);
+        return mappedItems;
     }, [relatedVersionsData]);
 
     const hasMore = useMemo(() => {
-        if (!relatedVersionsData?.data) return false;
-        return relatedVersionsData.data.totalResults > relatedVersionsData.data.page * relatedVersionsData.data.pageSize;
+        if (!relatedVersionsData?.data?.searchMetadata) {
+            console.log('No searchMetadata found for hasMore calculation');
+            return false;
+        }
+
+        const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
+        const hasMoreItems = totalResults > page * pageSize;
+        console.log('Has more items:', hasMoreItems);
+        return hasMoreItems;
     }, [relatedVersionsData]);
 
+    console.log('Rendering RelatedItemsView with items:', items);
     return (
         <RelatedItemsView
             items={items}
@@ -426,6 +500,9 @@ const VideoDetailContent: React.FC = () => {
     const { isExpanded } = useRightSidebar();
     const { data: assetData, isLoading, error } = useAsset(id || '') as { data: AssetResponse | undefined; isLoading: boolean; error: any };
     const [activeTab, setActiveTab] = useState<string>('summary');
+    const [relatedPage, setRelatedPage] = useState(1);
+    const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const [showHeader, setShowHeader] = useState(true);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -568,6 +645,38 @@ const VideoDetailContent: React.FC = () => {
         }
     }, [navigate, location.state, searchTerm]);
 
+    // Track scroll position to hide/show header
+    useEffect(() => {
+        let lastScrollTop = 0;
+        
+        const handleScroll = () => {
+            // Get scrollTop from the parent scrollable container instead
+            const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
+            
+            if (currentScrollTop <= 10) {
+                setShowHeader(true);
+            } else if (currentScrollTop > lastScrollTop) {
+                setShowHeader(false);
+            } else if (currentScrollTop < lastScrollTop) {
+                setShowHeader(true);
+            }
+            
+            lastScrollTop = currentScrollTop;
+        };
+        
+        // Listen to scroll on the parent container
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.addEventListener('scroll', handleScroll, { passive: true });
+        }
+        
+        return () => {
+            if (container) {
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -599,19 +708,29 @@ const VideoDetailContent: React.FC = () => {
 
 
     return (
-        <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
-            transition: theme => theme.transitions.create(['max-width'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-            }),
-            height: '100vh',
-            overflow: 'auto',
-            bgcolor: 'transparent',
-        }}>
-            <Box sx={{ position: 'sticky', top: 0, zIndex: 1200, background: 'transparent' }}>
+        <Box 
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                maxWidth: isExpanded ? 'calc(100% - 300px)' : '100%',
+                transition: theme => theme.transitions.create(['max-width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
+                bgcolor: 'transparent',
+            }}
+        >
+            <Box sx={{ 
+                position: 'sticky', 
+                top: 0, 
+                zIndex: 1200, 
+                background: theme => alpha(theme.palette.background.default, 0.8),
+                backdropFilter: 'blur(8px)',
+                transform: showHeader ? 'translateY(0)' : 'translateY(-100%)',
+                transition: 'transform 0.3s ease-in-out',
+                visibility: showHeader ? 'visible' : 'hidden',
+                opacity: showHeader ? 1 : 0,
+            }}>
                 <Box sx={{ py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
                         searchTerm={searchTerm}
@@ -627,11 +746,7 @@ const VideoDetailContent: React.FC = () => {
                 </Box>
             </Box>
 
-            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, mb: 0 }}>
-                <AssetHeader />
-            </Box>
-
-            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ px: 3, pt: 0, pb: 0, mt: 0, height: '75vh', minHeight: '600px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                 <Paper
                     elevation={0}
                     sx={{
@@ -657,7 +772,7 @@ const VideoDetailContent: React.FC = () => {
                         sx={{
                             p: 0,
                             borderRadius: 2,
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             background: 'transparent'
                         }}
                     >
@@ -716,22 +831,24 @@ const VideoDetailContent: React.FC = () => {
                                 pt: 2,
                                 outline: 'none', // Remove outline when focused but keep it accessible
                                 borderRadius: 1,
-                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.5)
+                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.5),
+                                maxHeight: 'none',
+                                overflow: 'visible'
                             }}
                             role="tabpanel"
                             id={`tabpanel-${activeTab}`}
                             aria-labelledby={`tab-${activeTab}`}
                             tabIndex={0} // Make the panel focusable
                         >
-                            {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} />}
+                            {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 
-                                    relatedVersionsData={assetData?.data?.asset?.relatedVersionsData} 
-                                    isLoading={isLoading} 
-                                    onLoadMore={() => {}} 
+                                    relatedVersionsData={relatedVersionsData}
+                                    isLoading={isLoadingRelated}
+                                    onLoadMore={() => setRelatedPage(prev => prev + 1)}
                                 />
                             )}
                         </Box>

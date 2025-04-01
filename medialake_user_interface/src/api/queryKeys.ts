@@ -5,6 +5,8 @@ export const QUERY_KEYS = {
         list: (filters: string) => [...QUERY_KEYS.CONNECTORS.lists(), { filters }] as const,
         details: () => [...QUERY_KEYS.CONNECTORS.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.CONNECTORS.details(), id] as const,
+        assets: (connectorId: string, page: number, pageSize: number, sortBy: string, sortDirection: string, assetType?: string, searchTerm?: string, bucketName?: string) =>
+            [...QUERY_KEYS.CONNECTORS.all, 'assets', connectorId, { page, pageSize, sortBy, sortDirection, assetType, searchTerm, bucketName }] as const,
         s3: {
             all: ['connectors', 's3'] as const,
             buckets: () => [...QUERY_KEYS.CONNECTORS.s3.all, 'buckets'] as const,
@@ -12,6 +14,7 @@ export const QUERY_KEYS = {
                 [...QUERY_KEYS.CONNECTORS.s3.all, 'explorer', connectorId, prefix, continuationToken] as const,
         },
     },
+
     PIPELINES: {
         all: ['pipelines'] as const,
         lists: () => [...QUERY_KEYS.PIPELINES.all, 'list'] as const,

@@ -1,13 +1,16 @@
 export interface RelatedVersionsResponse {
     data: {
-        hits: Array<{
+        searchMetadata: {
+            totalResults: number;
+            page: number;
+            pageSize: number;
+            searchTerm: string;
+        };
+        results: Array<{
             InventoryID: string;
             DigitalSourceAsset: {
-                ID: string;
                 Type: string;
-                CreateDate: string;
                 MainRepresentation: {
-                    ID: string;
                     Format: string;
                     StorageInfo: {
                         PrimaryLocation: {
@@ -21,14 +24,30 @@ export interface RelatedVersionsResponse {
                         };
                     };
                 };
+                CreateDate: string;
             };
+            DerivedRepresentations: Array<{
+                Purpose: string;
+                StorageInfo: {
+                    PrimaryLocation: {
+                        StorageType: string;
+                        Bucket: string;
+                        ObjectKey: {
+                            FullPath: string;
+                        };
+                    };
+                };
+            }>;
+            FileHash: string;
+            Metadata: {
+                Consolidated: {
+                    type: string;
+                };
+            };
+            score: number;
             thumbnailUrl?: string;
             proxyUrl?: string;
-            score: number;
         }>;
-        totalResults: number;
-        page: number;
-        pageSize: number;
     };
 }
 
