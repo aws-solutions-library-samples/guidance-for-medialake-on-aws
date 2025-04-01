@@ -286,12 +286,31 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
     const theme = useTheme();
     
+    // Create array of all item IDs to pre-expand them
+    const [expandedItems] = useState<string[]>(() => {
+        // Initialize with all items expanded
+        const allItems: string[] = [];
+        
+        metadataAccordions.forEach((parent, parentIndex) => {
+            // Add parent item
+            allItems.push(`parent-${parentIndex}`);
+            
+            // Add all child items
+            parent.subCategories.forEach((_, subIndex) => {
+                allItems.push(`${parentIndex}-${subIndex}`);
+            });
+        });
+        
+        return allItems;
+    });
+    
     return (
         <Box sx={{
             borderRadius: 1,
             width: '100%'
         }}>
             <SimpleTreeView
+                defaultExpandedItems={expandedItems}
                 sx={{
                     flexGrow: 1,
                     width: '100%',
