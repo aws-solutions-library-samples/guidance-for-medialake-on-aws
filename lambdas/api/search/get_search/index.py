@@ -8,6 +8,8 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
+import concurrent.futures
+from collections import defaultdict
 
 from opensearchpy import (
     RequestsHttpConnection,
@@ -132,6 +134,7 @@ class AssetSearchResult(BaseModelWithConfig):
     score: float
     thumbnailUrl: Optional[str] = None
     proxyUrl: Optional[str] = None
+    clips: Optional[List[Dict[str, Any]]] = None
 
 
 class SearchMetadata(BaseModelWithConfig):
@@ -208,8 +211,9 @@ def build_semantic_query(params: SearchParams) -> Dict:
             if not all(isinstance(x, (int, float)) for x in embedding):
                 raise SearchException("Invalid embedding format")
                 
+            # Increased size to get more results for grouping
             return {
-                "size": params.pageSize,
+                "size": params.pageSize * 20,  # Further increase size to get more results
                 "query": {
                     "bool": {
                         "must": [
@@ -217,18 +221,12 @@ def build_semantic_query(params: SearchParams) -> Dict:
                                 "knn": {
                                     "embedding": {
                                         "vector": embedding,
-                                        "k": params.pageSize * 3
+                                        "k": params.pageSize * 20  # Further increase k to get more results
                                     }
                                 }
                             }
-                        ],
-                        "must_not": [
-                            {
-                                "term": {
-                                    "embedding_scope": "clip"
-                                }
-                            }
                         ]
+                        # Removed the must_not clause to include clips
                     }
                 },
                 "_source": {
@@ -461,6 +459,161 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     )
 
 
+def process_clip(clip_hit: Dict) -> Dict:
+    """
+    Process a clip hit to preserve all clip-specific fields.
+    
+    Args:
+        clip_hit: The clip hit from OpenSearch
+        
+    Returns:
+        Processed clip with all relevant fields
+    """
+    source = clip_hit["_source"]
+    
+    # Create a base result with standard fields
+    result = {
+        "DigitalSourceAsset": source.get("DigitalSourceAsset", {}),
+        "score": clip_hit["_score"],
+    }
+    
+    # Add all clip-specific fields
+    if "embedding_scope" in source:
+        result["embedding_scope"] = source["embedding_scope"]
+    if "start_timecode" in source:
+        result["start_timecode"] = source["start_timecode"]
+    if "end_timecode" in source:
+        result["end_timecode"] = source["end_timecode"]
+    if "type" in source:
+        result["type"] = source["type"]
+    if "timestamp" in source:
+        result["timestamp"] = source["timestamp"]
+    
+    # Add any other fields that might be present
+    for key, value in source.items():
+        if key not in result and key not in ["DigitalSourceAsset"]:
+            result[key] = value
+    
+    return result
+
+
+def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
+    """
+    Process semantic search results using parallel processing for better performance.
+    Group clips with their parent assets and keep only the top 30 clips per parent.
+    
+    Args:
+        hits: List of search hits from OpenSearch
+        
+    Returns:
+        List of processed results with clips grouped by parent asset
+    """
+    # Separate parent assets and clips
+    parent_assets = {}
+    clips_by_asset = defaultdict(list)
+    standalone_hits = []
+    
+    for hit in hits:
+        source = hit["_source"]
+        if source.get("embedding_scope") == "clip":
+            # This is a clip
+            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
+            if asset_id:
+                clips_by_asset[asset_id].append({
+                    "source": source,
+                    "score": hit["_score"],
+                    "hit": hit
+                })
+        else:
+            # This is a parent asset
+            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
+            if asset_id:
+                parent_assets[asset_id] = {
+                    "source": source,
+                    "score": hit["_score"],
+                    "hit": hit
+                }
+            else:
+                # This is a standalone hit (not a parent or clip)
+                standalone_hits.append(hit)
+    
+    logger.info(f"Found {len(parent_assets)} parent assets, clips for {len(clips_by_asset)} assets, and {len(standalone_hits)} standalone hits")
+    
+    # Process each parent asset and its clips in parallel
+    def process_asset_with_clips(asset_id):
+        # Process parent asset if it exists
+        if asset_id in parent_assets:
+            try:
+                result = process_search_hit(parent_assets[asset_id]["hit"])
+                result_dict = result.model_dump(by_alias=True)
+                result_dict["clips"] = []
+                
+                # Add clips if available
+                if asset_id in clips_by_asset:
+                    # Sort clips by score and take top 30
+                    asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)[:30]
+                    
+                    # Process clips using our custom clip processor to preserve all fields
+                    for clip in asset_clips:
+                        try:
+                            clip_result = process_clip(clip["hit"])
+                            result_dict["clips"].append(clip_result)
+                        except Exception as e:
+                            logger.warning(f"Error processing clip: {str(e)}")
+                
+                return result_dict
+            except Exception as e:
+                logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
+                return None
+        
+        return None
+    
+    # Process standalone hits
+    def process_standalone_hit(hit):
+        try:
+            result = process_search_hit(hit)
+            return result.model_dump(by_alias=True)
+        except Exception as e:
+            logger.warning(f"Error processing standalone hit: {str(e)}")
+            return None
+    
+    # Process all parent assets (not just those with clips)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result_futures = {
+            executor.submit(process_asset_with_clips, asset_id): asset_id
+            for asset_id in parent_assets.keys()
+        }
+        
+        results = []
+        for future in concurrent.futures.as_completed(result_futures):
+            try:
+                result = future.result()
+                if result:
+                    results.append(result)
+            except Exception as e:
+                asset_id = result_futures[future]
+                logger.warning(f"Error processing asset {asset_id}: {str(e)}")
+    
+    # Process standalone hits
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        standalone_futures = [executor.submit(process_standalone_hit, hit) for hit in standalone_hits]
+        
+        for future in concurrent.futures.as_completed(standalone_futures):
+            try:
+                result = future.result()
+                if result:
+                    results.append(result)
+            except Exception as e:
+                logger.warning(f"Error processing standalone hit: {str(e)}")
+    
+    # Sort results by score
+    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    
+    logger.info(f"Total processed results: {len(results)}")
+    
+    return results
+
+
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
     client = get_opensearch_client()
@@ -473,36 +626,77 @@ def perform_search(params: SearchParams) -> Dict:
         response = client.search(body=search_body, index=index_name)
 
         logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
-        logger.info("OpenSearch response:", extra={"response": response})
+        
+        if params.semantic:
+            # Use the parallel processing function for semantic search
+            processed_results = process_semantic_results_parallel(response["hits"]["hits"])
+            
+            # Calculate total results (for pagination)
+            total_results = len(processed_results)
+            
+            # Limit results to pageSize
+            start_idx = (params.page - 1) * params.pageSize
+            end_idx = start_idx + params.pageSize
+            
+            # Make sure we don't go out of bounds
+            if start_idx >= total_results:
+                start_idx = 0
+                end_idx = min(params.pageSize, total_results)
+            
+            paged_results = processed_results[start_idx:end_idx]
+            
+            logger.info(f"Successfully processed semantic search results: {total_results} total, {len(paged_results)} returned")
+            
+            # Use the original total count from OpenSearch for better pagination
+            original_total = response["hits"]["total"]["value"]
+            
+            search_metadata = SearchMetadata(
+                totalResults=max(total_results, original_total),  # Use the larger of the two counts
+                page=params.page,
+                pageSize=params.pageSize,
+                searchTerm=params.q,
+                facets=response.get("aggregations"),
+                suggestions=response.get("suggest"),
+            )
+            
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "searchMetadata": search_metadata.model_dump(by_alias=True),
+                    "results": paged_results,
+                },
+            }
+        else:
+            # Standard processing for non-semantic search
+            hits = []
+            for hit in response["hits"]["hits"]:
+                try:
+                    result = process_search_hit(hit)
+                    hits.append(result)
+                except Exception as e:
+                    logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
+                    continue
 
-        hits = []
-        for hit in response["hits"]["hits"]:
-            try:
-                result = process_search_hit(hit)
-                hits.append(result)
-            except Exception as e:
-                logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
-                continue
+            logger.info(f"Successfully processed hits: {len(hits)}")
 
-        logger.info(f"Successfully processed hits: {len(hits)}")
+            search_metadata = SearchMetadata(
+                totalResults=response["hits"]["total"]["value"],
+                page=params.page,
+                pageSize=params.pageSize,
+                searchTerm=params.q,
+                facets=response.get("aggregations"),
+                suggestions=response.get("suggest"),
+            )
 
-        search_metadata = SearchMetadata(
-            totalResults=response["hits"]["total"]["value"],
-            page=params.page,
-            pageSize=params.pageSize,
-            searchTerm=params.q,
-            facets=response.get("aggregations"),
-            suggestions=response.get("suggest"),
-        )
-
-        return {
-            "status": "200",
-            "message": "ok",
-            "data": {
-                "searchMetadata": search_metadata.model_dump(by_alias=True),
-                "results": [hit.model_dump(by_alias=True) for hit in hits],
-            },
-        }
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "searchMetadata": search_metadata.model_dump(by_alias=True),
+                    "results": [hit.model_dump(by_alias=True) for hit in hits],
+                },
+            }
 
     except (RequestError, NotFoundError) as e:
         logger.warning(f"OpenSearch error: {str(e)}")

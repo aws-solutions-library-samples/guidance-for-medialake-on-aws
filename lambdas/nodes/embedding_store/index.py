@@ -119,7 +119,8 @@ def lambda_handler(event, context):
             "timestamp": datetime.utcnow().isoformat()
         }
 
-        if scope == "clip":
+        if scope == "clip" or scope == "audio":
+            scope = "clip"
             # For clips, store the original asset_id and add timecodes.
             document["DigitalSourceAsset"] = {"ID": asset_id}
             document["start_timecode"] = seconds_to_smpte(item.get("start_offset_sec", None))
