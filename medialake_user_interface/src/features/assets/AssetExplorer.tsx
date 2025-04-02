@@ -6,7 +6,7 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
 import ModularUnifiedResultsView from '@/components/search/ModularUnifiedResultsView';
-import { useConnectorAssets, type AssetItem } from '@/api/hooks/useConnectorAssets';
+import { useConnectorAssets, type AssetItem, type ConnectorAssetsResponse } from '@/api/hooks/useConnectorAssets';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 
@@ -48,7 +48,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     sortBy,
     sortDirection,
     assetType
-  });
+  }) as { data: ConnectorAssetsResponse | undefined; isLoading: boolean; error: any };
 
   // Asset operations
   const {
@@ -221,7 +221,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   }
 
   // Don't show content while loading initial data
-  if (isLoading && !searchResponse?.data?.results) {
+  if (isLoading && (!searchResponse || searchResponse?.data === null || searchResponse?.data === undefined || !searchResponse?.data?.results)) {
     return (
       <Box sx={{ 
         height: '100%', 
@@ -254,7 +254,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       )}
 
       {/* Only show the results view when we have data or after initial loading */}
-      {(!isLoading || searchResponse?.data?.results) && (
+      {(!isLoading || (searchResponse && searchResponse?.data !== null && searchResponse?.data !== undefined && searchResponse?.data?.results)) && (
         <Box sx={{ 
           '& h1': { 
             display: 'none !important' 
@@ -309,7 +309,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       )}
       
       {/* Show loading indicator during initial load */}
-      {isLoading && !searchResponse?.data?.results && (
+      {isLoading && (!searchResponse || searchResponse?.data === null || searchResponse?.data === undefined || !searchResponse?.data?.results) && (
         <Box sx={{ 
           height: '100%', 
           display: 'flex',
