@@ -90,6 +90,6 @@ export const SCRUBBER_LANE_STYLE_DARK: Partial<ScrubberLaneStyle> = {
 
 export const PERIOD_MARKER_STYLE: Partial<PeriodMarkerStyle> = {
   color: randomHexColor(),
-  symbolSize: 15,
+  symbolSize: 30,
   symbolType: 'circle'
 };
