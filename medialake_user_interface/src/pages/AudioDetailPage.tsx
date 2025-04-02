@@ -130,6 +130,196 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
     }
 };
 
+// New component for audio metadata content with a grid layout like the screenshot
+const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const theme = useTheme();
+    
+    const sortEntries = (entries: [string, any][]): [string, any][] => {
+        if (category && outputFilters[category]) {
+            const preferredOrder = outputFilters[category];
+            return [
+                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
+                ...entries.filter(([key]) => !preferredOrder.includes(key))
+            ];
+        }
+        return entries;
+    };
+
+    // Function to flatten nested objects like Tags/Encoder
+    const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
+        const result: [string, any][] = [];
+        
+        entries.forEach(([key, value]) => {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
+                // Special case for Tags with Encoder
+                if (key === 'Tags' && 'Encoder' in value) {
+                    // Mark this as a parent with _PARENT_ prefix (for internal use)
+                    result.push([`_PARENT_${key}`, '']);
+                    
+                    // Then add the Encoder with its value - using a more visible indent prefix
+                    Object.entries(value).forEach(([subKey, subValue]) => {
+                        result.push([`      ↳ ${subKey}`, subValue]);
+                    });
+                } else {
+                    // Mark this as a parent with _PARENT_ prefix (for internal use)
+                    result.push([`_PARENT_${key}`, '']);
+                    
+                    // Then add the subkeys with more pronounced indentation
+                    Object.entries(value).forEach(([subKey, subValue]) => {
+                        result.push([`      ↳ ${subKey}`, subValue]);
+                    });
+                }
+            } else {
+                result.push([key, value]);
+            }
+        });
+        
+        return result;
+    };
+
+    // Function to identify parent-child relationships in entries
+    const isParentEntry = (key: string): boolean => {
+        return key.startsWith('_PARENT_');
+    };
+
+    const isChildEntry = (key: string): boolean => {
+        return key.includes('↳');
+    };
+
+    // Function to clean display keys (remove internal markings)
+    const cleanDisplayKey = (key: string): string => {
+        if (key.startsWith('_PARENT_')) {
+            return key.substring(8); // Remove the _PARENT_ prefix
+        }
+        return key;
+    };
+
+    if (Array.isArray(data)) {
+        const displayData = showAll ? data : data.slice(0, 5);
+        return (
+            <List dense disablePadding>
+                {displayData.map((item, index) => (
+                    <ListItem key={index} sx={{ pl: depth * 2 }}>
+                        <AudioMetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else if (typeof data === 'object' && data !== null) {
+        let entries = Object.entries(data);
+        const sortedEntries = sortEntries(entries);
+        // Flatten nested metadata like Tags/Encoder
+        const flattenedEntries = flattenNestedMetadata(sortedEntries);
+        const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
+        
+        // Create rows efficiently while preserving parent-child relationships
+        const rows: [string, any][][] = [];
+        
+        let currentIndex = 0;
+        while (currentIndex < displayEntries.length) {
+            const row: [string, any][] = [];
+            
+            // Process the left column
+            if (currentIndex < displayEntries.length) {
+                const leftEntry = displayEntries[currentIndex];
+                const [leftKey] = leftEntry;
+                
+                // Parent entries must always be on the left side
+                if (isParentEntry(leftKey)) {
+                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
+                    currentIndex++;
+                    
+                    // In this case, we don't add a right column entry
+                    // because we want to ensure the child appears in the next row
+                } else {
+                    row.push(leftEntry);
+                    currentIndex++;
+                    
+                    // Process the right column if available and not a parent
+                    if (currentIndex < displayEntries.length) {
+                        const rightEntry = displayEntries[currentIndex];
+                        const [rightKey] = rightEntry;
+                        
+                        if (!isParentEntry(rightKey)) {
+                            row.push(rightEntry);
+                            currentIndex++;
+                        }
+                    }
+                }
+            }
+            
+            if (row.length > 0) {
+                rows.push(row);
+            }
+        }
+
+        return (
+            <Box sx={{
+                width: '100%',
+                mb: 2,
+                backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                borderRadius: 1,
+                p: 2
+            }}>
+                {rows.map((row, rowIndex) => (
+                    <Box 
+                        key={rowIndex} 
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
+                            py: 1,
+                            borderBottom: rowIndex < rows.length - 1 ? 
+                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
+                        }}
+                    >
+                        {row.map(([key, value], colIndex) => (
+                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
+                                <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        color: key.trim().startsWith('↳') ? 
+                                            theme.palette.primary.main : 
+                                            theme.palette.text.secondary,
+                                        textAlign: 'left',
+                                        pr: 1
+                                    }}
+                                >
+                                    {formatCamelCase(key)}:
+                                </Typography>
+                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
+                                    {typeof value === 'object' && value !== null ? (
+                                        <AudioMetadataContent
+                                            data={value}
+                                            depth={depth + 1}
+                                            showAll={showAll}
+                                            category={category}
+                                        />
+                                    ) : (
+                                        <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {String(value)}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </React.Fragment>
+                        ))}
+                    </Box>
+                ))}
+            </Box>
+        );
+    } else {
+        return <Typography variant="body2">{String(data)}</Typography>;
+    }
+};
+
 // Tab content components
 const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
     const theme = useTheme();
@@ -141,6 +331,24 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     const objectName = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
     const fullPath = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
     const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : 'Unknown';
+
+    // Extract metadata from API response
+    const metadata = assetData?.data?.asset?.Metadata?.CustomMetadata || {};
+    const generalMetadata = metadata?.General || {};
+    const audioMetadata = metadata?.Audio?.[0] || {};
+    const fileSize = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+    const format = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
+    
+    // Audio-specific metadata fields
+    const duration = generalMetadata?.Duration || audioMetadata?.Duration || 'Unknown';
+    const sampleRate = audioMetadata?.SampleRate || audioMetadata?.Samplerate || '44.1';
+    const bitDepth = audioMetadata?.BitDepth || audioMetadata?.BitsPerSample || '16';
+    const channels = audioMetadata?.Channels || audioMetadata?.AudioChannels || '2';
+    const bitRate = audioMetadata?.Bitrate ? `${Math.round(audioMetadata.Bitrate / 1000)} kbps` : 'Unknown';
+    const codec = audioMetadata?.CodecName || audioMetadata?.Format || 'Unknown';
+    const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
+        ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
+        : 'Unknown';
 
     return (
         <Box>
@@ -165,19 +373,19 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Audio'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{assetData?.data?.asset?.DigitalSourceAsset?.Type || 'Audio'}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
+                        {formatFileSize(fileSize)}
                     </Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{format}</Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', mb: 1 }}>
@@ -223,13 +431,38 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Duration:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{duration} seconds</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Sample Rate:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{sampleRate} kHz</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Bit Depth:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{bitDepth} bit</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Channels:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{channels}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Bit Rate:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{bitRate}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Codec:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{codec}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown'}
+                        {createdDate}
                     </Typography>
                 </Box>
             </Box>
@@ -286,12 +519,56 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
     const theme = useTheme();
     
+    // Create array of all item IDs to pre-expand them
+    const [expandedItems] = useState<string[]>(() => {
+        // Initialize with all items expanded
+        const allItems: string[] = [];
+        
+        metadataAccordions.forEach((parent, parentIndex) => {
+            // Add parent item
+            allItems.push(`parent-${parentIndex}`);
+            
+            // Add all child items
+            parent.subCategories.forEach((_, subIndex) => {
+                allItems.push(`${parentIndex}-${subIndex}`);
+            });
+        });
+        
+        return allItems;
+    });
+
+    // Function to determine which content component to use based on category
+    const getContentComponent = (subCategory: any) => {
+        // Use AudioMetadataContent for audio-related categories and General category
+        if (subCategory.category.toLowerCase().includes('audio') || 
+            subCategory.category === 'General' ||
+            subCategory.category.toLowerCase() === 'general') {
+            return (
+                <AudioMetadataContent
+                    data={subCategory.data}
+                    showAll={true}
+                    category={subCategory.category}
+                />
+            );
+        }
+        
+        // Use default MetadataContent for other categories
+        return (
+            <MetadataContent
+                data={subCategory.data}
+                showAll={true}
+                category={subCategory.category}
+            />
+        );
+    };
+    
     return (
         <Box sx={{
             borderRadius: 1,
             width: '100%'
         }}>
             <SimpleTreeView
+                defaultExpandedItems={expandedItems}
                 sx={{
                     flexGrow: 1,
                     width: '100%',
@@ -326,7 +603,10 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category}
+                                    {/* Replace "CustomMetadata" with "Embedded Metadata" */}
+                                    {parentAccordion.category === "CustomMetadata" 
+                                        ? "Embedded Metadata" 
+                                        : parentAccordion.category}
                                 </Typography>
                                 <Chip
                                     size="small"
@@ -371,11 +651,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                                     borderRadius: 1,
                                     mt: 1
                                 }}>
-                                    <MetadataContent
-                                        data={subCategory.data}
-                                        showAll={true}
-                                        category={subCategory.category}
-                                    />
+                                    {getContentComponent(subCategory)}
                                 </Box>
                             </TreeItem>
                         ))}
@@ -442,61 +718,61 @@ const TranscriptionTab: React.FC = () => {
     
     // Sample Amazon Transcribe data
     const transcriptionData = {
-        jobName: "mountain-stream-transcription",
+        jobName: "media-futures-podcast-transcription",
         accountId: "123456789012",
         results: {
             transcripts: [
                 {
-                    transcript: "This is an ambient recording of a mountain stream in the Blue Ridge Mountains. You can hear the water flowing over rocks, birds chirping in the background, and a light breeze rustling through the trees."
+                    transcript: "Welcome to Media Futures Podcast. Today we're exploring three big questions facing the media and entertainment industry. First, how will streaming platforms evolve with market saturation? Second, what monetization strategies will prove sustainable? And finally, how is AI transforming creative workflows? Joining me are industry experts Sarah Chen, former Netflix executive, David Rodriguez from Universal Media, and AI specialist Dr. Michelle Wong."
                 }
             ],
             items: [
                 {
                     start_time: "0.00",
-                    end_time: "2.35",
-                    alternatives: [{ confidence: "0.98", content: "This is an ambient recording of a mountain stream" }],
+                    end_time: "3.45",
+                    alternatives: [{ confidence: "0.98", content: "Welcome to Media Futures Podcast. Today we're exploring three big questions" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "2.35",
-                    end_time: "3.10",
-                    alternatives: [{ confidence: "0.96", content: "in the" }],
+                    start_time: "3.46",
+                    end_time: "6.70",
+                    alternatives: [{ confidence: "0.96", content: "facing the media and entertainment industry." }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "3.10",
-                    end_time: "4.45",
-                    alternatives: [{ confidence: "0.99", content: "Blue Ridge Mountains" }],
+                    start_time: "7.15",
+                    end_time: "11.45",
+                    alternatives: [{ confidence: "0.99", content: "First, how will streaming platforms evolve with market saturation?" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "4.83",
-                    end_time: "5.21",
-                    alternatives: [{ confidence: "0.89", content: "You can hear" }],
+                    start_time: "12.23",
+                    end_time: "16.82",
+                    alternatives: [{ confidence: "0.95", content: "Second, what monetization strategies will prove sustainable?" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "5.22",
-                    end_time: "7.78",
-                    alternatives: [{ confidence: "0.95", content: "the water flowing over rocks" }],
+                    start_time: "17.32",
+                    end_time: "21.78",
+                    alternatives: [{ confidence: "0.97", content: "And finally, how is AI transforming creative workflows?" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "8.12",
-                    end_time: "10.55",
-                    alternatives: [{ confidence: "0.97", content: "birds chirping in the background" }],
+                    start_time: "22.48",
+                    end_time: "25.95",
+                    alternatives: [{ confidence: "0.95", content: "Joining me are industry experts Sarah Chen" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "10.89",
-                    end_time: "11.35",
-                    alternatives: [{ confidence: "0.85", content: "and a" }],
+                    start_time: "26.12",
+                    end_time: "29.35",
+                    alternatives: [{ confidence: "0.92", content: "former Netflix executive, David Rodriguez from Universal Media" }],
                     type: "pronunciation"
                 },
                 {
-                    start_time: "11.36",
-                    end_time: "14.23",
-                    alternatives: [{ confidence: "0.94", content: "light breeze rustling through the trees" }],
+                    start_time: "29.68",
+                    end_time: "32.43",
+                    alternatives: [{ confidence: "0.94", content: "and AI specialist Dr. Michelle Wong." }],
                     type: "pronunciation"
                 }
             ],
@@ -762,19 +1038,19 @@ const AudioDetailContent: React.FC = () => {
 
         return {
             summary: [
-                { label: 'Title', value: 'Mountain Stream Ambience' },
+                { label: 'Title', value: 'Media Futures Podcast: Three Big Questions' },
                 { label: 'Type', value: 'Audio' },
-                { label: 'Duration', value: '03:45' }
+                { label: 'Duration', value: '42:18' }
             ],
             descriptive: [
-                { label: 'Description', value: 'Ambient audio recording of a mountain stream' },
-                { label: 'Keywords', value: 'mountain, stream, ambient, nature, water' },
-                { label: 'Location', value: 'Blue Ridge Mountains' }
+                { label: 'Description', value: 'Industry experts discuss three fundamental questions facing the media and entertainment industry: the future of streaming platforms, content monetization strategies, and the impact of AI on creative workflows.' },
+                { label: 'Keywords', value: 'podcast, media industry, streaming, monetization, AI, entertainment' },
+                { label: 'Location', value: 'NAB 2025' }
             ],
             technical: [
                 { label: 'Format', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format },
                 { label: 'File Size', value: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size },
-                { label: 'Date Created', value: '2024-01-07' }
+                { label: 'Date Created', value: '2024-05-15' }
             ]
         };
     }, [assetData]);
@@ -830,7 +1106,7 @@ const AudioDetailContent: React.FC = () => {
             path: `/audio/${assetData.data.asset.InventoryID}`,
             searchTerm: searchTerm,
             metadata: {
-                duration: '03:45',
+                duration: '42:18',
                 fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
                 creator: 'John Doe'
             }

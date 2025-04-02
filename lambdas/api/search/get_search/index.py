@@ -210,6 +210,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 
             return {
                 "size": params.pageSize,
+                "from": params.from_,
                 "query": {
                     "bool": {
                         "must": [
@@ -233,6 +234,20 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 },
                 "_source": {
                     "excludes": ["embedding"]
+                },
+                "aggs": {
+                    "file_types": {
+                        "terms": {
+                            "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+                            "size": 20
+                        }
+                    },
+                    "asset_types": {
+                        "terms": {
+                            "field": "DigitalSourceAsset.Type.keyword",
+                            "size": 20
+                        }
+                    }
                 }
             }
         else:
@@ -502,6 +517,7 @@ def perform_search(params: SearchParams) -> Dict:
 
         logger.info(f"Successfully processed hits: {len(hits)}")
 
+        # Always build metadata consistently for both regular and semantic searches
         search_metadata = SearchMetadata(
             totalResults=response["hits"]["total"]["value"],
             page=params.page,

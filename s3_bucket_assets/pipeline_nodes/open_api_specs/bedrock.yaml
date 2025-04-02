@@ -1,0 +1,519 @@
+openapi: 3.0.0
+info:
+  title: Amazon Bedrock
+  version: 2023-10-15
+  description: "Amazon Bedrock API for foundation model inference and management"
+  license:
+    name: Apache 2.0
+    url: https://aws.amazon.com/apache-2-0/
+  contact:
+    name: AWS Support
+    url: https://aws.amazon.com/support/
+    email: aws-support@amazon.com
+
+servers:
+  - url: https://bedrock-runtime.{region}.amazonaws.com
+    description: AWS Bedrock Runtime regional endpoint
+    variables:
+      region:
+        default: us-east-1
+        enum:
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+          - eu-west-1
+          - eu-west-2
+          - eu-central-1
+          - ap-northeast-1
+          - ap-northeast-2
+          - ap-southeast-1
+          - ap-southeast-2
+          - sa-east-1
+  - url: https://bedrock.{region}.amazonaws.com
+    description: AWS Bedrock Control Plane regional endpoint
+    variables:
+      region:
+        default: us-east-1
+        enum:
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+          - eu-west-1
+          - eu-west-2
+          - eu-central-1
+          - ap-northeast-1
+          - ap-northeast-2
+          - ap-southeast-1
+          - ap-southeast-2
+          - sa-east-1
+
+components:
+  securitySchemes:
+    awsSignatureV4:
+      type: apiKey
+      name: Authorization
+      in: header
+      description: AWS Signature Version 4 authentication
+
+  schemas:
+    TextModelRequest:
+      type: object
+      required:
+        - prompt
+        - modelId
+      properties:
+        modelId:
+          type: string
+          description: The identifier of the foundation model
+          enum:
+            - anthropic.claude-v2
+            - anthropic.claude-v2:1
+            - anthropic.claude-instant-v1
+            - amazon.titan-text-express-v1
+            - ai21.j2-ultra-v1
+            - ai21.j2-mid-v1
+            - cohere.command-text-v14
+            - meta.llama2-13b-chat-v1
+            - mistral.mistral-7b-instruct-v0:2
+        prompt:
+          type: string
+          description: The prompt for text generation
+        temperature:
+          type: number
+          description: Controls randomness. Higher values produce more random outputs
+          minimum: 0
+          maximum: 1
+        maxTokens:
+          type: integer
+          description: The maximum number of tokens to generate
+        topP:
+          type: number
+          description: Controls diversity via nucleus sampling
+          minimum: 0
+          maximum: 1
+        stopSequences:
+          type: array
+          description: Sequences that trigger the model to stop generating
+          items:
+            type: string
+
+    ImageModelRequest:
+      type: object
+      required:
+        - prompt
+        - modelId
+      properties:
+        modelId:
+          type: string
+          description: The identifier of the foundation model
+          enum:
+            - stability.stable-diffusion-xl-v1
+            - amazon.titan-image-generator-v1
+        prompt:
+          type: string
+          description: The prompt for image generation
+        negativePrompt:
+          type: string
+          description: What to exclude from the generated image
+        width:
+          type: integer
+          description: The width of the generated image
+          enum: [256, 512, 768, 1024]
+        height:
+          type: integer
+          description: The height of the generated image
+          enum: [256, 512, 768, 1024]
+        cfgScale:
+          type: number
+          description: How closely the image should conform to the prompt
+          minimum: 1
+          maximum: 30
+        seed:
+          type: integer
+          description: Seed for random number generation for reproducible results
+
+    TextModelResponse:
+      type: object
+      properties:
+        completion:
+          type: string
+          description: The generated text
+        usage:
+          type: object
+          properties:
+            promptTokens:
+              type: integer
+              description: Number of tokens in the prompt
+            completionTokens:
+              type: integer
+              description: Number of tokens in the completion
+            totalTokens:
+              type: integer
+              description: Total number of tokens used
+
+    ImageModelResponse:
+      type: object
+      properties:
+        images:
+          type: array
+          description: Array of generated images
+          items:
+            type: object
+            properties:
+              image:
+                type: string
+                format: byte
+                description: Base64-encoded image data
+              seed:
+                type: integer
+                description: Seed used for this image generation
+
+    ModelSummary:
+      type: object
+      properties:
+        modelId:
+          type: string
+          description: The identifier of the foundation model
+        modelName:
+          type: string
+          description: The name of the model
+        providerName:
+          type: string
+          description: The provider of the model
+        modelArn:
+          type: string
+          description: ARN of the model
+        inputModalities:
+          type: array
+          description: Input modalities supported by the model
+          items:
+            type: string
+            enum: [TEXT, IMAGE, AUDIO]
+        outputModalities:
+          type: array
+          description: Output modalities supported by the model
+          items:
+            type: string
+            enum: [TEXT, IMAGE, AUDIO]
+        customizationSupport:
+          type: boolean
+          description: Whether the model supports customization
+
+    FineTuningJob:
+      type: object
+      required:
+        - jobName
+        - modelId
+        - trainingDataConfig
+      properties:
+        jobName:
+          type: string
+          description: Name of the fine-tuning job
+          pattern: ^[a-zA-Z0-9][-a-zA-Z0-9]*$
+        modelId:
+          type: string
+          description: Base model to fine-tune
+        trainingDataConfig:
+          type: object
+          properties:
+            s3Uri:
+              type: string
+              description: S3 URI to the training dataset
+              pattern: ^s3://[a-z0-9][\.\-a-z0-9]{1,61}[a-z0-9](/.*)?$
+        hyperParameters:
+          type: object
+          description: Model-specific hyperparameters
+        outputDataConfig:
+          type: object
+          required:
+            - s3Uri
+          properties:
+            s3Uri:
+              type: string
+              description: S3 URI where fine-tuning artifacts will be stored
+        jobStatus:
+          type: string
+          readOnly: true
+          description: The status of the fine-tuning job
+          enum:
+            - PENDING
+            - IN_PROGRESS
+            - COMPLETED
+            - FAILED
+            - STOPPING
+            - STOPPED
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Error code returned by the service
+        message:
+          type: string
+          description: Description of the error
+
+paths:
+  /model/invoke:
+    post:
+      summary: Invoke a foundation model for inference
+      operationId: InvokeModel
+      tags:
+        - ModelInference
+      security:
+        - awsSignatureV4: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/TextModelRequest'
+                - $ref: '#/components/schemas/ImageModelRequest'
+      responses:
+        '200':
+          description: Successful model invocation
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TextModelResponse'
+                  - $ref: '#/components/schemas/ImageModelResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /models:
+    get:
+      summary: List available foundation models
+      operationId: ListFoundationModels
+      tags:
+        - ModelManagement
+      security:
+        - awsSignatureV4: []
+      parameters:
+        - name: byProvider
+          in: query
+          description: Filter models by provider name
+          schema:
+            type: string
+        - name: byOutputModality
+          in: query
+          description: Filter models by output modality
+          schema:
+            type: string
+            enum:
+              - TEXT
+              - IMAGE
+        - name: maxResults
+          in: query
+          description: The maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: nextToken
+          in: query
+          description: The token to retrieve the next set of results
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelSummary'
+                  nextToken:
+                    type: string
+                    description: The token to retrieve the next set of results
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fine-tuning-jobs:
+    post:
+      summary: Create a fine-tuning job
+      operationId: CreateFineTuningJob
+      tags:
+        - FineTuning
+      security:
+        - awsSignatureV4: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FineTuningJob'
+      responses:
+        '200':
+          description: Successfully created fine-tuning job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobArn:
+                    type: string
+                    description: ARN of the created fine-tuning job
+                  jobName:
+                    type: string
+                    description: Name of the created fine-tuning job
+                  modelId:
+                    type: string
+                    description: ID of the base model
+                  status:
+                    type: string
+                    description: Status of the fine-tuning job
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    get:
+      summary: List fine-tuning jobs
+      operationId: ListFineTuningJobs
+      tags:
+        - FineTuning
+      security:
+        - awsSignatureV4: []
+      parameters:
+        - name: modelId
+          in: query
+          description: Filter by model ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by job status
+          schema:
+            type: string
+            enum:
+              - IN_PROGRESS
+              - COMPLETED
+              - FAILED
+              - STOPPED
+        - name: maxResults
+          in: query
+          description: The maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: nextToken
+          in: query
+          description: The token to retrieve the next set of results
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved fine-tuning jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fineTuningJobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FineTuningJob'
+                  nextToken:
+                    type: string
+                    description: The token to retrieve the next set of results
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /fine-tuning-jobs/{jobName}:
+    get:
+      summary: Get a fine-tuning job
+      operationId: GetFineTuningJob
+      tags:
+        - FineTuning
+      security:
+        - awsSignatureV4: []
+      parameters:
+        - name: jobName
+          in: path
+          required: true
+          description: The name of the fine-tuning job
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved the fine-tuning job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FineTuningJob'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      summary: Stop and delete a fine-tuning job
+      operationId: StopFineTuningJob
+      tags:
+        - FineTuning
+      security:
+        - awsSignatureV4: []
+      parameters:
+        - name: jobName
+          in: path
+          required: true
+          description: The name of the fine-tuning job
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully stopped the fine-tuning job
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: ModelInference
+    description: Foundation model inference operations
+  - name: ModelManagement
+    description: Manage access to foundation models
+  - name: FineTuning
+    description: Create and manage fine-tuning jobs for customizing foundation models
+
+security:
+  - awsSignatureV4: [] 

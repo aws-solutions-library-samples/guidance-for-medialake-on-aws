@@ -31,7 +31,7 @@ const AppLayout: React.FC = () => {
                         left: 0,
                         height: '64px',
                         zIndex: 1100,
-                        bgcolor: 'transparent',
+                        bgcolor: theme => theme.palette.background.default,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

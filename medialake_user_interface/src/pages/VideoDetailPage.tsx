@@ -132,6 +132,185 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
     }
 };
 
+// Add new component for grid layout metadata display
+const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const theme = useTheme();
+    
+    const sortEntries = (entries: [string, any][]): [string, any][] => {
+        if (category && outputFilters[category]) {
+            const preferredOrder = outputFilters[category];
+            return [
+                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
+                ...entries.filter(([key]) => !preferredOrder.includes(key))
+            ];
+        }
+        return entries;
+    };
+
+    // Function to flatten nested objects like Tags/Encoder
+    const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
+        const result: [string, any][] = [];
+        
+        entries.forEach(([key, value]) => {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
+                // Mark this as a parent with _PARENT_ prefix (for internal use)
+                result.push([`_PARENT_${key}`, '']);
+                
+                // Then add the child properties with a visible indent prefix
+                Object.entries(value).forEach(([subKey, subValue]) => {
+                    result.push([`      ↳ ${subKey}`, subValue]);
+                });
+            } else {
+                result.push([key, value]);
+            }
+        });
+        
+        return result;
+    };
+
+    // Function to identify parent-child relationships in entries
+    const isParentEntry = (key: string): boolean => {
+        return key.startsWith('_PARENT_');
+    };
+
+    const isChildEntry = (key: string): boolean => {
+        return key.includes('↳');
+    };
+
+    // Function to clean display keys (remove internal markings)
+    const cleanDisplayKey = (key: string): string => {
+        if (key.startsWith('_PARENT_')) {
+            return key.substring(8); // Remove the _PARENT_ prefix
+        }
+        return key;
+    };
+
+    if (Array.isArray(data)) {
+        const displayData = showAll ? data : data.slice(0, 5);
+        return (
+            <List dense disablePadding>
+                {displayData.map((item, index) => (
+                    <ListItem key={index} sx={{ pl: depth * 2 }}>
+                        <GridMetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else if (typeof data === 'object' && data !== null) {
+        let entries = Object.entries(data);
+        const sortedEntries = sortEntries(entries);
+        // Flatten nested metadata
+        const flattenedEntries = flattenNestedMetadata(sortedEntries);
+        const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
+        
+        // Create rows efficiently while preserving parent-child relationships
+        const rows: [string, any][][] = [];
+        
+        let currentIndex = 0;
+        while (currentIndex < displayEntries.length) {
+            const row: [string, any][] = [];
+            
+            // Process the left column
+            if (currentIndex < displayEntries.length) {
+                const leftEntry = displayEntries[currentIndex];
+                const [leftKey] = leftEntry;
+                
+                // Parent entries must always be on the left side
+                if (isParentEntry(leftKey)) {
+                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
+                    currentIndex++;
+                    
+                    // In this case, we don't add a right column entry
+                    // because we want to ensure the parent is alone on its row
+                } else {
+                    row.push(leftEntry);
+                    currentIndex++;
+                    
+                    // Process the right column if available and not a parent
+                    if (currentIndex < displayEntries.length) {
+                        const rightEntry = displayEntries[currentIndex];
+                        const [rightKey] = rightEntry;
+                        
+                        if (!isParentEntry(rightKey)) {
+                            row.push(rightEntry);
+                            currentIndex++;
+                        }
+                    }
+                }
+            }
+            
+            if (row.length > 0) {
+                rows.push(row);
+            }
+        }
+
+        return (
+            <Box sx={{
+                width: '100%',
+                mb: 2,
+                backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                borderRadius: 1,
+                p: 2
+            }}>
+                {rows.map((row, rowIndex) => (
+                    <Box 
+                        key={rowIndex} 
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
+                            py: 1,
+                            borderBottom: rowIndex < rows.length - 1 ? 
+                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
+                        }}
+                    >
+                        {row.map(([key, value], colIndex) => (
+                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
+                                <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        color: key.trim().startsWith('↳') ? 
+                                            theme.palette.primary.main : 
+                                            theme.palette.text.secondary,
+                                        textAlign: 'left',
+                                        pr: 1
+                                    }}
+                                >
+                                    {formatCamelCase(key)}:
+                                </Typography>
+                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
+                                    {typeof value === 'object' && value !== null ? (
+                                        <GridMetadataContent
+                                            data={value}
+                                            depth={depth + 1}
+                                            showAll={showAll}
+                                            category={category}
+                                        />
+                                    ) : (
+                                        <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {String(value)}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </React.Fragment>
+                        ))}
+                    </Box>
+                ))}
+            </Box>
+        );
+    } else {
+        return <Typography variant="body2">{String(data)}</Typography>;
+    }
+};
+
 // Tab content components
 const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
     const theme = useTheme();
@@ -143,6 +322,22 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     const objectName = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
     const fullPath = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
     const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : 'Unknown';
+
+    // Extract metadata from API response
+    const metadata = assetData?.data?.asset?.Metadata?.CustomMetadata || {};
+    const generalMetadata = metadata?.General || {};
+    const videoMetadata = metadata?.Video?.[0] || {};
+    const fileSize = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+    const format = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
+    const duration = generalMetadata?.Duration || 'Unknown';
+    const width = videoMetadata?.Width || 'Unknown';
+    const height = videoMetadata?.Height || 'Unknown';
+    const frameRate = videoMetadata?.Framerate || 'Unknown';
+    const bitRate = videoMetadata?.Bitrate ? `${Math.round(videoMetadata.Bitrate / 1000)} kbps` : 'Unknown';
+    const codec = videoMetadata?.CodecName || 'Unknown';
+    const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
+        ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
+        : 'Unknown';
 
     return (
         <Box>
@@ -167,19 +362,19 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Type')?.value || 'Video'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{assetData?.data?.asset?.DigitalSourceAsset?.Type || 'Video'}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
+                        {formatFileSize(fileSize)}
                     </Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.technical.find((item: any) => item.label === 'Format')?.value || 'Unknown'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{format}</Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', mb: 1 }}>
@@ -225,13 +420,33 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Duration:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{metadataFields.summary.find((item: any) => item.label === 'Duration')?.value || 'Unknown'}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{duration} seconds</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Resolution:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{width}x{height}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Frame Rate:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{frameRate} FPS</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Bit Rate:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{bitRate}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Codec:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{codec}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {metadataFields.technical.find((item: any) => item.label === 'Date Created')?.value || 'Unknown'}
+                        {createdDate}
                     </Typography>
                 </Box>
             </Box>
@@ -288,12 +503,58 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
     const theme = useTheme();
     
+    // Create array of all item IDs to pre-expand them
+    const [expandedItems] = useState<string[]>(() => {
+        // Initialize with all items expanded
+        const allItems: string[] = [];
+        
+        metadataAccordions.forEach((parent, parentIndex) => {
+            // Add parent item
+            allItems.push(`parent-${parentIndex}`);
+            
+            // Add all child items
+            parent.subCategories.forEach((_, subIndex) => {
+                allItems.push(`${parentIndex}-${subIndex}`);
+            });
+        });
+        
+        return allItems;
+    });
+    
+    // Function to determine which content component to use based on category
+    const getContentComponent = (subCategory: any) => {
+        // Use GridMetadataContent for 'General' category and other important metadata
+        if (subCategory.category === 'General' || 
+            subCategory.category.toLowerCase() === 'general' ||
+            subCategory.category.includes('Format') ||
+            subCategory.category.includes('Codec') ||
+            subCategory.category.includes('Stream')) {
+            return (
+                <GridMetadataContent
+                    data={subCategory.data}
+                    showAll={true}
+                    category={subCategory.category}
+                />
+            );
+        }
+        
+        // Use default MetadataContent for other categories
+        return (
+            <MetadataContent
+                data={subCategory.data}
+                showAll={true}
+                category={subCategory.category}
+            />
+        );
+    };
+    
     return (
         <Box sx={{
             borderRadius: 1,
             width: '100%'
         }}>
             <SimpleTreeView
+                defaultExpandedItems={expandedItems}
                 sx={{
                     flexGrow: 1,
                     width: '100%',
@@ -328,7 +589,9 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category}
+                                    {parentAccordion.category === "CustomMetadata" 
+                                        ? "Embedded Metadata" 
+                                        : parentAccordion.category}
                                 </Typography>
                                 <Chip
                                     size="small"
@@ -373,11 +636,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                                     borderRadius: 1,
                                     mt: 1
                                 }}>
-                                    <MetadataContent
-                                        data={subCategory.data}
-                                        showAll={true}
-                                        category={subCategory.category}
-                                    />
+                                    {getContentComponent(subCategory)}
                                 </Box>
                             </TreeItem>
                         ))}
