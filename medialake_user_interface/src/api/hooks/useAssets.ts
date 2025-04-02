@@ -89,6 +89,94 @@ interface DeleteAssetResponse {
     };
 }
 
+interface RelatedVersionHit {
+    InventoryID: string;
+    DigitalSourceAsset: {
+        ID: string;
+        Type: string;
+        CreateDate: string;
+        MainRepresentation: {
+            Format: string;
+            StorageInfo: {
+                PrimaryLocation: {
+                    ObjectKey: {
+                        Name: string;
+                    };
+                    FileInfo: {
+                        Size: number;
+                    };
+                };
+            };
+        };
+    };
+    thumbnailUrl?: string;
+    proxyUrl?: string;
+    score: number;
+}
+
+export interface RelatedVersionsResponse {
+    status: string;
+    message: string;
+    data: {
+        searchMetadata: {
+            totalResults: number;
+            page: number;
+            pageSize: number;
+            searchTerm: string;
+        };
+        results: Array<{
+            InventoryID: string;
+            DigitalSourceAsset: {
+                Type: string;
+                MainRepresentation: {
+                    Format: string;
+                    StorageInfo: {
+                        PrimaryLocation: {
+                            FileInfo: {
+                                Size: number;
+                                Hash?: {
+                                    Value: string;
+                                    MD5Hash: string;
+                                    Algorithm: string;
+                                };
+                                CreateDate: string;
+                            };
+                            ObjectKey: {
+                                Path: string;
+                                FullPath: string;
+                                Name: string;
+                            };
+                        };
+                    };
+                };
+                CreateDate: string;
+            };
+            DerivedRepresentations: Array<{
+                StorageInfo: {
+                    PrimaryLocation: {
+                        Status: string;
+                        StorageType: string;
+                        FileInfo: {
+                            Size: number;
+                        };
+                        Bucket: string;
+                        ObjectKey: {
+                            FullPath: string;
+                        };
+                        Provider: string;
+                    };
+                };
+                Purpose: string;
+            }>;
+            FileHash: string;
+            Metadata: Record<string, any>;
+            score: number;
+            thumbnailUrl: string;
+            proxyUrl: string;
+        }>;
+    };
+}
+
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
     const { showError } = useErrorModal();
@@ -209,6 +297,28 @@ export const useRenameAsset = () => {
             logger.error('Error in rename mutation:', error);
             showError('Failed to rename asset');
         },
+    });
+};
+
+export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 50) => {
+    console.log('useRelatedVersions - Called with assetId:', assetId, 'page:', page);
+    
+    return useQuery<RelatedVersionsResponse, Error>({
+        queryKey: ['relatedVersions', assetId, page, pageSize],
+        queryFn: async (): Promise<RelatedVersionsResponse> => {
+            console.log('useRelatedVersions - Fetching data for assetId:', assetId);
+            const response = await apiClient.get<RelatedVersionsResponse>(`/assets/${assetId}/relatedversions`, {
+                params: {
+                    page,
+                    pageSize,
+                    min_score: 0.01
+                }
+            });
+            console.log('useRelatedVersions - Received response:', response.data);
+            return response.data;
+        },
+        enabled: !!assetId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 };
 

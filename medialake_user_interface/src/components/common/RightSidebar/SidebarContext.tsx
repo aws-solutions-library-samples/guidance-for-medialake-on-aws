@@ -7,6 +7,8 @@ export const COLLAPSED_WIDTH = 8;
 interface RightSidebarContextType {
     isExpanded: boolean;
     setIsExpanded: (expanded: boolean) => void;
+    openSidebar: () => void;
+    closeSidebar: () => void;
     width: number;
     setWidth: (width: number) => void;
 }
@@ -19,6 +21,9 @@ interface RightSidebarProviderProps {
 
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+
+    const openSidebar = () => setIsExpanded(true);
+    const closeSidebar = () => setIsExpanded(false);
     const [width, setWidth] = useState(DEFAULT_WIDTH);
 
     // Load saved width on mount
@@ -33,7 +38,7 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
     }, []);
 
     return (
-        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, width, setWidth }}>
+        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, openSidebar, closeSidebar, width, setWidth }}>
             {children}
         </RightSidebarContext.Provider>
     );

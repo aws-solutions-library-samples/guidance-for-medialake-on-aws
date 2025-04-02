@@ -40,6 +40,8 @@ import React, {
   
   import { filter } from 'rxjs';
   import { randomHexColor } from './utils';
+import { start } from 'repl';
+import { Currency } from 'lucide-react';
   
   export interface VideoViewerProps {
     videoSrc: string;
@@ -60,10 +62,20 @@ import React, {
     onTimeUpdate?: (time: number) => void;
     showThumbnails?: boolean;
     onMarkerAdd?: (time: number) => void;
+    playerRef?: React.RefObject<OmakasePlayer>;
+  }
+
+  export type Marker = {
+    start: number;
+    color: string;
+    end: number;
   }
   
   export interface VideoViewerRef {
-    hello: () => void;
+    hello: () =>  PeriodMarker;
+    getMarkerLane: () => MarkerLane | null;
+    getCurrentTime: () => number;
+    formatToTimecode: (time: number) => string;
   }
   
   /**
@@ -103,7 +115,8 @@ import React, {
         .subscribe((timelineApi) => {
           console.log('Timeline created');
           const scrubberLane = timelineApi.getScrubberLane();
-          scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK };
+          scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK
+          };
         });
   
       const subscriptions = [
@@ -128,7 +141,7 @@ import React, {
         }),
         player.video.onPause$.subscribe({
           next: (event) => {
-            console.log(`Video pause. Timestamp: ${event.currentTime}`);
+            console.log(`Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`);
             callbacksRef.current.onPause?.();
           },
         }),
@@ -191,7 +204,9 @@ import React, {
   
       const markerLane1 = () => {
         const markerLane = new MarkerLane({
-          style: { ...TIMELINE_STYLE_DARK },
+          style: { ...TIMELINE_STYLE_DARK,
+            height: 25
+          },
         });
         const lane = player.timeline!.addTimelineLane(markerLane);
         markerLaneRef.current = lane;
@@ -199,17 +214,6 @@ import React, {
           timeObservation: { start: 200, end: 300 },
           editable: true,
           style: { ...PERIOD_MARKER_STYLE },
-        });
-        markerLane.addMarker(periodMarker);
-        periodMarker.onChange$.subscribe({
-          next: (event) => {
-            console.log('Period marker changed', event);
-          },
-        });
-        periodMarker.onMouseEnter$.subscribe({
-          next: (event) => {
-            console.log('Period marker hover', event);
-          },
         });
       };
   
@@ -329,6 +333,7 @@ import React, {
       currentTime,
       duration,
       setCurrentTime,
+      playerRef
     };
   };
   
@@ -412,6 +417,7 @@ import React, {
         onTimeUpdate,
         showThumbnails = false,
         onMarkerAdd,
+        playerRef,
       },
       ref
     ) => {
@@ -472,11 +478,9 @@ import React, {
         ref,
         () => ({
           hello: () => {
-            console.log('Acao 4: ')
-            console.log('Hello from VideoViewer!');
             if (markerLaneRef.current) {
               const periodMarker = new PeriodMarker({
-                timeObservation: { start: currentTime, end: currentTime + 20 },
+                timeObservation: { start: currentTime, end: currentTime + 5 },
                 editable: true,
                 style: {
                   ...PERIOD_MARKER_STYLE,
@@ -484,12 +488,27 @@ import React, {
                 },
               });
               markerLaneRef.current.addMarker(periodMarker);
-              customCallbacks.onMarkerAdd(currentTime)
+              customCallbacks.onMarkerAdd(currentTime);
+              
+              console.log('playeref',playerRef)
+              return periodMarker
             }
+
+          },
+          getMarkerLane: () => markerLaneRef.current,
+          getCurrentTime: () => currentTime,
+          formatToTimecode: (time: number) => {
+            const hours = Math.floor(time / 3600);
+            const minutes = Math.floor((time % 3600) / 60);
+            const seconds = Math.floor(time % 60);
+            const frames = Math.floor((time % 1) * 24);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+
           },
         }),
-        [currentTime, customCallbacks]
+        [currentTime, customCallbacks,playerRef]
       );
+
       const handlePlayPause = () => {
         if (isPlaying) {
           pause();
@@ -560,14 +579,14 @@ import React, {
       };
   
       return (
-        <Stack spacing={0} sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden',}}>
+        <Stack spacing={0} sx={{ width: '100%', height: '10%', position: 'relative', overflow: 'hidden',}}>
           <Box
             onClick={onClickEvent}
             ref={playerContainerRef}
             id="omakase-player"
             sx={{
               width: '100%',
-              height: 'calc(100% - 300px)',
+              height: 'calc(100% - 250px)',
               position: 'relative',
               bgcolor: 'black',
               '& > *': {

@@ -151,11 +151,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                 onClick={() => setIsExpanded(!isExpanded)}
                 sx={{
                     position: 'fixed',
-                    right: isExpanded ? width - 12 : COLLAPSED_WIDTH - 12,
-                    top: 'calc(50vh - 12px)',
-                    minWidth: '24px',
-                    width: '24px',
-                    height: '24px',
+                    right: isExpanded ? width - 16 : COLLAPSED_WIDTH - 16,
+                    top: 'calc(50vh - 16px)',
+                    minWidth: '32px',
+                    width: '32px',
+                    height: '32px',
                     bgcolor: 'background.paper',
                     borderRadius: '8px',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
@@ -177,9 +177,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                 }}
             >
                 {isExpanded ? (
-                    <ChevronRight sx={{ fontSize: 16 }} />
+                    <ChevronRight sx={{ fontSize: 20 }} />
                 ) : (
-                    <ChevronLeft sx={{ fontSize: 16 }} />
+                    <ChevronLeft sx={{ fontSize: 20 }} />
                 )}
             </Button>
 

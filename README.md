@@ -202,6 +202,16 @@ touch config.json
 }
 ```
 
+3. Config changes 
+
+1. environment - Choose between dev or prod, currently use dev
+2. resource_prefix - This will be a prefix string added to all AWS resources created, choose what you want to be added
+3. account_id - This is the account that you will be deploying to, this should be the same account that the aws credentials or profile is configured for that you will be using.
+4. global_prefix - Make this the same as the resource prefix, this is retiring in the near future
+5. resource_application_tag - This is the application tag that is used across resources
+6. api_path - Don't modify this 
+7. 
+
 ## 📚 Configuration Parameters
 
 - environment - Environment name, used in resource naming and configuration

@@ -7,6 +7,7 @@ import io
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import unquote_plus
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
@@ -359,7 +360,8 @@ class AssetSyncProcessor:
         Returns:
             Processing result
         """
-        object_key = obj['key']
+        # URL decode the object key
+        object_key = unquote_plus(obj['key'])
         processing_action = obj.get('processingAction', 'PUT')
         
         try:
@@ -374,90 +376,30 @@ class AssetSyncProcessor:
                 logger.warning(f"Error fetching tags for {object_key}: {str(e)}")
                 existing_tags = {}
             
-            # Prepare new tags
-            new_tags = existing_tags.copy()
+            # Simulate S3 copy operation to trigger ObjectCreated event
+            copy_source = {'Bucket': self.bucket_name, 'Key': object_key}
             
-            # If object doesn't have AssetID, generate one
-            if not obj.get('assetId'):
-                obj['assetId'] = f"asset:img:{str(uuid.uuid4())}"
-                new_tags['AssetID'] = obj['assetId']
+            # Generate tag string from existing tags
+            tag_string = "&".join([f"{k}={v}" for k, v in existing_tags.items()])
             
-            # If object doesn't have InventoryID, generate one
-            if not obj.get('inventoryId'):
-                obj['inventoryId'] = f"asset:uuid:{str(uuid.uuid4())}"
-                new_tags['InventoryID'] = obj['inventoryId']
+            logger.info(f"Simulating S3 copy for object {object_key}")
             
-            # Set job ID tag for tracking
-            new_tags['JobID'] = self.job_id
-            new_tags['ProcessedAt'] = datetime.now(timezone.utc).isoformat()
+            # Copy object to itself, preserving existing tags
+            self.s3_client.copy_object(
+                Bucket=self.bucket_name,
+                CopySource=copy_source,
+                Key=object_key,
+                TaggingDirective='REPLACE',
+                Tagging=tag_string
+            )
             
-            # Only update tags if they changed
-            if new_tags != existing_tags:
-                # Update object tags
-                tag_set = [{'Key': k, 'Value': v} for k, v in new_tags.items()]
-                self.s3_client.put_object_tagging(
-                    Bucket=self.bucket_name,
-                    Key=object_key,
-                    Tagging={'TagSet': tag_set}
-                )
-                logger.info(f"Updated tags for object {object_key}")
-            
-            # Simulate S3 copy operation based on processing action
-            if processing_action in ('COPY', 'PUT'):
-                # Trigger S3:ObjectCreated event by copying object to itself
-                copy_source = {'Bucket': self.bucket_name, 'Key': object_key}
-                
-                # Generate tag string for copy operation
-                tag_string = "&".join([f"{k}={v}" for k, v in new_tags.items()])
-                
-                logger.info(f"Simulating S3 copy for object {object_key} with action {processing_action}")
-                
-                # Copy object to itself
-                self.s3_client.copy_object(
-                    Bucket=self.bucket_name,
-                    CopySource=copy_source,
-                    Key=object_key,
-                    TaggingDirective='REPLACE',
-                    Tagging=tag_string
-                )
-                
-                logger.info(f"Successfully copied object {object_key}")
-                
-                # Send event to ingest event bus if configured
-                if 'INGEST_EVENT_BUS_NAME' in os.environ:
-                    try:
-                        events = boto3.client('events')
-                        events.put_events(
-                            Entries=[
-                                {
-                                    'Source': 'asset-sync',
-                                    'DetailType': 'AssetProcessed',
-                                    'Detail': json.dumps({
-                                        'jobId': self.job_id,
-                                        'bucketName': self.bucket_name,
-                                        'objectKey': object_key,
-                                        'assetId': obj['assetId'],
-                                        'inventoryId': obj['inventoryId'],
-                                        'processingAction': processing_action
-                                    }),
-                                    'EventBusName': os.environ['INGEST_EVENT_BUS_NAME']
-                                }
-                            ]
-                        )
-                        logger.info(f"Sent event to ingest event bus for object {object_key}")
-                    except Exception as e:
-                        logger.warning(f"Error sending event to ingest event bus: {str(e)}")
-                
-            else:
-                logger.info(f"Skipping copy for object {object_key} with action {processing_action}")
+            logger.info(f"Successfully copied object {object_key}")
             
             # Return success result
             return {
                 'status': 'success',
                 'key': object_key,
-                'assetId': obj['assetId'],
-                'inventoryId': obj['inventoryId'],
-                'action': processing_action
+                'action': 'COPY'
             }
             
         except Exception as e:

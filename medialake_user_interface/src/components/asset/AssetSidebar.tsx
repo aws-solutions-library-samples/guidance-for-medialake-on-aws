@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import {
     Box,
     Typography,
@@ -39,7 +39,31 @@ import PreviewIcon from '@mui/icons-material/Preview';
 import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { RefObject } from 'react';
-import { VideoViewer, VideoViewerRef } from '../common/VideoViewer';
+import { VideoViewer, VideoViewerRef, Marker } from '../common/VideoViewer';
+import {randomHexColor} from '../common/utils';
+  import {
+    SCRUBBER_LANE_STYLE_DARK,
+    TIMELINE_STYLE_DARK,
+    PERIOD_MARKER_STYLE,
+  } from '../common/OmakaseTimeLineConstants';
+    import {
+      MarkerLane,
+      OmakasePlayer,
+      PeriodMarker,
+    } from '@byomakase/omakase-player';
+import { subscribe } from 'diagnostics_channel';
+
+
+interface MarkerInfo {
+    id: string;
+    timeObservation: {
+        start: string;
+        end: string;
+    };
+    style: {
+        color: string;
+    };
+}
 
 interface AssetSidebarProps {
     versions?: any[];
@@ -48,12 +72,17 @@ interface AssetSidebarProps {
     videoViewerRef?: RefObject<VideoViewerRef>;
 }
 
+
+
 interface AssetVersionProps {
     versions: any[];
 }
 
 interface AssetMarkersProps {
-    onMarkerAdd?: () => void;  // Add this
+    onMarkerAdd?: () => void; 
+    videoViewerRef?: RefObject<VideoViewerRef>; // Add this
+    markers?: MarkerInfo[];
+    setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;    
 }
 
 interface AssetCollaborationProps {
@@ -173,24 +202,47 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
     );
 };
 
-export const addMakerDiv = (time: number, markers,setMarkers) =>{
-    setMarkers(prev => [...prev, `Marker: ${prev.length + 1}
-        'Marker time : ${time}'`]);
-    console.log("time: ",time);
-    console.log("Acao 5: Marker adicionado")
-}
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef,markers, setMarkers,}) => {
     const theme = useTheme();
-    const [markers, setMarkers] = useState<string[]>([]); // Add this state
+    const maxId = markers.length + 1;
+    const newId = maxId.toString(); // Call the toString() method
 
-
-    // Add this function
     const addMarker = () => {
-        console.log("Acao 1: Botao apertado")
-        onMarkerAdd?.();
-        addMakerDiv(13,markers,setMarkers)
+        const lane = videoViewerRef.current.getMarkerLane();
+        const currentTime = videoViewerRef.current.getCurrentTime();
+        const periodMarker = new PeriodMarker({
+            timeObservation: { start: currentTime, end:  currentTime + 5 },
+            editable: true,
+            text: newId, 
+            style: {
+            ...PERIOD_MARKER_STYLE,
+            color: randomHexColor(),
+            },
+        });
+        lane.addMarker(periodMarker);
+
+        setMarkers(prev => [...prev, {
+            id: newId,
+            timeObservation: {
+                start:  videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.start),
+                end: videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.end),
+            },
+            style: {
+                color: periodMarker.style.color
+            }
+        }]
+        );      
+
+        periodMarker.onChange$.subscribe({
+            next: (event) => {
+                console.log('PeriodMarker text type:', typeof periodMarker.text);
+                console.log(markers);
+            }
+        });
+        
+        
     };
 
     return (
@@ -205,7 +257,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                     fullWidth 
                     sx={{ mt: 1 }}
                     startIcon={<BookmarkIcon />}
-                    // onClick={onMarkerAdd}
                     onClick = {addMarker}
                 >
                     Add Marker
@@ -218,14 +269,27 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                     sx={{
                         mt: 2,
                         p: 2,
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        bgcolor: alpha(marker.style.color, 0.1),
                         borderRadius: 1,
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                        border: `1px solid ${alpha(marker.style.color, 0.2)}`,
                     }}
                 >
-                    <Typography variant="body2">{marker}</Typography>
+                    <Typography variant="body2" component="div">
+                        <Box>
+                            <Typography variant="body2">
+                                <b>Marker:</b> {marker.id}
+                            </Typography>
+                            <Typography variant="body2">
+                                <b>IN:</b> {marker.timeObservation.start}
+                            </Typography>
+                            <Typography variant="body2">
+                                <b>OUT: </b> {marker.timeObservation.end}
+                            </Typography>
+                        </Box>
+                    </Typography>
                 </Box>
             ))}
+
         </Box>
     );
 };
@@ -496,57 +560,15 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
 export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versions = [],comments = [],onAddComment }) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
-
+    const [markers, setMarkers] = useState<MarkerInfo[]>([]);
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
-    };
-    // Add this handler
-    const handleAddMarker = () => {
-        console.log("Acao 3: ")
-        console.log("handleAddMarker called"); // Debug log
-        console.log("videoViewerRef:", videoViewerRef); // Debug log
-        if (videoViewerRef?.current) {
-            console.log("Calling hello function"); // Debug log
-            videoViewerRef.current.hello();
-        } else {
-            console.log("videoViewerRef.current is null"); // Debug log
-        }
     };
 
     return (
         <RightSidebar>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Main header with badge showing number of items */}
-                <Box sx={{ 
-                    p: 2, 
-                    borderBottom: 1, 
-                    borderColor: 'divider',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: theme.palette.mode === 'dark' 
-                        ? `linear-gradient(to right, ${alpha(theme.palette.primary.dark, 0.2)}, transparent)`
-                        : `linear-gradient(to right, ${alpha(theme.palette.primary.light, 0.1)}, transparent)`,
-                }}>
-                    <Typography 
-                        variant="h6" 
-                        sx={{ 
-                            fontWeight: 600,
-                            color: theme.palette.mode === 'dark'
-                                ? theme.palette.primary.light
-                                : theme.palette.primary.main,
-                        }}
-                    >
-                        Asset Console
-                </Typography>
-                    <Tooltip title="Sidebar settings">
-                        <IconButton size="small">
-                            <SettingsIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-                
-                {/* Tabs navigation */}
+                {/* Tabs navigation - now with fixed height and no scroll */}
                 <Box sx={{ 
                     borderBottom: 1, 
                     borderColor: 'divider',
@@ -555,18 +577,19 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                     <Tabs 
                         value={currentTab} 
                         onChange={handleTabChange}
-                        variant="scrollable"
-                        scrollButtons="auto"
+                        variant="fullWidth"
                         aria-label="asset sidebar tabs"
                         sx={{
-                            minHeight: 48,
+                            minHeight: 40,
                             '& .MuiTab-root': {
-                                minHeight: 48,
+                                minHeight: 40,
                                 textTransform: 'none',
-                                fontSize: '0.875rem',
+                                fontSize: '0.75rem',
                                 fontWeight: 500,
                                 opacity: 0.7,
                                 transition: 'all 0.2s',
+                                padding: '6px 8px',
+                                minWidth: 'auto',
                                 '&.Mui-selected': {
                                     opacity: 1,
                                     fontWeight: 600,
@@ -574,9 +597,9 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                 }
                             },
                             '& .MuiTabs-indicator': {
-                                height: 3,
-                                borderTopLeftRadius: 3,
-                                borderTopRightRadius: 3,
+                                height: 2,
+                                borderTopLeftRadius: 2,
+                                borderTopRightRadius: 2,
                             }
                         }}
                     >
@@ -596,9 +619,10 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                     sx={{ 
                                         pr: 1,
                                         '& .MuiBadge-badge': {
-                                            fontSize: '0.7rem',
-                                            height: 18,
-                                            minWidth: 18
+                                            fontSize: '0.65rem',
+                                            height: 16,
+                                            minWidth: 16,
+                                            padding: '0 4px'
                                         }
                                     }}
                                 >
@@ -607,43 +631,6 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                             }
                             id="sidebar-tab-1"
                             aria-controls="sidebar-tabpanel-1"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<GroupsIcon fontSize="small" />} 
-                            label={
-                                <Badge 
-                                    badgeContent={comments.length} 
-                                    color="secondary"
-                                    sx={{ 
-                                        pr: 1,
-                                        '& .MuiBadge-badge': {
-                                            fontSize: '0.7rem',
-                                            height: 18,
-                                            minWidth: 18,
-                                            display: comments.length ? 'flex' : 'none'
-                                        }
-                                    }}
-                                >
-                                    <span>Collab</span>
-                                </Badge>
-                            }
-                            id="sidebar-tab-2"
-                            aria-controls="sidebar-tabpanel-2"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<AccountTreeIcon fontSize="small" />} 
-                            label="Pipelines"
-                            id="sidebar-tab-3"
-                            aria-controls="sidebar-tabpanel-3"
-                            iconPosition="start"
-                        />
-                        <Tab 
-                            icon={<TimelineIcon fontSize="small" />} 
-                            label="Activity"
-                            id="sidebar-tab-4"
-                            aria-controls="sidebar-tabpanel-4"
                             iconPosition="start"
                         />
                     </Tabs>
@@ -660,11 +647,10 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                     >
                                         {currentTab === 0 && (
                     <AssetMarkers 
-                        onMarkerAdd={() => {
-                            console.log("Acao 2:")
-                            console.log("AssetMarkers onMarkerAdd called"); // Debug log
-                            handleAddMarker();
-                        }} 
+                        videoViewerRef= {videoViewerRef}
+                        markers = {markers}
+                        setMarkers = {setMarkers}
+                        
                     />
                 )}
                     </Box>
@@ -677,41 +663,6 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                         sx={{ height: '100%', overflow: 'auto' }}
                     >
                         {currentTab === 1 && <AssetVersions versions={versions} />}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 2}
-                        id="sidebar-tabpanel-2"
-                        aria-labelledby="sidebar-tab-2"
-                        sx={{ height: '100%', overflow: 'hidden' }}
-                    >
-                        {currentTab === 2 && (
-                            <AssetCollaboration 
-                                comments={comments} 
-                                onAddComment={onAddComment}
-                            />
-                        )}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 3}
-                        id="sidebar-tabpanel-3"
-                        aria-labelledby="sidebar-tab-3"
-                        sx={{ height: '100%', overflow: 'auto' }}
-                    >
-                        {currentTab === 3 && <AssetPipelines />}
-                    </Box>
-                    
-                    <Box
-                        role="tabpanel"
-                        hidden={currentTab !== 4}
-                        id="sidebar-tabpanel-4"
-                        aria-labelledby="sidebar-tab-4"
-                        sx={{ height: '100%', overflow: 'auto' }}
-                    >
-                        {currentTab === 4 && <AssetActivity />}
                     </Box>
                 </Box>
             </Box>

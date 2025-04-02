@@ -6,41 +6,39 @@ interface DateTimeFormatOptions {
   allowSecondsToggle?: boolean;
 }
 
-export const formatLocalDateTime = (isoString: string | null | undefined, options: DateTimeFormatOptions = {}): string => {
-  // Return empty string if isoString is null or undefined
-  if (isoString == null) {
-    return '';
+const convertToDate = (input: string | number): Date => {
+  try {
+    // If it's a number or string number, treat as epoch timestamp
+    if (!isNaN(Number(input))) {
+      const ms = String(input).length === 10 ? Number(input) * 1000 : Number(input);
+      return new Date(ms);
+    }
+    // Otherwise try to parse as ISO string
+    return parseISO(String(input));
+  } catch (error) {
+    console.error('Error converting to date:', error);
+    throw new Error('Invalid date input');
   }
-  
+};
+
+export const formatLocalDateTime = (input: string | number, options: DateTimeFormatOptions = {}): string => {
   try {
     const { showSeconds = false } = options;
-    // Parse the UTC date string
-    const utcDate = parseISO(isoString);
-    
-    // Convert to local time
-    const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
+    const date = convertToDate(input);
     
     // Format the date in local time with timezone indicator
-    // PP = date format (e.g., Apr 29, 2023)
-    // p = time without seconds (e.g., 12:00 PM)
-    // pp = time with seconds (e.g., 12:00:00 PM)
     const formatString = `PP, ${showSeconds ? 'pp' : 'p'}`;
-    return format(localDate, formatString, { locale: enUS }) + ' ' + getTimezoneAbbreviation();
+    return format(date, formatString, { locale: enUS }) + ' ' + getTimezoneAbbreviation();
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Invalid date';
   }
 };
 
-export const formatRelativeTime = (isoString: string): string => {
+export const formatRelativeTime = (input: string | number): string => {
   try {
-    // Parse the UTC date
-    const utcDate = parseISO(isoString);
-    
-    // Convert to local time
-    const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
-    
-    return formatDistanceToNow(localDate, { 
+    const date = convertToDate(input);
+    return formatDistanceToNow(date, { 
       addSuffix: true,
       locale: enUS
     });
@@ -50,9 +48,10 @@ export const formatRelativeTime = (isoString: string): string => {
   }
 };
 
-export const isValidISOString = (isoString: string): boolean => {
+export const isValidISOString = (input: string | number): boolean => {
   try {
-    return !isNaN(Date.parse(isoString));
+    convertToDate(input);
+    return true;
   } catch {
     return false;
   }

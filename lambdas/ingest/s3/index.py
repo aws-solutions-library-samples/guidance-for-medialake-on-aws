@@ -86,10 +86,6 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     Returns:
         One of: "Image", "Video", "Audio", or "Other"
     """
-    # Default to Image if we can't determine
-    if not content_type and not file_extension:
-        return "Image"
-    
     # Convert to lowercase for comparison
     content_type = content_type.lower() if content_type else ""
     file_extension = file_extension.lower() if file_extension else ""
@@ -129,14 +125,22 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     if file_extension in audio_extensions:
         return "Audio"
     
-    # Fall back to looking at the first part of the MIME type
+    # If we have a content type but no clear match, try to infer from the main type
     if content_type:
         mime_main_type = content_type.split('/')[0].capitalize()
         if mime_main_type in ["Image", "Video", "Audio"]:
             return mime_main_type
     
-    # Default fallback
-    return "Image"
+    # If we have a file extension but no clear match, try to infer from common patterns
+    if file_extension:
+        # Log the unknown extension for monitoring
+        logger.warning(f"Unknown file extension encountered: {file_extension}")
+        # Default to "Other" instead of "Image" for unknown types
+        return "Other"
+    
+    # If we have no information at all, log it and return "Other"
+    logger.warning("No content type or file extension available for type determination")
+    return "Other"
 
 # Event filtering optimization
 def is_relevant_event(event_name: str, allowed_prefixes=("ObjectCreated:", "ObjectRemoved:")) -> bool:
@@ -243,6 +247,14 @@ class AssetProcessor:
 
         return decoded_key
 
+    def _extract_file_extension(self, key: str) -> str:
+        """Extract file extension from key after URL decoding"""
+        # First decode the key
+        decoded_key = self._decode_s3_event_key(key)
+        
+        # Then extract the extension
+        return decoded_key.split(".")[-1].lower() if "." in decoded_key else ""
+
     @tracer.capture_method
     def _calculate_md5(self, bucket: str, key: str, chunk_size: int = 8192) -> str:
         """Calculate MD5 hash with optimal chunk size for memory efficiency"""
@@ -307,6 +319,20 @@ class AssetProcessor:
                     logger.exception(f"Error getting S3 object tags: {str(e)}")
                     raise
             
+            # Early check for asset type
+            content_type = response.get("ContentType", "")
+            file_ext = self._extract_file_extension(key)
+            asset_type = determine_asset_type(content_type, file_ext)
+            
+            # Log the type determination for debugging
+            logger.info(f"Asset type determination for {key}: content_type={content_type}, file_ext={file_ext}, determined_type={asset_type}")
+            
+            # Stop processing if asset type is not one of: "Image", "Video", "Audio"
+            if asset_type not in ["Image", "Video", "Audio"]:
+                logger.info(f"Skipping processing for unsupported asset type: {asset_type} for {bucket}/{key}")
+                metrics.add_metric(name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1)
+                return None
+
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
             # Check existing tags first - this is a fast path if object already processed
@@ -585,7 +611,7 @@ class AssetProcessor:
         """Create asset metadata structure with optimized field extraction"""
         # Get file extension from key
         filename = key.split("/")[-1]
-        file_ext = filename.split(".")[-1].upper() if "." in filename else ""
+        file_ext = self._extract_file_extension(filename)
         
         # Optimize path splitting
         path_parts = key.split("/")
@@ -656,7 +682,7 @@ class AssetProcessor:
                 .get("S3", {})
                 .get("ContentType", "")
             )
-            file_ext = key.split(".")[-1] if "." in key else ""
+            file_ext = self._extract_file_extension(key)
             
             # Use more accurate asset type detection
             asset_type = determine_asset_type(content_type, file_ext)
@@ -681,11 +707,7 @@ class AssetProcessor:
                     "MainRepresentation": {
                         "ID": f"asset:rep:{asset_id}:master",
                         "Type": asset_type,
-                        "Format": metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"][
-                            "Name"
-                        ]
-                        .split(".")[-1]
-                        .upper(),
+                        "Format": file_ext.upper(),
                         "Purpose": "master",
                         "StorageInfo": metadata["StorageInfo"],
                     },
@@ -768,7 +790,7 @@ class AssetProcessor:
             )
             # Get file extension from the object key
             object_key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
-            file_ext = object_key.split(".")[-1] if "." in object_key else ""
+            file_ext = self._extract_file_extension(object_key)
             
             # Use more accurate asset type detection
             asset_type = determine_asset_type(content_type, file_ext)
@@ -789,11 +811,7 @@ class AssetProcessor:
                     "MainRepresentation": {
                         "ID": f"{asset_id}:master",
                         "Type": asset_type,
-                        "Format": metadata["StorageInfo"]["PrimaryLocation"][
-                            "ObjectKey"
-                        ]["Name"]
-                        .split(".")[-1]
-                        .upper(),
+                        "Format": file_ext.upper(),
                         "Purpose": "master",
                         "StorageInfo": metadata["StorageInfo"],
                     },
@@ -1179,14 +1197,15 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                     "Object Tagged": "ObjectTagging:",
                     "PutObject": "ObjectCreated:Put",
                     "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
-                    "DeleteObject": "ObjectRemoved:Delete"
+                    "DeleteObject": "ObjectRemoved:Delete",
+                    "CopyObject": "ObjectCreated:Copy"  # Add mapping for CopyObject events
                 }
                 
                 event_name = event_type_mapping.get(detail_type, "")
                 
                 # If we have valid bucket and key, process the event
                 if bucket and key:
-                    logger.info(f"Processing EventBridge event for {bucket}/{key}")
+                    logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
                     process_s3_event(processor, bucket, key, event_name)
                 else:
                     logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
@@ -1229,16 +1248,15 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
             logger.info(f"Asset deletion processed: {key}")
         else:
-            # Handle creation/modification/copy events
-            event_type_category = "Copy" if event_name == "ObjectCreated:Copy" else "Creation"
-            logger.info(f"Processing {event_type_category} event for {bucket}/{key}")
+            # Handle creation/modification/copy events - process all ObjectCreated events the same way
+            logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
             
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
             if result:
                 metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
-                metrics.add_metric(name=f"{event_type_category}Events", unit=MetricUnit.Count, value=1)
-                logger.info(f"Asset {event_type_category.lower()} processed successfully: {result['DigitalSourceAsset']['ID']}")
+                metrics.add_metric(name="CreationEvents", unit=MetricUnit.Count, value=1)
+                logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
             else:
                 logger.info(f"Asset already processed or skipped: {key}")
         

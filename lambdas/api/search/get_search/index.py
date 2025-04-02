@@ -8,6 +8,8 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
+import concurrent.futures
+from collections import defaultdict
 
 from opensearchpy import (
     RequestsHttpConnection,
@@ -132,6 +134,7 @@ class AssetSearchResult(BaseModelWithConfig):
     score: float
     thumbnailUrl: Optional[str] = None
     proxyUrl: Optional[str] = None
+    clips: Optional[List[Dict[str, Any]]] = None
 
 
 class SearchMetadata(BaseModelWithConfig):
@@ -181,6 +184,8 @@ def build_semantic_query(params: SearchParams) -> Dict:
     from twelvelabs import TwelveLabs
     from twelvelabs.models.embed import SegmentEmbedding
     
+    logger.info(f"Building semantic query for: {params.q}")
+    
     # Get the API key from Secrets Manager
     api_key = get_api_key()
     
@@ -207,9 +212,12 @@ def build_semantic_query(params: SearchParams) -> Dict:
             # Verify it's a flat list of numbers
             if not all(isinstance(x, (int, float)) for x in embedding):
                 raise SearchException("Invalid embedding format")
+            
+            logger.info(f"Generated embedding for query: {params.q} (length: {len(embedding)})")
                 
-            return {
-                "size": params.pageSize,
+            # Increased size to get more results for grouping
+            query = {
+                "size": params.pageSize * 20,  # Further increase size to get more results
                 "query": {
                     "bool": {
                         "must": [
@@ -217,24 +225,21 @@ def build_semantic_query(params: SearchParams) -> Dict:
                                 "knn": {
                                     "embedding": {
                                         "vector": embedding,
-                                        "k": params.pageSize
+                                        "k": params.pageSize * 20  # Further increase k to get more results
                                     }
                                 }
                             }
-                        ],
-                        "must_not": [
-                            {
-                                "term": {
-                                    "embedding_scope": "clip"
-                                }
-                            }
                         ]
+                        # Removed the must_not clause to include clips
                     }
                 },
                 "_source": {
                     "excludes": ["embedding"]
                 }
             }
+            print(json.dumps(query))
+            logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
+            return query
         else:
             raise SearchException("Failed to generate embedding for search term")
     except Exception as e:
@@ -383,6 +388,22 @@ def build_search_query(params: SearchParams) -> Dict:
             query["bool"]["filter"].append({
                 "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
             })
+            
+        # connector filter
+        if 'storageIdentifier' in parsed_filters:
+            path_value = parsed_filters['storageIdentifier']
+            # Add wildcard if not already present
+            if isinstance(path_value, str) and not path_value.endswith('*'):
+                path_value = f"{path_value}*"
+                
+            logger.info(f"Applying Connector Bucket filter: {path_value}")
+            query["bool"]["filter"].append({
+                "wildcard": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket.keyword": {
+                        "value": path_value[0]
+                    }
+                }
+            })
 
         # Size filter
         if 'size' in parsed_filters:
@@ -472,6 +493,11 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     derived_representations = source.get("DerivedRepresentations", [])
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+    
+    # Log the original score from OpenSearch
+    asset_id = digital_source_asset.get("ID", "unknown")
+    original_score = hit.get("_score", 0)
+    logger.info(f"Original OpenSearch score for asset {asset_id}: {original_score}")
 
     # Generate thumbnail URL if applicable
     thumbnail_url = None
@@ -507,6 +533,341 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     )
 
 
+def process_clip(clip_hit: Dict) -> Dict:
+    """
+    Process a clip hit to preserve all clip-specific fields.
+    
+    Args:
+        clip_hit: The clip hit from OpenSearch
+        
+    Returns:
+        Processed clip with all relevant fields
+    """
+    source = clip_hit["_source"]
+    
+    # Log the original score from OpenSearch
+    asset_id = source.get("DigitalSourceAsset", {}).get("ID", "unknown")
+    original_score = clip_hit.get("_score", 0)
+    logger.info(f"Original OpenSearch score for clip of asset {asset_id}: {original_score}")
+    
+    # Create a base result with standard fields
+    result = {
+        "DigitalSourceAsset": source.get("DigitalSourceAsset", {}),
+        "score": clip_hit["_score"],
+    }
+    
+    # Add all clip-specific fields
+    if "embedding_scope" in source:
+        result["embedding_scope"] = source["embedding_scope"]
+    if "start_timecode" in source:
+        result["start_timecode"] = source["start_timecode"]
+    if "end_timecode" in source:
+        result["end_timecode"] = source["end_timecode"]
+    if "type" in source:
+        result["type"] = source["type"]
+    if "timestamp" in source:
+        result["timestamp"] = source["timestamp"]
+    
+    # Add any other fields that might be present
+    for key, value in source.items():
+        if key not in result and key not in ["DigitalSourceAsset"]:
+            result[key] = value
+    
+    return result
+
+
+def get_parent_asset(client, index_name, asset_id):
+    """
+    Fetch a parent asset by its ID from OpenSearch.
+    
+    Args:
+        client: OpenSearch client
+        index_name: Index name to search in
+        asset_id: Asset ID to search for
+        
+    Returns:
+        Parent asset hit if found, None otherwise
+    """
+    try:
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "DigitalSourceAsset.ID.keyword": asset_id
+                            }
+                        }
+                    ],
+                    "must_not": [
+                        {
+                            "term": {
+                                "embedding_scope": "clip"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": 1
+        }
+        
+        response = client.search(body=query, index=index_name)
+        
+        if response["hits"]["total"]["value"] > 0:
+            return response["hits"]["hits"][0]
+        
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching parent asset {asset_id}: {str(e)}")
+        return None
+
+
+def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
+    """
+    Process semantic search results using parallel processing for better performance.
+    Group clips with their parent assets and keep only the top 30 clips per parent.
+    Only Video and Audio assets can have clips.
+    
+    Args:
+        hits: List of search hits from OpenSearch
+        
+    Returns:
+        List of processed results with clips grouped by parent asset
+    """
+    # Separate parent assets and clips
+    parent_assets = {}
+    clips_by_asset = defaultdict(list)
+    standalone_hits = []
+    orphaned_clip_assets = set()  # Track asset IDs of orphaned clips
+    
+    # Log all hit scores for debugging
+    logger.info("All hit scores:")
+    for i, hit in enumerate(hits):
+        logger.info(f"Hit {i}: score={hit['_score']}, id={hit.get('_id')}, embedding_scope={hit.get('_source', {}).get('embedding_scope')}")
+    
+    for hit in hits:
+        source = hit["_source"]
+        if source.get("embedding_scope") == "clip":
+            # This is a clip - check if it's for a Video or Audio asset
+            asset_type = source.get("type", "").lower()
+            if asset_type in ["video", "audio"]:
+                asset_id = source.get("DigitalSourceAsset", {}).get("ID")
+                if asset_id:
+                    clips_by_asset[asset_id].append({
+                        "source": source,
+                        "score": hit["_score"],
+                        "hit": hit
+                    })
+                    # Track this as a potential orphaned clip asset
+                    orphaned_clip_assets.add(asset_id)
+                    logger.info(f"Added clip for asset {asset_id} with score {hit['_score']}")
+        else:
+            # This is a parent asset
+            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
+            if asset_id:
+                parent_assets[asset_id] = {
+                    "source": source,
+                    "score": hit["_score"],
+                    "hit": hit
+                }
+                logger.info(f"Added parent asset {asset_id} with score {hit['_score']}")
+                # Remove from orphaned clips since we found the parent
+                if asset_id in orphaned_clip_assets:
+                    orphaned_clip_assets.remove(asset_id)
+                    logger.info(f"Removed {asset_id} from orphaned clips")
+            else:
+                # This is a standalone hit (not a parent or clip)
+                standalone_hits.append(hit)
+                logger.info(f"Added standalone hit with score {hit['_score']}")
+    
+    logger.info(f"Found {len(parent_assets)} parent assets, clips for {len(clips_by_asset)} assets, and {len(standalone_hits)} standalone hits")
+    logger.info(f"Found {len(orphaned_clip_assets)} orphaned clip assets")
+    
+    # Get OpenSearch client and index name for fetching parent assets
+    client = get_opensearch_client()
+    index_name = os.environ["OPENSEARCH_INDEX"]
+    
+    # Fetch missing parent assets for orphaned clips
+    for asset_id in orphaned_clip_assets:
+        if asset_id not in parent_assets:
+            parent_hit = get_parent_asset(client, index_name, asset_id)
+            if parent_hit:
+                # Find the highest clip score for this asset
+                highest_clip_score = 0
+                if asset_id in clips_by_asset:
+                    for clip in clips_by_asset[asset_id]:
+                        if clip["score"] > highest_clip_score:
+                            highest_clip_score = clip["score"]
+                
+                # Get the original parent score
+                parent_score = parent_hit["_score"]
+                
+                # Log the original scores for debugging
+                logger.info(f"Original scores for orphaned asset {asset_id}: parent={parent_score}, highest_clip={highest_clip_score}, clip_count={len(clips_by_asset.get(asset_id, []))}")
+                
+                # Determine if we should use the clip score instead
+                use_clip_score = False
+                if highest_clip_score > parent_score:
+                    # Calculate how much more relevant the clip is
+                    relevance_ratio = highest_clip_score / parent_score if parent_score > 0 else 2.0
+                    
+                    # Only use clip score if it's significantly more relevant
+                    if relevance_ratio > 1.2:
+                        use_clip_score = True
+                        logger.info(f"Using clip score for orphaned asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
+                    else:
+                        logger.info(f"Clip not significantly more relevant for orphaned asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
+                
+                # Set the appropriate score
+                final_score = highest_clip_score if use_clip_score else parent_score
+                
+                # Normalize the score if it's unusually high (greater than 1.0)
+                if final_score > 1.0:
+                    logger.info(f"Normalizing unusually high score for orphaned asset {asset_id}: {final_score} -> 1.0")
+                    final_score = 1.0
+                
+                parent_assets[asset_id] = {
+                    "source": parent_hit["_source"],
+                    "score": final_score,
+                    "hit": parent_hit
+                }
+                logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
+    
+    # Process each parent asset and its clips in parallel
+    def process_asset_with_clips(asset_id):
+        # Process parent asset if it exists
+        if asset_id in parent_assets:
+            try:
+                result = process_search_hit(parent_assets[asset_id]["hit"])
+                result_dict = result.model_dump(by_alias=True)
+                result_dict["clips"] = []
+                
+                # Add clips if available
+                if asset_id in clips_by_asset:
+                    # Get asset type
+                    asset_type = parent_assets[asset_id]["source"].get("DigitalSourceAsset", {}).get("Type", "").lower()
+                    
+                    # Only add clips for Video and Audio assets
+                    if asset_type in ["video", "audio"]:
+                        # Sort clips by score and take top 30
+                        asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)[:30]
+                        
+                        # Process clips using our custom clip processor to preserve all fields
+                        highest_clip_score = 0
+                        for clip in asset_clips:
+                            try:
+                                clip_result = process_clip(clip["hit"])
+                                result_dict["clips"].append(clip_result)
+                                
+                                # Track the highest clip score
+                                if clip["score"] > highest_clip_score:
+                                    highest_clip_score = clip["score"]
+                            except Exception as e:
+                                logger.warning(f"Error processing clip: {str(e)}")
+                        
+                        # Update the parent asset's score based on the clips' scores
+                        parent_score = result_dict.get("score", 0)
+                        
+                        # Log the original scores for debugging
+                        logger.info(f"Original scores for asset {asset_id}: parent={parent_score}, highest_clip={highest_clip_score}, clip_count={len(asset_clips)}")
+                        
+                        if highest_clip_score > 0:
+                            # Only promote the parent's score if the clip is significantly more relevant
+                            if highest_clip_score > parent_score:
+                                # Calculate how much more relevant the clip is compared to the parent
+                                relevance_ratio = highest_clip_score / parent_score if parent_score > 0 else 2.0
+                                
+                                # Only boost the parent's score if the clip is significantly more relevant
+                                # (e.g., at least 20% more relevant)
+                                if relevance_ratio > 1.2:
+                                    # Use the clip score but ensure it's normalized (between 0 and 1)
+                                    # If the score is already greater than 1, normalize it
+                                    new_score = highest_clip_score
+                                    if new_score > 1.0:
+                                        logger.info(f"Normalizing unusually high score for asset {asset_id}: {new_score} -> 1.0")
+                                        new_score = 1.0
+                                    
+                                    logger.info(f"Promoted asset {asset_id}: {parent_score} -> {new_score} (clip relevance ratio: {relevance_ratio:.2f})")
+                                    result_dict["score"] = new_score
+                                else:
+                                    logger.info(f"Clip not significantly more relevant for asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
+                
+                return result_dict
+            except Exception as e:
+                logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
+                return None
+        
+        return None
+    
+    # Process standalone hits
+    def process_standalone_hit(hit):
+        try:
+            result = process_search_hit(hit)
+            return result.model_dump(by_alias=True)
+        except Exception as e:
+            logger.warning(f"Error processing standalone hit: {str(e)}")
+            return None
+    
+    # Process all parent assets (not just those with clips)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result_futures = {
+            executor.submit(process_asset_with_clips, asset_id): asset_id
+            for asset_id in parent_assets.keys()
+        }
+        
+        results = []
+        for future in concurrent.futures.as_completed(result_futures):
+            try:
+                result = future.result()
+                if result:
+                    results.append(result)
+            except Exception as e:
+                asset_id = result_futures[future]
+                logger.warning(f"Error processing asset {asset_id}: {str(e)}")
+    
+    # Process standalone hits
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        standalone_futures = [executor.submit(process_standalone_hit, hit) for hit in standalone_hits]
+        
+        for future in concurrent.futures.as_completed(standalone_futures):
+            try:
+                result = future.result()
+                if result:
+                    results.append(result)
+            except Exception as e:
+                logger.warning(f"Error processing standalone hit: {str(e)}")
+    
+    # Log scores before sorting
+    logger.info("Scores before sorting:")
+    for i, result in enumerate(results):
+        asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
+        score = result.get("score", 0)
+        clip_count = len(result.get("clips", []))
+        logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
+    
+    # Final normalization step - ensure all scores are between 0 and 1
+    for result in results:
+        score = result.get("score", 0)
+        if score > 1.0:
+            logger.info(f"Final normalization: Capping score for asset {result.get('DigitalSourceAsset', {}).get('ID', 'unknown')}: {score} -> 1.0")
+            result["score"] = 1.0
+    
+    # Sort results by score
+    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    
+    # Log scores after sorting
+    logger.info("Scores after sorting (final order):")
+    for i, result in enumerate(results):
+        asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
+        score = result.get("score", 0)
+        clip_count = len(result.get("clips", []))
+        logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
+    
+    logger.info(f"Total processed results: {len(results)}")
+    
+    return results
+
+
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
     client = get_opensearch_client()
@@ -519,36 +880,85 @@ def perform_search(params: SearchParams) -> Dict:
         response = client.search(body=search_body, index=index_name)
 
         logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
-        logger.info("OpenSearch response:", extra={"response": response})
+        
+        if params.semantic:
+            # Use the parallel processing function for semantic search
+            processed_results = process_semantic_results_parallel(response["hits"]["hits"])
+            
+            # Calculate total results (for pagination)
+            total_results = len(processed_results)
+            
+            # Limit results to pageSize
+            start_idx = (params.page - 1) * params.pageSize
+            end_idx = start_idx + params.pageSize
+            
+            # Make sure we don't go out of bounds
+            if start_idx >= total_results:
+                start_idx = 0
+                end_idx = min(params.pageSize, total_results)
+            
+            paged_results = processed_results[start_idx:end_idx]
+            
+            logger.info(f"Successfully processed semantic search results: {total_results} total, {len(paged_results)} returned")
+            
+            # Calculate the correct total count for pagination
+            # If we're on page 2+ and have fewer results than pageSize, we need to adjust the total
+            if params.page > 1 and len(paged_results) < params.pageSize:
+                # We're on the last page - calculate the actual total
+                total_count = (params.page - 1) * params.pageSize + len(paged_results)
+            else:
+                # Use the actual count of processed results
+                total_count = total_results
+            
+            logger.info(f"Calculated total count: {total_count} (original: {total_results})")
+            
+            search_metadata = SearchMetadata(
+                totalResults=total_count,
+                page=params.page,
+                pageSize=params.pageSize,
+                searchTerm=params.q,
+                facets=response.get("aggregations"),
+                suggestions=response.get("suggest"),
+            )
+            
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "searchMetadata": search_metadata.model_dump(by_alias=True),
+                    "results": paged_results,
+                },
+            }
+        else:
+            # Standard processing for non-semantic search
+            hits = []
+            for hit in response["hits"]["hits"]:
+                try:
+                    result = process_search_hit(hit)
+                    hits.append(result)
+                except Exception as e:
+                    logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
+                    continue
 
-        hits = []
-        for hit in response["hits"]["hits"]:
-            try:
-                result = process_search_hit(hit)
-                hits.append(result)
-            except Exception as e:
-                logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
-                continue
+            logger.info(f"Successfully processed hits: {len(hits)}")
 
-        logger.info(f"Successfully processed hits: {len(hits)}")
+            search_metadata = SearchMetadata(
+                totalResults=response["hits"]["total"]["value"],
+                page=params.page,
+                pageSize=params.pageSize,
+                searchTerm=params.q,
+                facets=response.get("aggregations"),
+                suggestions=response.get("suggest"),
+            )
 
-        search_metadata = SearchMetadata(
-            totalResults=response["hits"]["total"]["value"],
-            page=params.page,
-            pageSize=params.pageSize,
-            searchTerm=params.q,
-            facets=response.get("aggregations"),
-            suggestions=response.get("suggest"),
-        )
-
-        return {
-            "status": "200",
-            "message": "ok",
-            "data": {
-                "searchMetadata": search_metadata.model_dump(by_alias=True),
-                "results": [hit.model_dump(by_alias=True) for hit in hits],
-            },
-        }
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {
+                    "searchMetadata": search_metadata.model_dump(by_alias=True),
+                    "results": [hit.model_dump(by_alias=True) for hit in hits],
+                },
+            }
 
     except (RequestError, NotFoundError) as e:
         logger.warning(f"OpenSearch error: {str(e)}")

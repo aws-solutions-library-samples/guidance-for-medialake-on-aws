@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -26,7 +26,7 @@ import {
   ListItemText,
   LinearProgress
 } from '@mui/material';
-import { useAsset } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import { formatCamelCase } from '../utils/stringUtils';
@@ -41,6 +41,8 @@ import MetadataSection from '../components/common/MetadataSection';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
+import { RelatedItemsView } from '../components/shared/RelatedItemsView';
+import { RelatedVersionsResponse as NewRelatedVersionsResponse } from '../api/types/asset.types';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -217,24 +219,39 @@ const TagInput: React.FC<{
 const SummaryTab = ({ assetData }: { assetData: any }) => {
     const theme = useTheme();
     const asset = assetData?.data?.asset;
-    const metadata = asset?.DigitalSourceAsset?.MainRepresentation?.Metadata || {};
-    const filename = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
-    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.Size || 0;
-    const fileType = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.AssetType || 'Unknown';
-    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.Format || 'Unknown';
-    const dimensions = metadata?.Common?.VisualInfo?.Dimensions 
-        ? `${metadata.Common.VisualInfo.Dimensions.Width}x${metadata.Common.VisualInfo.Dimensions.Height}`
-        : 'Unknown';
-    const createdDate = metadata?.Common?.CreationDate || 'Unknown';
-    const description = metadata?.Common?.Description || 'High resolution landscape image';
-    
-    // Extract keywords/tags
-    const keywords = metadata?.Common?.Keywords || ['nature', 'landscape'];
-    
-    // Colors matching the image exactly
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
     const descKeywordsColor = '#F6AD55';  // Orange
+    
+    // Extract metadata from API response
+    const metadata = asset?.Metadata?.CustomMetadata || {};
+    const generalMetadata = metadata?.General || {};
+    const imageMetadata = metadata?.Image?.[0] || {};
+    
+    // Primary fields
+    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+    const fileType = asset?.DigitalSourceAsset?.Type || 'Image';
+    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
+    const s3Bucket = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket || 'Unknown';
+    const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
+    const s3Uri = s3Bucket && asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath
+        ? `s3://${s3Bucket}/${asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath}`
+        : 'Unknown';
+    
+    // Technical details
+    const width = imageMetadata?.Width || generalMetadata?.ImageWidth || 'Unknown';
+    const height = imageMetadata?.Height || generalMetadata?.ImageHeight || 'Unknown';
+    const dimensions = `${width}x${height}`;
+    const colorDepth = imageMetadata?.BitDepth || imageMetadata?.Bitdepth || '8';
+    const colorSpace = imageMetadata?.ColorSpace || imageMetadata?.Colorspace || 'Unknown';
+    const compression = imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm || 'Unknown';
+    const createdDate = asset?.DigitalSourceAsset?.CreateDate 
+        ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString() 
+        : 'Unknown';
+    
+    // Extract keywords/tags
+    const description = generalMetadata?.Description || 'High resolution image';
+    const keywords = generalMetadata?.Keywords || metadata?.Keywords || ['image'];
     
     return (
         <Box>
@@ -258,23 +275,43 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 }} />
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Title:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{filename}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileType}</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{formatFileSize(fileSize)}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {formatFileSize(fileSize)}
+                    </Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileFormat}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
+                        {fileFormat}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Bucket}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {objectName}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                        {s3Uri}
+                    </Typography>
                 </Box>
             </Box>
             
@@ -303,9 +340,24 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Depth:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorDepth} bit</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Space:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorSpace}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
+                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Compression:</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{compression}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {typeof createdDate === 'string' ? createdDate : formatLocalDateTime(createdDate)}
+                        {createdDate}
                     </Typography>
                 </Box>
             </Box>
@@ -338,7 +390,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     flexWrap: 'wrap', 
                     gap: 0.75
                 }}>
-                    {keywords.map((keyword, index) => (
+                    {(Array.isArray(keywords) ? keywords : [keywords]).map((keyword, index) => (
                         <Chip
                             key={index}
                             label={keyword}
@@ -357,28 +409,240 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     );
 };
 
+// Add new component for grid layout metadata display
+const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const theme = useTheme();
+    
+    const sortEntries = (entries: [string, any][]): [string, any][] => {
+        if (category && outputFilters[category]) {
+            const preferredOrder = outputFilters[category];
+            return [
+                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
+                ...entries.filter(([key]) => !preferredOrder.includes(key))
+            ];
+        }
+        return entries;
+    };
+
+    // Function to flatten nested objects like Tags/Encoder
+    const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
+        const result: [string, any][] = [];
+        
+        entries.forEach(([key, value]) => {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
+                // Mark this as a parent with _PARENT_ prefix (for internal use)
+                result.push([`_PARENT_${key}`, '']);
+                
+                // Then add the child properties with a visible indent prefix
+                Object.entries(value).forEach(([subKey, subValue]) => {
+                    result.push([`      ↳ ${subKey}`, subValue]);
+                });
+            } else {
+                result.push([key, value]);
+            }
+        });
+        
+        return result;
+    };
+
+    // Function to identify parent-child relationships in entries
+    const isParentEntry = (key: string): boolean => {
+        return key.startsWith('_PARENT_');
+    };
+
+    const isChildEntry = (key: string): boolean => {
+        return key.includes('↳');
+    };
+
+    // Function to clean display keys (remove internal markings)
+    const cleanDisplayKey = (key: string): string => {
+        if (key.startsWith('_PARENT_')) {
+            return key.substring(8); // Remove the _PARENT_ prefix
+        }
+        return key;
+    };
+
+    if (Array.isArray(data)) {
+        const displayData = showAll ? data : data.slice(0, 5);
+        return (
+            <List dense disablePadding>
+                {displayData.map((item, index) => (
+                    <ListItem key={index} sx={{ pl: depth * 2 }}>
+                        <GridMetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
+                    </ListItem>
+                ))}
+            </List>
+        );
+    } else if (typeof data === 'object' && data !== null) {
+        let entries = Object.entries(data);
+        const sortedEntries = sortEntries(entries);
+        // Flatten nested metadata
+        const flattenedEntries = flattenNestedMetadata(sortedEntries);
+        const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
+        
+        // Create rows efficiently while preserving parent-child relationships
+        const rows: [string, any][][] = [];
+        
+        let currentIndex = 0;
+        while (currentIndex < displayEntries.length) {
+            const row: [string, any][] = [];
+            
+            // Process the left column
+            if (currentIndex < displayEntries.length) {
+                const leftEntry = displayEntries[currentIndex];
+                const [leftKey] = leftEntry;
+                
+                // Parent entries must always be on the left side
+                if (isParentEntry(leftKey)) {
+                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
+                    currentIndex++;
+                    
+                    // In this case, we don't add a right column entry
+                    // because we want to ensure the parent is alone on its row
+                } else {
+                    row.push(leftEntry);
+                    currentIndex++;
+                    
+                    // Process the right column if available and not a parent
+                    if (currentIndex < displayEntries.length) {
+                        const rightEntry = displayEntries[currentIndex];
+                        const [rightKey] = rightEntry;
+                        
+                        if (!isParentEntry(rightKey)) {
+                            row.push(rightEntry);
+                            currentIndex++;
+                        }
+                    }
+                }
+            }
+            
+            if (row.length > 0) {
+                rows.push(row);
+            }
+        }
+
+        return (
+            <Box sx={{
+                width: '100%',
+                mb: 2,
+                backgroundColor: alpha(theme.palette.background.paper, 0.3),
+                borderRadius: 1,
+                p: 2
+            }}>
+                {rows.map((row, rowIndex) => (
+                    <Box 
+                        key={rowIndex} 
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
+                            py: 1,
+                            borderBottom: rowIndex < rows.length - 1 ? 
+                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
+                        }}
+                    >
+                        {row.map(([key, value], colIndex) => (
+                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
+                                <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        color: key.trim().startsWith('↳') ? 
+                                            theme.palette.primary.main : 
+                                            theme.palette.text.secondary,
+                                        textAlign: 'left',
+                                        pr: 1
+                                    }}
+                                >
+                                    {formatCamelCase(key)}:
+                                </Typography>
+                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
+                                    {typeof value === 'object' && value !== null ? (
+                                        <GridMetadataContent
+                                            data={value}
+                                            depth={depth + 1}
+                                            showAll={showAll}
+                                            category={category}
+                                        />
+                                    ) : (
+                                        <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            {String(value)}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </React.Fragment>
+                        ))}
+                    </Box>
+                ))}
+            </Box>
+        );
+    } else {
+        return <Typography variant="body2">{String(data)}</Typography>;
+    }
+};
+
 const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
     const theme = useTheme();
     
+    // Create array of all item IDs to pre-expand them
+    const [expandedItems] = useState<string[]>(() => {
+        // Initialize with all items expanded
+        const allItems: string[] = [];
+        
+        metadataAccordions.forEach((parent, parentIndex) => {
+            // Add parent item
+            allItems.push(`parent-${parentIndex}`);
+            
+            // Add all child items
+            parent.subCategories.forEach((_, subIndex) => {
+                allItems.push(`${parentIndex}-${subIndex}`);
+            });
+        });
+        
+        return allItems;
+    });
+    
+    // Function to determine which content component to use based on category
+    const getContentComponent = (subCategory: any) => {
+        // Use GridMetadataContent for 'General' category and other important metadata
+        if (subCategory.category === 'General' || 
+            subCategory.category.toLowerCase() === 'general' ||
+            subCategory.category.includes('EXIF') ||
+            subCategory.category.includes('IPTC') ||
+            subCategory.category.includes('XMP') ||
+            subCategory.category.includes('Format')) {
+            return (
+                <GridMetadataContent
+                    data={subCategory.data}
+                    showAll={true}
+                    category={subCategory.category}
+                />
+            );
+        }
+        
+        // Use default MetadataContent for other categories
+        return (
+            <MetadataContent
+                data={subCategory.data}
+                showAll={true}
+                category={subCategory.category}
+            />
+        );
+    };
+    
     return (
         <Box sx={{
-            maxHeight: '600px',
-            overflowY: 'auto',
             borderRadius: 1,
-            '&::-webkit-scrollbar': {
-                width: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-            },
-            '&::-webkit-scrollbar-thumb': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                borderRadius: '4px',
-                '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.3),
-                }
-            }
+            width: '100%'
         }}>
+            {/* Keep the filter bar */}
             <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <TextField
                     placeholder="Filter metadata..." 
@@ -408,9 +672,12 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                     </Select>
                 </FormControl>
             </Box>
+            
             <SimpleTreeView
+                defaultExpandedItems={expandedItems}
                 sx={{
                     flexGrow: 1,
+                    width: '100%',
                     '& .MuiTreeItem-root': {
                         padding: '4px 0',
                     },
@@ -440,16 +707,11 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         key={parentIndex}
                         itemId={`parent-${parentIndex}`}
                         label={
-                            <Box sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                py: 0.5,
-                                pl: 1,
-                                borderLeft: `3px solid ${getMetadataCategoryColor(parentAccordion.category, theme)}`,
-                                borderRadius: '4px 0 0 4px',
-                            }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category}
+                                    {parentAccordion.category === "CustomMetadata" 
+                                        ? "Embedded Metadata" 
+                                        : parentAccordion.category}
                                 </Typography>
                                 <Chip
                                     size="small"
@@ -458,8 +720,8 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                                         ml: 1,
                                         height: '20px',
                                         fontSize: '0.7rem',
-                                        backgroundColor: alpha(getMetadataCategoryColor(parentAccordion.category, theme), 0.1),
-                                        color: getMetadataCategoryColor(parentAccordion.category, theme)
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        color: theme.palette.primary.main
                                     }}
                                 />
                             </Box>
@@ -494,11 +756,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                                     borderRadius: 1,
                                     mt: 1
                                 }}>
-                                    <MetadataContent
-                                        data={subCategory.data}
-                                        showAll={true}
-                                        category={subCategory.category}
-                                    />
+                                    {getContentComponent(subCategory)}
                                 </Box>
                             </TreeItem>
                         ))}
@@ -583,84 +841,59 @@ const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
     );
 };
 
-const RelatedItemsTab: React.FC = () => {
-    const theme = useTheme();
+const RelatedItemsTab: React.FC<{ 
+    assetId: string;
+    relatedVersionsData: RelatedVersionsResponse | undefined;
+    isLoading: boolean;
+    onLoadMore: () => void;
+}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+    console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
     
-    // This would typically fetch related items from an API
-    // For now, we'll use placeholder data
-    const relatedItems = [
-        { id: '1', title: 'Related Image 1', type: 'image', thumbnail: 'https://example.com/thumb1.jpg' },
-        { id: '2', title: 'Related Video 1', type: 'video', thumbnail: 'https://example.com/thumb2.jpg' },
-        { id: '3', title: 'Related Audio 1', type: 'audio', thumbnail: 'https://example.com/thumb3.jpg' },
-    ];
-
-    // Get icon based on item type
-    const getItemIcon = (type: string) => {
-        switch (type) {
-            case 'image':
-                return <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'video':
-                return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            case 'audio':
-                return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-            default:
-                return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+    const items = useMemo(() => {
+        if (!relatedVersionsData?.data?.results) {
+            console.log('No results found in relatedVersionsData');
+            return [];
         }
-    };
 
+        const mappedItems = relatedVersionsData.data.results.map((result) => ({
+            id: result.InventoryID,
+            title: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: result.DigitalSourceAsset.Type,
+            thumbnail: result.thumbnailUrl,
+            proxyUrl: result.proxyUrl,
+            score: result.score,
+            format: result.DigitalSourceAsset.MainRepresentation.Format,
+            fileSize: result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+            createDate: result.DigitalSourceAsset.CreateDate
+        }));
+        console.log('Mapped items:', mappedItems);
+        return mappedItems;
+    }, [relatedVersionsData]);
+
+    const hasMore = useMemo(() => {
+        if (!relatedVersionsData?.data?.searchMetadata) {
+            console.log('No searchMetadata found for hasMore calculation');
+            return false;
+        }
+
+        const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
+        const hasMoreItems = totalResults > page * pageSize;
+        console.log('Has more items:', hasMoreItems);
+        return hasMoreItems;
+    }, [relatedVersionsData]);
+
+    console.log('Rendering RelatedItemsView with items:', items);
     return (
-        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
-            <Grid container spacing={3}>
-                {relatedItems.map((item) => (
-                    <Grid item xs={12} sm={6} md={4} key={item.id}>
-                        <Card
-                            variant="outlined"
-                            sx={{
-                                height: '100%',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                    boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                                    transform: 'translateY(-2px)'
-                                },
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                    {getItemIcon(item.type)}
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            ml: 1,
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary
-                                        }}
-                                    >
-                                        {item.title}
-                                    </Typography>
-                                </Box>
-                                <Chip
-                                    size="small"
-                                    label={item.type.toUpperCase()}
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main,
-                                        fontWeight: 500,
-                                        fontSize: '0.75rem'
-                                    }}
-                                />
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-        </Box>
+        <RelatedItemsView
+            items={items}
+            isLoading={isLoading}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
+        />
     );
 };
 
 const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const theme = useTheme();
-    
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -689,37 +922,13 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
         const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
 
         return (
-            <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    md: 'repeat(auto-fill, minmax(200px, 1fr))'
-                }, 
-                gap: 2 
-            }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
                 {displayEntries.map(([key, value]) => (
-                    <Box key={key} sx={{
-                        backgroundColor: alpha(theme.palette.background.paper, 0.7),
-                        p: 1.5,
-                        borderRadius: 1,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                    }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-                                {formatCamelCase(key)}:
-                            </Typography>
-                            <IconButton 
-                                size="small" 
-                                onClick={() => navigator.clipboard.writeText(
-                                    typeof value === 'object' ? JSON.stringify(value) : String(value)
-                                )}
-                                sx={{ opacity: 0.6, '&:hover': { opacity: 1 }, ml: 0.5, p: 0.3 }}
-                            >
-                                <ContentCopyIcon fontSize="small" sx={{ fontSize: '0.9rem' }} />
-                            </IconButton>
-                        </Box>
-                        <Box sx={{ pl: 0 }}>
+                    <Box key={key}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {formatCamelCase(key)}:
+                        </Typography>
+                        <Box sx={{ pl: 2 }}>
                             <MetadataContent
                                 data={value}
                                 depth={depth + 1}
@@ -732,38 +941,79 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
             </Box>
         );
     } else {
-        return (
-            <Typography 
-                variant="body2" 
-                sx={{ 
-                    color: data === null || data === undefined 
-                        ? theme.palette.text.disabled 
-                        : theme.palette.text.primary,
-                    fontStyle: data === null || data === undefined ? 'italic' : 'normal'
-                }}
-            >
-                <TruncatedTextWithTooltip text={String(data)} />
-            </Typography>
-        );
+        return <TruncatedTextWithTooltip text={String(data)} />;
     }
 };
 
 const ImageDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { data: assetData, isLoading, error } = useAsset(id || '');
     const navigate = useNavigate();
     const location = useLocation();
-    const { isExpanded } = useRightSidebar();
+    const theme = useTheme();
+    const [activeTab, setActiveTab] = useState('summary');
+    const [relatedPage, setRelatedPage] = useState(1);
+    const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || '');
+    const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const { isExpanded, openSidebar, closeSidebar } = useRightSidebar();
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
     const [newComment, setNewComment] = useState('');
-    const [activeTab, setActiveTab] = useState<string>('summary');
+    const [showHeader, setShowHeader] = useState(true);
     const [comments, setComments] = useState([
         { user: "John Doe", avatar: "https://mui.com/static/images/avatar/1.jpg", content: "Great composition!", timestamp: "2023-06-15 09:30:22" },
-        { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
-        { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
+        { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect!", timestamp: "2023-06-15 10:15:45" },
+        { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Love the color palette!", timestamp: "2023-06-15 11:00:12" }
     ]);
+
+    // Track scroll position to hide/show header
+    useEffect(() => {
+        let lastScrollTop = 0;
+        
+        const handleScroll = () => {
+            // Get scrollTop from the parent scrollable container instead
+            const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
+            
+            if (currentScrollTop <= 10) {
+                setShowHeader(true);
+            } else if (currentScrollTop > lastScrollTop) {
+                setShowHeader(false);
+            } else if (currentScrollTop < lastScrollTop) {
+                setShowHeader(true);
+            }
+            
+            lastScrollTop = currentScrollTop;
+        };
+        
+        // Listen to scroll on the parent container
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.addEventListener('scroll', handleScroll, { passive: true });
+        }
+        
+        return () => {
+            if (container) {
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
+
+    const recentlyViewedItem = useMemo(() => {
+        if (!id || !assetData?.data?.asset) return null;
+        const asset = assetData.data.asset;
+        return {
+            id,
+            title: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: asset.DigitalSourceAsset.Type.toLowerCase() as 'video' | 'image' | 'audio',
+            path: location.pathname,
+            searchTerm: '',
+            metadata: {
+                fileSize: formatFileSize(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size)
+            }
+        };
+    }, [id, assetData, location.pathname]);
+
+    useTrackRecentlyViewed(recentlyViewedItem);
 
     // Get all the search state from location.state
     const {
@@ -855,25 +1105,6 @@ const ImageDetailContent: React.FC = () => {
         return proxyRep?.URL || assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
     }, [assetData]);
 
-    useTrackRecentlyViewed(
-        useMemo(() => {
-            if (!assetData?.data?.asset) return null;
-            return {
-                id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-                title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-                type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "image" | "video",
-                path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
-                searchTerm: searchTerm,
-                metadata: {
-                    fileSize: formatFileSize(assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size),
-                    dimensions: assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution
-                        ? `${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Width}x${assetData.data.asset.DerivedRepresentations.find(rep => rep.ImageSpec?.Resolution)?.ImageSpec?.Resolution.Height}`
-                        : undefined
-                }
-            };
-        }, [assetData, searchTerm])
-    );
-
     const handleBack = useCallback(() => {
         // Construct query parameters
         const queryParams = new URLSearchParams();
@@ -938,7 +1169,35 @@ const ImageDetailContent: React.FC = () => {
         setNewComment('');
     }, []);
 
-    if (isLoading) {
+    console.log('ImageDetailContent - activeTab:', activeTab);
+    console.log('ImageDetailContent - relatedVersionsData:', relatedVersionsData);
+    console.log('ImageDetailContent - isLoadingRelated:', isLoadingRelated);
+
+    const renderTabContent = () => {
+        console.log('renderTabContent - activeTab:', activeTab);
+        switch (activeTab) {
+            case 'summary':
+                return <SummaryTab assetData={assetData} />;
+            case 'technical':
+                return <TechnicalMetadataTab metadataAccordions={metadataAccordions} />;
+            case 'descriptor':
+                return <DescriptorMetadataTab assetData={assetData} />;
+            case 'related':
+                console.log('Rendering RelatedItemsTab');
+                return (
+                    <RelatedItemsTab 
+                        assetId={assetData.data.asset.DigitalSourceAsset.ID}
+                        relatedVersionsData={relatedVersionsData}
+                        isLoading={isLoadingRelated}
+                        onLoadMore={() => setRelatedPage(prev => prev + 1)}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
+    if (isLoadingAsset) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <CircularProgress />
@@ -946,7 +1205,7 @@ const ImageDetailContent: React.FC = () => {
         );
     }
 
-    if (error || !assetData) {
+    if (!assetData) {
         return (
             <Box sx={{ p: 3 }}>
                 <Typography variant="h5" color="error">Error loading asset data</Typography>
@@ -961,8 +1220,7 @@ const ImageDetailContent: React.FC = () => {
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100vh',
-            maxWidth: isExpanded ? 'calc(100% - 300px)' : 'calc(100% - 8px)',
+            maxWidth: isExpanded ? 'calc(100% - 300px)' : '100%',
             transition: theme => theme.transitions.create(['max-width'], {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.enteringScreen,
@@ -973,7 +1231,12 @@ const ImageDetailContent: React.FC = () => {
                 position: 'sticky',
                 top: 0,
                 zIndex: 1200,
-                background: 'transparent'
+                background: theme => alpha(theme.palette.background.default, 0.8),
+                backdropFilter: 'blur(8px)',
+                transform: showHeader ? 'translateY(0)' : 'translateY(-100%)',
+                transition: 'transform 0.3s ease-in-out',
+                visibility: showHeader ? 'visible' : 'hidden',
+                opacity: showHeader ? 1 : 0,
             }}>
                 <Box sx={{ px: 0, py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
@@ -988,174 +1251,135 @@ const ImageDetailContent: React.FC = () => {
                 </Box>
             </Box>
 
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                overflow: 'auto',
-                gap: 1,
-                px: 0,
-                pb: 0,
-                mt: 0
-            }}>
-                <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1
-                }}>
-                    <Box sx={{
-                        position: 'relative',
-                        bgcolor: 'transparent',
-                        pt: 0,
-                        pb: 0,
-                        mt: 0,
-                        mb: 0
-                    }}>
-                        <Box
-                            sx={{
-                                overflow: 'hidden',
-                                borderRadius: 2,
-                                position: 'relative'
-                            }}
-                        >
-                            <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
-                            {/* <Box
-                                sx={{
-                                    position: 'absolute',
-                                    top: 8,
-                                    right: 8,
-                                    bgcolor: 'rgba(255,255,255,0.8)',
-                                    borderRadius: '50%',
-                                    p: 0.5,
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        bgcolor: 'rgba(255,255,255,0.9)',
-                                    }
-                                }}
-                            >
-                                <ZoomOutMapIcon fontSize="small" color="primary" />
-                            </Box> */}
-                        </Box>
-                    </Box>
-
-                    <Box>
-                        <Paper
-                            elevation={0}
-                            sx={{
-                                p: 0,
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                                background: 'transparent'
-                            }}
-                        >
-                            <Tabs
-                                value={activeTab}
-                                onChange={(e, newValue) => setActiveTab(newValue)}
-                                textColor="secondary"
-                                indicatorColor="secondary"
-                                aria-label="metadata tabs"
-                                variant="scrollable"
-                                scrollButtons="auto"
-                                sx={{
-                                    px: 2,
-                                    pt: 1,
-                                    '& .MuiTab-root': {
-                                        minWidth: 'auto',
-                                        px: 2,
-                                        py: 1.5,
-                                        fontWeight: 500,
-                                        transition: 'all 0.2s',
-                                        '&:hover': {
-                                            backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
-                                        }
-                                    }
-                                }}
-                            >
-                                <Tab
-                                    value="summary"
-                                    label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <InfoOutlinedIcon fontSize="small" />
-                                            <span>Summary</span>
-                                        </Box>
-                                    }
-                                    id="tab-summary"
-                                    aria-controls="tabpanel-summary"
-                                />
-                                <Tab
-                                    value="technical"
-                                    label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <CodeOutlinedIcon fontSize="small" />
-                                            <span>Technical</span>
-                                            {metadataAccordions.length > 0 && (
-                                                <Chip 
-                                                    size="small" 
-                                                    label={metadataAccordions.length} 
-                                                    sx={{ height: 20, ml: 0.5 }} 
-                                                />
-                                            )}
-                                        </Box>
-                                    }
-                                    id="tab-technical"
-                                    aria-controls="tabpanel-technical"
-                                />
-                                <Tab
-                                    value="descriptor"
-                                    label="Descriptor Metadata"
-                                    id="tab-descriptor"
-                                    aria-controls="tabpanel-descriptor"
-                                />
-                                <Tab
-                                    value="related"
-                                    label="Related Items"
-                                    id="tab-related"
-                                    aria-controls="tabpanel-related"
-                                />
-                            </Tabs>
-                            <Box
-                                sx={{
-                                    mt: { xs: 2, sm: 3 },
-                                    mx: { xs: 1, sm: 2, md: 3 },
-                                    mb: { xs: 2, sm: 3 },
-                                    pt: { xs: 1, sm: 2 },
-                                    outline: 'none',
-                                    borderRadius: 1,
-                                    backgroundColor: 'transparent'
-                                }}
-                                role="tabpanel"
-                                id={`tabpanel-${activeTab}`}
-                                aria-labelledby={`tab-${activeTab}`}
-                                tabIndex={0}
-                            >
-                                {activeTab === 'summary' && <SummaryTab assetData={assetData} />}
-                                {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
-                                {activeTab === 'descriptor' && <DescriptorMetadataTab assetData={assetData} />}
-                                {activeTab === 'related' && <RelatedItemsTab />}
-                            </Box>
-                        </Paper>
-                    </Box>
+            {/* Image viewer section */}
+            <Box sx={{ px: 3, pt: 0, pb: 3, minHeight: '60vh' }}>
+                <Box
+                    sx={{
+                        overflow: 'hidden',
+                        borderRadius: 2,
+                        position: 'relative'
+                    }}
+                >
+                    <ImageViewer imageSrc={proxyUrl} maxHeight={600} />
                 </Box>
-
-                <AssetSidebar
-                    versions={versions}
-                    comments={comments}
-                    onAddComment={handleAddComment}
-                />
-                
-                {selectedComment !== null && (
-                    <CommentPopper
-                        id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
-                        open={Boolean(commentAnchorEl)}
-                        anchorEl={commentAnchorEl}
-                        comment={comments[selectedComment]}
-                        onClose={() => {
-                            setCommentAnchorEl(null);
-                            setSelectedComment(null);
-                        }}
-                    />
-                )}
             </Box>
+
+            {/* Metadata section */}
+            <Box sx={{ px: 3, pb: 3 }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 0,
+                        borderRadius: 2,
+                        overflow: 'visible',
+                        background: 'transparent'
+                    }}
+                >
+                    <Tabs
+                        value={activeTab}
+                        onChange={(e, newValue) => setActiveTab(newValue)}
+                        textColor="secondary"
+                        indicatorColor="secondary"
+                        aria-label="metadata tabs"
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        sx={{
+                            px: 2,
+                            pt: 1,
+                            '& .MuiTab-root': {
+                                minWidth: 'auto',
+                                px: 2,
+                                py: 1.5,
+                                fontWeight: 500,
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                    backgroundColor: theme => alpha(theme.palette.secondary.main, 0.05)
+                                }
+                            }
+                        }}
+                    >
+                        <Tab
+                            value="summary"
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <InfoOutlinedIcon fontSize="small" />
+                                    <span>Summary</span>
+                                </Box>
+                            }
+                            id="tab-summary"
+                            aria-controls="tabpanel-summary"
+                        />
+                        <Tab
+                            value="technical"
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <CodeOutlinedIcon fontSize="small" />
+                                    <span>Technical</span>
+                                    {metadataAccordions.length > 0 && (
+                                        <Chip 
+                                            size="small" 
+                                            label={metadataAccordions.length} 
+                                            sx={{ height: 20, ml: 0.5 }} 
+                                        />
+                                    )}
+                                </Box>
+                            }
+                            id="tab-technical"
+                            aria-controls="tabpanel-technical"
+                        />
+                        <Tab
+                            value="descriptor"
+                            label="Descriptor Metadata"
+                            id="tab-descriptor"
+                            aria-controls="tabpanel-descriptor"
+                        />
+                        <Tab
+                            value="related"
+                            label="Related Items"
+                            id="tab-related"
+                            aria-controls="tabpanel-related"
+                        />
+                    </Tabs>
+                    <Box
+                        sx={{
+                            mt: { xs: 2, sm: 3 },
+                            mx: { xs: 1, sm: 2, md: 3 },
+                            mb: { xs: 2, sm: 3 },
+                            pt: { xs: 1, sm: 2 },
+                            outline: 'none',
+                            borderRadius: 1,
+                            backgroundColor: 'transparent',
+                            overflow: 'visible',
+                            maxHeight: 'none'
+                        }}
+                        role="tabpanel"
+                        id={`tabpanel-${activeTab}`}
+                        aria-labelledby={`tab-${activeTab}`}
+                        tabIndex={0}
+                    >
+                        {renderTabContent()}
+                    </Box>
+                </Paper>
+            </Box>
+
+            <AssetSidebar
+                versions={versions}
+                comments={comments}
+                onAddComment={handleAddComment}
+            />
+            
+            {selectedComment !== null && (
+                <CommentPopper
+                    id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
+                    open={Boolean(commentAnchorEl)}
+                    anchorEl={commentAnchorEl}
+                    comment={comments[selectedComment]}
+                    onClose={() => {
+                        setCommentAnchorEl(null);
+                        setSelectedComment(null);
+                    }}
+                />
+            )}
         </Box>
     );
 };

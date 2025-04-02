@@ -1,0 +1,1435 @@
+openapi: 3.0.0
+info:
+  title: Groovy API
+  version: 1.0.0
+  description: AudioShake API
+  license:
+    name: © 2021 - 2025 AudioShake. All Rights Reserved
+    url: https://audioshake.ai
+  contact:
+    name: AudioShake
+    url: https://audioshake.ai
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+      in: header
+      bearerFormat: JWT
+  schemas:
+    def-0:
+      type: object
+      required:
+        - id
+        - name
+        - clientId
+        - type
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        clientId:
+          type: string
+          format: uuid
+        jobId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+        format:
+          type: string
+          description: The mimetype format of the asset.
+          example: wav
+        fileType:
+          type: string
+          description: The mimetype format of the asset.
+          example: audio
+        metadata:
+          type: object
+          description: Metadata associated with a asset.
+        type:
+          type: string
+          description: Describes the type of asset.
+          enum:
+            - source
+            - stem
+      title: Asset
+    def-1:
+      type: object
+      required:
+        - requestId
+        - stemMetadata
+        - callbackUrl
+        - clientId
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        requestId:
+          type: string
+          format: uuid
+          description: The request id.
+        clientId:
+          type: string
+          format: uuid
+          description: The client id.
+        licenseId:
+          type: string
+          format: uuid
+          description: The license id.
+        stemMetadata:
+          type: object
+          description: Metadata associated with a stem.
+        callbackUrl:
+          type: string
+          description: Url to call back to client.
+        status:
+          type: string
+          enum:
+            - created
+            - processing
+            - completed
+      title: Job
+paths:
+  /download/:
+    get:
+      summary: Download a group of files as a zip.
+      tags:
+        - download
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: sourceAssetName
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: userSessionId
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: audioId
+          required: false
+      responses:
+        '200':
+          description: Default Response
+  /job/:
+    post:
+      summary: Create a new job.
+      tags:
+        - job
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              oneOf:
+                - type: object
+                  required:
+                    - metadata
+                    - assetId
+                  properties:
+                    callbackUrl:
+                      type: string
+                      format: uri
+                      minLength: 4
+                      description: The callback URL for job status notifications. Must be a valid URI with a minimum length of 4 characters.
+                    assetId:
+                      type: string
+                      minLength: 8
+                      maxLength: 30
+                      description: A unique identifier for the asset. Must be a string with a minimum length of 8 characters and a maximum length of 30 characters.
+                    metadata:
+                      type: object
+                      maxProperties: 10
+                      oneOf:
+                        - required:
+                            - format
+                            - name
+                        - required:
+                            - formats
+                            - name
+                      properties:
+                        name:
+                          type: string
+                        format:
+                          type: string
+                        formats:
+                          type: array
+                          items:
+                            type: string
+                        otherAssets:
+                          type: array
+                        customProperty:
+                          type: string
+                          maxLength: 1000
+                          description: "A custom string for client use or debugging. Maximum length: 1000 characters. This is an optional property."
+                        residual:
+                          type: boolean
+                          description: "Set this flag to true to return a separate residual file. This is an optional property."
+                        variant:
+                          type: string
+                          description: "The variant of the stem you want to generate. This is an optional property."
+                        userSessionId:
+                          type: string
+                          description: Represents the user session ID associated with this job.
+                        audioId:
+                          type: string
+                          description: Represents the custom unique audio file ID associated with this job.
+                        licenseId:
+                          type: string
+                          description: The license ID associated with this job.
+                        maxTrackLength:
+                          type: number
+                          minimum: 20
+                          description: "The maximum length of the track in seconds. This is an optional property."
+                        preview:
+                          type: boolean
+                          description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                        watermarkInterval:
+                          type: number
+                          minimum: 10
+                          description: "The interval for watermark in seconds. This is an optional property."
+                        language:
+                          type: string
+                          pattern: ^[a-zA-Z]{2}$
+                          enum:
+                            - af
+                            - ar
+                            - az
+                            - be
+                            - bg
+                            - bs
+                            - ca
+                            - cs
+                            - cy
+                            - da
+                            - de
+                            - el
+                            - en
+                            - es
+                            - et
+                            - fa
+                            - fi
+                            - fr
+                            - gl
+                            - he
+                            - hi
+                            - hr
+                            - hu
+                            - hy
+                            - id
+                            - is
+                            - it
+                            - ja
+                            - kk
+                            - kn
+                            - ko
+                            - lt
+                            - lv
+                            - mi
+                            - mk
+                            - mr
+                            - ms
+                            - ne
+                            - nl
+                            - no
+                            - pl
+                            - pt
+                            - ro
+                            - ru
+                            - sk
+                            - sl
+                            - sr
+                            - sv
+                            - sw
+                            - ta
+                            - th
+                            - tl
+                            - tr
+                            - uk
+                            - ur
+                            - vi
+                            - zh
+                            - auto
+                          description: The language model to use for alignment (Default is auto)
+                        translationLanguage:
+                          type: string
+                          pattern: ^[a-zA-Z]{2}$
+                          enum:
+                            - af
+                            - ar
+                            - az
+                            - be
+                            - bg
+                            - bs
+                            - ca
+                            - cs
+                            - cy
+                            - da
+                            - de
+                            - el
+                            - en
+                            - es
+                            - et
+                            - fa
+                            - fi
+                            - fr
+                            - gl
+                            - he
+                            - hi
+                            - hr
+                            - hu
+                            - hy
+                            - id
+                            - is
+                            - it
+                            - ja
+                            - kk
+                            - kn
+                            - ko
+                            - lt
+                            - lv
+                            - mi
+                            - mk
+                            - mr
+                            - ms
+                            - ne
+                            - nl
+                            - no
+                            - pl
+                            - pt
+                            - ro
+                            - ru
+                            - sk
+                            - sl
+                            - sr
+                            - sv
+                            - sw
+                            - ta
+                            - th
+                            - tl
+                            - tr
+                            - uk
+                            - ur
+                            - vi
+                            - zh
+                          description: The language for lyrics translation
+                    otherSourceAssets:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - id
+                          - type
+                        properties:
+                          id:
+                            type: string
+                          type:
+                            type: string
+                            enum:
+                              - transcription
+                          name:
+                            type: string
+                - required:
+                    - stemMetadata
+                    - assetId
+                  properties:
+                    stemMetadata:
+                      type: object
+                      maxProperties: 10
+                      required:
+                        - format
+                        - stemName
+                      properties:
+                        format:
+                          type: string
+                          description: The audio file format.
+                        stemName:
+                          type: string
+                          description: The stem you want to generate.
+                        customProperty:
+                          type: string
+                          maxLength: 1000
+                          description: "A custom string for client use or debugging. Maximum length: 1000 characters. This is an optional property."
+                        residual:
+                          type: boolean
+                          description: "Set this flag to true to return a separate residual file. This is an optional property."
+                        variant:
+                          type: string
+                          description: "The variant of the stem you want to generate. This is an optional property."
+                        userSessionId:
+                          type: string
+                          description: Represents the user session ID associated with this job.
+                        audioId:
+                          type: string
+                          description: Represents the custom unique audio file ID associated with this job.
+                        licenseId:
+                          type: string
+                          description: The license ID associated with this job.
+                        maxTrackLength:
+                          type: number
+                          minimum: 20
+                          description: "The maximum length of the track in seconds. This is an optional property."
+                        preview:
+                          type: boolean
+                          description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                        watermarkInterval:
+                          type: number
+                          minimum: 10
+                          description: "The interval for watermark in seconds. This is an optional property."
+                      example:
+                        format: wav
+                        stemName: vocals
+                    callbackUrl:
+                      type: string
+                      format: uri
+                      minLength: 4
+                      description: The callback URL for job status notifications. Must be a valid URI with a minimum length of 4 characters.
+                    assetId:
+                      type: string
+                      minLength: 8
+                      maxLength: 30
+                      description: A unique identifier for the asset. Must be a string with a minimum length of 8 characters and a maximum length of 30 characters.
+            examples:
+              example1:
+                value:
+                  metadata:
+                    format: wav
+                    name: vocals
+                  assetId: abc123
+                  callbackUrl: https://example.com/webhook/vocals
+              example2:
+                value:
+                  metadata:
+                    format: json
+                    name: transcription
+                  assetId: def456
+              example3:
+                value:
+                  metadata:
+                    format: json
+                    name: alignment
+                  assetId: ghi789
+                  otherAssets:
+                    - id: xyz001
+                      type: transcription
+                      name: transcription
+              example4:
+                value:
+                  stemMetadata:
+                    format: wav
+                    stemName: drums
+                  assetId: jkl234
+        required: true
+      responses:
+        2XX:
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: Unique identifier of the stem generation job
+                      clientId:
+                        type: string
+                        description: Identifier of the client making the request
+                      createdAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was created
+                      startedAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was started
+                      updatedAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was last updated
+                      requestId:
+                        type: string
+                        description: Unique identifier of the request that generated this stem generation job
+                      licenseId:
+                        type: string
+                        description: Identifier of the license used for stem generation
+                      metadata:
+                        type: object
+                        maxProperties: 10
+                        properties:
+                          format:
+                            type: string
+                            enum:
+                              - wav
+                              - flac
+                              - mp3
+                              - aiff
+                              - mp4
+                            description: Audio format of the stem
+                          name:
+                            type: string
+                            description: Name of the stem being generated
+                          language:
+                            type: string
+                            pattern: ^[a-zA-Z]{2}$
+                            enum:
+                              - af
+                              - ar
+                              - az
+                              - be
+                              - bg
+                              - bs
+                              - ca
+                              - cs
+                              - cy
+                              - da
+                              - de
+                              - el
+                              - en
+                              - es
+                              - et
+                              - fa
+                              - fi
+                              - fr
+                              - gl
+                              - he
+                              - hi
+                              - hr
+                              - hu
+                              - hy
+                              - id
+                              - is
+                              - it
+                              - ja
+                              - kk
+                              - kn
+                              - ko
+                              - lt
+                              - lv
+                              - mi
+                              - mk
+                              - mr
+                              - ms
+                              - ne
+                              - nl
+                              - no
+                              - pl
+                              - pt
+                              - ro
+                              - ru
+                              - sk
+                              - sl
+                              - sr
+                              - sv
+                              - sw
+                              - ta
+                              - th
+                              - tl
+                              - tr
+                              - uk
+                              - ur
+                              - vi
+                              - zh
+                              - auto
+                            description: The language model to use for alignment (Default is auto)
+                          customProperty:
+                            type: string
+                            maxLength: 1000
+                            description: Custom property of the stem
+                          residual:
+                            type: boolean
+                            description: Flag indicating if the stem is or should generate a residual
+                          userSessionId:
+                            type: string
+                            description: Identifier of the user session making the request. Widget specific.
+                          audioId:
+                            type: string
+                            description: Identifier of the audio source used for stem generation. Widget specific.
+                          maxTrackLength:
+                            type: number
+                            minimum: 20
+                            description: "The maximum length of the track in seconds. This is an optional property."
+                          preview:
+                            type: boolean
+                            description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                          watermarkInterval:
+                            type: number
+                            minimum: 10
+                            description: "The interval for watermark in seconds. This is an optional property."
+                          variant:
+                            type: string
+                            description: Variant of the stem generation job
+                      stemMetadata:
+                        type: object
+                        maxProperties: 10
+                        properties:
+                          format:
+                            type: string
+                            enum:
+                              - wav
+                              - flac
+                              - mp3
+                              - aiff
+                              - mp4
+                            description: Audio format of the stem
+                          stemName:
+                            type: string
+                            description: Name of the stem being generated
+                          language:
+                            type: string
+                            pattern: ^[a-zA-Z]{2}$
+                            enum:
+                              - af
+                              - ar
+                              - az
+                              - be
+                              - bg
+                              - bs
+                              - ca
+                              - cs
+                              - cy
+                              - da
+                              - de
+                              - el
+                              - en
+                              - es
+                              - et
+                              - fa
+                              - fi
+                              - fr
+                              - gl
+                              - he
+                              - hi
+                              - hr
+                              - hu
+                              - hy
+                              - id
+                              - is
+                              - it
+                              - ja
+                              - kk
+                              - kn
+                              - ko
+                              - lt
+                              - lv
+                              - mi
+                              - mk
+                              - mr
+                              - ms
+                              - ne
+                              - nl
+                              - no
+                              - pl
+                              - pt
+                              - ro
+                              - ru
+                              - sk
+                              - sl
+                              - sr
+                              - sv
+                              - sw
+                              - ta
+                              - th
+                              - tl
+                              - tr
+                              - uk
+                              - ur
+                              - vi
+                              - zh
+                              - auto
+                            description: The language model to use for alignment (Default is auto)
+                          customProperty:
+                            type: string
+                            maxLength: 1000
+                            description: Custom property of the stem
+                          residual:
+                            type: boolean
+                            description: Flag indicating if the stem is or should generate a residual
+                          userSessionId:
+                            type: string
+                            description: Identifier of the user session making the request. Widget specific.
+                          audioId:
+                            type: string
+                            description: Identifier of the audio source used for stem generation. Widget specific.
+                          maxTrackLength:
+                            type: number
+                            minimum: 20
+                            description: "The maximum length of the track in seconds. This is an optional property."
+                          preview:
+                            type: boolean
+                            description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                          variant:
+                            type: string
+                            description: "Variant of the stem generation job"
+                          watermarkInterval:
+                            type: number
+                            minimum: 10
+                            description: "The interval for watermark in seconds. This is an optional property."
+                      callbackUrl:
+                        type: string
+                        description: URL for the callback function to receive updates on the stem generation job
+                      status:
+                        type: string
+                        description: Current status of the stem generation job
+                      statusInfo:
+                        type:
+                          - 'null'
+                          - object
+                        properties:
+                          code:
+                            type: number
+                            description: Code indicating the status of the stem generation job
+                          message:
+                            type: string
+                            description: Message providing additional information on the status of the stem generation job
+                          duration:
+                            type: number
+                            description: duration of the asset processed
+                      sourceAsset:
+                        type:
+                          - 'null'
+                          - object
+                        properties:
+                          name:
+                            type: string
+                            description: Name of the asset
+                          id:
+                            type: string
+                            description: Unique identifier of the asset
+                          fileType:
+                            type: string
+                            description: Type of the file of the asset
+                          format:
+                            type: string
+                            description: Format of the asset
+                          link:
+                            type: string
+                            description: URL link of the asset
+                          jobs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                stemAssets:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        description: Name of the stem asset
+                                      id:
+                                        type: string
+                                        description: Unique identifier of the stem asset
+                                      fileType:
+                                        type: string
+                                        description: Type of the file of the stem asset
+                                      format:
+                                        type: string
+                                        description: Format of the stem asset
+                                      path:
+                                        type: string
+                                        description: Path of the stem asset
+                                  description: Array of stem assets generated for the job
+                            description: Array of jobs containing the stem assets generated from the asset
+                        description: Asset representing the source audio used for stem generation
+                      stemAssets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Name of the asset
+                            id:
+                              type: string
+                              description: Unique identifier of the asset
+                            fileType:
+                              type: string
+                              description: Type of the file of the asset
+                            format:
+                              type: string
+                              description: Format of the asset
+                            link:
+                              type: string
+                              description: URL link of the asset
+                            jobs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  stemAssets:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                          description: Name of the stem asset
+                                        id:
+                                          type: string
+                                          description: Unique identifier of the stem asset
+                                        fileType:
+                                          type: string
+                                          description: Type of the file of the stem asset
+                                        format:
+                                          type: string
+                                          description: Format of the stem asset
+                                        path:
+                                          type: string
+                                          description: Path of the stem asset
+                                    description: Array of stem assets generated for the job
+                              description: Array of jobs containing the stem assets generated from the asset
+                        description: Array of assets representing the generated stems
+                      outputAssets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Name of the asset
+                            id:
+                              type: string
+                              description: Unique identifier of the asset
+                            fileType:
+                              type: string
+                              description: Type of the file of the asset
+                            format:
+                              type: string
+                              description: Format of the asset
+                            link:
+                              type: string
+                              description: URL link of the asset
+                            jobs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  stemAssets:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                          description: Name of the stem asset
+                                        id:
+                                          type: string
+                                          description: Unique identifier of the stem asset
+                                        fileType:
+                                          type: string
+                                          description: Type of the file of the stem asset
+                                        format:
+                                          type: string
+                                          description: Format of the stem asset
+                                        path:
+                                          type: string
+                                          description: Path of the stem asset
+                                    description: Array of stem assets generated for the job
+                              description: Array of jobs containing the stem assets generated from the asset
+                        description: Array of assets representing the generated stems
+  /job/{id}:
+    get:
+      summary: Get a job given an Id.
+      tags:
+        - job
+      parameters:
+        - schema:
+            type: string
+            minLength: 3
+            maxLength: 60
+          in: path
+          name: id
+          required: true
+      responses:
+        2XX:
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: Unique identifier of the stem generation job
+                      clientId:
+                        type: string
+                        description: Identifier of the client making the request
+                      createdAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was created
+                      startedAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was started
+                      updatedAt:
+                        type: string
+                        description: Timestamp of when the stem generation job was last updated
+                      requestId:
+                        type: string
+                        description: Unique identifier of the request that generated this stem generation job
+                      licenseId:
+                        type: string
+                        description: Identifier of the license used for stem generation
+                      metadata:
+                        type: object
+                        maxProperties: 10
+                        properties:
+                          format:
+                            type: string
+                            enum:
+                              - wav
+                              - flac
+                              - mp3
+                              - aiff
+                              - mp4
+                            description: Audio format of the stem
+                          name:
+                            type: string
+                            description: Name of the stem being generated
+                          language:
+                            type: string
+                            pattern: ^[a-zA-Z]{2}$
+                            enum:
+                              - af
+                              - ar
+                              - az
+                              - be
+                              - bg
+                              - bs
+                              - ca
+                              - cs
+                              - cy
+                              - da
+                              - de
+                              - el
+                              - en
+                              - es
+                              - et
+                              - fa
+                              - fi
+                              - fr
+                              - gl
+                              - he
+                              - hi
+                              - hr
+                              - hu
+                              - hy
+                              - id
+                              - is
+                              - it
+                              - ja
+                              - kk
+                              - kn
+                              - ko
+                              - lt
+                              - lv
+                              - mi
+                              - mk
+                              - mr
+                              - ms
+                              - ne
+                              - nl
+                              - no
+                              - pl
+                              - pt
+                              - ro
+                              - ru
+                              - sk
+                              - sl
+                              - sr
+                              - sv
+                              - sw
+                              - ta
+                              - th
+                              - tl
+                              - tr
+                              - uk
+                              - ur
+                              - vi
+                              - zh
+                              - auto
+                            description: The language model to use for alignment (Default is auto)
+                          customProperty:
+                            type: string
+                            maxLength: 1000
+                            description: Custom property of the stem
+                          residual:
+                            type: boolean
+                            description: Flag indicating if the stem is or should generate a residual
+                          userSessionId:
+                            type: string
+                            description: Identifier of the user session making the request. Widget specific.
+                          audioId:
+                            type: string
+                            description: Identifier of the audio source used for stem generation. Widget specific.
+                          maxTrackLength:
+                            type: number
+                            minimum: 20
+                            description: "The maximum length of the track in seconds. This is an optional property."
+                          preview:
+                            type: boolean
+                            description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                          watermarkInterval:
+                            type: number
+                            minimum: 10
+                            description: "The interval for watermark in seconds. This is an optional property."
+                          variant:
+                            type: string
+                            description: "Variant of the stem generation job"
+                      stemMetadata:
+                        type: object
+                        maxProperties: 10
+                        properties:
+                          format:
+                            type: string
+                            enum:
+                              - wav
+                              - flac
+                              - mp3
+                              - aiff
+                              - mp4
+                            description: Audio format of the stem
+                          stemName:
+                            type: string
+                            description: Name of the stem being generated
+                          language:
+                            type: string
+                            pattern: ^[a-zA-Z]{2}$
+                            enum:
+                              - af
+                              - ar
+                              - az
+                              - be
+                              - bg
+                              - bs
+                              - ca
+                              - cs
+                              - cy
+                              - da
+                              - de
+                              - el
+                              - en
+                              - es
+                              - et
+                              - fa
+                              - fi
+                              - fr
+                              - gl
+                              - he
+                              - hi
+                              - hr
+                              - hu
+                              - hy
+                              - id
+                              - is
+                              - it
+                              - ja
+                              - kk
+                              - kn
+                              - ko
+                              - lt
+                              - lv
+                              - mi
+                              - mk
+                              - mr
+                              - ms
+                              - ne
+                              - nl
+                              - no
+                              - pl
+                              - pt
+                              - ro
+                              - ru
+                              - sk
+                              - sl
+                              - sr
+                              - sv
+                              - sw
+                              - ta
+                              - th
+                              - tl
+                              - tr
+                              - uk
+                              - ur
+                              - vi
+                              - zh
+                              - auto
+                            description: The language model to use for alignment (Default is auto)
+                          customProperty:
+                            type: string
+                            maxLength: 1000
+                            description: Custom property of the stem
+                          residual:
+                            type: boolean
+                            description: Flag indicating if the stem is or should generate a residual
+                          userSessionId:
+                            type: string
+                            description: Identifier of the user session making the request. Widget specific.
+                          audioId:
+                            type: string
+                            description: Identifier of the audio source used for stem generation. Widget specific.
+                          maxTrackLength:
+                            type: number
+                            minimum: 20
+                            description: "The maximum length of the track in seconds. This is an optional property."
+                          preview:
+                            type: boolean
+                            description: "Set this flag to true to return a separate preview mp3 file. This is an optional property."
+                          watermarkInterval:
+                            type: number
+                            minimum: 10
+                            description: "The interval for watermark in seconds. This is an optional property."
+                          variant:
+                            type: string
+                            description: "Variant of the stem generation job"
+                      callbackUrl:
+                        type: string
+                        description: URL for the callback function to receive updates on the stem generation job
+                      status:
+                        type: string
+                        description: Current status of the stem generation job
+                      statusInfo:
+                        type:
+                          - 'null'
+                          - object
+                        properties:
+                          code:
+                            type: number
+                            description: Code indicating the status of the stem generation job
+                          message:
+                            type: string
+                            description: Message providing additional information on the status of the stem generation job
+                          duration:
+                            type: number
+                            description: duration of the asset processed
+                      sourceAsset:
+                        type:
+                          - 'null'
+                          - object
+                        properties:
+                          name:
+                            type: string
+                            description: Name of the asset
+                          id:
+                            type: string
+                            description: Unique identifier of the asset
+                          fileType:
+                            type: string
+                            description: Type of the file of the asset
+                          format:
+                            type: string
+                            description: Format of the asset
+                          link:
+                            type: string
+                            description: URL link of the asset
+                          jobs:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                stemAssets:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        description: Name of the stem asset
+                                      id:
+                                        type: string
+                                        description: Unique identifier of the stem asset
+                                      fileType:
+                                        type: string
+                                        description: Type of the file of the stem asset
+                                      format:
+                                        type: string
+                                        description: Format of the stem asset
+                                      path:
+                                        type: string
+                                        description: Path of the stem asset
+                                  description: Array of stem assets generated for the job
+                            description: Array of jobs containing the stem assets generated from the asset
+                        description: Asset representing the source audio used for stem generation
+                      stemAssets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Name of the asset
+                            id:
+                              type: string
+                              description: Unique identifier of the asset
+                            fileType:
+                              type: string
+                              description: Type of the file of the asset
+                            format:
+                              type: string
+                              description: Format of the asset
+                            link:
+                              type: string
+                              description: URL link of the asset
+                            jobs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  stemAssets:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                          description: Name of the stem asset
+                                        id:
+                                          type: string
+                                          description: Unique identifier of the stem asset
+                                        fileType:
+                                          type: string
+                                          description: Type of the file of the stem asset
+                                        format:
+                                          type: string
+                                          description: Format of the stem asset
+                                        path:
+                                          type: string
+                                          description: Path of the stem asset
+                                    description: Array of stem assets generated for the job
+                              description: Array of jobs containing the stem assets generated from the asset
+                        description: Array of assets representing the generated stems
+                      outputAssets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Name of the asset
+                            id:
+                              type: string
+                              description: Unique identifier of the asset
+                            fileType:
+                              type: string
+                              description: Type of the file of the asset
+                            format:
+                              type: string
+                              description: Format of the asset
+                            link:
+                              type: string
+                              description: URL link of the asset
+                            jobs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  stemAssets:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                          description: Name of the stem asset
+                                        id:
+                                          type: string
+                                          description: Unique identifier of the stem asset
+                                        fileType:
+                                          type: string
+                                          description: Type of the file of the stem asset
+                                        format:
+                                          type: string
+                                          description: Format of the stem asset
+                                        path:
+                                          type: string
+                                          description: Path of the stem asset
+                                    description: Array of stem assets generated for the job
+                              description: Array of jobs containing the stem assets generated from the asset
+                        description: Array of assets representing the generated stems
+  /upload/link:
+    post:
+      summary: Create a new asset from a file link.
+      tags:
+        - upload
+      description: This route will only work for files that are publicly accessible. Use this route for both audio files for separation or transcription json files for alignment.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - link
+              properties:
+                link:
+                  type: string
+                  format: uri
+                  minLength: 4
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 300
+        required: true
+      responses:
+        2XX:
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Name of the asset
+                  id:
+                    type: string
+                    description: Unique identifier of the asset
+                  fileType:
+                    type: string
+                    description: Type of the file of the asset
+                  format:
+                    type: string
+                    description: Format of the asset
+                  link:
+                    type: string
+                    description: URL link of the asset
+                  jobs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        stemAssets:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                description: Name of the stem asset
+                              id:
+                                type: string
+                                description: Unique identifier of the stem asset
+                              fileType:
+                                type: string
+                                description: Type of the file of the stem asset
+                              format:
+                                type: string
+                                description: Format of the stem asset
+                              path:
+                                type: string
+                                description: Path of the stem asset
+                          description: Array of stem assets generated for the job
+                    description: Array of jobs containing the stem assets generated from the asset
+  /upload/:
+    post:
+      summary: Create a new asset.
+      tags:
+        - upload
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: file
+                  description: The uploaded file data. Supported audio formats only. (e.g. wav, aiff, flac, mp3)
+              required:
+                - file
+        required: true
+      responses:
+        2XX:
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Name of the asset
+                  id:
+                    type: string
+                    description: Unique identifier of the asset
+                  fileType:
+                    type: string
+                    description: Type of the file of the asset
+                  format:
+                    type: string
+                    description: Format of the asset
+                  link:
+                    type: string
+                    description: URL link of the asset
+                  jobs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        stemAssets:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                description: Name of the stem asset
+                              id:
+                                type: string
+                                description: Unique identifier of the stem asset
+                              fileType:
+                                type: string
+                                description: Type of the file of the stem asset
+                              format:
+                                type: string
+                                description: Format of the stem asset
+                              path:
+                                type: string
+                                description: Path of the stem asset
+                          description: Array of stem assets generated for the job
+                    description: Array of jobs containing the stem assets generated from the asset
+  /usage/:
+    get:
+      summary: Get the usage for a client.
+      tags:
+        - usage
+      responses:
+        '200':
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clientId:
+                    type: string
+                  usage:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        month:
+                          type: string
+                        totalJobs:
+                          type: number
+                        totalMinutes:
+                          type: number
+servers:
+  - url: https://groovy.audioshake.ai
+    description: Production server
+security:
+  - token: []
+tags:
+  - name: upload
+    description: Upload audio file directly or via link
+  - name: job
+    description: Create and track stem generation jobs

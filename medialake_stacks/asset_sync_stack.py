@@ -429,6 +429,7 @@ class AssetSyncStack(Stack):
                     "s3:PutObject",
                     "s3:CopyObject",
                     "s3:GetBucketLocation",
+                    "s3:ListBucket",
                 ],
                 resources=["*"],
             )

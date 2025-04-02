@@ -74,9 +74,7 @@ def handler(event, context):
                 "settings": {
                     "index": {
                         "knn": True,
-                        "number_of_shards": 2,
-                        "knn.algo_param.ef_search": 100,
-                        "mapping.total_fields.limit": 2000
+                        "mapping.total_fields.limit": 3000
                     }
                 },
                 "mappings": {
@@ -106,10 +104,6 @@ def handler(event, context):
                                 "name": "hnsw",
                                 "space_type": "cosinesimil",
                                 "engine": "nmslib",
-                                "parameters": {
-                                    "ef_construction": 128,
-                                    "m": 16
-                                }
                             }
                         }
                     }

@@ -1,0 +1,7447 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": "API for client-side interactions",
+    "title": "MASV API",
+    "termsOfService": "https://massive.io/terms-of-service/",
+    "contact": {
+      "name": "MASV API team",
+      "url": "https://massive.io",
+      "email": "team@masv.io"
+    },
+    "license": {
+      "name": "Proprietary"
+    },
+    "version": "1.0.0"
+  },
+  "host": "api.massive.app",
+  "paths": {
+    "/v1.1/portals/{portalId}": {
+      "get": {
+        "security": [
+          {},
+          {
+            "PortalAccessCode": []
+          },
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portals"
+        ],
+        "summary": "Get a specific portal. If authentication is required, but not supplied, then a partial response will be returned with limited details.",
+        "operationId": "getPortal",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PortalWithFields"
+            }
+          },
+          "203": {
+            "description": "Authentication Required",
+            "schema": {
+              "$ref": "#/definitions/PortalPartial"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1.1/portals/{portalId}/packages": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portalPackagesPaged"
+        ],
+        "summary": "Get all packages for the portal",
+        "operationId": "getPortalPackagesPaged",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/sort"
+          },
+          {
+            "$ref": "#/parameters/package_status"
+          },
+          {
+            "$ref": "#/parameters/package_name"
+          },
+          {
+            "$ref": "#/parameters/sender_email"
+          },
+          {
+            "$ref": "#/parameters/tagIDs"
+          },
+          {
+            "$ref": "#/parameters/created_at_start"
+          },
+          {
+            "$ref": "#/parameters/created_at_end"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedPortalPackages"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1.1/spaces/{teamspaceId}/packages": {
+      "get": {
+        "tags": [
+          "teamspaces"
+        ],
+        "summary": "Get all packages belonging to this teamspace",
+        "operationId": "getTeamspacePackages",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/sort"
+          },
+          {
+            "$ref": "#/parameters/package_status"
+          },
+          {
+            "$ref": "#/parameters/package_name"
+          },
+          {
+            "$ref": "#/parameters/sender_email"
+          },
+          {
+            "$ref": "#/parameters/portal_name"
+          },
+          {
+            "$ref": "#/parameters/tagIDs"
+          },
+          {
+            "$ref": "#/parameters/created_at_start"
+          },
+          {
+            "$ref": "#/parameters/created_at_end"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedInboxPackages"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamspaceId"
+        }
+      ]
+    },
+    "/v1.1/teams/{teamId}/inbox": {
+      "get": {
+        "tags": [
+          "teamPortalPackagesPaged"
+        ],
+        "summary": "Get all portal packages",
+        "operationId": "getTeamPortalPackagesPaged",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/sort"
+          },
+          {
+            "$ref": "#/parameters/package_status"
+          },
+          {
+            "$ref": "#/parameters/package_name"
+          },
+          {
+            "$ref": "#/parameters/sender_email"
+          },
+          {
+            "$ref": "#/parameters/portal_name"
+          },
+          {
+            "$ref": "#/parameters/tagIDs"
+          },
+          {
+            "$ref": "#/parameters/teamspaceIDs"
+          },
+          {
+            "$ref": "#/parameters/created_at_start"
+          },
+          {
+            "$ref": "#/parameters/created_at_end"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedInboxPackages"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1.1/teams/{teamId}/packages": {
+      "get": {
+        "tags": [
+          "teamPackagesPaged"
+        ],
+        "summary": "Get all packages",
+        "operationId": "getTeamPackagesPaged",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/sort"
+          },
+          {
+            "$ref": "#/parameters/package_status"
+          },
+          {
+            "$ref": "#/parameters/package_name"
+          },
+          {
+            "$ref": "#/parameters/sender_email"
+          },
+          {
+            "$ref": "#/parameters/tagIDs"
+          },
+          {
+            "$ref": "#/parameters/created_at_start"
+          },
+          {
+            "$ref": "#/parameters/created_at_end"
+          },
+          {
+            "$ref": "#/parameters/teamspaceIDs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedSentPackages"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1.1/teams/{teamId}/packages/{packageId}": {
+      "get": {
+        "tags": [
+          "teamPackages"
+        ],
+        "summary": "Get a package sent by the team or received via a portal",
+        "operationId": "getTeamFullPackage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/FullPackage"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        },
+        {
+          "type": "string",
+          "description": "ID of team package to get",
+          "name": "packageId",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/v1.1/teams/{teamId}/portals": {
+      "get": {
+        "tags": [
+          "teamPortalsPaged"
+        ],
+        "summary": "Get portals that belong to the team",
+        "operationId": "getPortalsPaged",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/sort"
+          },
+          {
+            "$ref": "#/parameters/portalName"
+          },
+          {
+            "$ref": "#/parameters/portalSubdomain"
+          },
+          {
+            "$ref": "#/parameters/tagIDs"
+          },
+          {
+            "$ref": "#/parameters/teamspaceIDs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedTeamPortals"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1.1/teams/{teamId}/spaces": {
+      "get": {
+        "tags": [
+          "teamspaces"
+        ],
+        "summary": "Get teamspaces belonging to a team",
+        "operationId": "getTeamspaces",
+        "parameters": [
+          {
+            "$ref": "#/parameters/page"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/teamspaceName"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PagedTeamspaces"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/cloud_connections/{cloudConnectionID}": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "cloud_connections"
+        ],
+        "summary": "Get specific cloud connection",
+        "operationId": "getCloudConnection",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/CloudConnection"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "cloud_connections"
+        ],
+        "summary": "Update a cloud connection",
+        "operationId": "updateCloudConnection",
+        "parameters": [
+          {
+            "description": "Cloud connection to update",
+            "name": "cloud_connection",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CloudConnection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/CloudConnection"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "cloud_connections"
+        ],
+        "summary": "Delete a cloud connection",
+        "operationId": "deleteCloudConnection",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/cloudConnectionID"
+        }
+      ]
+    },
+    "/v1/cloud_connections/{cloudConnectionID}/files": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "cloud_connections"
+        ],
+        "summary": "Queries the specific cloud connection for available files",
+        "operationId": "queryCloudConnectionFiles",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "A directory prefix. The response will contain all items that exist in the remote storage directory. count is ignored if one specifies this directory prefix",
+            "name": "prefix",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "The key after which to begin listing objects (s3)",
+            "name": "prev_key",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "The number of files to return with the query. 0 means no limit.",
+            "name": "count",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TransferFile"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/cloudConnectionID"
+        }
+      ]
+    },
+    "/v1/links/{linkId}": {
+      "get": {
+        "security": [],
+        "tags": [
+          "links"
+        ],
+        "summary": "Get link details",
+        "operationId": "getLink",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Link secret token",
+            "name": "secret",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Link password, if required",
+            "name": "X-Link-Password",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Link"
+            }
+          },
+          "203": {
+            "description": "Partial information, password required",
+            "schema": {
+              "$ref": "#/definitions/Link"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/linkId"
+        }
+      ]
+    },
+    "/v1/links/{linkId}/complete": {
+      "put": {
+        "security": [],
+        "tags": [
+          "links"
+        ],
+        "summary": "Used by a client to notify us that they successfully completed a download",
+        "operationId": "notifyLinkDownloaded",
+        "parameters": [
+          {
+            "name": "notify_downloaded",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "secret": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "string",
+            "description": "Link password, if required",
+            "name": "X-Link-Password",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/linkId"
+        }
+      ]
+    },
+    "/v1/metadata/forms/templates/{formTemplateId}": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Gets a form template by ID",
+        "tags": [
+          "metadataFormTemplates"
+        ],
+        "summary": "Gets a form template",
+        "operationId": "getMetadataFormTemplate",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataFormTemplate"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Updates the provided form template",
+        "tags": [
+          "metadataFormTemplates"
+        ],
+        "summary": "Updates a form template",
+        "operationId": "updateMetadataFormTemplate",
+        "parameters": [
+          {
+            "description": "the updated form template",
+            "name": "form_template",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MetadataFormTemplate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataFormTemplate"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Deletes a form template by ID",
+        "tags": [
+          "metadataFormTemplates"
+        ],
+        "summary": "Deletes a form template",
+        "operationId": "deleteMetadataFormTemplate",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/formTemplateId"
+        }
+      ]
+    },
+    "/v1/metadata/forms/{formId}": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Gets a form and its fields by ID",
+        "tags": [
+          "metadataForms"
+        ],
+        "summary": "Get a form by ID",
+        "operationId": "getMetadataForm",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataForm"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Updates the provided form and returns the updated form along with its fields.",
+        "tags": [
+          "metadataForms"
+        ],
+        "summary": "Updates a form",
+        "operationId": "updateMetadataForm",
+        "parameters": [
+          {
+            "description": "the updated form",
+            "name": "form",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MetadataForm"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataForm"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "description": "Deletes a form by ID",
+        "tags": [
+          "metadataForms"
+        ],
+        "summary": "Deletes a form",
+        "operationId": "deleteMetadataForm",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/formId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packages"
+        ],
+        "summary": "Get a package",
+        "operationId": "getPackage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Package"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packages"
+        ],
+        "summary": "Update a package",
+        "operationId": "updatePackage",
+        "parameters": [
+          {
+            "description": "package to update",
+            "name": "package",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Package"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Package"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packages"
+        ],
+        "summary": "Delete a package",
+        "operationId": "deletePackage",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/expiry": {
+      "put": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packages"
+        ],
+        "summary": "Update a package expiry",
+        "operationId": "updatePackageExpiry",
+        "parameters": [
+          {
+            "name": "package",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "expiry": {
+                  "description": "Specify an expiry date-time",
+                  "type": "string",
+                  "format": "date-time",
+                  "x-nullable": true
+                },
+                "unlimited_storage": {
+                  "description": "Specifies if unlimited storage is enabled or disabled for a package",
+                  "type": "boolean",
+                  "default": false
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Package"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/files": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Get package files",
+        "operationId": "getFiles",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/File"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Add a file to a package",
+        "operationId": "addFile",
+        "parameters": [
+          {
+            "description": "File to add to the package",
+            "name": "file",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/File"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "File entry created",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "create_blueprint": {
+                  "$ref": "#/definitions/RequestBlueprint"
+                },
+                "file": {
+                  "$ref": "#/definitions/File"
+                },
+                "max_chunk_size": {
+                  "type": "integer",
+                  "format": "int64",
+                  "x-go-name": "AltMaxChunkSize"
+                },
+                "max_chunks_count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "x-go-name": "AltMaxChunksCount"
+                },
+                "min_chunk_size": {
+                  "type": "integer",
+                  "format": "int64",
+                  "x-go-name": "AltMinChunkSize"
+                },
+                "storage_type": {
+                  "type": "string",
+                  "enum": [
+                    "s3",
+                    "azure"
+                  ],
+                  "x-go-name": "AltStorageType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete all file from the package",
+        "operationId": "deleteFiles",
+        "responses": {
+          "204": {
+            "description": "All file entries deleted"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/files/{fileId}": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Get a file",
+        "operationId": "getFile",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/File"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Add chunks to file",
+        "operationId": "addChunks",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int64",
+            "default": 0,
+            "description": "Starting index of the first chunk",
+            "name": "start",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "default": 1,
+            "description": "Number of chunk requests to generate",
+            "name": "count",
+            "in": "query",
+            "required": true
+          },
+          {
+            "description": "Storage object metadata",
+            "name": "extras",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/Metadata"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blueprints created",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RequestBlueprint"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete file from package",
+        "operationId": "deleteFile",
+        "responses": {
+          "204": {
+            "description": "File entry deleted"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        },
+        {
+          "$ref": "#/parameters/fileId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/files/{fileId}/download": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Download a file",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "enum": [
+              "json",
+              "media"
+            ],
+            "type": "string",
+            "default": "json",
+            "description": "Media type",
+            "name": "alt",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "custom",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download request blueprint, if alt parameter is set to json",
+            "schema": {
+              "$ref": "#/definitions/RequestBlueprint"
+            }
+          },
+          "302": {
+            "description": "Redirect to accelerated download link, if alt parameter is set to media",
+            "headers": {
+              "Location": {
+                "type": "string"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        },
+        {
+          "$ref": "#/parameters/fileId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/files/{fileId}/finalize": {
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "files"
+        ],
+        "summary": "Finalize a file",
+        "operationId": "finalizeFile",
+        "parameters": [
+          {
+            "description": "Storage object metadata",
+            "name": "extras",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "size"
+              ],
+              "properties": {
+                "chunkExtras": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Metadata"
+                  }
+                },
+                "chunk_extras": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Metadata"
+                  },
+                  "x-go-name": "AltChunkExtras"
+                },
+                "chunk_size": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "fileExtras": {
+                  "$ref": "#/definitions/Metadata"
+                },
+                "file_extras": {
+                  "$ref": "#/definitions/Metadata"
+                },
+                "size": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "File entry finalized"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        },
+        {
+          "$ref": "#/parameters/fileId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/finalize": {
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packages"
+        ],
+        "summary": "Finalize a package",
+        "operationId": "finalizePackage",
+        "parameters": [
+          {
+            "description": "package to finalize",
+            "name": "package",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/FinalizePackage"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Finalized package successfully"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/links": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "links"
+        ],
+        "summary": "Get all links that have access to this package",
+        "operationId": "getPackageLinks",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PackageLink"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "links"
+        ],
+        "summary": "Add package link",
+        "operationId": "createPackageLink",
+        "parameters": [
+          {
+            "description": "link to create",
+            "name": "link",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PackageLink"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/PackageLink"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/links/{linkId}": {
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "links"
+        ],
+        "summary": "Update link on this package",
+        "operationId": "updatePackageLink",
+        "parameters": [
+          {
+            "description": "Link to update",
+            "name": "link",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdatePackageLink"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PackageLink"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "links"
+        ],
+        "summary": "Delete a link",
+        "operationId": "deletePackageLink",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        },
+        {
+          "type": "string",
+          "description": "ID of link to get",
+          "name": "linkId",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/metadata": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "packageMetadata"
+        ],
+        "summary": "Get this package's form data",
+        "operationId": "getMetadataFormResponse",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/PackageMetadataResponse"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/packages/{packageId}/transfer": {
+      "get": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Get all transfers of a package to storage",
+        "operationId": "getPackageTransfersToStorage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TransferSimpleDetails"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "PackageToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Transfer File(s) directly to cloud storage",
+        "operationId": "createPackageTransferToStorage",
+        "parameters": [
+          {
+            "description": "Transfer details",
+            "name": "transfer",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TransferToStorage"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/TransferDetails"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/packageId"
+        }
+      ]
+    },
+    "/v1/portals/{portalId}": {
+      "put": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portals"
+        ],
+        "summary": "Update a portal",
+        "operationId": "updatePortal",
+        "parameters": [
+          {
+            "description": "Team to update",
+            "name": "portal",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdatePortal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Portal"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portals"
+        ],
+        "summary": "Delete a portal",
+        "operationId": "deletePortal",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1/portals/{portalId}/form": {
+      "get": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portalMetadata"
+        ],
+        "summary": "Get a portal's form",
+        "operationId": "getPortalForm",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataForm"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "portalMetadata"
+        ],
+        "summary": "Create a new form for a portal",
+        "operationId": "createPortalForm",
+        "parameters": [
+          {
+            "description": "form to create",
+            "name": "form",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateMetadataFormPayload"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataForm"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1/portals/{portalId}/form/responses": {
+      "post": {
+        "security": [
+          {
+            "PortalAccessCode": []
+          },
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          },
+          {}
+        ],
+        "description": "Adds a new response to the portal's form",
+        "tags": [
+          "portalMetadata"
+        ],
+        "summary": "Adds a response to the portal's form",
+        "operationId": "createPortalFormResponse",
+        "parameters": [
+          {
+            "description": "the form response data",
+            "name": "form_response",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MetadataFormSubmission"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataFormData"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1/portals/{portalId}/packages": {
+      "post": {
+        "security": [
+          {},
+          {
+            "PortalAccessCode": []
+          },
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "portalPackages"
+        ],
+        "summary": "Create a package for the portal",
+        "operationId": "createPortalPackage",
+        "parameters": [
+          {
+            "description": "package to create",
+            "name": "package",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PortalPackage"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/PortalPackage"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/portalId"
+        }
+      ]
+    },
+    "/v1/tags/{tagId}": {
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          },
+          {
+            "APIKey": []
+          }
+        ],
+        "tags": [
+          "tags"
+        ],
+        "summary": "Deactivates a tag and omits it from lists",
+        "operationId": "deleteTag",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/tagId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get specific team",
+        "operationId": "getTeam",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/TeamWithSubscription"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update a team",
+        "operationId": "updateTeam",
+        "parameters": [
+          {
+            "description": "Team to update",
+            "name": "team",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Team"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/TeamWithSubscription"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "UserToken": []
+          }
+        ],
+        "tags": [
+          "teams"
+        ],
+        "summary": "Delete a team",
+        "operationId": "deleteTeam",
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/cloud_connections": {
+      "get": {
+        "tags": [
+          "teamCloudConnections"
+        ],
+        "summary": "Get cloud connections that belong to the team",
+        "operationId": "getCloudConnections",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TeamCloudConnection"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "teamCloudConnections"
+        ],
+        "summary": "Create a cloud connection",
+        "operationId": "createCloudConnection",
+        "parameters": [
+          {
+            "description": "cloud connection to create",
+            "name": "connection",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TeamCloudConnection"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/TeamCloudConnection"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/forms/templates": {
+      "get": {
+        "tags": [
+          "teamsMetadata"
+        ],
+        "summary": "Get form templates for a team",
+        "operationId": "getTeamMetadataFormTemplates",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/MetadataFormTemplate"
+              }
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "teamsMetadata"
+        ],
+        "summary": "Creates a new form template for a team",
+        "operationId": "createTeamMetadataFormTemplate",
+        "parameters": [
+          {
+            "description": "the create form template payload",
+            "name": "template",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateMetadataFormTemplatePayload"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/MetadataFormTemplate"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/packages": {
+      "post": {
+        "tags": [
+          "teamPackages"
+        ],
+        "summary": "Create a package",
+        "operationId": "createTeamPackage",
+        "parameters": [
+          {
+            "description": "package to create",
+            "name": "package",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TeamPackage"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/TeamPackage"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/portals": {
+      "post": {
+        "tags": [
+          "teamPortals"
+        ],
+        "summary": "Create a team",
+        "operationId": "createPortal",
+        "parameters": [
+          {
+            "description": "portal to create",
+            "name": "portal",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateTeamPortal"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/TeamPortal"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/spaces": {
+      "post": {
+        "tags": [
+          "teamspaces"
+        ],
+        "summary": "Creates a new teamspace for this team",
+        "operationId": "createTeamspace",
+        "parameters": [
+          {
+            "description": "The new teamspace definition",
+            "name": "teamspace",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateTeamspace"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Teamspace"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/teams/{teamId}/tags": {
+      "get": {
+        "tags": [
+          "teamTags"
+        ],
+        "summary": "Get all tags for a team",
+        "operationId": "getTeamTags",
+        "parameters": [
+          {
+            "$ref": "#/parameters/tagName"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Tag"
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "teamTags"
+        ],
+        "summary": "Creates a tag for a team",
+        "operationId": "createTag",
+        "parameters": [
+          {
+            "description": "The new tag",
+            "name": "tag",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Tag"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/Tag"
+            }
+          },
+          "default": {
+            "description": "Error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/teamId"
+        }
+      ]
+    },
+    "/v1/transfers/{transferId}": {
+      "get": {
+        "security": [
+          {
+            "TransferToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Get status of transfer to cloud storage",
+        "operationId": "getTransferToStorage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/TransferDetails"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "TransferToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Update package transfer",
+        "operationId": "updateTransferToStorage",
+        "parameters": [
+          {
+            "description": "Email address to notify on completion of transfer",
+            "name": "transfer",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error_message": {
+                  "type": "string",
+                  "x-nullable": true
+                },
+                "notify_email": {
+                  "type": "string",
+                  "format": "email",
+                  "x-nullable": true
+                },
+                "state": {
+                  "type": "string",
+                  "x-nullable": true
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/TransferDetails"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "TransferToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Cancel package transfer to cloud storage account",
+        "operationId": "deleteTransferToStorage",
+        "responses": {
+          "204": {
+            "description": "Transfer cancelled"
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/transferId"
+        }
+      ]
+    },
+    "/v1/transfers/{transferId}/retry": {
+      "post": {
+        "security": [
+          {
+            "TransferToken": []
+          }
+        ],
+        "tags": [
+          "transferToStorage"
+        ],
+        "summary": "Retry package transfer to cloud storage account",
+        "operationId": "retryTransferToStorage",
+        "responses": {
+          "201": {
+            "description": "Transfer queued for retry",
+            "schema": {
+              "$ref": "#/definitions/TransferSimpleDetails"
+            }
+          },
+          "default": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/transferId"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "CloudConnection": {
+      "type": "object",
+      "required": [
+        "provider"
+      ],
+      "properties": {
+        "authorization": {
+          "description": "Authorization settings in key-value format that are provider specific",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "authorization_code": {
+          "description": "Authentication token that is provider specific",
+          "type": "string"
+        },
+        "connections": {
+          "description": "Number of connected sources",
+          "type": "integer",
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "destination": {
+          "description": "The connection destination, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "direction": {
+          "description": "Directionality of the cloud connection data transfer. Blank defaults to masv_to_cloud",
+          "type": "string",
+          "enum": [
+            "cloud_to_masv",
+            "masv_to_cloud"
+          ]
+        },
+        "generate_sidecars": {
+          "description": "Sidecar configurations for this cloud connection",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SidecarConfiguration"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Name for the cloud connection",
+          "type": "string",
+          "maxLength": 255
+        },
+        "provider": {
+          "description": "Cloud Storage provider",
+          "type": "string"
+        },
+        "region": {
+          "description": "The region the connection points to, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "source_directory_ids": {
+          "description": "Identifiers for the cloud storage source directories",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "description": "Current status of the cloud connection",
+          "type": "string",
+          "readOnly": true
+        },
+        "storage_class": {
+          "description": "The storage class to use for transferred files, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "sync_metadata": {
+          "description": "If true, MASV metadata will be synced with the cloud connection provider external metadata if supported.",
+          "type": "boolean",
+          "default": false
+        },
+        "target_directory_id": {
+          "description": "Identifier for the directory in storage where files should be stored",
+          "type": "string"
+        },
+        "transfer_to_target_root": {
+          "description": "If true, files will be transfered to the root of the target directory instead of being in a folder created for the package",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_transfer_manifest": {
+          "description": "If true, a file containing package metadata and a file listing will be included with the package files",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "CloudConnectionPartial": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "CreateMetadataFormPayload": {
+      "type": "object",
+      "required": [
+        "name",
+        "delivery_formats"
+      ],
+      "properties": {
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataFormField"
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "template_id": {
+          "type": "string",
+          "maxLength": 255
+        }
+      }
+    },
+    "CreateMetadataFormTemplatePayload": {
+      "type": "object",
+      "required": [
+        "name",
+        "delivery_formats"
+      ],
+      "properties": {
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataFormFieldTemplate"
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        }
+      }
+    },
+    "CreateTeamPortal": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "access_level": {
+          "description": "Portal access level",
+          "type": "string",
+          "default": "regular",
+          "enum": [
+            "regular",
+            "private"
+          ]
+        },
+        "access_list": {
+          "description": "Membership IDs of users with direct access to the portal",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnection"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_webhooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCustomWebhook"
+          }
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace_id": {
+          "type": "string"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    },
+    "CreateTeamspace": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "membership_ids": {
+          "description": "team membership IDs to add to teamspace",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        }
+      }
+    },
+    "CustomerSupport": {
+      "type": "object",
+      "properties": {
+        "chat_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "customer_help_links_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "help_links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HelpLink"
+          }
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": [
+        "message",
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "errors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "msg": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "validation_failed",
+                  "api_error"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "x-omitempty": true
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "File": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "completed": {
+          "description": "If the file is finalized and ready for download",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory",
+            "zip_mac",
+            "zip_windows",
+            "manifest",
+            "metadata",
+            "package_contents"
+          ]
+        },
+        "last_modified": {
+          "description": "Original file last modified date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "manifest": {
+          "description": "A manifest file containing hashes of the file parts",
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "description": "Original file path within a file system",
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "virus_detected": {
+          "description": "If the file is or contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        }
+      }
+    },
+    "FinalizePackage": {
+      "type": "object",
+      "properties": {
+        "empty_directories": {
+          "description": "Paths for empty directories to be included in the package",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PackageDirectory"
+          }
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "upload_average_bits_per_second": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "FullPackage": {
+      "type": "object",
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_days": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "form_data_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string",
+          "maxLength": 255
+        },
+        "password": {
+          "description": "Password to restrict download access to the package",
+          "type": "string"
+        },
+        "portal_id": {
+          "description": "Portal identifier",
+          "type": "string",
+          "readOnly": true
+        },
+        "portal_name": {
+          "description": "Portal name",
+          "type": "string",
+          "readOnly": true
+        },
+        "progress_channels": {
+          "description": "List of topics and credentials for subscribing to events",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressChannel"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email",
+          "readOnly": true
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "total_files": {
+          "description": "Number of files in package",
+          "type": "integer",
+          "readOnly": true
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_average_bits_per_second": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "HelpLink": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "branding": {
+          "description": "Branding information for download page",
+          "type": "object",
+          "properties": {
+            "background_url": {
+              "description": "Background image URL",
+              "type": "string"
+            },
+            "logo_url": {
+              "description": "Logo image URL",
+              "type": "string"
+            },
+            "primary_color": {
+              "description": "Primary color for UI elements",
+              "type": "string"
+            }
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "disable_download_to_cloud": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "display_sender_warning": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time"
+        },
+        "id": {
+          "type": "string"
+        },
+        "locked": {
+          "description": "Whether the share is locked or not",
+          "type": "boolean",
+          "default": false
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string"
+        },
+        "package_contains_virus": {
+          "description": "If the package this link is for contains a virus",
+          "type": "boolean",
+          "default": false
+        },
+        "package_has_custom_metadata": {
+          "description": "Whether or not the associated package has custom metadata",
+          "type": "boolean",
+          "readOnly": true
+        },
+        "package_id": {
+          "description": "ID of the package",
+          "type": "string"
+        },
+        "package_size": {
+          "description": "Total package size in bytes",
+          "type": "integer",
+          "format": "int64"
+        },
+        "package_token": {
+          "description": "Token to access package content",
+          "type": "string"
+        },
+        "progress_channels": {
+          "description": "List of topics and credentials for subscribing to events",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressChannel"
+          },
+          "readOnly": true
+        },
+        "recipient_email": {
+          "description": "Recipient's email address",
+          "type": "string",
+          "format": "email"
+        },
+        "recipient_notified": {
+          "description": "Indicates state of the email notification sent to recipient email",
+          "type": "string",
+          "readOnly": true
+        },
+        "sender_email": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "zip_progress_channel": {
+          "description": "Auth keys to access zip progress",
+          "type": "object",
+          "properties": {
+            "auth": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "ListTeamspace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "MetadataDeliveryFile": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "completed": {
+          "description": "If the file is finalized and ready for download",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "download_url": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "metadata"
+          ]
+        },
+        "last_modified": {
+          "description": "Original file last modified date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "name": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "virus_detected": {
+          "description": "If the file is or contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        }
+      }
+    },
+    "MetadataForm": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataFormField"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "owner_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "MetadataFormData": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataFormFieldData"
+          }
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "owner_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "package_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "MetadataFormField": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "visibility"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "default_value": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "field_template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "position": {
+          "type": "number",
+          "format": "int64"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "checkbox",
+            "radio",
+            "dropdown",
+            "date",
+            "short_text",
+            "long_text",
+            "number",
+            "url",
+            "email",
+            "package_name",
+            "package_description",
+            "sender_email",
+            "file_selection",
+            "package_name_format"
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "readonly",
+            "hidden"
+          ]
+        }
+      }
+    },
+    "MetadataFormFieldData": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "visibility",
+        "value"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "description": {
+          "type": "string"
+        },
+        "field_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "field_template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "form_data_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "position": {
+          "type": "number",
+          "format": "int64"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "checkbox",
+            "radio",
+            "dropdown",
+            "date",
+            "short_text",
+            "long_text",
+            "number",
+            "url",
+            "email",
+            "package_name",
+            "package_description",
+            "sender_email",
+            "file_selection",
+            "package_name_format"
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "value": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "readonly",
+            "hidden"
+          ]
+        }
+      }
+    },
+    "MetadataFormFieldTemplate": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "visibility"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "default_value": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "form_template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "position": {
+          "type": "number",
+          "format": "int64"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "checkbox",
+            "radio",
+            "dropdown",
+            "date",
+            "short_text",
+            "long_text",
+            "number",
+            "url",
+            "email",
+            "package_name",
+            "package_description",
+            "sender_email",
+            "file_selection",
+            "package_name_format"
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "readonly",
+            "hidden"
+          ]
+        }
+      }
+    },
+    "MetadataFormSubmission": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 65535
+          }
+        }
+      }
+    },
+    "MetadataFormTemplate": {
+      "type": "object",
+      "required": [
+        "name",
+        "delivery_formats"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataFormFieldTemplate"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "Package": {
+      "type": "object",
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "disable_download_to_cloud": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "form_data_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "password": {
+          "description": "Password to restrict download access to the package",
+          "type": "string"
+        },
+        "portal_id": {
+          "description": "Portal identifier",
+          "type": "string",
+          "readOnly": true
+        },
+        "portal_name": {
+          "description": "Portal name",
+          "type": "string",
+          "readOnly": true
+        },
+        "progress_channels": {
+          "description": "List of topics and credentials for subscribing to events",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressChannel"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email",
+          "readOnly": true
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "total_files": {
+          "description": "Number of files in package",
+          "type": "integer",
+          "readOnly": true
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_average_bits_per_second": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PackageContentsConfig": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "file_formats",
+        "combine_file_name_sequences"
+      ],
+      "properties": {
+        "combine_file_name_sequences": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "file_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "csv",
+              "json"
+            ]
+          }
+        }
+      }
+    },
+    "PackageDirectory": {
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ],
+      "properties": {
+        "last_modified": {
+          "description": "Original directory last modified date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "PackageLink": {
+      "type": "object",
+      "properties": {
+        "access_count": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "access_limit": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "access_limit_enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "accessed_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "cc_sender": {
+          "description": "When creating the link email a copy to the package sender",
+          "type": "boolean",
+          "default": false
+        },
+        "completed_downloads": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "download_secret": {
+          "type": "string",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "expiry": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "password": {
+          "type": "string"
+        },
+        "recipient_notified": {
+          "description": "Indicates state of the email notification sent to recipient email",
+          "type": "string",
+          "readOnly": true
+        },
+        "selected_package_content_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "csv",
+              "json"
+            ]
+          }
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "use_package_password": {
+          "description": "Create this link using the package password (if present). Will ignore the value supplied in 'password' if set to true. Can be set during creation only.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "PackageMetadataFieldData": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "visibility",
+        "value"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "description": {
+          "type": "string"
+        },
+        "form_data_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "position": {
+          "type": "number",
+          "format": "int64"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "checkbox",
+            "radio",
+            "dropdown",
+            "date",
+            "short_text",
+            "long_text",
+            "number",
+            "url",
+            "email",
+            "package_name",
+            "package_description",
+            "sender_email"
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "value": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "readonly",
+            "hidden"
+          ]
+        }
+      }
+    },
+    "PackageMetadataResponse": {
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "delivery_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataDeliveryFile"
+          }
+        },
+        "delivery_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "json",
+              "xml",
+              "csv",
+              "email_body"
+            ]
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PackageMetadataFieldData"
+          }
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "owner_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "package_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "template_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PackageNameFormatConfig": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "A label shown to users to explain the required package name format",
+          "type": "string",
+          "x-omitempty": false
+        },
+        "value": {
+          "description": "Regex pattern used by the frontend to enforce package name format",
+          "type": "string",
+          "x-omitempty": false
+        }
+      },
+      "x-omitempty": false
+    },
+    "PageMetadata": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "PagedInboxPackage": {
+      "type": "object",
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time"
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_days": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string"
+        },
+        "password": {
+          "description": "Indicates if a default password is set for use on new links to restrict download access to the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "portal_id": {
+          "description": "Portal identifier",
+          "type": "string",
+          "readOnly": true
+        },
+        "portal_name": {
+          "description": "Portal name",
+          "type": "string",
+          "readOnly": true
+        },
+        "recipients": {
+          "description": "Recipients of the package",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "total_files": {
+          "description": "Number of files in package",
+          "type": "integer"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_average_bits_per_second": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PagedInboxPackages": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PageMetadata"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PagedInboxPackage"
+          }
+        }
+      }
+    },
+    "PagedPortalPackage": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "sender"
+      ],
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_days": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "form_data_id": {
+          "description": "The ID of the form data associated with this package if any",
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string"
+        },
+        "password": {
+          "description": "Indicates if a default password is set for use on new links to restrict download access to the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "recipients": {
+          "description": "Recipients of the package",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PagedPortalPackages": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PageMetadata"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PagedPortalPackage"
+          }
+        }
+      }
+    },
+    "PagedSentPackage": {
+      "type": "object",
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "custom_metadata_id": {
+          "description": "The ID of the form data associated with this package if any",
+          "type": "string",
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time"
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_days": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string"
+        },
+        "password": {
+          "description": "Indicates if a default password is set for use on new links to restrict download access to the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "recipients": {
+          "description": "Recipients of the package",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email",
+          "readOnly": true
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "total_files": {
+          "description": "Number of files in package",
+          "type": "integer"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_average_bits_per_second": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PagedSentPackages": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PageMetadata"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PagedSentPackage"
+          }
+        }
+      }
+    },
+    "PagedTeamPortal": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnectionPartial"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "total_cloud_connections": {
+          "type": "integer",
+          "default": 0
+        },
+        "total_custom_webhooks": {
+          "type": "integer",
+          "default": 0
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    },
+    "PagedTeamPortals": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PageMetadata"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PagedTeamPortal"
+          }
+        }
+      }
+    },
+    "PagedTeamspaces": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PageMetadata"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListTeamspace"
+          }
+        }
+      }
+    },
+    "Portal": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "description": "Cloud Connections that will be attached to this portal",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnection"
+          }
+        },
+        "configure_cloud_connections": {
+          "description": "Overwrite the attached cloud connections for this portal with the list passed in 'cloud_connections' array",
+          "type": "boolean",
+          "default": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_webhooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCustomWebhook"
+          }
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    },
+    "PortalCloudConnection": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_action"
+      ],
+      "properties": {
+        "connections": {
+          "description": "Number of connected sources",
+          "type": "integer",
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "destination": {
+          "description": "The connection destination, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "generate_sidecars": {
+          "description": "Sidecar configurations for this cloud connection",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SidecarConfiguration"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Name for the cloud connection",
+          "type": "string",
+          "readOnly": true
+        },
+        "provider": {
+          "description": "Cloud Storage provider",
+          "type": "string",
+          "readOnly": true
+        },
+        "region": {
+          "description": "The region the connection points to, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "relative_target_directory_id": {
+          "description": "Appended to the cloud connection's target directory on transfers",
+          "type": "string"
+        },
+        "state": {
+          "description": "Current status of the cloud connection",
+          "type": "string",
+          "readOnly": true
+        },
+        "sync_metadata": {
+          "description": "If true, MASV metadata will be synced with the cloud connection provider external metadata if supported.",
+          "type": "boolean"
+        },
+        "target_action": {
+          "description": "Action to be taken using this connection (ie. 'transfer')",
+          "type": "string"
+        },
+        "target_directory_id": {
+          "description": "Identifier for the directory in storage where files should be stored",
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PortalCloudConnectionPartial": {
+      "type": "object",
+      "properties": {
+        "generate_sidecars": {
+          "description": "Sidecar configurations for this cloud connection",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SidecarConfiguration"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "readOnly": true
+        },
+        "provider": {
+          "type": "string",
+          "readOnly": true
+        },
+        "relative_target_directory_id": {
+          "description": "Appended to the cloud connection's target directory on transfers",
+          "type": "string"
+        },
+        "target_directory_id": {
+          "description": "Identifier for the directory in storage where files should be stored",
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "PortalCustomWebhook": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "active": {
+          "description": "Indicates if the webhook is active or not",
+          "type": "boolean",
+          "default": true,
+          "readOnly": true
+        },
+        "events": {
+          "description": "Indicates which events this webhook will receive",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "description": "An optional internal reference to the webhook and its purpose",
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "PortalFormField": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "visibility"
+      ],
+      "properties": {
+        "default_value": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "position": {
+          "type": "number",
+          "format": "int64"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "checkbox",
+            "radio",
+            "dropdown",
+            "date",
+            "short_text",
+            "long_text",
+            "number",
+            "url",
+            "email",
+            "package_name",
+            "package_description",
+            "sender_email",
+            "file_selection",
+            "package_name_format"
+          ]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "readonly",
+            "hidden"
+          ]
+        }
+      }
+    },
+    "PortalPackage": {
+      "type": "object",
+      "properties": {
+        "access_limit": {
+          "description": "Indicates a default access limit for new links to restrict download access to the package. A 0 value indicates that no default has been set.",
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "form_data_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "password": {
+          "description": "Indicates if a default password is set for use on new links to restrict download access to the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "progress_channels": {
+          "description": "List of topics and credentials for subscribing to events",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressChannel"
+          },
+          "readOnly": true
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "terms_of_service_checked": {
+          "description": "If terms of service is enabled in portal, it must be checked to proceed",
+          "type": "boolean",
+          "default": false
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_duration_milliseconds": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_estimated_cost": {
+          "type": "number",
+          "format": "float64",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "PortalPartial": {
+      "type": "object",
+      "properties": {
+        "has_access_code": {
+          "type": "boolean",
+          "x-omitempty": false,
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "readOnly": true
+        },
+        "subdomain": {
+          "type": "string",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false,
+          "readOnly": true
+        }
+      }
+    },
+    "PortalTermsOfService": {
+      "type": "object",
+      "properties": {
+        "checkbox_label": {
+          "type": "string",
+          "x-omitempty": false
+        },
+        "checkbox_url": {
+          "type": "string",
+          "x-omitempty": false
+        },
+        "description": {
+          "type": "string",
+          "x-omitempty": false
+        },
+        "title": {
+          "type": "string",
+          "x-omitempty": false
+        }
+      }
+    },
+    "PortalWithFields": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "description": "Cloud Connections that will be attached to this portal",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnection"
+          }
+        },
+        "configure_cloud_connections": {
+          "description": "Overwrite the attached cloud connections for this portal with the list passed in 'cloud_connections' array",
+          "type": "boolean",
+          "default": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalFormField"
+          }
+        },
+        "custom_webhooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCustomWebhook"
+          }
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_data_required": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    },
+    "ProgressChannel": {
+      "description": "Credentials for subscribing progress channel and tracking a specific activity",
+      "type": "object",
+      "properties": {
+        "auth": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "provider": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        }
+      }
+    },
+    "RequestBlueprint": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "format": "url"
+        }
+      }
+    },
+    "SidecarConfiguration": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "configuration": {
+          "description": "Sidecar configuration details",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "mimir"
+          ]
+        }
+      }
+    },
+    "Tag": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "TagPartial": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "Team": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "background_url": {
+          "type": "string"
+        },
+        "custom_expiry_default": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_expiry_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "customer_support": {
+          "$ref": "#/definitions/CustomerSupport"
+        },
+        "disable_download_to_cloud": {
+          "description": "If true, cloud services are disabled for downloading packages",
+          "type": "boolean",
+          "default": false
+        },
+        "enforce_download_password": {
+          "description": "If true, a download password will be required on all new packages",
+          "type": "boolean",
+          "default": false
+        },
+        "from_email": {
+          "type": "string",
+          "format": "email"
+        },
+        "from_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "link_access_limit": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "link_access_limit_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "mfa_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "new_member_automatic_private_portal": {
+          "type": "boolean",
+          "default": false
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "sso_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag_management_restricted": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "TeamCloudConnection": {
+      "type": "object",
+      "required": [
+        "provider"
+      ],
+      "properties": {
+        "authorization": {
+          "description": "Authorization settings in key-value format that are provider specific",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "authorization_code": {
+          "description": "Authentication token that is provider specific",
+          "type": "string"
+        },
+        "connections": {
+          "description": "Number of connected sources",
+          "type": "integer",
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "destination": {
+          "description": "The connection destination, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "direction": {
+          "description": "Directionality of the cloud connection data transfer. Blank defaults to masv_to_cloud",
+          "type": "string",
+          "enum": [
+            "cloud_to_masv",
+            "masv_to_cloud"
+          ]
+        },
+        "generate_sidecars": {
+          "description": "Sidecar configurations for this cloud connection",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SidecarConfiguration"
+          }
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Name for the cloud connection",
+          "type": "string",
+          "maxLength": 255
+        },
+        "provider": {
+          "description": "Cloud Storage provider",
+          "type": "string"
+        },
+        "region": {
+          "description": "The region the connection points to, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "secret": {
+          "description": "Secret field that should only be returned on creation",
+          "type": "string",
+          "x-omitempty": true,
+          "readOnly": true
+        },
+        "source_directory_ids": {
+          "description": "Identifiers for the cloud storage source directories",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "description": "Current status of the cloud connection",
+          "type": "string",
+          "readOnly": true
+        },
+        "storage_class": {
+          "description": "The storage class to use for transferred files, if applicable",
+          "type": "string",
+          "readOnly": true
+        },
+        "sync_metadata": {
+          "description": "If true, MASV metadata will be synced with the cloud connection provider external metadata if supported.",
+          "type": "boolean",
+          "default": true
+        },
+        "target_directory_id": {
+          "description": "Identifier for the directory in storage where files should be stored",
+          "type": "string"
+        },
+        "transfer_to_target_root": {
+          "description": "If true, files will be transfered to the root of the target directory instead of being in a folder created for the package",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "upload_transfer_manifest": {
+          "description": "If true, a file containing package metadata and a file listing will be included with the package files",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "TeamConfig": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "readOnly": true
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "TeamPackage": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "recipients"
+      ],
+      "properties": {
+        "access_limit": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535
+        },
+        "access_token": {
+          "description": "Access token for managing and retrieving the package",
+          "type": "string",
+          "readOnly": true
+        },
+        "contains_virus": {
+          "description": "If this package contains a virus",
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "description": {
+          "description": "Package description",
+          "type": "string"
+        },
+        "expiry": {
+          "description": "The date \u0026 time on which the package will expire",
+          "type": "string",
+          "format": "date-time"
+        },
+        "extra_storage": {
+          "type": "boolean",
+          "default": false,
+          "readOnly": true
+        },
+        "extra_storage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "extra_storage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "extras": {
+          "description": "Extra metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "readOnly": true
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Package name",
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "password": {
+          "description": "Password to restrict download access to the package",
+          "type": "string"
+        },
+        "progress_channels": {
+          "description": "List of topics and credentials for subscribing to events",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressChannel"
+          },
+          "readOnly": true
+        },
+        "recipients": {
+          "description": "Recipients of the package",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "sender": {
+          "description": "Sender's email address",
+          "type": "string",
+          "format": "email",
+          "readOnly": true
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "state": {
+          "description": "Current status of the package (ie. new, finalized, or expired)",
+          "type": "string",
+          "readOnly": true
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace_id": {
+          "type": "string"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "usage_total_bytes": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true
+        },
+        "usage_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "TeamPortal": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnection"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_webhooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCustomWebhook"
+          }
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "teamspace": {
+          "$ref": "#/definitions/TeamspacePartial"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    },
+    "TeamWithSubscription": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "background_url": {
+          "type": "string"
+        },
+        "config": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamConfig"
+          }
+        },
+        "custom_expiry_default": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_expiry_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "customer_support": {
+          "$ref": "#/definitions/CustomerSupport"
+        },
+        "disable_download_to_cloud": {
+          "description": "If true, cloud services are disabled for downloading packages",
+          "type": "boolean",
+          "default": false
+        },
+        "enforce_download_password": {
+          "description": "If true, a download password will be required on all new packages",
+          "type": "boolean",
+          "default": false
+        },
+        "from_email": {
+          "type": "string",
+          "format": "email"
+        },
+        "from_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "link_access_limit": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "link_access_limit_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "mfa_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "new_member_automatic_private_portal": {
+          "type": "boolean",
+          "default": false
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "sso_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "subscription_state": {
+          "type": "string",
+          "readOnly": true
+        },
+        "tag_management_restricted": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "Teamspace": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamspaceMember"
+          }
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "TeamspaceMember": {
+      "type": "object",
+      "properties": {
+        "membership_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "readOnly": true
+        },
+        "user_id": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "TeamspacePartial": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "TransferDetails": {
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "description": "Access token for managing and retrieving the transfer",
+          "type": "string",
+          "readOnly": true
+        },
+        "cloud_connection": {
+          "$ref": "#/definitions/CloudConnectionPartial"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "direction": {
+          "description": "The transfer direction",
+          "type": "string",
+          "enum": [
+            "masv_to_cloud",
+            "cloud_to_masv"
+          ],
+          "readOnly": true
+        },
+        "error_message": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "progress_channel": {
+          "description": "Auth keys to access transfer progress",
+          "type": "object",
+          "properties": {
+            "auth": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string"
+            }
+          }
+        },
+        "provider": {
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "retries": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "state": {
+          "type": "string"
+        },
+        "target_directory_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "TransferFile": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Identifier for the object in the source file system",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The type of object (ie. file, directory)",
+          "type": "string",
+          "enum": [
+            "file",
+            "directory"
+          ]
+        },
+        "last_modified": {
+          "description": "Original file last modified date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "name": {
+          "description": "Name of the object",
+          "type": "string"
+        },
+        "path": {
+          "description": "Original file path within a file system",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size of the object in bytes",
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "TransferSimpleDetails": {
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "description": "Access token for managing and retrieving the transfer",
+          "type": "string",
+          "readOnly": true
+        },
+        "cloud_connection": {
+          "$ref": "#/definitions/CloudConnectionPartial"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "direction": {
+          "description": "The transfer direction",
+          "type": "string",
+          "enum": [
+            "masv_to_cloud",
+            "cloud_to_masv"
+          ],
+          "readOnly": true
+        },
+        "error_message": {
+          "type": "string",
+          "readOnly": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "progress_channel": {
+          "description": "Auth keys to access transfer progress",
+          "type": "object",
+          "properties": {
+            "auth": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string"
+            }
+          }
+        },
+        "provider": {
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean",
+          "readOnly": true
+        },
+        "retries": {
+          "type": "integer",
+          "readOnly": true
+        },
+        "state": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        }
+      }
+    },
+    "TransferToStorage": {
+      "type": "object",
+      "properties": {
+        "authorization": {
+          "description": "Authorization settings in key-value format that are provider specific",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "authorization_code": {
+          "description": "Authorization code for connecting to cloud storage provider",
+          "type": "string"
+        },
+        "cloud_connection_id": {
+          "description": "Use an existing Cloud Connection instead of providing authorization",
+          "type": "string"
+        },
+        "direction": {
+          "description": "Directionality of the cloud connection data transfer. Blank defaults to masv_to_cloud",
+          "type": "string",
+          "enum": [
+            "cloud_to_masv",
+            "masv_to_cloud"
+          ]
+        },
+        "files": {
+          "description": "Files to be transferred to storage",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransferFile"
+          }
+        },
+        "notify_email": {
+          "description": "Email address to notify when transfer completes",
+          "type": "string",
+          "format": "email"
+        },
+        "provider": {
+          "description": "Cloud storage provider",
+          "type": "string"
+        },
+        "source_directory_ids": {
+          "description": "Identifiers for the cloud storage source directories",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "target_directory_id": {
+          "description": "Target directory path for package to be uploaded to on cloud storage provider",
+          "type": "string"
+        }
+      }
+    },
+    "UpdatePackageLink": {
+      "type": "object",
+      "required": [
+        "password",
+        "expiry"
+      ],
+      "properties": {
+        "access_limit": {
+          "type": "integer",
+          "format": "int64",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "access_limit_enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "expiry": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "has_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "password": {
+          "type": "string"
+        },
+        "unlimited_storage": {
+          "description": "Specifies if unlimited storage is enabled or disabled for a package link",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "UpdatePortal": {
+      "type": "object",
+      "required": [
+        "name",
+        "subdomain"
+      ],
+      "properties": {
+        "access_code": {
+          "type": "string"
+        },
+        "access_level": {
+          "description": "Portal access level",
+          "type": "string",
+          "default": "regular",
+          "enum": [
+            "regular",
+            "private"
+          ]
+        },
+        "access_list": {
+          "description": "Membership IDs of users with direct access to the portal",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "active": {
+          "type": "boolean",
+          "default": false
+        },
+        "background_url": {
+          "type": "string"
+        },
+        "cc_recipients": {
+          "description": "Emails that will receive carbon copy notifications for portal uploads without download link.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "cloud_connections": {
+          "description": "Cloud Connections that will be attached to this portal",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCloudConnection"
+          }
+        },
+        "configure_cloud_connections": {
+          "description": "Overwrite the attached cloud connections for this portal with the list passed in 'cloud_connections' array",
+          "type": "boolean",
+          "default": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "custom_expiry_days": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": -1
+        },
+        "custom_webhooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PortalCustomWebhook"
+          }
+        },
+        "disable_upload_receipt": {
+          "type": "boolean",
+          "default": false
+        },
+        "download_password": {
+          "type": "string"
+        },
+        "expiry": {
+          "description": "Portals will be disabled automatically on this date",
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
+        "expiry_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_type_restriction_exclude": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "file_types": {
+          "description": "Allowed file extensions prefixed with dots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-omitempty": false
+        },
+        "form_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "has_access_code": {
+          "type": "boolean",
+          "default": false
+        },
+        "has_download_password": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "logo_url": {
+          "type": "string"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_file_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "max_package_size": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "x-omitempty": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "package_contents": {
+          "$ref": "#/definitions/PackageContentsConfig"
+        },
+        "package_name_format": {
+          "$ref": "#/definitions/PackageNameFormatConfig"
+        },
+        "package_name_format_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "package_size_restriction_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "primary_color": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "recipients": {
+          "description": "Emails that will receive notifications for portal uploads",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "subdomain": {
+          "type": "string",
+          "maxLength": 53,
+          "minLength": 3
+        },
+        "tag": {
+          "$ref": "#/definitions/TagPartial"
+        },
+        "team_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "teamspace_id": {
+          "type": "string"
+        },
+        "terms_of_service": {
+          "$ref": "#/definitions/PortalTermsOfService"
+        },
+        "terms_of_service_enabled": {
+          "type": "boolean",
+          "x-omitempty": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "user_authentication_required": {
+          "type": "boolean",
+          "x-omitempty": false
+        }
+      }
+    }
+  },
+  "parameters": {
+    "cloudConnectionID": {
+      "type": "string",
+      "description": "ID of cloud connection",
+      "name": "cloudConnectionID",
+      "in": "path",
+      "required": true
+    },
+    "created_at_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Retrieve records that were created on or before (YYYY-MM-DD)",
+      "name": "created_at_end",
+      "in": "query"
+    },
+    "created_at_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Retrieve records that were created on or after (YYYY-MM-DD)",
+      "name": "created_at_start",
+      "in": "query"
+    },
+    "fileId": {
+      "type": "string",
+      "description": "ID of file",
+      "name": "fileId",
+      "in": "path",
+      "required": true
+    },
+    "formId": {
+      "type": "string",
+      "description": "ID of a form",
+      "name": "formId",
+      "in": "path",
+      "required": true
+    },
+    "formTemplateId": {
+      "type": "string",
+      "description": "ID of a form template",
+      "name": "formTemplateId",
+      "in": "path",
+      "required": true
+    },
+    "limit": {
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer",
+      "description": "Number of records to return",
+      "name": "limit",
+      "in": "query"
+    },
+    "linkId": {
+      "type": "string",
+      "description": "Link ID",
+      "name": "linkId",
+      "in": "path",
+      "required": true
+    },
+    "packageId": {
+      "type": "string",
+      "description": "ID of package",
+      "name": "packageId",
+      "in": "path",
+      "required": true
+    },
+    "package_name": {
+      "type": "string",
+      "description": "Retrieve records where name is like the value specified (includes partial matches)",
+      "name": "name",
+      "in": "query"
+    },
+    "package_status": {
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "enum": [
+          "new",
+          "finalized",
+          "expired",
+          "archived"
+        ],
+        "type": "string"
+      },
+      "collectionFormat": "csv",
+      "default": [
+        "finalized",
+        "expired"
+      ],
+      "description": "Retrieve records that match one of the specified states",
+      "name": "status",
+      "in": "query"
+    },
+    "page": {
+      "minimum": 1,
+      "type": "integer",
+      "description": "Page number of results to return",
+      "name": "page",
+      "in": "query"
+    },
+    "portalId": {
+      "type": "string",
+      "description": "ID of portal",
+      "name": "portalId",
+      "in": "path",
+      "required": true
+    },
+    "portalName": {
+      "type": "string",
+      "description": "Name of team",
+      "name": "name",
+      "in": "query"
+    },
+    "portalSubdomain": {
+      "type": "string",
+      "description": "Subdomain of team",
+      "name": "subdomain",
+      "in": "query"
+    },
+    "portal_name": {
+      "type": "string",
+      "description": "Retrieve records that belongs to the specified portal name",
+      "name": "portal",
+      "in": "query"
+    },
+    "sender_email": {
+      "type": "string",
+      "description": "Sender's email address",
+      "name": "sender",
+      "in": "query"
+    },
+    "sort": {
+      "type": "string",
+      "description": "Sort results ascending (fieldname) or descending (-fieldname)",
+      "name": "sort",
+      "in": "query"
+    },
+    "tagIDs": {
+      "type": "string",
+      "description": "Retrieve records where tag is equal to one of these values (comma separated tag IDs)",
+      "name": "tags",
+      "in": "query"
+    },
+    "tagId": {
+      "type": "string",
+      "description": "ID of tag",
+      "name": "tagId",
+      "in": "path",
+      "required": true
+    },
+    "tagName": {
+      "type": "string",
+      "name": "tagName",
+      "in": "query"
+    },
+    "teamId": {
+      "type": "string",
+      "description": "ID of team",
+      "name": "teamId",
+      "in": "path",
+      "required": true
+    },
+    "teamspaceIDs": {
+      "type": "string",
+      "description": "Retrieve records where teamspace_id is equal to one of these values (comma separated)",
+      "name": "teamspaces",
+      "in": "query"
+    },
+    "teamspaceId": {
+      "type": "string",
+      "description": "ID of a teamspace",
+      "name": "teamspaceId",
+      "in": "path",
+      "required": true
+    },
+    "teamspaceName": {
+      "type": "string",
+      "description": "Name filter for teamspace search",
+      "name": "name",
+      "in": "query"
+    },
+    "transferId": {
+      "type": "string",
+      "description": "ID of transfer",
+      "name": "transferId",
+      "in": "path",
+      "required": true
+    }
+  },
+  "securityDefinitions": {
+    "APIKey": {
+      "type": "apiKey",
+      "name": "X-API-Key",
+      "in": "header"
+    },
+    "PackageToken": {
+      "type": "apiKey",
+      "name": "X-Package-Token",
+      "in": "header"
+    },
+    "PortalAccessCode": {
+      "type": "apiKey",
+      "name": "X-Portal-Access-Code",
+      "in": "header"
+    },
+    "TransferToken": {
+      "type": "apiKey",
+      "name": "X-Transfer-Token",
+      "in": "header"
+    },
+    "UserToken": {
+      "type": "apiKey",
+      "name": "X-User-Token",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "UserToken": []
+    },
+    {
+      "APIKey": []
+    },
+    {
+      "TransferToken": []
+    }
+  ]
+}
