@@ -1,5 +1,5 @@
-import {ScrubberLaneStyle, TimelineLaneStyle, TimelineStyle, PeriodMarkerStyle} from '@byomakase/omakase-player';
 import { Triangle } from 'lucide-react';
+import {ScrubberLaneStyle, TimelineLaneStyle, TimelineStyle, PeriodMarkerStyle} from '@byomakase/omakase-player';
 import {randomHexColor} from './utils'
 
 export const TIMELINE_STYLE: Partial<TimelineStyle> = {
@@ -65,7 +65,7 @@ export const SCRUBBER_LANE_STYLE: Partial<ScrubberLaneStyle> = {
 
 export const TIMELINE_STYLE_DARK: Partial<TimelineStyle> = {
   ...TIMELINE_STYLE,
-
+  stageMinHeight: 30,
   backgroundFill: '#292d43',
 
   playheadFill: '#43F4FF',
@@ -90,6 +90,6 @@ export const SCRUBBER_LANE_STYLE_DARK: Partial<ScrubberLaneStyle> = {
 
 export const PERIOD_MARKER_STYLE: Partial<PeriodMarkerStyle> = {
   color: randomHexColor(),
-  symbolSize: 40,
-  symbolType: 'triangle'
+  symbolSize: 15,
+  symbolType: 'circle'
 };

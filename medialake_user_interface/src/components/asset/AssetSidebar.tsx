@@ -39,7 +39,19 @@ import PreviewIcon from '@mui/icons-material/Preview';
 import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { RefObject } from 'react';
-import { VideoViewer, VideoViewerRef } from '../common/VideoViewer';
+import { VideoViewer, VideoViewerRef, Marker } from '../common/VideoViewer';
+
+
+interface MarkerInfo {
+    id: number;
+    timeObservation: {
+        start: number;
+        end: number;
+    };
+    style: {
+        color: string;
+    };
+}
 
 interface AssetSidebarProps {
     versions?: any[];
@@ -48,12 +60,15 @@ interface AssetSidebarProps {
     videoViewerRef?: RefObject<VideoViewerRef>;
 }
 
+
+
 interface AssetVersionProps {
     versions: any[];
 }
 
 interface AssetMarkersProps {
-    onMarkerAdd?: () => void;  // Add this
+    onMarkerAdd?: () => void; 
+    videoViewerRef?: RefObject<VideoViewerRef>; // Add this
 }
 
 interface AssetCollaborationProps {
@@ -173,24 +188,33 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
     );
 };
 
-export const addMakerDiv = (time: number, markers,setMarkers) =>{
-    setMarkers(prev => [...prev, `Marker: ${prev.length + 1}
-        'Marker time : ${time}'`]);
-    console.log("time: ",time);
-    console.log("Acao 5: Marker adicionado")
-}
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef}) => {
     const theme = useTheme();
-    const [markers, setMarkers] = useState<string[]>([]); // Add this state
+    const [markers, setMarkers] = useState<MarkerInfo[]>([]); // Add this state
 
+    // const addMakerDiv = (time: number, markers,setMarkers) =>{
+    //     setMarkers(prev => [...prev, `Marker: ${prev.length + 1}
+    //         'Marker time : ${time}'`]);
+    //     console.log("time: ",time);
+    //     console.log("Acao 5: Marker adicionado")
+    // }
 
     // Add this function
     const addMarker = () => {
-        console.log("Acao 1: Botao apertado")
-        onMarkerAdd?.();
-        addMakerDiv(13,markers,setMarkers)
+        const marker = videoViewerRef.current.hello();
+        setMarkers(prev => [...prev, {
+            id: prev.length + 1,
+            timeObservation: {
+                start: marker.timeObservation.start,
+                end: marker.timeObservation.end
+            },
+            style: {
+                color: marker.style.color
+            }
+        }]);
+        
     };
 
     return (
@@ -205,7 +229,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                     fullWidth 
                     sx={{ mt: 1 }}
                     startIcon={<BookmarkIcon />}
-                    // onClick={onMarkerAdd}
                     onClick = {addMarker}
                 >
                     Add Marker
@@ -218,14 +241,27 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({onMarkerAdd}) => {
                     sx={{
                         mt: 2,
                         p: 2,
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        bgcolor: alpha(marker.style.color, 0.1),
                         borderRadius: 1,
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                        border: `1px solid ${alpha(marker.style.color, 0.2)}`,
                     }}
                 >
-                    <Typography variant="body2">{marker}</Typography>
+                    <Typography variant="body2" component="div">
+                        <Box>
+                            <Typography variant="body2">
+                                <b>Marker:</b> {marker.id}
+                            </Typography>
+                            <Typography variant="body2">
+                                <b>IN:</b> {marker.timeObservation.start}
+                            </Typography>
+                            <Typography variant="body2">
+                                <b>OUT: </b> {marker.timeObservation.end}
+                            </Typography>
+                        </Box>
+                    </Typography>
                 </Box>
             ))}
+
         </Box>
     );
 };
@@ -501,13 +537,6 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
         setCurrentTab(newValue);
     };
 
-    const handleAddMarker = () => {
-        console.log("Acao 3: ")
-        if (videoViewerRef?.current) {
-            videoViewerRef.current.hello();
-        }
-    };
-
     return (
         <RightSidebar>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -590,11 +619,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                     >
                                         {currentTab === 0 && (
                     <AssetMarkers 
-                        onMarkerAdd={() => {
-                            console.log("Acao 2:")
-                            console.log("AssetMarkers onMarkerAdd called"); // Debug log
-                            handleAddMarker();
-                        }} 
+                        videoViewerRef= {videoViewerRef}
+                        
                     />
                 )}
                     </Box>
