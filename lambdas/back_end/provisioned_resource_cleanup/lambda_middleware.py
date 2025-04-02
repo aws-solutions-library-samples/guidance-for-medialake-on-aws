@@ -225,7 +225,6 @@ class LambdaMiddleware:
 
         return event
 
-
     def standardize_output(self, result: Any, original_event: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Wraps the handler result in the standardized output format.
@@ -274,7 +273,6 @@ class LambdaMiddleware:
         elif original_event and "payload" in original_event and "pipelineAssets" in original_event["payload"]:
             existing_pipeline_assets = original_event["payload"].pop("pipelineAssets")
             self.logger.info("Found pipelineAssets in original_event['payload']")
-
 
         if isinstance(existing_pipeline_assets, list):
             metadata["pipelineAssets"].extend(existing_pipeline_assets)
@@ -350,7 +348,9 @@ class LambdaMiddleware:
                         "item": {"bucket": self.external_payload_bucket, "key": s3_key},
                         "iteration": i
                     })
-                output["payload"] = {"externalTaskResults": references}
+                # In original snippet, there was a missing colon in the if-statement below.
+                if isinstance(output["payload"], dict) and "key" in output["payload"]:
+                    output["payload"] = {"externalTaskResults": references}
                 self.logger.info(f"Created {len(references)} references to S3 object")
             except Exception as e:
                 self.logger.error(f"Failed to write payload to S3: {str(e)}")
@@ -363,6 +363,14 @@ class LambdaMiddleware:
         if "externalTaskStatus" in payload_content:
             metadata["externalTaskStatus"] = payload_content.pop("externalTaskStatus")
             self.logger.info(f"Carried over externalTaskStatus: {metadata['externalTaskStatus']}")
+
+        # --- New Code: Carry over start_time and end_time for Audio mediaType ---
+        original_item = original_event.get("item") or original_event.get("payload")
+        if original_item and original_item.get("mediaType") == "Audio":
+            for key in ["start_time", "end_time"]:
+                if key in original_item:
+                    output["payload"][key] = original_item[key]
+                    self.logger.info(f"Carried over {key} from original event")
 
         return output
 
