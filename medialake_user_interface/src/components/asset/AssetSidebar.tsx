@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import {
     Box,
     Typography,
@@ -40,13 +40,25 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { RefObject } from 'react';
 import { VideoViewer, VideoViewerRef, Marker } from '../common/VideoViewer';
+import {randomHexColor} from '../common/utils';
+  import {
+    SCRUBBER_LANE_STYLE_DARK,
+    TIMELINE_STYLE_DARK,
+    PERIOD_MARKER_STYLE,
+  } from '../common/OmakaseTimeLineConstants';
+    import {
+      MarkerLane,
+      OmakasePlayer,
+      PeriodMarker,
+    } from '@byomakase/omakase-player';
+import { subscribe } from 'diagnostics_channel';
 
 
 interface MarkerInfo {
-    id: number;
+    id: string;
     timeObservation: {
-        start: number;
-        end: number;
+        start: string;
+        end: string;
     };
     style: {
         color: string;
@@ -69,6 +81,8 @@ interface AssetVersionProps {
 interface AssetMarkersProps {
     onMarkerAdd?: () => void; 
     videoViewerRef?: RefObject<VideoViewerRef>; // Add this
+    markers?: MarkerInfo[];
+    setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;    
 }
 
 interface AssetCollaborationProps {
@@ -190,30 +204,44 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef}) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef,markers, setMarkers,}) => {
     const theme = useTheme();
-    const [markers, setMarkers] = useState<MarkerInfo[]>([]); // Add this state
+    const maxId = markers.length + 1;
+    const newId = maxId.toString(); // Call the toString() method
 
-    // const addMakerDiv = (time: number, markers,setMarkers) =>{
-    //     setMarkers(prev => [...prev, `Marker: ${prev.length + 1}
-    //         'Marker time : ${time}'`]);
-    //     console.log("time: ",time);
-    //     console.log("Acao 5: Marker adicionado")
-    // }
-
-    // Add this function
     const addMarker = () => {
-        const marker = videoViewerRef.current.hello();
+        const lane = videoViewerRef.current.getMarkerLane();
+        const currentTime = videoViewerRef.current.getCurrentTime();
+        const periodMarker = new PeriodMarker({
+            timeObservation: { start: currentTime, end:  currentTime + 5 },
+            editable: true,
+            text: newId, 
+            style: {
+            ...PERIOD_MARKER_STYLE,
+            color: randomHexColor(),
+            },
+        });
+        lane.addMarker(periodMarker);
+
         setMarkers(prev => [...prev, {
-            id: prev.length + 1,
+            id: newId,
             timeObservation: {
-                start: marker.timeObservation.start,
-                end: marker.timeObservation.end
+                start:  videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.start),
+                end: videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.end),
             },
             style: {
-                color: marker.style.color
+                color: periodMarker.style.color
             }
-        }]);
+        }]
+        );      
+
+        periodMarker.onChange$.subscribe({
+            next: (event) => {
+                console.log('PeriodMarker text type:', typeof periodMarker.text);
+                console.log(markers);
+            }
+        });
+        
         
     };
 
@@ -532,7 +560,7 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
 export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versions = [],comments = [],onAddComment }) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
-
+    const [markers, setMarkers] = useState<MarkerInfo[]>([]);
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
@@ -620,6 +648,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                                         {currentTab === 0 && (
                     <AssetMarkers 
                         videoViewerRef= {videoViewerRef}
+                        markers = {markers}
+                        setMarkers = {setMarkers}
                         
                     />
                 )}

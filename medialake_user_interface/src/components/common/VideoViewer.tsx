@@ -62,6 +62,7 @@ import { Currency } from 'lucide-react';
     onTimeUpdate?: (time: number) => void;
     showThumbnails?: boolean;
     onMarkerAdd?: (time: number) => void;
+    playerRef?: React.RefObject<OmakasePlayer>;
   }
 
   export type Marker = {
@@ -72,6 +73,9 @@ import { Currency } from 'lucide-react';
   
   export interface VideoViewerRef {
     hello: () =>  PeriodMarker;
+    getMarkerLane: () => MarkerLane | null;
+    getCurrentTime: () => number;
+    formatToTimecode: (time: number) => string;
   }
   
   /**
@@ -211,17 +215,6 @@ import { Currency } from 'lucide-react';
           editable: true,
           style: { ...PERIOD_MARKER_STYLE },
         });
-        markerLane.addMarker(periodMarker);
-        periodMarker.onChange$.subscribe({
-          next: (event) => {
-            console.log('Period marker changed', event);
-          },
-        });
-        periodMarker.onMouseEnter$.subscribe({
-          next: (event) => {
-            console.log('Period marker hover', event);
-          },
-        });
       };
   
       return () => {
@@ -340,6 +333,7 @@ import { Currency } from 'lucide-react';
       currentTime,
       duration,
       setCurrentTime,
+      playerRef
     };
   };
   
@@ -423,6 +417,7 @@ import { Currency } from 'lucide-react';
         onTimeUpdate,
         showThumbnails = false,
         onMarkerAdd,
+        playerRef,
       },
       ref
     ) => {
@@ -494,18 +489,26 @@ import { Currency } from 'lucide-react';
               });
               markerLaneRef.current.addMarker(periodMarker);
               customCallbacks.onMarkerAdd(currentTime);
-              periodMarker.onChange$.subscribe({
-                next: (event) => {
-                  console.log('period marker changed', event);
-                }
-              })
+              
+              console.log('playeref',playerRef)
               return periodMarker
             }
 
           },
+          getMarkerLane: () => markerLaneRef.current,
+          getCurrentTime: () => currentTime,
+          formatToTimecode: (time: number) => {
+            const hours = Math.floor(time / 3600);
+            const minutes = Math.floor((time % 3600) / 60);
+            const seconds = Math.floor(time % 60);
+            const frames = Math.floor((time % 1) * 24);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+
+          },
         }),
-        [currentTime, customCallbacks]
+        [currentTime, customCallbacks,playerRef]
       );
+
       const handlePlayPause = () => {
         if (isPlaying) {
           pause();
