@@ -247,23 +247,34 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         right: 8, 
                         display: 'flex', 
                         gap: 1, 
-                        zIndex: 2,
+                        zIndex: 10, // Increased z-index to ensure buttons are above other elements
                         opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
                         transition: 'opacity 0.2s ease-in-out',
                         pointerEvents: shouldShowButtons ? 'auto' : 'none', // Ensure buttons are clickable when visible
                     }}
+                    onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
                 >
                     <IconButton
                         size="small"
                         onClick={handleDeleteClick}
-                        sx={{ bgcolor: 'background.paper' }}
+                        sx={{ 
+                            bgcolor: 'background.paper',
+                            '&:hover': {
+                                bgcolor: 'background.default',
+                            }
+                        }}
                     >
                         <DeleteIcon fontSize="small" />
                     </IconButton>
                     <IconButton
                         size="small"
                         onClick={handleMenuClick}
-                        sx={{ bgcolor: 'background.paper' }}
+                        sx={{ 
+                            bgcolor: 'background.paper',
+                            '&:hover': {
+                                bgcolor: 'background.default',
+                            }
+                        }}
                     >
                         <MoreVertIcon fontSize="small" />
                     </IconButton>

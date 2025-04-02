@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, LinearProgress, alpha, useTheme } from '@mui/material';
+import { Box, Typography, LinearProgress, alpha, useTheme, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, CircularProgress } from '@mui/material';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { formatFileSize } from '@/utils/fileSize';
@@ -220,6 +220,25 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     );
   }
 
+  // Don't show content while loading initial data
+  if (isLoading && !searchResponse?.data?.results) {
+    return (
+      <Box sx={{ 
+        height: '100%', 
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        p: 2
+      }}>
+        <CircularProgress size={40} />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Loading assets...
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 2 }}>
       {isLoading && (
@@ -234,58 +253,143 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         />
       )}
 
-      {/* CSS to hide the "Results" title */}
-      <Box sx={{ 
-        '& h1': { 
-          display: 'none !important' 
-        },
-        '& > div > div:first-of-type': {
-          mb: 0
-        }
-      }}>
-        <ModularUnifiedResultsView
-          results={searchResponse?.data?.results || []}
-          searchMetadata={{
-            totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
-            page,
-            pageSize,
-          }}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          searchTerm=""
-          groupByType={groupByType}
-          onGroupByTypeChange={setGroupByType}
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
-          cardSize={cardSize}
-          onCardSizeChange={setCardSize}
-          aspectRatio={aspectRatio}
-          onAspectRatioChange={setAspectRatio}
-          thumbnailScale={thumbnailScale}
-          onThumbnailScaleChange={setThumbnailScale}
-          showMetadata={showMetadata}
-          onShowMetadataChange={setShowMetadata}
-          sorting={sorting}
-          onSortChange={handleSortChange}
-          cardFields={cardFields}
-          onCardFieldToggle={handleCardFieldToggle}
-          columns={columns}
-          onColumnToggle={handleColumnToggle}
-          onAssetClick={handleAssetClick}
-          onDeleteClick={handleDeleteClick}
-          onMenuClick={handleMenuOpen}
-          onEditClick={handleStartEditing}
-          onEditNameChange={handleNameChange}
-          onEditNameComplete={handleNameEditComplete}
-          editingAssetId={editingAssetId}
-          editedName={editedName}
-          error={error ? {
-            status: error.name || 'Error',
-            message: error.message || 'Failed to load assets'
-          } : undefined}
-          isLoading={isLoading}
-        />
-      </Box>
+      {/* Only show the results view when we have data or after initial loading */}
+      {(!isLoading || searchResponse?.data?.results) && (
+        <Box sx={{ 
+          '& h1': { 
+            display: 'none !important' 
+          },
+          '& > div > div:first-of-type': {
+            mb: 0
+          }
+        }}>
+          <ModularUnifiedResultsView
+            results={searchResponse?.data?.results || []}
+            searchMetadata={{
+              totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
+              page,
+              pageSize,
+            }}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            searchTerm=""
+            groupByType={groupByType}
+            onGroupByTypeChange={setGroupByType}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            cardSize={cardSize}
+            onCardSizeChange={setCardSize}
+            aspectRatio={aspectRatio}
+            onAspectRatioChange={setAspectRatio}
+            thumbnailScale={thumbnailScale}
+            onThumbnailScaleChange={setThumbnailScale}
+            showMetadata={showMetadata}
+            onShowMetadataChange={setShowMetadata}
+            sorting={sorting}
+            onSortChange={handleSortChange}
+            cardFields={cardFields}
+            onCardFieldToggle={handleCardFieldToggle}
+            columns={columns}
+            onColumnToggle={handleColumnToggle}
+            onAssetClick={handleAssetClick}
+            onDeleteClick={handleDeleteClick}
+            onMenuClick={handleMenuOpen}
+            onEditClick={handleStartEditing}
+            onEditNameChange={handleNameChange}
+            onEditNameComplete={handleNameEditComplete}
+            editingAssetId={editingAssetId}
+            editedName={editedName}
+            error={error ? {
+              status: error.name || 'Error',
+              message: error.message || 'Failed to load assets'
+            } : undefined}
+            isLoading={isLoading}
+          />
+        </Box>
+      )}
+      
+      {/* Show loading indicator during initial load */}
+      {isLoading && !searchResponse?.data?.results && (
+        <Box sx={{ 
+          height: '100%', 
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          p: 2
+        }}>
+          <CircularProgress size={40} />
+          <Typography variant="body1" sx={{ mt: 2 }}>
+            Loading assets...
+          </Typography>
+        </Box>
+      )}
+      
+      {/* Asset Menu */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        MenuListProps={{
+          'aria-labelledby': selectedAsset ? `asset-menu-button-${selectedAsset.InventoryID}` : undefined
+        }}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            borderRadius: '8px',
+            minWidth: 200,
+            mt: 1,
+            border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            backgroundColor: theme => theme.palette.background.paper,
+            overflow: 'visible',
+            position: 'fixed',
+            zIndex: 1400,
+          },
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              overflow: 'visible',
+              position: 'fixed',
+            }
+          }
+        }}
+      >
+        <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
+        <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
+        <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
+      </Menu>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={isDeleteModalOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirm Delete
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description">
+            Are you sure you want to delete this asset? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
