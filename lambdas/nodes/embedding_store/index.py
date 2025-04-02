@@ -120,11 +120,20 @@ def lambda_handler(event, context):
         }
 
         if scope == "clip" or scope == "audio":
-            scope = "clip"
+            end_offset_sec = 0
+            start_offset_sec = 0
+           
+            if scope == "clip":
+                start_offset_sec = item["start_offset_sec"]
+                end_offset_sec = item["end_offset_sec"]
+            if scope == "audio":
+                start_offset_sec = item["start_time"]
+                end_offset_sec = item["end_time"]
+            document["embedding_scope"] = "clip"
             # For clips, store the original asset_id and add timecodes.
             document["DigitalSourceAsset"] = {"ID": asset_id}
-            document["start_timecode"] = seconds_to_smpte(item.get("start_offset_sec", None))
-            document["end_timecode"] = seconds_to_smpte(item.get("end_offset_sec", None))
+            document["start_timecode"] = seconds_to_smpte(start_offset_sec)
+            document["end_timecode"] = seconds_to_smpte(end_offset_sec)
 
             # Index the document without a forced refresh.
             response = client.index(index=INDEX_NAME, body=document)
@@ -136,24 +145,15 @@ def lambda_handler(event, context):
             search_query = {
                 "query": {
                     "bool": {
-                    "must": [
-                        {
-                        "term": {
-                            "DigitalSourceAsset.ID.keyword": asset_id
-                        }
-                        },
-                        {"exists": {"field": "InventoryID"}},
-                        {
-                        "exists": {
-                            "field": "DerivedRepresentations.ID"
-                        }
-                        }
-                    ]
+                        "must": [
+                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
+                            {"exists": {"field": "InventoryID"}},
+                            {"exists": {"field": "DerivedRepresentations.ID"}}
+                        ]
                     }
                 }
             }
 
-            
             start_time = time.time()
             search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
             # Retry search for up to 2 minutes if the document is not found.
@@ -245,6 +245,40 @@ def lambda_handler(event, context):
                 error_msg = "Failed to validate the update after multiple attempts. 'embedding_scope' field missing."
                 logger.error(error_msg)
                 raise Exception(error_msg)
+            
+            # **** New DerivedRepresentations Count Validation Loop ****
+            # This loop will repeatedly retrieve the document and count the number of items in DerivedRepresentations.
+            # If the count is not exactly 2, it will re-update the document and try again.
+            max_dr_validation_attempts = 50
+            dr_validation_attempt = 0
+            while dr_validation_attempt < max_dr_validation_attempts:
+                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
+                source = updated_doc.get("_source", {})
+                dr = source.get("DerivedRepresentations", [])
+                actual_count = len(dr) if isinstance(dr, list) else 0
+                if isinstance(dr, list) and actual_count == 2:
+                    logger.info("Validation succeeded: 'DerivedRepresentations' count is 2.")
+                    break
+                else:
+                    logger.warning(
+                        f"Validation failed: 'DerivedRepresentations' count is not 2 (actual count: {actual_count}). Retrying update..."
+                    )
+                    current_seq_no = updated_doc.get("_seq_no")
+                    current_primary_term = updated_doc.get("_primary_term")
+                    response = client.update(
+                        index=INDEX_NAME,
+                        id=existing_doc_id,
+                        body={"doc": document},
+                        if_seq_no=current_seq_no,
+                        if_primary_term=current_primary_term
+                    )
+                    dr_validation_attempt += 1
+                    time.sleep(5)
+            if dr_validation_attempt == max_dr_validation_attempts:
+                error_msg = "Failed to validate 'DerivedRepresentations' count after multiple attempts."
+                logger.error(error_msg)
+                raise Exception(error_msg)
+            # **** End of DerivedRepresentations Validation Loop ****
             
             # Log the final updated document after validation
             logger.info("Document after update validation: %s", json.dumps(updated_doc))
