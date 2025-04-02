@@ -298,13 +298,32 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                         autoFocus
                                                         size="small"
                                                         fullWidth
+                                                        multiline
+                                                        sx={{ 
+                                                            width: '100%',
+                                                            '& .MuiInputBase-root': {
+                                                                width: '100%',
+                                                                minHeight: '2.5em',
+                                                                height: 'auto',
+                                                            },
+                                                            '& .MuiInputBase-input': {
+                                                                whiteSpace: 'normal',
+                                                                wordBreak: 'break-word',
+                                                                overflow: 'visible',
+                                                                textOverflow: 'clip',
+                                                                width: '100%',
+                                                                minHeight: '1.5em',
+                                                                height: 'auto',
+                                                                lineHeight: '1.5',
+                                                            }
+                                                        }}
                                                         InputProps={{
                                                             endAdornment: isRenaming && (
                                                               <CircularProgress size={16} />
                                                             )
                                                           }}
                                                     />
-                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
                                                         <Button
                                                             size="small"
                                                             onClick={(e) => {
@@ -329,10 +348,14 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                     </Box>
                                                 </Box>
                                             ) : (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                                                     <Typography
                                                         sx={{
                                                             wordBreak: 'break-word',
+                                                            whiteSpace: 'normal',
+                                                            overflow: 'visible',
+                                                            textOverflow: 'clip',
+                                                            width: '100%',
                                                             userSelect: 'text', // Allow text selection
                                                         }}
                                                         display="inline"

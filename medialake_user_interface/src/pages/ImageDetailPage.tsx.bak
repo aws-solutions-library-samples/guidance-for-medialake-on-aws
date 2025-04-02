@@ -219,39 +219,24 @@ const TagInput: React.FC<{
 const SummaryTab = ({ assetData }: { assetData: any }) => {
     const theme = useTheme();
     const asset = assetData?.data?.asset;
+    const metadata = asset?.DigitalSourceAsset?.MainRepresentation?.Metadata || {};
+    const filename = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
+    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.Size || 0;
+    const fileType = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.AssetType || 'Unknown';
+    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.MediaFormat?.Format || 'Unknown';
+    const dimensions = metadata?.Common?.VisualInfo?.Dimensions 
+        ? `${metadata.Common.VisualInfo.Dimensions.Width}x${metadata.Common.VisualInfo.Dimensions.Height}`
+        : 'Unknown';
+    const createdDate = metadata?.Common?.CreationDate || 'Unknown';
+    const description = metadata?.Common?.Description || 'High resolution landscape image';
+    
+    // Extract keywords/tags
+    const keywords = metadata?.Common?.Keywords || ['nature', 'landscape'];
+    
+    // Colors matching the image exactly
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
     const descKeywordsColor = '#F6AD55';  // Orange
-    
-    // Extract metadata from API response
-    const metadata = asset?.Metadata?.CustomMetadata || {};
-    const generalMetadata = metadata?.General || {};
-    const imageMetadata = metadata?.Image?.[0] || {};
-    
-    // Primary fields
-    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
-    const fileType = asset?.DigitalSourceAsset?.Type || 'Image';
-    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
-    const s3Bucket = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket || 'Unknown';
-    const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
-    const s3Uri = s3Bucket && asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath
-        ? `s3://${s3Bucket}/${asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath}`
-        : 'Unknown';
-    
-    // Technical details
-    const width = imageMetadata?.Width || generalMetadata?.ImageWidth || 'Unknown';
-    const height = imageMetadata?.Height || generalMetadata?.ImageHeight || 'Unknown';
-    const dimensions = `${width}x${height}`;
-    const colorDepth = imageMetadata?.BitDepth || imageMetadata?.Bitdepth || '8';
-    const colorSpace = imageMetadata?.ColorSpace || imageMetadata?.Colorspace || 'Unknown';
-    const compression = imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm || 'Unknown';
-    const createdDate = asset?.DigitalSourceAsset?.CreateDate 
-        ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString() 
-        : 'Unknown';
-    
-    // Extract keywords/tags
-    const description = generalMetadata?.Description || 'High resolution image';
-    const keywords = generalMetadata?.Keywords || metadata?.Keywords || ['image'];
     
     return (
         <Box>
@@ -276,41 +261,41 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileType}</Typography>
+                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>Image</Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {formatFileSize(fileSize)}
+                        {formatFileSize(assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0)}
                     </Typography>
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {fileFormat}
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown'}
                     </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {s3Bucket}
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket || 'Unknown'}
                     </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {objectName}
+                        {assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown'}
                     </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {s3Uri}
+                        {`s3://${assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket}/${assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath}` || 'Unknown'}
                     </Typography>
                 </Box>
             </Box>
@@ -340,24 +325,9 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 </Box>
                 
                 <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Depth:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorDepth} bit</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Space:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorSpace}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Compression:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{compression}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {createdDate}
+                        {typeof createdDate === 'string' ? createdDate : formatLocalDateTime(createdDate)}
                     </Typography>
                 </Box>
             </Box>
@@ -390,7 +360,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     flexWrap: 'wrap', 
                     gap: 0.75
                 }}>
-                    {(Array.isArray(keywords) ? keywords : [keywords]).map((keyword, index) => (
+                    {keywords.map((keyword, index) => (
                         <Chip
                             key={index}
                             label={keyword}
@@ -894,6 +864,8 @@ const RelatedItemsTab: React.FC<{
 };
 
 const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
+    const theme = useTheme();
+    
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -922,13 +894,37 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
         const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
 
         return (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
+            <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    md: 'repeat(auto-fill, minmax(200px, 1fr))'
+                }, 
+                gap: 2 
+            }}>
                 {displayEntries.map(([key, value]) => (
-                    <Box key={key}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {formatCamelCase(key)}:
-                        </Typography>
-                        <Box sx={{ pl: 2 }}>
+                    <Box key={key} sx={{
+                        backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                        p: 1.5,
+                        borderRadius: 1,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                    }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
+                                {formatCamelCase(key)}:
+                            </Typography>
+                            <IconButton 
+                                size="small" 
+                                onClick={() => navigator.clipboard.writeText(
+                                    typeof value === 'object' ? JSON.stringify(value) : String(value)
+                                )}
+                                sx={{ opacity: 0.6, '&:hover': { opacity: 1 }, ml: 0.5, p: 0.3 }}
+                            >
+                                <ContentCopyIcon fontSize="small" sx={{ fontSize: '0.9rem' }} />
+                            </IconButton>
+                        </Box>
+                        <Box sx={{ pl: 0 }}>
                             <MetadataContent
                                 data={value}
                                 depth={depth + 1}
@@ -941,7 +937,19 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
             </Box>
         );
     } else {
-        return <TruncatedTextWithTooltip text={String(data)} />;
+        return (
+            <Typography 
+                variant="body2" 
+                sx={{ 
+                    color: data === null || data === undefined 
+                        ? theme.palette.text.disabled 
+                        : theme.palette.text.primary,
+                    fontStyle: data === null || data === undefined ? 'italic' : 'normal'
+                }}
+            >
+                <TruncatedTextWithTooltip text={String(data)} />
+            </Typography>
+        );
     }
 };
 

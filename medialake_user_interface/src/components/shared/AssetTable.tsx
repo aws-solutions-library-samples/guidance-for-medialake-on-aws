@@ -126,9 +126,21 @@ export function AssetTable<T>({
                         if (col.id === 'name' && onEditClick) {
                             const isEditing = editingId === getId(info.row.original);
                             return (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: isEditing ? 'flex-start' : 'center', 
+                                    gap: 1, 
+                                    p: 1,
+                                    minWidth: 0,
+                                    width: '100%'
+                                }}>
                                     {isEditing ? (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            flexDirection: 'column',
+                                            gap: 1, 
+                                            width: '100%'
+                                        }}>
                                             <TextField
                                                 value={editedName}
                                                 onChange={onEditNameChange}
@@ -142,9 +154,29 @@ export function AssetTable<T>({
                                                 onClick={(e) => e.stopPropagation()}
                                                 autoFocus
                                                 size="small"
-                                                sx={{ flex: 1 }}
+                                                sx={{ 
+                                                    flex: 1,
+                                                    minWidth: '100%',
+                                                    '& .MuiInputBase-root': {
+                                                        width: '100%',
+                                                        minHeight: '2.5em',
+                                                        height: 'auto',
+                                                    },
+                                                    '& .MuiInputBase-input': {
+                                                        whiteSpace: 'normal',
+                                                        wordBreak: 'break-word',
+                                                        overflow: 'visible',
+                                                        textOverflow: 'clip',
+                                                        width: '100%',
+                                                        minHeight: '1.5em',
+                                                        height: 'auto',
+                                                        lineHeight: '1.5',
+                                                    }
+                                                }}
+                                                multiline
+                                                fullWidth
                                             />
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
                                                 <Button
                                                     size="small"
                                                     onClick={(e) => {
