@@ -174,7 +174,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         >
             <Box
                 sx={{
-                    borderRadius: 2,
+                    borderRadius: 4, // Increased from 2 to 4 for more curved corners
                     overflow: 'hidden',
                     bgcolor: 'background.paper',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
