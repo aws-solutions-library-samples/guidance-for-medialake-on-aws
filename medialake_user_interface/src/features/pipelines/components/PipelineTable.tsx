@@ -5,13 +5,16 @@ import {
     CircularProgress,
     Tooltip,
     Typography,
-    Chip
+    Chip,
+    FormControlLabel
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon
+    Stop as StopIcon,
+    PowerSettingsNew as PowerOnIcon,
+    PowerOff as PowerOffIcon
 } from '@mui/icons-material';
 import {
     useReactTable,
@@ -26,8 +29,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
 import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
+import { IconSwitch } from '@/components/common';
+import { TriggerTypeChips } from './TriggerTypeChips';
+import { PipelineStatusCell } from './PipelineStatusCell';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
+
 
 interface PipelineTableProps {
     data: Pipeline[];
@@ -36,9 +43,12 @@ interface PipelineTableProps {
     tableActions: TableActions;
     onStartPipeline: (id: string) => void;
     onStopPipeline: (id: string) => void;
+    onToggleActive: (id: string, active: boolean) => void;
+    togglingPipelines?: Record<string, boolean>; // Track which pipelines are being toggled
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
+
 
 export const PipelineTable: React.FC<PipelineTableProps> = ({
     data,
@@ -46,7 +56,9 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     tableState,
     tableActions,
     onStartPipeline,
-    onStopPipeline
+    onStopPipeline,
+    onToggleActive,
+    togglingPipelines = {}
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,15 +75,28 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         }),
         columnHelper.accessor('type', {
             header: 'Type',
-            cell: info => (
-                <TableCellContent variant="secondary">
-                    <Chip
-                        label={info.getValue()}
-                        size="small"
-                        color={info.getValue() === 'Ingest Triggered' ? 'primary' : 'default'}
-                    />
-                </TableCellContent>
-            ),
+            cell: info => {
+                // Get the pipeline object
+                const pipeline = info.row.original;
+                
+                // Parse the comma-separated list into an array
+                const triggerTypes = info.getValue().split(',');
+                
+                // For now, if the type is "Ingest Triggered", replace it with "Event Triggered"
+                const displayTypes = triggerTypes.map(type =>
+                    type === 'Ingest Triggered' ? 'Event Triggered' : type
+                );
+                
+                return (
+                    <TableCellContent variant="secondary">
+                        <TriggerTypeChips
+                            triggerTypes={displayTypes}
+                            eventRuleInfo={pipeline.eventRuleInfo}
+                            pipeline={pipeline}
+                        />
+                    </TableCellContent>
+                );
+            },
             enableSorting: true,
             size: 150
         }),
@@ -88,6 +113,21 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             ),
             enableSorting: true,
             size: 100
+        }),
+        columnHelper.accessor('deploymentStatus', {
+            header: 'Status',
+            cell: info => {
+                const pipeline = info.row.original;
+                return (
+                    <PipelineStatusCell
+                        pipeline={pipeline}
+                        onToggleActive={onToggleActive}
+                        togglingPipelines={togglingPipelines}
+                    />
+                );
+            },
+            enableSorting: true,
+            size: 150  // Increased size to accommodate the switch
         }),
         columnHelper.accessor('createdAt', {
             header: 'Created',
@@ -154,7 +194,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             ),
             size: 200
         })
-    ], [tableActions, onStartPipeline, onStopPipeline]);
+    ], [tableActions, onStartPipeline, onStopPipeline, onToggleActive]);
 
     const table = useReactTable({
         data,

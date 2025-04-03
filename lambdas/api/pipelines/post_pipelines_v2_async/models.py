@@ -48,4 +48,3 @@ class PipelineDefinition(BaseModel):
     name: str
     description: str
     configuration: Configuration
-    active: bool = True  # Default to active

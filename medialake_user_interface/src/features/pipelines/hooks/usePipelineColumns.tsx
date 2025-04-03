@@ -1,21 +1,26 @@
 import { useMemo } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Box, Tooltip, IconButton, Chip } from '@mui/material';
+import { Box, Tooltip, IconButton, Typography, Chip, FormControlLabel } from '@mui/material';
+import { IconSwitch } from '@/components/common';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon
+    Stop as StopIcon,
+    CheckCircle as CheckCircleIcon,
+    Cancel as CancelIcon
 } from '@mui/icons-material';
 import { TableCellContent } from '@/components/common/table';
 import { format } from 'date-fns';
 import { Pipeline } from '../types/pipelines.types';
+import { TriggerTypeChips } from '../components';
 
 interface UsePipelineColumnsProps {
     onEdit: (id: string) => void;
     onDelete: (id: string, name: string) => void;
     onStart: (id: string) => void;
     onStop: (id: string) => void;
+    onToggleActive: (id: string, active: boolean) => void;
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
@@ -24,7 +29,8 @@ export const usePipelineColumns = ({
     onEdit,
     onDelete,
     onStart,
-    onStop
+    onStop,
+    onToggleActive
 }: UsePipelineColumnsProps) => {
     return useMemo(
         () => [
@@ -42,15 +48,28 @@ export const usePipelineColumns = ({
                 header: 'Type',
                 size: 150,
                 enableSorting: true,
-                cell: info => (
-                    <TableCellContent variant="secondary">
-                        <Chip
-                            label={info.getValue()}
-                            size="small"
-                            color={info.getValue() === 'Ingest Triggered' ? 'primary' : 'default'}
-                        />
-                    </TableCellContent>
-                ),
+                cell: info => {
+                    // Get the pipeline object
+                    const pipeline = info.row.original;
+                    
+                    // Parse the comma-separated list into an array
+                    const triggerTypes = info.getValue().split(',');
+                    
+                    // For now, if the type is "Ingest Triggered", replace it with "Event Triggered"
+                    const displayTypes = triggerTypes.map(type =>
+                        type === 'Ingest Triggered' ? 'Event Triggered' : type
+                    );
+                    
+                    return (
+                        <TableCellContent variant="secondary">
+                            <TriggerTypeChips
+                                triggerTypes={displayTypes}
+                                eventRuleInfo={pipeline.eventRuleInfo}
+                                pipeline={pipeline}
+                            />
+                        </TableCellContent>
+                    );
+                },
             }),
             columnHelper.accessor('system', {
                 header: 'System',
@@ -65,6 +84,64 @@ export const usePipelineColumns = ({
                         />
                     </TableCellContent>
                 ),
+            }),
+            columnHelper.accessor('deploymentStatus', {
+                header: 'Status',
+                size: 150, // Increased size to accommodate the switch
+                enableSorting: true,
+                cell: info => {
+                    const status = info.getValue();
+                    const pipeline = info.row.original;
+                    let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
+                    
+                    if (status === 'DEPLOYED') {
+                        color = 'success.main';
+                    } else if (status === 'CREATING') {
+                        color = 'info.main';
+                    } else if (status === 'FAILED') {
+                        color = 'error.main';
+                    }
+                    
+                    return (
+                        <TableCellContent variant="secondary">
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                {status !== 'DEPLOYED' && (
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            color: color,
+                                            fontWeight: 'medium'
+                                        }}
+                                    >
+                                        {status || 'N/A'}
+                                    </Typography>
+                                )}
+                                
+                                {status === 'DEPLOYED' && (
+                                    <FormControlLabel
+                                        control={
+                                            <IconSwitch
+                                                size="small"
+                                                checked={pipeline.active !== false}
+                                                onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
+                                                disabled={pipeline.system}
+                                                onIcon={<CheckCircleIcon />}
+                                                offIcon={<CancelIcon />}
+                                                onColor="#2e7d32"
+                                                offColor="#757575"
+                                                trackOnColor="#b2ebf2"
+                                                trackOffColor="#cfd8dc"
+                                            />
+                                        }
+                                        // label={pipeline.active !== false ? "Active" : "Inactive"}
+                                        label=""
+                                        sx={{ mt: 1, ml: 0 }}
+                                    />
+                                )}
+                            </Box>
+                        </TableCellContent>
+                    );
+                },
             }),
             columnHelper.accessor('createdAt', {
                 header: 'Created',
@@ -106,23 +183,44 @@ export const usePipelineColumns = ({
                 size: 200,
                 cell: info => (
                     <Box sx={{ display: 'flex', gap: 1 }} className="action-buttons">
-                        <Tooltip title="Edit Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onEdit(info.row.original.id)}
-                                // disabled={info.row.original.system}
-                            >
-                                <EditIcon fontSize="small" />
-                            </IconButton>
+                        <Tooltip title={
+                            info.row.original.deploymentStatus &&
+                            !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                ? "Cannot edit pipeline while it's being created"
+                                : "Edit Pipeline"
+                        }>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => onEdit(info.row.original.id)}
+                                    disabled={
+                                        info.row.original.deploymentStatus &&
+                                        !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                    }
+                                >
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            </span>
                         </Tooltip>
-                        <Tooltip title="Delete Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onDelete(info.row.original.id, info.row.original.name)}
-                                disabled={info.row.original.system}
-                            >
+                        <Tooltip title={
+                            info.row.original.deploymentStatus &&
+                            !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus)
+                                ? "Cannot delete pipeline while it's being created"
+                                : "Delete Pipeline"
+                        }>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => onDelete(info.row.original.id, info.row.original.name)}
+                                    disabled={
+                                        info.row.original.system ||
+                                        (info.row.original.deploymentStatus &&
+                                        !['DEPLOYED', 'FAILED'].includes(info.row.original.deploymentStatus))
+                                    }
+                                >
                                 <DeleteIcon fontSize="small" />
                             </IconButton>
+                            </span>
                         </Tooltip>
                         <Tooltip title="Start Pipeline">
                             <IconButton
@@ -146,7 +244,7 @@ export const usePipelineColumns = ({
                 ),
             }),
         ],
-        [onEdit, onDelete, onStart, onStop]
+        [onEdit, onDelete, onStart, onStop, onToggleActive]
     );
 };
 
@@ -154,6 +252,7 @@ export const defaultColumnVisibility = {
     name: true,
     type: true,
     system: true,
+    deploymentStatus: true,
     createdAt: true,
     updatedAt: true,
     actions: true,

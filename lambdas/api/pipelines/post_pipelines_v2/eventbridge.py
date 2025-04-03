@@ -156,7 +156,7 @@ def get_event_pattern_for_rule(
 
 
 def create_eventbridge_rule(
-    pipeline_name: str, node: Any, state_machine_arn: str
+    pipeline_name: str, node: Any, state_machine_arn: str, active: bool = True
 ) -> Optional[str]:
     """
     Create an EventBridge rule for a trigger node.
@@ -165,6 +165,7 @@ def create_eventbridge_rule(
         pipeline_name: Name of the pipeline
         node: Node object containing configuration
         state_machine_arn: ARN of the state machine to target
+        active: Whether the rule should be enabled (True) or disabled (False)
 
     Returns:
         ARN of the created rule, or None if creation was skipped
@@ -219,7 +220,7 @@ def create_eventbridge_rule(
         response = events_client.put_rule(
             Name=unique_rule_name,
             EventPattern=json.dumps(event_pattern),
-            State="ENABLED",
+            State="ENABLED" if active else "DISABLED",
             EventBusName=event_bus_name,
             Description=f"Rule for pipeline {pipeline_name}, node {node.data.label}",
         )
@@ -269,6 +270,34 @@ def create_eventbridge_rule(
     except Exception as e:
         logger.exception(f"Failed to create EventBridge rule for node {node.id}: {e}")
         return None
+
+
+def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
+    """
+    Enable or disable an EventBridge rule.
+    
+    Args:
+        rule_name: Name of the rule
+        enabled: True to enable, False to disable
+    """
+    events_client = boto3.client("events")
+    event_bus_name = INGEST_EVENT_BUS_NAME
+    
+    try:
+        if enabled:
+            events_client.enable_rule(
+                Name=rule_name,
+                EventBusName=event_bus_name
+            )
+            logger.info(f"Enabled EventBridge rule: {rule_name}")
+        else:
+            events_client.disable_rule(
+                Name=rule_name,
+                EventBusName=event_bus_name
+            )
+            logger.info(f"Disabled EventBridge rule: {rule_name}")
+    except Exception as e:
+        logger.error(f"Error updating EventBridge rule state for {rule_name}: {e}")
 
 
 def delete_eventbridge_rule(rule_name: str) -> None:

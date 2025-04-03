@@ -274,6 +274,23 @@ def build_search_query(params: SearchParams) -> Dict:
     if clean_query:
         query = {
             "bool": {
+                "must": [
+                    # Ensure InventoryID exists and is not empty
+                    {
+                        "exists": {
+                            "field": "InventoryID"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    "InventoryID": ""
+                                }
+                            }
+                        }
+                    }
+                ],
                 "should": [
                     # Name matching
                     {
@@ -318,14 +335,43 @@ def build_search_query(params: SearchParams) -> Dict:
                     }
                 ],
                 "minimum_should_match": 1,
-                "filter": []
+                "must_not": [
+                    {
+                        "term": {
+                            "embedding_scope": "clip"
+                        }
+                    }
+                ]
             }
         }
     else:
         query = {
             "bool": {
-                "must": [{"match_all": {}}],
-                "filter": []
+                "must": [
+                    {"match_all": {}},
+                    # Ensure InventoryID exists and is not empty
+                    {
+                        "exists": {
+                            "field": "InventoryID"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    "InventoryID": ""
+                                }
+                            }
+                        }
+                    }
+                ],
+                "must_not": [
+                    {
+                        "term": {
+                            "embedding_scope": "clip"
+                        }
+                    }
+                ]
             }
         }
 

@@ -1,7 +1,7 @@
 import React, { ReactNode, useState, useEffect, useRef } from 'react';
 import { Box, Button } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
-import { useRightSidebar } from './SidebarContext';
+import { useRightSidebar, COLLAPSED_WIDTH, DEFAULT_WIDTH } from './SidebarContext';
 import { useLocation } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 
@@ -9,29 +9,14 @@ interface RightSidebarProps {
     children: ReactNode;
 }
 
-// Default width is now 375px (25% wider than previous 300px)
-const DEFAULT_WIDTH = 375;
 const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
-const COLLAPSED_WIDTH = 8;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-    const { isExpanded, setIsExpanded } = useRightSidebar();
+    const { isExpanded, setIsExpanded, width, setWidth } = useRightSidebar();
     const location = useLocation();
-    const [width, setWidth] = useState(DEFAULT_WIDTH);
     const [isResizing, setIsResizing] = useState(false);
     const resizeHandleRef = useRef<HTMLDivElement | null>(null);
-
-    // Load saved width on mount
-    useEffect(() => {
-        const savedWidth = localStorage.getItem('rightSidebarWidth');
-        if (savedWidth) {
-            const parsedWidth = parseInt(savedWidth, 10);
-            if (!isNaN(parsedWidth) && parsedWidth >= MIN_WIDTH && parsedWidth <= MAX_WIDTH) {
-                setWidth(parsedWidth);
-            }
-        }
-    }, []);
 
     // Save width to localStorage when it changes
     useEffect(() => {

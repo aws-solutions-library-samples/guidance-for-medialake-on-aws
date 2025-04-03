@@ -20,11 +20,11 @@ export const useGetPipelines = (
     return useQuery({
         queryKey: PIPELINES_QUERY_KEYS.list(),
         queryFn: () => PipelinesService.getPipelines(),
-        // Add optimizations to prevent unnecessary refetching
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        // Refresh every 15 seconds to check for pipeline status updates
+        refetchInterval: 15 * 1000, // 15 seconds
         gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-        refetchOnWindowFocus: false,
-        refetchOnMount: false,
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
         ...options
     });
 };
@@ -42,13 +42,33 @@ export const useGetPipeline = (
 };
 
 export const useCreatePipeline = (
-    options?: Omit<UseMutationOptions<Pipeline, PipelineError, CreatePipelineDto>, 'mutationFn'>
+    options?: Omit<UseMutationOptions<{
+        pipeline_id: string;
+        execution_arn: string;
+        status: string;
+        pipeline_name: string;
+        message: string;
+    }, PipelineError, CreatePipelineDto>, 'mutationFn'>
 ) => {
     return useMutation({
         mutationFn: (data: CreatePipelineDto) => PipelinesService.createPipeline(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: PIPELINES_QUERY_KEYS.list() });
-        },
+        ...options
+    });
+};
+
+export const useGetPipelineStatus = (
+    executionArn: string,
+    options?: Omit<UseQueryOptions<{
+        execution_arn: string;
+        step_function_status: string;
+        step_function_output: any;
+        pipeline: Pipeline | null;
+    }, PipelineError>, 'queryKey' | 'queryFn'>
+) => {
+    return useQuery({
+        queryKey: [...PIPELINES_QUERY_KEYS.all, 'status', executionArn],
+        queryFn: () => PipelinesService.getPipelineStatus(executionArn),
+        enabled: !!executionArn,
         ...options
     });
 };

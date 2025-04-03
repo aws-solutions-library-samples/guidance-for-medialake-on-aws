@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactFlow, {
     Background,
     Controls,
@@ -16,9 +16,11 @@ import ReactFlow, {
     reconnectEdge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button } from '@mui/material';
+import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button, CircularProgress } from '@mui/material';
+import ApiStatusModal from '@/components/ApiStatusModal';
 import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from 'react-icons/fa';
-import { useGetPipeline, useCreatePipeline, useUpdatePipeline } from '../api/pipelinesController';
+import { useGetPipeline, useCreatePipeline, useUpdatePipeline, useGetPipelineStatus } from '../api/pipelinesController';
+import queryClient from '@/api/queryClient';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
 import type { Pipeline, CreatePipelineDto, PipelineEdge, PipelineNode } from '../types/pipelines.types';
 import type { NodesResponse } from '@/shared/nodes/types/nodes.types';
@@ -406,10 +408,22 @@ const PipelineEditorContent = () => {
     const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
     const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
     const { isExpanded } = useRightSidebar();
+    
+    // State for API status modal
+    const [apiStatusModalOpen, setApiStatusModalOpen] = useState(false);
+    const [apiStatusModalState, setApiStatusModalState] = useState<'loading' | 'success' | 'error'>('loading');
+    const [apiStatusModalMessage, setApiStatusModalMessage] = useState('');
+    const [apiStatusModalAction, setApiStatusModalAction] = useState('');
+    
+    // State for pipeline creation status tracking
+    const [creatingPipelineId, setCreatingPipelineId] = useState<string | null>(null);
+    const [executionArn, setExecutionArn] = useState<string | null>(null);
+    const [shouldPollStatus, setShouldPollStatus] = useState(false);
 
     const [formData, setFormData] = React.useState<CreatePipelineDto>({
         name: '',
         description: '',
+        active: true, // Default to active
         configuration: {
             nodes: [],
             edges: [],
@@ -463,8 +477,25 @@ const PipelineEditorContent = () => {
     }, [nodeDetails]);
 
     const createPipeline = useCreatePipeline({
-        onSuccess: () => {
-            navigate('/pipelines');
+        onSuccess: (data) => {
+            console.log('[PipelineEditorPage] Pipeline creation started:', data);
+            // Show success message in ApiStatusModal
+            setApiStatusModalState('success');
+            setApiStatusModalAction('Pipeline Creation Started');
+            setApiStatusModalMessage('Pipeline creation started. This might take a while. You can monitor the status in the pipeline page.');
+            setApiStatusModalOpen(true);
+            
+            // Store the pipeline ID and execution ARN for status polling
+            setCreatingPipelineId(data.pipeline_id);
+            setExecutionArn(data.execution_arn);
+        },
+        onError: (error) => {
+            console.error('[PipelineEditorPage] Pipeline creation error:', error);
+            // Show error message in ApiStatusModal
+            setApiStatusModalState('error');
+            setApiStatusModalAction('Pipeline Creation Failed');
+            setApiStatusModalMessage(error.message || 'An error occurred while creating the pipeline.');
+            setApiStatusModalOpen(true);
         }
     });
 
@@ -473,6 +504,65 @@ const PipelineEditorContent = () => {
             navigate('/pipelines');
         }
     });
+    
+    // Set up the pipeline status polling
+    const { data: pipelineStatus, refetch: refetchPipelineStatus } = useGetPipelineStatus(
+        executionArn || '',
+        {
+            enabled: !!executionArn && shouldPollStatus,
+            refetchInterval: 5000 // Poll every 5 seconds
+        }
+    );
+    
+    // Handle pipeline status changes
+    useEffect(() => {
+        if (pipelineStatus && shouldPollStatus) {
+            console.log('[PipelineEditorPage] Pipeline status:', pipelineStatus);
+            console.log('[PipelineEditorPage] Step function status:', pipelineStatus.step_function_status);
+            console.log('[PipelineEditorPage] Pipeline record:', pipelineStatus.pipeline);
+            
+            if (pipelineStatus.pipeline) {
+                console.log('[PipelineEditorPage] Pipeline deploymentStatus:', pipelineStatus.pipeline.deploymentStatus);
+            }
+            
+            // Check if the pipeline creation is complete
+            if (pipelineStatus.step_function_status === 'SUCCEEDED') {
+                // Pipeline creation completed successfully
+                console.log('[PipelineEditorPage] Pipeline creation completed successfully');
+                setShouldPollStatus(false);
+                queryClient.invalidateQueries({ queryKey: ['pipelines', 'list'] });
+                
+                // Force a refetch of the pipeline status to ensure we have the latest data
+                refetchPipelineStatus();
+            } else if (['FAILED', 'TIMED_OUT', 'ABORTED'].includes(pipelineStatus.step_function_status)) {
+                // Pipeline creation failed
+                console.error('[PipelineEditorPage] Pipeline creation failed:', pipelineStatus.step_function_status);
+                setShouldPollStatus(false);
+                
+                // Force a refetch of the pipeline status to ensure we have the latest data
+                refetchPipelineStatus();
+                
+                // Show error message
+                setApiStatusModalState('error');
+                setApiStatusModalAction('Pipeline Creation Failed');
+                setApiStatusModalMessage(`Pipeline creation failed with status: ${pipelineStatus.step_function_status}`);
+                setApiStatusModalOpen(true);
+            }
+        }
+    }, [pipelineStatus, shouldPollStatus]);
+    
+    // Start polling when the modal is closed after successful creation
+    const handleApiStatusModalClose = useCallback(() => {
+        setApiStatusModalOpen(false);
+        
+        // If we have an execution ARN and the status was success, start polling
+        if (executionArn && apiStatusModalState === 'success') {
+            setShouldPollStatus(true);
+        }
+        
+        // Always navigate back to pipelines page when modal closes
+        navigate('/pipelines');
+    }, [executionArn, apiStatusModalState, navigate]);
 
     // Set form data when pipeline data is loaded
     React.useEffect(() => {
@@ -481,6 +571,7 @@ const PipelineEditorContent = () => {
             setFormData({
                 name: pipeline.name,
                 description: pipeline.description || '',
+                active: pipeline.active !== false, // Use pipeline active state or default to true
                 configuration: pipeline.configuration || {
                     nodes: [],
                     edges: [],
@@ -494,6 +585,14 @@ const PipelineEditorContent = () => {
         }
     }, [pipeline]);
 
+    // Add handler for active state change
+    const handleActiveChange = (active: boolean) => {
+        setFormData(prev => ({
+            ...prev,
+            active
+        }));
+    };
+
     const handleSave = async () => {
         console.log('[PipelineEditorPage] Saving pipeline with form data:', formData);
         console.log('[PipelineEditorPage] Node positions:', formData.configuration.nodes.map(node => ({
@@ -501,6 +600,12 @@ const PipelineEditorContent = () => {
             position: node.position,
             positionAbsolute: node.positionAbsolute
         })));
+
+        // Show the ApiStatusModal in loading state
+        setApiStatusModalState('loading');
+        setApiStatusModalAction('Creating Pipeline');
+        setApiStatusModalMessage('Please wait while we create your pipeline...');
+        setApiStatusModalOpen(true);
 
         if (pipelineId && pipelineId !== 'new') {
             updatePipeline.mutate({ id: pipelineId, data: formData });
@@ -989,6 +1094,8 @@ const PipelineEditorContent = () => {
                 reactFlowInstance={reactFlowInstance}
                 setNodes={setNodes}
                 setEdges={setEdges}
+                active={formData.active !== undefined ? formData.active : true}
+                onActiveChange={handleActiveChange}
             />
             <Box sx={{
                 position: 'fixed',
@@ -1127,6 +1234,15 @@ const PipelineEditorContent = () => {
                     </Typography>
                 </Box>
             </Modal>
+            
+            {/* API Status Modal */}
+            <ApiStatusModal
+                open={apiStatusModalOpen}
+                onClose={handleApiStatusModalClose}
+                status={apiStatusModalState}
+                action={apiStatusModalAction}
+                message={apiStatusModalMessage}
+            />
         </Box>
     );
 };

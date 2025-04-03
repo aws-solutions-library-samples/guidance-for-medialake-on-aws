@@ -1,3 +1,17 @@
+export interface EventRule {
+    ruleName?: string;
+    eventBusName?: string;
+    ruleArn?: string;
+    description?: string;
+    fileTypes?: string[];
+    eventType?: string;
+}
+
+export interface EventRuleInfo {
+    triggerTypes: string[];
+    eventRules: EventRule[];
+}
+
 export interface Pipeline {
     id: string;
     name: string;
@@ -13,6 +27,10 @@ export interface Pipeline {
     sfnRoleArn: string;
     triggerLambdaArn: string;
     dependentResources: [string, string | { rule_name: string; eventbus_name: string }][];
+    deploymentStatus?: 'CREATING' | 'DEPLOYED' | 'FAILED' | string;
+    executionArn?: string;
+    active?: boolean; // New field to track if the pipeline is active
+    eventRuleInfo?: EventRuleInfo; // New field to store event rule information
     definition: {
         nodes: PipelineNode[];
         edges: PipelineEdge[];
@@ -101,12 +119,14 @@ export interface CreatePipelineDto {
     name: string;
     description?: string;
     configuration: PipelineConfiguration;
+    active?: boolean; // New optional field
 }
 
 export interface UpdatePipelineDto {
     name?: string;
     description?: string;
     configuration?: PipelineConfiguration;
+    active?: boolean; // New optional field
 }
 
 export interface SearchMetadata {

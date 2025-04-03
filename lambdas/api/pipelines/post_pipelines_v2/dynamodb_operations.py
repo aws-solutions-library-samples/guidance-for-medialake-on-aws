@@ -276,12 +276,203 @@ def get_integration_secret_arn(integration_id: str) -> Optional[str]:
     return secret_arn
 
 
+def get_pipeline_by_id(pipeline_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get pipeline record from DynamoDB by ID.
+    
+    Args:
+        pipeline_id: ID of the pipeline to look up
+        
+    Returns:
+        Pipeline record if found, None otherwise
+    """
+    logger.info(f"Looking up pipeline with ID: {pipeline_id}")
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+    
+    try:
+        response = table.get_item(Key={"id": pipeline_id})
+        pipeline = response.get("Item")
+        if pipeline:
+            logger.info(f"Found pipeline with ID: {pipeline_id}")
+            return pipeline
+        logger.info(f"No pipeline found with ID: {pipeline_id}")
+        return None
+    except Exception as e:
+        logger.error(f"Error looking up pipeline: {e}")
+        return None
+
+def create_pipeline_record(
+    pipeline: Any,
+    execution_arn: Optional[str] = None,
+    deployment_status: str = "CREATING",
+    active: bool = True  # Default to active
+) -> str:
+    """
+    Create a new pipeline record in DynamoDB with initial status.
+    
+    Args:
+        pipeline: Pipeline definition object
+        execution_arn: Optional ARN of the Step Function execution
+        deployment_status: Initial deployment status
+        active: Whether the pipeline is active
+        
+    Returns:
+        ID of the created pipeline record
+    """
+    logger.info(f"Creating pipeline record with status: {deployment_status}, active: {active}")
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+    
+    pipeline_id = str(uuid.uuid4())
+    now_iso = datetime.utcnow().isoformat()
+    
+    item = {
+        "id": pipeline_id,
+        "createdAt": now_iso,
+        "updatedAt": now_iso,
+        "definition": pipeline.dict(),
+        "dependentResources": [],  # Will be populated later
+        "name": pipeline.name,
+        "stateMachineArn": "",  # Will be populated later
+        "type": "Ingest Triggered",
+        "system": False,
+        "deploymentStatus": deployment_status,
+        "active": active  # Add active field
+    }
+    
+    if execution_arn:
+        item["executionArn"] = execution_arn
+    
+    try:
+        table.put_item(Item=item)
+        logger.info(f"Successfully created pipeline record with id {pipeline_id}")
+        return pipeline_id
+    except Exception as e:
+        logger.exception(f"Failed to create pipeline record: {e}")
+        raise
+        logger.info(f"Successfully created pipeline record with id {pipeline_id}")
+        return pipeline_id
+    except Exception as e:
+        logger.exception(f"Failed to create pipeline record: {e}")
+        raise
+
+
+def update_pipeline_status(
+    pipeline_id: str,
+    deployment_status: str,
+    state_machine_arn: Optional[str] = None,
+    lambda_arns: Optional[Dict[str, str]] = None,
+    eventbridge_rule_arns: Optional[Dict[str, str]] = None,
+    active: Optional[bool] = None  # New parameter
+) -> None:
+    """
+    Update the deployment status and optionally resources of a pipeline.
+    
+    Args:
+        pipeline_id: ID of the pipeline to update
+        deployment_status: New deployment status
+        state_machine_arn: Optional ARN of the state machine
+        lambda_arns: Optional dictionary mapping node IDs to Lambda ARNs
+        eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
+        active: Optional boolean indicating whether the pipeline is active
+    """
+    logger.info(f"Updating pipeline {pipeline_id} status to {deployment_status}")
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(PIPELINES_TABLE)
+    
+    now_iso = datetime.utcnow().isoformat()
+    
+    update_expr = "SET #status = :status, #up = :updated"
+    expr_values = {
+        ":status": deployment_status,
+        ":updated": now_iso
+    }
+    expr_names = {
+        "#status": "deploymentStatus",
+        "#up": "updatedAt"
+    }
+    
+    # Add active state if provided
+    if active is not None:
+        update_expr += ", #active = :active"
+        expr_values[":active"] = active
+        expr_names["#active"] = "active"
+    
+    # Add resources if provided
+    dependent_resources = []
+    if lambda_arns:
+        for node_id, arn in lambda_arns.items():
+            if arn:
+                dependent_resources.append(["lambda", arn])
+        
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
+    
+    if state_machine_arn:
+        if lambda_arns:
+            # Already added dependentResources, just append to it
+            dependent_resources.append(["step_function", state_machine_arn])
+        else:
+            # Need to get existing dependentResources first
+            pipeline = get_pipeline_by_id(pipeline_id)
+            if pipeline and "dependentResources" in pipeline:
+                dependent_resources = pipeline["dependentResources"]
+                dependent_resources.append(["step_function", state_machine_arn])
+                update_expr += ", #res = :res"
+                expr_values[":res"] = dependent_resources
+                expr_names["#res"] = "dependentResources"
+            else:
+                dependent_resources = [["step_function", state_machine_arn]]
+                update_expr += ", #res = :res"
+                expr_values[":res"] = dependent_resources
+                expr_names["#res"] = "dependentResources"
+        
+        update_expr += ", #arn = :arn"
+        expr_values[":arn"] = state_machine_arn
+        expr_names["#arn"] = "stateMachineArn"
+    
+    if eventbridge_rule_arns and not lambda_arns:
+        # Need to get existing dependentResources first if lambda_arns not provided
+        pipeline = get_pipeline_by_id(pipeline_id)
+        if pipeline and "dependentResources" in pipeline:
+            dependent_resources = pipeline["dependentResources"]
+        
+        for node_id, arn in eventbridge_rule_arns.items():
+            if arn:
+                dependent_resources.append(["eventbridge_rule", arn])
+        
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
+    elif eventbridge_rule_arns:
+        # lambda_arns was provided, so dependentResources is already set up
+        for node_id, arn in eventbridge_rule_arns.items():
+            if arn:
+                dependent_resources.append(["eventbridge_rule", arn])
+    
+    try:
+        table.update_item(
+            Key={"id": pipeline_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeValues=expr_values,
+            ExpressionAttributeNames=expr_names
+        )
+        logger.info(f"Successfully updated pipeline {pipeline_id} status to {deployment_status}")
+    except Exception as e:
+        logger.exception(f"Failed to update pipeline status: {e}")
+        raise
+
+
 def store_pipeline_info(
     pipeline: Any,
     state_machine_arn: str,
     lambda_arns: Dict[str, str],
     eventbridge_rule_arns: Optional[Dict[str, str]] = None,
-) -> None:
+    pipeline_id: Optional[str] = None,
+    active: bool = True  # Default to active
+) -> str:
     """
     Store or update pipeline information in DynamoDB.
 
@@ -290,93 +481,47 @@ def store_pipeline_info(
         state_machine_arn: ARN of the state machine
         lambda_arns: Dictionary mapping node IDs to Lambda ARNs
         eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
+        pipeline_id: Optional ID of an existing pipeline record
+        active: Whether the pipeline is active
+        
+    Returns:
+        ID of the created or updated pipeline
     """
     logger.info("Storing/updating pipeline information in DynamoDB")
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(PIPELINES_TABLE)
-
-    # Check for existing pipeline with same name and definition
-    existing_pipeline = get_pipeline_by_name(pipeline.name, pipeline.dict())
-    now_iso = datetime.utcnow().isoformat()
-
-    # Build list of dependent resources
-    dependent_resources = []
-    for node_id, arn in lambda_arns.items():
-        if arn:  # Only add if ARN is not None
-            dependent_resources.append(["lambda", arn])
-            logger.debug(
-                f"Added dependent resource for node {node_id}: lambda -> {arn}"
-            )
-
-    dependent_resources.append(["step_function", state_machine_arn])
-    logger.debug(
-        f"Added dependent resource for state machine: step_function -> {state_machine_arn}"
-    )
-
-    # Add EventBridge rules if any
-    if eventbridge_rule_arns:
-        for node_id, arn in eventbridge_rule_arns.items():
-            if arn:  # Only add if ARN is not None
-                dependent_resources.append(["eventbridge_rule", arn])
-                logger.debug(
-                    f"Added dependent resource for node {node_id}: eventbridge_rule -> {arn}"
-                )
-
-    if existing_pipeline:
-        # Update existing pipeline
-        pipeline_id = existing_pipeline["id"]
-        logger.info(f"Updating existing pipeline with id {pipeline_id}")
-
-        try:
-            update_expr = """
-            SET #def = :def,
-                #res = :res,
-                #arn = :arn,
-                #up = :updated
-            """
-
-            expr_values = {
-                ":def": pipeline.dict(),
-                ":res": dependent_resources,
-                ":arn": state_machine_arn,
-                ":updated": now_iso,
-            }
-
-            expr_names = {
-                "#def": "definition",
-                "#res": "dependentResources",
-                "#arn": "stateMachineArn",
-                "#up": "updatedAt",
-            }
-
-            table.update_item(
-                Key={"id": pipeline_id},
-                UpdateExpression=update_expr,
-                ExpressionAttributeValues=expr_values,
-                ExpressionAttributeNames=expr_names,
-            )
-            logger.info(f"Successfully updated pipeline info with id {pipeline_id}")
-        except Exception as e:
-            logger.exception(f"Failed to update pipeline info: {e}")
-            raise
+    
+    if pipeline_id:
+        # Update existing pipeline with DEPLOYED status
+        update_pipeline_status(
+            pipeline_id,
+            "DEPLOYED",
+            state_machine_arn,
+            lambda_arns,
+            eventbridge_rule_arns,
+            active=active
+        )
+        return pipeline_id
     else:
-        # Create new pipeline
-        pipeline_id = str(uuid.uuid4())
-        item = {
-            "id": pipeline_id,
-            "createdAt": now_iso,
-            "updatedAt": now_iso,
-            "definition": pipeline.dict(),
-            "dependentResources": dependent_resources,
-            "name": pipeline.name,
-            "stateMachineArn": state_machine_arn,
-            "type": "Ingest Triggered",
-            "system": False,
-        }
-
-        try:
-            table.put_item(Item=item)
-            logger.info(f"Successfully stored new pipeline info with id {pipeline_id}")
-        except Exception as e:
-            logger.exception(f"Failed to store pipeline info: {e}")
-            raise
+        # Check for existing pipeline with same name
+        existing_pipeline = get_pipeline_by_name(pipeline.name)
+        if existing_pipeline:
+            pipeline_id = existing_pipeline["id"]
+            update_pipeline_status(
+                pipeline_id,
+                "DEPLOYED",
+                state_machine_arn,
+                lambda_arns,
+                eventbridge_rule_arns,
+                active=active
+            )
+            return pipeline_id
+        else:
+            # Create new pipeline with DEPLOYED status
+            pipeline_id = create_pipeline_record(pipeline, None, "DEPLOYED", active=active)
+            update_pipeline_status(
+                pipeline_id,
+                "DEPLOYED",
+                state_machine_arn,
+                lambda_arns,
+                eventbridge_rule_arns
+            )
+            return pipeline_id

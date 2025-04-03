@@ -5,12 +5,15 @@ import {
     ColumnFiltersState,
     PaginationState,
 } from '@tanstack/react-table';
-import { useGetPipelines, useDeletePipeline, useStartPipeline, useStopPipeline } from '../api/pipelinesController';
+import { useGetPipelines, useDeletePipeline, useStartPipeline, useStopPipeline, useUpdatePipeline } from '../api/pipelinesController';
 import type { Pipeline, PipelinesResponse } from '../types/pipelines.types';
+import queryClient from '@/api/queryClient';
 
 const PAGE_SIZE = 20;
 
 export const usePipelineManager = () => {
+    // Track which pipelines are currently being toggled
+    const [togglingPipelines, setTogglingPipelines] = useState<Record<string, boolean>>({});
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [showDeleteButton, setShowDeleteButton] = useState(false);
@@ -56,6 +59,7 @@ export const usePipelineManager = () => {
     const deletePipelineMutation = useDeletePipeline();
     const startPipelineMutation = useStartPipeline();
     const stopPipelineMutation = useStopPipeline();
+    const updatePipelineMutation = useUpdatePipeline();
 
     // Keyboard shortcut effect for delete button
     useEffect(() => {
@@ -215,6 +219,76 @@ export const usePipelineManager = () => {
         },
         startPipeline: startPipelineMutation.mutate,
         stopPipeline: stopPipelineMutation.mutate,
+        // Track which pipelines are currently being toggled
+        togglingPipelines,
+        
+        // Enhanced toggleActive with optimistic updates
+        toggleActive: (id: string, active: boolean) => {
+            console.log(`[usePipelineManager] Toggling pipeline ${id} active state to ${active}`);
+            
+            // Mark this pipeline as currently toggling
+            setTogglingPipelines(prev => ({ ...prev, [id]: true }));
+            
+            // Create a copy of the current pipelines for optimistic update
+            const updatedPipelines = pipelines.map(pipeline =>
+                pipeline.id === id
+                    ? { ...pipeline, active }
+                    : pipeline
+            );
+            
+            // Optimistically update the query data
+            queryClient.setQueryData(
+                ['pipelines', 'list'],
+                {
+                    ...pipelinesResponse,
+                    data: {
+                        ...pipelinesResponse?.data,
+                        s: updatedPipelines
+                    }
+                }
+            );
+            
+            return updatePipelineMutation.mutateAsync({
+                id,
+                data: { active }
+            })
+            .then(() => {
+                console.log(`[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`);
+                // Remove from toggling state
+                setTogglingPipelines(prev => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                // Refetch to ensure data consistency
+                refetch();
+            })
+            .catch(error => {
+                console.error(`[usePipelineManager] Error toggling pipeline ${id} active state:`, error);
+                
+                // Revert the optimistic update on error
+                queryClient.setQueryData(
+                    ['pipelines', 'list'],
+                    pipelinesResponse
+                );
+                
+                // Remove from toggling state
+                setTogglingPipelines(prev => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                
+                // Show error in snackbar
+                setSnackbar({
+                    open: true,
+                    message: `Failed to ${active ? 'enable' : 'disable'} pipeline: ${error.message || 'Unknown error'}`,
+                    severity: 'error'
+                });
+                
+                throw error;
+            });
+        },
         refetch,
 
         // Actions

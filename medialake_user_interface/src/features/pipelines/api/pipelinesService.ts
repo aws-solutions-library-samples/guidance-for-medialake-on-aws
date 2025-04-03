@@ -41,7 +41,9 @@ export class PipelinesService {
                     type: pipelineData.type || 'Custom',
                     system: pipelineData.system || false,
                     createdAt: pipelineData.createdAt || new Date().toISOString(),
-                    updatedAt: pipelineData.updatedAt || new Date().toISOString()
+                    updatedAt: pipelineData.updatedAt || new Date().toISOString(),
+                    deploymentStatus: pipelineData.deploymentStatus,
+                    executionArn: pipelineData.executionArn
                 } as Pipeline;
             }
             
@@ -53,8 +55,25 @@ export class PipelinesService {
         return response.data;
     }
 
-    static async createPipeline(data: CreatePipelineDto): Promise<Pipeline> {
-        const response = await apiClient.post<Pipeline>(PIPELINES_API.endpoints.CREATE_PIPELINE, data);
+    static async createPipeline(data: CreatePipelineDto): Promise<{
+        pipeline_id: string;
+        execution_arn: string;
+        status: string;
+        pipeline_name: string;
+        message: string;
+    }> {
+        const response = await apiClient.post<any>(PIPELINES_API.endpoints.CREATE_PIPELINE, data);
+        return response.data;
+    }
+
+    static async getPipelineStatus(executionArn: string): Promise<{
+        execution_arn: string;
+        step_function_status: string;
+        step_function_output: any;
+        pipeline: Pipeline | null;
+    }> {
+        const encodedArn = encodeURIComponent(executionArn);
+        const response = await apiClient.get<any>(`/pipelinesv2/status/${encodedArn}`);
         return response.data;
     }
 
