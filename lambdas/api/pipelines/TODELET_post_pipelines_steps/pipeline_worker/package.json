@@ -1,7 +1,0 @@
-{
-  "name": "pipeline-worker",
-  "version": "1.0.0",
-  "description": "Worker Lambda for pipeline creation Step Function",
-  "main": "index.py",
-  "dependencies": {}
-}
