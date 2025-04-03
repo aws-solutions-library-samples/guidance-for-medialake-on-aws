@@ -91,7 +91,8 @@ const PipelinesPage: React.FC = () => {
         isDeleting,
         startPipeline,
         stopPipeline,
-        toggleActive
+        toggleActive,
+        togglingPipelines
     } = usePipelineManager();
 
     // Handle edit pipeline
@@ -339,6 +340,8 @@ const PipelinesPage: React.FC = () => {
                     <PipelineList
                         table={table}
                         onFilterColumn={handleFilterColumn}
+                        togglingPipelines={togglingPipelines}
+                        onToggleActive={toggleActive}
                     />
                 </PageContent>
 

@@ -56,7 +56,7 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
         enabled: True to enable, False to disable
     """
     # Get the event bus name from environment variable
-    event_bus_name = os.environ.get("INGEST_EVENT_BUS_NAME", "default")
+    event_bus_name = os.environ.get("INGEST_EVENT_BUS_NAME")
     events_client = boto3.client("events")
     
     try:
@@ -87,7 +87,7 @@ def update_pipeline_active_state(pipeline_id: str, active: bool) -> None:
     """
     try:
         # Get the pipeline record to find its EventBridge rules
-        response = table.get_item(Key={"pipeline_id": pipeline_id})
+        response = table.get_item(Key={"id": pipeline_id})
         pipeline = response.get("Item")
         
         if not pipeline:
@@ -160,7 +160,7 @@ def put_pipeline(pipeline_id: str):
         update_expression = update_expression.rstrip(", ")
 
         response = table.update_item(
-            Key={"pipeline_id": pipeline_id},
+            Key={"id": pipeline_id},
             UpdateExpression=update_expression,
             ExpressionAttributeValues=expression_attribute_values,
             ExpressionAttributeNames=expression_attribute_names,

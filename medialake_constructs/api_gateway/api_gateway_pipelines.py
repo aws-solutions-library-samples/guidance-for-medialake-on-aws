@@ -818,7 +818,8 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
+                "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name
             },
         )
 
@@ -827,6 +828,21 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PutPipelineIdHandler",
             config=put_pipeline_id_lambda_config,
         )
+
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem","dynamodb:UpdateItem"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+        
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["events:DisableRule","events:EnableRule"],
+                resources=[f"arn:aws:events:us-east-1:{self.account_id}:rule/*"],
+            )
+        )
+
 
         pipeline_id_resource.add_method(
             "PUT",

@@ -31,6 +31,7 @@ import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
 import { IconSwitch } from '@/components/common';
 import { TriggerTypeChips } from './TriggerTypeChips';
+import { PipelineStatusCell } from './PipelineStatusCell';
 import type { Pipeline } from '../types/pipelines.types';
 import type { TableState, TableActions } from '../types/table.types';
 
@@ -43,6 +44,7 @@ interface PipelineTableProps {
     onStartPipeline: (id: string) => void;
     onStopPipeline: (id: string) => void;
     onToggleActive: (id: string, active: boolean) => void;
+    togglingPipelines?: Record<string, boolean>; // Track which pipelines are being toggled
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
@@ -55,7 +57,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     tableActions,
     onStartPipeline,
     onStopPipeline,
-    onToggleActive
+    onToggleActive,
+    togglingPipelines = {}
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -114,57 +117,13 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         columnHelper.accessor('deploymentStatus', {
             header: 'Status',
             cell: info => {
-                const status = info.getValue();
                 const pipeline = info.row.original;
-                let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
-                
-                if (status === 'DEPLOYED') {
-                    color = 'success.main';
-                } else if (status === 'CREATING') {
-                    color = 'info.main';
-                } else if (status === 'FAILED') {
-                    color = 'error.main';
-                }
-                
                 return (
-                    <TableCellContent variant="secondary">
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            {status !== 'DEPLOYED' && (
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        color: color,
-                                        fontWeight: 'medium'
-                                    }}
-                                >
-                                    {status || 'N/A'}
-                                </Typography>
-                            )}
-                            
-                            {status === 'DEPLOYED' && (
-                                <FormControlLabel
-                                    control={
-                                        <IconSwitch
-                                            sx={{ m: 1 }}
-                                            size="small"
-                                            checked={pipeline.active !== false}
-                                            onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
-                                            disabled={pipeline.system}
-                                            onIcon={<PowerOnIcon />}
-                                            offIcon={<PowerOffIcon />}
-                                            onColor="#2e7d32"
-                                            offColor="#757575"
-                                            trackOnColor="#b2ebf2"
-                                            trackOffColor="#cfd8dc"
-                                        />
-                                    }
-                                    // label={pipeline.active !== false ? "Active" : "Inactive"}
-                                    label=""
-                                    sx={{ mt: 1, ml: 0 }}
-                                />
-                            )}
-                        </Box>
-                    </TableCellContent>
+                    <PipelineStatusCell
+                        pipeline={pipeline}
+                        onToggleActive={onToggleActive}
+                        togglingPipelines={togglingPipelines}
+                    />
                 );
             },
             enableSorting: true,
