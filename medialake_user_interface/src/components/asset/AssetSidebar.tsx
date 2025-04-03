@@ -237,7 +237,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef,markers, setM
 
         periodMarker.onChange$.subscribe({
             next: (event) => {
-                console.log('PeriodMarker text type:', typeof periodMarker.text);
+                const id = periodMarker.text
                 console.log(markers);
             }
         });
