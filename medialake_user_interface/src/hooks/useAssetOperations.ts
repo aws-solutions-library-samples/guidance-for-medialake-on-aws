@@ -45,7 +45,10 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
 
 
     const handleMenuOpen = (asset: T, event: React.MouseEvent<HTMLElement>) => {
+        // Make sure to stop propagation to prevent the card click
         event.stopPropagation();
+        event.preventDefault();
+        console.log('Menu opened for asset:', asset.InventoryID);
         setMenuAnchorEl(event.currentTarget);
         setSelectedAsset(asset);
     };
@@ -88,7 +91,10 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     };
 
     const handleDeleteClick = (asset: T, event: React.MouseEvent<HTMLElement>) => {
+        // Make sure to stop propagation to prevent the card click
         event.stopPropagation();
+        event.preventDefault();
+        console.log('Delete clicked for asset:', asset.InventoryID);
         setAssetToDelete(asset);
         setIsDeleteModalOpen(true);
     };
