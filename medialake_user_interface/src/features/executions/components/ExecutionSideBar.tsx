@@ -42,7 +42,7 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                     flexDirection: 'column',
                     boxShadow: (theme) => theme.shadows[1],
                     overflow: 'hidden',
-                    '& .MuiPaper-root': { // Ensure child papers don't override
+                    '& .MuiPaper-root': {
                         borderRadius: '8px',
                     },
                 }}

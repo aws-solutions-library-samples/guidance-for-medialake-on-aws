@@ -954,7 +954,7 @@ const ImageDetailContent: React.FC = () => {
     const [relatedPage, setRelatedPage] = useState(1);
     const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || '');
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
-    const { isExpanded, openSidebar, closeSidebar } = useRightSidebar();
+    const { isExpanded, closeSidebar } = useRightSidebar();
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedComment, setSelectedComment] = useState<number | null>(null);
@@ -965,6 +965,18 @@ const ImageDetailContent: React.FC = () => {
         { user: "Jane Smith", avatar: "https://mui.com/static/images/avatar/2.jpg", content: "The lighting is perfect!", timestamp: "2023-06-15 10:15:45" },
         { user: "Mike Johnson", avatar: "https://mui.com/static/images/avatar/3.jpg", content: "Love the color palette!", timestamp: "2023-06-15 11:00:12" }
     ]);
+
+    // Scroll to top when component mounts
+    useEffect(() => {
+        // Find the scrollable container in the AppLayout
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.scrollTo(0, 0);
+        } else {
+            // Fallback to window scrolling
+            window.scrollTo(0, 0);
+        }
+    }, [id]); // Include id in dependencies to ensure scroll reset when navigating between detail pages
 
     // Track scroll position to hide/show header
     useEffect(() => {

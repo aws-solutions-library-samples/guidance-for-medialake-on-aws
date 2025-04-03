@@ -210,6 +210,8 @@ class DigitalSourceAsset(TypedDict):
     Type: str
     CreateDate: str
     MainRepresentation: AssetRepresentation
+    originalIngestDate: Optional[str]
+    lastModifiedDate: Optional[str]
 
 
 class AssetRecord(TypedDict):
@@ -324,6 +326,13 @@ class AssetProcessor:
             file_ext = self._extract_file_extension(key)
             asset_type = determine_asset_type(content_type, file_ext)
             
+            # Get S3 object's last modified date
+            s3_last_modified = response.get("LastModified", datetime.utcnow())
+            if isinstance(s3_last_modified, datetime):
+                s3_last_modified_str = s3_last_modified.isoformat()
+            else:
+                s3_last_modified_str = s3_last_modified
+            
             # Log the type determination for debugging
             logger.info(f"Asset type determination for {key}: content_type={content_type}, file_ext={file_ext}, determined_type={asset_type}")
             
@@ -348,6 +357,19 @@ class AssetProcessor:
                     )
                     if "Item" in existing_record:
                         logger.info(f"Found existing record in DynamoDB: {json_serialize(existing_record['Item'])}")
+                        
+                        # Update the lastModifiedDate field but preserve originalIngestDate
+                        # Create updateExpression and attributeValues for update operation
+                        update_expression = "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
+                        expression_attribute_values = {":lastModDate": s3_last_modified_str}
+                        
+                        # Update only the lastModifiedDate
+                        self.dynamodb.update_item(
+                            Key={"InventoryID": tags["InventoryID"]},
+                            UpdateExpression=update_expression,
+                            ExpressionAttributeValues=expression_attribute_values
+                        )
+                        logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}")
                     else:
                         logger.warning(f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}")
                         
@@ -380,6 +402,9 @@ class AssetProcessor:
                             file_ext = key.split(".")[-1] if "." in key else ""
                             asset_type = determine_asset_type(content_type, file_ext)
                         
+                        # Current time for ingest date
+                        current_time = datetime.utcnow().isoformat()
+                        
                         # Create the item structure
                         item = {
                             "InventoryID": inventory_id,
@@ -390,6 +415,8 @@ class AssetProcessor:
                                 "Type": asset_type,
                                 "CreateDate": datetime.utcnow().isoformat(),
                                 "IngestedAt": datetime.utcnow().isoformat(),
+                                "originalIngestDate": current_time,
+                                "lastModifiedDate": s3_last_modified_str,
                                 "MainRepresentation": {
                                     "ID": f"{asset_id}:master",
                                     "Type": asset_type,
@@ -470,7 +497,7 @@ class AssetProcessor:
                     
                     # Create new asset entry with existing inventory ID
                     metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
-                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"])
+                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
                     
                     self.publish_event(
                         dynamo_entry["InventoryID"],
@@ -495,6 +522,15 @@ class AssetProcessor:
                             ]
                         },
                     )
+                    
+                    # Update lastModifiedDate for the existing file in DynamoDB
+                    self.dynamodb.update_item(
+                        Key={"InventoryID": existing_file["InventoryID"]},
+                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                    )
+                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                    
                     return None
                 
                 # Handle other cases from existing code
@@ -529,6 +565,15 @@ class AssetProcessor:
                             ]
                         },
                     )
+                    
+                    # Update lastModifiedDate for the existing file in DynamoDB
+                    self.dynamodb.update_item(
+                        Key={"InventoryID": existing_file["InventoryID"]},
+                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                    )
+                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                    
                     return None
                 else:
                     # Same hash but different key - tag with same InventoryID but new AssetID
@@ -571,10 +616,10 @@ class AssetProcessor:
             # If we have InventoryID tag but no AssetID tag, use existing inventory
             if "InventoryID" in tags and "AssetID" not in tags:
                 logger.info(f"Using existing InventoryID: {tags['InventoryID']}")
-                dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"])
+                dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
             else:
                 # Normal processing for new file
-                dynamo_entry = self.create_dynamo_entry(metadata)
+                dynamo_entry = self.create_dynamo_entry(metadata, s3_last_modified=s3_last_modified_str)
 
             # Add tags to S3 object
             self.s3.put_object_tagging(
@@ -659,7 +704,7 @@ class AssetProcessor:
         }
 
     @tracer.capture_method
-    def create_dynamo_entry(self, metadata: StorageInfo, inventory_id: str = None) -> AssetRecord:
+    def create_dynamo_entry(self, metadata: StorageInfo, inventory_id: str = None, s3_last_modified: str = None) -> AssetRecord:
         """Create DynamoDB entry for the asset with optimized data handling"""
         try:
             if not inventory_id:
@@ -692,6 +737,10 @@ class AssetProcessor:
 
             # Get current timestamp once for reuse
             timestamp = datetime.utcnow().isoformat()
+            
+            # Use provided S3 last modified date or current timestamp
+            if not s3_last_modified:
+                s3_last_modified = timestamp
 
             item: AssetRecord = {
                 "InventoryID": inventory_id,
@@ -704,6 +753,8 @@ class AssetProcessor:
                     "Type": asset_type,
                     "CreateDate": timestamp,
                     "IngestedAt": timestamp,
+                    "originalIngestDate": timestamp,  # Set original ingest date to current time for new assets
+                    "lastModifiedDate": s3_last_modified,  # Use the S3 object's last modified date
                     "MainRepresentation": {
                         "ID": f"asset:rep:{asset_id}:master",
                         "Type": asset_type,
@@ -797,6 +848,14 @@ class AssetProcessor:
 
             # Get timestamp once for reuse
             timestamp = datetime.utcnow().isoformat()
+            
+            # Get last modified date from S3 metadata if available
+            s3_last_modified = (
+                metadata.get("Metadata", {})
+                .get("Embedded", {})
+                .get("S3", {})
+                .get("LastModified", timestamp)
+            )
 
             # Construct event detail
             event_detail = {
@@ -808,6 +867,8 @@ class AssetProcessor:
                     "ID": asset_id,
                     "Type": asset_type,
                     "CreateDate": timestamp,
+                    "originalIngestDate": timestamp,
+                    "lastModifiedDate": s3_last_modified,
                     "MainRepresentation": {
                         "ID": f"{asset_id}:master",
                         "Type": asset_type,

@@ -756,7 +756,7 @@ const VideoDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const { isExpanded } = useRightSidebar();
+    const { isExpanded, closeSidebar } = useRightSidebar();
     const { data: assetData, isLoading, error } = useAsset(id || '') as { data: AssetResponse | undefined; isLoading: boolean; error: any };
     const [activeTab, setActiveTab] = useState<string>('summary');
     const [relatedPage, setRelatedPage] = useState(1);
@@ -769,6 +769,18 @@ const VideoDetailContent: React.FC = () => {
         { user: "Jane Smith", avatar: "https://mui.com/static/videos/avatar/2.jpg", content: "The lighting is perfect", timestamp: "2023-06-15 10:15:43" },
         { user: "Mike Johnson", avatar: "https://mui.com/static/videos/avatar/3.jpg", content: "Can we adjust the contrast?", timestamp: "2023-06-15 11:22:17" },
     ]);
+
+    // Scroll to top when component mounts
+    useEffect(() => {
+        // Find the scrollable container in the AppLayout
+        const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
+        if (container) {
+            container.scrollTo(0, 0);
+        } else {
+            // Fallback to window scrolling
+            window.scrollTo(0, 0);
+        }
+    }, [id]); // Include id in dependencies to ensure scroll reset when navigating between detail pages
 
     const searchParams = new URLSearchParams(location.search);
     const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';

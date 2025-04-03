@@ -14,7 +14,7 @@ interface RightSidebarProviderProps {
 }
 
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const openSidebar = () => setIsExpanded(true);
     const closeSidebar = () => setIsExpanded(false);
