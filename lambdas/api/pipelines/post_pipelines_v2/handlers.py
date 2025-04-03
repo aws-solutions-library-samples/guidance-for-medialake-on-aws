@@ -144,10 +144,10 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             for node in pipeline.configuration.nodes:
                 if node.data.type.lower() == "trigger":
                     try:
-                        rule_arn = create_eventbridge_rule(pipeline_name, node, state_machine_arn)
+                        rule_arn = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active)
                         if rule_arn:
                             eventbridge_rule_arns[node.data.id] = rule_arn
-                            logger.info(f"Added EventBridge rule {rule_arn} for node {node.data.id}")
+                            logger.info(f"Added EventBridge rule {rule_arn} for node {node.data.id} with active={pipeline.active}")
                     except Exception as e:
                         logger.error(f"Failed to create EventBridge rule for node {node.data.id}: {e}")
 
