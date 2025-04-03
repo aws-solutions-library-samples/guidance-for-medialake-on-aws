@@ -20,10 +20,12 @@ const PipelineNameInput: React.FC<PipelineNameInputProps> = ({ value, onChange }
                     borderRadius: '4px',
                     backgroundColor: 'transparent',
                 },
-                width: '300px'
+                width: '100%', // Use 100% width to fill the container
+                minWidth: '150px', // Minimum width to ensure readability
+                maxWidth: '300px' // Maximum width to prevent it from getting too large
             }}
         />
     );
 };
 
-export default PipelineNameInput; 
+export default PipelineNameInput;

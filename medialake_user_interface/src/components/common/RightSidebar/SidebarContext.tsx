@@ -1,10 +1,16 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+
+// Default width values
+export const DEFAULT_WIDTH = 375;
+export const COLLAPSED_WIDTH = 8;
 
 interface RightSidebarContextType {
     isExpanded: boolean;
     setIsExpanded: (expanded: boolean) => void;
     openSidebar: () => void;
     closeSidebar: () => void;
+    width: number;
+    setWidth: (width: number) => void;
 }
 
 const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
@@ -18,9 +24,21 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
 
     const openSidebar = () => setIsExpanded(true);
     const closeSidebar = () => setIsExpanded(false);
+    const [width, setWidth] = useState(DEFAULT_WIDTH);
+
+    // Load saved width on mount
+    useEffect(() => {
+        const savedWidth = localStorage.getItem('rightSidebarWidth');
+        if (savedWidth) {
+            const parsedWidth = parseInt(savedWidth, 10);
+            if (!isNaN(parsedWidth)) {
+                setWidth(parsedWidth);
+            }
+        }
+    }, []);
 
     return (
-        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, openSidebar, closeSidebar }}>
+        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, openSidebar, closeSidebar, width, setWidth }}>
             {children}
         </RightSidebarContext.Provider>
     );

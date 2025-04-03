@@ -34,6 +34,9 @@ interface ResizableTableProps<T> {
     activeSorting?: Array<{ columnId: string; desc: boolean }>;
     onRemoveFilter?: (columnId: string) => void;
     onRemoveSort?: (columnId: string) => void;
+    // For pipeline toggle functionality
+    togglingPipelines?: Record<string, boolean>;
+    onToggleActive?: (id: string, active: boolean) => void;
 }
 
 type TableProps = React.ComponentProps<typeof MUITable>;
@@ -169,6 +172,8 @@ export function ResizableTable<T>({
     activeSorting = [],
     onRemoveFilter,
     onRemoveSort,
+    togglingPipelines = {},
+    onToggleActive,
 }: ResizableTableProps<T>) {
     const theme = useTheme();
     const { mode } = useTableDensity();

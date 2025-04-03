@@ -9,6 +9,9 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_secretsmanager as secretsmanager,
     aws_lambda as lambda_,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as tasks,
+    Duration
 )
 from constructs import Construct
 from config import config
@@ -234,8 +237,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             authorizer=cognito_authorizer,
         )
 
+
+
+        ## Pipelines v2
+
         pyaml_layer = PyamlLayer(self, "PyamlLayer")
         shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
+
         # POST /api/pipelines V2
         post_pipelines_v2_lambda_config = LambdaConfig(
             name="pipeline_post_v2",
@@ -261,6 +269,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "ACCOUNT_ID": self.account_id,
             },
         )
+        
         self._post_pipelines_v2_handler = Lambda(
             self,
             "PostPipelinesHandlerV2",
@@ -277,7 +286,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 resources=["*"],
             )
         )
-
 
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -400,6 +408,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 resources=["*"],
             )
         )
+       
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:GetObject"],
@@ -409,6 +418,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 ],
             )
         )
+        
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -434,9 +444,95 @@ class ApiGatewayPipelinesConstruct(Construct):
             self._post_pipelines_v2_handler.function
         )
 
+        
+
+       
+        # Create a simple Step Function that just invokes the pipeline v2 Lambda
+        pipeline_worker_task = tasks.LambdaInvoke(
+            self,
+            "PipelineV2WorkerTask",
+            lambda_function=self._post_pipelines_v2_handler.function,
+            output_path="$",
+            retry_on_service_exceptions=True,
+            payload_response_only=True
+        )
+        
+        # Define the success state
+        success_state = sfn.Succeed(self, "SuccessState")
+        
+        # Create a simple state machine definition
+        definition = pipeline_worker_task.next(success_state)
+        
+        # Create the state machine
+        self._pipeline_creation_state_machine = sfn.StateMachine(
+            self,
+            "PipelineCreationStateMachine",
+            definition=definition,
+            timeout=Duration.minutes(300),
+        )
+  
+        # Create the front-end Lambda
+        self._post_pipelines_async_handler = Lambda(
+            self,
+            "PostPipelinesV2AsyncHandler",
+            config=LambdaConfig(
+                name="pipeline_post_async",
+                entry="lambdas/api/pipelines/post_pipelines_v2_async",
+                layers=[pyaml_layer.layer, shortuuid_layer.layer],
+                iam_role_boundary_policy=post_lambda_iam_boundary_policy,
+                environment_variables={
+                    "PIPELINE_CREATION_STATE_MACHINE_ARN": self._pipeline_creation_state_machine.state_machine_arn,
+                    "PIPELINES_TABLE": props.pipeline_table.table_name,
+                },
+            ),
+        )
+
+        # Grant the front-end Lambda permission to start the Step Function
+        self._pipeline_creation_state_machine.grant_start_execution(self._post_pipelines_async_handler.function)
+        
+        # Grant the front-end Lambda permission to access the DynamoDB table
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Scan",
+                ],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+        
+        # Grant the front-end Lambda permission to describe Step Functions executions
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:DescribeExecution",
+                ],
+                resources=["*"],
+            )
+        )
+
         pipelines_v2_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(self._post_pipelines_v2_handler.function),
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+        
+        # Add status endpoint
+        pipelines_v2_status_resource = pipelines_v2_resource.add_resource("status")
+        pipelines_v2_status_resource.add_resource("{executionArn}").add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=cognito_authorizer,
+        )
+        
+        # Add get pipeline by ID endpoint - use a different name to avoid conflicts
+        pipelines_v2_resource.add_resource("pipeline").add_resource("{pipelineId}").add_method(
+            "GET",
+            apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=cognito_authorizer,
         )
@@ -722,7 +818,8 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
+                "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name
             },
         )
 
@@ -731,6 +828,21 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PutPipelineIdHandler",
             config=put_pipeline_id_lambda_config,
         )
+
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem","dynamodb:UpdateItem"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+        
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["events:DisableRule","events:EnableRule"],
+                resources=[f"arn:aws:events:us-east-1:{self.account_id}:rule/*"],
+            )
+        )
+
 
         pipeline_id_resource.add_method(
             "PUT",
@@ -860,6 +972,10 @@ class ApiGatewayPipelinesConstruct(Construct):
     @property
     def post_pipelines_handler(self) -> Lambda:
         return self._post_pipelines_handler
+
+    @property
+    def post_pipelines_async_handler(self) -> Lambda:
+        return self._pipelines_async_construct.post_pipelines_async_handler
 
     @property
     def get_pipelines_handler(self) -> Lambda:
