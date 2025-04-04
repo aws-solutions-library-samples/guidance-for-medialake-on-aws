@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect,useRef} from 'react';
 import {
     Box,
     Typography,
@@ -57,8 +57,8 @@ import { subscribe } from 'diagnostics_channel';
 interface MarkerInfo {
     id: string;
     timeObservation: {
-        start: string;
-        end: string;
+        start: number;
+        end: number;
     };
     style: {
         color: string;
@@ -204,68 +204,138 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef,markers, setMarkers,}) => {
-    const theme = useTheme();
-    const maxId = markers.length + 1;
-    const newId = maxId.toString(); // Call the toString() method
+const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef }) => {
+    // Store all marker references in a Map
+    const markerRefsMap = useRef(new Map<string, PeriodMarker>());
+
+    // Set up subscriptions for all markers
+    useEffect(() => {
+        const subscriptions: any[] = [];
+
+        // Get all markers from the lane
+        if (videoViewerRef?.current) {
+            const lane = videoViewerRef.current.getMarkerLane();
+            if (lane) {
+                markerRefsMap.current.forEach((periodMarker, id) => {
+                    const subscription = periodMarker.onChange$.subscribe({
+                        next: (event) => {
+                            console.log('Marker changed:', {
+                                id,
+                                event
+                            });
+                            
+                            setMarkers(prevMarkers => 
+                                prevMarkers.map(marker => 
+                                    marker.id === id
+                                        ? {
+                                            ...marker,
+                                            timeObservation: {
+                                                start: event.timeObservation.start,
+                                                end: event.timeObservation.end
+                                            }
+                                          }
+                                        : marker
+                                )
+                            );
+                        }
+                    });
+                    subscriptions.push(subscription);
+                });
+            }
+        }
+
+        // Cleanup subscriptions
+        return () => {
+            subscriptions.forEach(sub => sub.unsubscribe());
+        };
+    }, [videoViewerRef, setMarkers]);
 
     const addMarker = () => {
-        const lane = videoViewerRef.current.getMarkerLane();
-        const currentTime = videoViewerRef.current.getCurrentTime();
-        const periodMarker = new PeriodMarker({
-            timeObservation: { start: currentTime, end:  currentTime + 5 },
-            editable: true,
-            text: newId, 
-            style: {
-            ...PERIOD_MARKER_STYLE,
-            color: randomHexColor(),
-            },
-        });
-        lane.addMarker(periodMarker);
-
-        setMarkers(prev => [...prev, {
-            id: newId,
-            timeObservation: {
-                start:  videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.start),
-                end: videoViewerRef.current.formatToTimecode(periodMarker.timeObservation.end),
-            },
-            style: {
-                color: periodMarker.style.color
-            }
-        }]
-        );      
-
-        periodMarker.onChange$.subscribe({
-            next: (event) => {
-                const id = periodMarker.text
-                console.log(markers);
-            }
-        });
+        if (!videoViewerRef?.current) return;
         
-        
+        try {
+            const lane = videoViewerRef.current.getMarkerLane();
+            if (!lane) {
+                console.warn('Marker lane is not available');
+                return;
+            }
+
+            const currentTime = videoViewerRef.current.getCurrentTime();
+            const newId = (markers.length + 1).toString();
+
+            const periodMarker = new PeriodMarker({
+                timeObservation: { 
+                    start: currentTime, 
+                    end: currentTime + 5 
+                },
+                editable: true,
+                id: newId,
+                style: {
+                    ...PERIOD_MARKER_STYLE,
+                    color: randomHexColor(),
+                },
+            });
+            
+            // Store the marker reference
+            markerRefsMap.current.set(newId, periodMarker);
+            
+            // Set up subscription for the new marker
+            const subscription = periodMarker.onChange$.subscribe({
+                next: (event) => {
+                    console.log('New marker changed:', {
+                        id: newId,
+                        event
+                    });
+                    
+                    setMarkers(prevMarkers => 
+                        prevMarkers.map(marker => 
+                            marker.id === newId
+                                ? {
+                                    ...marker,
+                                    timeObservation: {
+                                        start: event.timeObservation.start,
+                                        end: event.timeObservation.end
+                                    }
+                                  }
+                                : marker
+                        )
+                    );
+                }
+            });
+            
+            lane.addMarker(periodMarker);
+
+            setMarkers(prev => [...prev, {
+                id: newId,
+                timeObservation: {
+                    start: currentTime,
+                    end: currentTime + 5
+                },
+                style: {
+                    color: periodMarker.style.color
+                }
+            }]);
+
+        } catch (error) {
+            console.error('Error adding marker:', error);
+        }
     };
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Add time markers to highlight important moments in your media.
-            </Typography>
+            <Button 
+                variant="contained" 
+                fullWidth 
+                sx={{ mt: 1 }}
+                startIcon={<BookmarkIcon />}
+                onClick={addMarker}
+            >
+                Add Marker ({markers.length})
+            </Button>
             
-            <Tooltip title="Create a new time marker">
-                <Button 
-                    variant="contained" 
-                    fullWidth 
-                    sx={{ mt: 1 }}
-                    startIcon={<BookmarkIcon />}
-                    onClick = {addMarker}
-                >
-                    Add Marker
-                </Button>
-            </Tooltip>
-           {/* Add this section to render markers */}
-           {markers.map((marker, index) => (
+            {markers.map((marker, index) => (
                 <Box
-                    key={index}
+                    key={marker.id}
                     sx={{
                         mt: 2,
                         p: 2,
@@ -274,25 +344,23 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({videoViewerRef,markers, setM
                         border: `1px solid ${alpha(marker.style.color, 0.2)}`,
                     }}
                 >
-                    <Typography variant="body2" component="div">
-                        <Box>
-                            <Typography variant="body2">
-                                <b>Marker:</b> {marker.id}
-                            </Typography>
-                            <Typography variant="body2">
-                                <b>IN:</b> {marker.timeObservation.start}
-                            </Typography>
-                            <Typography variant="body2">
-                                <b>OUT: </b> {marker.timeObservation.end}
-                            </Typography>
-                        </Box>
+                    <Typography variant="body2">
+                        <b>Marker {marker.id}</b>
+                    </Typography>
+                    <Typography variant="body2">
+                        <b>IN:</b> {videoViewerRef?.current?.formatToTimecode(marker.timeObservation.start)}
+                    </Typography>
+                    <Typography variant="body2">
+                        <b>OUT:</b> {videoViewerRef?.current?.formatToTimecode(marker.timeObservation.end)}
                     </Typography>
                 </Box>
             ))}
-
         </Box>
     );
 };
+
+
+
 
 // Collaboration content component
 const AssetCollaboration: React.FC<AssetCollaborationProps> = ({ comments = [], onAddComment }) => {
@@ -564,6 +632,10 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
+    useEffect(() => {
+        console.log('Parent markers state:', markers);
+    }, [markers]);
+    
 
     return (
         <RightSidebar>
