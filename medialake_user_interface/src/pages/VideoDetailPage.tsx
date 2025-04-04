@@ -523,24 +523,9 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     
     // Function to determine which content component to use based on category
     const getContentComponent = (subCategory: any) => {
-        // Use GridMetadataContent for 'General' category and other important metadata
-        if (subCategory.category === 'General' || 
-            subCategory.category.toLowerCase() === 'general' ||
-            subCategory.category.includes('Format') ||
-            subCategory.category.includes('Codec') ||
-            subCategory.category.includes('Stream')) {
-            return (
-                <GridMetadataContent
-                    data={subCategory.data}
-                    showAll={true}
-                    category={subCategory.category}
-                />
-            );
-        }
-        
-        // Use default MetadataContent for other categories
+        // Use GridMetadataContent for all categories to ensure consistent formatting
         return (
-            <MetadataContent
+            <GridMetadataContent
                 data={subCategory.data}
                 showAll={true}
                 category={subCategory.category}
@@ -984,6 +969,7 @@ const VideoDetailContent: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 maxWidth: isExpanded ? 'calc(100% - 300px)' : '100%',
+                width: '100%',
                 transition: theme => theme.transitions.create(['max-width'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
@@ -1025,7 +1011,13 @@ const VideoDetailContent: React.FC = () => {
                         borderRadius: 2,
                         background: 'transparent',
                         position: 'relative',
-                        height: '100%'
+                        height: '100%',
+                        width: '100%',
+                        maxWidth: isExpanded ? 'calc(100% - 10px)' : '100%',
+                        transition: theme => theme.transitions.create(['width', 'max-width'], {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.enteringScreen,
+                        }),
                     }}
                 >
                     <AssetVideo

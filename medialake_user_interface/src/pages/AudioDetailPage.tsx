@@ -539,22 +539,9 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
 
     // Function to determine which content component to use based on category
     const getContentComponent = (subCategory: any) => {
-        // Use AudioMetadataContent for audio-related categories and General category
-        if (subCategory.category.toLowerCase().includes('audio') || 
-            subCategory.category === 'General' ||
-            subCategory.category.toLowerCase() === 'general') {
-            return (
-                <AudioMetadataContent
-                    data={subCategory.data}
-                    showAll={true}
-                    category={subCategory.category}
-                />
-            );
-        }
-        
-        // Use default MetadataContent for other categories
+        // Use AudioMetadataContent for all categories to ensure consistent formatting
         return (
-            <MetadataContent
+            <AudioMetadataContent
                 data={subCategory.data}
                 showAll={true}
                 category={subCategory.category}

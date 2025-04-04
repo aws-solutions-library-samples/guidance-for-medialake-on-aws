@@ -611,25 +611,9 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     
     // Function to determine which content component to use based on category
     const getContentComponent = (subCategory: any) => {
-        // Use GridMetadataContent for 'General' category and other important metadata
-        if (subCategory.category === 'General' || 
-            subCategory.category.toLowerCase() === 'general' ||
-            subCategory.category.includes('EXIF') ||
-            subCategory.category.includes('IPTC') ||
-            subCategory.category.includes('XMP') ||
-            subCategory.category.includes('Format')) {
-            return (
-                <GridMetadataContent
-                    data={subCategory.data}
-                    showAll={true}
-                    category={subCategory.category}
-                />
-            );
-        }
-        
-        // Use default MetadataContent for other categories
+        // Use GridMetadataContent for all categories to ensure consistent formatting
         return (
-            <MetadataContent
+            <GridMetadataContent
                 data={subCategory.data}
                 showAll={true}
                 category={subCategory.category}
