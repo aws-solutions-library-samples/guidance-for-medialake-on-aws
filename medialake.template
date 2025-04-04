@@ -35,6 +35,7 @@ Parameters:
     Type: String
     Default: 20
     AllowedValues:
+      - 18
       - 20
       - 22
   
@@ -43,16 +44,6 @@ Parameters:
     Type: String
     AllowedPattern: '[^@]+@[^@]+\.[^@]+'
   
-  InitialUserFirstName:
-    Description: Initial Cognito first name
-    Type: String
-    AllowedPattern: '[^@]+@[^@]+\.[^@]+'
-
-  InitialUserLastName:
-    Description: Initial Cognito last name
-    Type: String
-    AllowedPattern: '[^@]+@[^@]+\.[^@]+'
-
   ProjectEnvironment:
     Description: Project environment (dev, prod, ...)
     Type: String
@@ -81,7 +72,7 @@ Metadata:
           - ProjectEnvironment
       -
         Label:
-          default: Amazon Cognito User
+          default: Amazon Cognito / Amazon Simple Notification Service
         Parameters:
           - InitialUserEmail
     ParameterLabels:
@@ -89,10 +80,6 @@ Metadata:
         default: CodePipeline Pipeline Name
       InitialUserEmail:
         default: Email
-      InitialUserFirstName:
-        default: First Name
-      InitialUserLastName:
-        default: Last Name
       NodejsVersion:
         default: Nodejs Version
       ProjectEnvironment:
@@ -504,8 +491,6 @@ Resources:
                 - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
                 - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
                 - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
-                - echo "$( jq --arg u "${InitialUserFirstName}" '.initial_user.first_name = $u' config.json )" > config.json
-                - echo "$( jq --arg u "${InitialUserLastName}" '.initial_user.last_name = $u' config.json )" > config.json
             build:
               commands:
                 - echo "Building frontend"
