@@ -18,7 +18,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import { useAsset, useRelatedVersions } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, useTranscription } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import AssetSidebar from '../components/asset/AssetSidebar';
@@ -33,7 +33,7 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
 import { AssetResponse } from '../api/types/asset.types';
-import type { RelatedVersionsResponse } from '../api/hooks/useAssets';
+import type { RelatedVersionsResponse, TranscriptionResponse } from '../api/hooks/useAssets';
 import { formatFileSize } from '../utils/imageUtils';
 
 // MUI Icons
@@ -700,72 +700,51 @@ const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFiel
     );
 };
 
-const TranscriptionTab: React.FC = () => {
+const TranscriptionTab: React.FC<{ 
+    assetId: string;
+    transcriptionData: TranscriptionResponse | undefined;
+    isLoading: boolean;
+}> = ({ assetId, transcriptionData, isLoading }) => {
     const theme = useTheme();
     
-    // Sample Amazon Transcribe data
-    const transcriptionData = {
-        jobName: "media-futures-podcast-transcription",
-        accountId: "123456789012",
-        results: {
-            transcripts: [
-                {
-                    transcript: "Welcome to Media Futures Podcast. Today we're exploring three big questions facing the media and entertainment industry. First, how will streaming platforms evolve with market saturation? Second, what monetization strategies will prove sustainable? And finally, how is AI transforming creative workflows? Joining me are industry experts Sarah Chen, former Netflix executive, David Rodriguez from Universal Media, and AI specialist Dr. Michelle Wong."
-                }
-            ],
-            items: [
-                {
-                    start_time: "0.00",
-                    end_time: "3.45",
-                    alternatives: [{ confidence: "0.98", content: "Welcome to Media Futures Podcast. Today we're exploring three big questions" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "3.46",
-                    end_time: "6.70",
-                    alternatives: [{ confidence: "0.96", content: "facing the media and entertainment industry." }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "7.15",
-                    end_time: "11.45",
-                    alternatives: [{ confidence: "0.99", content: "First, how will streaming platforms evolve with market saturation?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "12.23",
-                    end_time: "16.82",
-                    alternatives: [{ confidence: "0.95", content: "Second, what monetization strategies will prove sustainable?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "17.32",
-                    end_time: "21.78",
-                    alternatives: [{ confidence: "0.97", content: "And finally, how is AI transforming creative workflows?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "22.48",
-                    end_time: "25.95",
-                    alternatives: [{ confidence: "0.95", content: "Joining me are industry experts Sarah Chen" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "26.12",
-                    end_time: "29.35",
-                    alternatives: [{ confidence: "0.92", content: "former Netflix executive, David Rodriguez from Universal Media" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "29.68",
-                    end_time: "32.43",
-                    alternatives: [{ confidence: "0.94", content: "and AI specialist Dr. Michelle Wong." }],
-                    type: "pronunciation"
-                }
-            ],
-            status: "COMPLETED"
-        }
-    };
+    // Handle loading state
+    if (isLoading) {
+        return (
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+    
+    // Handle missing or invalid data
+    if (!transcriptionData || !transcriptionData.data || !transcriptionData.data.results) {
+        return (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                    Audio Transcription
+                </Typography>
+                <Paper elevation={0} sx={{ 
+                    mb: 3, 
+                    p: 4, 
+                    backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                    <Typography variant="body1" color="text.secondary">
+                        No transcription data available for this audio file.
+                    </Typography>
+                </Paper>
+            </Box>
+        );
+    }
+    
+    // Check if transcripts array exists and has items
+    const hasTranscripts = transcriptionData.data.results.transcripts && 
+                          transcriptionData.data.results.transcripts.length > 0;
+    
+    // Check if items array exists
+    const hasItems = transcriptionData.data.results.items && 
+                    transcriptionData.data.results.items.length > 0;
 
     return (
         <Box sx={{ p: 2 }}>
@@ -784,97 +763,114 @@ const TranscriptionTab: React.FC = () => {
                     Full Transcript:
                 </Typography>
                 <Typography variant="body1" paragraph>
-                    {transcriptionData.results.transcripts[0].transcript}
+                    {hasTranscripts 
+                        ? transcriptionData.data.results.transcripts[0].transcript
+                        : "Full transcript not available"}
                 </Typography>
             </Paper>
             
-            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                Time-Aligned Segments
-            </Typography>
-            
-            <Paper elevation={0} sx={{ 
-                backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                borderRadius: 1
-            }}>
-                {transcriptionData.results.items.map((item, index) => (
-                    <Box 
-                        key={index} 
-                        sx={{ 
-                            display: 'flex', 
-                            p: 1.5, 
-                            borderBottom: index < transcriptionData.results.items.length - 1 ? 
-                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
-                            '&:hover': {
-                                backgroundColor: alpha(theme.palette.primary.main, 0.03)
-                            }
-                        }}
-                    >
-                        <Box sx={{ 
-                            minWidth: '100px', 
-                            pr: 2, 
-                            borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}>
-                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                {`${item.start_time}s - ${item.end_time}s`}
-                            </Typography>
-                            <Chip 
-                                size="small" 
-                                label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`} 
+            {hasItems && (
+                <>
+                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                        Time-Aligned Segments
+                    </Typography>
+                    
+                    <Paper elevation={0} sx={{ 
+                        backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                        borderRadius: 1
+                    }}>
+                        {transcriptionData.data.results.items.map((item, index) => (
+                            <Box 
+                                key={index} 
                                 sx={{ 
-                                    height: '18px', 
-                                    mt: 0.5,
-                                    fontSize: '0.65rem',
-                                    backgroundColor: (() => {
-                                        const conf = parseFloat(item.alternatives[0].confidence);
-                                        if (conf >= 0.95) return alpha(theme.palette.success.main, 0.1);
-                                        if (conf >= 0.85) return alpha(theme.palette.warning.main, 0.1);
-                                        return alpha(theme.palette.error.main, 0.1);
-                                    })(),
-                                    color: (() => {
-                                        const conf = parseFloat(item.alternatives[0].confidence);
-                                        if (conf >= 0.95) return theme.palette.success.main;
-                                        if (conf >= 0.85) return theme.palette.warning.main;
-                                        return theme.palette.error.main;
-                                    })()
+                                    display: 'flex', 
+                                    p: 1.5, 
+                                    borderBottom: index < transcriptionData.data.results.items.length - 1 ? 
+                                        `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.03)
+                                    }
                                 }}
-                            />
-                        </Box>
-                        <Box sx={{ pl: 2, flex: 1 }}>
-                            <Typography variant="body2">
-                                {item.alternatives[0].content}
-                            </Typography>
-                            {item.alternatives.length > 1 && (
-                                <Box sx={{ mt: 1 }}>
+                            >
+                                <Box sx={{ 
+                                    minWidth: '100px', 
+                                    pr: 2, 
+                                    borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}>
                                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                        Alternatives:
+                                        {`${item.start_time}s - ${item.end_time}s`}
                                     </Typography>
-                                    {item.alternatives.slice(1).map((alt, altIndex) => {
-                                        const confidenceValue = Math.round(parseFloat(alt.confidence) * 100);
-                                        return (
-                                            <Typography key={altIndex} variant="caption" sx={{ 
-                                                display: 'block',
-                                                color: theme.palette.text.secondary,
-                                                fontStyle: 'italic',
-                                                pl: 1
-                                            }}>
-                                                {alt.content} ({confidenceValue}%)
-                                            </Typography>
-                                        );
-                                    })}
+                                    {item.alternatives && item.alternatives.length > 0 && item.alternatives[0].confidence && (
+                                        <Chip 
+                                            size="small" 
+                                            label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`} 
+                                            sx={{ 
+                                                height: '18px', 
+                                                mt: 0.5,
+                                                fontSize: '0.65rem',
+                                                backgroundColor: (() => {
+                                                    const conf = parseFloat(item.alternatives[0].confidence);
+                                                    if (conf >= 0.95) return alpha(theme.palette.success.main, 0.1);
+                                                    if (conf >= 0.85) return alpha(theme.palette.warning.main, 0.1);
+                                                    return alpha(theme.palette.error.main, 0.1);
+                                                })(),
+                                                color: (() => {
+                                                    const conf = parseFloat(item.alternatives[0].confidence);
+                                                    if (conf >= 0.95) return theme.palette.success.main;
+                                                    if (conf >= 0.85) return theme.palette.warning.main;
+                                                    return theme.palette.error.main;
+                                                })()
+                                            }}
+                                        />
+                                    )}
                                 </Box>
-                            )}
-                        </Box>
-                    </Box>
-                ))}
-            </Paper>
+                                <Box sx={{ pl: 2, flex: 1 }}>
+                                    {item.alternatives && item.alternatives.length > 0 ? (
+                                        <>
+                                            <Typography variant="body2">
+                                                {item.alternatives[0].content}
+                                            </Typography>
+                                            {item.alternatives.length > 1 && (
+                                                <Box sx={{ mt: 1 }}>
+                                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                                                        Alternatives:
+                                                    </Typography>
+                                                    {item.alternatives.slice(1).map((alt, altIndex) => {
+                                                        const confidenceValue = alt.confidence ? Math.round(parseFloat(alt.confidence) * 100) : 'N/A';
+                                                        return (
+                                                            <Typography key={altIndex} variant="caption" sx={{ 
+                                                                display: 'block',
+                                                                color: theme.palette.text.secondary,
+                                                                fontStyle: 'italic',
+                                                                pl: 1
+                                                            }}>
+                                                                {alt.content} ({confidenceValue}%)
+                                                            </Typography>
+                                                        );
+                                                    })}
+                                                </Box>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
+                                            No content available
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </Box>
+                        ))}
+                    </Paper>
+                </>
+            )}
             
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
                 <Button 
                     variant="outlined" 
                     startIcon={<SubtitlesOutlinedIcon />}
                     sx={{ mr: 2 }}
+                    disabled={!hasTranscripts}
                 >
                     Export Transcript
                 </Button>
@@ -950,6 +946,7 @@ const AudioDetailContent: React.FC = () => {
     const [activeTab, setActiveTab] = useState<string>('summary');
     const [relatedPage, setRelatedPage] = useState(1);
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || '');
     const [showHeader, setShowHeader] = useState(true);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
@@ -1305,7 +1302,13 @@ const AudioDetailContent: React.FC = () => {
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
-                            {activeTab === 'transcription' && <TranscriptionTab />}
+                            {activeTab === 'transcription' && (
+                                <TranscriptionTab
+                                    assetId={id || ''}
+                                    transcriptionData={transcriptionData}
+                                    isLoading={isLoadingTranscription}
+                                />
+                            )}
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 

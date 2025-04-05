@@ -476,3 +476,80 @@ class AssetsConstruct(Construct):
                 resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
             )
         )
+
+        # Add GET /assets/{id}/transcript endpoint
+        transcript_resource = asset_resource.add_resource("transcript")
+        transcript_asset_lambda = Lambda(
+            self,
+            "TranscriptAssetLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_transcript_asset_{config.environment}",
+                entry="lambdas/api/assets/rp_assets_id/transcript",
+                environment_variables={
+                    # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        # Add DynamoDB and S3 permissions for transcript Lambda
+        transcript_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                ],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+        # transcript_asset_lambda.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=[
+        #             "kms:Encrypt",
+        #             "kms:Decrypt",
+        #             "kms:ReEncrypt*",
+        #             "kms:GenerateDataKey*",
+        #             "kms:DescribeKey",
+        #         ],
+        #         resources=["*"],
+        #     )
+        # )
+
+        # Update the policy to allow access to all S3 buckets
+        transcript_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
+        # Add GET method to /assets/{id}/transcript
+        transcript_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(
+                transcript_asset_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    api_gateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+            method_responses=[
+                api_gateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+        )
