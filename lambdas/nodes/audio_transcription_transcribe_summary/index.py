@@ -1,15 +1,13 @@
 import boto3
 import os
 import json
-import time
 import datetime
 from aws_lambda_powertools import Logger, Tracer
 from lambda_middleware import lambda_middleware
-from nodes_utils import format_duration
 from decimal import Decimal
-import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from botocore.exceptions import ClientError
+from urllib.parse import urlparse
 
 # Initialize Powertools
 logger = Logger()
@@ -173,22 +171,28 @@ def lambda_handler(event, context):
         assistant_response = json.loads(response.get('body').read())
         print(f'assistant_response: {assistant_response}')
 
-        summary_base_path = os.path.splitext(transcript_s3_key)[0]
+        _bucket, _key = parse_s3_uri(asset_details["TranscriptionS3Uri"])
+        summary_base_path = os.path.splitext(_key)[0]
 
-        summary_file_name = "{summary_base_path}-summary.txt",
+        summary_file_name = f"{summary_base_path}-summary.txt",
         print(f'summary_file_name: {summary_file_name}')
 
         # Save the response value in S3.
         s3_client.put_object(
-            Bucket=transcript_s3_bucket,
+            Bucket=_bucket,
             Key=summary_file_name,
             Body=assistant_response['content'][0]['text'],
             ContentType='text/plain'
         )
 
+        table.update_item(
+            Key={"InventoryID": asset_id},
+            UpdateExpression="SET TranscriptionSummaryS3Uri = :val",
+            ExpressionAttributeValues={":val": f"s3://{_bucket}/{summary_file_name}"}
+        )
+
         result = {
-            "bucket_name": transcript_s3_bucket,
-            "summary_key_name": summary_file_name,
+            "summary_s3_uri": f"s3://{_bucket}/{summary_file_name}",
             "status": "SUCCEEDED"
         }
         
