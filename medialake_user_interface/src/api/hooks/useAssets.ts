@@ -347,15 +347,16 @@ export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: 
     });
 };
 
-// Hook to get a single asset by ID
+// Hook to get transcription data for an asset
 export const useTranscription = (inventoryId: string) => {
     const { showError } = useErrorModal();
 
     return useQuery({
-        queryKey: QUERY_KEYS.ASSETS.detail(inventoryId),
+        queryKey: ['transcription', inventoryId],
         queryFn: async () => {
             try {
                 const response = await apiClient.get<TranscriptionResponse>(`assets/${inventoryId}/transcript`);
+                console.log('Transcription API response:', response.data);
                 return response.data;
             } catch (error) {
                 logger.error('Error fetching asset transcript:', error);
