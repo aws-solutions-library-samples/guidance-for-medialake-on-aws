@@ -24,6 +24,12 @@ node:
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
             
 actions:
   transcribe_summary:
