@@ -1,0 +1,41 @@
+spec: v1.0.0
+node:
+  id: audio_transcription_transcribe_status
+  title: Transcription Job Status
+  description: Get the status of a transcription job
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/AudioTranscriptionTranscribeStatusLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - transcribe:GetTranscriptionJob
+              resources:
+                - arn:aws:transcribe:*:*:transcription-job/*
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+
+actions:
+  transcribe_status:
+    summary: Transcription Job Status
+    description: Get the status of a transcription job
+    operationId: audioTranscriptionTranscribeStatus
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [metadata]

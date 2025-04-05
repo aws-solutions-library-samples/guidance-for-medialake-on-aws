@@ -1,0 +1,35 @@
+spec: v1.0.0
+node:
+  id: audio_transcription_transcribe
+  title: Transcribe Audio using Amazon Transcribe
+  description: Create an audio transcription using Amazon Transcribe
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/AudioTranscriptionTranscribeLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - transcribe:StartTranscriptionJob
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - iam:PassRole
+              resources:
+                - "*"
+            
+actions:
+  transcribe:
+    summary: Transcribe Audio using Amazon Transcribe
+    description: Create an audio transcription using Amazon Transcribe
+    operationId: audioTranscriptionTranscribe
+    connections:
+      incoming:
+        type: [audio, video]
+      outgoing:
+        type: [metadata]
