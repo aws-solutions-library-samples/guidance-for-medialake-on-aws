@@ -341,8 +341,7 @@ def build_search_query(params: SearchParams) -> Dict:
                             "embedding_scope": "clip"
                         }
                     }
-                ],
-                "filter": []  # Initialize the filter array
+                ]
             }
         }
     else:
@@ -372,8 +371,7 @@ def build_search_query(params: SearchParams) -> Dict:
                             "embedding_scope": "clip"
                         }
                     }
-                ],
-                "filter": []  # Initialize the filter array
+                ]
             }
         }
 
