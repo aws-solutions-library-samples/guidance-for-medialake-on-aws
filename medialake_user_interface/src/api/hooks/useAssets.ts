@@ -114,6 +114,31 @@ interface RelatedVersionHit {
     score: number;
 }
 
+interface TranscriptionResponse {
+    status: string;
+    message: string;
+    data: {
+        jobName: string;
+        status: string;
+        results: {
+            language_code: string;
+            transcripts: Array<{
+                transcript: string;
+            }>;
+            items: Array<{
+                id: number;
+                start_time: number;
+                end_time: number;
+                type: string;
+                alternatives: Array<{
+                    confidence: string;
+                    content: string;
+                }>;
+            }>;
+        }
+    };
+}
+
 export interface RelatedVersionsResponse {
     status: string;
     message: string;
@@ -322,5 +347,26 @@ export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: 
     });
 };
 
+// Hook to get a single asset by ID
+export const useTranscription = (inventoryId: string) => {
+    const { showError } = useErrorModal();
+
+    return useQuery({
+        queryKey: QUERY_KEYS.ASSETS.detail(inventoryId),
+        queryFn: async () => {
+            try {
+                const response = await apiClient.get<TranscriptionResponse>(`assets/${inventoryId}/transcript`);
+                return response.data;
+            } catch (error) {
+                logger.error('Error fetching asset transcript:', error);
+                showError('Failed to fetch asset transcript');
+                throw error;
+            }
+        },
+        enabled: !!inventoryId,
+        retry: 1,
+    });
+};
+
 // Export types for use in components
-export type { Asset, AssetResponse, DeleteAssetResponse };
+export type { Asset, AssetResponse, DeleteAssetResponse, TranscriptionResponse };

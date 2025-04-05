@@ -18,7 +18,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import { useAsset, useRelatedVersions } from '../api/hooks/useAssets';
+import { useAsset, useRelatedVersions, useTranscription } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from '../contexts/RecentlyViewedContext';
 import AssetSidebar from '../components/asset/AssetSidebar';
@@ -33,7 +33,7 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
 import { AssetResponse } from '../api/types/asset.types';
-import type { RelatedVersionsResponse } from '../api/hooks/useAssets';
+import type { RelatedVersionsResponse, TranscriptionResponse } from '../api/hooks/useAssets';
 import { formatFileSize } from '../utils/imageUtils';
 
 // MUI Icons
@@ -700,72 +700,76 @@ const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFiel
     );
 };
 
-const TranscriptionTab: React.FC = () => {
+const TranscriptionTab: React.FC<{ 
+    assetId: string;
+    transcriptionData: TranscriptionResponse | undefined;
+    isLoading: boolean;
+}> = ({ assetId, transcriptionData, isLoading }) => {
     const theme = useTheme();
     
-    // Sample Amazon Transcribe data
-    const transcriptionData = {
-        jobName: "media-futures-podcast-transcription",
-        accountId: "123456789012",
-        results: {
-            transcripts: [
-                {
-                    transcript: "Welcome to Media Futures Podcast. Today we're exploring three big questions facing the media and entertainment industry. First, how will streaming platforms evolve with market saturation? Second, what monetization strategies will prove sustainable? And finally, how is AI transforming creative workflows? Joining me are industry experts Sarah Chen, former Netflix executive, David Rodriguez from Universal Media, and AI specialist Dr. Michelle Wong."
-                }
-            ],
-            items: [
-                {
-                    start_time: "0.00",
-                    end_time: "3.45",
-                    alternatives: [{ confidence: "0.98", content: "Welcome to Media Futures Podcast. Today we're exploring three big questions" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "3.46",
-                    end_time: "6.70",
-                    alternatives: [{ confidence: "0.96", content: "facing the media and entertainment industry." }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "7.15",
-                    end_time: "11.45",
-                    alternatives: [{ confidence: "0.99", content: "First, how will streaming platforms evolve with market saturation?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "12.23",
-                    end_time: "16.82",
-                    alternatives: [{ confidence: "0.95", content: "Second, what monetization strategies will prove sustainable?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "17.32",
-                    end_time: "21.78",
-                    alternatives: [{ confidence: "0.97", content: "And finally, how is AI transforming creative workflows?" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "22.48",
-                    end_time: "25.95",
-                    alternatives: [{ confidence: "0.95", content: "Joining me are industry experts Sarah Chen" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "26.12",
-                    end_time: "29.35",
-                    alternatives: [{ confidence: "0.92", content: "former Netflix executive, David Rodriguez from Universal Media" }],
-                    type: "pronunciation"
-                },
-                {
-                    start_time: "29.68",
-                    end_time: "32.43",
-                    alternatives: [{ confidence: "0.94", content: "and AI specialist Dr. Michelle Wong." }],
-                    type: "pronunciation"
-                }
-            ],
-            status: "COMPLETED"
-        }
-    };
+    // // Sample Amazon Transcribe data
+    // const transcriptionData = {
+    //     jobName: "media-futures-podcast-transcription",
+    //     accountId: "123456789012",
+    //     results: {
+    //         transcripts: [
+    //             {
+    //                 transcript: "Welcome to Media Futures Podcast. Today we're exploring three big questions facing the media and entertainment industry. First, how will streaming platforms evolve with market saturation? Second, what monetization strategies will prove sustainable? And finally, how is AI transforming creative workflows? Joining me are industry experts Sarah Chen, former Netflix executive, David Rodriguez from Universal Media, and AI specialist Dr. Michelle Wong."
+    //             }
+    //         ],
+    //         items: [
+    //             {
+    //                 start_time: "0.00",
+    //                 end_time: "3.45",
+    //                 alternatives: [{ confidence: "0.98", content: "Welcome to Media Futures Podcast. Today we're exploring three big questions" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "3.46",
+    //                 end_time: "6.70",
+    //                 alternatives: [{ confidence: "0.96", content: "facing the media and entertainment industry." }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "7.15",
+    //                 end_time: "11.45",
+    //                 alternatives: [{ confidence: "0.99", content: "First, how will streaming platforms evolve with market saturation?" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "12.23",
+    //                 end_time: "16.82",
+    //                 alternatives: [{ confidence: "0.95", content: "Second, what monetization strategies will prove sustainable?" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "17.32",
+    //                 end_time: "21.78",
+    //                 alternatives: [{ confidence: "0.97", content: "And finally, how is AI transforming creative workflows?" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "22.48",
+    //                 end_time: "25.95",
+    //                 alternatives: [{ confidence: "0.95", content: "Joining me are industry experts Sarah Chen" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "26.12",
+    //                 end_time: "29.35",
+    //                 alternatives: [{ confidence: "0.92", content: "former Netflix executive, David Rodriguez from Universal Media" }],
+    //                 type: "pronunciation"
+    //             },
+    //             {
+    //                 start_time: "29.68",
+    //                 end_time: "32.43",
+    //                 alternatives: [{ confidence: "0.94", content: "and AI specialist Dr. Michelle Wong." }],
+    //                 type: "pronunciation"
+    //             }
+    //         ],
+    //         status: "COMPLETED"
+    //     }
+    // };
 
     return (
         <Box sx={{ p: 2 }}>
@@ -784,7 +788,7 @@ const TranscriptionTab: React.FC = () => {
                     Full Transcript:
                 </Typography>
                 <Typography variant="body1" paragraph>
-                    {transcriptionData.results.transcripts[0].transcript}
+                    {transcriptionData.data.results.transcripts[0].transcript}
                 </Typography>
             </Paper>
             
@@ -796,13 +800,13 @@ const TranscriptionTab: React.FC = () => {
                 backgroundColor: alpha(theme.palette.background.paper, 0.5),
                 borderRadius: 1
             }}>
-                {transcriptionData.results.items.map((item, index) => (
+                {transcriptionData.data.results.items.map((item, index) => (
                     <Box 
                         key={index} 
                         sx={{ 
                             display: 'flex', 
                             p: 1.5, 
-                            borderBottom: index < transcriptionData.results.items.length - 1 ? 
+                            borderBottom: index < transcriptionData.data.results.items.length - 1 ? 
                                 `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                             '&:hover': {
                                 backgroundColor: alpha(theme.palette.primary.main, 0.03)
@@ -950,6 +954,7 @@ const AudioDetailContent: React.FC = () => {
     const [activeTab, setActiveTab] = useState<string>('summary');
     const [relatedPage, setRelatedPage] = useState(1);
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
+    const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || '');
     const [showHeader, setShowHeader] = useState(true);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
@@ -1305,7 +1310,13 @@ const AudioDetailContent: React.FC = () => {
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
                             {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
-                            {activeTab === 'transcription' && <TranscriptionTab />}
+                            {activeTab === 'transcription' && (
+                                <TranscriptionTab
+                                    assetId={id || ''}
+                                    transcriptionData={transcriptionData}
+                                    isLoading={isLoadingTranscription}
+                                />
+                            )}
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 

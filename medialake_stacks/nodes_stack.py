@@ -74,6 +74,53 @@ class NodesStack(Stack):
             code_path=["lambdas", "nodes", "audio_metadata_extractor"],
         )
 
+        self.audio_transcription_transcribe_role = iam.Role(
+            self,
+            "AudioTranscriptionTranscribeRole",
+            assumed_by=iam.ServicePrincipal("transcribe.amazonaws.com"),
+            inline_policies={
+                "s3": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=[
+                                "s3:PutObject",
+                                "s3:ListBucket",
+                                "s3:GetObject",
+                                "s3:DeleteObject",
+                            ],
+                            resources=[
+                                "*" # TODO: need to adjust that
+                            ],
+                        )
+                    ]
+                )
+            }
+        )
+
+        self.audio_transcription_transcribe_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioTranscriptionTranscribeLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_transcription_transcribe"],   
+        )
+
+        self.audio_transcription_transcribe_status_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioTranscriptionTranscribeStatusLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_transcription_transcribe_status"],   
+        )
+
+        self.audio_transcription_transcribe_summary_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioTranscriptionTrSumLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_transcription_transcribe_summary"],   
+        )
+
         self.api_lambda_deployment = LambdaDeployment(
             self,
             "ApiLambdaDeployment",
