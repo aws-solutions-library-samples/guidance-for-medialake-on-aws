@@ -68,7 +68,7 @@ function Sidebar() {
                     setUserName(attributes.email.trim());
                 }
             } catch (error) {
-                console.error('Error loading user attributes:', error);
+                console.error(t('app.errors.loadingUserAttributes', 'Error loading user attributes:'), error);
             }
         };
         loadUserInfo();
@@ -88,7 +88,7 @@ function Sidebar() {
             setIsAuthenticated(false);
             navigate('/sign-in');
         } catch (error) {
-            console.error('Error signing out:', error);
+            console.error(t('app.errors.signingOut', 'Error signing out:'), error);
         }
         handleClose();
     };
@@ -147,12 +147,12 @@ function Sidebar() {
         // 2. We're on a sub-route of this path (except for root path '/')
         if (location.pathname === path ||
             (path !== '/' && location.pathname.startsWith(path))) {
-            console.log(`[Navigation] Prevented duplicate navigation to ${path}`);
+            console.log(`${t('app.navigation.preventedDuplicate', 'Prevented duplicate navigation to')} ${path}`);
             return;
         }
         
         // Log navigation for debugging
-        console.log(`[Navigation] Navigating from ${location.pathname} to ${path}`);
+        console.log(`${t('app.navigation.navigating', 'Navigating from')} ${location.pathname} to ${path}`);
         navigate(path);
     };
 
@@ -200,7 +200,7 @@ function Sidebar() {
                 }}>
                     <img
                         src="/logo.png"
-                        alt="MediaLake"
+                        alt={t('app.branding.name', 'MediaLake')}
                         style={{
                             height: '32px',
                             marginRight: isCollapsed ? 0 : theme.spacing(1)
@@ -214,7 +214,7 @@ function Sidebar() {
                                 color: theme.palette.primary.main,
                             }}
                         >
-                            MediaLake
+                            {t('app.branding.name', 'MediaLake')}
                         </Typography>
                     )}
                 </Box>

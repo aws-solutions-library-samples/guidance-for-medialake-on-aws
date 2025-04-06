@@ -1,10 +1,228 @@
 export default {
+    languages: {
+      english: 'Inglês',
+      german: 'Alemão',
+      portuguese: 'Português',
+      french: 'Francês',
+      chinese: 'Chinês',
+      hindi: 'Hindi',
+      arabic: 'Árabe',
+      hebrew: 'Hebraico'
+    },
+    assetsPage: {
+      title: 'Ativos',
+      connectors: 'Conectores',
+      selectConnector: 'Selecione um conector'
+    },
+    assetExplorer: {
+      noConnectorSelected: 'Selecione um conector para visualizar os ativos',
+      noAssetsFound: 'Nenhum ativo encontrado para este conector',
+      noIndexedAssets: 'Nenhum ativo indexado foi encontrado para este conector com o bucket "{{bucketName}}".',
+      loadingAssets: 'Carregando ativos...',
+      menu: {
+        rename: 'Renomear',
+        share: 'Compartilhar',
+        download: 'Baixar'
+      },
+      deleteDialog: {
+        title: 'Confirmar exclusão',
+        description: 'Tem certeza de que deseja excluir este ativo? Esta ação não pode ser desfeita.',
+        cancel: 'Cancelar',
+        confirm: 'Excluir'
+      }
+    },
+    sidebar: {
+        menu: {
+            home: 'Início',
+            assets: 'Ativos',
+            pipelines: 'Pipelines',
+            pipelineExecutions: 'Execuções de Pipeline',
+            settings: 'Configurações'
+        },
+        submenu: {
+            system: 'Configurações do Sistema',
+            connectors: 'Conectores',
+            userManagement: 'Gerenciamento de Usuários',
+            roles: 'Funções',
+            integrations: 'Integrações',
+            environments: 'Ambientes'
+        }
+    },
+    profile: {
+        title: 'Perfil',
+        description: 'Gerencie suas configurações e preferências de conta',
+        changePhoto: 'Alterar Foto',
+        jobTitle: 'Cargo',
+        organization: 'Organização',
+        preferences: 'Preferências',
+        timezone: 'Fuso Horário',
+        emailNotifications: 'Notificações por Email',
+        pushNotifications: 'Notificações Push',
+        changePassword: 'Alterar Senha',
+        twoFactorAuth: 'Autenticação de Dois Fatores',
+        appearance: 'Aparência'
+    },
+    app: {
+        loading: 'Carregando...',
+        errors: {
+            loadingConfig: 'Erro ao carregar configuração AWS:',
+            loadingUserAttributes: 'Erro ao carregar atributos do usuário:',
+            signingOut: 'Erro ao sair:'
+        },
+        navigation: {
+            preventedDuplicate: 'Navegação duplicada impedida para',
+            navigating: 'Navegando de'
+        },
+        branding: {
+            name: 'MediaLake'
+        }
+    },
+    search: {
+        semantic: 'Pesquisa Semântica',
+        filters: {
+            dateRange: 'Intervalo de Data',
+            contentType: 'Tipo de Conteúdo',
+            storageLocation: 'Local de Armazenamento',
+            comingSoon: 'Mais filtros em breve...'
+        }
+    },
+    admin: {
+        metrics: {
+            storageUsage: 'Uso de Armazenamento',
+            apiUsage: 'Uso de API',
+            activeUsers: 'Usuários Ativos',
+            systemLoad: 'Carga do Sistema'
+        },
+        errors: {
+            userDeletionNotImplemented: 'A exclusão de usuário ainda não foi implementada.',
+            userCreationNotImplemented: 'A criação de usuário ainda não foi implementada.',
+            userEditingNotImplemented: 'A edição de usuário ainda não foi implementada.',
+            analyticsExportNotImplemented: 'A exportação de análises ainda não foi implementada.',
+            systemResetNotImplemented: 'A redefinição do sistema ainda não foi implementada.'
+        },
+        columns: {
+            lastActive: 'Último Acesso'
+        },
+        buttons: {
+            exportAnalytics: 'Exportar Análises',
+            resetSystem: 'Redefinir Sistema'
+        }
+    },
+    common: {
+      select: 'Selecionar',
+      back: 'Voltar',
+      search: 'Pesquisar',
+      profile: 'Perfil',
+      logout: 'Sair',
+      theme: 'Tema',
+      close: 'Fechar',
+      refresh: 'Atualizar',
+      cancel: 'Cancelar',
+      save: 'Salvar',
+      loading: 'Carregando...',
+      loadMore: 'Carregar Mais',
+      tableDensity: 'Densidade da Tabela',
+      moreInfo: 'Mais informações',
+      error: 'Erro',
+      language: 'Idioma',
+      actions: {
+        add: 'Adicionar'
+      },
+      columns: {
+        username: 'Nome de Usuário',
+        firstName: 'Nome',
+        lastName: 'Sobrenome',
+        email: 'Email',
+        status: 'Status',
+        groups: 'Grupos',
+        created: 'Criado',
+        modified: 'Modificado',
+        actions: 'Ações'
+      },
+      status: {
+        active: 'Ativo',
+        inactive: 'Inativo'
+      }
+    },
+    pipelines: {
+      title: 'Pipelines',
+      description: 'Gerencie seus pipelines de mídia e metadados',
+      searchPlaceholder: 'Pesquisar pipelines...',
+      actions: {
+        create: 'Adicionar Novo Pipeline',
+        viewAll: 'Ver Todos os Pipelines'
+      }
+    },
+    users: {
+      title: 'Gerenciamento de Usuários',
+      description: 'Gerencie os usuários do sistema e seus acessos',
+      actions: {
+        addUser: 'Adicionar Usuário'
+      },
+      form: {
+        title: {
+          add: 'Adicionar Usuário'
+        },
+        fields: {
+          given_name: {
+            label: 'Nome',
+            tooltip: 'Digite o primeiro nome do usuário',
+            helper: ''
+          },
+          family_name: {
+            label: 'Sobrenome',
+            tooltip: 'Digite o sobrenome do usuário',
+            helper: ''
+          },
+          email: {
+            label: 'Email',
+            tooltip: 'Digite o endereço de email do usuário',
+            helper: ''
+          },
+          roles: {
+            label: 'Funções',
+            tooltip: 'Selecione as funções para o usuário',
+            options: {
+              Admin: 'Administrador',
+              Editor: 'Editor',
+              Viewer: 'Visualizador'
+            }
+          },
+          email_verified: {
+            label: 'Email Verificado',
+            tooltip: 'Indique se o email do usuário foi verificado'
+          },
+          enabled: {
+            label: 'Habilitado',
+            tooltip: 'Ative ou desative o usuário'
+          }
+        }
+      },
+      roles: {
+        admin: 'Administrador',
+        editor: 'Editor',
+        viewer: 'Visualizador'
+      }
+    },
+    roles: {
+      title: 'Gerenciamento de Funções',
+      description: 'Gerencie as funções do sistema e suas permissões',
+      actions: {
+        addRole: 'Adicionar Função'
+      }
+    },
     integrations: {
+      title: 'Integrações',
+      description: 'Gerencie suas integrações e conexões',
+      addIntegration: 'Adicionar Integração',
       selectProvider: 'Selecionar Integração',
       selectIntegration: 'Selecionar Integração',
       configureIntegration: 'Configurar Integração',
       form: {
         title: 'Adicionar Integração',
+        search: {
+          placeholder: 'Pesquisar integrações'
+        },
         fields: {
           nodeId: {
             label: 'Integração',
@@ -72,11 +290,98 @@ export default {
         }
       }
     },
-    common: {
-      select: 'Selecionar',
-      back: 'Voltar',
-      actions: {
-        add: 'Adicionar'
+    settings: {
+      environments: {
+        title: 'Ambientes',
+        description: 'Gerencie os ambientes do sistema',
+        addButton: 'Adicionar Ambiente',
+        searchPlaceholder: 'Pesquisar ambientes',
+        createTitle: 'Criar Ambiente',
+        editTitle: 'Editar Ambiente',
+        deleteSuccess: 'Ambiente excluído com sucesso',
+        deleteError: 'Erro ao excluir ambiente',
+        createSuccess: 'Ambiente criado com sucesso',
+        updateSuccess: 'Ambiente atualizado com sucesso',
+        submitError: 'Erro ao salvar ambiente',
+        search: 'Pesquisar ambientes',
+        columns: {
+          name: 'Nome',
+          region: 'Região',
+          status: 'Status',
+          team: 'Equipe',
+          costCenter: 'Centro de Custo',
+          createdAt: 'Criado em',
+          updatedAt: 'Atualizado em',
+          actions: 'Ações'
+        },
+        status: {
+          active: 'Ativo',
+          disabled: 'Desativado'
+        },
+        actions: {
+          edit: 'Editar Ambiente',
+          delete: 'Excluir Ambiente'
+        },
+        form: {
+          name: 'Nome do Ambiente',
+          region: 'Região',
+          status: {
+            name: 'Status',
+            active: 'Ativo',
+            disabled: 'Desativado'
+          },
+          costCenter: 'Centro de Custo',
+          team: 'Equipe'
+        }
+      },
+      systemSettings: {
+        title: 'Configurações do Sistema',
+        tabs: {
+          search: 'Pesquisa',
+          notifications: 'Notificações',
+          security: 'Segurança',
+          performance: 'Desempenho'
+        },
+        search: {
+          title: 'Configuração de Pesquisa',
+          description: 'Configure o provedor de pesquisa para recursos avançados de pesquisa em seus ativos de mídia.',
+          provider: 'Provedor de Pesquisa:',
+          configureProvider: 'Configurar Provedor de Pesquisa',
+          editProvider: 'Editar Provedor',
+          resetProvider: 'Redefinir Provedor',
+          providerDetails: 'Detalhes do Provedor',
+          providerName: 'Nome do Provedor',
+          apiKey: 'Chave de API',
+          endpoint: 'URL do Endpoint (Opcional)',
+          enabled: 'Pesquisa Ativada',
+          noProvider: 'Nenhum provedor de pesquisa configurado.',
+          configurePrompt: 'Configure o Twelve Labs para habilitar recursos de pesquisa.'
+        },
+        notifications: {
+          title: 'Configurações de Notificações',
+          comingSoon: 'Configurações de notificações em breve.'
+        },
+        security: {
+          title: 'Configurações de Segurança',
+          comingSoon: 'Configurações de segurança em breve.'
+        },
+        performance: {
+          title: 'Configurações de Desempenho',
+          comingSoon: 'Configurações de desempenho em breve.'
+        }
+      }
+    },
+    executions: {
+      title: 'Execuções de Pipeline',
+      description: 'Monitore e gerencie suas execuções de pipeline',
+      searchPlaceholder: 'Pesquisar execuções de pipeline...',
+      columns: {
+        pipelineName: 'Nome do Pipeline',
+        status: 'Status',
+        startTime: 'Hora de Início',
+        endTime: 'Hora de Término',
+        duration: 'Duração',
+        actions: 'Ações'
       }
     },
     translation: {
@@ -233,7 +538,10 @@ export default {
         sharedCollections: 'Coleções Compartilhadas',
         favorites: 'Favoritos',
         smartFolders: 'Pastas Inteligentes',
-        connectedStorage: 'Armazenamento Conectado'
+        connectedStorage: 'Armazenamento Conectado',
+        sharing: 'Compartilhamento',
+        comingSoon: 'Em breve'
+      
       },
       notifications: {
         'Pipeline Complete': 'Pipeline Completo',
@@ -278,23 +586,6 @@ export default {
           showEntries: 'Mostrar {{count}}'
         }
       },
-      sidebar: {
-        menu: {
-          home: 'Início',
-          assets: 'Ativos',
-          pipelines: 'Pipelines',
-          pipelineExecutions: 'Execuções de Pipeline',
-          settings: 'Configurações'
-        },
-        submenu: {
-          system: 'Configurações do Sistema',
-          connectors: 'Conectores',
-          userManagement: 'Gerenciamento de Usuários',
-          roles: 'Funções',
-          integrations: 'Integrações',
-          environments: 'Ambientes'
-        }
-      },
       s3Explorer: {
         filter: {
           label: 'Filtrar por nome'
@@ -324,7 +615,8 @@ export default {
         actions: {
           create: 'Adicionar Novo Pipeline',
           deploy: 'Implantar Pipeline de Imagens',
-          addNew: 'Adicionar Novo Pipeline'
+          addNew: 'Adicionar Novo Pipeline',
+          viewAll: 'Ver Todos os Pipelines'
         },
         description: 'Gerencie seus pipelines de mídia e metadados',
         search: 'Pesquisar pipelines',
@@ -460,116 +752,15 @@ export default {
                     required: 'Função IAM é obrigatória'
                   }
                 }
+              },
+              settings: {
+                environments: {
+                  title: 'Ambientes'
+                }
               }
             }
-          },
-          search: {
-            placeholder: 'Pesquisar integrações...'
-          },
-          errors: {
-            required: 'Este campo é obrigatório',
-            nodeId: {
-              unrecognized_keys: 'Seleção de integração inválida'
-            }
-          }
-        },
-        actions: {
-          edit: 'Editar Integração',
-          delete: 'Excluir Integração'
-        },
-        search: 'Pesquisar integrações...',
-        status: {
-          creating: 'Criando integração...',
-          created: 'Integração Criada',
-          createFailed: 'Falha na Criação da Integração',
-          deleting: 'Excluindo integração...',
-          deleted: 'Integração Excluída',
-          deleteFailed: 'Falha na Exclusão da Integração'
         }
-      },
-      settings: {
-        environments: {
-          title: 'Ambientes',
-          description: 'Gerencie os ambientes do sistema e suas configurações',
-          search: 'Pesquisar ambientes',
-          searchPlaceholder: 'Pesquisar ambientes...',
-          addButton: 'Adicionar Ambiente',
-          createTitle: 'Criar Ambiente',
-          editTitle: 'Editar Ambiente',
-          deleteSuccess: 'Ambiente excluído com sucesso',
-          deleteError: 'Falha ao excluir ambiente',
-          createSuccess: 'Ambiente criado com sucesso',
-          updateSuccess: 'Ambiente atualizado com sucesso',
-          submitError: 'Falha ao salvar ambiente',
-          columns: {
-            name: 'Nome',
-            region: 'Região',
-            status: 'Status',
-            team: 'Equipe',
-            costCenter: 'Centro de Custo',
-            createdAt: 'Criado Em',
-            updatedAt: 'Atualizado Em',
-            actions: 'Ações'
-          },
-          status: {
-            active: 'Ativo',
-            disabled: 'Desativado'
-          },
-          actions: {
-            edit: 'Editar Ambiente',
-            delete: 'Excluir Ambiente'
-          },
-          form: {
-            name: 'Nome do Ambiente',
-            region: 'Região',
-            costCenter: 'Centro de Custo',
-            team: 'Equipe',
-            status: {
-              name: 'Status',
-              active: 'Ativo',
-              disabled: 'Desativado'
-            }
-          }
-        },
-        systemSettings: {
-          title: 'Configurações do Sistema',
-          tabs: {
-            search: 'Pesquisar',
-            notifications: 'Notificações',
-            security: 'Segurança',
-            performance: 'Desempenho'
-          },
-          search: {
-            title: 'Configuração de Pesquisa',
-            description: 'Configure o provedor de pesquisa para aprimorar as capacidades de busca em seus ativos de mídia.',
-            provider: 'Provedor de Pesquisa:',
-            configureProvider: 'Configurar Provedor',
-            editProvider: 'Editar Provedor',
-            resetProvider: 'Redefinir Provedor',
-            providerDetails: 'Detalhes do Provedor',
-            providerName: 'Nome do Provedor',
-            providerType: 'Tipo de Provedor',
-            apiKey: 'Chave de API',
-            endpoint: 'URL do Endpoint',
-            enabled: 'Pesquisa Habilitada',
-            noProvider: 'Nenhum provedor de pesquisa configurado.',
-            configurePrompt: 'Configure Twelve Labs para habilitar as capacidades de busca.',
-            errorLoading: 'Erro ao carregar a configuração do provedor de pesquisa'
-          },
-          notifications: {
-            title: 'Configurações de Notificações',
-            comingSoon: 'Configurações de notificações em breve.'
-          },
-          security: {
-            title: 'Configurações de Segurança',
-            comingSoon: 'Configurações de segurança em breve.'
-          },
-          performance: {
-            title: 'Configurações de Desempenho',
-            comingSoon: 'Configurações de desempenho em breve.'
-          }
         }
       }
     }
-  }
-  
+}

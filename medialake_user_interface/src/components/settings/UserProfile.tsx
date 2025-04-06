@@ -30,6 +30,7 @@ import {
     Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { useTranslation } from 'react-i18next';
 
 interface UserProfileData {
     firstName: string;
@@ -71,6 +72,7 @@ const COMMON_TIMEZONES = [
 
 const UserProfile: React.FC = () => {
     const theme = useTheme();
+    const { t } = useTranslation();
     const { timezone, setTimezone } = useTimezone();
     const [editing, setEditing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -95,7 +97,7 @@ const UserProfile: React.FC = () => {
             setEditing(false);
             setError(null);
         } catch (err) {
-            setError('Failed to save profile changes. Please try again.');
+            setError(t('translation.errors.saveFailed', 'Failed to save profile changes. Please try again.'));
         }
     };
 
@@ -132,13 +134,13 @@ const UserProfile: React.FC = () => {
                         }}
                     >
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                            <Typography variant="h6">Profile Information</Typography>
+                            <Typography variant="h6">{t('translation.common.profile')}</Typography>
                             {!editing ? (
                                 <Button
                                     startIcon={<EditIcon />}
                                     onClick={() => setEditing(true)}
                                 >
-                                    Edit Profile
+                                    {t('translation.actions.edit', 'Edit Profile')}
                                 </Button>
                             ) : (
                                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -146,14 +148,14 @@ const UserProfile: React.FC = () => {
                                         startIcon={<CancelIcon />}
                                         onClick={handleCancel}
                                     >
-                                        Cancel
+                                        {t('translation.common.cancel', 'Cancel')}
                                     </Button>
                                     <Button
                                         variant="contained"
                                         startIcon={<SaveIcon />}
                                         onClick={handleSave}
                                     >
-                                        Save Changes
+                                        {t('translation.common.save', 'Save Changes')}
                                     </Button>
                                 </Box>
                             )}
@@ -184,7 +186,7 @@ const UserProfile: React.FC = () => {
                                                 startIcon={<PhotoCameraIcon />}
                                                 sx={{ mt: 1 }}
                                             >
-                                                Change Photo
+                                                {t('profile.changePhoto', 'Change Photo')}
                                             </Button>
                                         )}
                                     </Box>
@@ -194,7 +196,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="First Name"
+                                    label={t('translation.users.form.fields.given_name.label', 'First Name')}
                                     value={profileData.firstName}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -206,7 +208,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Last Name"
+                                    label={t('translation.users.form.fields.family_name.label', 'Last Name')}
                                     value={profileData.lastName}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -218,7 +220,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
-                                    label="Email"
+                                    label={t('translation.users.form.fields.email.label', 'Email')}
                                     value={profileData.email}
                                     disabled={!editing}
                                     type="email"
@@ -231,7 +233,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Job Title"
+                                    label={t('profile.jobTitle', 'Job Title')}
                                     value={profileData.jobTitle}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -243,7 +245,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Organization"
+                                    label={t('profile.organization', 'Organization')}
                                     value={profileData.organization}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -267,13 +269,13 @@ const UserProfile: React.FC = () => {
                         }}
                     >
                         <Typography variant="h6" sx={{ mb: 3 }}>
-                            Preferences
+                            {t('profile.preferences', 'Preferences')}
                         </Typography>
 
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <ScheduleIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">Timezone</Typography>
+                                <Typography variant="subtitle1">{t('profile.timezone', 'Timezone')}</Typography>
                             </Box>
                             <FormControl fullWidth>
                                 <Select
@@ -295,7 +297,7 @@ const UserProfile: React.FC = () => {
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <NotificationsIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">Notifications</Typography>
+                                <Typography variant="subtitle1">{t('translation.common.notifications', 'Notifications')}</Typography>
                             </Box>
                             <FormControlLabel
                                 control={
@@ -310,7 +312,7 @@ const UserProfile: React.FC = () => {
                                         })}
                                     />
                                 }
-                                label="Email Notifications"
+                                label={t('profile.emailNotifications', 'Email Notifications')}
                             />
                             <FormControlLabel
                                 control={
@@ -325,7 +327,7 @@ const UserProfile: React.FC = () => {
                                         })}
                                     />
                                 }
-                                label="Push Notifications"
+                                label={t('profile.pushNotifications', 'Push Notifications')}
                             />
                         </Box>
 
@@ -334,13 +336,13 @@ const UserProfile: React.FC = () => {
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <SecurityIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">Security</Typography>
+                                <Typography variant="subtitle1">{t('translation.settings.systemSettings.tabs.security', 'Security')}</Typography>
                             </Box>
                             <Button variant="outlined" fullWidth sx={{ mb: 1 }}>
-                                Change Password
+                                {t('profile.changePassword', 'Change Password')}
                             </Button>
                             <Button variant="outlined" fullWidth>
-                                Two-Factor Authentication
+                                {t('profile.twoFactorAuth', 'Two-Factor Authentication')}
                             </Button>
                         </Box>
 
@@ -349,7 +351,7 @@ const UserProfile: React.FC = () => {
                         <Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <PaletteIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">Appearance</Typography>
+                                <Typography variant="subtitle1">{t('profile.appearance', 'Appearance')}</Typography>
                             </Box>
                             <FormControlLabel
                                 control={
@@ -361,7 +363,7 @@ const UserProfile: React.FC = () => {
                                         })}
                                     />
                                 }
-                                label="Dark Mode"
+                                label={t('translation.common.darkMode', 'Dark Mode')}
                             />
                         </Box>
                     </Paper>

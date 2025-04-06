@@ -1,9 +1,124 @@
 export default {
+    languages: {
+        english: 'English',
+        german: 'German',
+        portuguese: 'Portuguese',
+        french: 'French',
+        chinese: 'Chinese',
+        hindi: 'Hindi',
+        arabic: 'Arabic',
+        hebrew: 'Hebrew'
+    },
+    assetsPage: {
+        title: 'Assets',
+        connectors: 'Connectors',
+        selectConnector: 'Select a connector'
+      },
+    assetExplorer: {
+        noConnectorSelected: 'Select a connector to view assets',
+        noAssetsFound: 'No assets found for this connector',
+        noIndexedAssets: 'No indexed assets were found for this connector with bucket "{{bucketName}}".',
+        loadingAssets: 'Loading assets...',
+        menu: {
+          rename: 'Rename',
+          share: 'Share',
+          download: 'Download'
+        },
+        deleteDialog: {
+          title: 'Confirm Delete',
+          description: 'Are you sure you want to delete this asset? This action cannot be undone.',
+          cancel: 'Cancel',
+          confirm: 'Delete'
+        }
+      },
+    sidebar: {
+        menu: {
+            home: 'Home',
+            assets: 'Assets',
+            pipelines: 'Pipelines',
+            pipelineExecutions: 'Pipeline Executions',
+            settings: 'Settings'
+        },
+        submenu: {
+            system: 'System Settings',
+            connectors: 'Connectors',
+            userManagement: 'User Management',
+            roles: 'Roles',
+            integrations: 'Integrations',
+            environments: 'Environments'
+        }
+    },
+    profile: {
+        title: 'Profile',
+        description: 'Manage your account settings and preferences',
+        changePhoto: 'Change Photo',
+        jobTitle: 'Job Title',
+        organization: 'Organization',
+        preferences: 'Preferences',
+        timezone: 'Timezone',
+        emailNotifications: 'Email Notifications',
+        pushNotifications: 'Push Notifications',
+        changePassword: 'Change Password',
+        twoFactorAuth: 'Two-Factor Authentication',
+        appearance: 'Appearance'
+    },
+    app: {
+        loading: 'Loading...',
+        errors: {
+            loadingConfig: 'Error loading AWS configuration:',
+            loadingUserAttributes: 'Error loading user attributes:',
+            signingOut: 'Error signing out:'
+        },
+        navigation: {
+            preventedDuplicate: 'Prevented duplicate navigation to',
+            navigating: 'Navigating from'
+        },
+        branding: {
+            name: 'MediaLake'
+        }
+    },
+    search: {
+        semantic: 'Semantic Search',
+        filters: {
+            dateRange: 'Date Range',
+            contentType: 'Content Type',
+            storageLocation: 'Storage Location',
+            comingSoon: 'More filters coming soon...'
+        }
+    },
+    admin: {
+        metrics: {
+            storageUsage: 'Storage Usage',
+            apiUsage: 'API Usage',
+            activeUsers: 'Active Users',
+            systemLoad: 'System Load'
+        },
+        errors: {
+            userDeletionNotImplemented: 'User deletion is not implemented yet.',
+            userCreationNotImplemented: 'User creation is not implemented yet.',
+            userEditingNotImplemented: 'User editing is not implemented yet.',
+            analyticsExportNotImplemented: 'Analytics export is not implemented yet.',
+            systemResetNotImplemented: 'System reset is not implemented yet.'
+        },
+        columns: {
+            lastActive: 'Last Active'
+        },
+        buttons: {
+            exportAnalytics: 'Export Analytics',
+            resetSystem: 'Reset System'
+        }
+    },
     integrations: {
+        title: 'Integrations',
         selectProvider: 'Select Integration',
         selectIntegration: 'Select Integration',
         configureIntegration: 'Configure Integration',
+        description: 'Manage your integrations and connections',
+        addIntegration: 'Add Integration',
         form: {
+            search: {
+                placeholder: 'Search integrations'
+            },
             title: 'Add Integration',
             fields: {
                 nodeId: {
@@ -72,11 +187,175 @@ export default {
             },
         },
     },
+    pipelines: {
+        title: 'Pipelines',
+        description: 'Manage your media and metadata pipelines',
+        searchPlaceholder: 'Search pipelines...',
+        actions: {
+            create: 'Add New Pipeline'
+        }
+    },
+    executions: {
+        title: 'Pipeline Executions',
+        description: 'Monitor and manage your pipeline executions',
+        searchPlaceholder: 'Search pipeline executions...',
+        columns: {
+            pipelineName: 'Pipeline Name',
+            status: 'Status',
+            startTime: 'Start Time',
+            endTime: 'End Time',
+            duration: 'Duration',
+            actions: 'Actions'
+        }
+    },
+    users: {
+        title: 'User Management',
+        description: 'Manage system users and their access',
+        actions: {
+            addUser: 'Add User'
+        },
+        form: {
+            title: {
+                add: 'Add User'
+            },
+            fields: {
+                given_name: {
+                    label: 'First Name',
+                    tooltip: 'Enter the user\'s first name',
+                    helper: ''
+                },
+                family_name: {
+                    label: 'Last Name',
+                    tooltip: 'Enter the user\'s last name',
+                    helper: ''
+                },
+                email: {
+                    label: 'Email',
+                    tooltip: 'Enter the user\'s email address',
+                    helper: ''
+                },
+                roles: {
+                    label: 'Roles',
+                    tooltip: 'Select the roles for the user',
+                    options: {
+                        Admin: 'Admin',
+                        Editor: 'Editor',
+                        Viewer: 'Viewer'
+                    }
+                },
+                email_verified: {
+                    label: 'Email Verified',
+                    tooltip: 'Indicate if the user\'s email has been verified'
+                },
+                enabled: {
+                    label: 'Enabled',
+                    tooltip: 'Enable or disable the user'
+                }
+            }
+        },
+        roles: {
+            admin: 'Admin',
+            editor: 'Editor',
+            viewer: 'Viewer'
+        }
+    },
+    roles: {
+        title: 'Role Management',
+        description: 'Manage system roles and their permissions',
+        actions: {
+            addRole: 'Add Role'
+        }
+    },
+    settings: {
+        environments: {
+            title: 'Environments',
+            description: 'Manage system environments and their configurations',
+            addButton: 'Add Environment',
+            searchPlaceholder: 'Search environments',
+            createTitle: 'Create Environment',
+            form: {
+                name: 'Environment Name',
+                region: 'Region',
+                status: {
+                    name: 'Status',
+                    active: 'Active',
+                    disabled: 'Disabled'
+                },
+                costCenter: 'Cost Center',
+                team: 'Team'
+            }
+        },
+        systemSettings: {
+            title: 'System Settings',
+            tabs: {
+                search: 'Search',
+                notifications: 'Notifications',
+                security: 'Security',
+                performance: 'Performance'
+            },
+            search: {
+                title: 'Search Configuration',
+                description: 'Configure the search provider for enhanced search capabilities across your media assets.',
+                provider: 'Search Provider:',
+                configureProvider: 'Configure Search Provider',
+                editProvider: 'Edit Provider',
+                resetProvider: 'Reset Provider',
+                providerDetails: 'Provider Details',
+                providerName: 'Provider Name',
+                apiKey: 'API Key',
+                endpoint: 'Endpoint URL (Optional)',
+                enabled: 'Search Enabled',
+                noProvider: 'No search provider configured.',
+                configurePrompt: 'Configure Twelve Labs to enable search capabilities.'
+            },
+            notifications: {
+                title: 'Notifications Settings',
+                comingSoon: 'Notification settings coming soon.'
+            },
+            security: {
+                title: 'Security Settings',
+                comingSoon: 'Security settings coming soon.'
+            },
+            performance: {
+                title: 'Performance Settings',
+                comingSoon: 'Performance settings coming soon.'
+            }
+        }
+    },
     common: {
         select: 'Select',
         back: 'Back',
+        search: 'Search',
+        profile: 'Profile',
+        logout: 'Logout',
+        theme: 'Theme',
+        close: 'Close',
+        refresh: 'Refresh',
+        cancel: 'Cancel',
+        save: 'Save',
+        loading: 'Loading...',
+        loadMore: 'Load More',
+        tableDensity: 'Table Density',
+        moreInfo: 'More information',
+        error: 'Error',
+        language: 'Language',
         actions: {
             add: 'Add'
+        },
+        columns: {
+            username: 'Username',
+            firstName: 'First Name',
+            lastName: 'Last Name',
+            email: 'Email',
+            status: 'Status',
+            groups: 'Groups',
+            created: 'Created',
+            modified: 'Modified',
+            actions: 'Actions'
+        },
+        status: {
+            active: 'Active',
+            inactive: 'Inactive'
         }
     },
     translation: {
@@ -115,7 +394,10 @@ export default {
             next: 'Next',
             show: 'Show',
             all: 'All',
-            status: 'Status',
+            status: {
+                active: 'Active',
+                inactive: 'Inactive'
+            },
             rename: 'Rename',
             root: 'Root',
             folder: 'Folder',
@@ -126,7 +408,17 @@ export default {
             textFilter: 'Text Filter',
             selectFilter: 'Select Filter',
             clearFilter: 'Clear Filter',
-            columns: 'Columns',
+            columns: {
+                username: 'Username',
+                firstName: 'First Name',
+                lastName: 'Last Name',
+                email: 'Email',
+                status: 'Status',
+                groups: 'Groups',
+                created: 'Created',
+                modified: 'Modified',
+                actions: 'Actions'
+            },
             noGroups: 'No Groups',
             select: 'Select',
             moreInfo: 'More information'
@@ -233,7 +525,9 @@ export default {
             sharedCollections: 'Shared Collections',
             favorites: 'Favorites',
             smartFolders: 'Smart Folders',
-            connectedStorage: 'Connected Storage'
+            connectedStorage: 'Connected Storage',
+            sharing: 'Sharing',          
+            comingSoon: 'Coming Soon' 
         },
         notifications: {
             'Pipeline Complete': 'Pipeline Complete',
@@ -251,8 +545,8 @@ export default {
         },
         executions: {
             title: 'Pipeline Executions',
-            searchPlaceholder: 'Search pipeline executions...',
             description: 'Monitor and manage your pipeline executions',
+            searchPlaceholder: 'Search pipeline executions...',
             columns: {
                 pipelineName: 'Pipeline Name',
                 status: 'Status',
@@ -276,23 +570,6 @@ export default {
             pagination: {
                 page: 'Page {{page}} of {{total}}',
                 showEntries: 'Show {{count}}'
-            }
-        },
-        sidebar: {
-            menu: {
-                home: 'Home',
-                assets: 'Assets',
-                pipelines: 'Pipelines',
-                pipelineExecutions: 'Pipeline Executions',
-                settings: 'Settings'
-            },
-            submenu: {
-                system: 'System Settings',
-                connectors: 'Connectors',
-                userManagement: 'User Management',
-                roles: 'Roles',
-                integrations: 'Integrations',
-                environments: 'Environments'
             }
         },
         s3Explorer: {
@@ -320,13 +597,14 @@ export default {
         },
         pipelines: {
             title: 'Pipelines',
+            description: 'Manage your media and metadata pipelines',
             searchPlaceholder: 'Search pipelines...',
             actions: {
                 create: 'Add New Pipeline',
                 deploy: 'Deploy Image Pipeline',
                 addNew: 'Add New Pipeline',
+                viewAll: 'View All Pipelines',
             },
-            description: 'Manage your media and metadata pipelines',
             search: 'Search pipelines',
             deploy: 'Deploy Image Pipeline',
             addNew: 'Add New Pipeline',
@@ -395,13 +673,6 @@ export default {
             selectIntegration: 'Select Integration',
             selectProvider: 'Select Provider',
             configureIntegration: 'Configure Integration',
-            columns: {
-                nodeName: 'Node Name',
-                environment: 'Environment',
-                createdDate: 'Created Date',
-                modifiedDate: 'Modified Date',
-                actions: 'Actions'
-            },
             form: {
                 title: 'Add Integration',
                 fields: {
@@ -464,8 +735,9 @@ export default {
                     }
                 },
                 search: {
-                    placeholder: 'Search integrations...'
+                    placeholder: 'Search integrations'
                 },
+                
                 errors: {
                     required: 'This field is required',
                     nodeId: {
@@ -473,100 +745,17 @@ export default {
                     }
                 }
             },
-            actions: {
-                edit: 'Edit Integration',
-                delete: 'Delete Integration'
+            columns: {
+                nodeName: 'Node Name',
+                environment: 'Environment',
+                createdDate: 'Created Date',
+                modifiedDate: 'Modified Date',
+                actions: 'Actions'
             },
-            search: 'Search integrations...',
-            status: {
-                creating: 'Creating integration...',
-                created: 'Integration Created',
-                createFailed: 'Integration Creation Failed',
-                deleting: 'Deleting integration...',
-                deleted: 'Integration Deleted',
-                deleteFailed: 'Integration Deletion Failed'
-            }
-        },
-        settings: {
-            environments: {
-                title: 'Environments',
-                description: 'Manage system environments and their configurations',
-                search: 'Search environments',
-                searchPlaceholder: 'Search environments...',
-                addButton: 'Add Environment',
-                createTitle: 'Create Environment',
-                editTitle: 'Edit Environment',
-                deleteSuccess: 'Environment deleted successfully',
-                deleteError: 'Failed to delete environment',
-                createSuccess: 'Environment created successfully',
-                updateSuccess: 'Environment updated successfully',
-                submitError: 'Failed to save environment',
-                columns: {
-                    name: 'Name',
-                    region: 'Region',
-                    status: 'Status',
-                    team: 'Team',
-                    costCenter: 'Cost Center',
-                    createdAt: 'Created At',
-                    updatedAt: 'Updated At',
-                    actions: 'Actions'
-                },
-                status: {
-                    active: 'Active',
-                    disabled: 'Disabled'
-                },
-                actions: {
-                    edit: 'Edit Environment',
-                    delete: 'Delete Environment'
-                },
-                form: {
-                    name: 'Environment Name',
-                    region: 'Region',
-                    costCenter: 'Cost Center',
-                    team: 'Team',
-                    status: {
-                        name: "Status",
-                        active: "Active",
-                        disabled: "Disabled"
-                    }
-                }
-            },
-            systemSettings: {
-                title: 'System Settings',
-                tabs: {
-                    search: 'Search',
-                    notifications: 'Notifications',
-                    security: 'Security',
-                    performance: 'Performance'
-                },
-                search: {
-                    title: 'Search Configuration',
-                    description: 'Configure the search provider for enhanced search capabilities across your media assets.',
-                    provider: 'Search Provider:',
-                    configureProvider: 'Configure Provider',
-                    editProvider: 'Edit Provider',
-                    resetProvider: 'Reset Provider',
-                    providerDetails: 'Provider Details',
-                    providerName: 'Provider Name',
-                    providerType: 'Provider Type',
-                    apiKey: 'API Key',
-                    endpoint: 'Endpoint URL',
-                    enabled: 'Search Enabled',
-                    noProvider: 'No search provider configured.',
-                    configurePrompt: 'Configure Twelve Labs to enable search capabilities.',
-                    errorLoading: 'Error loading search provider configuration'
-                },
-                notifications: {
-                    title: 'Notifications Settings',
-                    comingSoon: 'Notification settings coming soon.'
-                },
-                security: {
-                    title: 'Security Settings',
-                    comingSoon: 'Security settings coming soon.'
-                },
-                performance: {
-                    title: 'Performance Settings',
-                    comingSoon: 'Performance settings coming soon.'
+           
+            settings: {
+                environments: {
+                    title: 'Environments'
                 }
             }
         }

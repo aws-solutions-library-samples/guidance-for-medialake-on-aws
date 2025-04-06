@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, LinearProgress, alpha, useTheme, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, CircularProgress } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { formatFileSize } from '@/utils/fileSize';
@@ -16,6 +17,7 @@ interface AssetExplorerProps {
 }
 
 const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -190,7 +192,9 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         p: 3,
         color: 'text.secondary'
       }}>
-        <Typography variant="h6">Select a connector to view assets</Typography>
+        <Typography variant="h6">
+          {t('translation.assetExplorer.noConnectorSelected')}
+        </Typography>
       </Box>
     );
   }
@@ -212,16 +216,18 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         color: 'text.secondary'
       }}>
         <FolderOpenIcon sx={{ fontSize: 64, mb: 2, color: alpha(theme.palette.text.secondary, 0.5) }} />
-        <Typography variant="h6">No assets found for this connector</Typography>
+        <Typography variant="h6">
+          {t('translation.assetExplorer.noAssetsFound')}
+        </Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
-          No indexed assets were found for this connector with bucket "{bucketName}".
+          {t('translation.assetExplorer.noIndexedAssets', { bucketName })}
         </Typography>
       </Box>
     );
   }
 
   // Don't show content while loading initial data
-  if (isLoading && (!searchResponse || searchResponse?.data === null || searchResponse?.data === undefined || !searchResponse?.data?.results)) {
+  if (isLoading && (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results)) {
     return (
       <Box sx={{ 
         height: '100%', 
@@ -233,7 +239,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       }}>
         <CircularProgress size={40} />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          Loading assets...
+          {t('translation.assetExplorer.loadingAssets')}
         </Typography>
       </Box>
     );
@@ -254,7 +260,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       )}
 
       {/* Only show the results view when we have data or after initial loading */}
-      {(!isLoading || (searchResponse && searchResponse?.data !== null && searchResponse?.data !== undefined && searchResponse?.data?.results)) && (
+      {(!isLoading || (searchResponse && searchResponse?.data != null && searchResponse?.data?.results)) && (
         <Box sx={{ 
           '& h1': { 
             display: 'none !important' 
@@ -309,7 +315,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       )}
       
       {/* Show loading indicator during initial load */}
-      {isLoading && (!searchResponse || searchResponse?.data === null || searchResponse?.data === undefined || !searchResponse?.data?.results) && (
+      {isLoading && (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results) && (
         <Box sx={{ 
           height: '100%', 
           display: 'flex',
@@ -320,7 +326,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         }}>
           <CircularProgress size={40} />
           <Typography variant="body1" sx={{ mt: 2 }}>
-            Loading assets...
+            {t('translation.assetExplorer.loadingAssets')}
           </Typography>
         </Box>
       )}
@@ -363,9 +369,15 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
           }
         }}
       >
-        <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
-        <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
-        <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
+        <MenuItem onClick={() => handleAction('rename')}>
+          {t('translation.assetExplorer.menu.rename')}
+        </MenuItem>
+        <MenuItem onClick={() => handleAction('share')}>
+          {t('translation.assetExplorer.menu.share')}
+        </MenuItem>
+        <MenuItem onClick={() => handleAction('download')}>
+          {t('translation.assetExplorer.menu.download')}
+        </MenuItem>
       </Menu>
 
       {/* Delete Confirmation Dialog */}
@@ -376,17 +388,19 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         aria-describedby="delete-dialog-description"
       >
         <DialogTitle id="delete-dialog-title">
-          Confirm Delete
+          {t('translation.assetExplorer.deleteDialog.title')}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete this asset? This action cannot be undone.
+            {t('translation.assetExplorer.deleteDialog.description')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteCancel}>
+            {t('translation.assetExplorer.deleteDialog.cancel')}
+          </Button>
           <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-            Delete
+            {t('translation.assetExplorer.deleteDialog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>

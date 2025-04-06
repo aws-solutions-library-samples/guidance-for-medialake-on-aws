@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Stack, Typography, Paper, useTheme, useMediaQuery, Grid } from '@mui/material';
+import { Box, Grid, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import CollectionsIcon from '@mui/icons-material/Collections';
@@ -9,6 +9,7 @@ const FeatureCard: React.FC<{
     title: string;
     icon: React.ReactNode;
 }> = ({ title, icon }) => {
+    const { t } = useTranslation();
     return (
         <Paper
             elevation={0}
@@ -46,7 +47,7 @@ const FeatureCard: React.FC<{
                 color="text.secondary"
                 sx={{ mt: 1 }}
             >
-                Coming Soon
+                {t('translation.home.comingSoon')}
             </Typography>
         </Paper>
     );
@@ -87,33 +88,33 @@ const Home: React.FC = () => {
                             mb: 2
                         }}
                     >
-                        MediaLake
+                        {t('app.branding.name')}
                     </Typography>
                     <Typography
                         variant="h5"
                         color="text.secondary"
                         sx={{ mb: 4 }}
                     >
-                        Your data lake for Media, user home is coming soon
+                        {t('translation.home.description')}
                     </Typography>
                 </Box>
 
                 <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title="Favorites"
+                            title={t('translation.home.favorites')}
                             icon={<FavoriteIcon />}
                         />
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title="Collections"
+                            title={t('translation.home.collections')}
                             icon={<CollectionsIcon />}
                         />
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title="Sharing"
+                            title={t('translation.home.sharing')}
                             icon={<ShareIcon />}
                         />
                     </Grid>
