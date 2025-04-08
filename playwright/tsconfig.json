@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "outDir": "../dist-test",
+    "baseUrl": ".",
+    "strict": true,
+    "lib": ["ES2022", "dom"],
+    "types": ["node", "@playwright/test"],
+    "paths": {
+      "@/*": ["../medialake_user_interface/src/*"]
+    }
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules"]
+} 
