@@ -4,6 +4,11 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './locales/en';
 import de from './locales/de';
 import pt from './locales/pt';
+import fr from './locales/fr';
+import zh from './locales/zh';
+import hi from './locales/hi';
+import ar from './locales/ar';
+import he from './locales/he';
 
 i18n
     .use(LanguageDetector)
@@ -20,9 +25,14 @@ i18n
             caches: ['localStorage']
         },
         resources: {
-            en,
-            de,
-            pt
+            en: { translation: en },
+            de: { translation: de },
+            pt: { translation: pt },
+            fr: { translation: fr },
+            zh: { translation: zh },
+            hi: { translation: hi },
+            ar: { translation: ar },
+            he: { translation: he }
         }
     });
 

@@ -92,7 +92,7 @@ const AssetsPage: React.FC = () => {
                         color: 'transparent',
                     }}
                 >
-                    Assets
+                    {t('assetsPage.title')}
                 </Typography>
             </Box>
             
@@ -180,7 +180,7 @@ const AssetsPage: React.FC = () => {
                             <Box sx={{ p: 1.5, pb: 1 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                        Connectors
+                                        {t('assetsPage.connectors')}
                                     </Typography>
                                 </Box>
                                 
@@ -360,7 +360,7 @@ const AssetsPage: React.FC = () => {
                         }}>
                             <FolderIcon sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.5), mb: 2 }} />
                             <Typography variant="h6" color="text.secondary">
-                                Select a connector
+                                {t('assetsPage.selectConnector')}
                             </Typography>
                         </Box>
                     )}

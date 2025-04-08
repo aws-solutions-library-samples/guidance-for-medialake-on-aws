@@ -30,6 +30,7 @@ import {
     Group as GroupIcon,
     BarChart as BarChartIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
 interface User {
     id: string;
@@ -56,32 +57,33 @@ const mockUsers: User[] = [
 
 const AdminSettings: React.FC = () => {
     const theme = useTheme();
+    const { t } = useTranslation();
     const [error, setError] = useState<string | null>(null);
 
     const systemMetrics: SystemMetric[] = [
         {
-            label: 'Storage Usage',
+            label: t('admin.metrics.storageUsage', 'Storage Usage'),
             value: '789.5 GB / 1 TB',
             percentage: 78.95,
             icon: <StorageIcon />,
             color: theme.palette.primary.main,
         },
         {
-            label: 'API Usage',
+            label: t('admin.metrics.apiUsage', 'API Usage'),
             value: '85.2K / 100K calls',
             percentage: 85.2,
             icon: <CloudUploadIcon />,
             color: theme.palette.success.main,
         },
         {
-            label: 'Active Users',
+            label: t('admin.metrics.activeUsers', 'Active Users'),
             value: '45 / 50 seats',
             percentage: 90,
             icon: <GroupIcon />,
             color: theme.palette.warning.main,
         },
         {
-            label: 'System Load',
+            label: t('admin.metrics.systemLoad', 'System Load'),
             value: '65%',
             percentage: 65,
             icon: <SpeedIcon />,
@@ -91,7 +93,7 @@ const AdminSettings: React.FC = () => {
 
     const handleDeleteUser = (userId: string) => {
         // TODO: Implement user deletion
-        setError('User deletion is not implemented yet.');
+        setError(t('admin.errors.userDeletionNotImplemented', 'User deletion is not implemented yet.'));
     };
 
     return (
@@ -168,13 +170,13 @@ const AdminSettings: React.FC = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h6">User Management</Typography>
+                    <Typography variant="h6">{t('translation.users.title', 'User Management')}</Typography>
                     <Button
                         variant="contained"
                         startIcon={<PersonAddIcon />}
-                        onClick={() => setError('User creation is not implemented yet.')}
+                        onClick={() => setError(t('admin.errors.userCreationNotImplemented', 'User creation is not implemented yet.'))}
                     >
-                        Add User
+                        {t('translation.actions.addUser', 'Add User')}
                     </Button>
                 </Box>
 
@@ -182,12 +184,12 @@ const AdminSettings: React.FC = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Name</TableCell>
-                                <TableCell>Email</TableCell>
-                                <TableCell>Role</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Last Active</TableCell>
-                                <TableCell align="right">Actions</TableCell>
+                                <TableCell>{t('translation.columns.firstName', 'Name')}</TableCell>
+                                <TableCell>{t('translation.columns.email', 'Email')}</TableCell>
+                                <TableCell>{t('translation.roles.title', 'Role')}</TableCell>
+                                <TableCell>{t('translation.columns.status', 'Status')}</TableCell>
+                                <TableCell>{t('admin.columns.lastActive', 'Last Active')}</TableCell>
+                                <TableCell align="right">{t('translation.columns.actions', 'Actions')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -226,15 +228,15 @@ const AdminSettings: React.FC = () => {
                                     <TableCell>{new Date(user.lastActive).toLocaleDateString()}</TableCell>
                                     <TableCell align="right">
                                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                                            <Tooltip title="Edit user">
+                                            <Tooltip title={t('translation.actions.edit', 'Edit user')}>
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => setError('User editing is not implemented yet.')}
+                                                    onClick={() => setError(t('admin.errors.userEditingNotImplemented', 'User editing is not implemented yet.'))}
                                                 >
                                                     <EditIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title="Delete user">
+                                            <Tooltip title={t('translation.actions.delete', 'Delete user')}>
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => handleDeleteUser(user.id)}
@@ -261,16 +263,16 @@ const AdminSettings: React.FC = () => {
                     border: `1px solid ${theme.palette.divider}`,
                 }}
             >
-                <Typography variant="h6" sx={{ mb: 3 }}>System Settings</Typography>
+                <Typography variant="h6" sx={{ mb: 3 }}>{t('translation.settings.systemSettings.title', 'System Settings')}</Typography>
                 <Grid container spacing={3}>
                     <Grid item xs={12} sm={6}>
                         <Button
                             fullWidth
                             variant="outlined"
                             startIcon={<BarChartIcon />}
-                            onClick={() => setError('Analytics export is not implemented yet.')}
+                            onClick={() => setError(t('admin.errors.analyticsExportNotImplemented', 'Analytics export is not implemented yet.'))}
                         >
-                            Export Analytics
+                            {t('admin.buttons.exportAnalytics', 'Export Analytics')}
                         </Button>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -278,9 +280,9 @@ const AdminSettings: React.FC = () => {
                             fullWidth
                             variant="outlined"
                             color="error"
-                            onClick={() => setError('System reset is not implemented yet.')}
+                            onClick={() => setError(t('admin.errors.systemResetNotImplemented', 'System reset is not implemented yet.'))}
                         >
-                            Reset System
+                            {t('admin.buttons.resetSystem', 'Reset System')}
                         </Button>
                     </Grid>
                 </Grid>

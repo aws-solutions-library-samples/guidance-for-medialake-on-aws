@@ -1,4 +1,5 @@
-import React, { useState, useEffect,useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Box,
     Typography,
@@ -486,6 +487,7 @@ const AssetCollaboration: React.FC<AssetCollaborationProps> = ({ comments = [], 
 // Pipelines content component
 const AssetPipelines: React.FC<AssetPipelinesProps> = () => {
     const theme = useTheme();
+    const { t } = useTranslation();
     
     return (
         <Box sx={{ p: 2 }}>
@@ -549,7 +551,7 @@ const AssetPipelines: React.FC<AssetPipelinesProps> = () => {
             
             <Tooltip title="Browse all available pipelines">
                 <Button variant="text" fullWidth sx={{ mt: 2 }}>
-                    View All Pipelines
+                    {t('translation.pipelines.viewAll', 'View All Pipelines')}
                 </Button>
             </Tooltip>
         </Box>

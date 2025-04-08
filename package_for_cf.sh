@@ -1,0 +1,1 @@
+zip -r9 ../media-lake-v2.zip ./ -x ./.envrc -x ./.git/\* -x ./.venv/\* -x ./__pycache__/\* -x ./cdk.out/\* -x ./dist/\* -x ./node_modules/\* -x ./medialake_user_interface/dist/\* -x ./medialake_user_interface/node_modules/\* -x ./config.json -x ./cdk.context.json -x ./package-lock.json -x ./lambdas/nodes/image_metadata_extractor/node_modules/\*

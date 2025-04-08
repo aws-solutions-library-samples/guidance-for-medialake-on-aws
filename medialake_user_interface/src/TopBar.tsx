@@ -228,20 +228,20 @@ function TopBar() {
                 >
                     <MenuItem>
                         <DateRangeIcon sx={{ mr: 2 }} />
-                        <Typography>Date Range</Typography>
+                        <Typography>{t('search.filters.dateRange', 'Date Range')}</Typography>
                     </MenuItem>
                     <MenuItem>
                         <CategoryIcon sx={{ mr: 2 }} />
-                        <Typography>Content Type</Typography>
+                        <Typography>{t('search.filters.contentType', 'Content Type')}</Typography>
                     </MenuItem>
                     <MenuItem>
                         <StorageIcon sx={{ mr: 2 }} />
-                        <Typography>Storage Location</Typography>
+                        <Typography>{t('search.filters.storageLocation', 'Storage Location')}</Typography>
                     </MenuItem>
                     <Divider />
                     <Box sx={{ p: 1 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
-                            More filters coming soon...
+                            {t('search.filters.comingSoon', 'More filters coming soon...')}
                         </Typography>
                     </Box>
                 </Menu>
@@ -272,7 +272,7 @@ function TopBar() {
                         }
                         label={
                             <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                                Semantic Search
+                                {t('search.semantic', 'Semantic Search')}
                             </Typography>
                         }
                         sx={{
