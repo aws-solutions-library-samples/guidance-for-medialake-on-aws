@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
+import { useDirection } from '../../../contexts/DirectionContext';
 
 interface PageContentProps {
     isLoading?: boolean;
@@ -19,29 +20,38 @@ const LoadingState = () => (
     </Box>
 );
 
-const ErrorState = ({ error }: { error: Error }) => (
-    <Box sx={{ p: 2 }}>
-        <Alert 
-            severity="error"
-            sx={{ mb: 2 }}
-        >
-            {error.message}
-        </Alert>
-    </Box>
-);
+const ErrorState = ({ error }: { error: Error }) => {
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
+    
+    return (
+        <Box sx={{ p: 2, textAlign: isRTL ? 'right' : 'left' }}>
+            <Alert
+                severity="error"
+                sx={{ mb: 2, textAlign: isRTL ? 'right' : 'left' }}
+            >
+                {error.message}
+            </Alert>
+        </Box>
+    );
+};
 
-const PageContent: React.FC<PageContentProps> = ({ 
+const PageContent: React.FC<PageContentProps> = ({
     isLoading = false,
     error = null,
-    children 
+    children
 }) => {
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
     return (
         <Box sx={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            minHeight: 0
+            minHeight: 0,
+            textAlign: isRTL ? 'right' : 'left',
+            direction: isRTL ? 'rtl' : 'ltr'
         }}>
             {isLoading ? (
                 <LoadingState />

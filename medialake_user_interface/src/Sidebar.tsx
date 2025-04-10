@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
+import { useDirection } from './contexts/DirectionContext';
 import {
     Drawer,
     List,
@@ -52,6 +53,8 @@ function Sidebar() {
     const { setIsAuthenticated } = useAuth();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { isCollapsed, setIsCollapsed } = useSidebar();
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [userInitial, setUserInitial] = useState('U');
     const [userName, setUserName] = useState('');
@@ -172,12 +175,13 @@ function Sidebar() {
                 '& .MuiDrawer-paper': {
                     width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
-                    borderRight: '1px solid rgba(0,0,0,0.08)',
+                    borderRight: isRTL ? 'none' : '1px solid rgba(0,0,0,0.08)',
+                    borderLeft: isRTL ? '1px solid rgba(0,0,0,0.08)' : 'none',
                     backgroundColor: theme.palette.background.paper,
                     position: 'fixed',
                     height: '100vh',
                     top: 0,
-                    left: 0,
+                    [isRTL ? 'right' : 'left']: 0,
                     overflow: 'visible',
                 },
             }}
@@ -203,7 +207,8 @@ function Sidebar() {
                         alt={t('app.branding.name', 'MediaLake')}
                         style={{
                             height: '32px',
-                            marginRight: isCollapsed ? 0 : theme.spacing(1)
+                            marginRight: isRTL ? 0 : (isCollapsed ? 0 : theme.spacing(1)),
+                            marginLeft: isRTL ? (isCollapsed ? 0 : theme.spacing(1)) : 0
                         }}
                     />
                     {!isCollapsed && (
@@ -223,7 +228,7 @@ function Sidebar() {
                     onClick={toggleDrawer}
                     sx={{
                         position: 'absolute',
-                        right: -12,
+                        [isRTL ? 'left' : 'right']: -12,
                         top: '50%',
                         transform: 'translateY(-50%)',
                         minWidth: '24px',
@@ -246,9 +251,9 @@ function Sidebar() {
                     }}
                 >
                     {isCollapsed ? (
-                        <ChevronRight sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronLeft sx={{ fontSize: 16 }} /> : <ChevronRight sx={{ fontSize: 16 }} />
                     ) : (
-                        <ChevronLeft sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronRight sx={{ fontSize: 16 }} /> : <ChevronLeft sx={{ fontSize: 16 }} />
                     )}
                 </Button>
                 <List sx={{
@@ -298,11 +303,16 @@ function Sidebar() {
                                             '&:hover': {
                                                 backgroundColor: `${theme.palette.primary.main}15`,
                                             },
-                                            borderRight: isActive(item.path || '')
+                                            borderRight: isActive(item.path || '') && !isRTL
+                                                ? `3px solid ${theme.palette.primary.main}`
+                                                : 'none',
+                                            borderLeft: isActive(item.path || '') && isRTL
                                                 ? `3px solid ${theme.palette.primary.main}`
                                                 : 'none',
                                             mx: 1,
                                             borderRadius: '8px',
+                                            flexDirection: 'row',
+                                            justifyContent: isRTL ? 'flex-start' : 'flex-start',
                                         }}
                                     >
                                         <ListItemIcon sx={{
@@ -319,12 +329,14 @@ function Sidebar() {
                                                         fontWeight: isActive(item.path || '') || (item.isExpandable && item.isExpanded) ? 600 : 400,
                                                         color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
                                                             ? theme.palette.primary.main
-                                                            : customTheme === 'dark' ? 'white' : theme.palette.text.primary
+                                                            : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                                        textAlign: isRTL ? 'right' : 'left'
                                                     }}
                                                 >
                                                     {item.text}
                                                 </Typography>
                                             }
+                                            sx={{ textAlign: isRTL ? 'right' : 'left' }}
                                         />
                                         {item.isExpandable && (
                                             <Box sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }}>
@@ -342,18 +354,23 @@ function Sidebar() {
                                                 <ListItemButton
                                                     onClick={() => handleNavigation(subItem.path)}
                                                     sx={{
-                                                        pl: 6,
+                                                        [isRTL ? 'pr' : 'pl']: 6,
                                                         backgroundColor: isSettingsActive(subItem.path)
                                                             ? `${theme.palette.primary.main}08`
                                                             : 'transparent',
                                                         '&:hover': {
                                                             backgroundColor: `${theme.palette.primary.main}15`,
                                                         },
-                                                        borderRight: isSettingsActive(subItem.path)
+                                                        borderRight: isSettingsActive(subItem.path) && !isRTL
+                                                            ? `3px solid ${theme.palette.primary.main}`
+                                                            : 'none',
+                                                        borderLeft: isSettingsActive(subItem.path) && isRTL
                                                             ? `3px solid ${theme.palette.primary.main}`
                                                             : 'none',
                                                         mx: 1,
                                                         borderRadius: '8px',
+                                                        flexDirection: 'row',
+                                                        justifyContent: isRTL ? 'flex-start' : 'flex-start',
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{
@@ -370,12 +387,14 @@ function Sidebar() {
                                                                     fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
                                                                     color: isSettingsActive(subItem.path)
                                                                         ? theme.palette.primary.main
-                                                                        : customTheme === 'dark' ? 'white' : theme.palette.text.primary
+                                                                        : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                                                    textAlign: isRTL ? 'right' : 'left'
                                                                 }}
                                                             >
                                                                 {subItem.text}
                                                             </Typography>
                                                         }
+                                                        sx={{ textAlign: isRTL ? 'right' : 'left' }}
                                                     />
                                                 </ListItemButton>
                                             </ListItem>

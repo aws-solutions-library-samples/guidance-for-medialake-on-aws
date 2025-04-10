@@ -11,6 +11,7 @@ import { ThemeProvider } from '../hooks/useTheme';
 import { ThemeWrapper } from './ThemeWrapper';
 import { TimezoneProvider } from '../contexts/TimezoneContext';
 import { TableDensityProvider } from '../contexts/TableDensityContext';
+import { DirectionProvider } from '../contexts/DirectionContext';
 import { router } from '../routes/router';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -48,15 +49,17 @@ const AppConfigured = () => {
                         <AuthProvider>
                             <TimezoneProvider>
                                 <ThemeProvider>
-                                    <TableDensityProvider>
-                                        <ThemeWrapper>
-                                            <ModalProvider>
-                                                <RouterProvider router={router} />
-                                            </ModalProvider>
-                                        </ThemeWrapper>
-                                    </TableDensityProvider>
-                                </ThemeProvider>
-                            </TimezoneProvider>
+                                    <DirectionProvider>
+                                        <TableDensityProvider>
+                                            <ThemeWrapper>
+                                                <ModalProvider>
+                                                    <RouterProvider router={router} />
+                                                    </ModalProvider>
+                                                </ThemeWrapper>
+                                            </TableDensityProvider>
+                                        </DirectionProvider>
+                                    </ThemeProvider>
+                                </TimezoneProvider>
                         </AuthProvider>
                     </AwsConfigProvider>
                 </QueryClientProvider>

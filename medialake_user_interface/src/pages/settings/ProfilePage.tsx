@@ -1,3 +1,4 @@
+import React from 'react';
 import {
     Box,
     Paper,
@@ -25,9 +26,11 @@ import {
 } from '@mui/icons-material';
 import { useGetUser } from '../../api/hooks/useUsers';
 import { getCurrentUser } from 'aws-amplify/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { UserAttributes } from '../../api/types/api.types';
 import { useTranslation } from 'react-i18next';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { useDirection } from '../../contexts/DirectionContext';
 
 interface UserProfileData {
     username: string;
@@ -44,10 +47,27 @@ interface UserProfileResponse {
     data: UserProfileData;
 }
 
+// Helper function to check if a language is RTL
+const isRTL = (language: string): boolean => {
+    return ['ar', 'he'].includes(language);
+};
+
 const ProfilePage: React.FC = () => {
     const theme = useTheme();
     const { t, i18n } = useTranslation();
     const [userId, setUserId] = useState<string | null>(null);
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
+    
+    // Create a theme with the appropriate direction
+    const rtlTheme = useMemo(
+        () =>
+            createTheme({
+                ...theme,
+                direction,
+            }),
+        [theme, direction]
+    );
 
     // Load saved language preference when component mounts
     useEffect(() => {
@@ -79,25 +99,31 @@ const ProfilePage: React.FC = () => {
 
     if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-            </Box>
+            <ThemeProvider theme={rtlTheme}>
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px" sx={{ direction }}>
+                    <CircularProgress />
+                </Box>
+            </ThemeProvider>
         );
     }
 
     if (error) {
         return (
-            <Box>
-                <Typography color="error">{t('translation.errors.loadFailed', 'Error loading profile')}: {error.message}</Typography>
-            </Box>
+            <ThemeProvider theme={rtlTheme}>
+                <Box sx={{ direction }}>
+                    <Typography color="error">{t('translation.errors.loadFailed', 'Error loading profile')}: {error.message}</Typography>
+                </Box>
+            </ThemeProvider>
         );
     }
 
     if (!userProfile) {
         return (
-            <Box>
-                <Typography>{t('common.error', 'No profile data available')}</Typography>
-            </Box>
+            <ThemeProvider theme={rtlTheme}>
+                <Box sx={{ direction }}>
+                    <Typography>{t('common.error', 'No profile data available')}</Typography>
+                </Box>
+            </ThemeProvider>
         );
     }
 
@@ -109,7 +135,8 @@ const ProfilePage: React.FC = () => {
     const userStatus = userProfile.data?.user_status || unavailable;
 
     return (
-        <Box>
+        <ThemeProvider theme={rtlTheme}>
+        <Box sx={{ direction }}>
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" sx={{
                     fontWeight: 700,
@@ -138,10 +165,10 @@ const ProfilePage: React.FC = () => {
                         >
                             {email !== unavailable ? email[0].toUpperCase() : 'U'}
                         </Avatar>
-                        <Typography variant="h5" gutterBottom>
+                        <Typography variant="h5" gutterBottom sx={{ textAlign: isRTL ? 'center' : 'center' }}>
                             {`${firstName} ${lastName}`}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                        <Typography variant="body2" color="text.secondary" gutterBottom sx={{ textAlign: isRTL ? 'center' : 'center' }}>
                             {email}
                         </Typography>
                         <Chip
@@ -156,10 +183,10 @@ const ProfilePage: React.FC = () => {
                 {/* Profile Details */}
                 <Grid item xs={12} md={8}>
                     <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant="h6" gutterBottom sx={{ textAlign: isRTL ? 'right' : 'left' }}>
                             {t('profile.title', 'Profile')}
                         </Typography>
-                        <List>
+                        <List sx={{ textAlign: isRTL ? 'right' : 'left' }}>
                             <ListItem>
                                 <ListItemIcon>
                                     <EmailIcon color="primary" />
@@ -167,6 +194,8 @@ const ProfilePage: React.FC = () => {
                                 <ListItemText
                                     primary={t('translation.users.form.fields.email.label', 'Email')}
                                     secondary={email}
+                                    primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
+                                    secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                 />
                             </ListItem>
                             <ListItem>
@@ -176,6 +205,8 @@ const ProfilePage: React.FC = () => {
                                 <ListItemText
                                     primary={t('translation.users.form.fields.given_name.label', 'First Name')}
                                     secondary={firstName}
+                                    primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
+                                    secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                 />
                             </ListItem>
                             <ListItem>
@@ -185,6 +216,8 @@ const ProfilePage: React.FC = () => {
                                 <ListItemText
                                     primary={t('translation.users.form.fields.family_name.label', 'Last Name')}
                                     secondary={lastName}
+                                    primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
+                                    secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                 />
                             </ListItem>
                             <ListItem>
@@ -193,10 +226,19 @@ const ProfilePage: React.FC = () => {
                                 </ListItemIcon>
                                 <ListItemText
                                     primary={t('common.language', 'Language')}
+                                    primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondary={
-                                        <FormControl variant="outlined" size="small" sx={{ mt: 1, minWidth: 200 }}>
+                                        <FormControl variant="outlined" size="small" sx={{ mt: 1, minWidth: 200, textAlign: isRTL ? 'right' : 'left', width: '100%' }}>
                                             <Select
                                                 value={i18n.language}
+                                                sx={{
+                                                    textAlign: isRTL ? 'right' : 'left',
+                                                    '& .MuiSelect-select': {
+                                                        textAlign: isRTL ? 'right' : 'left',
+                                                        paddingRight: isRTL ? '8px' : '32px',
+                                                        paddingLeft: isRTL ? '32px' : '8px'
+                                                    }
+                                                }}
                                                 onChange={(e: SelectChangeEvent) => {
                                                     const newLanguage = e.target.value;
                                                     console.log('Changing language to:', newLanguage);
@@ -206,73 +248,165 @@ const ProfilePage: React.FC = () => {
                                                     localStorage.setItem('i18nextLng', newLanguage);
                                                     localStorage.setItem('i18next', newLanguage);
                                                     
-                                                    // Force language change
+                                                    // Force language change - DirectionContext will handle direction update
                                                     i18n.changeLanguage(newLanguage);
+                                                    
+                                                    // Log for debugging
+                                                    const isRtlLanguage = ['ar', 'he'].includes(newLanguage);
+                                                    console.log('Language changed to:', newLanguage, 'isRTL:', isRtlLanguage);
                                                 }}
                                             >
-                                                <MenuItem value="en">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            GB
-                                                        </Box>
-                                                        <span>English</span>
-                                                    </Stack>
+                                                <MenuItem value="en" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>English</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    GB
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    GB
+                                                                </Box>
+                                                                <span>English</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="de">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            DE
-                                                        </Box>
-                                                        <span>Deutsch</span>
-                                                    </Stack>
+                                                <MenuItem value="de" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>Deutsch</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    DE
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    DE
+                                                                </Box>
+                                                                <span>Deutsch</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="pt">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            PT
-                                                        </Box>
-                                                        <span>Português</span>
-                                                    </Stack>
+                                                <MenuItem value="pt" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>Português</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    PT
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    PT
+                                                                </Box>
+                                                                <span>Português</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="fr">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            FR
-                                                        </Box>
-                                                        <span>Français</span>
-                                                    </Stack>
+                                                <MenuItem value="fr" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>Français</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    FR
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    FR
+                                                                </Box>
+                                                                <span>Français</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="zh">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            CN
-                                                        </Box>
-                                                        <span>中文</span>
-                                                    </Stack>
+                                                <MenuItem value="zh" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>中文</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    CN
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    CN
+                                                                </Box>
+                                                                <span>中文</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="hi">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            IN
-                                                        </Box>
-                                                        <span>हिन्दी</span>
-                                                    </Stack>
+                                                <MenuItem value="hi" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>हिन्दी</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    IN
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    IN
+                                                                </Box>
+                                                                <span>हिन्दी</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="ar">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            SA
-                                                        </Box>
-                                                        <span>العربية</span>
-                                                    </Stack>
+                                                <MenuItem value="ar" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>العربية</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    SA
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    SA
+                                                                </Box>
+                                                                <span>العربية</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
-                                                <MenuItem value="he">
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                                                            IL
-                                                        </Box>
-                                                        <span>עברית</span>
-                                                    </Stack>
+                                                <MenuItem value="he" sx={{ textAlign: isRTL ? 'right' : 'left', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', width: '100%', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                                                        {isRTL ? (
+                                                            <>
+                                                                <span>עברית</span>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    IL
+                                                                </Box>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Box sx={{ width: 24, height: 16, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                                                    IL
+                                                                </Box>
+                                                                <span>עברית</span>
+                                                            </>
+                                                        )}
+                                                    </Box>
                                                 </MenuItem>
                                             </Select>
                                         </FormControl>
@@ -284,6 +418,7 @@ const ProfilePage: React.FC = () => {
                 </Grid>
             </Grid>
         </Box>
+        </ThemeProvider>
     );
 };
 

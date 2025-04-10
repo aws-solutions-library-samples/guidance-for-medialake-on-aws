@@ -3,15 +3,18 @@ import { drawerWidth, collapsedDrawerWidth } from '@/constants';
 import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import { SidebarContext } from '../contexts/SidebarContext';
+import { useDirection } from '../contexts/DirectionContext';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
 
 const AppLayout: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
 
     return (
         <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
-            <Box sx={{ display: 'flex' }}>
+            <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                 <Sidebar />
                 <Box
                     component="main"
@@ -19,7 +22,7 @@ const AppLayout: React.FC = () => {
                         display: 'flex',
                         flexDirection: 'column',
                         width: '100%',
-                        ml: `${isCollapsed ? collapsedDrawerWidth : drawerWidth}px`,
+                        [isRTL ? 'marginRight' : 'marginLeft']: `${isCollapsed ? collapsedDrawerWidth : drawerWidth}px`,
                         position: 'relative',
                         minHeight: '100vh',
                     }}
@@ -30,6 +33,7 @@ const AppLayout: React.FC = () => {
                         right: 0,
                         left: 0,
                         height: '64px',
+                        [isRTL ? 'paddingRight' : 'paddingLeft']: `${isCollapsed ? collapsedDrawerWidth : drawerWidth}px`,
                         zIndex: 1100,
                         bgcolor: theme => theme.palette.background.default,
                         display: 'flex',
