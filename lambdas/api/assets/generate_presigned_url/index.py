@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 import os
 import boto3
 import json
+from botocore.config import Config
 from pydantic import BaseModel, Field
 
 # Initialize AWS X-Ray, metrics, and logger
@@ -15,7 +16,9 @@ logger = Logger(service="asset-api", level=os.getenv("LOG_LEVEL", "WARNING"))
 
 # Initialize DynamoDB and S3
 dynamodb = boto3.resource("dynamodb")
-s3_client = boto3.client("s3")
+# Configure S3 client with Signature Version 4 for KMS compatibility
+s3_config = Config(signature_version='s3v4')
+s3_client = boto3.client("s3", config=s3_config)
 table = dynamodb.Table(os.getenv("MEDIALAKE_ASSET_TABLE"))
 
 DEFAULT_EXPIRATION = 3600  # 1 hour in seconds
@@ -26,6 +29,7 @@ class RequestBody(BaseModel):
     expiration_time: Optional[int] = Field(
         default=DEFAULT_EXPIRATION, ge=60, le=604800
     )  # Between 1 minute and 7 days
+    purpose: Optional[str] = None  # Optional purpose to specify which representation to use
 
 
 class APIError(Exception):
@@ -82,12 +86,38 @@ def lambda_handler(
         # Get asset details
         asset = get_asset_details(request.inventory_id)
 
-        # Extract S3 details
-        storage_info = (
-            asset.get("DigitalSourceAsset", {})
-            .get("MainRepresentation", {})
-            .get("StorageInfo", {})
-        )
+        # Determine which representation to use based on purpose
+        purpose = request.purpose
+        
+        if purpose and purpose.lower() != "original" and purpose.lower() != "master":
+            # Look for a derived representation matching the purpose
+            derived_representations = asset.get("DerivedRepresentations", [])
+            matching_representation = None
+            
+            for rep in derived_representations:
+                if rep.get("Purpose", "").lower() == purpose.lower():
+                    matching_representation = rep
+                    break
+            
+            if matching_representation:
+                logger.info(f"Using derived representation with purpose: {purpose}")
+                storage_info = matching_representation.get("StorageInfo", {})
+            else:
+                logger.info(f"No derived representation found for purpose: {purpose}, falling back to main representation")
+                storage_info = (
+                    asset.get("DigitalSourceAsset", {})
+                    .get("MainRepresentation", {})
+                    .get("StorageInfo", {})
+                )
+        else:
+            # Use main representation
+            logger.info("Using main representation")
+            storage_info = (
+                asset.get("DigitalSourceAsset", {})
+                .get("MainRepresentation", {})
+                .get("StorageInfo", {})
+            )
+            
         location = storage_info.get("PrimaryLocation", {})
 
         bucket = location.get("Bucket")

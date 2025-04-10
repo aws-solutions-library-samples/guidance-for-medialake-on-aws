@@ -13,7 +13,7 @@ interface ImageViewerProps {
     filename?: string;
 }
 
-const ZOOM_FACTOR = 1.1;
+const ZOOM_FACTOR = 1.07; // Moderate zoom factor for balance between speed and smoothness
 
 const ImageViewer: React.FC<ImageViewerProps> = ({
     imageSrc,
@@ -44,6 +44,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const divRef = useRef<HTMLDivElement>(null);
     const touch = useRef({ x: 0, y: 0 });
+    // Track if we're currently zooming to prevent resize calculations during zoom
+    const isZoomingRef = useRef(false);
 
     // We'll clamp zoom between half and 5x the "base" scale
     const MIN_ZOOM = scaleSize * 0.5;
@@ -99,7 +101,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         const canvas = canvasRef.current;
         if (!canvas || !background) return;
 
-        const context = canvas.getContext('2d');
+        const context = canvas.getContext('2d', { alpha: false });
         if (!context) return;
 
         const dpr = window.devicePixelRatio || 1;
@@ -114,7 +116,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         context.scale(dpr, dpr);
         
         // Set background color based on theme - use a color that contrasts with the main background
-        const bgColor = theme.palette.mode === 'dark' 
+        const bgColor = theme.palette.mode === 'dark'
             ? theme.palette.background.paper  // Dark mode - slightly lighter than background
             : '#ffffff';                      // Light mode - pure white for contrast
         
@@ -185,6 +187,40 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
         return () => cancelAnimationFrame(animationFrame);
     }, [isInitialized, background, draw, isFirstDrawComplete]);
+    
+    // Create a single requestAnimationFrame loop for all rendering
+    const animationFrameRef = useRef<number | null>(null);
+    const isRenderPendingRef = useRef(false);
+    
+    // Function to request a render on the next animation frame
+    const requestRender = useCallback(() => {
+        if (!isRenderPendingRef.current && isInitialized && background) {
+            isRenderPendingRef.current = true;
+            
+            if (animationFrameRef.current === null) {
+                animationFrameRef.current = requestAnimationFrame(() => {
+                    draw();
+                    animationFrameRef.current = null;
+                    isRenderPendingRef.current = false;
+                });
+            }
+        }
+    }, [draw, isInitialized, background]);
+    
+    // Redraw whenever zoom, offset, or rotate changes
+    useEffect(() => {
+        requestRender();
+    }, [zoom, offset, rotate, requestRender]);
+    
+    // Clean up animation frame on unmount
+    useEffect(() => {
+        return () => {
+            if (animationFrameRef.current !== null) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+        };
+    }, []);
 
     /**
      * Handle zoom (wheel) - only if unlocked
@@ -193,19 +229,30 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         (event: WheelEvent) => {
             if (isCanvasLocked) return;
             event.preventDefault();
-
+            
+            // Mark that we're zooming to prevent resize calculations
+            isZoomingRef.current = true;
+            
+            // Get the wheel delta and direction
             const { deltaY } = event;
-            setZoom((prevZoom) => {
-                const zoomDirection = deltaY > 0 ? -1 : 1;
-                const newZoom = _.clamp(
-                    prevZoom * Math.pow(ZOOM_FACTOR, zoomDirection),
-                    MIN_ZOOM,
-                    MAX_ZOOM
-                );
-                return newZoom;
-            });
+            const zoomDirection = deltaY > 0 ? -1 : 1;
+            
+            // Calculate new zoom level
+            const newZoom = _.clamp(
+                zoom * Math.pow(ZOOM_FACTOR, zoomDirection),
+                MIN_ZOOM,
+                MAX_ZOOM
+            );
+            
+            // Update zoom state
+            setZoom(newZoom);
+            
+            // Clear the zooming flag after a short delay
+            setTimeout(() => {
+                isZoomingRef.current = false;
+            }, 300);
         },
-        [isCanvasLocked, MIN_ZOOM, MAX_ZOOM]
+        [isCanvasLocked, MIN_ZOOM, MAX_ZOOM, zoom]
     );
 
     // Add or remove the wheel listener
@@ -302,26 +349,29 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
      * Handle container resize via ResizeObserver
      */
     const handleResize = useCallback(async () => {
-        if (!background || !canvasRef.current) return;
+        // Skip resize handling during active zooming
+        if (isZoomingRef.current || !background || !canvasRef.current) return;
+        
         try {
             const newScaleSize = await calculateInitialScale(background.width, background.height);
-            setScaleSize(newScaleSize);
-
-            // Re-fit the image fully on container resize:
-            // setZoom(newScaleSize);
-            // setOffset({ x: 0, y: 0 });
-
-            // Redraw after resizing
-            requestAnimationFrame(() => {
-                draw();
-            });
+            
+            // Only update scale size if it's significantly different
+            if (Math.abs(newScaleSize - scaleSize) > 0.01) {
+                setScaleSize(newScaleSize);
+                
+                // Don't automatically change zoom during resize
+                // This prevents unexpected rescaling during user interactions
+                
+                // Request a render with the updated scale
+                requestRender();
+            }
         } catch (err) {
             console.error('Error handling resize:', err);
         }
-    }, [background, calculateInitialScale, draw]);
+    }, [background, calculateInitialScale, scaleSize, requestRender]);
 
-    // Debounce the resize handler so it doesn't fire too often
-    const debouncedHandleResize = useCallback(_.debounce(handleResize, 100), [
+    // Use a more aggressive debounce for resize to ensure it doesn't interfere with zooming
+    const debouncedHandleResize = useCallback(_.debounce(handleResize, 250), [
         handleResize,
     ]);
 

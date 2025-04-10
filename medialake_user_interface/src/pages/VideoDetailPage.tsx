@@ -1123,7 +1123,8 @@ const VideoDetailContent: React.FC = () => {
                 versions={versions}
                 comments={comments}
                 onAddComment={handleAddComment}
-                videoViewerRef={videoViewerRef}      
+                videoViewerRef={videoViewerRef}
+                assetId={assetData?.data?.asset?.InventoryID}
             />
         </Box>
     );

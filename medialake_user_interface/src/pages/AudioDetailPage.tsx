@@ -1326,6 +1326,7 @@ const AudioDetailContent: React.FC = () => {
                 versions={versions}
                 comments={comments}
                 onAddComment={handleAddComment}
+                assetId={assetData?.data?.asset?.InventoryID}
             />
         </Box>
     );

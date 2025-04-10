@@ -38,6 +38,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
     const [editedName, setEditedName] = useState<string>('');
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+    const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null);
 
     const renameAsset = useRenameAsset();
     const deleteAsset = useDeleteAsset();
@@ -61,6 +62,9 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const handleAction = async (action: string) => {
         if (!selectedAsset) return;
 
+        // Close the menu immediately for all actions
+        handleMenuClose();
+
         switch (action) {
             case 'rename':
                 setEditingAssetId(selectedAsset.InventoryID);
@@ -71,23 +75,35 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                 console.log('Share:', selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
                 break;
             case 'download':
-
-
-                const fileName = selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-                const result = await generatePresignedUrl.mutateAsync({
-                    inventoryId: selectedAsset.InventoryID,
-                    expirationTime: 60 // 1 minute in seconds
-                });
-                const link = document.createElement('a');
-                link.href = result.presigned_url;
-                link.setAttribute('download', fileName);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                try {
+                    // Set the downloading asset ID to show loading state
+                    setDownloadingAssetId(selectedAsset.InventoryID);
+                    
+                    // Always generate a presigned URL
+                    // Determine the purpose based on asset type (use 'original' as default)
+                    const purpose = 'original';
+                    
+                    const fileName = selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+                    const result = await generatePresignedUrl.mutateAsync({
+                        inventoryId: selectedAsset.InventoryID,
+                        expirationTime: 60, // 1 minute in seconds
+                        purpose: purpose // Pass the purpose to get the correct representation
+                    });
+                    
+                    const link = document.createElement('a');
+                    link.href = result.presigned_url;
+                    link.setAttribute('download', fileName);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                } finally {
+                    // Reset the downloading asset ID
+                    setDownloadingAssetId(null);
+                }
                 break;
-
         }
-        handleMenuClose();
     };
 
     const handleDeleteClick = (asset: T, event: React.MouseEvent<HTMLElement>) => {
@@ -187,7 +203,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         isLoading: {
             rename: renameAsset.isPending,
             delete: deleteAsset.isPending,
-            download: generatePresignedUrl.isPending,
+            download: generatePresignedUrl.isPending || (selectedAsset && selectedAsset.InventoryID === downloadingAssetId),
         },
     };
 }

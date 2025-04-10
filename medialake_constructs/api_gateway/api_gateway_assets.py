@@ -265,6 +265,16 @@ class AssetsConstruct(Construct):
         generate_presigned_url_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        generate_presigned_url_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
                     "s3:GetObject",
                     "s3:GetObjectVersion",
                 ],

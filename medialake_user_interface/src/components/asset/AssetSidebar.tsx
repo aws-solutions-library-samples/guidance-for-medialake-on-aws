@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGeneratePresignedUrl } from '../../api/hooks/usePresignedUrl';
 import {
     Box,
     Typography,
@@ -18,7 +19,8 @@ import {
     Paper,
     alpha,
     useTheme,
-    Tooltip
+    Tooltip,
+    CircularProgress
 } from '@mui/material';
 import { RightSidebar } from '../common/RightSidebar';
 
@@ -71,6 +73,7 @@ interface AssetSidebarProps {
     comments?: any[];
     onAddComment?: (comment: string) => void;
     videoViewerRef?: RefObject<VideoViewerRef>;
+    assetId?: string; // Add optional assetId prop
 }
 
 
@@ -98,6 +101,40 @@ interface AssetActivityProps {}
 // Version content component (using existing data)
 const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
     const theme = useTheme();
+    const generatePresignedUrl = useGeneratePresignedUrl();
+    const [downloadingVersionId, setDownloadingVersionId] = useState<string | null>(null);
+    
+    const handleDownload = async (version: any) => {
+        try {
+            setDownloadingVersionId(version.id);
+            
+            // Always generate a presigned URL
+            // Determine the purpose based on version type
+            const purpose = version.type.toLowerCase();
+            
+            const result = await generatePresignedUrl.mutateAsync({
+                inventoryId: version.inventoryId || version.assetId,
+                expirationTime: 60, // 1 minute in seconds
+                purpose: purpose // Pass the purpose to get the correct representation
+            });
+            
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.href = result.presigned_url;
+            
+            // Use version name or extract filename from the URL
+            const fileName = version.name || (version.src ? version.src.split('/').pop() : purpose);
+            link.setAttribute('download', fileName);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading file:', error);
+        } finally {
+            setDownloadingVersionId(null);
+        }
+    };
     
     const getVersionIcon = (version: any) => {
         const type = version.type.toLowerCase();
@@ -171,15 +208,19 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                 </Typography>
                                 <Box sx={{ display: 'flex', mt: 1 }}>
                                     <Tooltip title="Download this version">
-                                        <Button 
-                                            variant="outlined" 
-                                            size="small" 
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
                                             sx={{ mr: 1, textTransform: 'none' }}
-                                            href={version.src}
-                                            target="_blank"
-                                            startIcon={<DownloadIcon fontSize="small" />}
+                                            onClick={() => handleDownload(version)}
+                                            disabled={downloadingVersionId === version.id}
+                                            startIcon={
+                                                downloadingVersionId === version.id ?
+                                                <CircularProgress size={16} /> :
+                                                <DownloadIcon fontSize="small" />
+                                            }
                                         >
-                                            Download
+                                            {downloadingVersionId === version.id ? 'Downloading...' : 'Download'}
                                         </Button>
                                     </Tooltip>
                                     <Tooltip title="Preview this version">
@@ -627,7 +668,7 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
         </Box>
     );
 };
-export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versions = [],comments = [],onAddComment }) => {
+export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, versions = [], comments = [], onAddComment, assetId }) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
     const [markers, setMarkers] = useState<MarkerInfo[]>([]);
@@ -736,7 +777,14 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef,versi
                         aria-labelledby="sidebar-tab-1"
                         sx={{ height: '100%', overflow: 'auto' }}
                     >
-                        {currentTab === 1 && <AssetVersions versions={versions} />}
+                        {currentTab === 1 && (
+                            <AssetVersions
+                                versions={versions.map(v => ({
+                                    ...v,
+                                    assetId: assetId // Add assetId to each version
+                                }))}
+                            />
+                        )}
                     </Box>
                 </Box>
             </Box>
