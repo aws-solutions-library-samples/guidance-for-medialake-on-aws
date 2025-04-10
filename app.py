@@ -97,6 +97,7 @@ api_gateway_stack = ApiGatewayStack(
         pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
         asset_table_file_hash_index_arn=base_infrastructure.asset_table_file_hash_index_arn,
         asset_table_asset_id_index_arn=base_infrastructure.asset_table_asset_id_index_arn,
+        asset_table_s3_path_index_arn=base_infrastructure.asset_table_s3_path_index_arn,
         ingest_event_bus=base_infrastructure.ingest_event_bus,
         asset_table=base_infrastructure.asset_table,
         vpc=base_infrastructure.vpc,

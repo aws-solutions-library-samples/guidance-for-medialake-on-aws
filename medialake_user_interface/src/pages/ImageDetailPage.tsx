@@ -751,80 +751,6 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     );
 };
 
-const DescriptorMetadataTab: React.FC<{ assetData: any }> = ({ assetData }) => {
-    const theme = useTheme();
-    
-    // This would typically contain descriptive metadata like who/what is in the image
-    // For now, we'll use placeholder data
-    const descriptiveData = [
-        {
-            label: 'Description',
-            value: 'High-resolution image from the collection',
-            icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-        },
-        {
-            label: 'Keywords',
-            value: 'nature, landscape, photography',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-        },
-        {
-            label: 'Location',
-            value: 'Unknown',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-        },
-        {
-            label: 'People',
-            value: 'None identified',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-        },
-        {
-            label: 'Objects',
-            value: 'Various natural elements',
-            icon: <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-        }
-    ];
-
-    return (
-        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
-            <Grid container spacing={2}>
-                {descriptiveData.map((field, index) => (
-                    <Grid item xs={12} key={index}>
-                        <Card variant="outlined" sx={{
-                            p: 2,
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
-                            }
-                        }}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                <Box sx={{
-                                    mr: 2,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                    borderRadius: '50%',
-                                    p: 1
-                                }}>
-                                    {field.icon}
-                                </Box>
-                                <Box>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                        {field.label}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                                        {field.value}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-        </Box>
-    );
-};
-
 const RelatedItemsTab: React.FC<{ 
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
@@ -1176,8 +1102,6 @@ const ImageDetailContent: React.FC = () => {
                 return <SummaryTab assetData={assetData} />;
             case 'technical':
                 return <TechnicalMetadataTab metadataAccordions={metadataAccordions} />;
-            case 'descriptor':
-                return <DescriptorMetadataTab assetData={assetData} />;
             case 'related':
                 console.log('Rendering RelatedItemsTab');
                 return (
@@ -1322,12 +1246,6 @@ const ImageDetailContent: React.FC = () => {
                             }
                             id="tab-technical"
                             aria-controls="tabpanel-technical"
-                        />
-                        <Tab
-                            value="descriptor"
-                            label="Descriptor Metadata"
-                            id="tab-descriptor"
-                            aria-controls="tabpanel-descriptor"
                         />
                         <Tab
                             value="related"
