@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { 
-    Box, 
-    useTheme as useMuiTheme, 
-    InputBase, 
+import {
+    Box,
+    useTheme as useMuiTheme,
+    InputBase,
+    Stack,
     Chip,
     IconButton,
     Menu,
@@ -27,6 +28,7 @@ import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
+import { useDirection } from './contexts/DirectionContext';
 import { drawerWidth, collapsedDrawerWidth } from './constants';
 
 interface SearchTag {
@@ -40,6 +42,8 @@ function TopBar() {
     const { isCollapsed } = useSidebar();
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
     const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
@@ -178,10 +182,11 @@ function TopBar() {
                     borderRadius: '8px',
                     padding: '4px 12px',
                     flex: 1,
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                 }}>
                     <SearchIcon sx={{
                         color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                        mr: 1
+                        [isRTL ? 'ml' : 'mr']: 1
                     }} />
                     <InputBase
                         placeholder={t('common.search')}
@@ -190,6 +195,7 @@ function TopBar() {
                         onKeyUp={handleSearchKeyPress}
                         fullWidth
                         sx={{
+                            textAlign: isRTL ? 'right' : 'left',
                             fontSize: '14px',
                             color: theme === 'dark' ? 'white' : muiTheme.palette.text.primary,
                             '& input': {
@@ -201,11 +207,11 @@ function TopBar() {
                             },
                         }}
                     />
-                    <IconButton 
-                        size="small" 
+                    <IconButton
+                        size="small"
                         onClick={handleFilterClick}
-                        sx={{ 
-                            ml: 1,
+                        sx={{
+                            [isRTL ? 'mr' : 'ml']: 1,
                             color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
                         }}
                     >
@@ -227,16 +233,22 @@ function TopBar() {
                     }}
                 >
                     <MenuItem>
-                        <DateRangeIcon sx={{ mr: 2 }} />
-                        <Typography>{t('search.filters.dateRange', 'Date Range')}</Typography>
+                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
+                            <DateRangeIcon />
+                            <Typography>{t('search.filters.dateRange', 'Date Range')}</Typography>
+                        </Stack>
                     </MenuItem>
                     <MenuItem>
-                        <CategoryIcon sx={{ mr: 2 }} />
-                        <Typography>{t('search.filters.contentType', 'Content Type')}</Typography>
+                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
+                            <CategoryIcon />
+                            <Typography>{t('search.filters.contentType', 'Content Type')}</Typography>
+                        </Stack>
                     </MenuItem>
                     <MenuItem>
-                        <StorageIcon sx={{ mr: 2 }} />
-                        <Typography>{t('search.filters.storageLocation', 'Storage Location')}</Typography>
+                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
+                            <StorageIcon />
+                            <Typography>{t('search.filters.storageLocation', 'Storage Location')}</Typography>
+                        </Stack>
                     </MenuItem>
                     <Divider />
                     <Box sx={{ p: 1 }}>

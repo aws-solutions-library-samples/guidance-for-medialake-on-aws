@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Grid, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { useDirection } from '../contexts/DirectionContext';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import ShareIcon from '@mui/icons-material/Share';
@@ -10,6 +11,8 @@ const FeatureCard: React.FC<{
     icon: React.ReactNode;
 }> = ({ title, icon }) => {
     const { t } = useTranslation();
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
     return (
         <Paper
             elevation={0}
@@ -23,7 +26,7 @@ const FeatureCard: React.FC<{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                textAlign: 'center',
+                textAlign: isRTL ? 'right' : 'center',
                 transition: 'transform 0.2s ease-in-out',
                 '&:hover': {
                     transform: 'translateY(-4px)',
@@ -57,6 +60,8 @@ const Home: React.FC = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const { t } = useTranslation();
+    const { direction } = useDirection();
+    const isRTL = direction === 'rtl';
 
     return (
         <Box
@@ -64,20 +69,22 @@ const Home: React.FC = () => {
             sx={{
                 position: 'fixed',
                 top: 64,
-                left: 240,
-                right: 0,
+                ...(isRTL
+                    ? { left: 0, right: 240 }
+                    : { left: 240, right: 0 }),
                 bottom: 0,
                 bgcolor: 'background.default',
                 overflowY: 'auto',
                 overflowX: 'hidden',
+                textAlign: isRTL ? 'right' : 'left',
             }}
         >
             <Box sx={{ p: { xs: 2, sm: 3 } }}>
                 <Box sx={{
                     mb: 6,
-                    textAlign: 'center',
                     maxWidth: 800,
-                    mx: 'auto'
+                    mx: 'auto',
+                    // Remove textAlign property to let children control their own alignment
                 }}>
                     <Typography
                         variant="h3"
@@ -85,7 +92,8 @@ const Home: React.FC = () => {
                         sx={{
                             fontWeight: 700,
                             color: 'primary.main',
-                            mb: 2
+                            mb: 2,
+                            textAlign: 'center' // Force center alignment regardless of parent
                         }}
                     >
                         {t('app.branding.name')}
@@ -93,7 +101,7 @@ const Home: React.FC = () => {
                     <Typography
                         variant="h5"
                         color="text.secondary"
-                        sx={{ mb: 4 }}
+                        sx={{ mb: 4, textAlign: 'center' }} // Force center alignment
                     >
                         {t('translation.home.description')}
                     </Typography>
