@@ -86,6 +86,7 @@ class ApiGatewayStackProps:
     pipelines_nodes_templates_bucket: s3.Bucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
+    asset_table_s3_path_index_arn: str
     ingest_event_bus: events.EventBus
     vpc: ec2.Vpc
     security_group: ec2.SecurityGroup
@@ -141,6 +142,7 @@ class ApiGatewayStack(Stack):
                 asset_table=props.asset_table,
                 asset_table_file_hash_index_arn=props.asset_table_file_hash_index_arn,
                 asset_table_asset_id_index_arn=props.asset_table_asset_id_index_arn,
+                asset_table_s3_path_index_arn=props.asset_table_s3_path_index_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
                 api_resource=self._api_gateway.rest_api,
                 cognito_authorizer=self._api_gateway.cognito_authorizer,

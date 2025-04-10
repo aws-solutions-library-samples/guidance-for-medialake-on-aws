@@ -9,7 +9,6 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_ec2 as ec2,
     aws_kms as kms,
-    # custom_resources as cr,
     Duration,
     RemovalPolicy,
     CfnOutput,
@@ -20,10 +19,6 @@ from medialake_constructs.shared_constructs.s3_logging import (
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import (
-    S3ExpressOneZoneBucket,
-    S3ExpressOneZoneBucketProps,
-)
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
@@ -731,6 +726,23 @@ class BaseInfrastructureStack(Stack):
 
         return f"{self._asset_table.table_arn}/index/AssetIDIndex"
 
+    @property
+    def asset_table_s3_path_index_name(self) -> str:
+        """
+        Returns the name of the S3Path GSI on the asset table.
+
+        Returns:
+            str: Name of the S3Path global secondary index
+        """
+        return "S3PathIndex"
+
+    @property
+    def asset_table_s3_path_index_arn(self) -> str:
+        """
+        Returns the ARN of the S3Path GSI on the asset table.
+        """
+        return f"{self._asset_table.table_arn}/index/S3PathIndex"
+        
     @property
     def collection_dashboards_url(self) -> str:
         """

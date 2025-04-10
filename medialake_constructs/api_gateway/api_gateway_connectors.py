@@ -45,6 +45,7 @@ class ConnectorsProps:
     iac_assets_bucket: s3.IBucket
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
+    asset_table_s3_path_index_arn: str
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
     ingest_event_bus: str | None
@@ -394,6 +395,7 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
                     "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+                    "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
                     "RESOURCE_PREFIX": config.resource_prefix,
                     "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
                 },

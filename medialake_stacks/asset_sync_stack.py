@@ -434,6 +434,18 @@ class AssetSyncStack(Stack):
                 resources=["*"],
             )
         )
+        
+        # Add KMS permissions for processor to access SSE-KMS encrypted S3 buckets
+        self._asset_sync_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                    "kms:GenerateDataKey",
+                ],
+                resources=["*"], 
+            )
+        )
 
     def _create_results_bucket(self) -> s3.Bucket:
         """Create S3 bucket for manifests and results"""
@@ -475,9 +487,6 @@ class AssetSyncStack(Stack):
     @property
     def asset_sync_error_table(self) -> dynamodb.TableV2:
         return self._asset_sync_error_table.table
-    # @property
-    # def results_bucket(self) -> s3.Bucket:
-    #     return self._results_bucket
     @property
     def asset_sync_engine_lambda(self) -> lambda_.Function:
         return self._asset_sync_engine_lambda.function

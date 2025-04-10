@@ -733,6 +733,9 @@ def create_connector(createconnector: S3Connector) -> dict:
             asset_table_asset_id_index_arn = os.environ.get(
                 "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX"
             )
+            asset_table_s3_path_index_arn = os.environ.get(
+                "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX"
+            )
             layer_arn = os.environ.get("INGEST_MEDIA_PROCESSOR_LAYER")
 
             # Create Lambda execution, IAM roles for Lambda
@@ -881,6 +884,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                             medialake_asset_table,
                             asset_table_file_hash_index_arn,
                             asset_table_asset_id_index_arn,
+                            asset_table_s3_path_index_arn,
                         ],
                     }
                 ],

@@ -632,57 +632,6 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     );
 };
 
-const DescriptorMetadataTab: React.FC<{ metadataFields: any }> = ({ metadataFields }) => {
-    const theme = useTheme();
-    
-    // Create descriptive data from metadata fields
-    const descriptiveData = metadataFields.descriptive.map((item: any) => ({
-        label: item.label,
-        value: item.value,
-        icon: <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-    }));
-
-    return (
-        <Box sx={{ p: 2, backgroundColor: alpha(theme.palette.background.paper, 0.5), borderRadius: 1 }}>
-            <Grid container spacing={2}>
-                {descriptiveData.map((field, index) => (
-                    <Grid item xs={12} key={index}>
-                        <Card variant="outlined" sx={{
-                            p: 2,
-                            transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
-                            }
-                        }}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                <Box sx={{
-                                    mr: 2,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                    borderRadius: '50%',
-                                    p: 1
-                                }}>
-                                    {field.icon}
-                                </Box>
-                                <Box>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                        {field.label}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                                        {field.value}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-        </Box>
-    );
-};
-
 const RelatedItemsTab: React.FC<{ 
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
@@ -879,7 +828,7 @@ const VideoDetailContent: React.FC = () => {
 
     // Handle keyboard navigation for tabs
     const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
-        const tabs = ['summary', 'technical', 'descriptor', 'related'];
+        const tabs = ['summary', 'technical', 'related'];
         const currentIndex = tabs.indexOf(activeTab);
         
         if (event.key === 'ArrowRight') {
@@ -1074,12 +1023,6 @@ const VideoDetailContent: React.FC = () => {
                                 aria-controls="tabpanel-technical"
                             />
                             <Tab
-                                value="descriptor"
-                                label="Descriptor Metadata"
-                                id="tab-descriptor"
-                                aria-controls="tabpanel-descriptor"
-                            />
-                            <Tab
                                 value="related"
                                 label="Related Items"
                                 id="tab-related"
@@ -1105,7 +1048,6 @@ const VideoDetailContent: React.FC = () => {
                         >
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
                             {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
-                            {activeTab === 'descriptor' && <DescriptorMetadataTab metadataFields={metadataFields} />}
                             {activeTab === 'related' && (
                                 <RelatedItemsTab 
                                     assetId={id || ''} 
