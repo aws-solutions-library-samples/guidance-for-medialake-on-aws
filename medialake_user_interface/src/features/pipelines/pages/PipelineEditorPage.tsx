@@ -595,6 +595,8 @@ const PipelineEditorContent = () => {
 
     const handleSave = async () => {
         console.log('[PipelineEditorPage] Saving pipeline with form data:', formData);
+        console.log('[PipelineEditorPage] Number of nodes:', formData.configuration.nodes.length);
+        console.log('[PipelineEditorPage] Number of edges:', formData.configuration.edges.length);
         console.log('[PipelineEditorPage] Node positions:', formData.configuration.nodes.map(node => ({
             id: node.id,
             position: node.position,
@@ -1096,6 +1098,41 @@ const PipelineEditorContent = () => {
                 setEdges={setEdges}
                 active={formData.active !== undefined ? formData.active : true}
                 onActiveChange={handleActiveChange}
+                updateFormData={(importedNodes, importedEdges) => {
+                    // Convert imported React Flow nodes to pipeline nodes
+                    const pipelineNodes = importedNodes.map(node => convertToPipelineNode(node));
+                    
+                    // Convert imported React Flow edges to pipeline edges
+                    const pipelineEdges = importedEdges.map(edge => ({
+                        id: edge.id || `${edge.source}-${edge.target}`,
+                        source: edge.source,
+                        target: edge.target,
+                        type: edge.type || 'custom',
+                        data: edge.data || { text: 'Connected' },
+                        // Include sourceHandle and targetHandle if they exist
+                        ...(edge.sourceHandle && { sourceHandle: edge.sourceHandle }),
+                        ...(edge.targetHandle && { targetHandle: edge.targetHandle })
+                    })) as PipelineEdge[];
+                    
+                    // Update formData with imported nodes and edges
+                    setFormData(prev => ({
+                        ...prev,
+                        configuration: {
+                            ...prev.configuration,
+                            nodes: pipelineNodes,
+                            edges: pipelineEdges,
+                            settings: prev.configuration.settings || {
+                                autoStart: false,
+                                retryAttempts: 3,
+                                timeout: 3600
+                            }
+                        }
+                    }));
+                    console.log('[PipelineEditorPage] Updated formData with imported pipeline');
+                    console.log('[PipelineEditorPage] Imported nodes:', pipelineNodes.length);
+                    console.log('[PipelineEditorPage] Imported edges:', pipelineEdges.length);
+                    console.log('[PipelineEditorPage] Updated formData with imported pipeline');
+                }}
             />
             <Box sx={{
                 position: 'fixed',

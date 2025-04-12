@@ -32,6 +32,8 @@ export interface PipelineToolbarProps {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   active: boolean; // New prop for pipeline active state
   onActiveChange: (active: boolean) => void; // New prop for handling active state changes
+  // Add prop for updating formData with imported pipeline
+  updateFormData?: (nodes: Node[], edges: Edge[]) => void;
 }
 
 const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
@@ -44,6 +46,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   setEdges,
   active,
   onActiveChange,
+  updateFormData,
 }) => {
   const navigate = useNavigate();
   const { isCollapsed: isLeftSidebarCollapsed } = useSidebar();
@@ -89,6 +92,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               }));
               setNodes(fixedNodes);
               setEdges(flow.edges);
+              
+              // Update formData with imported nodes and edges
+              if (updateFormData) {
+                updateFormData(fixedNodes, flow.edges);
+              }
             }
             // Alternatively, if the flow uses an "elements" array, split it into nodes and edges.
             else if (flow.elements) {
@@ -112,6 +120,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               }));
               setNodes(fixedNodes);
               setEdges(edges);
+              
+              // Update formData with imported nodes and edges
+              if (updateFormData) {
+                updateFormData(fixedNodes, edges);
+              }
             }
             // Update viewport if available
             if (flow.viewport && reactFlowInstance) {
