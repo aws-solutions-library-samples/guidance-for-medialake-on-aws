@@ -11,6 +11,24 @@ import {
 } from '../types/system.types';
 import { SYSTEM_SETTINGS_CONFIG } from '../config';
 
+// Function to check if semantic search is properly configured and enabled
+export const useSemanticSearchStatus = () => {
+  const { data: providerData, isLoading, error } = useSearchProvider();
+  
+  const isSemanticSearchEnabled = !!providerData?.data?.searchProvider?.isEnabled && 
+                                !!providerData?.data?.searchProvider?.isConfigured;
+  
+  const isConfigured = !!providerData?.data?.searchProvider?.isConfigured;
+  
+  return {
+    isSemanticSearchEnabled,
+    isConfigured,
+    isLoading,
+    error,
+    providerData
+  };
+};
+
 export const useSystemSettingsManager = () => {
   const [provider, setProvider] = useState<SearchProvider>({
     id: '',

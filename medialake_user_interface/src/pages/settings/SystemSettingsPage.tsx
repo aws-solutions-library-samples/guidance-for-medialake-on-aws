@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -17,11 +17,53 @@ import {
   Switch,
   FormControlLabel,
   CircularProgress,
-  Alert
+  Alert,
+  Snackbar
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
-import { useSystemSettingsManager } from '@/features/settings/system/hooks/useSystemSettings';
+import { useSystemSettingsManager, useSemanticSearchStatus } from '@/features/settings/system/hooks/useSystemSettings';
+
+// Create a custom hook that falls back to a local notification if the global one isn't available
+const useNotificationWithFallback = () => {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [severity, setSeverity] = useState<'success' | 'info' | 'warning' | 'error'>('info');
+  
+  // Try to use the global notification context, but don't throw if it's not available
+  let globalNotification;
+  try {
+    // Dynamic import to avoid the error during rendering
+    const { useNotification } = require('@/shared/context/NotificationContext');
+    globalNotification = useNotification();
+  } catch (error) {
+    console.log('NotificationContext not available, using fallback');
+    globalNotification = null;
+  }
+  
+  const showNotification = (msg: string, sev: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+    if (globalNotification) {
+      globalNotification.showNotification(msg, sev);
+    } else {
+      setMessage(msg);
+      setSeverity(sev);
+      setOpen(true);
+    }
+  };
+  
+  const hideNotification = () => {
+    setOpen(false);
+  };
+  
+  return {
+    showNotification,
+    hideNotification,
+    open,
+    message,
+    severity,
+    usingFallback: !globalNotification
+  };
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -54,8 +96,17 @@ const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
+  const { 
+    showNotification, 
+    hideNotification, 
+    open: notificationOpen, 
+    message: notificationMessage, 
+    severity: notificationSeverity,
+    usingFallback 
+  } = useNotificationWithFallback();
   
-  // Use our custom hook for system settings management
+  // Use our custom hooks for system settings management
+  const semanticSearchStatus = useSemanticSearchStatus();
   const {
     provider,
     isProviderLoading,
@@ -74,6 +125,18 @@ const SystemSettingsPage: React.FC = () => {
     setProvider
   } = useSystemSettingsManager();
 
+  // Initialize provider data on mount
+  useEffect(() => {
+    if (!isProviderLoading && !providerError && semanticSearchStatus.providerData?.data?.searchProvider) {
+      // If we have fresh data from the semantic search status, update the provider state
+      const freshProvider = semanticSearchStatus.providerData.data.searchProvider;
+      setProvider({
+        ...freshProvider,
+        isConfigured: true
+      });
+    }
+  }, [semanticSearchStatus.providerData, isProviderLoading, providerError, setProvider]);
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
@@ -84,8 +147,11 @@ const SystemSettingsPage: React.FC = () => {
     
     // If trying to enable search but provider not configured, show warning
     if (isEnabled && !provider.isConfigured) {
-      alert(t('settings.systemSettings.search.providerRequired', 
-        'A semantic search provider must be configured before enabling search.'));
+      showNotification(
+        t('settings.systemSettings.search.providerRequired', 
+          'A semantic search provider must be configured before enabling search.'),
+        'warning'
+      );
       return;
     }
     
@@ -112,6 +178,20 @@ const SystemSettingsPage: React.FC = () => {
       minHeight: 'calc(100vh - 120px)',
       p: 3
     }}>
+      {/* Render fallback notification if using the local version */}
+      {usingFallback && (
+        <Snackbar
+          open={notificationOpen}
+          autoHideDuration={4000}
+          onClose={hideNotification}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert onClose={hideNotification} severity={notificationSeverity} sx={{ width: '100%' }}>
+            {notificationMessage}
+          </Alert>
+        </Snackbar>
+      )}
+      
       <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4 }}>
         {t('settings.systemSettings.title', 'System Settings')}
       </Typography>
@@ -194,6 +274,7 @@ const SystemSettingsPage: React.FC = () => {
                     checked={provider.isEnabled || false} 
                     onChange={handleSearchToggleChange}
                     disabled={!provider.isConfigured}
+                    color="primary"
                   />
                 </Box>
                 
