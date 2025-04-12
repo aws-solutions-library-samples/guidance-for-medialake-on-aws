@@ -36,6 +36,7 @@ export const useGetUsers = () => {
         queryFn: async () => {
             const { data } = await apiClient.get<{ statusCode: number; body: string }>(API_ENDPOINTS.USERS);
             const parsedBody = JSON.parse(data.body) as UsersResponse;
+            console.log('Raw user data:', JSON.stringify(parsedBody.data.users[0]));
             // Map API response to include roles if not present
             return parsedBody.data.users.map(user => ({
                 ...user,

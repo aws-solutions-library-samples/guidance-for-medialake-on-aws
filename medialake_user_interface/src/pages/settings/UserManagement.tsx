@@ -43,7 +43,12 @@ const UserManagement: React.FC = () => {
     };
 
     const handleEditUser = (user: User) => {
-        setEditingUser(user);
+        console.log('Edit user data:', user);
+        const normalizedUser = {
+            ...user,
+            given_name: user.given_name || '',
+        };
+        setEditingUser(normalizedUser);
         setOpenUserForm(true);
     };
 
