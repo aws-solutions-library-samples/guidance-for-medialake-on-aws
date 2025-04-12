@@ -62,6 +62,14 @@ class ApiGatewayConstruct(Construct):
                         "managedRuleGroupStatement": {
                             "vendorName": "AWS",
                             "name": "AWSManagedRulesCommonRuleSet",
+                             "ruleActionOverrides": [
+                                {
+                                    "name": "SizeRestrictions_BODY",
+                                    "actionToUse": {
+                                        "allow": {}
+                                    }
+                                }
+                            ]
                         }
                     },
                     "visibilityConfig": {
