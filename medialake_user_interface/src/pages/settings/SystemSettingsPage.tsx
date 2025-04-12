@@ -69,11 +69,38 @@ const SystemSettingsPage: React.FC = () => {
     handleTextFieldChange,
     handleConfigureProvider,
     handleResetProvider,
-    isSubmitting
+    isSubmitting,
+    updateProvider,
+    setProvider
   } = useSystemSettingsManager();
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  // Add a handler for the semantic search toggle
+  const handleSearchToggleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isEnabled = event.target.checked;
+    
+    // If trying to enable search but provider not configured, show warning
+    if (isEnabled && !provider.isConfigured) {
+      alert(t('settings.systemSettings.search.providerRequired', 
+        'A semantic search provider must be configured before enabling search.'));
+      return;
+    }
+    
+    // Update the provider with the new isEnabled value
+    if (provider.isConfigured) {
+      updateProvider.mutateAsync({
+        isEnabled: isEnabled
+      });
+      
+      // Update local state
+      setProvider({
+        ...provider,
+        isEnabled: isEnabled
+      });
+    }
   };
 
   return (
@@ -150,6 +177,29 @@ const SystemSettingsPage: React.FC = () => {
               </Alert>
             ) : (
               <>
+                {/* Semantic Search Enabled Toggle */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 2,
+                  px: 1,
+                  borderRadius: 1,
+                  mb: 3
+                }}>
+                  <Typography variant="subtitle1">
+                    {t('settings.systemSettings.search.semanticEnabled', 'Semantic Search Enabled')}
+                  </Typography>
+                  <Switch 
+                    checked={provider.isEnabled || false} 
+                    onChange={handleSearchToggleChange}
+                    disabled={!provider.isConfigured}
+                  />
+                </Box>
+                
+                <Divider sx={{ my: 3 }} />
+                
+                {/* Search Provider section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <Typography variant="subtitle1" sx={{ mr: 2 }}>
                     {t('settings.systemSettings.search.provider', 'Search Provider:')}
@@ -224,12 +274,6 @@ const SystemSettingsPage: React.FC = () => {
                           />
                         </Grid>
                       )}
-                      <Grid item xs={12}>
-                        <FormControlLabel
-                          control={<Switch checked={provider.isEnabled} />}
-                          label={t('settings.systemSettings.search.enabled', 'Search Enabled')}
-                        />
-                      </Grid>
                     </Grid>
                   </Box>
                 )}

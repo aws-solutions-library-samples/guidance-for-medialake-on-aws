@@ -150,6 +150,8 @@ export const useSystemSettingsManager = () => {
     handleTextFieldChange,
     handleConfigureProvider,
     handleResetProvider,
-    isSubmitting: createProvider.isPending || updateProvider.isPending
+    isSubmitting: createProvider.isPending || updateProvider.isPending,
+    updateProvider,
+    setProvider
   };
 }; 
