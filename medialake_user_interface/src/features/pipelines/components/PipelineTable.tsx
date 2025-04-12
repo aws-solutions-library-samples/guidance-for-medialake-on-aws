@@ -82,10 +82,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                 // Parse the comma-separated list into an array
                 const triggerTypes = info.getValue().split(',');
                 
-                // For now, if the type is "Ingest Triggered", replace it with "Event Triggered"
-                const displayTypes = triggerTypes.map(type =>
-                    type === 'Ingest Triggered' ? 'Event Triggered' : type
-                );
+                // Always display as "Event Triggered" regardless of the original value
+                const displayTypes = triggerTypes.map(() => 'Event Triggered');
                 
                 return (
                     <TableCellContent variant="secondary">

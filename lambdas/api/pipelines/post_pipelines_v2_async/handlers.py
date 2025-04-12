@@ -129,7 +129,7 @@ def create_pipeline_record(
         "dependentResources": [],  # Will be populated later
         "name": pipeline.name,
         "stateMachineArn": "",  # Will be populated later
-        "type": "Ingest Triggered",
+        "type": "Event Triggered",
         "system": False,
         "deploymentStatus": deployment_status
     }
