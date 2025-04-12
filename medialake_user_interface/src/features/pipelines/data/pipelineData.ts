@@ -2,7 +2,7 @@ import { CreatePipelineRequest } from '@/api/types/pipeline.types';
 
 export const hardcodedPipelineData: CreatePipelineRequest = {
     name: "image-pipeline",
-    type: "Ingest Triggered",
+    type: "Event Triggered",
     system: true,
     definition: {
         nodes: [

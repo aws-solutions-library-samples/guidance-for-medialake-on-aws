@@ -15,7 +15,7 @@ export interface EventRuleInfo {
 export interface Pipeline {
     id: string;
     name: string;
-    type: 'Ingest Triggered' | string;
+    type: 'Event Triggered' | string;
     system: boolean;
     description?: string;
     configuration?: PipelineConfiguration;

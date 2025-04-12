@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import WarningIcon from '@mui/icons-material/Warning';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, PageContent } from '@/components/common/layout';
 import IntegrationList from '@/features/settings/integrations/components/IntegrationList/index';
@@ -22,6 +23,8 @@ const IntegrationsPage = () => {
     const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
     const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
     const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [integrationToDelete, setIntegrationToDelete] = useState<string | null>(null);
 
     // Fetch nodes using React Query
     const { nodes, isLoading: isLoadingNodes, error: nodesError } = IntegrationsNodesService.useNodes();
@@ -68,11 +71,28 @@ const IntegrationsPage = () => {
     };
 
     const handleDeleteIntegration = async (id: string) => {
-        try {
-            await integrationsController.deleteIntegration(id);
-        } catch (error) {
-            console.error('Failed to delete integration:', error);
+        // Open the confirmation dialog and set the integration ID to delete
+        setIntegrationToDelete(id);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteIntegration = async () => {
+        if (integrationToDelete) {
+            try {
+                await integrationsController.deleteIntegration(integrationToDelete);
+                // Close the dialog after successful deletion
+                setDeleteDialogOpen(false);
+                setIntegrationToDelete(null);
+            } catch (error) {
+                console.error('Failed to delete integration:', error);
+                // Keep the dialog open if there's an error
+            }
         }
+    };
+
+    const cancelDeleteIntegration = () => {
+        setDeleteDialogOpen(false);
+        setIntegrationToDelete(null);
     };
 
     return (
@@ -149,6 +169,35 @@ const IntegrationsPage = () => {
                 onClose={handleCloseIntegrationForm}
                 filteredNodes={integrationNodes}
             />
+
+            {/* Confirmation Dialog for Integration Deletion */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={cancelDeleteIntegration}
+                aria-labelledby="alert-dialog-title"
+                aria-describedby="alert-dialog-description"
+            >
+                <DialogTitle id="alert-dialog-title" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WarningIcon color="warning" />
+                    {t('integrations.deleteConfirmation.title')}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="alert-dialog-description">
+                        {t('integrations.deleteConfirmation.message')}
+                    </DialogContentText>
+                    <DialogContentText sx={{ mt: 2, fontWeight: 'bold', color: 'error.main' }}>
+                        {t('integrations.deleteConfirmation.warning')}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cancelDeleteIntegration} color="primary">
+                        {t('common.cancel')}
+                    </Button>
+                    <Button onClick={confirmDeleteIntegration} color="error" variant="contained" autoFocus>
+                        {t('common.delete')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

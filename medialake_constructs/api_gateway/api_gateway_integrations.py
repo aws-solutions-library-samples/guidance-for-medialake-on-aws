@@ -158,15 +158,28 @@ class ApiGatewayIntegrationsConstruct(Construct):
             ),
         )
 
-        # self._put_integration_handler.function.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
-        #         resources=[self._integrations_table.table_arn],
-        #     )
-        # )
-
         self._integrations_table.table.grant_write_data(
             self._put_integration_handler.function
+        )
+        
+        # Add specific DynamoDB permissions for query and update operations
+        self._put_integration_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
+                resources=[self._integrations_table.table_arn],
+            )
+        )
+        
+        # Add Secrets Manager permissions for updating API key secrets
+        self._put_integration_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:PutSecretValue",
+                    "secretsmanager:UpdateSecret",
+                ],
+                resources=["arn:aws:secretsmanager:*:*:secret:integration/*"],
+            )
         )
 
         integration_id_resource.add_method(
@@ -193,12 +206,22 @@ class ApiGatewayIntegrationsConstruct(Construct):
         self._integrations_table.table.grant_write_data(
             self._delete_integration_handler.function
         )
-        # self._delete_integration_handler.function.add_to_role_policy(
-        #     iam.PolicyStatement(
-        #         actions=["dynamodb:DeleteItem"],
-        #         resources=[self._integrations_table.table_arn],
-        #     )
-        # )
+        
+        # Add specific DynamoDB permissions for batch operations
+        self._delete_integration_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:Query"],
+                resources=[self._integrations_table.table_arn],
+            )
+        )
+        
+        # Add Secrets Manager permissions for deleting API key secrets
+        self._delete_integration_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:DeleteSecret"],
+                resources=["arn:aws:secretsmanager:*:*:secret:integration/*"],
+            )
+        )
 
         integration_id_resource.add_method(
             "DELETE",

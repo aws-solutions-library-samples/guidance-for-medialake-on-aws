@@ -115,6 +115,11 @@ export default {
         configureIntegration: 'Configure Integration',
         description: 'Manage your integrations and connections',
         addIntegration: 'Add Integration',
+        deleteConfirmation: {
+            title: 'Delete Integration',
+            message: 'Are you sure you want to delete this integration?',
+            warning: 'Caution: Removing this integration may cause pipelines that rely on it to fail.'
+        },
         form: {
             search: {
                 placeholder: 'Search integrations'
@@ -673,6 +678,11 @@ export default {
             selectIntegration: 'Select Integration',
             selectProvider: 'Select Provider',
             configureIntegration: 'Configure Integration',
+            deleteConfirmation: {
+                title: 'Delete Integration',
+                message: 'Are you sure you want to delete this integration?',
+                warning: 'Warning: Deleting this integration may break pipelines that are using it.'
+            },
             form: {
                 title: 'Add Integration',
                 fields: {
