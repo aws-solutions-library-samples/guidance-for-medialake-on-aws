@@ -229,9 +229,7 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t('settings.systemSettings.tabs.search', 'Search')} />
-            <Tab label={t('settings.systemSettings.tabs.notifications', 'Notifications')} />
-            <Tab label={t('settings.systemSettings.tabs.security', 'Security')} />
-            <Tab label={t('settings.systemSettings.tabs.performance', 'Performance')} />
+            <Tab label={t('settings.systemSettings.tabs.regions', 'Regions')} />
           </Tabs>
         </Box>
         
@@ -393,29 +391,12 @@ const SystemSettingsPage: React.FC = () => {
           </TabPanel>
           
           <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6">
-              {t('settings.systemSettings.notifications.title', 'Notifications Settings')}
+            <Typography variant="h6" gutterBottom>
+              {t('settings.systemSettings.regions.title', 'Regions')}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('settings.systemSettings.notifications.comingSoon', 'Notification settings coming soon.')}
-            </Typography>
-          </TabPanel>
-          
-          <TabPanel value={tabValue} index={2}>
-            <Typography variant="h6">
-              {t('settings.systemSettings.security.title', 'Security Settings')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('settings.systemSettings.security.comingSoon', 'Security settings coming soon.')}
-            </Typography>
-          </TabPanel>
-          
-          <TabPanel value={tabValue} index={3}>
-            <Typography variant="h6">
-              {t('settings.systemSettings.performance.title', 'Performance Settings')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('settings.systemSettings.performance.comingSoon', 'Performance settings coming soon.')}
+            <Typography variant="body2" color="text.secondary" paragraph>
+              {t('settings.systemSettings.regions.description', 
+                'Enable and disable regions that assets can be indexed from and pipelines can be deployed to.')}
             </Typography>
           </TabPanel>
         </Box>

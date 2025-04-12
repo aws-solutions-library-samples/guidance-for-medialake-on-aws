@@ -6,8 +6,6 @@ import {
 } from '../api/systemHooks';
 import { 
   SearchProvider, 
-  SearchProviderCreate, 
-  SearchProviderUpdate 
 } from '../types/system.types';
 import { SYSTEM_SETTINGS_CONFIG } from '../config';
 
