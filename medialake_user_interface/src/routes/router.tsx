@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import AuthPage from '@/components/AuthPage';
 import AppLayout from '@/components/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { RouteErrorBoundary } from '@/shared/ui/errors';
 import Home from '@/pages/Home';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
@@ -28,7 +29,8 @@ const S3ExplorerWrapper = () => {
 export const router = createBrowserRouter([
     {
         path: '/sign-in',
-        element: <AuthPage />
+        element: <AuthPage />,
+        errorElement: <RouteErrorBoundary />
     },
     {
         path: '/',
@@ -37,6 +39,7 @@ export const router = createBrowserRouter([
                 <AppLayout />
             </ProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
         children: [
             {
                 index: true,
@@ -124,7 +127,8 @@ export const router = createBrowserRouter([
             },
             {
                 path: '*',
-                element: <Navigate to="/" replace />
+                element: <Navigate to="/" replace />,
+                errorElement: <RouteErrorBoundary />
             }
         ]
     }

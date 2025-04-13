@@ -119,8 +119,6 @@ const PipelinesPage: React.FC = () => {
         error,
         deletePipeline,
         isDeleting,
-        startPipeline,
-        stopPipeline,
         toggleActive,
         togglingPipelines
     } = usePipelineManager();
@@ -295,8 +293,6 @@ const PipelinesPage: React.FC = () => {
     const columns = usePipelineColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
-        onStart: startPipeline,
-        onStop: stopPipeline,
         onToggleActive: toggleActive
     });
 

@@ -5,8 +5,6 @@ import { IconSwitch } from '@/components/common';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
-    PlayArrow as PlayIcon,
-    Stop as StopIcon,
     CheckCircle as CheckCircleIcon,
     Cancel as CancelIcon
 } from '@mui/icons-material';
@@ -18,8 +16,6 @@ import { TriggerTypeChips } from '../components';
 interface UsePipelineColumnsProps {
     onEdit: (id: string) => void;
     onDelete: (id: string, name: string) => void;
-    onStart: (id: string) => void;
-    onStop: (id: string) => void;
     onToggleActive: (id: string, active: boolean) => void;
 }
 
@@ -28,8 +24,6 @@ const columnHelper = createColumnHelper<Pipeline>();
 export const usePipelineColumns = ({
     onEdit,
     onDelete,
-    onStart,
-    onStop,
     onToggleActive
 }: UsePipelineColumnsProps) => {
     return useMemo(
@@ -179,7 +173,7 @@ export const usePipelineColumns = ({
             columnHelper.display({
                 id: 'actions',
                 header: 'Actions',
-                size: 200,
+                size: 120,
                 cell: info => (
                     <Box sx={{ display: 'flex', gap: 1 }} className="action-buttons">
                         <Tooltip title={
@@ -221,29 +215,11 @@ export const usePipelineColumns = ({
                             </IconButton>
                             </span>
                         </Tooltip>
-                        <Tooltip title="Start Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onStart(info.row.original.id)}
-                                disabled={true}
-                            >
-                                <PlayIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Stop Pipeline">
-                            <IconButton
-                                size="small"
-                                onClick={() => onStop(info.row.original.id)}
-                                disabled={true}
-                            >
-                                <StopIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
                     </Box>
                 ),
             }),
         ],
-        [onEdit, onDelete, onStart, onStop, onToggleActive]
+        [onEdit, onDelete, onToggleActive]
     );
 };
 
