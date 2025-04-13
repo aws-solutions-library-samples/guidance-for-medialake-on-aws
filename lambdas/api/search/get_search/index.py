@@ -649,35 +649,41 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 }
                 logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
 
-    # Revised process_asset_with_clips using a weighted average approach.
     def process_asset_with_clips(asset_id):
         if asset_id in parent_assets:
             try:
                 result = process_search_hit(parent_assets[asset_id]["hit"])
                 result_dict = result.model_dump(by_alias=True)
                 parent_score = result_dict.get("score", 0)
+                digital_source = result_dict.get("DigitalSourceAsset", {})
+                asset_type = digital_source.get("Type", "").lower()
 
                 if asset_id in clips_by_asset:
                     asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)
                     highest_clip_score = asset_clips[0]["score"]
 
-                    # Compute relevance ratio to decide significance.
-                    relevance_ratio = (highest_clip_score / parent_score) if parent_score > 0 else 2.0
-                    if relevance_ratio > 1.2:
-                        # Use a weighted average (50/50) to merge parent and clip scores.
-                        combined_score = (0.5 * parent_score) + (0.5 * highest_clip_score)
-                        logger.info(f"Asset {asset_id}: Combining scores parent {parent_score} and clip {highest_clip_score} into {combined_score} due to high relevance ratio ({relevance_ratio:.2f})")
+                    # Branch the logic based on asset type.
+                    if asset_type == "audio":
+                        # For audio, use the highest clip score directly as the asset score.
+                        combined_score = highest_clip_score
+                        logger.info(f"Audio asset {asset_id}: using highest clip score {highest_clip_score} as combined score.")
                     else:
-                        combined_score = parent_score
-                        logger.info(f"Asset {asset_id}: Keeping parent's score {parent_score} as clip relevance ratio ({relevance_ratio:.2f}) is not high enough")
-
+                        # For video (or other types with their own embeddings), use a weighted average.
+                        relevance_ratio = (highest_clip_score / parent_score) if parent_score > 0 else 2.0
+                        if relevance_ratio > 1.2:
+                            combined_score = (0.5 * parent_score) + (0.5 * highest_clip_score)
+                            logger.info(f"Asset {asset_id}: Combining scores parent {parent_score} and clip {highest_clip_score} into {combined_score} (relevance ratio: {relevance_ratio:.2f}).")
+                        else:
+                            combined_score = parent_score
+                            logger.info(f"Asset {asset_id}: Keeping parent's score {parent_score} (relevance ratio: {relevance_ratio:.2f}).")
+                    
                     # Ensure the score does not exceed 1.0.
                     combined_score = min(combined_score, 1.0)
                     result_dict["score"] = combined_score
 
-                    # Process and attach clips.
+                    # Process and attach clips for transparency/debugging.
                     result_dict["clips"] = [process_clip(clip_hit["hit"]) for clip_hit in asset_clips]
-                # Ensure that 'clips' key is always a list even if no clips are attached.
+                # Ensure the 'clips' key is always a list.
                 result_dict["clips"] = result_dict.get("clips") or []
                 return result_dict
             except Exception as e:
