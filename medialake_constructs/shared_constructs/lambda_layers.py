@@ -331,14 +331,14 @@ class SearchLayer(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Define the Lambda layer
-        self.layer = LambdaLayer(
+        self.layer_version = LambdaLayer(
             self,
             "SearchLayer",
             config=LambdaLayerConfig(
                 entry="lambdas/layers/search", description="A Lambda layer for search"
             ),
         )
-        
+
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
