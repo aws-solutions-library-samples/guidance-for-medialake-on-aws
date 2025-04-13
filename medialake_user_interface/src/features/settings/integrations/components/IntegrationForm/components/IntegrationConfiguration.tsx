@@ -15,7 +15,6 @@ import { FormField } from '@/forms/components/FormField';
 import { FormSelect } from '@/forms/components/FormSelect';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
 import { IntegrationConfigurationProps, IntegrationFormData } from '@/features/settings/integrations/components/IntegrationForm/types';
-import { useCreateIntegration } from '../../../api/integrations.controller';
 
 export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> = ({
     formData,
@@ -27,8 +26,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
     const { t } = useTranslation();
     const [showApiKey, setShowApiKey] = React.useState(false);
     const [enabled, setEnabled] = React.useState(true);
-
-    const createIntegrationMutation = useCreateIntegration();
 
     // Define schema directly with Zod
     const validationSchema = React.useMemo(() => {
@@ -88,39 +85,28 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
     });
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
+        // Close the form immediately before any validation or submission
+        onClose();
+        
         console.log('[IntegrationConfiguration] Starting submission with data:', data);
         try {
-            const now = new Date().toISOString();
-
+            // Add enabled flag to the data
             const submissionData = {
-                nodeId: data.nodeId,
-                integrationType: data.nodeId.replace('node-', '').replace('-api', ''),
-                description: data.description,
-                environmentId: data.environmentId,
-                integrationEnabled: enabled,
-                createdDate: now,
-                modifiedDate: now,
-                auth: {
-                    type: data.auth.type,
-                    credentials: {
-                        apiKey: data.auth.type === 'apiKey' ? data.auth.credentials.apiKey : undefined,
-                        iamRole: data.auth.type === 'awsIam' ? data.auth.credentials.iamRole : undefined
-                    }
-                }
+                ...data,
+                integrationEnabled: enabled
             };
-            console.log('[IntegrationConfiguration] Cleaned submission data:', submissionData);
-
-            await createIntegrationMutation.mutateAsync(submissionData);
-            console.log('[IntegrationConfiguration] Mutation completed');
-
-            if (onClose) {
-                console.log('[IntegrationConfiguration] Closing form');
-                onClose();
-            }
+            
+            console.log('[IntegrationConfiguration] Calling parent onSubmit with data:', submissionData);
+            
+            // Use the onSubmit prop passed from the parent component
+            await onSubmit(submissionData);
+            
+            console.log('[IntegrationConfiguration] Parent onSubmit completed successfully');
         } catch (error) {
             console.error('[IntegrationConfiguration] Error during submission:', error);
+            throw error; // Re-throw to allow parent component to handle the error
         }
-    }, [createIntegrationMutation, onClose, enabled]);
+    }, [onSubmit, enabled]);
 
     const authMethod = formData.auth.type;
 
@@ -213,7 +199,16 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                     <Button onClick={onClose} variant="outlined">
                         {t('common.cancel')}
                     </Button>
-                    <Button type="submit" variant="contained" color="primary">
+                    <Button
+                        onClick={(e) => {
+                            // Close the form immediately
+                            onClose();
+                            // Then submit the form
+                            form.handleSubmit(handleSubmit)(e);
+                        }}
+                        variant="contained"
+                        color="primary"
+                    >
                         {t('common.create')}
                     </Button>
                 </Box>

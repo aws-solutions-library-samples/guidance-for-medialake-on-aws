@@ -24,7 +24,7 @@ import { Form } from '@/forms/components/Form';
 import { FormField } from '@/forms/components/FormField';
 import { FormSelect } from '@/forms/components/FormSelect';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
-import { IntegrationFormProps, IntegrationFormData } from './types';
+import { IntegrationFormProps, IntegrationFormData, IntegrationFormResult } from './types';
 import { integrationFormSchema, createIntegrationFormDefaults } from './schemas/integrationFormSchema';
 import { useCreateIntegration } from '@/features/settings/integrations/api/integrations.controller';
 import { IntegrationsNodesService } from '@/features/settings/integrations/services/integrations-nodes.service';
@@ -38,6 +38,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     open,
     onClose,
     filteredNodes,
+    onSubmitSuccess,
 }) => {
     const { t } = useTranslation();
     const [activeStep, setActiveStep] = React.useState(0);
@@ -84,15 +85,44 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             };
         });
     }, [rawNodes]);
+    
+    // Memoize form values to prevent infinite render loops
+    const formValues = React.useMemo(() => form.getValues(), [form.formState.isDirty, form.formState.dirtyFields]);
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
+        // Close the form immediately when the user clicks the button
+        onClose();
+        
         try {
             console.log('Starting integration creation with data:', data);
 
+            // Call the mutation after closing the form
             const result = await createIntegration.mutateAsync(data);
-
+            
             console.log('Integration created successfully:', result);
-            onClose();
+            
+            // Notify parent component of successful submission if callback exists
+            if (onSubmitSuccess) {
+                console.log('Calling onSubmitSuccess with result:', result);
+                // Convert the result to match IntegrationFormResult type
+                // The result might be a single Integration object or an IntegrationsResponse
+                const formResult: IntegrationFormResult = {
+                    // Try to get the id from various possible locations in the result
+                    id: (result as any).id ||
+                        (result.data && result.data[0] && result.data[0].id) ||
+                        data.nodeId, // Fallback to nodeId if no id is found
+                    nodeId: data.nodeId,
+                    // Add any additional properties needed by the parent component
+                    type: data.nodeId.replace('node-', '').replace('-api', ''),
+                    description: data.description
+                };
+                console.log('Created form result for callback:', formResult);
+                
+                // Call onSubmitSuccess after API call completes
+                onSubmitSuccess(formResult);
+            }
+            
+            return result;
         } catch (error) {
             console.error('Failed to create integration:', {
                 error,
@@ -102,7 +132,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             });
             throw error;
         }
-    }, [createIntegration, onClose, selectedNodeId, form.formState]);
+    }, [createIntegration, onClose, onSubmitSuccess, selectedNodeId, form.formState]);
 
     const handleBack = React.useCallback(() => {
         setActiveStep(0);
@@ -257,7 +287,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
 
         return (
             <IntegrationConfiguration
-                formData={form.getValues()}
+                formData={formValues}
                 onSubmit={handleSubmit}
                 onBack={handleBack}
                 onClose={onClose}

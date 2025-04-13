@@ -17,7 +17,7 @@ export default {
     assetExplorer: {
       noConnectorSelected: 'Sélectionnez un connecteur pour afficher les actifs',
       noAssetsFound: 'Aucun actif trouvé pour ce connecteur',
-      noIndexedAssets: 'Aucun actif indexé n’a été trouvé pour ce connecteur avec le compartiment "{{bucketName}}".',
+      noIndexedAssets: 'Aucun actif indexé n\'a été trouvé pour ce connecteur avec le compartiment "{{bucketName}}".',
       loadingAssets: 'Chargement des actifs...',
       menu: {
         rename: 'Renommer',
@@ -89,16 +89,16 @@ export default {
     admin: {
       metrics: {
         storageUsage: 'Utilisation du stockage',
-        apiUsage: 'Utilisation de l’API',
+        apiUsage: 'Utilisation de l\'API',
         activeUsers: 'Utilisateurs actifs',
         systemLoad: 'Charge du système'
       },
       errors: {
-        userDeletionNotImplemented: 'La suppression d’utilisateur n’est pas encore implémentée.',
-        userCreationNotImplemented: 'La création d’utilisateur n’est pas encore implémentée.',
-        userEditingNotImplemented: 'La modification d’utilisateur n’est pas encore implémentée.',
-        analyticsExportNotImplemented: 'L’export des analyses n’est pas encore implémenté.',
-        systemResetNotImplemented: 'La réinitialisation du système n’est pas encore implémentée.'
+        userDeletionNotImplemented: 'La suppression d\'utilisateur n\'est pas encore implémentée.',
+        userCreationNotImplemented: 'La création d\'utilisateur n\'est pas encore implémentée.',
+        userEditingNotImplemented: 'La modification d\'utilisateur n\'est pas encore implémentée.',
+        analyticsExportNotImplemented: 'L\'export des analyses n\'est pas encore implémenté.',
+        systemResetNotImplemented: 'La réinitialisation du système n\'est pas encore implémentée.'
       },
       columns: {
         lastActive: 'Dernière activité'
@@ -112,7 +112,7 @@ export default {
       title: 'Intégrations',
       selectProvider: 'Sélectionnez une intégration',
       selectIntegration: 'Sélectionnez une intégration',
-      configureIntegration: 'Configurer l’intégration',
+      configureIntegration: 'Configurer l\'intégration',
       description: 'Gérez vos intégrations et connexions',
       addIntegration: 'Ajouter une intégration',
       form: {
@@ -123,55 +123,57 @@ export default {
         fields: {
           nodeId: {
             label: 'Intégration',
-            tooltip: 'Sélectionnez un fournisseur d’intégration',
+            tooltip: 'Sélectionnez un fournisseur d\'intégration',
             errors: {
-              required: 'La sélection d’une intégration est requise'
+              required: 'La sélection d\'une intégration est requise'
             }
           },
           description: {
             label: 'Description',
             tooltip: 'Fournissez une description pour cette intégration',
+            helper: 'Brève description de cette intégration',
             errors: {
               required: 'La description est requise'
             }
           },
           environmentId: {
             label: 'Environnement',
-            tooltip: 'Sélectionnez l’environnement pour cette intégration',
+            tooltip: 'Sélectionnez l\'environnement pour cette intégration',
             errors: {
-              required: 'La sélection d’un environnement est requise'
+              required: 'La sélection d\'un environnement est requise'
             }
           },
           enabled: {
             label: 'Activé',
             tooltip: 'Activez ou désactivez cette intégration',
             errors: {
-              required: 'L’activation est requise'
+              required: 'L\'activation est requise'
             }
           },
           auth: {
             type: {
-              label: 'Type d’authentification',
-              tooltip: 'Sélectionnez la méthode d’authentification',
+              label: 'Type d\'authentification',
+              tooltip: 'Sélectionnez la méthode d\'authentification',
               options: {
                 awsIam: 'AWS IAM',
                 apiKey: 'Clé API'
               },
               errors: {
-                required: 'Le type d’authentification est requis'
+                required: 'Le type d\'authentification est requis'
               }
             },
             credentials: {
               apiKey: {
                 label: 'Clé API',
                 tooltip: 'Entrez votre clé API',
+                helper: 'Clé API pour l\'authentification avec le service',
                 errors: {
                   required: 'La clé API est requise'
                 }
               },
               iamRole: {
                 label: 'Rôle IAM',
-                tooltip: 'Entrez l’ARN du rôle IAM',
+                tooltip: 'Entrez l\'ARN du rôle IAM',
                 errors: {
                   required: 'Le rôle IAM est requis'
                 }
@@ -182,7 +184,7 @@ export default {
         errors: {
           required: 'Ce champ est requis',
           nodeId: {
-            unrecognized_keys: 'Sélection d’intégration invalide'
+            unrecognized_keys: 'Sélection d\'intégration invalide'
           }
         }
       }
@@ -192,7 +194,8 @@ export default {
       description: 'Gérez vos pipelines de médias et métadonnées',
       searchPlaceholder: 'Recherchez des pipelines...',
       actions: {
-        create: 'Ajouter un nouveau pipeline'
+        create: 'Ajouter un nouveau pipeline',
+        import: 'Importer un pipeline'
       }
     },
     executions: {
@@ -221,22 +224,22 @@ export default {
         fields: {
           given_name: {
             label: 'Prénom',
-            tooltip: 'Entrez le prénom de l’utilisateur',
+            tooltip: 'Entrez le prénom de l\'utilisateur',
             helper: ''
           },
           family_name: {
             label: 'Nom de famille',
-            tooltip: 'Entrez le nom de famille de l’utilisateur',
+            tooltip: 'Entrez le nom de famille de l\'utilisateur',
             helper: ''
           },
           email: {
             label: 'Email',
-            tooltip: 'Entrez l’adresse email de l’utilisateur',
+            tooltip: 'Entrez l\'adresse email de l\'utilisateur',
             helper: ''
           },
           roles: {
             label: 'Rôles',
-            tooltip: 'Sélectionnez les rôles pour l’utilisateur',
+            tooltip: 'Sélectionnez les rôles pour l\'utilisateur',
             options: {
               Admin: 'Administrateur',
               Editor: 'Éditeur',
@@ -245,11 +248,11 @@ export default {
           },
           email_verified: {
             label: 'Email vérifié',
-            tooltip: 'Indiquez si l’email de l’utilisateur a été vérifié'
+            tooltip: 'Indiquez si l\'email de l\'utilisateur a été vérifié'
           },
           enabled: {
             label: 'Activé',
-            tooltip: 'Activez ou désactivez l’utilisateur'
+            tooltip: 'Activez ou désactivez l\'utilisateur'
           }
         }
       },
@@ -274,7 +277,7 @@ export default {
         searchPlaceholder: 'Recherchez des environnements',
         createTitle: 'Créer un environnement',
         form: {
-          name: 'Nom de l’environnement',
+          name: 'Nom de l\'environnement',
           region: 'Région',
           status: {
             name: 'Statut',
@@ -303,7 +306,7 @@ export default {
           providerDetails: 'Détails du fournisseur',
           providerName: 'Nom du fournisseur',
           apiKey: 'Clé API',
-          endpoint: 'URL de l’endpoint (optionnel)',
+          endpoint: 'URL de l\'endpoint (optionnel)',
           enabled: 'Recherche activée',
           noProvider: 'Aucun fournisseur de recherche configuré.',
           configurePrompt: 'Configurez Twelve Labs pour activer les capacités de recherche.'
@@ -336,14 +339,16 @@ export default {
       loading: 'Chargement...',
       loadMore: 'Charger plus',
       tableDensity: 'Densité du tableau',
-      moreInfo: 'Plus d’informations',
+      moreInfo: 'Plus d\'informations',
       error: 'Erreur',
       language: 'Langue',
+      delete: 'Supprimer',
+      create: 'Créer',
       actions: {
         add: 'Ajouter'
       },
       columns: {
-        username: 'Nom d’utilisateur',
+        username: 'Nom d\'utilisateur',
         firstName: 'Prénom',
         lastName: 'Nom de famille',
         email: 'Email',
@@ -372,7 +377,7 @@ export default {
         theme: 'Thème',
         back: 'Retour',
         loading: 'Chargement...',
-        error: 'Quelque chose s’est mal passé',
+        error: 'Quelque chose s\'est mal passé',
         save: 'Enregistrer',
         cancel: 'Annuler',
         delete: 'Supprimer',
@@ -409,7 +414,7 @@ export default {
         selectFilter: 'Sélectionner un filtre',
         clearFilter: 'Effacer le filtre',
         columns: {
-          username: 'Nom d’utilisateur',
+          username: 'Nom d\'utilisateur',
           firstName: 'Prénom',
           lastName: 'Nom de famille',
           email: 'Email',
@@ -421,7 +426,7 @@ export default {
         },
         noGroups: 'Aucun groupe',
         select: 'Sélectionner',
-        moreInfo: 'Plus d’informations'
+        moreInfo: 'Plus d\'informations'
       },
       users: {
         title: 'Gestion des utilisateurs',
@@ -431,45 +436,45 @@ export default {
           fields: {
             given_name: {
               label: 'Prénom',
-              tooltip: 'Entrez le prénom de l’utilisateur',
+              tooltip: 'Entrez le prénom de l\'utilisateur',
               errors: {
                 required: 'Le prénom est requis'
               }
             },
             family_name: {
               label: 'Nom de famille',
-              tooltip: 'Entrez le nom de famille de l’utilisateur',
+              tooltip: 'Entrez le nom de famille de l\'utilisateur',
               errors: {
                 required: 'Le nom de famille est requis'
               }
             },
             email: {
               label: 'Email',
-              tooltip: 'Entrez l’adresse email de l’utilisateur',
+              tooltip: 'Entrez l\'adresse email de l\'utilisateur',
               errors: {
-                required: 'L’email est requis',
+                required: 'L\'email est requis',
                 invalid: 'Adresse email invalide'
               }
             },
             enabled: {
               label: 'Activé',
-              tooltip: 'Activez ou désactivez l’utilisateur',
+              tooltip: 'Activez ou désactivez l\'utilisateur',
               errors: {
-                required: 'L’activation est requise'
+                required: 'L\'activation est requise'
               }
             },
             roles: {
               label: 'Rôles',
-              tooltip: 'Sélectionnez les rôles pour l’utilisateur',
+              tooltip: 'Sélectionnez les rôles pour l\'utilisateur',
               errors: {
                 required: 'Les rôles sont requis'
               }
             },
             email_verified: {
               label: 'Email vérifié',
-              tooltip: 'Indiquez si l’email de l’utilisateur a été vérifié',
+              tooltip: 'Indiquez si l\'email de l\'utilisateur a été vérifié',
               errors: {
-                required: 'La vérification de l’email est requise'
+                required: 'La vérification de l\'email est requise'
               }
             }
           }
@@ -486,7 +491,7 @@ export default {
         }
       },
       columns: {
-        username: 'Nom d’utilisateur',
+        username: 'Nom d\'utilisateur',
         firstName: 'Prénom',
         lastName: 'Nom de famille',
         email: 'Email',
@@ -498,10 +503,10 @@ export default {
       },
       actions: {
         addUser: 'Ajouter un utilisateur',
-        edit: 'Modifier l’utilisateur',
-        delete: 'Supprimer l’utilisateur',
-        activate: 'Activer l’utilisateur',
-        deactivate: 'Désactiver l’utilisateur'
+        edit: 'Modifier l\'utilisateur',
+        delete: 'Supprimer l\'utilisateur',
+        activate: 'Activer l\'utilisateur',
+        deactivate: 'Désactiver l\'utilisateur'
       },
       status: {
         active: 'Actif',
@@ -509,8 +514,8 @@ export default {
       },
       errors: {
         loadFailed: 'Échec du chargement des utilisateurs',
-        saveFailed: 'Échec de l’enregistrement de l’utilisateur',
-        deleteFailed: 'Échec de la suppression de l’utilisateur'
+        saveFailed: 'Échec de l\'enregistrement de l\'utilisateur',
+        deleteFailed: 'Échec de la suppression de l\'utilisateur'
       },
       navigation: {
         home: 'Accueil',
@@ -531,7 +536,7 @@ export default {
       },
       notifications: {
         'Pipeline Complete': 'Pipeline terminé',
-        'Asset processing pipeline completed successfully': 'Le pipeline de traitement des actifs s’est terminé avec succès',
+        'Asset processing pipeline completed successfully': 'Le pipeline de traitement des actifs s\'est terminé avec succès',
         'Storage Warning': 'Avertissement de stockage',
         'Storage capacity reaching 80%': 'Capacité de stockage atteignant 80%',
         'Pipeline Failed': 'Pipeline échoué',
@@ -593,7 +598,7 @@ export default {
       },
       metadata: {
         title: 'Bientôt disponible',
-        description: 'Nous travaillons à vous offrir des fonctionnalités de gestion des métadonnées. Restez à l’écoute !'
+        description: 'Nous travaillons à vous offrir des fonctionnalités de gestion des métadonnées. Restez à l\'écoute !'
       },
       pipelines: {
         title: 'Pipelines',
@@ -601,12 +606,13 @@ export default {
         searchPlaceholder: 'Recherchez des pipelines...',
         actions: {
           create: 'Ajouter un nouveau pipeline',
-          deploy: 'Déployer le pipeline d’images',
+          deploy: 'Déployer le pipeline d\'images',
           addNew: 'Ajouter un nouveau pipeline',
-          viewAll: 'Voir tous les pipelines'
+          viewAll: 'Voir tous les pipelines',
+          import: 'Importer un pipeline'
         },
         search: 'Rechercher des pipelines',
-        deploy: 'Déployer le pipeline d’images',
+        deploy: 'Déployer le pipeline d\'images',
         addNew: 'Ajouter un nouveau pipeline',
         columns: {
           name: 'Nom',
@@ -631,14 +637,14 @@ export default {
             edit: 'Modifier le nœud'
           },
           edge: {
-            title: 'Modifier l’étiquette de la connexion',
+            title: 'Modifier l\'étiquette de la connexion',
             label: 'Étiquette de connexion',
             delete: 'Supprimer la connexion'
           },
           modals: {
             error: {
               title: 'Erreur',
-              incompatibleNodes: 'La sortie du nœud précédent n’est pas compatible avec l’entrée du nœud de destination.',
+              incompatibleNodes: 'La sortie du nœud précédent n\'est pas compatible avec l\'entrée du nœud de destination.',
               validation: 'La validation du pipeline a échoué'
             },
             delete: {
@@ -659,7 +665,7 @@ export default {
             saved: 'Pipeline enregistré avec succès',
             validated: 'Validation du pipeline réussie',
             error: {
-              save: 'Échec de l’enregistrement du pipeline',
+              save: 'Échec de l\'enregistrement du pipeline',
               validation: 'La validation du pipeline a échoué',
               incompatibleNodes: 'Connexion de nœud incompatible'
             }
@@ -672,61 +678,68 @@ export default {
         addIntegration: 'Ajouter une intégration',
         selectIntegration: 'Sélectionnez une intégration',
         selectProvider: 'Sélectionnez un fournisseur',
-        configureIntegration: 'Configurer l’intégration',
+        configureIntegration: 'Configurer l\'intégration',
+        deleteConfirmation: {
+          title: 'Supprimer l\'intégration',
+          message: 'Êtes-vous sûr de vouloir supprimer cette intégration ?',
+          warning: 'Attention : La suppression de cette intégration peut entraîner l\'échec des pipelines qui l\'utilisent.'
+        },
         form: {
           title: 'Ajouter une intégration',
           fields: {
             nodeId: {
               label: 'Intégration',
-              tooltip: 'Sélectionnez un fournisseur d’intégration',
+              tooltip: 'Sélectionnez un fournisseur d\'intégration',
               errors: {
-                required: 'La sélection d’une intégration est requise'
+                required: 'La sélection d\'une intégration est requise'
               }
             },
             description: {
               label: 'Description',
               tooltip: 'Fournissez une description pour cette intégration',
+              helper: 'Brève description de cette intégration',
               errors: {
                 required: 'La description est requise'
               }
             },
             environmentId: {
               label: 'Environnement',
-              tooltip: 'Sélectionnez l’environnement pour cette intégration',
+              tooltip: 'Sélectionnez l\'environnement pour cette intégration',
               errors: {
-                required: 'La sélection d’un environnement est requise'
+                required: 'La sélection d\'un environnement est requise'
               }
             },
             enabled: {
               label: 'Activé',
               tooltip: 'Activez ou désactivez cette intégration',
               errors: {
-                required: 'L’activation est requise'
+                required: 'L\'activation est requise'
               }
             },
             auth: {
               type: {
-                label: 'Type d’authentification',
-                tooltip: 'Sélectionnez la méthode d’authentification',
+                label: 'Type d\'authentification',
+                tooltip: 'Sélectionnez la méthode d\'authentification',
                 options: {
                   awsIam: 'AWS IAM',
                   apiKey: 'Clé API'
                 },
                 errors: {
-                  required: 'Le type d’authentification est requis'
+                  required: 'Le type d\'authentification est requis'
                 }
               },
               credentials: {
                 apiKey: {
                   label: 'Clé API',
                   tooltip: 'Entrez votre clé API',
+                  helper: 'Clé API pour l\'authentification avec le service',
                   errors: {
                     required: 'La clé API est requise'
                   }
                 },
                 iamRole: {
                   label: 'Rôle IAM',
-                  tooltip: 'Entrez l’ARN du rôle IAM',
+                  tooltip: 'Entrez l\'ARN du rôle IAM',
                   errors: {
                     required: 'Le rôle IAM est requis'
                   }
@@ -740,7 +753,7 @@ export default {
           errors: {
             required: 'Ce champ est requis',
             nodeId: {
-              unrecognized_keys: 'Sélection d’intégration invalide'
+              unrecognized_keys: 'Sélection d\'intégration invalide'
             }
           }
         },
@@ -759,4 +772,3 @@ export default {
       }
     }
   }
-  

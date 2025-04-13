@@ -170,13 +170,13 @@ const AdminSettings: React.FC = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h6">{t('translation.users.title', 'User Management')}</Typography>
+                    <Typography variant="h6">{t('users.title', 'User Management')}</Typography>
                     <Button
                         variant="contained"
                         startIcon={<PersonAddIcon />}
                         onClick={() => setError(t('admin.errors.userCreationNotImplemented', 'User creation is not implemented yet.'))}
                     >
-                        {t('translation.actions.addUser', 'Add User')}
+                        {t('actions.addUser', 'Add User')}
                     </Button>
                 </Box>
 
@@ -184,12 +184,12 @@ const AdminSettings: React.FC = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>{t('translation.columns.firstName', 'Name')}</TableCell>
-                                <TableCell>{t('translation.columns.email', 'Email')}</TableCell>
-                                <TableCell>{t('translation.roles.title', 'Role')}</TableCell>
-                                <TableCell>{t('translation.columns.status', 'Status')}</TableCell>
+                                <TableCell>{t('columns.firstName', 'Name')}</TableCell>
+                                <TableCell>{t('columns.email', 'Email')}</TableCell>
+                                <TableCell>{t('roles.title', 'Role')}</TableCell>
+                                <TableCell>{t('columns.status', 'Status')}</TableCell>
                                 <TableCell>{t('admin.columns.lastActive', 'Last Active')}</TableCell>
-                                <TableCell align="right">{t('translation.columns.actions', 'Actions')}</TableCell>
+                                <TableCell align="right">{t('columns.actions', 'Actions')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -228,7 +228,7 @@ const AdminSettings: React.FC = () => {
                                     <TableCell>{new Date(user.lastActive).toLocaleDateString()}</TableCell>
                                     <TableCell align="right">
                                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                                            <Tooltip title={t('translation.actions.edit', 'Edit user')}>
+                                            <Tooltip title={t('actions.edit', 'Edit user')}>
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => setError(t('admin.errors.userEditingNotImplemented', 'User editing is not implemented yet.'))}
@@ -236,7 +236,7 @@ const AdminSettings: React.FC = () => {
                                                     <EditIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title={t('translation.actions.delete', 'Delete user')}>
+                                            <Tooltip title={t('actions.delete', 'Delete user')}>
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => handleDeleteUser(user.id)}
@@ -263,7 +263,7 @@ const AdminSettings: React.FC = () => {
                     border: `1px solid ${theme.palette.divider}`,
                 }}
             >
-                <Typography variant="h6" sx={{ mb: 3 }}>{t('translation.settings.systemSettings.title', 'System Settings')}</Typography>
+                <Typography variant="h6" sx={{ mb: 3 }}>{t('settings.systemSettings.title', 'System Settings')}</Typography>
                 <Grid container spacing={3}>
                     <Grid item xs={12} sm={6}>
                         <Button

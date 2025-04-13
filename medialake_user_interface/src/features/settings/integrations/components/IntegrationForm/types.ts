@@ -11,10 +11,17 @@ export interface IntegrationNode {
     };
 }
 
+export interface IntegrationFormResult {
+    id: string;
+    nodeId: string;
+    [key: string]: any;
+}
+
 export interface IntegrationFormProps {
     open: boolean;
     onClose: () => void;
     filteredNodes?: IntegrationNode[];
+    onSubmitSuccess?: (result: IntegrationFormResult) => void;
 }
 
 export interface IntegrationFormData {
@@ -38,7 +45,7 @@ export interface IntegrationListItemProps {
 
 export interface IntegrationConfigurationProps {
     formData: IntegrationFormData;
-    onSubmit: (data: IntegrationFormData) => Promise<void>;
+    onSubmit: (data: IntegrationFormData) => Promise<any>;
     onBack: () => void;
     onClose: () => void;
     environments: Environment[];

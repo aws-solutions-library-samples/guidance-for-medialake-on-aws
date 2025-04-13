@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import ApiStatusModal from '@/components/ApiStatusModal';
 import AddIcon from '@mui/icons-material/Add';
 import WarningIcon from '@mui/icons-material/Warning';
 import { useTranslation } from 'react-i18next';
@@ -11,20 +12,32 @@ import {
     IntegrationSorting,
     IntegrationsResponse
 } from '@/features/settings/integrations/types/integrations.types';
+import { IntegrationFormResult } from '@/features/settings/integrations/components/IntegrationForm/types';
 import {
     useGetIntegrations,
     useCreateIntegration,
     integrationsController
 } from '@/features/settings/integrations/api/integrations.controller';
 import { IntegrationsNodesService } from '@/features/settings/integrations/services/integrations-nodes.service';
+import queryClient from '@/api/queryClient';
 
-const IntegrationsPage = () => {
+const IntegrationsPage: React.FC = () => {
     const { t } = useTranslation();
     const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
     const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
     const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [integrationToDelete, setIntegrationToDelete] = useState<string | null>(null);
+    const [apiStatus, setApiStatus] = useState<{
+        show: boolean;
+        status: 'loading' | 'success' | 'error';
+        action: string;
+        message?: string;
+    }>({
+        show: false,
+        status: 'loading',
+        action: '',
+    });
 
     // Fetch nodes using React Query
     const { nodes, isLoading: isLoadingNodes, error: nodesError } = IntegrationsNodesService.useNodes();
@@ -48,14 +61,50 @@ const IntegrationsPage = () => {
     
     // Fetch integrations using React Query
     const { data: integrationsData, isLoading: isLoadingIntegrations, error: integrationsError } = useGetIntegrations();
-    const createIntegration = useCreateIntegration();
     
     // Combine loading and error states
     const isLoading = isLoadingNodes || isLoadingIntegrations;
     const error = nodesError || integrationsError;
 
+    // Function to refresh the integrations data
+    const refreshIntegrations = () => {
+        // Invalidate the integrations query to trigger a refetch
+        queryClient.invalidateQueries({ queryKey: ['integrations'] });
+    };
+
     const handleAddIntegration = () => {
         setOpenIntegrationForm(true);
+    };
+    
+    const handleCloseApiStatus = () => {
+        console.log('Closing API status modal');
+        setApiStatus(prev => ({ ...prev, show: false }));
+    };
+    
+    // Handle successful integration creation
+    const handleIntegrationCreated = (result: IntegrationFormResult) => {
+        console.log('Integration created callback received with result:', result);
+        
+        // Show the success status immediately with loading first
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action: 'Creating integration...',
+        });
+        
+        // Then show success after a brief moment
+        setTimeout(() => {
+            console.log('Setting API status to success');
+            setApiStatus({
+                show: true,
+                status: 'success',
+                action: 'Integration Created',
+                message: `New integration "${result.nodeId}" has been successfully created`,
+            });
+            
+            // Refresh the integrations data
+            refreshIntegrations();
+        }, 500);
     };
 
     const handleCloseIntegrationForm = () => {
@@ -63,9 +112,31 @@ const IntegrationsPage = () => {
     };
 
     const handleEditIntegration = async (id: string, data: any) => {
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action: 'Updating integration...',
+        });
+        
         try {
             await integrationsController.updateIntegration(id, data);
+            setApiStatus({
+                show: true,
+                status: 'success',
+                action: 'Integration Updated',
+                message: 'Integration has been successfully updated',
+            });
+            
+            // Refresh the integrations data
+            refreshIntegrations();
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update integration';
+            setApiStatus({
+                show: true,
+                status: 'error',
+                action: 'Integration Update Failed',
+                message: errorMessage,
+            });
             console.error('Failed to update integration:', error);
         }
     };
@@ -78,14 +149,34 @@ const IntegrationsPage = () => {
 
     const confirmDeleteIntegration = async () => {
         if (integrationToDelete) {
+            setDeleteDialogOpen(false);
+            setApiStatus({
+                show: true,
+                status: 'loading',
+                action: 'Deleting integration...',
+            });
+            
             try {
                 await integrationsController.deleteIntegration(integrationToDelete);
-                // Close the dialog after successful deletion
-                setDeleteDialogOpen(false);
+                setApiStatus({
+                    show: true,
+                    status: 'success',
+                    action: 'Integration Deleted',
+                    message: 'Integration has been successfully deleted',
+                });
                 setIntegrationToDelete(null);
+                
+                // Refresh the integrations data
+                refreshIntegrations();
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Failed to delete integration';
+                setApiStatus({
+                    show: true,
+                    status: 'error',
+                    action: 'Integration Deletion Failed',
+                    message: errorMessage,
+                });
                 console.error('Failed to delete integration:', error);
-                // Keep the dialog open if there's an error
             }
         }
     };
@@ -95,6 +186,9 @@ const IntegrationsPage = () => {
         setIntegrationToDelete(null);
     };
 
+    // Log the current apiStatus state for debugging
+    console.log('Current apiStatus state:', apiStatus);
+    
     return (
         <Box sx={{
             height: '100%',
@@ -168,6 +262,7 @@ const IntegrationsPage = () => {
                 open={openIntegrationForm}
                 onClose={handleCloseIntegrationForm}
                 filteredNodes={integrationNodes}
+                onSubmitSuccess={handleIntegrationCreated}
             />
 
             {/* Confirmation Dialog for Integration Deletion */}
@@ -198,10 +293,20 @@ const IntegrationsPage = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+            
+            {/* Force the ApiStatusModal to be rendered */}
+            <ApiStatusModal
+                open={apiStatus.show}
+                status={apiStatus.status}
+                action={apiStatus.action}
+                message={apiStatus.message}
+                onClose={handleCloseApiStatus}
+            />
         </Box>
     );
 };
 
 IntegrationsPage.displayName = 'IntegrationsPage';
 
-export default React.memo(IntegrationsPage);
+// Fix the TypeScript error by explicitly typing the component
+export default React.memo(IntegrationsPage as React.FC);

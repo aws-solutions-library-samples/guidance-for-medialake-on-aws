@@ -131,6 +131,7 @@ export default {
         description: {
           label: 'विवरण',
           tooltip: 'इस एकीकरण के लिए विवरण प्रदान करें',
+          helper: 'इस एकीकरण का संक्षिप्त विवरण',
           errors: {
             required: 'विवरण आवश्यक है'
           }
@@ -165,6 +166,7 @@ export default {
             apiKey: {
               label: 'API कुंजी',
               tooltip: 'अपनी API कुंजी दर्ज करें',
+              helper: 'सेवा के साथ प्रमाणीकरण के लिए API कुंजी',
               errors: {
                 required: 'API कुंजी आवश्यक है'
               }
@@ -192,7 +194,8 @@ export default {
     description: 'अपने मीडिया और मेटाडाटा पाइपलाइन्स का प्रबंधन करें',
     searchPlaceholder: 'पाइपलाइन्स खोजें...',
     actions: {
-      create: 'नया पाइपलाइन जोड़ें'
+      create: 'नया पाइपलाइन जोड़ें',
+      import: 'पाइपलाइन आयात करें'
     }
   },
   executions: {
@@ -339,6 +342,8 @@ export default {
     moreInfo: 'अधिक जानकारी',
     error: 'त्रुटि',
     language: 'भाषा',
+    delete: 'हटाएँ',
+    create: 'बनाएँ',
     actions: {
       add: 'जोड़ें'
     },

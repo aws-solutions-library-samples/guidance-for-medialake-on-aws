@@ -89,7 +89,7 @@ const ProfilePage: React.FC = () => {
                 const { username } = await getCurrentUser();
                 setUserId(username);
             } catch (error) {
-                console.error(t('translation.errors.loadFailed', 'Error getting current user:'), error);
+                console.error(t('errors.loadFailed', 'Error getting current user:'), error);
             }
         };
         getCurrentAuthUser();
@@ -111,7 +111,7 @@ const ProfilePage: React.FC = () => {
         return (
             <ThemeProvider theme={rtlTheme}>
                 <Box sx={{ direction }}>
-                    <Typography color="error">{t('translation.errors.loadFailed', 'Error loading profile')}: {error.message}</Typography>
+                    <Typography color="error">{t('errors.loadFailed', 'Error loading profile')}: {error.message}</Typography>
                 </Box>
             </ThemeProvider>
         );
@@ -192,7 +192,7 @@ const ProfilePage: React.FC = () => {
                                     <EmailIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary={t('translation.users.form.fields.email.label', 'Email')}
+                                    primary={t('users.form.fields.email.label', 'Email')}
                                     secondary={email}
                                     primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
@@ -203,7 +203,7 @@ const ProfilePage: React.FC = () => {
                                     <PersonIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary={t('translation.users.form.fields.given_name.label', 'First Name')}
+                                    primary={t('users.form.fields.given_name.label', 'First Name')}
                                     secondary={firstName}
                                     primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
@@ -214,7 +214,7 @@ const ProfilePage: React.FC = () => {
                                     <PersonIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary={t('translation.users.form.fields.family_name.label', 'Last Name')}
+                                    primary={t('users.form.fields.family_name.label', 'Last Name')}
                                     secondary={lastName}
                                     primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}

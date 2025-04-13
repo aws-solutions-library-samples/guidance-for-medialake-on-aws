@@ -101,16 +101,31 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
         # If pipeline_id is not provided, create a new pipeline record
         if not pipeline_id:
             # Create new pipeline record with initial status
-            pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
+            pipeline_id = create_pipeline_record(pipeline, None, "INITIALIZING")
             logger.info(f"Created new pipeline record with ID: {pipeline_id}")
         
         try:
-            # Create/update Lambda functions for each node
-            update_pipeline_status(pipeline_id, "CREATING_RESOURCES")
+            # Update status to indicate validation phase
+            update_pipeline_status(pipeline_id, "VALIDATING PIPELINE")
+            logger.info(f"Validating pipeline configuration for {pipeline_name}")
+            
+            # Update status to indicate resource creation phase
+            update_pipeline_status(pipeline_id, "CREATING RESOURCES")
+            logger.info(f"Starting resource creation for pipeline {pipeline_name}")
+            
             lambda_arns = {}
+            total_nodes = len(pipeline.configuration.nodes)
+            processed_nodes = 0
             for node in pipeline.configuration.nodes:
-                logger.info(f"Processing node with id: {node.id}")
+                processed_nodes += 1
+                node_id = node.data.id
+                node_type = node.data.type.lower()
+                
+                # Update status for each node being processed
+                update_pipeline_status(pipeline_id, f"PROCESSING NODE {processed_nodes}/{total_nodes}")
+                logger.info(f"Processing node {processed_nodes}/{total_nodes} with id: {node_id}, type: {node_type}")
                 logger.debug(f"Node details: {node}")
+                
                 lambda_arn = create_lambda_function(pipeline_name, node)
                 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
@@ -121,28 +136,55 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                         lambda_key = f"{lambda_key}_{node.data.configuration['operationId']}"
                 
                 lambda_arns[lambda_key] = lambda_arn
+                
+                # Update status after node processing is complete
+                if lambda_arn:
+                    # update_pipeline_status(pipeline_id, f"NODE {node_id} LAMBDA CREATED")
+                    logger.info(f"Lambda function created for node {node_id}")
+                else:
+                    logger.info(f"No Lambda function needed for node {node_id}")
 
+            # Update status after all Lambda functions are created
+            update_pipeline_status(pipeline_id, "LAMBDA RESOURCES CREATED")
+            logger.info(f"All Lambda functions created for pipeline {pipeline_name}")
+            
             # Log edge processing (if any)
+            update_pipeline_status(pipeline_id, "PROCESSING EDGES")
+            logger.info(f"Processing {len(pipeline.configuration.edges)} edges for pipeline {pipeline_name}")
             for edge in pipeline.configuration.edges:
                 logger.info(f"Processing edge: {edge.id} from {edge.source} to {edge.target}")
-
+            
             settings = pipeline.configuration.settings
             logger.info(
                 f"Pipeline settings: AutoStart={settings.autoStart}, RetryAttempts={settings.retryAttempts}, Timeout={settings.timeout}"
             )
 
             # Build and create/update the state machine
-            update_pipeline_status(pipeline_id, "CREATING_STEP_FUNCTION")
+            update_pipeline_status(pipeline_id, "BUILDING STATE MACHINE DEFINITION")
+            logger.info(f"Building state machine definition for pipeline {pipeline_name}")
             state_machine_definition = build_step_function_definition(pipeline, lambda_arns)
+            
+            update_pipeline_status(pipeline_id, "CREATING STATE MACHINE")
+            logger.info(f"Creating state machine for pipeline {pipeline_name}")
             sfn_response = create_step_function(pipeline_name, state_machine_definition)
             state_machine_arn = sfn_response.get("stateMachineArn")
-            logger.info(f"State machine ARN: {state_machine_arn}")
+            logger.info(f"State machine created with ARN: {state_machine_arn}")
+            
+            update_pipeline_status(pipeline_id, "STATE MACHINE CREATED")
+            logger.info(f"State machine successfully created for pipeline {pipeline_name}")
 
             # Create EventBridge rules for trigger nodes
-            update_pipeline_status(pipeline_id, "CREATING_EVENT_RULES")
+            update_pipeline_status(pipeline_id, "CREATING EVENT RULES")
+            logger.info(f"Creating EventBridge rules for trigger nodes in pipeline {pipeline_name}")
             eventbridge_rule_arns = {}
+            trigger_nodes = [node for node in pipeline.configuration.nodes if node.data.type.lower() == "trigger"]
+            total_triggers = len(trigger_nodes)
+            processed_triggers = 0
             for node in pipeline.configuration.nodes:
                 if node.data.type.lower() == "trigger":
+                    processed_triggers += 1
+                    update_pipeline_status(pipeline_id, f"CREATING EVENT RULE {processed_triggers}/{total_triggers}")
+                    logger.info(f"Creating EventBridge rule for trigger node {processed_triggers}/{total_triggers}: {node.data.id}")
                     try:
                         rule_arn = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active)
                         if rule_arn:
@@ -150,7 +192,17 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                             logger.info(f"Added EventBridge rule {rule_arn} for node {node.data.id} with active={pipeline.active}")
                     except Exception as e:
                         logger.error(f"Failed to create EventBridge rule for node {node.data.id}: {e}")
-
+            
+            if total_triggers > 0:
+                update_pipeline_status(pipeline_id, "EVENT RULES CREATED")
+                logger.info(f"All EventBridge rules created for pipeline {pipeline_name}")
+            else:
+                logger.info(f"No trigger nodes found in pipeline {pipeline_name}, skipping EventBridge rule creation")
+            
+            # Update status before final deployment
+            update_pipeline_status(pipeline_id, "FINALIZING DEPLOYMENT")
+            logger.info(f"Finalizing deployment for pipeline {pipeline_name}")
+            
             # Update pipeline info in DynamoDB with DEPLOYED status
             pipeline_id = store_pipeline_info(
                 pipeline,
@@ -160,6 +212,9 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 pipeline_id,
                 active=pipeline.active  # Pass the active field from the pipeline definition
             )
+            
+            update_pipeline_status(pipeline_id, "DEPLOYED")
+            logger.info(f"Pipeline {pipeline_name} successfully deployed with ID: {pipeline_id}")
 
             response_body = {
                 "message": "Pipeline created successfully",

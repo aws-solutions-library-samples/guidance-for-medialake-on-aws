@@ -592,7 +592,7 @@ const AssetPipelines: React.FC<AssetPipelinesProps> = () => {
             
             <Tooltip title="Browse all available pipelines">
                 <Button variant="text" fullWidth sx={{ mt: 2 }}>
-                    {t('translation.pipelines.viewAll', 'View All Pipelines')}
+                    {t('pipelines.viewAll', 'View All Pipelines')}
                 </Button>
             </Tooltip>
         </Box>

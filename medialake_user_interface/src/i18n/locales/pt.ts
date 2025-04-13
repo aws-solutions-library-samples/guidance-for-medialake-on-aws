@@ -125,6 +125,8 @@ export default {
       moreInfo: 'Mais informações',
       error: 'Erro',
       language: 'Idioma',
+      delete: 'Excluir',
+      create: 'Criar',
       actions: {
         add: 'Adicionar'
       },
@@ -150,7 +152,8 @@ export default {
       searchPlaceholder: 'Pesquisar pipelines...',
       actions: {
         create: 'Adicionar Novo Pipeline',
-        viewAll: 'Ver Todos os Pipelines'
+        viewAll: 'Ver Todos os Pipelines',
+        import: 'Importar Pipeline'
       }
     },
     users: {
@@ -234,6 +237,7 @@ export default {
           description: {
             label: 'Descrição',
             tooltip: 'Forneça uma descrição para esta integração',
+            helper: 'Breve descrição desta integração',
             errors: {
               required: 'Descrição é obrigatória'
             }
@@ -268,6 +272,7 @@ export default {
               apiKey: {
                 label: 'Chave de API',
                 tooltip: 'Digite sua chave de API',
+                helper: 'Chave de API para autenticação com o serviço',
                 errors: {
                   required: 'Chave de API é obrigatória'
                 }

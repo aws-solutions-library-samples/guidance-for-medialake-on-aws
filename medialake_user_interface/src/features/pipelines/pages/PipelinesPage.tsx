@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { Box, Button, Snackbar, Alert } from '@mui/material';
+import React, { useState, useMemo, useRef } from 'react';
+import { Box, Button, Snackbar, Alert, ButtonGroup, Popper, Grow, Paper, ClickAwayListener, MenuList, MenuItem } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { FileUpload as FileUploadIcon } from '@mui/icons-material';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,7 +39,11 @@ const PIPELINES_QUERY_KEYS = {
 const PipelinesPage: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-
+    
+    // Add Pipeline Button Menu state
+    const addPipelineButtonRef = useRef<HTMLDivElement>(null);
+    const [addPipelineMenuOpen, setAddPipelineMenuOpen] = useState(false);
+    
     // API Status Modal state
     const [apiStatus, setApiStatus] = useState({
         open: false,
@@ -79,6 +85,30 @@ const PipelinesPage: React.FC = () => {
     });
 
     // Function to handle closing the ApiStatusModal
+    // Handle Add Pipeline Menu Toggle
+    const handleAddPipelineMenuToggle = () => {
+        setAddPipelineMenuOpen((prevOpen) => !prevOpen);
+    };
+    
+    // Handle Add Pipeline Menu Close
+    const handleAddPipelineMenuClose = (event: Event) => {
+        if (
+            addPipelineButtonRef.current &&
+            addPipelineButtonRef.current.contains(event.target as HTMLElement)
+        ) {
+            return;
+        }
+        setAddPipelineMenuOpen(false);
+    };
+    
+    // Handle Import Pipeline
+    const handleImportPipeline = () => {
+        const fileInput = document.getElementById('pipeline-import-input');
+        if (fileInput) fileInput.click();
+        setAddPipelineMenuOpen(false);
+    };
+    
+    // Handle Close API Status Modal
     const handleCloseApiStatus = () => {
         setApiStatus(prev => ({ ...prev, open: false }));
     };
@@ -305,19 +335,149 @@ const PipelinesPage: React.FC = () => {
                 title={t('pipelines.title')}
                 description={t('pipelines.description')}
                 action={
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => navigate('/settings/pipelines/new')}
-                        sx={{
-                            borderRadius: '8px',
-                            textTransform: 'none',
-                            px: 3,
-                            height: 40
-                        }}
-                    >
-                        {t('pipelines.actions.create')}
-                    </Button>
+                    <>
+                        <input
+                            type="file"
+                            accept="application/json"
+                            id="pipeline-import-input"
+                            style={{ display: 'none' }}
+                            onChange={(event) => {
+                                const fileReader = new FileReader();
+                                const files = event.target.files;
+                                if (files && files.length > 0) {
+                                    // Extract the file name without extension to use as pipeline name
+                                    const fileName = files[0].name;
+                                    const pipelineNameFromFile = fileName.endsWith('.json')
+                                        ? fileName.slice(0, -5) // Remove .json extension
+                                        : fileName;
+                                    
+                                    fileReader.readAsText(files[0], 'UTF-8');
+                                    fileReader.onload = (e) => {
+                                        try {
+                                            const flow = JSON.parse(e.target?.result as string);
+                                            if (flow) {
+                                                // Ensure the active property is preserved
+                                                // If active is not defined in the imported flow, default to true
+                                                // Process the imported flow to ensure all edges have the required data field
+                                                const processedFlow = { ...flow };
+                                                
+                                                // If the flow has edges, ensure each edge has a data field
+                                                if (processedFlow.edges && Array.isArray(processedFlow.edges)) {
+                                                    processedFlow.edges = processedFlow.edges.map(edge => {
+                                                        // Ensure edge has data field with at least a text property
+                                                        if (!edge.data) {
+                                                            return { ...edge, data: { text: '', id: edge.id, type: 'custom' } };
+                                                        } else if (typeof edge.data === 'object' && !edge.data.id) {
+                                                            // If data exists but doesn't have id and type fields, add them
+                                                            return {
+                                                                ...edge,
+                                                                data: {
+                                                                    ...edge.data,
+                                                                    id: edge.id,
+                                                                    type: 'custom'
+                                                                }
+                                                            };
+                                                        }
+                                                        return edge;
+                                                    });
+                                                }
+                                                
+                                                const importedFlow = {
+                                                    ...processedFlow,
+                                                    active: processedFlow.active !== undefined ? processedFlow.active : true
+                                                };
+                                                
+                                                console.log('[PipelinesPage] Processed imported flow:', importedFlow);
+                                                
+                                                // Navigate to new pipeline page with the imported flow and name
+                                                // Pass showImporting flag to indicate the editor should show the importing state
+                                                navigate('/settings/pipelines/new', {
+                                                    state: {
+                                                        importedFlow: importedFlow,
+                                                        pipelineName: pipelineNameFromFile,
+                                                        showImporting: true
+                                                    }
+                                                });
+                                            }
+                                        } catch (error) {
+                                            console.error('Error parsing flow JSON', error);
+                                            setApiStatus({
+                                                open: true,
+                                                status: 'error',
+                                                action: 'Import Failed',
+                                                message: 'Failed to parse the pipeline file.'
+                                            });
+                                        } finally {
+                                            // Reset the file input
+                                            const fileInput = document.getElementById('pipeline-import-input') as HTMLInputElement;
+                                            if (fileInput) fileInput.value = '';
+                                        }
+                                    };
+                                }
+                            }}
+                        />
+                        <ButtonGroup
+                            variant="contained"
+                            ref={addPipelineButtonRef}
+                            aria-label="Pipeline actions"
+                        >
+                            <Button
+                                startIcon={<AddIcon />}
+                                onClick={() => navigate('/settings/pipelines/new')}
+                                sx={{
+                                    borderRadius: '8px 0 0 8px',
+                                    textTransform: 'none',
+                                    px: 3,
+                                    height: 40
+                                }}
+                            >
+                                {t('pipelines.actions.create')}
+                            </Button>
+                            <Button
+                                size="small"
+                                sx={{
+                                    borderRadius: '0 8px 8px 0',
+                                    height: 40
+                                }}
+                                aria-controls={addPipelineMenuOpen ? 'add-pipeline-menu' : undefined}
+                                aria-expanded={addPipelineMenuOpen ? 'true' : undefined}
+                                aria-label="select pipeline action"
+                                aria-haspopup="menu"
+                                onClick={handleAddPipelineMenuToggle}
+                            >
+                                <ArrowDropDownIcon />
+                            </Button>
+                        </ButtonGroup>
+                        
+                        <Popper
+                            sx={{ zIndex: 1200 }}
+                            open={addPipelineMenuOpen}
+                            anchorEl={addPipelineButtonRef.current}
+                            role={undefined}
+                            transition
+                            disablePortal
+                        >
+                            {({ TransitionProps, placement }) => (
+                                <Grow
+                                    {...TransitionProps}
+                                    style={{
+                                        transformOrigin:
+                                            placement === 'bottom' ? 'center top' : 'center bottom',
+                                    }}
+                                >
+                                    <Paper>
+                                        <ClickAwayListener onClickAway={handleAddPipelineMenuClose}>
+                                            <MenuList id="add-pipeline-menu" autoFocusItem>
+                                                <MenuItem onClick={handleImportPipeline}>
+                                                    <FileUploadIcon sx={{ mr: 1 }} /> {t('pipelines.actions.import')}
+                                                </MenuItem>
+                                            </MenuList>
+                                        </ClickAwayListener>
+                                    </Paper>
+                                </Grow>
+                            )}
+                        </Popper>
+                    </>
                 }
             />
 

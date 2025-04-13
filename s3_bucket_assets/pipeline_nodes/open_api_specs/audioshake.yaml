@@ -1426,6 +1426,7 @@ paths:
 servers:
   - url: https://groovy.audioshake.ai
     description: Production server
+    x-server-environment: Production
 security:
   - token: []
 tags:
