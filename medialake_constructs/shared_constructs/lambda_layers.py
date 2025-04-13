@@ -338,6 +338,10 @@ class SearchLayer(Construct):
                 entry="lambdas/layers/search", description="A Lambda layer for search"
             ),
         )
+        
+    @property
+    def layer(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer
 
 
 class PyamlLayer(Construct):
