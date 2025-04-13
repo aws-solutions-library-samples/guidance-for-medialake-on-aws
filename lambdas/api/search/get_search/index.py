@@ -674,9 +674,11 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                     # Ensure the score does not exceed 1.0.
                     combined_score = min(combined_score, 1.0)
                     result_dict["score"] = combined_score
-                # Remove clip-specific details since the front end expects only the parent asset.
-                result_dict.pop("clips", None)
 
+                    # Process and attach clips.
+                    result_dict["clips"] = [process_clip(clip_hit["hit"]) for clip_hit in asset_clips]
+                # Ensure that 'clips' key is always a list even if no clips are attached.
+                result_dict["clips"] = result_dict.get("clips") or []
                 return result_dict
             except Exception as e:
                 logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
@@ -721,7 +723,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     for i, result in enumerate(results):
         asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
         score = result.get("score", 0)
-        clip_count = len(result.get("clips", [])) if "clips" in result else 0
+        clip_val = result.get("clips", [])
+        clip_count = len(clip_val) if isinstance(clip_val, list) else 0
         logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
 
     for result in results:
@@ -736,7 +739,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     for i, result in enumerate(results):
         asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
         score = result.get("score", 0)
-        clip_count = len(result.get("clips", [])) if "clips" in result else 0
+        clip_val = result.get("clips", [])
+        clip_count = len(clip_val) if isinstance(clip_val, list) else 0
         logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
 
     logger.info(f"Total processed results: {len(results)}")
@@ -757,9 +761,16 @@ def perform_search(params: SearchParams) -> Dict:
 
         logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
 
+        # Use a fallback in case 'hits' or the 'hits' list is missing.
+        hits = response.get("hits", {}).get("hits", [])
+        if hits is None:
+            hits = []
+
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
-                processed_results = process_semantic_results_parallel(response["hits"]["hits"])
+                processed_results = process_semantic_results_parallel(hits)
+                if processed_results is None:  # Safety check.
+                    processed_results = []
                 total_results = len(processed_results)
                 start_idx = (params.page - 1) * params.pageSize
                 end_idx = start_idx + params.pageSize
@@ -791,7 +802,7 @@ def perform_search(params: SearchParams) -> Dict:
                 }
             else:
                 results = []
-                for hit in response["hits"]["hits"]:
+                for hit in hits:
                     try:
                         result = process_search_hit(hit)
                         results.append(result.model_dump(by_alias=True))
@@ -824,16 +835,16 @@ def perform_search(params: SearchParams) -> Dict:
                     },
                 }
         else:
-            hits = []
-            for hit in response["hits"]["hits"]:
+            hits_list = []
+            for hit in hits:
                 try:
                     result = process_search_hit(hit)
-                    hits.append(result)
+                    hits_list.append(result)
                 except Exception as e:
                     logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                     continue
 
-            logger.info(f"Successfully processed hits: {len(hits)}")
+            logger.info(f"Successfully processed hits: {len(hits_list)}")
             search_metadata = SearchMetadata(
                 totalResults=response["hits"]["total"]["value"],
                 page=params.page,
@@ -847,7 +858,7 @@ def perform_search(params: SearchParams) -> Dict:
                 "message": "ok",
                 "data": {
                     "searchMetadata": search_metadata.model_dump(by_alias=True),
-                    "results": [hit.model_dump(by_alias=True) for hit in hits],
+                    "results": [hit.model_dump(by_alias=True) for hit in hits_list],
                 },
             }
 
