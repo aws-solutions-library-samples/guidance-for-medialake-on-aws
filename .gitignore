@@ -51,6 +51,7 @@ cdk.context.json
 *.swp
 *.clinerules
 *.cursorrules
+*.cursorignore
 docs/
 cline_docs/
 

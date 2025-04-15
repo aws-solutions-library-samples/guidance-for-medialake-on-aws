@@ -938,7 +938,9 @@ def create_connector(createconnector: S3Connector) -> dict:
                     }
                 },
                 Layers=layers,  # Updated to include both custom and AWS SDK layers
-                Timeout=300,  # 5 minutes
+                Timeout=900,  # Maximum timeout: 15 minutes
+                MemorySize=10240,  # Maximum memory: 10GB
+                EphemeralStorage={"Size": 10240},  # Maximum ephemeral storage: 10GB
             )
             logger.info(f"Deployed new lambda function: {target_function_name}")
             lambda_arn = create_function_response["FunctionArn"]

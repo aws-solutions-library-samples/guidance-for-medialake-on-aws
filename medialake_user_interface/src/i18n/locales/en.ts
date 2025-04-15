@@ -31,7 +31,19 @@ export default {
           confirm: 'Delete'
         }
       },
-    sidebar: {
+    home: {
+        title: 'Home',
+        description: 'MediaLake - A data lake for your media and metadata',
+        statistics: 'Statistics',
+        collections: 'Collections',
+        sharedCollections: 'Shared Collections',
+        favorites: 'Favorites',
+        smartFolders: 'Smart Folders',
+        connectedStorage: 'Connected Storage',
+        sharing: 'Sharing',
+        comingSoon: 'Coming Soon'
+    },
+      sidebar: {
         menu: {
             home: 'Home',
             assets: 'Assets',
@@ -350,6 +362,7 @@ export default {
         textFilter: 'Text Filter',
         all: 'All',
         filter: 'Filter',
+        noGroups: 'No Groups',
         actions: {
             add: 'Add',
             save: 'Save',
