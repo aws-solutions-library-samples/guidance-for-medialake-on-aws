@@ -107,7 +107,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
             throw error; // Re-throw to allow parent component to handle the error
         }
     }, [onSubmit, enabled]);
-    }, [onSubmit, enabled]);
 
     const authMethod = formData.auth.type;
 
