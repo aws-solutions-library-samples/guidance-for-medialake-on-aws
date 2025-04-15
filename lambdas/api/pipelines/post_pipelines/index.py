@@ -204,6 +204,14 @@ def get_state_machine_definition(
                     },
                 },
                 "ResultPath": f"$.{state_name}Result",
+                "Retry": [
+                    {
+                        "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                        "IntervalSeconds": 1,
+                        "MaxAttempts": 10,
+                        "BackoffRate": 2.0
+                    }
+                ]
             }
         elif node_data["type"] == "choice":
             state = {"Type": "Choice", "Choices": [], "Default": "FailState"}
