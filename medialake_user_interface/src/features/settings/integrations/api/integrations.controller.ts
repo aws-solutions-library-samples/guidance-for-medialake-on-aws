@@ -16,7 +16,6 @@ const transformFormDataToDto = (formData: IntegrationFormData): CreateIntegratio
         nodeId: formData.nodeId,
         integrationType: formData.nodeId.replace('node-', '').replace('-api', ''),
         description: formData.description,
-        environmentId: formData.environmentId,
         integrationEnabled: true,
         createdDate: now,
         modifiedDate: now,

@@ -138,7 +138,7 @@ function Sidebar() {
                 { text: t('sidebar.submenu.userManagement'), icon: <GroupIcon />, path: '/settings/users' },
                 { text: t('sidebar.submenu.roles'), icon: <SecurityIcon />, path: '/settings/roles' },
                 { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations' },
-                { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
+                // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
                 { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system' },
             ]
         }

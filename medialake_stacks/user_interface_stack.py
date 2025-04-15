@@ -22,6 +22,7 @@ from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 class UserInterfaceStackProps:
     access_log_bucket: s3.IBucket
     api_gateway_rest_id: str
+    api_gateway_stage: str
     cognito_user_pool_id: str
     cognito_user_pool_client_id: str
     cognito_identity_pool: str
@@ -93,6 +94,7 @@ class UserInterfaceStack(Stack):
                 cognito_user_pool_client_id=props.cognito_user_pool_client_id,
                 cognito_identity_pool=props.cognito_identity_pool,
                 api_gateway_rest_id=props.api_gateway_rest_id,
+                api_gateway_stage=props.api_gateway_stage,
                 access_log_bucket=props.access_log_bucket,
                 cloudfront_waf_acl_arn=waf_acl_arn,  # Use the looked-up ARN
             ),

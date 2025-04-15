@@ -76,6 +76,7 @@ class LocalBundling:
 class UIConstructProps:
     access_log_bucket: s3.IBucket
     api_gateway_rest_id: str
+    api_gateway_stage: str
     cognito_user_pool_id: str
     cognito_user_pool_client_id: str
     cloudfront_waf_acl_arn: str
@@ -371,7 +372,7 @@ class UIConstruct(Construct):
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
                 ),
-                f"/{config.api_path}/*": cloudfront.BehaviorOptions(
+                f"/{props.api_gateway_stage}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
                         origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
@@ -457,7 +458,7 @@ class UIConstruct(Construct):
             "API": {
                 "REST": {
                     "RestApi": {
-                        "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{config.api_path}"
+                        "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{props.api_gateway_stage}"
                     }
                 }
             }

@@ -51,6 +51,7 @@ class RolesApi(Construct):
         props: RolesApiProps,
     ) -> None:
         super().__init__(scope, constructor_id)
+        from config import config
 
         # Get the current account ID
         account_id = Stack.of(self).account
@@ -59,14 +60,14 @@ class RolesApi(Construct):
             self,
             "RolesTable",
             props=DynamoDBProps(
-                name=f"medialake_roles_table",
+                name=f"{config.resource_prefix}-roles-table-{config.environment}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
         )
 
         # Create connectors resource
-        roles_resource = props.api_resource.root.add_resource("roles")
+        roles_resource = props.api_resource.add_resource("roles")
 
         # Add role_id path parameter resource
         roles_role_resource = roles_resource.add_resource("role")

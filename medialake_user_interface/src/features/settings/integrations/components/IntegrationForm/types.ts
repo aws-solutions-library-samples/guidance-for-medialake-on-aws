@@ -20,7 +20,6 @@ export interface IntegrationFormProps {
 export interface IntegrationFormData {
     nodeId: string;
     description: string;
-    environmentId: string;
     auth: {
         type: 'awsIam' | 'apiKey';
         credentials: {
@@ -41,7 +40,6 @@ export interface IntegrationConfigurationProps {
     onSubmit: (data: IntegrationFormData) => Promise<void>;
     onBack: () => void;
     onClose: () => void;
-    environments: Environment[];
 }
 
 export interface StepperHeaderProps {

@@ -28,7 +28,6 @@ import { IntegrationFormProps, IntegrationFormData } from './types';
 import { integrationFormSchema, createIntegrationFormDefaults } from './schemas/integrationFormSchema';
 import { useCreateIntegration } from '@/features/settings/integrations/api/integrations.controller';
 import { IntegrationsNodesService } from '@/features/settings/integrations/services/integrations-nodes.service';
-import { IntegrationsEnvironmentsService } from '@/features/settings/integrations/services/integrations-environments.service';
 import { IntegrationNode } from '@/features/settings/integrations/types';
 import { IntegrationConfiguration } from './components/IntegrationConfiguration';
 
@@ -48,13 +47,10 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     // Use filteredNodes if provided, otherwise fetch all nodes
     const { nodes: fetchedNodes = [], isLoading: isLoadingNodes } = IntegrationsNodesService.useNodes();
     const rawNodes = filteredNodes || fetchedNodes;
-    
-    const { environments = [], isLoading: isLoadingEnvironments } = IntegrationsEnvironmentsService.useEnvironments();
 
     const defaultFormValues: IntegrationFormData = {
         nodeId: '',
         description: '',
-        environmentId: '',
         auth: {
             type: 'apiKey',
             credentials: {},
@@ -127,7 +123,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
         form.reset({
             nodeId: nodeId,
             description: '',
-            environmentId: '',
             auth: {
                 type: authType,
                 credentials: {},
@@ -146,7 +141,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     }, [open, handleReset]);
 
     const renderContent = () => {
-        if (isLoadingNodes || isLoadingEnvironments) {
+        if (isLoadingNodes) {
             return (
                 <Box sx={{ p: 2, textAlign: 'center' }}>
                     <Typography>{t('common.loading')}</Typography>
@@ -261,7 +256,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
                 onSubmit={handleSubmit}
                 onBack={handleBack}
                 onClose={onClose}
-                environments={environments}
             />
         );
     };

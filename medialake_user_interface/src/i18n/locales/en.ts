@@ -344,8 +344,18 @@ export default {
         moreInfo: 'More information',
         error: 'Error',
         language: 'Language',
+        noResults: 'No results found',
+        selectFilter: 'Select Filter',
+        textFilter: 'Text Filter',
+        all: 'All',
+        filter: 'Filter',
         actions: {
-            add: 'Add'
+            add: 'Add',
+            save: 'Save',
+            delete: 'Delete',
+            edit: 'Edit',
+            activate: 'Activate',
+            deactivate: 'Deactivate'
         },
         columns: {
             username: 'Username',
@@ -419,6 +429,7 @@ export default {
                 lastName: 'Last Name',
                 email: 'Email',
                 status: 'Status',
+                role: 'Role',
                 groups: 'Groups',
                 created: 'Created',
                 modified: 'Modified',

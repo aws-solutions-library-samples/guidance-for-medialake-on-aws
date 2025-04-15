@@ -74,7 +74,7 @@ class ApiGatewayIntegrationsConstruct(Construct):
         )
 
         # Create integrations resource
-        integrations_resource = props.api_resource.root.add_resource("integrations")
+        integrations_resource = props.api_resource.add_resource("integrations")
 
         # GET /integrations
         self._get_integrations_handler = Lambda(
@@ -248,8 +248,16 @@ class ApiGatewayIntegrationsConstruct(Construct):
 
     @property
     def put_integration_handler(self) -> Lambda:
-        return self._put_integration_handler
+        return self._put_integration_handler.function
 
     @property
     def delete_integration_handler(self) -> Lambda:
-        return self._delete_integration_handler
+        return self._delete_integration_handler.function
+
+    @property
+    def get_integrations_handler(self) -> Lambda:
+        return self._get_integrations_handler.function
+
+    @property
+    def post_integrations_handler(self) -> Lambda:
+        return self._post_integrations_handler.function

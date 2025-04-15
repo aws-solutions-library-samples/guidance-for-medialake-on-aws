@@ -48,10 +48,6 @@ REQUEST_SCHEMA = {
     "properties": {
         "nodeId": {"type": "string", "minLength": 1},
         "description": {"type": "string"},
-        "environmentId": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-        },
         "auth": {
             "type": "object",
             "properties": {
@@ -65,8 +61,35 @@ REQUEST_SCHEMA = {
             "required": ["type", "credentials"],
         },
     },
-    "required": ["nodeId", "environmentId", "auth"],
+    "required": ["nodeId", "auth"],
 }
+
+
+@tracer.capture_method
+def get_default_environment() -> str:
+    """
+    Find the default environment from DynamoDB
+    """
+    try:
+        table = dynamodb.Table(os.environ["ENVIRONMENTS_TABLE"])
+        # Simply scan the entire table as there should only be one default environment
+        response = table.scan(
+            FilterExpression="begins_with(PK, :pk_prefix) AND #name = :name",
+            ExpressionAttributeNames={"#name": "name"},
+            ExpressionAttributeValues={":pk_prefix": "ENV#", ":name": "default"},
+        )
+        
+        if not response.get("Items"):
+            logger.error("Default environment not found")
+            raise InternalServerError("Default environment not found")
+            
+        # Return the environment ID (extracting from "ENV#uuid" format)
+        environment_id = response["Items"][0]["PK"].split("#")[1]
+        logger.info(f"Found default environment: {environment_id}")
+        return environment_id
+    except ClientError as e:
+        logger.error(f"Failed to find default environment: {str(e)}")
+        raise InternalServerError("Failed to find default environment")
 
 
 @tracer.capture_method
@@ -90,10 +113,10 @@ def store_api_key_secret(api_key: str, integration_id: str) -> str:
 
 @tracer.capture_method
 def create_integration(
-    integration_data: Dict[str, Any], integration_id: str
+    integration_data: Dict[str, Any], integration_id: str, environment_id: str
 ) -> Dict[str, Any]:
     """
-    Create a new integration in DynamoDB
+    Create a new integration in DynamoDB using the provided environment ID
     """
     table = dynamodb.Table(os.environ["INTEGRATIONS_TABLE"])
 
@@ -108,11 +131,11 @@ def create_integration(
         # Prepare the item
         item = {
             "PK": f"INTEGRATION#{integration_id}",
-            "SK": f"CONFIG#{integration_data['environmentId']}",
+            "SK": f"CONFIG#{environment_id}",
             "ID": integration_id,
             "Node": integration_data["nodeId"],
             "Type": node_type,
-            "Environment": integration_data["environmentId"],
+            "Environment": environment_id,
             "Status": "active",  # Default to active
             "Description": integration_data.get("description", ""),
             "Configuration": {"auth": integration_data["auth"]},
@@ -158,11 +181,14 @@ def handle_post_integrations() -> Dict[str, Any]:
         event_body = app.current_event.json_body
         validate(event=event_body, schema=REQUEST_SCHEMA)
 
+        # Get the default environment
+        environment_id = get_default_environment()
+
         # Generate unique ID for the integration
         integration_id = str(uuid.uuid4())
 
-        # Create the integration
-        integration = create_integration(event_body, integration_id)
+        # Create the integration with the default environment
+        integration = create_integration(event_body, integration_id, environment_id)
 
         return {
             "statusCode": 201,

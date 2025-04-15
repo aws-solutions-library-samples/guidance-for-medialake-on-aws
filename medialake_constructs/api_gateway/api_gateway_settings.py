@@ -19,6 +19,10 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_dynamodb as dynamodb,
     Stack,
+    aws_lambda_python_alpha as lambda_python_alpha,
+    aws_lambda as _lambda,
+    aws_events as events,
+    aws_s3 as s3,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 
@@ -32,6 +36,8 @@ from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDBProps,
 )
 
+from .api_gateway_utils import add_cors_options_method
+
 
 @dataclass
 class SettingsConstructProps:
@@ -42,6 +48,8 @@ class SettingsConstructProps:
     cognito_authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
+    system_settings_table_name: str
+    system_settings_table_arn: str
 
 
 class SettingsConstruct(Construct):
@@ -81,25 +89,19 @@ class SettingsConstruct(Construct):
         account_id = Stack.of(self).account
 
         # Create settings resource
-        settings_resource = props.api_resource.root.add_resource("settings")
+        settings_resource = props.api_resource.add_resource("settings")
+        # Add OPTIONS method to support CORS
+        add_cors_options_method(settings_resource)
         
         # Create system settings resource and DynamoDB table
         system_resource = settings_resource.add_resource("system")
+        # Add OPTIONS method to support CORS
+        add_cors_options_method(system_resource)
         
-        # Create DynamoDB table for system settings
-        self.system_settings_table = DynamoDB(
-            self,
-            "SystemSettingsTable",
-            props=DynamoDBProps(
-                name=f"medialake-system-settings",
-                partition_key_name="PK",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                sort_key_name="SK",
-                sort_key_type=dynamodb.AttributeType.STRING,
-                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-                point_in_time_recovery=True,
-            ),
-        )
+    
+        # Get the existing system settings table by ARN
+        self._system_settings_table_name = props.system_settings_table_name
+        self._system_settings_table_arn = props.system_settings_table_arn
         
         # GET /settings/system
         self._get_system_settings_handler = Lambda(
@@ -110,14 +112,23 @@ class SettingsConstruct(Construct):
                 entry="lambdas/api/settings/system/get_system_settings",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "SYSTEM_SETTINGS_TABLE": self._system_settings_table_name,
                     "METRICS_NAMESPACE": "MediaLake",
                 },
             ),
         )
 
-        self.system_settings_table.table.grant_read_data(
-            self._get_system_settings_handler.function
+        # Grant access to the existing system settings table
+        self._get_system_settings_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[self._system_settings_table_arn],
+            )
         )
 
         system_resource.add_method(
@@ -129,6 +140,8 @@ class SettingsConstruct(Construct):
         
         # Create search provider resource
         search_resource = system_resource.add_resource("search")
+        # Add OPTIONS method to support CORS
+        add_cors_options_method(search_resource)
 
         # GET /settings/system/search
         self._get_search_provider_handler = Lambda(
@@ -139,14 +152,22 @@ class SettingsConstruct(Construct):
                 entry="lambdas/api/settings/system/search/get_search",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "SYSTEM_SETTINGS_TABLE": self._system_settings_table_name,
                     "METRICS_NAMESPACE": "MediaLake",
                 },
             ),
         )
 
-        self.system_settings_table.table.grant_read_data(
-            self._get_search_provider_handler.function
+        self._get_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[self._system_settings_table_arn],
+            )
         )
 
         search_resource.add_method(
@@ -165,14 +186,23 @@ class SettingsConstruct(Construct):
                 entry="lambdas/api/settings/system/search/post_search",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "SYSTEM_SETTINGS_TABLE": self._system_settings_table_name,
                     "METRICS_NAMESPACE": "MediaLake",
                 },
             ),
         )
 
-        self.system_settings_table.table.grant_read_write_data(
-            self._post_search_provider_handler.function
+        self._post_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[self._system_settings_table_arn],
+            )
         )
         
         # Add permissions to access Secrets Manager
@@ -206,14 +236,20 @@ class SettingsConstruct(Construct):
                 entry="lambdas/api/settings/system/search/put_search",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "SYSTEM_SETTINGS_TABLE": self.system_settings_table.table_name,
+                    "SYSTEM_SETTINGS_TABLE": self._system_settings_table_name,
                     "METRICS_NAMESPACE": "MediaLake",
                 },
             ),
         )
 
-        self.system_settings_table.table.grant_read_write_data(
-            self._put_search_provider_handler.function
+        self._put_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                ],
+                resources=[self._system_settings_table_arn],
+            )
         )
         
         # Add permissions to access Secrets Manager
@@ -464,11 +500,11 @@ class SettingsConstruct(Construct):
         
     @property
     def system_settings_table_name(self) -> str:
-        return self.system_settings_table.table_name
+        return self._system_settings_table_name
 
     @property
     def system_settings_table_arn(self) -> str:
-        return self.system_settings_table.table_arn
+        return self._system_settings_table_arn
 
     @property
     def get_system_settings_handler(self) -> Lambda:
@@ -480,7 +516,7 @@ class SettingsConstruct(Construct):
 
     @property
     def post_search_provider_handler(self) -> Lambda:
-        return self._post_search_provider_handler
+        return self._post_search_provider_handler.function
 
     @property
     def put_search_provider_handler(self) -> Lambda:

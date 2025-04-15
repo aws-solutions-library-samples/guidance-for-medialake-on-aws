@@ -36,7 +36,7 @@ class ApiGatewayPipelinesProps:
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
-    integrations_table: dynamodb.TableV2
+    # integrations_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
@@ -46,8 +46,6 @@ class ApiGatewayPipelinesProps:
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
     open_search_endpoint: str
-    # open_search_arn: str
-    # open_search_index: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -262,7 +260,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name,
                 "RESOURCE_PREFIX": config.resource_prefix,
                 "NODE_TABLE": props.node_table.table_arn,
-                "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                 "OPENSEARCH_VPC_SUBNET_IDS": ','.join([subnet.subnet_id for subnet in props.vpc.private_subnets]),
                 "OPENSEARCH_SECURITY_GROUP_ID": props.security_group.security_group_id,
@@ -368,12 +365,6 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:Query"],
-                resources=[props.integrations_table.table_arn],
-            )
-        )
 
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -432,7 +423,6 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    # "logs:CreateLogGroup",
                     "logs:CreateLogStream",
                     "logs:PutLogEvents",
                 ],
@@ -445,8 +435,6 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         
-
-       
         # Create a simple Step Function that just invokes the pipeline v2 Lambda
         pipeline_worker_task = tasks.LambdaInvoke(
             self,

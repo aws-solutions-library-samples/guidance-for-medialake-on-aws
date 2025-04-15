@@ -240,42 +240,41 @@ const UserList: React.FC<UserListProps> = ({
                 },
             },
             {
-                header: t('translation.common.columns.groups'),
-                accessorKey: 'groups',
+                header: t('translation.common.columns.role'),
+                accessorKey: 'roles',
                 minSize: 120,
                 size: 160,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
                 cell: ({ getValue }) => {
-                    const groups = getValue() as string[];
+                    const roles = getValue() as string[];
+                    const primaryRole = roles && roles.length > 0 ? roles[0] : null;
+                    
                     return (
                         <Box sx={{
                             display: 'flex',
                             gap: 1,
-                            flexWrap: 'wrap',
                         }}>
-                            {groups.length > 0 ? (
-                                groups.map((group) => (
-                                    <Chip
-                                        key={group}
-                                        label={group}
-                                        size="small"
-                                        sx={{
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                            color: theme.palette.primary.main,
-                                            fontWeight: 600,
-                                            borderRadius: '6px',
-                                            height: '24px',
-                                            '& .MuiChip-label': {
-                                                px: 1.5,
-                                            },
-                                        }}
-                                    />
-                                ))
+                            {primaryRole ? (
+                                <Chip
+                                    key={primaryRole}
+                                    label={primaryRole}
+                                    size="small"
+                                    sx={{
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                        color: theme.palette.primary.main,
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        height: '24px',
+                                        '& .MuiChip-label': {
+                                            px: 1.5,
+                                        },
+                                    }}
+                                />
                             ) : (
                                 <TableCellContent variant="secondary">
-                                    {t('translation.common.noGroups')}
+                                    No Role
                                 </TableCellContent>
                             )}
                         </Box>

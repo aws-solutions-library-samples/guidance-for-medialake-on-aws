@@ -1,48 +1,48 @@
-from dataclasses import dataclass
 from aws_cdk import (
     Stack,
-    Environment,
-    aws_events as events,
     aws_dynamodb as dynamodb,
-    aws_lambda as lambda_,
     aws_iam as iam,
-    aws_events_targets as targets,
-    aws_s3_notifications as s3n,
-    aws_s3 as s3,
-    aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
+from dataclasses import dataclass
 
-# Local imports
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
+from medialake_constructs.shared_constructs.dynamodb import (
+    DynamoDB,
+    DynamoDBProps,
 )
 
 
 @dataclass
 class SettingsStackProps:
-    test: str
+    """Configuration for Settings Stack."""
+    pass
 
 
 class SettingsStack(Stack):
     def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        props: SettingsStackProps,
-        **kwargs,
+        self, scope: Construct, id: str, props: SettingsStackProps, **kwargs
     ):
-        super().__init__(scope, construct_id, **kwargs)
+        super().__init__(scope, id, **kwargs)
 
-        self._user_settings_table = DynamoDB(
+        # Create DynamoDB table for system settings
+        self.system_settings_table = DynamoDB(
             self,
-            "UserSettingsTable",
+            "SystemSettingsTable",
             props=DynamoDBProps(
-                name="medialake_user_settings_table",
-                partition_key_name="user_id",
+                name=f"medialake-system-settings",
+                partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="SK",
+                sort_key_type=dynamodb.AttributeType.STRING,
+                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+                point_in_time_recovery=True,
             ),
         )
+
+    @property
+    def system_settings_table_name(self) -> str:
+        return self.system_settings_table.table_name
+        
+    @property
+    def system_settings_table_arn(self) -> str:
+        return self.system_settings_table.table_arn

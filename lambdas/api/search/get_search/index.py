@@ -230,7 +230,6 @@ def build_semantic_query(params: SearchParams) -> Dict:
                     {"term": {"embedding_scope": "clip"}}
                 ]
             
-            print(json.dumps(query))
             logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
             return query
         else:

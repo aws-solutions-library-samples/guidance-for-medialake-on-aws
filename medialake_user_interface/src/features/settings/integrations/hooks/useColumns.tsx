@@ -21,11 +21,6 @@ export const useColumns = ({ onEditIntegration, onDeleteIntegration }: UseColumn
                 size: 200,
                 enableSorting: true,
             }),
-            columnHelper.accessor('type', {
-                header: 'Type',
-                size: 150,
-                enableSorting: true,
-            }),
             columnHelper.accessor('status', {
                 header: 'Status',
                 size: 120,

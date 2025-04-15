@@ -22,7 +22,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
     onSubmit,
     onBack,
     onClose,
-    environments,
 }) => {
     const { t } = useTranslation();
     const [showApiKey, setShowApiKey] = React.useState(false);
@@ -35,7 +34,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         return z.object({
             nodeId: z.string().min(1, 'Integration selection is required'),
             description: z.string().min(1, 'Description is required'),
-            environmentId: z.string().min(1, 'Environment selection is required'),
             auth: z.object({
                 type: z.enum(['apiKey', 'awsIam']),
                 credentials: z.object({
@@ -52,7 +50,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         const cleanData = {
             nodeId: formData.nodeId || '',
             description: formData.description || '',
-            environmentId: formData.environmentId || '',
             auth: {
                 type: formData.auth?.type || 'apiKey',
                 credentials: {
@@ -92,35 +89,23 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         try {
             const now = new Date().toISOString();
 
+            // Add metadata to the form data before submitting
             const submissionData = {
-                nodeId: data.nodeId,
+                ...data, // This includes all required fields from IntegrationFormData
                 integrationType: data.nodeId.replace('node-', '').replace('-api', ''),
-                description: data.description,
-                environmentId: data.environmentId,
                 integrationEnabled: enabled,
                 createdDate: now,
                 modifiedDate: now,
-                auth: {
-                    type: data.auth.type,
-                    credentials: {
-                        apiKey: data.auth.type === 'apiKey' ? data.auth.credentials.apiKey : undefined,
-                        iamRole: data.auth.type === 'awsIam' ? data.auth.credentials.iamRole : undefined
-                    }
-                }
             };
-            console.log('[IntegrationConfiguration] Cleaned submission data:', submissionData);
+            
+            console.log('[IntegrationConfiguration] Prepared submission data:', submissionData);
 
-            await createIntegrationMutation.mutateAsync(submissionData);
-            console.log('[IntegrationConfiguration] Mutation completed');
-
-            if (onClose) {
-                console.log('[IntegrationConfiguration] Closing form');
-                onClose();
-            }
+            await onSubmit(data);
+            console.log('[IntegrationConfiguration] Submission completed');
         } catch (error) {
             console.error('[IntegrationConfiguration] Error during submission:', error);
         }
-    }, [createIntegrationMutation, onClose, enabled]);
+    }, [onSubmit, enabled]);
 
     const authMethod = formData.auth.type;
 
@@ -148,18 +133,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                     tooltip={t('integrations.form.fields.description.tooltip')}
                     multiline
                     rows={3}
-                    required
-                    translationPrefix="integrations.form"
-                />
-                <FormSelect
-                    name="environmentId"
-                    control={form.control}
-                    label={t('integrations.form.fields.environment.label')}
-                    tooltip={t('integrations.form.fields.environment.tooltip')}
-                    options={environments.map((env) => ({
-                        label: env.name,
-                        value: env.environment_id,
-                    }))}
                     required
                     translationPrefix="integrations.form"
                 />
@@ -198,23 +171,21 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                     />
                 )}
             </Box>
-            <Box sx={{
-                mt: 3,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-            }}>
-                <Box>
-                    <Button onClick={onBack} variant="outlined">
-                        {t('common.back')}
-                    </Button>
-                </Box>
+
+            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
+                <Button onClick={onBack} variant="outlined">
+                    {t('common.back')}
+                </Button>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button onClick={onClose} variant="outlined">
                         {t('common.cancel')}
                     </Button>
-                    <Button type="submit" variant="contained" color="primary">
-                        {t('common.create')}
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={!form.formState.isValid}
+                    >
+                        {t('common.save')}
                     </Button>
                 </Box>
             </Box>

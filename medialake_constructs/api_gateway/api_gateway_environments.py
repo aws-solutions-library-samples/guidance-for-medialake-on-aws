@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_dynamodb as dynamodb,
     aws_secretsmanager as secretsmanager,
+    aws_lambda as lambda_,
 )
 from constructs import Construct
 from config import config
@@ -26,6 +27,7 @@ class ApiGatewayEnvironmentsProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_authorizer: apigateway.IAuthorizer
     integrations_table: dynamodb.TableV2
+    post_integrations_handler: lambda_.Function
 
 
 class ApiGatewayEnvironmentsConstruct(Construct):
@@ -38,7 +40,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         super().__init__(scope, id)
 
         # Create DynamoDB table for environments
-        self.environments_table = DynamoDB(
+        self._environments_table = DynamoDB(
             self,
             "EnvironmentsTable",
             props=DynamoDBProps(
@@ -52,8 +54,14 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             ),
         )
 
+        self._environments_table.table.grant_read_data(props.post_integrations_handler)
+        
+        props.post_integrations_handler.add_environment(
+            "ENVIRONMENTS_TABLE", self._environments_table.table_name
+        )
+        
         # Create environments resource
-        environments_resource = props.api_resource.root.add_resource("environments")
+        environments_resource = props.api_resource.add_resource("environments")
 
         # GET /environments
         self._get_environments_handler = Lambda(
@@ -64,13 +72,13 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 entry="lambdas/api/environments/get_environments",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "ENVIRONMENTS_TABLE": self.environments_table.table_name,
+                    "ENVIRONMENTS_TABLE": self._environments_table.table_name,
                     "METRICS_NAMESPACE": config.resource_prefix,
                 },
             ),
         )
 
-        self.environments_table.table.grant_read_data(
+        self._environments_table.table.grant_read_data(
             self._get_environments_handler.function
         )
 
@@ -90,12 +98,12 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 entry="lambdas/api/environments/post_environments",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "ENVIRONMENTS_TABLE": self.environments_table.table_name,
+                    "ENVIRONMENTS_TABLE": self._environments_table.table_name,
                 },
             ),
         )
 
-        self.environments_table.table.grant_write_data(
+        self._environments_table.table.grant_write_data(
             self._post_environments_handler.function
         )
 
@@ -118,13 +126,13 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 entry="lambdas/api/environments/rp_environmentsId/put_environmentsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "ENVIRONMENTS_TABLE": self.environments_table.table_name,
+                    "ENVIRONMENTS_TABLE": self._environments_table.table_name,
                     "METRICS_NAMESPACE": config.resource_prefix,
                 },
             ),
         )
 
-        self.environments_table.table.grant_write_data(
+        self._environments_table.table.grant_write_data(
             self._put_environment_handler.function
         )
 
@@ -144,13 +152,13 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 entry="lambdas/api/environments/rp_environmentsId/del_environmentsId",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "ENVIRONMENTS_TABLE": self.environments_table.table_name,
+                    "ENVIRONMENTS_TABLE": self._environments_table.table_name,
                     "INTEGRATIONS_TABLE": props.integrations_table.table_name,
                 },
             ),
         )
 
-        self.environments_table.table.grant_write_data(
+        self._environments_table.table.grant_write_data(
             self._del_environment_handler.function
         )
         props.integrations_table.grant_read_data(self._del_environment_handler.function)
@@ -165,11 +173,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
 
     @property
     def environments_table_name(self) -> str:
-        return self.environments_table.table_name
+        return self._environments_table.table_name
 
     @property
     def environments_table_arn(self) -> str:
-        return self.environments_table.table_arn
+        return self._environments_table.table_arn
 
     @property
     def get_environments_handler(self) -> Lambda:
@@ -186,3 +194,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
     @property
     def del_environment_handler(self) -> Lambda:
         return self._del_environment_handler
+
+    @property
+    def environments_table(self) -> DynamoDB:
+        return self._environments_table

@@ -1,7 +1,6 @@
 import { FormDefinition } from '@/forms/types';
-import { Environment } from '@/types/environment';
 
-export const createIntegrationFormDefinition = (environments: Environment[]): FormDefinition => ({
+export const createIntegrationFormDefinition = (): FormDefinition => ({
     id: 'integration-form',
     name: 'Integration Form',
     translationPrefix: 'integrations.form',
@@ -38,27 +37,6 @@ export const createIntegrationFormDefinition = (environments: Environment[]): Fo
                         type: 'min',
                         value: 1,
                         message: 'Description is required'
-                    }
-                ]
-            }
-        },
-        {
-            name: 'environmentId',
-            type: 'select',
-            label: 'Environment',
-            tooltip: 'Select the environment for this integration',
-            required: true,
-            options: environments.map(env => ({
-                label: env.name,
-                value: env.environment_id,
-            })),
-            validation: {
-                type: 'string',
-                rules: [
-                    {
-                        type: 'min',
-                        value: 1,
-                        message: 'Environment selection is required'
                     }
                 ]
             }

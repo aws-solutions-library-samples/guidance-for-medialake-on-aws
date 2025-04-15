@@ -14,7 +14,9 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_stepfunctions as sfn,
     custom_resources as cr,
-    RemovalPolicy
+    aws_wafv2 as wafv2,
+    RemovalPolicy,
+    Fn
 )
 from constructs import Construct
 from dataclasses import dataclass
@@ -29,7 +31,6 @@ from medialake_constructs.api_gateway.api_gateway_pipelines import (
 )
 
 from config import config
-from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
 )
@@ -46,30 +47,20 @@ from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
 )
-from medialake_constructs.api_gateway.api_gateway_settings import (
-    SettingsConstruct,
-    SettingsConstructProps,
-)
-from medialake_constructs.api_gateway.api_gateway_users import (
-    UsersApi,
-    UsersApiProps,
-)
-from medialake_constructs.api_gateway.api_gateway_environments import (
-    ApiGatewayEnvironmentsConstruct,
-    ApiGatewayEnvironmentsProps,
-)
+
 from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
-)
-from medialake_constructs.api_gateway.api_gateway_integrations import (
-    ApiGatewayIntegrationsConstruct,
-    ApiGatewayIntegrationsProps,
 )
 
 from medialake_constructs.api_gateway.api_gateway_nodes import (
     ApiGatewayNodesConstruct,
     ApiGatewayNodesProps,
+)
+
+from medialake_constructs.api_gateway.api_gateway_deployment_construct import (
+    ApiGatewayDeploymentConstruct,
+ApiGatewayDeploymentProps,
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
@@ -79,6 +70,7 @@ from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 class ApiGatewayStackProps:
     """Configuration for API Gateway Stack."""
 
+    # Base infrastructure resources
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
     media_assets_bucket: S3Bucket
@@ -100,6 +92,13 @@ class ApiGatewayStackProps:
     node_table: dynamodb.TableV2
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
+    system_settings_table: str
+    rest_api: apigateway.RestApi
+    x_origin_verify_secret: secretsmanager.Secret
+    user_pool: cognito.UserPool
+    identity_pool: str
+    user_pool_client: str
+    waf_acl_arn: str
 
 
 class ApiGatewayStack(Stack):
@@ -107,33 +106,28 @@ class ApiGatewayStack(Stack):
         self, scope: Construct, id: str, props: ApiGatewayStackProps, **kwargs
     ):
         super().__init__(scope, id, **kwargs)
+        
 
-        # Create Cognito construct first
-        self._cognito_construct = CognitoConstruct(
-            self,
-            "Cognito",
-            props=CognitoProps(
-                self_sign_up_enabled=False,
-                auto_verify_email=True,
-                auto_verify_phone=True,
-                sign_in_with_email=True,
-                generate_secret=False,
-                admin_user_password=True,
-                user_password=True,
-                user_srp=True,
-                removal_policy=RemovalPolicy.DESTROY,
-            ),
+        # Store props for later use in property accessors
+        self._props = props
+
+
+
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        
+        api = apigateway.RestApi.from_rest_api_attributes(self, "ApiGatewayImportedApi",
+            rest_api_id=api_id,
+            root_resource_id=root_resource_id
+        )
+        
+        self._api_gateway_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self, 
+            "ApiGatewayAuthorizer",
+            identity_source="method.request.header.Authorization",
+            cognito_user_pools=[props.user_pool],
         )
 
-        # Create API Gateway construct
-        self._api_gateway = ApiGatewayConstruct(
-            self,
-            "ApiGateway",
-            props=ApiGatewayProps(
-                user_pool=self._cognito_construct.user_pool,
-                access_log_bucket=props.access_log_bucket,
-            ),
-        )
 
         self._connectors_api_gateway = ConnectorsConstruct(
             self,
@@ -144,47 +138,36 @@ class ApiGatewayStack(Stack):
                 asset_table_asset_id_index_arn=props.asset_table_asset_id_index_arn,
                 asset_table_s3_path_index_arn=props.asset_table_s3_path_index_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                api_resource=api,
+                cognito_authorizer=self._api_gateway_authorizer,
+                x_origin_verify_secret=props.x_origin_verify_secret,
                 ingest_event_bus=props.ingest_event_bus,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
             ),
         )
-
-        self._integrations_stack = ApiGatewayIntegrationsConstruct(
-            self,
-            "Integrations",
-            props=ApiGatewayIntegrationsProps(
-                api_resource=self._api_gateway.rest_api,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                pipelines_nodes_table=props.pipelines_nodes_table,
-            ),
-        )
+        
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,
             "PipelinesExecutions",
             props=PipelinesExecutionsStackProps(
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                x_origin_verify_secret=props.x_origin_verify_secret,
             ),
         )
 
         self._pipeline_stack = ApiGatewayPipelinesConstruct(
             self,
             "Pipelines",
-            api_resource=self._api_gateway.rest_api,
-            cognito_authorizer=self._api_gateway.cognito_authorizer,
+            api_resource=api,
+            cognito_authorizer=self._api_gateway_authorizer,
             ingest_event_bus=props.ingest_event_bus,
-            x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+            x_origin_verify_secret=props.x_origin_verify_secret,
             iac_assets_bucket=props.iac_assets_bucket,
             media_assets_bucket=props.media_assets_bucket,
             props=ApiGatewayPipelinesProps(
                 asset_table=props.asset_table,
                 connector_table=self._connectors_api_gateway.connector_table,
                 node_table=props.node_table,
-                integrations_table=self._integrations_stack.integrations_table,
                 pipeline_table=props.pipeline_table,
                 image_proxy_lambda=props.image_proxy_lambda,
                 image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
@@ -194,54 +177,38 @@ class ApiGatewayStack(Stack):
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
                 open_search_endpoint=props.collection_endpoint,
-                # open_search_arn=props.collection_arn,
-                # open_search_index="media",
                 vpc=props.vpc,
                 security_group=props.security_group
-              
-            ),
-        )
-
-        # Create Settings API Gateway construct (now includes system settings)
-        self._settings_construct = SettingsConstruct(
-            self,
-            "SettingsApiGateway",
-            props=SettingsConstructProps(
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                cognito_user_pool=self._cognito_construct.user_pool,
-                cognito_app_client=self._cognito_construct.user_pool_client,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
             ),
         )
 
         # Update the SearchConstruct to include the system settings table
-        _ = SearchConstruct(
+        self._search_construct = SearchConstruct(
             self,
             "SearchApiGateway",
             props=SearchProps(
                 asset_table=props.asset_table,
                 media_assets_bucket=props.media_assets_bucket,
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                api_resource=api,
+                cognito_authorizer=self._api_gateway_authorizer,
+                x_origin_verify_secret=props.x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 open_search_arn=props.collection_arn,
                 open_search_index="media",
                 vpc=props.vpc,
                 security_group=props.security_group,
-                system_settings_table=self._settings_construct.system_settings_table_name,
+                system_settings_table=props.system_settings_table,
             ),
         )
 
-        _ = AssetsConstruct(
+        self._assets_construct = AssetsConstruct(
             self,
             "AssetsApiGateway",
             props=AssetsProps(
                 asset_table=props.asset_table,
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
+                api_resource=api,
+                cognito_authorizer=self._api_gateway_authorizer,
+                x_origin_verify_secret=props.x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 opensearch_index="media",
                 vpc=props.vpc,
@@ -250,43 +217,43 @@ class ApiGatewayStack(Stack):
             ),
         )
 
-        _ = UsersApi(
-            self,
-            "UsersApiGateway",
-            props=UsersApiProps(
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                cognito_user_pool=self._cognito_construct.user_pool,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-            ),
-        )
-
-        # Create Environments API Gateway construct
-        _ = ApiGatewayEnvironmentsConstruct(
-            self,
-            "EnvironmentsApiGateway",
-            props=ApiGatewayEnvironmentsProps(
-                api_resource=self._api_gateway.rest_api,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-                integrations_table=self._integrations_stack.integrations_table,
-            ),
-        )
-
-        _ = ApiGatewayNodesConstruct(
+        self._nodes_construct = ApiGatewayNodesConstruct(
             self,
             "NodesApiGateway",
             props=ApiGatewayNodesProps(
-                api_resource=self._api_gateway.rest_api,
-                x_origin_verify_secret=self._api_gateway.x_origin_verify_secret,
-                cognito_authorizer=self._api_gateway.cognito_authorizer,
+                api_resource=api,
+                x_origin_verify_secret=props.x_origin_verify_secret,
+                cognito_authorizer=self._api_gateway_authorizer,
                 pipelines_nodes_table=props.pipelines_nodes_table,
             ),
+        )
+        
+        # Create a list of dependencies for the deployment
+        # These are the resources that the API Gateway deployment needs to wait for
+        deployment_dependencies = [
+            self._connectors_api_gateway,
+            self._pipeline_stack,
+            self._search_construct,
+            self._assets_construct,
+            self._nodes_construct
+        ]
+        
+        # Create a separate deployment for the API
+        # This ensures all resources are created before deploying the API
+        self._api_deployment = ApiGatewayDeploymentConstruct(
+            self,
+            "ApiDeployment",
+            props=ApiGatewayDeploymentProps(
+                rest_api=api,
+                waf_acl_arn=props.waf_acl_arn,
+                dependencies=deployment_dependencies,
+            )
         )
 
     @property
     def rest_api(self) -> apigateway.RestApi:
-        return self._api_gateway.rest_api
+        # Return from props instead of internal constructs
+        return self._props.rest_api
 
     @property
     def connector_table(self) -> dynamodb.TableV2:
@@ -294,11 +261,13 @@ class ApiGatewayStack(Stack):
 
     @property
     def x_origin_verify_secret(self) -> secretsmanager.Secret:
-        return self._api_gateway.x_origin_verify_secret
+        # Return from props instead of internal constructs
+        return self._props.x_origin_verify_secret
 
-    @property
-    def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
-        return self._api_gateway.cognito_authorizer
+    # @property
+    # def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
+    #     # Return from props instead of internal constructs
+    #     return self._props.cognito_authorizer
 
     @property
     def pipelines_create_handler(self) -> lambda_.Function:
@@ -310,21 +279,28 @@ class ApiGatewayStack(Stack):
     
     @property
     def user_pool_arn(self) -> str:
-        return self._cognito_construct.user_pool_arn
+        # No longer accessing from cognito_construct
+        return self._props.user_pool.user_pool_arn
     
     @property
     def identity_pool(self) -> str:
-        return self._cognito_construct.identity_pool
+        # This will need to be provided from props
+        return self._props.identity_pool
     
     @property
     def user_pool_client(self) -> str:
-        return self._cognito_construct.user_pool_client
+        # This will need to be provided from props
+        return self._props.user_pool_client
     
     @property
     def user_pool_id(self) -> str:
-        return self._cognito_construct.user_pool_id
-
-
+        # No longer accessing from cognito_construct
+        return self._props.user_pool.user_pool_id
+        
+    @property
+    def deployment_stage(self) -> apigateway.Stage:
+        return self._api_deployment.stage
+        
     def get_functions(self) -> list[lambda_.Function]:
         """Return all Lambda functions in this stack that need warming."""
         return [

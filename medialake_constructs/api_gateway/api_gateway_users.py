@@ -52,6 +52,8 @@ class UsersApi(Construct):
     ) -> None:
         super().__init__(scope, constructor_id)
 
+        from config import config
+        
         # Get the current account ID
         account_id = Stack.of(self).account
 
@@ -59,14 +61,14 @@ class UsersApi(Construct):
             self,
             "UsersTable",
             props=DynamoDBProps(
-                name=f"medialake_users_table",
+                name=f"{config.resource_prefix}_users_table_{config.environment}",
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
         )
 
         # Create connectors resource
-        users_resource = props.api_resource.root.add_resource("users")
+        users_resource = props.api_resource.add_resource("users")
 
         # Add connector_id path parameter resource
         users_user_resource = users_resource.add_resource("user")

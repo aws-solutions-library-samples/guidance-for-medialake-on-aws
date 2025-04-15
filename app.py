@@ -5,15 +5,19 @@ This module serves as the entry point for the MediaLake CDK application.
 import os
 import aws_cdk as cdk
 from cdk_logger import CDKLogger, get_logger
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
+from cdk_nag import AwsSolutionsChecks, NagSuppressions # Used for AWS Solutions checks ad-hoc
 from config import config
-from aws_cdk import aws_ssm as ssm
 
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
+from medialake_stacks.api_gateway_core_stack import ApiGatewayCoreStack, ApiGatewayCoreStackProps
+from medialake_stacks.users_groups_roles_stack import UsersGroupsRolesStack, UsersGroupsRolesStackProps
+from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
+from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
-from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack
+# from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack - Development paused, commented out for now
+from medialake_stacks.integrations_environment_stack import IntegrationsEnvironmentStack, IntegrationsEnvironmentStackProps
 from medialake_stacks.pipeline_stack import (
     PipelineStack,
     PipelineStackProps,
@@ -25,7 +29,7 @@ from medialake_stacks.pipeline_nodes_stack import (
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
-# from medialake_stacks.monitoring_stack import MonitoringStack
+# from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
 
 # Initialize global logger configuration
 if hasattr(config, 'logging') and hasattr(config.logging, 'level'):
@@ -37,24 +41,34 @@ logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.lev
 
 app = cdk.App()
 
+# us-east-1 environment, required for the WAF, certain configuration has to be deployed in us-east-1
+env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
+
 # Define environment once
 if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
     env = cdk.Environment(account=os.environ["CDK_DEFAULT_ACCOUNT"], region=os.environ["CDK_DEFAULT_REGION"])
 else:
     env = cdk.Environment(account=app.account, region=app.region)
 
-env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
-# Create Lambda warmer stack if enabled
-lambda_warmer = None
-if config.lambda_tail_warming:
-    lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
+
+## Create Lambda warmer stack if enabled ( ### Development paused, currently not used ###
+# lambda_warmer = None
+# if config.lambda_tail_warming:
+#     lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
+
 
 # Create base infrastructure stack first
 base_infrastructure = BaseInfrastructureStack(
     app, "MediaLakeBaseInfrastructure", env=env
 )
 
-
+# Create settings stack early
+settings_stack = SettingsStack(
+    app,
+    "MediaLakeSettings",
+    props=SettingsStackProps(),
+    env=env,
+)
 
 # Create nodes stack
 nodes_stack = NodesStack(
@@ -86,7 +100,49 @@ asset_sync_stack = AssetSyncStack(
     env=env,
 )
 
-# Create API Gateway Stack - includes auth and ui
+# Create API Gateway Core Stack first
+api_gateway_core_stack = ApiGatewayCoreStack(
+    app,
+    "MediaLakeApiGatewayCore",
+    props=ApiGatewayCoreStackProps(
+        access_log_bucket=base_infrastructure.access_log_bucket,
+    ),
+    env=env,
+)
+
+# Create Settings API Stack
+settings_api_stack = SettingsApiStack(
+    app,
+    "MediaLakeSettingsApi",
+    props=SettingsApiStackProps(
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        cognito_app_client=api_gateway_core_stack.user_pool_client,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+        system_settings_table_name=settings_stack.system_settings_table_name,
+        system_settings_table_arn=settings_stack.system_settings_table_arn,
+    ),
+    env=env,
+)
+
+# Add dependencies
+settings_api_stack.add_dependency(api_gateway_core_stack)
+settings_api_stack.add_dependency(settings_stack)
+
+users_groups_roles_stack = UsersGroupsRolesStack(
+    app,
+    "MediaLakeUsersGroupsRolesStack",
+    props=UsersGroupsRolesStackProps(
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        cognito_app_client=api_gateway_core_stack.user_pool_client,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+    ),
+    env=env,
+)
+
+# Add dependency
+users_groups_roles_stack.add_dependency(api_gateway_core_stack)
+
+# Create API Gateway Stack that depends on Core and UsersGroupsRoles stacks
 api_gateway_stack = ApiGatewayStack(
     app,
     "MediaLakeApiGatewayStack",
@@ -112,14 +168,38 @@ api_gateway_stack = ApiGatewayStack(
         node_table=nodes_stack.pipelines_nodes_table,
         asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
         asset_sync_engine_lambda=asset_sync_stack.asset_sync_engine_lambda,
+        system_settings_table=settings_stack.system_settings_table_name,
+        rest_api=api_gateway_core_stack.rest_api,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+        user_pool=api_gateway_core_stack.user_pool,
+        identity_pool=api_gateway_core_stack.identity_pool,
+        user_pool_client=api_gateway_core_stack.user_pool_client,
+        waf_acl_arn=api_gateway_core_stack.waf_acl_arn,
     ),
     env=env,
 )
 
-# Add Lambda warming to API Gateway functions if enabled
-if lambda_warmer:
-    for function in api_gateway_stack.get_functions():
-        lambda_warmer.add_function_to_warming(function)
+api_gateway_stack.add_dependency(api_gateway_core_stack)
+api_gateway_stack.add_dependency(users_groups_roles_stack)
+api_gateway_stack.add_dependency(asset_sync_stack)
+
+# Create IntegrationsEnvironmentStack 
+integrations_environment_stack = IntegrationsEnvironmentStack(
+    app,
+    "MediaLakeIntegrationsEnvironment",
+    props=IntegrationsEnvironmentStackProps(
+        api_resource=api_gateway_core_stack.rest_api,
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+        pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
+        post_pipelines_v2_lambda=api_gateway_stack._pipeline_stack._post_pipelines_v2_handler.function,
+    ),
+    env=env,
+)
+
+# Add dependencies for the IntegrationsEnvironmentStack
+integrations_environment_stack.add_dependency(api_gateway_core_stack)
+integrations_environment_stack.add_dependency(nodes_stack)
 
 pipeline_stack = PipelineStack(
     app,
@@ -149,21 +229,20 @@ cloudfront_waf_stack = CloudFrontWafStack(
 # Get the SSM parameter name for the WAF ACL ARN
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
-# Look up the WAF ACL ARN from SSM
-# We need to import this explicitly at the top of the file
 from aws_cdk import aws_ssm as ssm
 
 user_interface_stack = UserInterfaceStack(
     app,
     "MediaLakeUserInterface",
     props=UserInterfaceStackProps(
-        cognito_user_pool_id=api_gateway_stack.user_pool_id,
-        cognito_user_pool_client_id=api_gateway_stack.user_pool_client,
-        cognito_identity_pool=api_gateway_stack.identity_pool,
-        cognito_user_pool_arn=api_gateway_stack.user_pool_arn,
-        api_gateway_rest_id=api_gateway_stack.rest_api.rest_api_id,
+        cognito_user_pool_id=api_gateway_core_stack.user_pool_id,
+        cognito_user_pool_client_id=api_gateway_core_stack.user_pool_client,
+        cognito_identity_pool=api_gateway_core_stack.identity_pool,
+        cognito_user_pool_arn=api_gateway_core_stack.user_pool_arn,
+        api_gateway_rest_id=api_gateway_core_stack.rest_api.rest_api_id,
+        api_gateway_stage=api_gateway_stack.deployment_stage.stage_name,
         access_log_bucket=base_infrastructure.access_log_bucket,
-        cloudfront_waf_acl_arn=waf_acl_ssm_param_name,  # Pass the parameter name instead
+        cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),
     env=env,
 )
@@ -197,11 +276,13 @@ cleanup_stack = CleanupStack(
     env=env,
 )
 
-api_gateway_stack.add_dependency(asset_sync_stack)
 user_interface_stack.add_dependency(api_gateway_stack)
 user_interface_stack.add_dependency(cloudfront_waf_stack)
 
 cleanup_stack.add_dependency(api_gateway_stack)
+cleanup_stack.add_dependency(users_groups_roles_stack)
+cleanup_stack.add_dependency(settings_api_stack)
+cleanup_stack.add_dependency(settings_stack)
 cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
@@ -209,8 +290,8 @@ cleanup_stack.add_dependency(nodes_stack)
 # cleanup_stack.add_dependency(monitoring_stack)
 cleanup_stack.add_dependency(user_interface_stack)
 
-if lambda_warmer:
-    cleanup_stack.add_dependency(lambda_warmer)
+# if lambda_warmer:
+#     cleanup_stack.add_dependency(lambda_warmer)
 
 if config.resource_application_tag:
     cdk.Tags.of(app).add("Application", config.resource_application_tag)

@@ -111,6 +111,7 @@ class BaseInfrastructureStack(Stack):
                 ),
             )
 
+        ## CloudTrail Logs for DynamDB, commented out due to feature request
         # self.dynamodb_cloudtrail_logs = DynamoDBCloudTrailLogs(
         #     self,
         #     "DynamoDBCloudTrailLogs",
@@ -277,18 +278,6 @@ class BaseInfrastructureStack(Stack):
             source_bucket=self.media_assets_s3_bucket,
         )
 
-        # self.internal_s3_bucket = S3ExpressOneZoneBucket(
-        #     self,
-        #     "InternalS3Bucket",
-        #     props=S3ExpressOneZoneBucketProps(
-        #         bucket_name=f"{config.resource_prefix}-internal-s3-bucket".lower(),
-        #         access_logs=True,
-        #         access_logs_bucket=self.access_logs_bucket.bucket,
-        #     ),
-        # )
-
-        # Handle IAC assets bucket
-
         # Create new IAC assets bucket
         self.iac_assets_bucket = S3Bucket(
             self,
@@ -417,99 +406,99 @@ class BaseInfrastructureStack(Stack):
                 projection_type=dynamodb.ProjectionType.ALL,
             )
 
-        # Asset V2 table
-        if config.db.use_existing_tables:
-            self._assetv2_table = dynamodb.Table.from_table_arn(
-                self,
-                "ImportedAssetV2Table",
-                config.db.assetv2_table_arn,
-            )
-        else:
-            assetv2_table = DynamoDB(
-                self,
-                "MediaLakeAssetTableV2",
-                props=DynamoDBProps(
-                    name=f"{config.resource_prefix}-asset-table-v2-{config.environment}",
-                    partition_key_name="PK",
-                    partition_key_type=dynamodb.AttributeType.STRING,
-                    point_in_time_recovery=True,
-                    sort_key_name="SK",
-                    sort_key_type=dynamodb.AttributeType.STRING,
-                    removal_policy=(
-                        RemovalPolicy.RETAIN
-                        if config.should_retain_tables
-                        else RemovalPolicy.DESTROY
-                    ),
-                ),
-            )
-            self._assetv2_table = assetv2_table.table
+        ## Asset V2 table, commented out until implementation needed
+        # if config.db.use_existing_tables:
+        #     self._assetv2_table = dynamodb.Table.from_table_arn(
+        #         self,
+        #         "ImportedAssetV2Table",
+        #         config.db.assetv2_table_arn,
+        #     )
+        # else:
+        #     assetv2_table = DynamoDB(
+        #         self,
+        #         "MediaLakeAssetTableV2",
+        #         props=DynamoDBProps(
+        #             name=f"{config.resource_prefix}-asset-table-v2-{config.environment}",
+        #             partition_key_name="PK",
+        #             partition_key_type=dynamodb.AttributeType.STRING,
+        #             point_in_time_recovery=True,
+        #             sort_key_name="SK",
+        #             sort_key_type=dynamodb.AttributeType.STRING,
+        #             removal_policy=(
+        #                 RemovalPolicy.RETAIN
+        #                 if config.should_retain_tables
+        #                 else RemovalPolicy.DESTROY
+        #             ),
+        #         ),
+        #     )
+        #     self._assetv2_table = assetv2_table.table
 
-        if not config.db.use_existing_tables:
-            # Add GSI1 -
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI1",
-                partition_key=dynamodb.Attribute(
-                    name="GSI1PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI1SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        # if not config.db.use_existing_tables:
+        #     # Add GSI1 -
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI1",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI1PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI1SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
-            # Add GSI2 - Hash Index
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI2",
-                partition_key=dynamodb.Attribute(
-                    name="GSI2PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI2SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        #     # Add GSI2 - Hash Index
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI2",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI2PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI2SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
-            # Add GSI3 - Recent Assets Index
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI3",
-                partition_key=dynamodb.Attribute(
-                    name="GSI3PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI3SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        #     # Add GSI3 - Recent Assets Index
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI3",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI3PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI3SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
-            # Add GSI4 - TBD
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI4",
-                partition_key=dynamodb.Attribute(
-                    name="GSI4PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI4SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        #     # Add GSI4 - TBD
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI4",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI4PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI4SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
-            # Add GSI5 - TBD
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI5",
-                partition_key=dynamodb.Attribute(
-                    name="GSI5PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI5SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        #     # Add GSI5 - TBD
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI5",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI5PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI5SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
-            # Add GSI6 - TBD
-            self._assetv2_table.add_global_secondary_index(
-                index_name="GSI6",
-                partition_key=dynamodb.Attribute(
-                    name="GSI6PK", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="GSI6SK", type=dynamodb.AttributeType.STRING
-                ),
-            )
+        #     # Add GSI6 - TBD
+        #     self._assetv2_table.add_global_secondary_index(
+        #         index_name="GSI6",
+        #         partition_key=dynamodb.Attribute(
+        #             name="GSI6PK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #         sort_key=dynamodb.Attribute(
+        #             name="GSI6SK", type=dynamodb.AttributeType.STRING
+        #         ),
+        #     )
 
         self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
             self,

@@ -41,8 +41,17 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
             const value = user[columnId as keyof User];
             if (value != null) {
                 if (Array.isArray(value)) {
-                    // Handle arrays (like groups)
-                    value.forEach(v => values.add(String(v)));
+                    if (columnId === 'roles') {
+                        // For roles, only add the first role (primary role)
+                        if (value.length > 0) {
+                            values.add(String(value[0]));
+                        } else {
+                            values.add('No Role');
+                        }
+                    } else {
+                        // Handle other arrays (like groups)
+                        value.forEach(v => values.add(String(v)));
+                    }
                 } else if (typeof value === 'boolean') {
                     // Handle boolean values (like enabled)
                     values.add(value ? 'true' : 'false');

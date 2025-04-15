@@ -40,7 +40,6 @@ export interface IntegrationsError {
 export interface CreateIntegrationDto {
     nodeId: string;
     integrationType: string;
-    environmentId: string;
     description: string;
     integrationEnabled: boolean;
     createdDate: string;
@@ -56,7 +55,6 @@ export interface UpdateIntegrationDto {
 
 export interface IntegrationFormData {
     description: string;
-    environmentId: string;
     nodeId: string;
     auth: IntegrationAuth;
 }
