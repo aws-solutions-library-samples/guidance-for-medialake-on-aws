@@ -197,7 +197,8 @@ export default {
         description: 'Manage your media and metadata pipelines',
         searchPlaceholder: 'Search pipelines...',
         actions: {
-            create: 'Add New Pipeline'
+            create: 'Add New Pipeline',
+            import: 'Import Pipeline'
         }
     },
     executions: {
@@ -707,6 +708,7 @@ export default {
                     description: {
                         label: 'Description',
                         tooltip: 'Provide a description for this integration',
+                        helper: 'Brief description of this integration',
                         errors: {
                             required: 'Description is required'
                         }
@@ -741,6 +743,7 @@ export default {
                             apiKey: {
                                 label: 'API Key',
                                 tooltip: 'Enter your API key',
+                                helper: 'API key for authentication with the service',
                                 errors: {
                                     required: 'API Key is required'
                                 }

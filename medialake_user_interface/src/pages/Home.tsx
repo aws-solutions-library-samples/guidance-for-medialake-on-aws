@@ -50,7 +50,7 @@ const FeatureCard: React.FC<{
                 color="text.secondary"
                 sx={{ mt: 1 }}
             >
-                {t('translation.home.comingSoon')}
+                {t('home.comingSoon')}
             </Typography>
         </Paper>
     );
@@ -103,26 +103,26 @@ const Home: React.FC = () => {
                         color="text.secondary"
                         sx={{ mb: 4, textAlign: 'center' }} // Force center alignment
                     >
-                        {t('translation.home.description')}
+                        {t('home.description')}
                     </Typography>
                 </Box>
 
                 <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title={t('translation.home.favorites')}
+                            title={t('home.favorites')}
                             icon={<FavoriteIcon />}
                         />
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title={t('translation.home.collections')}
+                            title={t('home.collections')}
                             icon={<CollectionsIcon />}
                         />
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <FeatureCard
-                            title={t('translation.home.sharing')}
+                            title={t('home.sharing')}
                             icon={<ShareIcon />}
                         />
                     </Grid>

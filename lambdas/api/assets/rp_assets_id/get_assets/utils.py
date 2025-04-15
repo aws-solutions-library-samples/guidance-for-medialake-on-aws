@@ -11,6 +11,9 @@ s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 
 def replace_decimals(obj):
+    """
+    Recursively replace Decimal objects with int or float for JSON serialization.
+    """
     if isinstance(obj, list):
         return [replace_decimals(o) for o in obj]
     elif isinstance(obj, dict):

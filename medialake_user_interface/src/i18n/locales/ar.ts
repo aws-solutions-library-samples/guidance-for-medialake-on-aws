@@ -131,6 +131,7 @@ export default {
         description: {
           label: 'الوصف',
           tooltip: 'قم بتوفير وصف لهذا التكامل',
+          helper: 'وصف موجز لهذا التكامل',
           errors: {
             required: 'الوصف مطلوب'
           }
@@ -165,6 +166,7 @@ export default {
             apiKey: {
               label: 'مفتاح API',
               tooltip: 'أدخل مفتاح API الخاص بك',
+              helper: 'مفتاح API للمصادقة مع الخدمة',
               errors: {
                 required: 'مفتاح API مطلوب'
               }
@@ -192,7 +194,8 @@ export default {
     description: 'قم بإدارة خطوط أنابيب الوسائط والبيانات الوصفية الخاصة بك',
     searchPlaceholder: 'ابحث عن خطوط الأنابيب...',
     actions: {
-      create: 'إضافة خط أنابيب جديد'
+      create: 'إضافة خط أنابيب جديد',
+      import: 'استيراد خط أنابيب'
     }
   },
   executions: {
@@ -339,6 +342,8 @@ export default {
     moreInfo: 'مزيد من المعلومات',
     error: 'خطأ',
     language: 'اللغة',
+    delete: 'حذف',
+    create: 'إنشاء',
     actions: {
       add: 'إضافة'
     },

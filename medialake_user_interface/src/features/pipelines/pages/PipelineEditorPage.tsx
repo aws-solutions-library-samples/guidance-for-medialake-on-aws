@@ -16,14 +16,18 @@ import ReactFlow, {
     reconnectEdge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button, CircularProgress } from '@mui/material';
+import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogContent, Button, CircularProgress, Backdrop } from '@mui/material';
 import ApiStatusModal from '@/components/ApiStatusModal';
 import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from 'react-icons/fa';
+import { PipelineDeleteDialog } from '../components';
 import { useGetPipeline, useCreatePipeline, useUpdatePipeline, useGetPipelineStatus } from '../api/pipelinesController';
 import queryClient from '@/api/queryClient';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
 import type { Pipeline, CreatePipelineDto, PipelineEdge, PipelineNode } from '../types/pipelines.types';
 import type { NodesResponse } from '@/shared/nodes/types/nodes.types';
+import { IntegrationValidationService } from '../services/integrationValidation.service';
+import type { InvalidNodeInfo, IntegrationMapping } from '../services/integrationValidation.service';
+import type { Integration } from '@/features/settings/integrations/types/integrations.types';
 import {
     CustomNode,
     CustomEdge,
@@ -33,6 +37,7 @@ import {
     JobStatusNode
 } from '../components/PipelineEditor';
 import type { PipelineToolbarProps } from '../components/PipelineEditor/PipelineToolbar';
+import IntegrationValidationDialog from '../components/IntegrationValidationDialog';
 import { Node as NodeType, NodeConfiguration, NodeMethod } from '../types';
 import { RightSidebarProvider, useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
 import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
@@ -351,6 +356,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
 
 const PipelineEditorContent = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { id: pipelineId } = useParams();
     const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
@@ -414,6 +420,13 @@ const PipelineEditorContent = () => {
     const [apiStatusModalState, setApiStatusModalState] = useState<'loading' | 'success' | 'error'>('loading');
     const [apiStatusModalMessage, setApiStatusModalMessage] = useState('');
     const [apiStatusModalAction, setApiStatusModalAction] = useState('');
+    // Delete dialog state
+    const [deleteDialog, setDeleteDialog] = useState({
+        open: false,
+        pipelineName: '',
+        pipelineId: '',
+        userInput: '',
+    });
     
     // State for pipeline creation status tracking
     const [creatingPipelineId, setCreatingPipelineId] = useState<string | null>(null);
@@ -643,6 +656,218 @@ const PipelineEditorContent = () => {
             setIsNodeConfigOpen(true);
         }
     }, [nodes]);
+
+    // Debug pipeline object
+    React.useEffect(() => {
+        if (pipeline) {
+            console.log('[PipelineEditorPage] Pipeline object:', pipeline);
+            console.log('[PipelineEditorPage] Pipeline deploymentStatus:', pipeline.deploymentStatus);
+        }
+    }, [pipeline]);
+
+    // State for integration validation
+    const [validationDialogOpen, setValidationDialogOpen] = useState(false);
+    const [invalidNodes, setInvalidNodes] = useState<InvalidNodeInfo[]>([]);
+    const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
+    const [importedFlowData, setImportedFlowData] = useState<any>(null);
+    const [isImporting, setIsImporting] = useState(false);
+
+    // Check for imported flow from location state
+    React.useEffect(() => {
+        const loadImportedFlow = async () => {
+            const state = location.state as { importedFlow?: any; pipelineName?: string; showImporting?: boolean };
+            if (state?.importedFlow) {
+                // Set pipeline name if provided in state
+                if (state.pipelineName) {
+                    setFormData(prev => ({
+                        ...prev,
+                        name: state.pipelineName,
+                        // Ensure active property is set from imported flow or default to true
+                        active: state.importedFlow.active !== undefined ? state.importedFlow.active : true
+                    }));
+                } else {
+                    // If no pipeline name, still set the active property
+                    setFormData(prev => ({
+                        ...prev,
+                        active: state.importedFlow.active !== undefined ? state.importedFlow.active : true
+                    }));
+                }
+                console.log('[PipelineEditorPage] Initializing from imported flow:', state.importedFlow);
+                
+                // Set importing state based on the flag from navigation state or default to true
+                setIsImporting(state.showImporting !== undefined ? state.showImporting : true);
+                
+                try {
+                    // Check if the flow uses the nodes/edges structure
+                    if (state.importedFlow.nodes && state.importedFlow.edges) {
+                        // Ensure each edge has a data field with at least a text property
+                        const fixedEdges = state.importedFlow.edges.map((edge: any) => {
+                            if (!edge.data) {
+                                edge.data = { text: '', id: edge.id, type: 'custom' };
+                            } else if (typeof edge.data === 'object' && !edge.data.id) {
+                                // If data exists but doesn't have id and type fields, add them
+                                edge.data = {
+                                    ...edge.data,
+                                    id: edge.id,
+                                    type: 'custom'
+                                };
+                            }
+                            return edge;
+                        });
+                        
+                        const fixedNodes = state.importedFlow.nodes.map((node: any) => ({
+                            ...node,
+                            data: {
+                                ...node.data,
+                                // Fix icon if needed
+                                icon: node.data.icon && typeof node.data.icon === 'object' && node.data.icon.props
+                                    ? getNodeIcon(node.data.type)
+                                    : node.data.icon,
+                            },
+                        }));
+                        
+                        // Store the imported flow data for later use
+                        setImportedFlowData({
+                            nodes: fixedNodes,
+                            edges: fixedEdges
+                        });
+                        
+                        // Validate integration IDs
+                        try {
+                            console.log('[PipelineEditorPage] Validating integration IDs...');
+                            const validationResult = await IntegrationValidationService.validateIntegrationIds(fixedNodes);
+                            
+                            if (validationResult.isValid) {
+                                console.log('[PipelineEditorPage] All integration IDs are valid');
+                                // All integration IDs are valid, proceed with import
+                                setNodes(fixedNodes);
+                                setEdges(fixedEdges);
+                                
+                                // Update form data
+                                const pipelineNodes = fixedNodes.map(convertToPipelineNode);
+                                const pipelineEdges = fixedEdges.map((edge: any) => ({
+                                    id: edge.id,
+                                    source: edge.source,
+                                    target: edge.target,
+                                    sourceHandle: edge.sourceHandle,
+                                    targetHandle: edge.targetHandle,
+                                    type: edge.type || 'custom',
+                                    data: edge.data || { text: '', id: edge.id, type: 'custom' }
+                                }));
+                                
+                                setFormData(prev => ({
+                                    ...prev,
+                                    configuration: {
+                                        ...prev.configuration,
+                                        nodes: pipelineNodes,
+                                        edges: pipelineEdges
+                                    }
+                                }));
+                            } else {
+                                console.log('[PipelineEditorPage] Invalid integration IDs found:', validationResult.invalidNodes);
+                                // Some integration IDs are invalid, show validation dialog
+                                setInvalidNodes(validationResult.invalidNodes);
+                                setAvailableIntegrations(validationResult.availableIntegrations);
+                                setValidationDialogOpen(true);
+                            }
+                        } catch (validationError) {
+                            console.error('[PipelineEditorPage] Error validating integration IDs:', validationError);
+                            // Proceed with import without validation
+                            setNodes(fixedNodes);
+                            setEdges(fixedEdges);
+                            
+                            // Update form data
+                            const pipelineNodes = fixedNodes.map(convertToPipelineNode);
+                            const pipelineEdges = fixedEdges.map((edge: any) => ({
+                                id: edge.id,
+                                source: edge.source,
+                                target: edge.target,
+                                sourceHandle: edge.sourceHandle,
+                                targetHandle: edge.targetHandle,
+                                type: edge.type || 'custom',
+                                data: edge.data || { text: '', id: edge.id, type: 'custom' }
+                            }));
+                            
+                            setFormData(prev => ({
+                                ...prev,
+                                configuration: {
+                                    ...prev.configuration,
+                                    nodes: pipelineNodes,
+                                    edges: pipelineEdges
+                                }
+                            }));
+                        }
+                    }
+                } catch (error) {
+                    console.error('[PipelineEditorPage] Error initializing from imported flow:', error);
+                } finally {
+                    setIsImporting(false);
+                }
+            }
+        };
+        
+        loadImportedFlow();
+    }, [location.state]);
+    
+    // Handle validation dialog confirmation
+    const handleValidationConfirm = async (mappings: IntegrationMapping[]) => {
+        if (importedFlowData) {
+            setIsImporting(true);
+            console.log('[PipelineEditorPage] Applying integration mappings:', mappings);
+            
+            try {
+                // Update nodes with new integration IDs
+                const updatedPipelineNodes = IntegrationValidationService.mapInvalidIntegrationIds(
+                    importedFlowData.nodes,
+                    mappings
+                );
+                
+                // Convert PipelineNode[] to Node[] for ReactFlow
+                const updatedReactFlowNodes = updatedPipelineNodes.map((node: any) => ({
+                    ...node,
+                    data: {
+                        ...node.data,
+                        // Fix the icon property to ensure it's properly rendered
+                        icon: node.data.icon && typeof node.data.icon === 'object' && node.data.icon.props
+                            ? getNodeIcon(node.data.type)
+                            : node.data.icon
+                    },
+                    position: {
+                        x: typeof node.position.x === 'string' ? parseFloat(node.position.x) : node.position.x,
+                        y: typeof node.position.y === 'string' ? parseFloat(node.position.y) : node.position.y
+                    },
+                    // Convert other string numbers to actual numbers if needed
+                    ...(node.positionAbsolute && {
+                        positionAbsolute: {
+                            x: typeof node.positionAbsolute.x === 'string' ? parseFloat(node.positionAbsolute.x) : node.positionAbsolute.x,
+                            y: typeof node.positionAbsolute.y === 'string' ? parseFloat(node.positionAbsolute.y) : node.positionAbsolute.y
+                        }
+                    })
+                }));
+                
+                // Apply the updated nodes
+                setNodes(updatedReactFlowNodes);
+                setEdges(importedFlowData.edges);
+                
+                // Update form data
+                const pipelineNodes = updatedReactFlowNodes.map(convertToPipelineNode);
+                setFormData(prev => ({
+                    ...prev,
+                    configuration: {
+                        ...prev.configuration,
+                        nodes: pipelineNodes,
+                        edges: importedFlowData.edges
+                    }
+                }));
+            } catch (error) {
+                console.error('[PipelineEditorPage] Error applying integration mappings:', error);
+            } finally {
+                // Close the dialog
+                setValidationDialogOpen(false);
+                setIsImporting(false);
+            }
+        }
+    };
 
     // Initialize ReactFlow nodes and edges from pipeline configuration
     React.useEffect(() => {
@@ -1088,6 +1313,21 @@ const PipelineEditorContent = () => {
             margin: 0,
             padding: 0
         }}>
+            {/* Loading Backdrop */}
+            <Backdrop
+                sx={{
+                    color: '#fff',
+                    zIndex: (theme) => theme.zIndex.drawer + 1,
+                    flexDirection: 'column',
+                    gap: 2
+                }}
+                open={isImporting}
+            >
+                <CircularProgress color="inherit" />
+                <Box sx={{ typography: 'body1', fontWeight: 'medium' }}>
+                    Importing Pipeline...
+                </Box>
+            </Backdrop>
             <PipelineToolbar
                 onSave={handleSave}
                 isLoading={createPipeline.isPending || updatePipeline.isPending}
@@ -1098,6 +1338,7 @@ const PipelineEditorContent = () => {
                 setEdges={setEdges}
                 active={formData.active !== undefined ? formData.active : true}
                 onActiveChange={handleActiveChange}
+                status={pipeline?.deploymentStatus}
                 updateFormData={(importedNodes, importedEdges) => {
                     // Convert imported React Flow nodes to pipeline nodes
                     const pipelineNodes = importedNodes.map(node => convertToPipelineNode(node));
@@ -1114,9 +1355,18 @@ const PipelineEditorContent = () => {
                         ...(edge.targetHandle && { targetHandle: edge.targetHandle })
                     })) as PipelineEdge[];
                     
+                    // Check if the imported flow has an active property
+                    const importedActive = importedNodes.length > 0 &&
+                                          importedNodes[0].data &&
+                                          importedNodes[0].data.flow &&
+                                          importedNodes[0].data.flow.active !== undefined ?
+                                          importedNodes[0].data.flow.active : undefined;
+                    
                     // Update formData with imported nodes and edges
                     setFormData(prev => ({
                         ...prev,
+                        // Preserve active property from imported flow if available, otherwise keep current value
+                        active: importedActive !== undefined ? importedActive : prev.active,
                         configuration: {
                             ...prev.configuration,
                             nodes: pipelineNodes,
@@ -1133,6 +1383,15 @@ const PipelineEditorContent = () => {
                     console.log('[PipelineEditorPage] Imported edges:', pipelineEdges.length);
                     console.log('[PipelineEditorPage] Updated formData with imported pipeline');
                 }}
+                onDelete={pipelineId && pipelineId !== 'new' ? () => {
+                    // Open delete dialog
+                    setDeleteDialog({
+                        open: true,
+                        pipelineId: pipelineId,
+                        pipelineName: formData.name,
+                        userInput: '',
+                    });
+                } : undefined}
             />
             <Box sx={{
                 position: 'fixed',
@@ -1210,6 +1469,15 @@ const PipelineEditorContent = () => {
                 </Box>
             </Box>
 
+            {/* Integration Validation Dialog */}
+            <IntegrationValidationDialog
+                open={validationDialogOpen}
+                invalidNodes={invalidNodes}
+                availableIntegrations={availableIntegrations}
+                onClose={() => setValidationDialogOpen(false)}
+                onConfirm={handleValidationConfirm}
+            />
+
             <Dialog
                 open={isNodeConfigOpen}
                 onClose={(event, reason) => {
@@ -1279,6 +1547,48 @@ const PipelineEditorContent = () => {
                 status={apiStatusModalState}
                 action={apiStatusModalAction}
                 message={apiStatusModalMessage}
+            />
+            
+            {/* Pipeline Delete Dialog */}
+            <PipelineDeleteDialog
+                open={deleteDialog.open}
+                pipelineName={deleteDialog.pipelineName}
+                userInput={deleteDialog.userInput}
+                onClose={() => setDeleteDialog(prev => ({ ...prev, open: false }))}
+                onConfirm={() => {
+                    // Close the dialog first to prevent UI freezing
+                    setDeleteDialog(prev => ({ ...prev, open: false }));
+                    
+                    // Show loading modal
+                    setApiStatusModalState('loading');
+                    setApiStatusModalAction('Deleting Pipeline');
+                    setApiStatusModalMessage('');
+                    setApiStatusModalOpen(true);
+                    
+                    // Use the PipelinesService to delete the pipeline
+                    import('../api/pipelinesService').then(({ PipelinesService }) => {
+                        PipelinesService.deletePipeline(deleteDialog.pipelineId)
+                            .then(() => {
+                                // Show success message
+                                setApiStatusModalState('success');
+                                setApiStatusModalAction('Pipeline Deleted');
+                                setApiStatusModalMessage('The pipeline has been deleted successfully.');
+                                
+                                // Navigate back to pipelines page after a short delay
+                                setTimeout(() => {
+                                    navigate('/settings/pipelines');
+                                }, 1500);
+                            })
+                            .catch(error => {
+                                // Show error message
+                                setApiStatusModalState('error');
+                                setApiStatusModalAction('Delete Failed');
+                                setApiStatusModalMessage(error.message || 'An error occurred while deleting the pipeline.');
+                            });
+                    });
+                }}
+                onUserInputChange={(input) => setDeleteDialog(prev => ({ ...prev, userInput: input }))}
+                isDeleting={false}
             />
         </Box>
     );

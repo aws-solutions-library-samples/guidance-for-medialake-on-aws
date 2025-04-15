@@ -11,7 +11,7 @@ It implements AWS best practices including:
 - Performance optimization through global clients
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -22,8 +22,16 @@ import boto3
 import os
 import json
 from http import HTTPStatus
-from utils import generate_presigned_url, replace_binary_data
+from utils import generate_presigned_url, replace_binary_data, replace_decimals
 
+from opensearchpy import (
+    RequestsHttpConnection,
+    RequestsAWSV4SignerAuth,
+    OpenSearch,
+    OpenSearchException,
+    RequestError,
+    NotFoundError,
+)
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-details-service")
@@ -34,6 +42,29 @@ metrics = Metrics(namespace="AssetDetailsService", service="asset-details-servic
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
+# Initialize OpenSearch client
+def get_opensearch_client() -> OpenSearch:
+    """Create and return an OpenSearch client with optimized settings."""
+    host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
+    region = os.environ["AWS_REGION"]
+    service_scope = os.environ["SCOPE"]
+
+    auth = RequestsAWSV4SignerAuth(
+        boto3.Session().get_credentials(), region, service_scope
+    )
+
+    return OpenSearch(
+        hosts=[{"host": host, "port": 443}],
+        http_auth=auth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        region=region,
+        timeout=30,
+        max_retries=2,
+        retry_on_timeout=True,
+        maxsize=10,
+    )
 
 class AssetDetailsError(Exception):
     """Custom exception for asset retrieval errors"""
@@ -203,6 +234,78 @@ def get_url_for_purpose(asset, purpose):
 
 
 @tracer.capture_method
+def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve clips for a specific asset from OpenSearch.
+    
+    Args:
+        asset_id: The ID of the asset to retrieve clips for
+        
+    Returns:
+        List of clip objects
+    """
+    try:
+        client = get_opensearch_client()
+        index_name = os.environ["OPENSEARCH_INDEX"]
+        
+        # Query for clips associated with this asset
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "DigitalSourceAsset.ID.keyword": asset_id
+                            }
+                        },
+                        {
+                            "term": {
+                                "embedding_scope": "clip"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": 100,  # Limit to 100 clips per asset
+            "_source": {
+                    "excludes": ["embedding"]
+            },
+            "sort": [
+                {"start_timecode": {"order": "asc"}}  # Sort by start time
+            ]
+        }
+        
+        response = client.search(body=query, index=index_name)
+        
+        clips = []
+        for hit in response["hits"]["hits"]:
+            source = hit["_source"]
+            clip = {
+                "score": hit["_score"],
+                "start_timecode": source.get("start_timecode"),
+                "end_timecode": source.get("end_timecode"),
+                "timestamp": source.get("timestamp"),
+                "type": source.get("type")
+            }
+            
+            # Add any additional fields that might be useful
+            for key, value in source.items():
+                if key not in ["DigitalSourceAsset"] and key not in clip:
+                    clip[key] = value
+            
+            clips.append(clip)
+        
+        logger.info(f"Retrieved {len(clips)} clips for asset {asset_id}")
+        return clips
+        
+    except (RequestError, NotFoundError) as e:
+        logger.warning(f"OpenSearch error retrieving clips: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving clips: {str(e)}")
+        return []
+
+@tracer.capture_method
 def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
     """Enrich asset data with additional computed fields and handle binary data."""
     try:
@@ -233,7 +336,20 @@ def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
 
         # Replace binary data with "BINARY DATA" text
         asset = replace_binary_data(asset)
-
+        
+        # Get clips for this asset if it's a video or audio type
+        asset_type = asset.get("DigitalSourceAsset", {}).get("Type", "").lower()
+        if asset_type in ["video", "audio"]:
+            try:
+                asset_id = asset.get("DigitalSourceAsset", {}).get("ID")
+                if asset_id:
+                    clips = get_asset_clips(asset_id)
+                    if clips:
+                        asset["clips"] = clips
+                        logger.info(f"Added {len(clips)} clips to asset response")
+            except Exception as e:
+                logger.error(f"Error adding clips to asset: {str(e)}")
+        
         return asset
     except Exception as e:
         logger.error(f"Error enriching asset data: {str(e)}")

@@ -6,6 +6,7 @@ info:
 servers:
     - url: https://restapi.deepdub.ai
       description: Production server
+      x-server-environment: Production
 paths:
     /tts:
         post:

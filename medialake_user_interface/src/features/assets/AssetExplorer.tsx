@@ -193,7 +193,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         color: 'text.secondary'
       }}>
         <Typography variant="h6">
-          {t('translation.assetExplorer.noConnectorSelected')}
+          {t('assetExplorer.noConnectorSelected')}
         </Typography>
       </Box>
     );
@@ -217,10 +217,10 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       }}>
         <FolderOpenIcon sx={{ fontSize: 64, mb: 2, color: alpha(theme.palette.text.secondary, 0.5) }} />
         <Typography variant="h6">
-          {t('translation.assetExplorer.noAssetsFound')}
+          {t('assetExplorer.noAssetsFound')}
         </Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
-          {t('translation.assetExplorer.noIndexedAssets', { bucketName })}
+          {t('assetExplorer.noIndexedAssets', { bucketName })}
         </Typography>
       </Box>
     );
@@ -239,7 +239,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       }}>
         <CircularProgress size={40} />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          {t('translation.assetExplorer.loadingAssets')}
+          {t('assetExplorer.loadingAssets')}
         </Typography>
       </Box>
     );
@@ -326,7 +326,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         }}>
           <CircularProgress size={40} />
           <Typography variant="body1" sx={{ mt: 2 }}>
-            {t('translation.assetExplorer.loadingAssets')}
+            {t('assetExplorer.loadingAssets')}
           </Typography>
         </Box>
       )}
@@ -370,13 +370,13 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         }}
       >
         <MenuItem onClick={() => handleAction('rename')}>
-          {t('translation.assetExplorer.menu.rename')}
+          {t('assetExplorer.menu.rename')}
         </MenuItem>
         <MenuItem onClick={() => handleAction('share')}>
-          {t('translation.assetExplorer.menu.share')}
+          {t('assetExplorer.menu.share')}
         </MenuItem>
         <MenuItem onClick={() => handleAction('download')}>
-          {t('translation.assetExplorer.menu.download')}
+          {t('assetExplorer.menu.download')}
         </MenuItem>
       </Menu>
 
@@ -388,19 +388,19 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         aria-describedby="delete-dialog-description"
       >
         <DialogTitle id="delete-dialog-title">
-          {t('translation.assetExplorer.deleteDialog.title')}
+          {t('assetExplorer.deleteDialog.title')}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            {t('translation.assetExplorer.deleteDialog.description')}
+            {t('assetExplorer.deleteDialog.description')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel}>
-            {t('translation.assetExplorer.deleteDialog.cancel')}
+            {t('assetExplorer.deleteDialog.cancel')}
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-            {t('translation.assetExplorer.deleteDialog.confirm')}
+            {t('assetExplorer.deleteDialog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>

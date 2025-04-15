@@ -117,10 +117,15 @@ class AssetsConstruct(Construct):
             config=LambdaConfig(
                 name="rp_asset_id_get",
                 entry="lambdas/api/assets/rp_assets_id/get_assets",
+                vpc=props.vpc,
+                security_groups=[props.security_group],
                 layers=[search_layer.layer],
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_INDEX": props.opensearch_index,
+                    "SCOPE": "es",
                 },
             ),
         )
@@ -174,6 +179,45 @@ class AssetsConstruct(Construct):
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],
                 resources=[props.asset_table.table_arn],
+            )
+        )
+        
+        # Add EC2 permissions for VPC access
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
+        )
+        
+        # Add OpenSearch permissions
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpGet",
+                    "es:ESHttpPost",
+                    "es:ESHttpPut",
+                    "es:ESHttpDelete",
+                    "es:DescribeElasticsearchDomain",
+                    "es:ListDomainNames",
+                    "es:ESHttpHead",
+                ],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
+        )
+        
+        # Add Secrets Manager permissions for potential API key access
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[props.x_origin_verify_secret.secret_arn],
             )
         )
 

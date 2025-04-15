@@ -131,6 +131,7 @@ export default {
         description: {
           label: 'תיאור',
           tooltip: 'ספק תיאור לאינטגרציה זו',
+          helper: 'תיאור קצר של אינטגרציה זו',
           errors: {
             required: 'תיאור הינו חובה'
           }
@@ -165,6 +166,7 @@ export default {
             apiKey: {
               label: 'מפתח API',
               tooltip: 'הזן את מפתח ה-API שלך',
+              helper: 'מפתח API לאימות עם השירות',
               errors: {
                 required: 'מפתח API הינו חובה'
               }
@@ -192,7 +194,8 @@ export default {
     description: 'נהל את צינורות המדיה והמטא-דאטה שלך',
     searchPlaceholder: 'חפש צינורות...',
     actions: {
-      create: 'הוסף צינור חדש'
+      create: 'הוסף צינור חדש',
+      import: 'ייבא צינור'
     }
   },
   executions: {
@@ -339,6 +342,8 @@ export default {
     moreInfo: 'מידע נוסף',
     error: 'שגיאה',
     language: 'שפה',
+    delete: 'מחק',
+    create: 'צור',
     actions: {
       add: 'הוסף'
     },

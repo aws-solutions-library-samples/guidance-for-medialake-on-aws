@@ -176,34 +176,34 @@ def get_opensearch_client() -> OpenSearch:
 def build_semantic_query(params: SearchParams) -> Dict:
     from twelvelabs import TwelveLabs
     from twelvelabs.models.embed import SegmentEmbedding
-    
+
     logger.info(f"Building semantic query for: {params.q}")
-    
+
     # Get the API key from Secrets Manager
     api_key = get_api_key()
     if not api_key:
         raise SearchException("Search provider API key not configured or provider not enabled")
-    
+
     # Get the endpoint from the configuration
     endpoint = get_endpoint()
-    
+
     # Initialize the Twelve Labs client
     twelve_labs_client = TwelveLabs(api_key=api_key)
-    
+
     try:
         # Create embedding for the search query
         res = twelve_labs_client.embed.create(
             model_name="Marengo-retrieval-2.7",
             text=params.q,
         )
-        
+
         if res.text_embedding is not None and res.text_embedding.segments is not None:
             embedding = list(res.text_embedding.segments[0].embeddings_float)
             if not all(isinstance(x, (int, float)) for x in embedding):
                 raise SearchException("Invalid embedding format")
-            
+
             logger.info(f"Generated embedding for query: {params.q} (length: {len(embedding)})")
-                
+
             query = {
                 "size": params.pageSize * 20,
                 "query": {
@@ -242,7 +242,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     logger.info("Building search query with params:", extra={"params": params.model_dump()})
-    
+
     if params.semantic:
         return build_semantic_query(params)
 
@@ -253,7 +253,7 @@ def build_search_query(params: SearchParams) -> Dict:
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name^3",
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath^2"
     ]
-    
+
     type_fields = [
         "DigitalSourceAsset.Type^2",
         "DigitalSourceAsset.MainRepresentation.Format^2",
@@ -463,7 +463,7 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
     derived_representations = source.get("DerivedRepresentations", [])
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    
+
     asset_id = digital_source_asset.get("ID", "unknown")
     original_score = hit.get("_score", 0)
     logger.info(f"Original OpenSearch score for asset {asset_id}: {original_score}")
@@ -509,12 +509,12 @@ def process_clip(clip_hit: Dict) -> Dict:
     asset_id = source.get("DigitalSourceAsset", {}).get("ID", "unknown")
     original_score = clip_hit.get("_score", 0)
     logger.info(f"Original OpenSearch score for clip of asset {asset_id}: {original_score}")
-    
+
     result = {
         "DigitalSourceAsset": source.get("DigitalSourceAsset", {}),
         "score": clip_hit["_score"],
     }
-    
+
     if "embedding_scope" in source:
         result["embedding_scope"] = source["embedding_scope"]
     if "start_timecode" in source:
@@ -525,11 +525,11 @@ def process_clip(clip_hit: Dict) -> Dict:
         result["type"] = source["type"]
     if "timestamp" in source:
         result["timestamp"] = source["timestamp"]
-    
+
     for key, value in source.items():
         if key not in result and key not in ["DigitalSourceAsset"]:
             result[key] = value
-    
+
     return result
 
 
@@ -559,12 +559,12 @@ def get_parent_asset(client, index_name, asset_id):
             },
             "size": 1
         }
-        
+
         response = client.search(body=query, index=index_name)
-        
+
         if response["hits"]["total"]["value"] > 0:
             return response["hits"]["hits"][0]
-        
+
         return None
     except Exception as e:
         logger.warning(f"Error fetching parent asset {asset_id}: {str(e)}")
@@ -581,11 +581,11 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     clips_by_asset = defaultdict(list)
     standalone_hits = []
     orphaned_clip_assets = set()
-    
+
     logger.info("All hit scores:")
     for i, hit in enumerate(hits):
         logger.info(f"Hit {i}: score={hit['_score']}, id={hit.get('_id')}, embedding_scope={hit.get('_source', {}).get('embedding_scope')}")
-    
+
     for hit in hits:
         source = hit["_source"]
         if source.get("embedding_scope") == "clip":
@@ -615,22 +615,18 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
             else:
                 standalone_hits.append(hit)
                 logger.info(f"Added standalone hit with score {hit['_score']}")
-    
+
     logger.info(f"Found {len(parent_assets)} parent assets, clips for {len(clips_by_asset)} assets, and {len(standalone_hits)} standalone hits")
     logger.info(f"Found {len(orphaned_clip_assets)} orphaned clip assets")
-    
+
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
-    
+
     for asset_id in orphaned_clip_assets:
         if asset_id not in parent_assets:
             parent_hit = get_parent_asset(client, index_name, asset_id)
             if parent_hit:
-                highest_clip_score = 0
-                if asset_id in clips_by_asset:
-                    for clip in clips_by_asset[asset_id]:
-                        if clip["score"] > highest_clip_score:
-                            highest_clip_score = clip["score"]
+                highest_clip_score = max((clip["score"] for clip in clips_by_asset.get(asset_id, [])), default=0)
                 parent_score = parent_hit["_score"]
                 logger.info(f"Original scores for orphaned asset {asset_id}: parent={parent_score}, highest_clip={highest_clip_score}, clip_count={len(clips_by_asset.get(asset_id, []))}")
                 use_clip_score = False
@@ -651,49 +647,49 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                     "hit": parent_hit
                 }
                 logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
-    
+
     def process_asset_with_clips(asset_id):
         if asset_id in parent_assets:
             try:
                 result = process_search_hit(parent_assets[asset_id]["hit"])
                 result_dict = result.model_dump(by_alias=True)
-                result_dict["clips"] = []
-                
+                parent_score = result_dict.get("score", 0)
+                digital_source = result_dict.get("DigitalSourceAsset", {})
+                asset_type = digital_source.get("Type", "").lower()
+
                 if asset_id in clips_by_asset:
-                    asset_type = parent_assets[asset_id]["source"].get("DigitalSourceAsset", {}).get("Type", "").lower()
-                    if asset_type in ["video", "audio"]:
-                        asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)[:30]
-                        highest_clip_score = 0
-                        for clip in asset_clips:
-                            try:
-                                clip_result = process_clip(clip["hit"])
-                                result_dict["clips"].append(clip_result)
-                                if clip["score"] > highest_clip_score:
-                                    highest_clip_score = clip["score"]
-                            except Exception as e:
-                                logger.warning(f"Error processing clip: {str(e)}")
-                        
-                        parent_score = result_dict.get("score", 0)
-                        logger.info(f"Original scores for asset {asset_id}: parent={parent_score}, highest_clip={highest_clip_score}, clip_count={len(asset_clips)}")
-                        
-                        if highest_clip_score > 0:
-                            if highest_clip_score > parent_score:
-                                relevance_ratio = highest_clip_score / parent_score if parent_score > 0 else 2.0
-                                if relevance_ratio > 1.2:
-                                    new_score = highest_clip_score
-                                    if new_score > 1.0:
-                                        logger.info(f"Normalizing unusually high score for asset {asset_id}: {new_score} -> 1.0")
-                                        new_score = 1.0
-                                    logger.info(f"Promoted asset {asset_id}: {parent_score} -> {new_score} (clip relevance ratio: {relevance_ratio:.2f})")
-                                    result_dict["score"] = new_score
-                                else:
-                                    logger.info(f"Clip not significantly more relevant for asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
+                    asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)
+                    highest_clip_score = asset_clips[0]["score"]
+
+                    # Branch the logic based on asset type.
+                    if asset_type == "audio":
+                        # For audio, use the highest clip score directly as the asset score.
+                        combined_score = highest_clip_score
+                        logger.info(f"Audio asset {asset_id}: using highest clip score {highest_clip_score} as combined score.")
+                    else:
+                        # For video (or other types with their own embeddings), use a weighted average.
+                        relevance_ratio = (highest_clip_score / parent_score) if parent_score > 0 else 2.0
+                        if relevance_ratio > 1.2:
+                            combined_score = (0.5 * parent_score) + (0.5 * highest_clip_score)
+                            logger.info(f"Asset {asset_id}: Combining scores parent {parent_score} and clip {highest_clip_score} into {combined_score} (relevance ratio: {relevance_ratio:.2f}).")
+                        else:
+                            combined_score = parent_score
+                            logger.info(f"Asset {asset_id}: Keeping parent's score {parent_score} (relevance ratio: {relevance_ratio:.2f}).")
+                    
+                    # Ensure the score does not exceed 1.0.
+                    combined_score = min(combined_score, 1.0)
+                    result_dict["score"] = combined_score
+
+                    # Process and attach clips for transparency/debugging.
+                    result_dict["clips"] = [process_clip(clip_hit["hit"]) for clip_hit in asset_clips]
+                # Ensure the 'clips' key is always a list.
+                result_dict["clips"] = result_dict.get("clips") or []
                 return result_dict
             except Exception as e:
                 logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
                 return None
         return None
-    
+
     def process_standalone_hit(hit):
         try:
             result = process_search_hit(hit)
@@ -701,13 +697,13 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
         except Exception as e:
             logger.warning(f"Error processing standalone hit: {str(e)}")
             return None
-    
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         result_futures = {
             executor.submit(process_asset_with_clips, asset_id): asset_id
             for asset_id in parent_assets.keys()
         }
-        
+
         results = []
         for future in concurrent.futures.as_completed(result_futures):
             try:
@@ -717,7 +713,7 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
             except Exception as e:
                 asset_id = result_futures[future]
                 logger.warning(f"Error processing asset {asset_id}: {str(e)}")
-    
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         standalone_futures = [executor.submit(process_standalone_hit, hit) for hit in standalone_hits]
         for future in concurrent.futures.as_completed(standalone_futures):
@@ -727,31 +723,33 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                     results.append(result)
             except Exception as e:
                 logger.warning(f"Error processing standalone hit: {str(e)}")
-    
+
     logger.info("Scores before sorting:")
     for i, result in enumerate(results):
         asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
         score = result.get("score", 0)
-        clip_count = len(result.get("clips", []))
+        clip_val = result.get("clips", [])
+        clip_count = len(clip_val) if isinstance(clip_val, list) else 0
         logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
-    
+
     for result in results:
         score = result.get("score", 0)
         if score > 1.0:
             logger.info(f"Final normalization: Capping score for asset {result.get('DigitalSourceAsset', {}).get('ID', 'unknown')}: {score} -> 1.0")
             result["score"] = 1.0
-    
+
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
-    
+
     logger.info("Scores after sorting (final order):")
     for i, result in enumerate(results):
         asset_id = result.get("DigitalSourceAsset", {}).get("ID", "unknown")
         score = result.get("score", 0)
-        clip_count = len(result.get("clips", []))
+        clip_val = result.get("clips", [])
+        clip_count = len(clip_val) if isinstance(clip_val, list) else 0
         logger.info(f"Result {i}: asset_id={asset_id}, score={score}, clip_count={clip_count}")
-    
+
     logger.info(f"Total processed results: {len(results)}")
-    
+
     return results
 
 
@@ -767,10 +765,17 @@ def perform_search(params: SearchParams) -> Dict:
         response = client.search(body=search_body, index=index_name)
 
         logger.info(f"Total hits from OpenSearch: {response['hits']['total']['value']}")
-        
+
+        # Use a fallback in case 'hits' or the 'hits' list is missing.
+        hits = response.get("hits", {}).get("hits", [])
+        if hits is None:
+            hits = []
+
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
-                processed_results = process_semantic_results_parallel(response["hits"]["hits"])
+                processed_results = process_semantic_results_parallel(hits)
+                if processed_results is None:  # Safety check.
+                    processed_results = []
                 total_results = len(processed_results)
                 start_idx = (params.page - 1) * params.pageSize
                 end_idx = start_idx + params.pageSize
@@ -802,7 +807,7 @@ def perform_search(params: SearchParams) -> Dict:
                 }
             else:
                 results = []
-                for hit in response["hits"]["hits"]:
+                for hit in hits:
                     try:
                         result = process_search_hit(hit)
                         results.append(result.model_dump(by_alias=True))
@@ -835,16 +840,16 @@ def perform_search(params: SearchParams) -> Dict:
                     },
                 }
         else:
-            hits = []
-            for hit in response["hits"]["hits"]:
+            hits_list = []
+            for hit in hits:
                 try:
                     result = process_search_hit(hit)
-                    hits.append(result)
+                    hits_list.append(result)
                 except Exception as e:
                     logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                     continue
 
-            logger.info(f"Successfully processed hits: {len(hits)}")
+            logger.info(f"Successfully processed hits: {len(hits_list)}")
             search_metadata = SearchMetadata(
                 totalResults=response["hits"]["total"]["value"],
                 page=params.page,
@@ -858,7 +863,7 @@ def perform_search(params: SearchParams) -> Dict:
                 "message": "ok",
                 "data": {
                     "searchMetadata": search_metadata.model_dump(by_alias=True),
-                    "results": [hit.model_dump(by_alias=True) for hit in hits],
+                    "results": [hit.model_dump(by_alias=True) for hit in hits_list],
                 },
             }
 

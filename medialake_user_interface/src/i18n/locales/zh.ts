@@ -131,6 +131,7 @@ export default {
         description: {
           label: '描述',
           tooltip: '为此集成提供描述',
+          helper: '此集成的简要描述',
           errors: {
             required: '描述为必填项'
           }
@@ -165,6 +166,7 @@ export default {
             apiKey: {
               label: 'API密钥',
               tooltip: '输入您的API密钥',
+              helper: '用于服务认证的API密钥',
               errors: {
                 required: '必须输入API密钥'
               }
@@ -192,7 +194,8 @@ export default {
     description: '管理您的媒体和元数据管道',
     searchPlaceholder: '搜索管道...',
     actions: {
-      create: '添加新管道'
+      create: '添加新管道',
+      import: '导入管道'
     }
   },
   executions: {
@@ -339,6 +342,8 @@ export default {
     moreInfo: '更多信息',
     error: '错误',
     language: '语言',
+    delete: '删除',
+    create: '创建',
     actions: {
       add: '添加'
     },

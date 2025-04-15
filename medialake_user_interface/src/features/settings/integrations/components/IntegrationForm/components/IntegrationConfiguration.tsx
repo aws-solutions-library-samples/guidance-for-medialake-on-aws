@@ -15,7 +15,6 @@ import { FormField } from '@/forms/components/FormField';
 import { FormSelect } from '@/forms/components/FormSelect';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
 import { IntegrationConfigurationProps, IntegrationFormData } from '@/features/settings/integrations/components/IntegrationForm/types';
-import { useCreateIntegration } from '../../../api/integrations.controller';
 
 export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> = ({
     formData,
@@ -26,8 +25,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
     const { t } = useTranslation();
     const [showApiKey, setShowApiKey] = React.useState(false);
     const [enabled, setEnabled] = React.useState(true);
-
-    const createIntegrationMutation = useCreateIntegration();
 
     // Define schema directly with Zod
     const validationSchema = React.useMemo(() => {
@@ -85,6 +82,9 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
     });
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
+        // Close the form immediately before any validation or submission
+        onClose();
+        
         console.log('[IntegrationConfiguration] Starting submission with data:', data);
         try {
             const now = new Date().toISOString();
@@ -104,7 +104,9 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
             console.log('[IntegrationConfiguration] Submission completed');
         } catch (error) {
             console.error('[IntegrationConfiguration] Error during submission:', error);
+            throw error; // Re-throw to allow parent component to handle the error
         }
+    }, [onSubmit, enabled]);
     }, [onSubmit, enabled]);
 
     const authMethod = formData.auth.type;

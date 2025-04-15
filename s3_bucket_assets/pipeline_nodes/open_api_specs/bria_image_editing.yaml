@@ -26,7 +26,10 @@ externalDocs:
   description: Register and get API Access
   url: https://platform.bria.ai/console/account/api-keys
 servers:
-  - url: https://engine.prod.bria-api.com/v1
+  - url: https://engine.prod.bria-api.com/
+    path: v1
+    description: Production API Server
+    x-server-environment: Production
 paths:
   /eraser:
     post:

@@ -131,6 +131,7 @@ export default {
           description: {
             label: 'Beschreibung',
             tooltip: 'Geben Sie eine Beschreibung für diese Integration ein',
+            helper: 'Kurze Beschreibung dieser Integration',
             errors: {
               required: 'Beschreibung ist erforderlich'
             }
@@ -165,6 +166,7 @@ export default {
               apiKey: {
                 label: 'API-Schlüssel',
                 tooltip: 'Geben Sie Ihren API-Schlüssel ein',
+                helper: 'API-Schlüssel für die Authentifizierung mit dem Dienst',
                 errors: {
                   required: 'API-Schlüssel ist erforderlich'
                 }
@@ -192,7 +194,8 @@ export default {
       description: 'Verwalten Sie Ihre Medien- und Metadaten-Pipelines',
       searchPlaceholder: 'Pipelines suchen...',
       actions: {
-        create: 'Neue Pipeline hinzufügen'
+        create: 'Neue Pipeline hinzufügen',
+        import: 'Pipeline importieren'
       }
     },
     executions: {
@@ -339,6 +342,8 @@ export default {
       moreInfo: 'Mehr Informationen',
       error: 'Fehler',
       language: 'Sprache',
+      delete: 'Löschen',
+      create: 'Erstellen',
       actions: {
         add: 'Hinzufügen'
       },

@@ -97,7 +97,7 @@ const UserProfile: React.FC = () => {
             setEditing(false);
             setError(null);
         } catch (err) {
-            setError(t('translation.errors.saveFailed', 'Failed to save profile changes. Please try again.'));
+            setError(t('errors.saveFailed', 'Failed to save profile changes. Please try again.'));
         }
     };
 
@@ -134,13 +134,13 @@ const UserProfile: React.FC = () => {
                         }}
                     >
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                            <Typography variant="h6">{t('translation.common.profile')}</Typography>
+                            <Typography variant="h6">{t('common.profile')}</Typography>
                             {!editing ? (
                                 <Button
                                     startIcon={<EditIcon />}
                                     onClick={() => setEditing(true)}
                                 >
-                                    {t('translation.actions.edit', 'Edit Profile')}
+                                    {t('actions.edit', 'Edit Profile')}
                                 </Button>
                             ) : (
                                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -148,14 +148,14 @@ const UserProfile: React.FC = () => {
                                         startIcon={<CancelIcon />}
                                         onClick={handleCancel}
                                     >
-                                        {t('translation.common.cancel', 'Cancel')}
+                                        {t('common.cancel', 'Cancel')}
                                     </Button>
                                     <Button
                                         variant="contained"
                                         startIcon={<SaveIcon />}
                                         onClick={handleSave}
                                     >
-                                        {t('translation.common.save', 'Save Changes')}
+                                        {t('common.save', 'Save Changes')}
                                     </Button>
                                 </Box>
                             )}
@@ -196,7 +196,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label={t('translation.users.form.fields.given_name.label', 'First Name')}
+                                    label={t('users.form.fields.given_name.label', 'First Name')}
                                     value={profileData.firstName}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -208,7 +208,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label={t('translation.users.form.fields.family_name.label', 'Last Name')}
+                                    label={t('users.form.fields.family_name.label', 'Last Name')}
                                     value={profileData.lastName}
                                     disabled={!editing}
                                     onChange={(e) => setProfileData({
@@ -220,7 +220,7 @@ const UserProfile: React.FC = () => {
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
-                                    label={t('translation.users.form.fields.email.label', 'Email')}
+                                    label={t('users.form.fields.email.label', 'Email')}
                                     value={profileData.email}
                                     disabled={!editing}
                                     type="email"
@@ -297,7 +297,7 @@ const UserProfile: React.FC = () => {
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <NotificationsIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">{t('translation.common.notifications', 'Notifications')}</Typography>
+                                <Typography variant="subtitle1">{t('common.notifications', 'Notifications')}</Typography>
                             </Box>
                             <FormControlLabel
                                 control={
@@ -336,7 +336,7 @@ const UserProfile: React.FC = () => {
                         <Box sx={{ mb: 3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <SecurityIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle1">{t('translation.settings.systemSettings.tabs.security', 'Security')}</Typography>
+                                <Typography variant="subtitle1">{t('settings.systemSettings.tabs.security', 'Security')}</Typography>
                             </Box>
                             <Button variant="outlined" fullWidth sx={{ mb: 1 }}>
                                 {t('profile.changePassword', 'Change Password')}
@@ -363,7 +363,7 @@ const UserProfile: React.FC = () => {
                                         })}
                                     />
                                 }
-                                label={t('translation.common.darkMode', 'Dark Mode')}
+                                label={t('common.darkMode', 'Dark Mode')}
                             />
                         </Box>
                     </Paper>
