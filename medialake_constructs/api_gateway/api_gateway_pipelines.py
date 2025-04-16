@@ -197,10 +197,26 @@ class ApiGatewayPipelinesConstruct(Construct):
                 },
             ),
         )
+        # Set reserved concurrent executions to 1 to limit concurrency
+        self._pipeline_trigger_lambda.function.reserved_concurrent_executions = 1
         self._pipeline_trigger_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
+            )
+        )
+        
+        # Add permissions to list and describe Step Functions and their executions
+        self._pipeline_trigger_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:ListStateMachines",
+                    "states:ListExecutions",
+                    "states:DescribeExecution", 
+                    "states:DescribeStateMachine",
+                    "states:GetExecutionHistory"
+                ],
+                resources=["*"],
             )
         )
 
@@ -400,26 +416,6 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
        
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:GetObject"],
-                resources=[
-                    props.pipelines_nodes_templates_bucket.bucket_arn,
-                    f"{props.pipelines_nodes_templates_bucket.bucket_arn}/*",
-                ],
-            )
-        )
-        
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "kms:Decrypt",
-                ],
-                resources=["*"],
-            )
-        )
-
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
