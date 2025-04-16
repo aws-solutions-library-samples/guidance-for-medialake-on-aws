@@ -132,8 +132,21 @@ def setup_eventbridge_notifications(
         logger.error(f"Failed to enable EventBridge notifications: {str(e)}")
         raise
 
+    # Sanitize the bucket name for use in queue name (remove invalid chars)
+    sanitized_bucket = ''.join(c for c in s3_bucket if c.isalnum() or c in '-_')
+    
     # Create FIFO SQS queue with queue-level throughput limit
-    queue_name = f"medialake-connector-{s3_bucket}-eventbridge.fifo"
+    # Ensure the queue name with .fifo suffix is 80 chars or less
+    # Reserve 5 chars for suffix (.fifo)
+    max_queue_name_length = 75  # 80 - 5 (.fifo)
+    base_name = f"medialake-connector-{sanitized_bucket}-eventbridge"
+    if len(base_name) > max_queue_name_length:
+        base_name = base_name[:max_queue_name_length]
+    
+    queue_name = f"{base_name}.fifo"
+    
+    logger.info(f"Creating FIFO queue with name: {queue_name}")
+    
     response = sqs.create_queue(
         QueueName=queue_name,
         Attributes={
