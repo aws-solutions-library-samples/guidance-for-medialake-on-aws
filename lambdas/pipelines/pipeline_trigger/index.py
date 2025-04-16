@@ -159,9 +159,9 @@ def start_execution_with_backoff(state_machine_arn, execution_input):
 def lambda_handler(event, context):
     print(json.dumps(event))
     
-    # Track which messages were processed and which were skipped
+    # Track which messages were processed and which failed
     processed_records = []
-    skipped_records = []
+    failed_message_ids = []
     
     try:
         # Process each record from SQS
@@ -175,19 +175,16 @@ def lambda_handler(event, context):
             
             try:
                 # Check if we're under the concurrency limit
-                # Use cached value when possible to reduce API calls
                 current_running = get_running_executions_count(step_function_arn)
                 
                 if current_running >= MAX_CONCURRENT_EXECUTIONS:
                     logger.info(
-                        f"Skipping execution for asset {asset['InventoryID']} due to concurrency limit "
+                        f"Concurrency limit reached for asset {asset['InventoryID']} "
                         f"({current_running}/{MAX_CONCURRENT_EXECUTIONS} executions running)"
                     )
                     
-                    skipped_records.append({
-                        "inventory_id": asset['InventoryID'],
-                        "reason": "concurrency_limit_reached"
-                    })
+                    # Add message ID to the failed list so it will be retried
+                    failed_message_ids.append(record["messageId"])
                     continue
                 
                 # Prepare the input for the Step Function
@@ -216,30 +213,20 @@ def lambda_handler(event, context):
                     logger.error(
                         f"Throttling exception persisted when processing asset {asset['InventoryID']}"
                     )
-                    skipped_records.append({
-                        "inventory_id": asset['InventoryID'],
-                        "reason": "throttling_exception"
-                    })
+                    failed_message_ids.append(record["messageId"])
                 else:
                     logger.error(
                         f"Error processing asset {asset['InventoryID']}: {str(e)}"
                     )
-                    skipped_records.append({
-                        "inventory_id": asset['InventoryID'],
-                        "reason": "error",
-                        "error": str(e)
-                    })
+                    failed_message_ids.append(record["messageId"])
         
-        # Return a summary of what happened
+        # Return the result with batchItemFailures for SQS to retry just the failed messages
         return {
-            "statusCode": 200, 
-            "body": json.dumps({
-                "processed": processed_records,
-                "skipped": skipped_records,
-                "message": "Processing complete"
-            })
+            "batchItemFailures": [{"itemIdentifier": message_id} for message_id in failed_message_ids],
+            "processed": processed_records
         }
 
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
-        return {"statusCode": 500, "body": str(e)}
+        # If we have an unhandled exception, all messages will be retried anyway
+        raise
