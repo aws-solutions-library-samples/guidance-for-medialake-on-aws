@@ -1,294 +1,189 @@
-
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const dynamoDB = new AWS.DynamoDB();
 const exifr = require('exifr');
 const xml2js = require('xml2js');
 
-// List of file extensions that should be skipped during metadata extraction
-const UNSUPPORTED_EXTENSIONS = [
-    '.webp',    // WebP format
-];
-
 const MEDIALAKE_ASSET_TABLE = process.env.MEDIALAKE_ASSET_TABLE;
+const UNSUPPORTED_EXTENSIONS = ['.webp'];
 
-// Utility functions
-function clipBytes(uint8arr, limit = 60) {
-    const arr = Array.from(uint8arr);
-    const [values, remaining] = sliceArray(arr, limit);
-    let output = formatBytes(values);
-    if (remaining > 0) output += `\n... and ${remaining} more`;
-    return output;
-}
-
-function clipString(string, limit = 300) {
-    const arr = string.split('');
-    const [values, remaining] = sliceArray(arr, limit);
-    let output = values.join('');
-    if (remaining > 0) output += `\n... and ${remaining} more`;
-    return output;
-}
-
+// Slice and format helpers
 function sliceArray(arr, limit) {
-    const size = Math.min(arr.length, limit);
-    const values = arr.slice(0, size);
-    if (size < arr.length)
-        return [values, arr.length - size];
-    else
-        return [values, 0];
+  const size = Math.min(arr.length, limit);
+  const values = arr.slice(0, size);
+  return size < arr.length ? [values, arr.length - size] : [values, 0];
 }
 
 function formatBytes(arr) {
-    return arr
-        .map(val => val.toString(16).padStart(2, '0'))
-        .join(' ');
+  return arr.map(val => val.toString(16).padStart(2, '0')).join(' ');
+}
+
+// Clip for logging
+function clipBytes(uint8arr, limit = 60) {
+  const arr = Array.from(uint8arr);
+  const [values, remaining] = sliceArray(arr, limit);
+  let output = formatBytes(values);
+  if (remaining > 0) output += `\n... and ${remaining} more`;
+  return output;
+}
+
+function clipString(str, limit = 300) {
+  const arr = str.split('');
+  const [values, remaining] = sliceArray(arr, limit);
+  let output = values.join('');
+  if (remaining > 0) output += `\n... and ${remaining} more`;
+  return output;
 }
 
 function prettyCase(string) {
-    return string.match(/([A-Z]+(?=[A-Z][a-z]))|([A-Z][a-z]+)|([0-9]+)|([a-z]+)|([A-Z]+)/g)
-        .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ');
+  return string
+    .match(/([A-Z]+(?=[A-Z][a-z]))|([A-Z][a-z]+)|([0-9]+)|([a-z]+)|([A-Z]+)/g)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(' ');
 }
 
-const convertFloatsToDecimals = (obj) => {
-    if (typeof obj !== 'object' || obj === null) return obj;
-    if (Array.isArray(obj)) return obj.map(convertFloatsToDecimals);
-    const result = {};
-    for (const [key, value] of Object.entries(obj)) {
-        if (typeof value === 'number') {
-            result[key] = value.toString();
-        } else if (typeof value === 'object') {
-            result[key] = convertFloatsToDecimals(value);
-        } else {
-            result[key] = value;
-        }
-    }
-    return result;
+const convertFloatsToDecimals = obj => {
+  if (obj == null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(convertFloatsToDecimals);
+  const res = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'number') res[k] = v.toString();
+    else if (typeof v === 'object') res[k] = convertFloatsToDecimals(v);
+    else res[k] = v;
+  }
+  return res;
 };
 
-function humanReadableCategory(category) {
-    return category;
+// Normalize date-only strings to YYYY-MM-DD
+function normalizeDateString(str) {
+  const m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) {
+    const [, y, mn, d] = m;
+    return `${y}-${mn.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return str;
+}
+
+// Normalize malformed ISO datetime like 2008-03-20T04:54:000Z → 2008-03-20T04:54:00.000Z
+function normalizeDateTimeString(str) {
+  const m = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{3})Z$/);
+  if (m) {
+    const [, date, hh, mm, ms] = m;
+    return `${date}T${hh}:${mm}:00.${ms}Z`;
+  }
+  return str;
+}
+
+// Clean control chars and normalize dates
+function sanitizeMetadata(obj) {
+  if (obj == null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'string') {
+      let s = normalizeDateString(v);
+      s = normalizeDateTimeString(s);
+      out[k] = s
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+        .replace(/[\\"']/g, '\\$&');
+    } else if (v instanceof Uint8Array) {
+      out[k] = clipBytes(v);
+    } else {
+      out[k] = sanitizeMetadata(v);
+    }
+  }
+  return out;
+}
+
+// Force every leaf node into { value: ... }
+function forceAllObjects(x) {
+  if (x == null || typeof x !== 'object') return { value: x };
+  if (Array.isArray(x)) return x.map(forceAllObjects);
+  const out = {};
+  for (const [k, v] of Object.entries(x)) {
+    out[k] = forceAllObjects(v);
+  }
+  return out;
 }
 
 async function extractOrganizedMetadata(imageBuffer) {
-    const options = {
-        // APP segments
-        tiff: true,
-        // TIFF blocks start
-        ifd0: true,
-        exif: true,
-        gps: true,
-        interop: true,
-        ifd1: true,
-        // other data
-        makerNote: false,
-        userComment: false,
-        // TIFF blocks end
-        xmp: true,
-        icc: true,
-        iptc: true,
-        // JPEG only
-        jfif: true,
-        // PNG only
-        ihdr: true,
-        // output styles
-        mergeOutput: false,
-        sanitize: true,
-        reviveValues: true,
-        translateKeys: true,
-        translateValues: true,
-        // for XMP Extended
-        multiSegment: true,
-    };
-
-    const rawMetadata = await exifr.parse(imageBuffer, options);
-    return organizeMetadata(rawMetadata);
+  const options = {
+    tiff: true, ifd0: true, exif: true, gps: true,
+    interop: true, ifd1: true, makerNote: false, userComment: false,
+    xmp: true, icc: true, iptc: true, jfif: true, ihdr: true,
+    mergeOutput: false, sanitize: true, reviveValues: true,
+    translateKeys: true, translateValues: true, multiSegment: true
+  };
+  const raw = await exifr.parse(imageBuffer, options);
+  return organizeMetadata(raw || {});
 }
 
-function organizeMetadata(rawMetadata) {
-    const organizedMetadata = {};
-    const seenKeys = new Set();
-
-    for (const [segment, data] of Object.entries(rawMetadata)) {
-        if (segment === 'errors') {
-            console.error('Metadata extraction errors:', data);
-            continue; // Skip adding errors to the organized metadata
+function organizeMetadata(raw) {
+  const out = {};
+  const seen = new Set();
+  for (const [segment, data] of Object.entries(raw)) {
+    if (segment === 'errors') continue;
+    if (data && typeof data === 'object') {
+      out[segment] = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (!seen.has(k)) {
+          let val = v;
+          if (v instanceof Uint8Array) val = clipBytes(v);
+          else if (typeof v === 'string') val = clipString(v);
+          out[segment][prettyCase(k)] = val;
+          seen.add(k);
         }
-
-        const readableSegment = humanReadableCategory(segment);
-        if (typeof data === 'object' && data !== null) {
-            organizedMetadata[readableSegment] = {};
-            for (const [key, value] of Object.entries(data)) {
-                if (!seenKeys.has(key)) {
-                    let processedValue = value;
-                    if (value instanceof Uint8Array) {
-                        processedValue = clipBytes(value);
-                    } else if (typeof value === 'string') {
-                        processedValue = clipString(value);
-                    }
-                    organizedMetadata[readableSegment][prettyCase(key)] = processedValue;
-                    seenKeys.add(key);
-                }
-            }
-        } else {
-            organizedMetadata[readableSegment] = data;
-        }
+      }
+    } else {
+      out[segment] = data;
     }
-
-    return organizedMetadata;
+  }
+  return out;
 }
 
-// New function: extract SVG metadata using xml2js
-async function extractSvgMetadata(imageBuffer) {
-    const data = imageBuffer.toString('utf8');
-    const parser = new xml2js.Parser({ explicitArray: false });
-    try {
-        const result = await parser.parseStringPromise(data);
-        // Extract the <metadata> tag content from the <svg> element
-        const svgMetadata = result.svg && result.svg.metadata ? result.svg.metadata : null;
-        return { svgMetadata };
-    } catch (err) {
-        console.error('Error parsing SVG:', err);
-        return null;
-    }
+async function extractSvgMetadata(buffer) {
+  const xml = buffer.toString('utf8');
+  try {
+    const doc = await new xml2js.Parser({ explicitArray: false }).parseStringPromise(xml);
+    return { svgMetadata: doc.svg?.metadata || null };
+  } catch {
+    return null;
+  }
 }
 
-// Modified processImageFile: check file extension to determine extraction method
 async function processImageFile(bucket, key) {
-    try {
-        // Extract file extension from the key
-        const fileExtension = key.substring(key.lastIndexOf('.')).toLowerCase();
-        
-        // Check if the file extension is in the unsupported list
-        if (UNSUPPORTED_EXTENSIONS.includes(fileExtension)) {
-            console.log(`Skipping metadata extraction for unsupported file type: ${fileExtension}`);
-            return {
-                UnsupportedFormat: {
-                    Message: `File type ${fileExtension} is not supported for metadata extraction`,
-                    FileExtension: fileExtension
-                }
-            };
-        }
-
-        const { Body: imageContent } = await s3.getObject({ Bucket: bucket, Key: key }).promise();
-        console.log(`Retrieved image size: ${imageContent.length} bytes`);
-
-        // If the file is an SVG, use the SVG extraction method
-        if (fileExtension === '.svg') {
-            const svgData = await extractSvgMetadata(imageContent);
-            if (svgData && svgData.svgMetadata) {
-                console.log('SVG Metadata extracted:', svgData.svgMetadata);
-                return { SVGMetadata: svgData.svgMetadata };
-            } else {
-                console.log('No <metadata> tag found in the SVG.');
-                return { SVGMetadata: "No <metadata> tag found" };
-            }
-        } else {
-            // Use exifr for non-SVG image metadata extraction
-            const metadata = await extractOrganizedMetadata(imageContent);
-            if (!metadata) {
-                throw new Error('Failed to extract metadata');
-            }
-            return metadata;
-        }
-    } catch (error) {
-        console.error('Error processing image file:', error);
-        throw error;
-    }
-}
-
-function sanitizeMetadata(obj) {
-    if (typeof obj !== 'object' || obj === null) return obj;
-    if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
-    const result = {};
-    for (const [key, value] of Object.entries(obj)) {
-        if (typeof value === 'string') {
-            // Remove control characters and escape special characters
-            result[key] = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-                .replace(/[\\"']/g, '\\$&')
-                .replace(/\u0000/g, '\\0');
-        } else if (typeof value === 'object') {
-            result[key] = sanitizeMetadata(value);
-        } else {
-            result[key] = value;
-        }
-    }
-    return result;
+  const ext = key.slice(key.lastIndexOf('.')).toLowerCase();
+  if (UNSUPPORTED_EXTENSIONS.includes(ext)) {
+    return { UnsupportedFormat: { Message: `${ext} not supported`, FileExtension: ext } };
+  }
+  const { Body } = await s3.getObject({ Bucket: bucket, Key: key }).promise();
+  if (ext === '.svg') {
+    const svg = await extractSvgMetadata(Body);
+    return svg.svgMetadata ? { SVGMetadata: svg.svgMetadata } : { SVGMetadata: null };
+  }
+  return extractOrganizedMetadata(Body);
 }
 
 exports.lambda_handler = async (event) => {
-    console.log('Received event:', JSON.stringify(event));
-    const { input } = event;
-    const inventoryId = input?.InventoryID;
-    const digitalSourceAsset = input?.DigitalSourceAsset;
+  const inventoryId = event.input?.InventoryID;
+  if (!inventoryId) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing InventoryID' }) };
+  }
 
-    if (!inventoryId) {
-        console.error('Invalid event format: missing InventoryID');
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing InventoryID' }) };
-    }
+  const loc = event.input.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation;
+  const rawMeta = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
+  const cleaned = sanitizeMetadata(rawMeta);
+  const forced  = forceAllObjects(cleaned);
 
-    const bucket = digitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket;
-    const key = digitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
+  const newMeta   = { CustomMetadata: forced };
+  const marshalled = AWS.DynamoDB.Converter.marshall(convertFloatsToDecimals(newMeta));
 
-    try {
-        const extractedMetadata = await processImageFile(bucket, key);
-        if (!extractedMetadata) {
-            throw new Error('Failed to extract metadata');
-        }
+  await dynamoDB.updateItem({
+    TableName: MEDIALAKE_ASSET_TABLE,
+    Key: { InventoryID: { S: inventoryId } },
+    UpdateExpression: 'SET Metadata = :m',
+    ExpressionAttributeValues: { ':m': { M: marshalled } }
+  }).promise();
 
-        const sanitizedMetadata = sanitizeMetadata(extractedMetadata);
-        const newCustomMetadata = { CustomMetadata: sanitizedMetadata };
-        const convertedNewMetadata = convertFloatsToDecimals(newCustomMetadata);
-
-        // Get existing item from DynamoDB
-        const { Item: existingItem } = await dynamoDB.getItem({
-            TableName: MEDIALAKE_ASSET_TABLE,
-            Key: { InventoryID: { S: inventoryId } }
-        }).promise();
-
-        const existingMetadata = existingItem?.Metadata?.M || {};
-
-        // Combine existing metadata with new CustomMetadata
-        const updatedMetadata = {
-            ...existingMetadata,
-            ...AWS.DynamoDB.Converter.marshall(convertedNewMetadata)
-        };
-
-        // Update DynamoDB
-        await dynamoDB.updateItem({
-            TableName: MEDIALAKE_ASSET_TABLE,
-            Key: { InventoryID: { S: inventoryId } },
-            UpdateExpression: 'SET Metadata = :Metadata',
-            ExpressionAttributeValues: {
-                ':Metadata': { M: updatedMetadata }
-            },
-            ReturnValues: 'UPDATED_NEW'
-        }).promise();
-
-        console.log('Successfully updated DynamoDB item');
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                inventoryId,
-                message: 'Metadata extracted and stored successfully',
-            }, (key, value) => {
-                if (typeof value === 'bigint') {
-                    return value.toString();
-                }
-                return value;
-            })
-        };
-
-    } catch (error) {
-        console.error('Lambda handler error:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                error: 'Error extracting or storing image metadata',
-                message: error.message,
-                stack: error.stack
-            })
-        };
-    }
+  return { statusCode: 200, body: JSON.stringify({ inventoryId }) };
 };

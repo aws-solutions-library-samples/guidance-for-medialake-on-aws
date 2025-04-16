@@ -67,7 +67,7 @@ interface Asset {
         };
         Type: string;
         Metadata: {
-            CustomMetadata: {
+            EmbeddedMetadata: {
                 EXIF: any;
                 IPTC: any;
             };

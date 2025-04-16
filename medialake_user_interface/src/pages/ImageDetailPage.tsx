@@ -224,7 +224,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const descKeywordsColor = '#F6AD55';  // Orange
     
     // Extract metadata from API response
-    const metadata = asset?.Metadata?.CustomMetadata || {};
+    const metadata = asset?.Metadata?.EmbeddedMetadata || {};
     const generalMetadata = metadata?.General || {};
     const imageMetadata = metadata?.Image?.[0] || {};
     
@@ -693,7 +693,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category === "CustomMetadata" 
+                                    {parentAccordion.category === "EmbeddedMetadata" 
                                         ? "Embedded Metadata" 
                                         : parentAccordion.category}
                                 </Typography>

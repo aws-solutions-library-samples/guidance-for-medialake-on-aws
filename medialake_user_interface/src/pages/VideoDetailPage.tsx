@@ -324,7 +324,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : 'Unknown';
 
     // Extract metadata from API response
-    const metadata = assetData?.data?.asset?.Metadata?.CustomMetadata || {};
+    const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
     const generalMetadata = metadata?.General || {};
     const videoMetadata = metadata?.Video?.[0] || {};
     const fileSize = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
@@ -574,7 +574,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category === "CustomMetadata" 
+                                    {parentAccordion.category === "EmbeddedMetadata" 
                                         ? "Embedded Metadata" 
                                         : parentAccordion.category}
                                 </Typography>

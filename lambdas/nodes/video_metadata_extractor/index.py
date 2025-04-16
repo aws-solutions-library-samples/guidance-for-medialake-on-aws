@@ -251,7 +251,7 @@ def lambda_handler(event, context):
         existing_item = asset_table.get_item(
             Key={"InventoryID": clean_inventory_id}
         ).get("Item", {})
-        existing_metadata = existing_item.get("Metadata", {}).get("CustomMetadata", {})
+        existing_metadata = existing_item.get("Metadata", {}).get("EmbeddedMetadata", {})
         sanitized_merged_output = sanitize_metadata(merged_output)
 
         # Merge existing metadata with new metadata
@@ -261,7 +261,7 @@ def lambda_handler(event, context):
         response = asset_table.update_item(
             Key={"InventoryID": clean_inventory_id},
             UpdateExpression="SET #md.#cm = :metadata",
-            ExpressionAttributeNames={"#md": "Metadata", "#cm": "CustomMetadata"},
+            ExpressionAttributeNames={"#md": "Metadata", "#cm": "EmbeddedMetadata"},
             ExpressionAttributeValues={
                 ":metadata": merged_metadata,
             },
