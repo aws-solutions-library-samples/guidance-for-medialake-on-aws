@@ -33,6 +33,35 @@ cdk bootstrap --profile <profile> --region <region>
 
 - Bootstrap the account for CDK deployment, ensure the right region is selected
 
+## 🧹 MediaLake CloudFormation Stack Deletion
+
+For cleaning up MediaLake deployments, you can use the included stack deletion script:
+
+```bash
+./delete_medialake_stacks.py --profile your-aws-profile --region us-east-1
+```
+
+The script automatically:
+1. Lists all CloudFormation stacks with the "MediaLake" prefix
+2. Attempts to delete each stack
+3. Waits 60 seconds before checking again
+4. Repeats until all stacks are deleted, handling dependencies between stacks
+
+### Prerequisites for Stack Deletion
+
+- Python 3.6+
+- Required Python packages:
+  - boto3
+  - aws-lambda-powertools
+
+Install the requirements:
+```bash
+pip install boto3 aws-lambda-powertools
+chmod +x delete_medialake_stacks.py
+```
+
+⚠️ **Warning**: This script will permanently delete all CloudFormation stacks that match the criteria. Use with caution in production environments.
+
 ## 🛠️ Installation
 
 1. Clone the repository:
@@ -471,3 +500,54 @@ Licensed under the Apache License, Version 2.0 (the "License"). You may not use 
 <http://www.apache.org/licenses/LICENSE-2.0>
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+# MediaLake CloudFormation Stack Deletion Script
+
+This script automates the deletion of all CloudFormation stacks with the prefix "MediaLake" in a specified AWS region. It handles stack dependencies by repeatedly attempting deletion until all stacks are removed.
+
+## Prerequisites
+
+- Python 3.6+
+- AWS CLI configured with appropriate credentials
+- Required Python packages:
+  - boto3
+  - aws-lambda-powertools
+
+## Installation
+
+1. Install required packages:
+
+```bash
+pip install boto3 aws-lambda-powertools
+```
+
+2. Make the script executable:
+
+```bash
+chmod +x delete_medialake_stacks.py
+```
+
+## Usage
+
+Run the script specifying your AWS profile and region:
+
+```bash
+./delete_medialake_stacks.py --profile your-aws-profile --region us-east-1
+```
+
+### Parameters
+
+- `--profile`: Required. The AWS profile name to use.
+- `--region`: Required. The AWS region where the stacks are deployed.
+
+## How It Works
+
+1. The script lists all CloudFormation stacks with the "MediaLake" prefix in the specified region.
+2. It attempts to delete each stack.
+3. Then it waits for 60 seconds before checking again.
+4. This process repeats until all "MediaLake" stacks are deleted.
+5. Since some stacks may depend on others, the script will retry deletion until all stacks are gone.
+
+## Security Warning
+
+This script will permanently delete all CloudFormation stacks that match the criteria. Use with caution in production environments.

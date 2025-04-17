@@ -4,10 +4,13 @@ import boto3
 import uuid
 import csv
 import io
+import random
+import time
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote_plus
+from botocore.exceptions import ClientError
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
@@ -21,6 +24,138 @@ from common import (
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
+
+# Define retry constants
+MAX_RETRY_ATTEMPTS = 15
+BASE_BACKOFF_TIME = 0.1  # 100 ms
+MAX_BACKOFF_TIME = 30.0  # 30 seconds
+
+def retry_with_backoff(
+    func: Callable, 
+    *args, 
+    exception_class=ClientError, 
+    max_attempts=MAX_RETRY_ATTEMPTS, 
+    base_delay=BASE_BACKOFF_TIME, 
+    max_delay=MAX_BACKOFF_TIME,
+    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException'),
+    **kwargs
+) -> Any:
+    """
+    Execute a function with exponential backoff and jitter for retries.
+    Specifically handles DynamoDB throttling exceptions.
+    
+    Args:
+        func: Function to execute
+        *args: Arguments to pass to the function
+        exception_class: Exception class to catch and retry on
+        max_attempts: Maximum number of retry attempts
+        base_delay: Base delay time in seconds
+        max_delay: Maximum delay time in seconds
+        throttling_errors: Error codes that indicate throttling
+        **kwargs: Keyword arguments to pass to the function
+        
+    Returns:
+        Result from the function call
+        
+    Raises:
+        The last exception if all retries fail
+    """
+    attempt = 0
+    last_exception = None
+    metrics_count = 0
+    
+    while attempt < max_attempts:
+        try:
+            return func(*args, **kwargs)
+        except exception_class as e:
+            # Check if this is a throttling error
+            if hasattr(e, 'response') and 'Error' in e.response:
+                error_code = e.response['Error'].get('Code')
+                if error_code not in throttling_errors:
+                    # Not a throttling error, reraise
+                    raise
+            else:
+                # Not a ClientError with error code, reraise
+                raise
+                
+            attempt += 1
+            metrics_count += 1
+            last_exception = e
+            
+            if attempt >= max_attempts:
+                logger.error(f"Max retry attempts ({max_attempts}) exceeded: {str(e)}")
+                break
+                
+            # Calculate delay with exponential backoff and jitter
+            delay = min(max_delay, base_delay * (2 ** attempt))
+            jitter = random.uniform(0, 1)
+            delay = delay + (delay * 0.2 * jitter)  # Add up to 20% jitter
+            
+            logger.warning(
+                f"DynamoDB throttling error on attempt {attempt}/{max_attempts}. "
+                f"Retrying in {delay:.2f}s: {str(e)}"
+            )
+            
+            # Record metric for throttling
+            metrics.add_metric(
+                name="DynamoDBThrottlingRetries",
+                unit=MetricUnit.Count,
+                value=metrics_count
+            )
+            
+            # Sleep with backoff
+            time.sleep(delay)
+    
+    # If we get here, we've exhausted our retries
+    if last_exception:
+        raise last_exception
+        
+    # This should never happen
+    raise Exception("Unexpected error in retry mechanism")
+
+# Patch AssetProcessor methods with retry
+original_increment_job_counter = AssetProcessor.increment_job_counter
+original_update_job_status = AssetProcessor.update_job_status
+original_update_job_metadata = AssetProcessor.update_job_metadata
+original_log_error = AssetProcessor.log_error
+
+@staticmethod
+def patched_increment_job_counter(job_id: str, counter_name: str, increment_by: int = 1) -> bool:
+    """Patched method with retry for DynamoDB throttling"""
+    return retry_with_backoff(
+        original_increment_job_counter,
+        job_id, counter_name, increment_by
+    )
+
+@staticmethod
+def patched_update_job_status(job_id: str, status: JobStatus, message: str = None) -> bool:
+    """Patched method with retry for DynamoDB throttling"""
+    return retry_with_backoff(
+        original_update_job_status,
+        job_id, status, message
+    )
+
+@staticmethod
+def patched_update_job_metadata(job_id: str, metadata: Dict[str, Any]) -> bool:
+    """Patched method with retry for DynamoDB throttling"""
+    return retry_with_backoff(
+        original_update_job_metadata,
+        job_id, metadata
+    )
+
+@staticmethod
+def patched_log_error(error_data: Dict[str, Any]) -> bool:
+    """Patched method with retry for DynamoDB throttling"""
+    return retry_with_backoff(
+        original_log_error,
+        error_data
+    )
+
+# Apply patches
+AssetProcessor.increment_job_counter = patched_increment_job_counter
+AssetProcessor.update_job_status = patched_update_job_status
+AssetProcessor.update_job_metadata = patched_update_job_metadata
+AssetProcessor.log_error = patched_log_error
 
 class AssetSyncProcessor:
     """Processes objects for synchronization with the Asset Management system"""
@@ -264,8 +399,11 @@ class AssetSyncProcessor:
         inventory_ids = [obj.get('inventoryId') for obj in objects if obj.get('inventoryId')]
         
         try:
-            # Batch check existence
-            existing = AssetProcessor.batch_check_asset_exists(asset_ids, inventory_ids)
+            # Batch check existence with retry
+            existing = retry_with_backoff(
+                AssetProcessor.batch_check_asset_exists,
+                asset_ids, inventory_ids
+            )
             existing_asset_ids = existing['asset_ids']
             existing_inventory_ids = existing['inventory_ids']
             
@@ -446,7 +584,10 @@ def lambda_handler(event, context):
                         continue
                         
                     # Get the job details from DynamoDB
-                    job_details = AssetProcessor.get_job_details(job_id)
+                    job_details = retry_with_backoff(
+                        AssetProcessor.get_job_details,
+                        job_id
+                    )
                     if not job_details:
                         logger.error(f"Job {job_id} not found")
                         continue
@@ -551,7 +692,10 @@ def lambda_handler(event, context):
             
             if not bucket_name:
                 # Get the job details from DynamoDB to find the bucket name
-                job_details = AssetProcessor.get_job_details(job_id)
+                job_details = retry_with_backoff(
+                    AssetProcessor.get_job_details,
+                    job_id
+                )
                 if not job_details:
                     logger.error(f"Job {job_id} not found")
                     return {

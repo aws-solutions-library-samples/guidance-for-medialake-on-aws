@@ -780,7 +780,7 @@ def lambda_handler(event, context):
             prefix = event.get('objectPrefix')
             
             # Get maxConcurrentTasks from event or use default of 500
-            max_concurrent_tasks = event.get('maxConcurrentTasks', 500)
+            max_concurrent_tasks = event.get('maxConcurrentTasks', 250)
             
             logger.info(f"Starting sync for job {job_id}, bucket {bucket_name}, prefix {prefix}, maxConcurrentTasks={max_concurrent_tasks}")
             

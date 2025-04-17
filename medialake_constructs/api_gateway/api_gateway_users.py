@@ -19,6 +19,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_secretsmanager as secrets_manager,
     Stack,
+    Duration,
 )
 
 from medialake_constructs.shared_constructs.lambda_base import (
@@ -115,6 +116,14 @@ class UsersApi(Construct):
             request_templates={
                 "application/json": '{ "user_id": "$input.params(\'user_id\')" }'
             },
+        )
+
+        users_user_id_resources.add_cors_preflight(
+            allow_origins=["http://localhost:5173"],
+            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
+            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_credentials=True,
+            max_age=Duration.seconds(300),
         )
 
         users_user_id_resources.add_method(

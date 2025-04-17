@@ -105,10 +105,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                         "iam:DeleteRolePolicy",
                         "iam:AttachRolePolicy",
                         "iam:DetachRolePolicy",
-                        "iam:UpdateRole",
-                        "iam:UpdateRoleDescription",
-                        "iam:TagRole",
-                        "iam:UntagRole",
                         "iam:PassRole",
                     ],
                     resources=["*"],
@@ -197,8 +193,21 @@ class ApiGatewayPipelinesConstruct(Construct):
                 },
             ),
         )
-        # Set reserved concurrent executions to 1 to limit concurrency
-        self._pipeline_trigger_lambda.function.reserved_concurrent_executions = 1
+        
+        # The direct property setting doesn't work in CDK
+        # self._pipeline_trigger_lambda.function.reserved_concurrent_executions = 1
+        
+        # Using from_function_attributes doesn't work as it creates a reference, not a modification
+        # lambda_.CfnFunction.from_function_attributes(
+        #    self,
+        #    "PipelineTriggerLambdaCfn",
+        #    function_arn=self._pipeline_trigger_lambda.function.function_arn,
+        # ).reserved_concurrent_executions = 1
+        
+        # Set reserved concurrency by directly modifying the CloudFormation resource
+        cfn_function = self._pipeline_trigger_lambda.function.node.default_child
+        cfn_function.add_property_override("ReservedConcurrentExecutions", 1)
+        
         self._pipeline_trigger_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Scan"],
@@ -959,7 +968,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
     @property
     def post_pipelines_async_handler(self) -> Lambda:
-        return self._pipelines_async_construct.post_pipelines_async_handler
+        return self._post_pipelines_async_handler
 
     @property
     def get_pipelines_handler(self) -> Lambda:

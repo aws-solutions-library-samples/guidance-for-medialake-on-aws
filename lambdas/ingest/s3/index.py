@@ -8,6 +8,7 @@ from datetime import datetime
 import hashlib
 import functools
 import concurrent.futures
+import threading
 from botocore.config import Config
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -238,6 +239,12 @@ class AssetProcessor:
         
         # Cache for extension to content type mapping
         self.extension_content_type_cache = {}
+        
+        # Initialize a lock for thread-safe access to processed_inventory_ids
+        self.lock = threading.Lock()
+        
+        # Set to track processed inventory IDs to prevent duplicates
+        self.processed_inventory_ids = set()
 
     def _decode_s3_event_key(self, encoded_key: str) -> str:
         """Decode S3 event key by handling URL encoding and plus signs"""
@@ -431,7 +438,7 @@ class AssetProcessor:
                         
                         # Use batch writer for better DynamoDB performance
                         try:
-                            self.batch_writer.put_item(Item=item)
+                            self.dynamodb.put_item(Item=item)
                             logger.info(f"Successfully recreated DynamoDB record for {inventory_id}")
                             
                             # Verify the write with a get_item
@@ -714,6 +721,16 @@ class AssetProcessor:
                 if not inventory_id.startswith("asset:uuid:"):
                     inventory_id = f"asset:uuid:{inventory_id}"
             
+            # Thread-safe check for duplicate inventory IDs
+            if hasattr(self, 'lock') and hasattr(self, 'processed_inventory_ids'):
+                with self.lock:
+                    if inventory_id in self.processed_inventory_ids:
+                        logger.warning(f"Duplicate inventory ID detected: {inventory_id} - generating a new one")
+                        # Generate a new unique inventory ID instead
+                        inventory_id = f"asset:uuid:{str(uuid.uuid4())}"
+                    # Add this inventory ID to the set of processed IDs
+                    self.processed_inventory_ids.add(inventory_id)
+            
             asset_id = str(uuid.uuid4())
 
             # Extract bucket and key from metadata for StoragePath
@@ -771,22 +788,31 @@ class AssetProcessor:
             logger.info(f"Attempting to write to DynamoDB table: {os.environ['ASSETS_TABLE']}")
             logger.info(f"Using inventory_id: {inventory_id} for DynamoDB key")
             
-            # Log batch_writer status
-            logger.info(f"Batch writer type: {type(self.batch_writer).__name__}")
-            
-            # Use batch writer for better performance
-            self.batch_writer.put_item(Item=item)
-            logger.info(f"put_item operation completed for InventoryID: {inventory_id}")
-            
-            # Add delay to account for potential eventual consistency
-            import time
-            time.sleep(0.5)  # 500ms delay before verification
+            # Use direct put_item instead of batch_writer for immediate feedback
+            try:
+                # First, check if the item with this ID already exists
+                existing_item = self.dynamodb.get_item(
+                    Key={"InventoryID": inventory_id}
+                ).get("Item")
+                
+                if existing_item:
+                    logger.warning(f"Item with InventoryID {inventory_id} already exists. Generating new ID.")
+                    # Generate a new ID and try again
+                    item["InventoryID"] = f"asset:uuid:{str(uuid.uuid4())}"
+                    logger.info(f"Using new InventoryID: {item['InventoryID']}")
+                
+                # Now do the put_item operation
+                self.dynamodb.put_item(Item=item)
+                logger.info(f"put_item operation completed for InventoryID: {item['InventoryID']}")
+            except Exception as e:
+                logger.exception(f"Error in put_item operation: {str(e)}")
+                raise
             
             # Verify the item was written by doing a get_item
-            logger.info(f"Verifying item with InventoryID: {inventory_id}")
+            logger.info(f"Verifying item with InventoryID: {item['InventoryID']}")
             verification_response = self.dynamodb.get_item(
                 Key={
-                    "InventoryID": inventory_id
+                    "InventoryID": item["InventoryID"]
                 }
             )
             
@@ -809,14 +835,13 @@ class AssetProcessor:
                     # Try a direct query on the table to see if the item exists
                     query_response = self.dynamodb.query(
                         KeyConditionExpression="InventoryID = :id",
-                        ExpressionAttributeValues={":id": inventory_id}
+                        ExpressionAttributeValues={":id": item["InventoryID"]}
                     )
                     logger.info(f"Direct query response: {json_serialize(query_response)}")
                     
                     # Try to scan the table for recent items
                     scan_response = self.dynamodb.scan(
-                        Limit=5,
-                        ScanIndexForward=False
+                        Limit=5
                     )
                     logger.info(f"Recent items scan (count={scan_response.get('Count', 0)})")
                     
@@ -1133,9 +1158,8 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
                     if "eventSource" in event['Records'][0] and event['Records'][0]["eventSource"] == "aws:sqs":
                         logger.info("Detected SQS event source")
     
-    # Create processor without initializing batch_writer
+    # Create processor without using batch_writer
     processor = AssetProcessor()
-    processor.batch_writer = None  # Will be set in context below
 
     # Log environment variables at debug level
     logger.debug(f"Environment variables: ASSETS_TABLE={os.environ.get('ASSETS_TABLE')}, EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME')}")
@@ -1152,126 +1176,119 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
         metrics.add_metric(name="DynamoDBAccessErrors", unit=MetricUnit.Count, value=1)
     
     try:
-        # Process with batch writer in context manager
-        with processor.table.batch_writer() as batch_writer:
-            # Set batch_writer for processor methods to use
-            processor.batch_writer = batch_writer
+        # Quick filter for empty event
+        if not event:
+            logger.warning("Empty event received")
+            # Add comprehensive event structure logging to diagnose issues
+            logger.info(f"Event type: {type(event).__name__}")
+            if isinstance(event, dict):
+                logger.info(f"Event keys: {list(event.keys())}")
+                if "Records" in event:
+                    logger.info(f"Records count: {len(event['Records'])}")
+                    if event['Records']:
+                        logger.info(f"First record keys: {list(event['Records'][0].keys())}")
+                        if 's3' in event['Records'][0]:
+                            logger.info(f"S3 structure: {json_serialize(event['Records'][0]['s3'])}")
+            elif isinstance(event, list):
+                logger.info(f"List event length: {len(event)}")
+                if event:
+                    logger.info(f"First item type: {type(event[0]).__name__}")
+                    if isinstance(event[0], dict):
+                        logger.info(f"First item keys: {list(event[0].keys())}")
+            return {"statusCode": 200, "body": "No records to process"}
             
-            # Quick filter for empty event
-            if not event:
-                logger.warning("Empty event received")
-                # Add comprehensive event structure logging to diagnose issues
-                logger.info(f"Event type: {type(event).__name__}")
-                if isinstance(event, dict):
-                    logger.info(f"Event keys: {list(event.keys())}")
-                    if "Records" in event:
-                        logger.info(f"Records count: {len(event['Records'])}")
-                        if event['Records']:
-                            logger.info(f"First record keys: {list(event['Records'][0].keys())}")
-                            if 's3' in event['Records'][0]:
-                                logger.info(f"S3 structure: {json_serialize(event['Records'][0]['s3'])}")
-                elif isinstance(event, list):
-                    logger.info(f"List event length: {len(event)}")
-                    if event:
-                        logger.info(f"First item type: {type(event[0]).__name__}")
-                        if isinstance(event[0], dict):
-                            logger.info(f"First item keys: {list(event[0].keys())}")
-                return {"statusCode": 200, "body": "No records to process"}
-                
-            # Check if it's a test event
-            if isinstance(event, dict) and event.get("Event") == "s3:TestEvent":
-                logger.info("Received S3 test event - skipping processing")
-                return {"statusCode": 200, "body": "Test event received"}
+        # Check if it's a test event
+        if isinstance(event, dict) and event.get("Event") == "s3:TestEvent":
+            logger.info("Received S3 test event - skipping processing")
+            return {"statusCode": 200, "body": "Test event received"}
+        
+        # Count records for metrics
+        total_records = 0
+        
+        # Enhanced event detection - determine event type with less nesting
+        if isinstance(event, list):
+            # Direct list of records - process in parallel 
+            logger.info(f"Processing {len(event)} records directly")
+            total_records = len(event)
+            process_records_in_parallel(processor, event)
             
-            # Count records for metrics
-            total_records = 0
+        elif isinstance(event, dict) and "Records" in event:
+            # Standard S3 event format
+            logger.info(f"Processing standard S3 event with {len(event['Records'])} records")
+            total_records = len(event["Records"])
             
-            # Enhanced event detection - determine event type with less nesting
-            if isinstance(event, list):
-                # Direct list of records - process in parallel 
-                logger.info(f"Processing {len(event)} records directly")
-                total_records = len(event)
-                process_records_in_parallel(processor, event)
-                
-            elif isinstance(event, dict) and "Records" in event:
-                # Standard S3 event format
-                logger.info(f"Processing standard S3 event with {len(event['Records'])} records")
-                total_records = len(event["Records"])
-                
-                # Process records in parallel
-                s3_records = []
-                for record in event["Records"]:
-                    if "body" in record:
-                        # Parse SQS message body
-                        try:
-                            body = json.loads(record["body"])
-                            if "Records" in body:
-                                # Add these records to the batch
-                                s3_records.extend(body["Records"])
-                        except json.JSONDecodeError:
-                            logger.warning(f"Failed to parse SQS message body")
-                            continue
-                    elif "s3" in record:
-                        # Direct S3 record
-                        s3_records.append(record)
-                
-                # Process the collected records in parallel
-                if s3_records:
-                    logger.info(f"Processing {len(s3_records)} S3 records in parallel")
-                    process_records_in_parallel(processor, s3_records)
-                
-            elif isinstance(event, dict) and "detail-type" in event:
-                # EventBridge event format - single event
-                logger.info("Processing EventBridge event")
-                total_records = 1
-                
-                if event.get("source") != "aws.s3":
-                    logger.warning(f"Unexpected event source: {event.get('source')}")
-                    return {"statusCode": 200, "body": "Event ignored - not from S3"}
-                
-                detail = event.get("detail", {})
-                
-                # Extract bucket and key with enhanced robustness
-                bucket = None
-                key = None
-                
-                # Check all possible locations for bucket
-                if isinstance(detail.get("bucket"), dict):
-                    bucket = detail["bucket"].get("name")
-                elif isinstance(detail.get("bucket"), str):
-                    bucket = detail["bucket"]
-                
-                # Check all possible locations for key
-                if isinstance(detail.get("object"), dict):
-                    key = detail["object"].get("key")
-                elif isinstance(detail.get("object"), str):
-                    key = detail["object"]
-                elif "key" in detail:
-                    key = detail["key"]
-                
-                # Map EventBridge detail-type to S3 event name
-                detail_type = event.get("detail-type", "")
-                event_type_mapping = {
-                    "Object Created": "ObjectCreated:",
-                    "Object Deleted": "ObjectRemoved:",
-                    "Object Restored": "ObjectRestore:",
-                    "Object Tagged": "ObjectTagging:",
-                    "PutObject": "ObjectCreated:Put",
-                    "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
-                    "DeleteObject": "ObjectRemoved:Delete",
-                    "CopyObject": "ObjectCreated:Copy"  # Add mapping for CopyObject events
-                }
-                
-                event_name = event_type_mapping.get(detail_type, "")
-                
-                # If we have valid bucket and key, process the event
-                if bucket and key:
-                    logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
-                    process_s3_event(processor, bucket, key, event_name)
-                else:
-                    logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
+            # Process records in parallel
+            s3_records = []
+            for record in event["Records"]:
+                if "body" in record:
+                    # Parse SQS message body
+                    try:
+                        body = json.loads(record["body"])
+                        if "Records" in body:
+                            # Add these records to the batch
+                            s3_records.extend(body["Records"])
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse SQS message body")
+                        continue
+                elif "s3" in record:
+                    # Direct S3 record
+                    s3_records.append(record)
             
-            # No need to flush - context manager handles it automatically
+            # Process the collected records in parallel
+            if s3_records:
+                logger.info(f"Processing {len(s3_records)} S3 records in parallel")
+                process_records_in_parallel(processor, s3_records)
+            
+        elif isinstance(event, dict) and "detail-type" in event:
+            # EventBridge event format - single event
+            logger.info("Processing EventBridge event")
+            total_records = 1
+            
+            if event.get("source") != "aws.s3":
+                logger.warning(f"Unexpected event source: {event.get('source')}")
+                return {"statusCode": 200, "body": "Event ignored - not from S3"}
+            
+            detail = event.get("detail", {})
+            
+            # Extract bucket and key with enhanced robustness
+            bucket = None
+            key = None
+            
+            # Check all possible locations for bucket
+            if isinstance(detail.get("bucket"), dict):
+                bucket = detail["bucket"].get("name")
+            elif isinstance(detail.get("bucket"), str):
+                bucket = detail["bucket"]
+            
+            # Check all possible locations for key
+            if isinstance(detail.get("object"), dict):
+                key = detail["object"].get("key")
+            elif isinstance(detail.get("object"), str):
+                key = detail["object"]
+            elif "key" in detail:
+                key = detail["key"]
+            
+            # Map EventBridge detail-type to S3 event name
+            detail_type = event.get("detail-type", "")
+            event_type_mapping = {
+                "Object Created": "ObjectCreated:",
+                "Object Deleted": "ObjectRemoved:",
+                "Object Restored": "ObjectRestore:",
+                "Object Tagged": "ObjectTagging:",
+                "PutObject": "ObjectCreated:Put",
+                "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
+                "DeleteObject": "ObjectRemoved:Delete",
+                "CopyObject": "ObjectCreated:Copy"  # Add mapping for CopyObject events
+            }
+            
+            event_name = event_type_mapping.get(detail_type, "")
+            
+            # If we have valid bucket and key, process the event
+            if bucket and key:
+                logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
+                process_s3_event(processor, bucket, key, event_name)
+            else:
+                logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
         
         # Calculate memory usage metrics
         final_memory = get_memory_usage()
