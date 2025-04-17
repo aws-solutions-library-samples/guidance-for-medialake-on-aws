@@ -7,6 +7,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 from config import config
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -229,6 +230,10 @@ class ApiGatewayIntegrationsConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
+
+        # Add CORS support
+        add_cors_options_method(integrations_resource)
+        add_cors_options_method(integration_id_resource)
 
     @property
     def integrations_table(self) -> dynamodb.TableV2:

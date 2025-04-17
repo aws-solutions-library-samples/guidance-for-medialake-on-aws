@@ -20,6 +20,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 
 @dataclass
@@ -182,3 +183,7 @@ class ReviewsApiConstruct(Construct):
                 )
             ],
         )
+
+        # Add CORS support
+        add_cors_options_method(review_id_resource)
+        add_cors_options_method(review_resource)
