@@ -678,23 +678,12 @@ class ConnectorsConstruct(Construct):
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
         
-        # Add CORS support to all API resources
-        self._add_cors_to_all_resources(
-            connectors_resource,
-            connector_id_resource,
-            connector_s3_resource,
-            s3_sync_connector_resource,
-            s3_explorer_resource,
-            s3_explorer_connector_resource
-        )
-
-    def _add_cors_to_all_resources(self, *resources):
-        """Add CORS support to all API resources."""
-        for resource in resources:
-            add_cors_options_method(resource)
-            # Process child resources if any
-            for child in resource.resources.values():
-                add_cors_options_method(child)
+        # Add CORS support to child API resources (not root)
+        add_cors_options_method(connector_id_resource)
+        add_cors_options_method(connector_s3_resource)
+        add_cors_options_method(s3_sync_connector_resource)
+        add_cors_options_method(s3_explorer_resource)
+        add_cors_options_method(s3_explorer_connector_resource)
 
     @property
     def connector_table(self) -> dynamodb.TableV2:

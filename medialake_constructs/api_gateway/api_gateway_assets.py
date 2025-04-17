@@ -610,13 +610,8 @@ class AssetsConstruct(Construct):
         )
 
         # Add CORS support to all API resources
-        self._add_cors_to_all_resources(assets_resource, asset_resource, presigned_url_resource, 
-                                        rename_resource, related_versions_resource, transcript_resource)
-
-    def _add_cors_to_all_resources(self, *resources):
-        """Add CORS support to all API resources."""
-        for resource in resources:
-            add_cors_options_method(resource)
-            # Process child resources if any
-            for child in resource.resources.values():
-                add_cors_options_method(child)
+        add_cors_options_method(asset_resource)
+        add_cors_options_method(presigned_url_resource)
+        add_cors_options_method(rename_resource)
+        add_cors_options_method(related_versions_resource)
+        add_cors_options_method(transcript_resource)

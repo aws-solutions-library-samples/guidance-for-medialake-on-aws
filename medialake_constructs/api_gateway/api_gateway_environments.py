@@ -173,15 +173,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         )
         
         # Add CORS support to all API resources
-        self._add_cors_to_all_resources(environments_resource, environment_id_resource)
-
-    def _add_cors_to_all_resources(self, *resources):
-        """Add CORS support to all API resources."""
-        for resource in resources:
-            add_cors_options_method(resource)
-            # Process child resources if any
-            for child in resource.resources.values():
-                add_cors_options_method(child)
+        add_cors_options_method(environment_id_resource)
 
     @property
     def environments_table_name(self) -> str:

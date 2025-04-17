@@ -16,6 +16,7 @@ from medialake_constructs.api_gateway.api_gateway_roles import (
     RolesApi,
     RolesApiProps,
 )
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 
 @dataclass
