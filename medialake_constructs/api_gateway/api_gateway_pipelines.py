@@ -187,6 +187,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=LambdaConfig(
                 name="PipelineTrigger",
                 entry="lambdas/pipelines/pipeline_trigger",
+                reserved_concurrent_executions=1,
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
                     "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
@@ -205,15 +206,15 @@ class ApiGatewayPipelinesConstruct(Construct):
         # ).reserved_concurrent_executions = 1
         
         # Set reserved concurrency by directly modifying the CloudFormation resource
-        cfn_function = self._pipeline_trigger_lambda.function.node.default_child
-        cfn_function.add_property_override("ReservedConcurrentExecutions", 1)
+        # cfn_function = self._pipeline_trigger_lambda.function.node.default_child
+        # cfn_function.add_property_override("ReservedConcurrentExecutions", 1)
         
-        self._pipeline_trigger_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:Scan"],
-                resources=[props.pipeline_table.table_arn],
-            )
-        )
+        # self._pipeline_trigger_lambda.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         actions=["dynamodb:GetItem", "dynamodb:Scan"],
+        #         resources=[props.pipeline_table.table_arn],
+        #     )
+        # )
         
         # Add permissions to list and describe Step Functions and their executions
         self._pipeline_trigger_lambda.function.add_to_role_policy(

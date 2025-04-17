@@ -146,6 +146,7 @@ class LambdaConfig:
     log_removal_policy: Optional[RemovalPolicy] = RemovalPolicy.DESTROY
     python_bundling: Optional[BundlingOptions] = None
     nodejs_bundling: Optional[NodeJSBundlingOptions] = None
+    reserved_concurrent_executions: Optional[int] = None
 
 
 class Lambda(Construct):
@@ -291,6 +292,11 @@ class Lambda(Construct):
             "layers": layer_objects,
         }
 
+        # Add reserved concurrent executions if provided
+        if config.reserved_concurrent_executions is not None:
+            logger.debug(f"Setting reserved concurrent executions to {config.reserved_concurrent_executions}")
+            common_lambda_props["reserved_concurrent_executions"] = config.reserved_concurrent_executions
+
         # Add environment variables if provided
         if config.environment_variables:
             logger.debug("Adding environment variables")
@@ -300,9 +306,6 @@ class Lambda(Construct):
             lambda_environment_variables["METRICS_NAMESPACE"] = (
                 env_config.resource_prefix
             )
-            # lambda_environment_variables["external_payload_s3_bucket"] = (
-            #     f"{WORKFLOW_PAYLOAD_TEMP_BUCKET}-{stack.region}"
-            # )
             common_lambda_props["environment"] = lambda_environment_variables
         else:
             lambda_environment_variables = {}
