@@ -37,7 +37,6 @@ class ApiGatewayPipelinesProps:
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
-    # integrations_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
@@ -174,13 +173,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 ),
             ],
         )
-
-        # self.pipeline_trigger_lambda_deployment = LambdaDeployment(
-        #     self,
-        #     "PipelineTriggerLambdaDeployment",
-        #     destination_bucket=props.iac_assets_bucket.bucket,
-        #     code_path=["lambdas", "pipelines", "pipeline_trigger"],
-        # )
 
         self._pipeline_trigger_lambda = Lambda(
             self,
@@ -935,19 +927,10 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         retry_resource = execution_id_resource.add_resource("retry")
 
-        # POST /api/pipelines/executions/{executionId}/retry
-
-        # retry_resource.add_method(
-        #     "POST",
-        #     apigateway.LambdaIntegration(props.post_retry_pipelines_executions_lambda),
-        #     authorization_type=apigateway.AuthorizationType.COGNITO,
-        #     authorizer=cognito_authorizer,
-        # )
         
         # Add CORS support to all pipeline API resources
         add_cors_options_method(pipelines_resource)
         add_cors_options_method(pipeline_id_resource)
-        # add_cors_options_method(executions_id_resource)
         add_cors_options_method(execution_id_resource)
         add_cors_options_method(retry_resource)
 

@@ -75,7 +75,7 @@ class PipelinesExecutionsStack(Stack):
                 self,
                 "PipelinesExecutionsTable",
                 props=DynamoDBProps(
-                    name=f"{config.resource_prefix}pipelines_executions_{config.environment}",
+                    name=f"{config.resource_prefix}-pipelines-executions-{config.environment}",
                     partition_key_name="execution_id",
                     partition_key_type=dynamodb.AttributeType.STRING,
                     sort_key_name="start_time",

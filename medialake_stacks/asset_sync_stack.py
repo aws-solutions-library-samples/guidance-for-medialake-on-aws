@@ -100,6 +100,7 @@ class AssetSyncStack(Stack):
                     "s3:PutObjectVersionTagging",
                     "s3:GetBucketLocation",
                     "s3:PutObject",
+                    "s3:PutInventoryConfiguration",
                 ],
                 resources=["*"],  # Should be restricted in production
             )
@@ -431,6 +432,7 @@ class AssetSyncStack(Stack):
                     "s3:CopyObject",
                     "s3:GetBucketLocation",
                     "s3:ListBucket",
+                    "s3:PutJobTagging",
                 ],
                 resources=["*"],
             )
