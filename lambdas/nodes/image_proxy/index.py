@@ -2,16 +2,12 @@ import boto3
 from PIL import Image, ExifTags
 import io
 import os
-import sys
+import cairosvg
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
-import cairosvg
-# Initialize Powertools
+
 logger = Logger()
 tracer = Tracer()
-
-
 
 def get_image_rotation(image):
     try:
@@ -19,19 +15,11 @@ def get_image_rotation(image):
         if not exif:
             return 0
         orientation_key = next(
-            (key for key, value in ExifTags.TAGS.items() if value == "Orientation"),
-            None,
+            (k for k, v in ExifTags.TAGS.items() if v == "Orientation"),
+            None
         )
-        if not orientation_key or orientation_key not in exif:
-            return 0
-        orientation = exif[orientation_key]
-        rotation_map = {
-            1: 0,
-            3: 180,
-            6: 270,
-            8: 90,
-        }
-        return rotation_map.get(orientation, 0)
+        orientation = exif.get(orientation_key, 1)
+        return {1: 0, 3: 180, 6: 270, 8: 90}.get(orientation, 0)
     except Exception as e:
         logger.warning(f"Error getting image rotation: {e}")
         return 0
@@ -40,201 +28,157 @@ def create_thumbnail(img, width, height, crop=False):
     rotation = get_image_rotation(img)
     if rotation:
         img = img.rotate(rotation, expand=True)
-
     if crop:
         target_ratio = width / height
         img_ratio = img.width / img.height
         if img_ratio > target_ratio:
-            new_width = int(height * img_ratio)
-            img = img.resize((new_width, height))
-            left = (new_width - width) // 2
+            new_w = int(height * img_ratio)
+            img = img.resize((new_w, height))
+            left = (new_w - width) // 2
             img = img.crop((left, 0, left + width, height))
         else:
-            new_height = int(width / img_ratio)
-            img = img.resize((width, new_height))
-            top = (new_height - height) // 2
+            new_h = int(width / img_ratio)
+            img = img.resize((width, new_h))
+            top = (new_h - height) // 2
             img = img.crop((0, top, width, top + height))
     else:
         img.thumbnail((width, height))
-
     return img
 
 def create_proxy(img):
     rotation = get_image_rotation(img)
-    if rotation:
-        img = img.rotate(rotation, expand=True)
-    return img
-
-def strip_after_last_colon(input_string: str) -> str:
-    return input_string.rsplit(":", 1)[0]
+    return img.rotate(rotation, expand=True) if rotation else img
 
 def clean_asset_id(input_string: str) -> str:
     parts = input_string.split(":")
-    uuid = parts[-1]
-    if uuid == "master":
-        uuid = parts[-2]
+    uuid = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
-    table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(table_name)
-
-    input = event.get("input", {})
-    input_data = input.get("DigitalSourceAsset", {})
-    inventory_id = input.get("InventoryID")
-    clean_inventory_id = clean_asset_id(inventory_id)
-    main_representation = input_data.get("MainRepresentation", {})
-    master_asset_id = input_data.get("ID")
-    asset_id = clean_asset_id(master_asset_id)
-    storage_info = main_representation.get("StorageInfo", {})
-    PrimaryLocation = storage_info.get("PrimaryLocation", {})
-    object_info = PrimaryLocation.get("ObjectKey", {})
-    bucket = PrimaryLocation.get("Bucket")
-    key = object_info.get("FullPath")
-
-    output_bucket = event.get("output_bucket")
-    mode = event.get("mode", "proxy")
-
-    if not key:
-        return {"statusCode": 400, "body": "Missing key parameter"}
-    if not bucket:
-        return {"statusCode": 400, "body": "Missing bucket parameter"}
-    if not output_bucket:
-        return {"statusCode": 400, "body": "Missing output_bucket parameter"}
-
+    # DynamoDB table and S3 client
+    table = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
     s3 = boto3.client("s3")
 
+    # extract parameters
+    inv = event.get("input", {}).get("InventoryID") or _raise("Missing InventoryID")
+    key = (
+        event.get("input", {})
+             .get("DigitalSourceAsset", {})
+             .get("MainRepresentation", {})
+             .get("StorageInfo", {})
+             .get("PrimaryLocation", {})
+             .get("ObjectKey", {})
+             .get("FullPath")
+    ) or _raise("Missing key parameter")
+    bucket = (
+        event.get("input", {})
+             .get("DigitalSourceAsset", {})
+             .get("MainRepresentation", {})
+             .get("StorageInfo", {})
+             .get("PrimaryLocation", {})
+             .get("Bucket")
+    ) or _raise("Missing bucket parameter")
+    out_bucket = event.get("output_bucket") or _raise("Missing output_bucket parameter")
+    mode = event.get("mode", "proxy")
+
+    # fetch image bytes
+    body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+
+    # open image (convert SVG→PNG if needed)
+    if key.lower().endswith(".svg"):
+        png_bytes = cairosvg.svg2png(bytestring=body)
+        img = Image.open(io.BytesIO(png_bytes))
+    else:
+        img = Image.open(io.BytesIO(body))
+
+    # process image
+    if mode == "thumbnail":
+        w = event.get("width")
+        h = event.get("height")
+        if w is None and h is None:
+            _raise("Both width and height cannot be None for thumbnail")
+        w, h = _resolve_dims(w, h, img.width, img.height)
+        proc = create_thumbnail(img, w, h, crop=bool(event.get("crop", False)))
+        ext, fmt = "png", "PNG"
+    elif mode == "proxy":
+        proc = create_proxy(img)
+        w, h = proc.size
+        ext, fmt = "png", "PNG"
+    else:
+        _raise(f"Invalid mode parameter: {mode}")
+
+    # save & upload
+    new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
+    buf = io.BytesIO()
+
+    # ** CONVERSION FIX: ensure PNG‑compatible mode **
+    if proc.mode not in ("RGB", "RGBA"):
+        proc = proc.convert("RGB")
+
+    proc.save(buf, format=fmt)
+    data = buf.getvalue()
+    s3.put_object(
+        Bucket=out_bucket,
+        Key=new_key,
+        Body=data,
+        ContentType=f"image/{ext}"
+    )
+
+    # update DynamoDB with new representation
     try:
-        s3_response = s3.get_object(Bucket=bucket, Key=key)
-        image_data = s3_response["Body"].read()
-
-        # Check if the file is an SVG by its extension
-        if key.lower().endswith(".svg"):
-            # Convert SVG to PNG
-            png_data = cairosvg.svg2png(bytestring=image_data)
-            img = Image.open(io.BytesIO(png_data))
-        else:
-            img = Image.open(io.BytesIO(image_data))
-
-        if mode == "thumbnail":
-            width = event.get("width")
-            height = event.get("height")
-            crop = event.get("crop", False)
-            if width is None and height is None:
-                return {
-                    "statusCode": 400,
-                    "body": "Both width and height cannot be None for thumbnail creation",
-                }
-            if width is None:
-                width = int(height * (img.width / img.height))
-            elif height is None:
-                height = int(width * (img.height / img.width))
-            width = int(width)
-            height = int(height)
-            processed_img = create_thumbnail(img, width, height, crop)
-            output_format = "PNG"
-            output_extension = "png"
-        elif mode == "proxy":
-            processed_img = create_proxy(img)
-            width, height = img.size
-            output_format = "PNG"
-            output_extension = "png"
-        else:
-            return {"statusCode": 400, "body": "Invalid mode parameter"}
-
-        output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{output_extension}"
-        output_buffer = io.BytesIO()
-        processed_img.save(output_buffer, format=output_format, lossless=True)
-        output_data = output_buffer.getvalue()
-
-        if mode == "thumbnail":
-            content_type = "image/png"
-            asset_id = f"{asset_id}:thumbnail"
-            new_representation = {
-                "ID": asset_id,
-                "Type": "Image",
-                "Format": "PNG",
-                "Purpose": mode,
-                "StorageInfo": {
-                    "PrimaryLocation": {
-                        "StorageType": "s3",
-                        "Provider": "aws",
-                        "Bucket": output_bucket,
-                        "ObjectKey": {"FullPath": output_key},
-                        "Status": "active",
-                        "FileInfo": {"Size": len(output_data)},
-                    }
-                },
-                "ImageSpec": {"Resolution": {"Width": width, "Height": height}},
+        table.update_item(
+            Key={"InventoryID": clean_asset_id(inv)},
+            UpdateExpression=(
+                "SET DerivedRepresentations = list_append("
+                "if_not_exists(DerivedRepresentations, :empty), :r)"
+            ),
+            ExpressionAttributeValues={
+                ":r": [{
+                    "ID": f"{clean_asset_id(inv)}:{mode}",
+                    "Type": "Image",
+                    "Format": fmt,
+                    "Purpose": mode,
+                    "StorageInfo": {
+                        "PrimaryLocation": {
+                            "StorageType": "s3",
+                            "Provider": "aws",
+                            "Bucket": out_bucket,
+                            "ObjectKey": {"FullPath": new_key},
+                            "Status": "active",
+                            "FileInfo": {"Size": len(data)}
+                        }
+                    },
+                    **(
+                        {"ImageSpec": {"Resolution": {"Width": w, "Height": h}}}
+                        if mode == "thumbnail"
+                        else {}
+                    )
+                }],
+                ":empty": []
             }
-        else:
-            content_type = "image/png"
-            asset_id = f"{asset_id}:proxy"
-            new_representation = {
-                "ID": asset_id,
-                "Type": "Image",
-                "Format": "PNG",
-                "Purpose": mode,
-                "StorageInfo": {
-                    "PrimaryLocation": {
-                        "StorageType": "s3",
-                        "Provider": "aws",
-                        "Bucket": output_bucket,
-                        "ObjectKey": {"FullPath": output_key},
-                        "Status": "active",
-                        "FileInfo": {"Size": len(output_data)},
-                    }
-                },
-            }
-
-        s3.put_object(
-            Bucket=output_bucket,
-            Key=output_key,
-            Body=output_data,
-            ContentType=content_type,
         )
+    except Exception:
+        logger.exception("Error updating DynamoDB")
+        raise
 
-        try:
-            logger.info(
-                "Attempting DynamoDB update",
-                extra={"inventory_id": clean_inventory_id, "new_representation": new_representation},
-            )
-            response = table.update_item(
-                Key={"InventoryID": clean_inventory_id},
-                UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
-                ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
-                ExpressionAttributeValues={":new_rep": [new_representation], ":empty_list": []},
-                ReturnValues="UPDATED_NEW",
-            )
-            logger.info("DynamoDB update response", extra={"response": response, "inventory_id": clean_inventory_id})
-        except Exception as e:
-            logger.exception("Error updating DynamoDB", extra={"inventory_id": clean_inventory_id, "error": str(e), "error_type": type(e).__name__})
-            raise
-
-        return {
-            "statusCode": 200,
-            "body": {
-                "ID": asset_id,
-                "type": "image",
-                "format": "PNG" if mode == "thumbnail" else "PNG",
-                "Purpose": mode,
-                "StorageInfo": {
-                    "PrimaryLocation": {
-                        "StorageType": "s3",
-                        "Bucket": output_bucket,
-                        "path": output_key,
-                        "status": "active",
-                        "ObjectKey": {"FullPath": output_key},
-                    }
-                },
-                "location": {"bucket": output_bucket, "key": output_key},
-                "mode": mode,
-            },
+    return {
+        "statusCode": 200,
+        "body": {
+            "bucket": out_bucket,
+            "key": new_key,
+            "mode": mode,
+            "format": fmt
         }
+    }
 
-    except Exception as e:
-        logger.exception("Error in lambda_handler")
-        return {"statusCode": 500, "body": {"error": str(e), "error_type": type(e).__name__}}
+def _raise(msg: str):
+    raise ValueError(msg)
+
+def _resolve_dims(w, h, iw, ih):
+    if w is None:
+        w = int(h * (iw / ih))
+    elif h is None:
+        h = int(w * (ih / iw))
+    return int(w), int(h)

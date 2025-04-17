@@ -21,7 +21,7 @@ def build_step_function_definition(pipeline: Any, lambda_arns: Dict[str, str]) -
         Complete state machine definition
     """
     # Import here to avoid circular imports
-    from step_functions.builders import StateMachineBuilder
+    from builders import StateMachineBuilder
     import os
     
     resource_prefix = os.environ.get("RESOURCE_PREFIX", "")
@@ -43,6 +43,6 @@ def create_step_function(pipeline_name: str, definition: Dict[str, Any]) -> Dict
         Response from the create_state_machine API call
     """
     # Import here to avoid circular imports
-    from step_functions.aws_operations import create_step_function as create_sfn
+    from aws_operations import create_step_function as create_sfn
     
     return create_sfn(pipeline_name, definition)
