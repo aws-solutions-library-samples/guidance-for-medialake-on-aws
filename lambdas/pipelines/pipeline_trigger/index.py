@@ -8,11 +8,10 @@ from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer, Metrics
 
 # Configuration variables
-MAX_CONCURRENT_EXECUTIONS = 100  # Adjust based on your workload
-MAX_API_RETRIES = 4
-BASE_BACKOFF = 0.5  # Base delay in seconds
-# Use a cache to reduce API calls
-EXECUTION_COUNT_CACHE_TTL = 2  # seconds
+MAX_CONCURRENT_EXECUTIONS = 1000
+MAX_API_RETRIES = 10
+BASE_BACKOFF = 0.5 # seconds
+EXECUTION_COUNT_CACHE_TTL = 10  # seconds
 
 logger = Logger()
 tracer = Tracer()
