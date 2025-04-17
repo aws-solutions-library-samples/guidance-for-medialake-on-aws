@@ -8,6 +8,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 from config import config
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -170,6 +171,9 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
+        
+        # Add CORS support to all API resources
+        add_cors_options_method(environment_id_resource)
 
     @property
     def environments_table_name(self) -> str:

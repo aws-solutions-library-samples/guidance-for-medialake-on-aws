@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './playwright/tests',
   timeout: 30000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -12,8 +12,7 @@ export default defineConfig({
     ['list']
   ],
   use: {
-    // Comment out baseURL to avoid waiting for web server
-    // baseURL: 'http://localhost:3000',
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [
@@ -22,10 +21,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Disable webServer configuration
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // }
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 60000,
+  },
+  globalSetup: './playwright/global-setup.ts',
+  globalTeardown: './playwright/global-teardown.ts',
 }); 

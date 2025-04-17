@@ -56,10 +56,11 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
-    "test:basic": "playwright test tests/basic.spec.ts",
-    "test:api": "playwright test tests/api.spec.ts",
-    "test:ui-tests": "playwright test tests/ui.spec.ts",
-    "test:example": "playwright test tests/example.spec.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:login": "playwright test playwright/tests/login.spec.ts",
+    "test:e2e:api": "playwright test playwright/tests/api.spec.ts",
+    "test:e2e:ui-tests": "playwright test playwright/tests/ui.spec.ts",
     "test:report": "playwright show-report"
   },
   "browserslist": {

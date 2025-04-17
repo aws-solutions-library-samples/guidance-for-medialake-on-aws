@@ -30,7 +30,7 @@ def handle(event, context):
                 'body': json.dumps({'error': 'bucketName is required'})
             }
             
-        concurrency_limit = min(int(body.get('concurrencyLimit', 20)), 100)  # Cap at 100
+        concurrency_limit = min(int(body.get('concurrencyLimit', 10)), 100)  # Cap at 100
         batch_size = min(int(body.get('batchSize', 1000)), 10000)  # Cap at 10,000
         
         # Initialize job record in DynamoDB

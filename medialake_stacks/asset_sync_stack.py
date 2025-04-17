@@ -156,7 +156,8 @@ class AssetSyncStack(Stack):
             ),
         )
 
-        # Create the Asset Sync Processor Lambda
+        ## Not neededed, delete after 5/1/25
+        ## Create the Asset Sync Processor Lambda
         self._asset_sync_processor_lambda = Lambda(
             self,
             "AssetSyncProcessorLambda",

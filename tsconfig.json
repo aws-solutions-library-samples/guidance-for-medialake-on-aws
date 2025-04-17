@@ -17,6 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["node", "@playwright/test"]
   },
-  "include": ["src", "tests", "playwright", "playwright.config.ts"],
+  "include": ["src", "tests", "playwright", "playwright.config.ts", "medialake_user_interface/tests/login.spec.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 } 

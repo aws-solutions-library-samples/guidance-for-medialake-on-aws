@@ -85,7 +85,7 @@ def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[
     if body is None:
         body = {}
     
-    concurrency_limit = min(int(body.get('concurrencyLimit', 20)), 100)
+    concurrency_limit = min(int(body.get('concurrencyLimit', 10)), 100)
     batch_size = min(int(body.get('batchSize', 1000)), 10000)
     
     # Calculate TTL for job record (30 days)
@@ -228,8 +228,6 @@ def lambda_handler(event, context):
         path_params = event.get('pathParameters', {}) or {}
         connector_id = path_params.get('connectorId')
         
-        # For compatibility with the URL format:
-        # https://dmu2q37ivmztq.cloudfront.net/prod/connectors/31ab3ecb-a714-470a-b009-e6f046f9aa4e/sync
         if not connector_id:
             # Extract from path if not in path parameters
             path = event.get('path', "")
