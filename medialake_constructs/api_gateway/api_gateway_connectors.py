@@ -24,6 +24,7 @@ from aws_cdk import (
     aws_stepfunctions as sfn,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -676,6 +677,24 @@ class ConnectorsConstruct(Construct):
         )
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
+        
+        # Add CORS support to all API resources
+        self._add_cors_to_all_resources(
+            connectors_resource,
+            connector_id_resource,
+            connector_s3_resource,
+            s3_sync_connector_resource,
+            s3_explorer_resource,
+            s3_explorer_connector_resource
+        )
+
+    def _add_cors_to_all_resources(self, *resources):
+        """Add CORS support to all API resources."""
+        for resource in resources:
+            add_cors_options_method(resource)
+            # Process child resources if any
+            for child in resource.resources.values():
+                add_cors_options_method(child)
 
     @property
     def connector_table(self) -> dynamodb.TableV2:

@@ -24,6 +24,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from config import config
 from typing import Optional
 
@@ -607,3 +608,15 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+
+        # Add CORS support to all API resources
+        self._add_cors_to_all_resources(assets_resource, asset_resource, presigned_url_resource, 
+                                        rename_resource, related_versions_resource, transcript_resource)
+
+    def _add_cors_to_all_resources(self, *resources):
+        """Add CORS support to all API resources."""
+        for resource in resources:
+            add_cors_options_method(resource)
+            # Process child resources if any
+            for child in resource.resources.values():
+                add_cors_options_method(child)
