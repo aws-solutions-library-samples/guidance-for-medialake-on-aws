@@ -201,6 +201,10 @@ integrations_environment_stack = IntegrationsEnvironmentStack(
 integrations_environment_stack.add_dependency(api_gateway_core_stack)
 integrations_environment_stack.add_dependency(nodes_stack)
 
+# Add the IntegrationsEnvironmentStack as a dependency to the ApiGatewayStack's deployment
+# This ensures the pipelinesv2 endpoint is included in the API Gateway deployment
+api_gateway_stack.add_deployment_dependency(integrations_environment_stack)
+
 pipeline_stack = PipelineStack(
     app,
     "MediaLakePipeline",

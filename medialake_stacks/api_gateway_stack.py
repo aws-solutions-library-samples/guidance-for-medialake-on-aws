@@ -258,6 +258,16 @@ class ApiGatewayStack(Stack):
     @property
     def connector_table(self) -> dynamodb.TableV2:
         return self._connectors_api_gateway.connector_table
+        
+    def add_deployment_dependency(self, dependency: Construct):
+        """
+        Add a dependency to the API Gateway deployment.
+        This ensures the dependency is created before the API is deployed.
+        
+        Args:
+            dependency: The construct to add as a dependency
+        """
+        self._api_deployment.deployment.node.add_dependency(dependency)
 
     @property
     def x_origin_verify_secret(self) -> secretsmanager.Secret:

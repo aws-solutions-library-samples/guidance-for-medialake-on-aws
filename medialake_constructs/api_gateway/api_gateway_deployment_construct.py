@@ -55,7 +55,7 @@ class ApiGatewayDeploymentConstruct(Construct):
         )
 
         # Create a deployment for the RestApi
-        deployment = apigateway.Deployment(
+        self._deployment = apigateway.Deployment(
             self,
             "ApiDeployment",
             api=props.rest_api,
@@ -65,13 +65,13 @@ class ApiGatewayDeploymentConstruct(Construct):
         # Add dependencies if provided
         if props.dependencies:
             for dependency in props.dependencies:
-                deployment.node.add_dependency(dependency)
+                self._deployment.node.add_dependency(dependency)
 
         # Create a stage for the deployment with the same configuration as original
         stage = apigateway.Stage(
             self,
             "ApiStage",
-            deployment=deployment,
+            deployment=self._deployment,
             stage_name=config.api_path,  # Use the same stage name from config
             tracing_enabled=True,
             metrics_enabled=True,
@@ -100,4 +100,8 @@ class ApiGatewayDeploymentConstruct(Construct):
     
     @property
     def stage(self) -> apigateway.Stage:
-        return self._stage 
+        return self._stage
+        
+    @property
+    def deployment(self) -> apigateway.Deployment:
+        return self._deployment

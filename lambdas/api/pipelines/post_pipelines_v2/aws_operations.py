@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import boto3
 from aws_lambda_powertools import Logger
 
-from .sanitizers import sanitize_role_name, sanitize_state_machine_name
+from sanitizers import sanitize_role_name, sanitize_state_machine_name
 from iam_operations import create_sfn_role
 
 logger = Logger()

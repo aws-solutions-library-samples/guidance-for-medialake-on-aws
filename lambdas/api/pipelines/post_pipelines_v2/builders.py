@@ -6,11 +6,11 @@ from typing import Dict, Any, List, Set, Optional
 import os
 from aws_lambda_powertools import Logger
 
-from .graph_utils import GraphAnalyzer
-from .state_definitions import StateDefinitionFactory
-from .state_connector import StateConnector
-from .validators import StateMachineValidator
-from .sanitizers import sanitize_state_name
+from graph_utils import GraphAnalyzer
+from state_definitions import StateDefinitionFactory
+from state_connector import StateConnector
+from validators import StateMachineValidator
+from sanitizers import sanitize_state_name
 
 logger = Logger()
 

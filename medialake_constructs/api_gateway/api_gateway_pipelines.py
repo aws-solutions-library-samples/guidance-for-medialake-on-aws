@@ -391,7 +391,6 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:PutItem", "dynamodb:Scan", "dynamodb:UpdateItem"],
@@ -422,6 +421,13 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._post_pipelines_v2_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt"],
                 resources=["*"],
             )
         )
