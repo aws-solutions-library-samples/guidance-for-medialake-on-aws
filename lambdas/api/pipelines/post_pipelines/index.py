@@ -866,6 +866,7 @@ def create_event_source_mapping(lambda_client, queue_arn, pipeline_trigger_lambd
                 EventSourceArn=queue_arn,
                 FunctionName=pipeline_trigger_lambda_arn,
                 Enabled=True,
+                FunctionResponseTypes=['ReportBatchItemFailures']
                 # BatchSize=1000, #default is 100.
             )
             logger.info("Event source mapping created successfully")
