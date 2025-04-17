@@ -21,6 +21,7 @@ from aws_cdk import (
     Stack,
     Duration,
 )
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -355,3 +356,10 @@ class UsersApi(Construct):
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
+
+        # Add CORS support
+        add_cors_options_method(users_resource)
+        add_cors_options_method(users_user_resource)
+        add_cors_options_method(users_user_id_resources)
+        add_cors_options_method(users_user_id_disableuser_resource)
+        add_cors_options_method(users_user_id_enableuser_resource)

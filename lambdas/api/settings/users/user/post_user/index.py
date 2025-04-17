@@ -137,6 +137,7 @@ def create_user():
         error_code = e.response["Error"]["Code"]
         error_message = e.response["Error"]["Message"]
 
+        # Log the error appropriately based on severity
         (
             logger.warning(
                 {
@@ -163,12 +164,37 @@ def create_user():
 
         metrics.add_metric(name="FailedUserCreations", unit=MetricUnit.Count, value=1)
 
+        # Handle "UsernameExistsException" as a successful case
+        if error_code == "UsernameExistsException":
+            logger.info(
+                {
+                    "message": "User already exists, returning success",
+                    "user_email": request_data.get("email"),
+                    "operation": "cognito_create_user",
+                    "status": "success",
+                }
+            )
+            # Track these as a different metric
+            metrics.add_metric(name="UserAlreadyExists", unit=MetricUnit.Count, value=1)
+            
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "status": 200,
+                        "message": "User already exists",
+                        "data": {
+                            "username": request_data.get("email"),
+                            "userStatus": "CONFIRMED",
+                        },
+                    }
+                ),
+            }
+        
+        # Other errors are still treated as errors
         return {
             "statusCode": (
-                400
-                if error_code
-                in ["UsernameExistsException", "InvalidParameterException"]
-                else 500
+                400 if error_code == "InvalidParameterException" else 500
             ),
             "body": json.dumps({"error": error_code, "message": error_message}),
         }

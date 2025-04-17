@@ -12,7 +12,7 @@ MAX_CONCURRENT_EXECUTIONS = 100  # Adjust based on your workload
 MAX_API_RETRIES = 4
 BASE_BACKOFF = 0.5  # Base delay in seconds
 # Use a cache to reduce API calls
-EXECUTION_COUNT_CACHE_TTL = 5  # seconds
+EXECUTION_COUNT_CACHE_TTL = 2  # seconds
 
 logger = Logger()
 tracer = Tracer()

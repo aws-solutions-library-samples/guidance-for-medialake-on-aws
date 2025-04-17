@@ -20,6 +20,7 @@ from aws_cdk import (
     aws_secretsmanager as secrets_manager,
     Stack,
 )
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
@@ -89,3 +90,8 @@ class RolesApi(Construct):
                 },
             ),
         )
+        
+        # Add CORS support
+        add_cors_options_method(roles_resource)
+        add_cors_options_method(roles_role_resource)
+        add_cors_options_method(roles_role_id_resources)

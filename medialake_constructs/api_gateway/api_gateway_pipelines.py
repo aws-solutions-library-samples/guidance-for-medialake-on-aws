@@ -27,6 +27,7 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PyamlLayer,
     ShortuuidLayer,
 )
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
 
 @dataclass
@@ -964,6 +965,13 @@ class ApiGatewayPipelinesConstruct(Construct):
         #     authorization_type=apigateway.AuthorizationType.COGNITO,
         #     authorizer=cognito_authorizer,
         # )
+        
+        # Add CORS support to all pipeline API resources
+        add_cors_options_method(pipelines_resource)
+        add_cors_options_method(pipeline_id_resource)
+        add_cors_options_method(executions_resource)
+        add_cors_options_method(execution_id_resource)
+        add_cors_options_method(retry_resource)
 
     @property
     def pipelines_create_handler(self) -> lambda_.Function:

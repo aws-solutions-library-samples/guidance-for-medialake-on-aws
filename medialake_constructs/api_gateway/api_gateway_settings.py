@@ -498,6 +498,14 @@ class SettingsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
         
+        # Add CORS support to additional resources
+        add_cors_options_method(settings_users_resource)
+        add_cors_options_method(settings_users_userid_resource)
+        add_cors_options_method(settings_users_user_resource)
+        add_cors_options_method(settings_users_user_userid_resource)
+        add_cors_options_method(settings_roles_resource)
+        add_cors_options_method(settings_roles_role_resource)
+        
     @property
     def system_settings_table_name(self) -> str:
         return self._system_settings_table_name

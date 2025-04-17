@@ -173,6 +173,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         )
         
         # Add CORS support to all API resources
+        add_cors_options_method(environments_resource)
         add_cors_options_method(environment_id_resource)
 
     @property
