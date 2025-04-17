@@ -1,8 +1,8 @@
-const AWS = require('aws-sdk');
-const s3 = new AWS.S3();
-const dynamoDB = new AWS.DynamoDB();
-const exifr = require('exifr');
-const xml2js = require('xml2js');
+const AWS     = require('aws-sdk');
+const s3      = new AWS.S3();
+const dynamo  = new AWS.DynamoDB();
+const exifr   = require('exifr');
+const xml2js  = require('xml2js');
 
 const MEDIALAKE_ASSET_TABLE = process.env.MEDIALAKE_ASSET_TABLE;
 const UNSUPPORTED_EXTENSIONS = ['.webp'];
@@ -74,28 +74,38 @@ function normalizeDateTimeString(str) {
   return str;
 }
 
-// Clean control chars and normalize dates
+// Clean control chars, normalize dates, and drop invalid dates
 function sanitizeMetadata(obj) {
   if (obj == null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
     if (typeof v === 'string') {
+      // Drop placeholder zero dates
+      if (/^0000-00-00/.test(v)) continue;
+      // Normalize simple dates and malformed times
       let s = normalizeDateString(v);
       s = normalizeDateTimeString(s);
-      out[k] = s
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-        .replace(/[\\"']/g, '\\$&');
+      // Validate final ISO date
+      const parsed = Date.parse(s);
+      if (!isNaN(parsed)) {
+        out[k] = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+                   .replace(/[\\"']/g, '\\$&');
+      } else {
+        // If not a valid date, skip this field entirely
+        continue;
+      }
     } else if (v instanceof Uint8Array) {
       out[k] = clipBytes(v);
     } else {
-      out[k] = sanitizeMetadata(v);
+      const nested = sanitizeMetadata(v);
+      if (nested !== undefined) out[k] = nested;
     }
   }
   return out;
 }
 
-// Force every leaf node into { value: ... }
+// Force every leaf node to be an object { value: ... }
 function forceAllObjects(x) {
   if (x == null || typeof x !== 'object') return { value: x };
   if (Array.isArray(x)) return x.map(forceAllObjects);
@@ -165,6 +175,7 @@ async function processImageFile(bucket, key) {
 }
 
 exports.lambda_handler = async (event) => {
+  console.log(event);
   const inventoryId = event.input?.InventoryID;
   if (!inventoryId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing InventoryID' }) };
@@ -175,10 +186,10 @@ exports.lambda_handler = async (event) => {
   const cleaned = sanitizeMetadata(rawMeta);
   const forced  = forceAllObjects(cleaned);
 
-  const newMeta   = { CustomMetadata: forced };
+  const newMeta    = { CustomMetadata: forced };
   const marshalled = AWS.DynamoDB.Converter.marshall(convertFloatsToDecimals(newMeta));
 
-  await dynamoDB.updateItem({
+  await dynamo.updateItem({
     TableName: MEDIALAKE_ASSET_TABLE,
     Key: { InventoryID: { S: inventoryId } },
     UpdateExpression: 'SET Metadata = :m',
