@@ -180,7 +180,9 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=LambdaConfig(
                 name="PipelineTrigger",
                 entry="lambdas/pipelines/pipeline_trigger",
-                reserved_concurrent_executions=50,
+                reserved_concurrent_executions=40,
+                timeout_minutes=5,
+                memory_size=256,
                 environment_variables={
                     "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
                 },
