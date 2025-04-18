@@ -274,6 +274,6 @@ exports.lambda_handler = async (event) => {
 
   } catch (err) {
     console.error('Processing failed for', inventoryId, err);
-    throw err;
+    // throw err;
   }
 };
