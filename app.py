@@ -183,28 +183,6 @@ api_gateway_stack.add_dependency(api_gateway_core_stack)
 api_gateway_stack.add_dependency(users_groups_roles_stack)
 api_gateway_stack.add_dependency(asset_sync_stack)
 
-# Create IntegrationsEnvironmentStack 
-integrations_environment_stack = IntegrationsEnvironmentStack(
-    app,
-    "MediaLakeIntegrationsEnvironment",
-    props=IntegrationsEnvironmentStackProps(
-        api_resource=api_gateway_core_stack.rest_api,
-        cognito_user_pool=api_gateway_core_stack.user_pool,
-        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
-        pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-        post_pipelines_v2_lambda=api_gateway_stack._pipeline_stack._post_pipelines_v2_handler.function,
-    ),
-    env=env,
-)
-
-# Add dependencies for the IntegrationsEnvironmentStack
-integrations_environment_stack.add_dependency(api_gateway_core_stack)
-integrations_environment_stack.add_dependency(nodes_stack)
-
-# Add the IntegrationsEnvironmentStack as a dependency to the ApiGatewayStack's deployment
-# This ensures the pipelinesv2 endpoint is included in the API Gateway deployment
-api_gateway_stack.add_deployment_dependency(integrations_environment_stack)
-
 pipeline_stack = PipelineStack(
     app,
     "MediaLakePipeline",
@@ -218,10 +196,46 @@ pipeline_stack = PipelineStack(
         video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
         audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
         check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
-        post_pipeline_lambda=api_gateway_stack.pipelines_create_handler,
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        cognito_app_client=api_gateway_core_stack.user_pool_client,
+        asset_table=base_infrastructure.asset_table,
+        connector_table=api_gateway_stack.connector_table,
+        node_table=nodes_stack.pipelines_nodes_table,
+        pipeline_table=base_infrastructure.pipeline_table,
+        image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+        image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+        external_payload_bucket=base_infrastructure.external_payload_bucket,
+        pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
+        open_search_endpoint=base_infrastructure.collection_endpoint,
+        vpc=base_infrastructure.vpc,
+        security_group=base_infrastructure.security_group,
+        ingest_event_bus=base_infrastructure.ingest_event_bus,
+        media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+        collection_endpoint=base_infrastructure.collection_endpoint,
     ),
     env=env,
 )
+pipeline_stack.add_dependency(api_gateway_stack)
+
+
+integrations_environment_stack = IntegrationsEnvironmentStack(
+    app,
+    "MediaLakeIntegrationsEnvironment",
+    props=IntegrationsEnvironmentStackProps(
+        api_resource=api_gateway_core_stack.rest_api,
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        x_origin_verify_secret=api_gateway_core_stack.x_origin_verify_secret,
+        pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
+        post_pipelines_v2_lambda=pipeline_stack.post_pipelinesv2_async_handler,
+    ),
+    env=env,
+)
+
+integrations_environment_stack.add_dependency(api_gateway_core_stack)
+integrations_environment_stack.add_dependency(nodes_stack)
+api_gateway_stack.add_dependency(integrations_environment_stack)
+
 
 # Create the CloudFront WAF stack in us-east-1
 cloudfront_waf_stack = CloudFrontWafStack(
@@ -229,6 +243,8 @@ cloudfront_waf_stack = CloudFrontWafStack(
     "MediaLakeCloudFrontWAF",
     env=env_us_east_1,
 )
+
+pipeline_stack.add_dependency(cloudfront_waf_stack)
 
 # Get the SSM parameter name for the WAF ACL ARN
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
@@ -250,24 +266,6 @@ user_interface_stack = UserInterfaceStack(
     ),
     env=env,
 )
-
-# Create the monitoring stack
-# monitoring_stack = MonitoringStack(
-#     app,
-#     "MediaLakeMonitoringStack",
-#     config_path="config.json",
-#     env=env,
-# )
-
-# Add dependencies to the monitoring stack
-# monitoring_stack.add_dependency(base_infrastructure)
-# monitoring_stack.add_dependency(nodes_stack)
-# monitoring_stack.add_dependency(pipeline_nodes_stack)
-# monitoring_stack.add_dependency(asset_sync_stack)
-# monitoring_stack.add_dependency(api_gateway_stack)
-# monitoring_stack.add_dependency(pipeline_stack)
-# if lambda_warmer:
-#     monitoring_stack.add_dependency(lambda_warmer)
 
 cleanup_stack = CleanupStack(
     app,
@@ -291,17 +289,10 @@ cleanup_stack.add_dependency(base_infrastructure)
 cleanup_stack.add_dependency(pipeline_nodes_stack)
 cleanup_stack.add_dependency(pipeline_stack)
 cleanup_stack.add_dependency(nodes_stack)
-# cleanup_stack.add_dependency(monitoring_stack)
 cleanup_stack.add_dependency(user_interface_stack)
-
-# if lambda_warmer:
-#     cleanup_stack.add_dependency(lambda_warmer)
 
 if config.resource_application_tag:
     cdk.Tags.of(app).add("Application", config.resource_application_tag)
-
-# AWS Solutions checks
-# cdk.Aspects.of(app).add(AwsSolutionsChecks())
 
 cdk.CfnOutput(
     user_interface_stack,
@@ -310,11 +301,40 @@ cdk.CfnOutput(
     description="URL for the MediaLake User Interface",
 )
 
+app.synth()
+
+
+# AWS Solutions checks
+# cdk.Aspects.of(app).add(AwsSolutionsChecks())
+
+# cleanup_stack.add_dependency(monitoring_stack)
+
+# Create the monitoring stack
+# monitoring_stack = MonitoringStack(
+#     app,
+#     "MediaLakeMonitoringStack",
+#     config_path="config.json",
+#     env=env,
+# )
+
+# if lambda_warmer:
+#     cleanup_stack.add_dependency(lambda_warmer)
+
+# Add dependencies to the monitoring stack
+# monitoring_stack.add_dependency(base_infrastructure)
+# monitoring_stack.add_dependency(nodes_stack)
+# monitoring_stack.add_dependency(pipeline_nodes_stack)
+# monitoring_stack.add_dependency(asset_sync_stack)
+# monitoring_stack.add_dependency(api_gateway_stack)
+# monitoring_stack.add_dependency(pipeline_stack)
+# if lambda_warmer:
+#     monitoring_stack.add_dependency(lambda_warmer)
+
+
+
 # cdk.CfnOutput(
 #     monitoring_stack,
 #     "MonitoringDashboardUrl",
 #     value=f"https://{app.region}.console.aws.amazon.com/cloudwatch/home?region={app.region}#dashboards:name={monitoring_stack.dashboard.dashboard_name}",
 #     description="URL for the MediaLake Monitoring Dashboard",
 # )
-
-app.synth()

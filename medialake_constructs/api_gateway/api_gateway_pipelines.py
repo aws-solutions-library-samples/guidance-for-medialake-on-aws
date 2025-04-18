@@ -11,7 +11,8 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
-    Duration
+    Duration,
+    Fn
 )
 from constructs import Construct
 from config import config
@@ -29,11 +30,9 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 )
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
-
 @dataclass
 class ApiGatewayPipelinesProps:
     """Configuration for Lambda function creation."""
-
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
@@ -43,12 +42,17 @@ class ApiGatewayPipelinesProps:
     pipelines_nodes_templates_bucket: s3.IBucket
     image_proxy_lambda: lambda_.IFunction
     image_metadata_extractor_lambda: lambda_.IFunction
+    open_search_endpoint: str
+    api_resource: apigateway.IResource
+    ingest_event_bus: events.EventBus
+    iac_assets_bucket: s3.IBucket
+    media_assets_bucket: S3Bucket
+    x_origin_verify_secret: secretsmanager.Secret
+    cognito_authorizer: apigateway.IAuthorizer
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
-    open_search_endpoint: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
-
 
 class ApiGatewayPipelinesConstruct(Construct):
 
@@ -56,12 +60,6 @@ class ApiGatewayPipelinesConstruct(Construct):
         self,
         scope: Construct,
         id: str,
-        api_resource: apigateway.IResource,
-        cognito_authorizer: apigateway.IAuthorizer,
-        ingest_event_bus: events.EventBus,
-        iac_assets_bucket: s3.IBucket,
-        media_assets_bucket: S3Bucket,
-        x_origin_verify_secret: secretsmanager.Secret,
         props: ApiGatewayPipelinesProps,
     ) -> None:
         super().__init__(scope, id)
@@ -204,8 +202,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Create pipelines resource
-        pipelines_resource = api_resource.root.add_resource("pipelines")
-        pipelines_v2_resource = api_resource.root.add_resource("pipelinesv2")
+        pipelines_resource = props.api_resource.add_resource("pipelines")
+        pipelines_v2_resource = props.api_resource.add_resource("pipelinesv2")
 
         self._get_pipelines_handler = Lambda(
             self,
@@ -214,7 +212,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 name="GetPipelinesHandler",
                 entry="lambdas/api/pipelines/get_pipelines",
                 environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 },
             ),
@@ -231,13 +229,12 @@ class ApiGatewayPipelinesConstruct(Construct):
             "GET",
             apigateway.LambdaIntegration(self._get_pipelines_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
 
 
         ## Pipelines v2
-
         pyaml_layer = PyamlLayer(self, "PyamlLayer")
         shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
 
@@ -249,14 +246,14 @@ class ApiGatewayPipelinesConstruct(Construct):
             layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
-                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket_name,
-                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": media_assets_bucket.key_arn,
+                "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
                 "PIPELINES_TABLE": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
-                "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name,
+                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
                 "RESOURCE_PREFIX": config.resource_prefix,
                 "NODE_TABLE": props.node_table.table_arn,
                 "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
@@ -490,7 +487,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "POST",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
         
         # Add status endpoint
@@ -499,7 +496,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
         
         # Add get pipeline by ID endpoint - use a different name to avoid conflicts
@@ -507,7 +504,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # DELETE /api/pipelinesv2
@@ -591,7 +588,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "DELETE",
             apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # Add a resource for pipeline ID specific operations
@@ -602,7 +599,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "DELETE",
             apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # POST /api/pipelines
@@ -612,9 +609,9 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry="lambdas/api/pipelines/post_pipelines",
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
-                "MEDIA_ASSETS_BUCKET_NAME": media_assets_bucket.bucket_name,
-                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": media_assets_bucket.key_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
@@ -623,7 +620,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
                 "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                "INGEST_EVENT_BUS": ingest_event_bus.event_bus_name,
+                "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
                 "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "AWS_ACCOUNT_ID": scope.account,
                 "GLOBAL_PREFIX": config.resource_prefix,
@@ -748,7 +745,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "POST",
             apigateway.LambdaIntegration(self._post_pipelines_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # Pipeline ID specific endpoints
@@ -759,7 +756,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             name="pipeline_get",
             entry=("lambdas/api/pipelines/rp_pipelinesId/get_pipelinesId"),
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
@@ -781,7 +778,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "GET",
             apigateway.LambdaIntegration(self._get_pipeline_id_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # PUT /api/pipelines/{pipelineId}
@@ -790,9 +787,9 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelinesId/put_pipelinesId"),
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
-                "INGEST_EVENT_BUS_NAME": ingest_event_bus.event_bus_name
+                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name
             },
         )
 
@@ -821,7 +818,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PUT",
             apigateway.LambdaIntegration(self._put_pipeline_id_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # DELETE /pipelines/{pipelineId}
@@ -830,7 +827,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelinesId/del_pipelinesId"),
             iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
             },
         )
@@ -909,7 +906,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "DELETE",
             apigateway.LambdaIntegration(self._del_pipeline_id_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         pipelines_executions_resource = pipelines_resource.add_resource("executions")
@@ -919,7 +916,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "GET",
             apigateway.LambdaIntegration(props.get_pipelines_executions_lambda),
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=cognito_authorizer,
+            authorizer=props.cognito_authorizer,
         )
 
         # Add new execution ID resource and retry endpoint
@@ -948,6 +945,10 @@ class ApiGatewayPipelinesConstruct(Construct):
     def post_pipelines_async_handler(self) -> Lambda:
         return self._post_pipelines_async_handler
 
+    @property
+    def post_pipelinesv2_async_handler(self) -> lambda_.Function:
+        return self._post_pipelines_v2_handler.function
+    
     @property
     def get_pipelines_handler(self) -> Lambda:
         return self._get_pipelines_handler

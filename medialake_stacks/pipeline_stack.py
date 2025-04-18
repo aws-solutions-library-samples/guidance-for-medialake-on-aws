@@ -11,8 +11,22 @@ from aws_cdk import (
     aws_lambda as lambda_,
     custom_resources as cr,
     Duration,
+    aws_apigateway as apigateway,
+    aws_cognito as cognito,
+    aws_dynamodb as dynamodb,
+    aws_ec2 as ec2,
+    Fn,
+    aws_events as events,
+    aws_secretsmanager as secretsmanager
 )
-
+from medialake_constructs.api_gateway.api_gateway_pipelines import (
+    ApiGatewayPipelinesConstruct,
+    ApiGatewayPipelinesProps,
+)
+from medialake_stacks.pipelines_executions_stack import (
+    PipelinesExecutionsStack,
+    PipelinesExecutionsStackProps,
+)
 # from config import config
 from constructs import Construct
 from dataclasses import dataclass
@@ -21,7 +35,6 @@ from dataclasses import dataclass
 @dataclass
 class PipelineStackProps:
     iac_assets_bucket: s3.IBucket
-    post_pipeline_lambda: lambda_.Function
     trigger_node_function_arn: str
     image_metadata_extractor_function_arn: str
     image_proxy_function_arn: str
@@ -30,6 +43,24 @@ class PipelineStackProps:
     audio_metadata_extractor_function_arn: str
     audio_proxy_thumbnail_function_arn: str
     check_mediaconvert_status_function_arn: str
+    cognito_user_pool: cognito.UserPool
+    cognito_app_client: cognito.UserPoolClient
+    asset_table: dynamodb.TableV2
+    connector_table: dynamodb.TableV2
+    node_table: dynamodb.TableV2
+    pipeline_table: dynamodb.TableV2
+    image_proxy_lambda: lambda_.Function
+    image_metadata_extractor_lambda: lambda_.Function
+    iac_assets_bucket: s3.IBucket
+    external_payload_bucket: s3.IBucket
+    pipelines_nodes_templates_bucket: s3.IBucket
+    open_search_endpoint: str
+    vpc: ec2.Vpc
+    security_group: ec2.SecurityGroup
+    ingest_event_bus: events.EventBus
+    media_assets_bucket: s3.IBucket
+    x_origin_verify_secret: secretsmanager.Secret
+    collection_endpoint: str
 
 
 class PipelineStack(Stack):
@@ -42,6 +73,55 @@ class PipelineStack(Stack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        
+        api = apigateway.RestApi.from_rest_api_attributes(self, "PipelineStackApi",
+            rest_api_id=api_id,
+            root_resource_id=root_resource_id
+        )
+        
+        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self, 
+            "PipelineStackApiAuthorizer",
+            identity_source="method.request.header.Authorization",
+            cognito_user_pools=[props.cognito_user_pool],
+        )
+
+        self._pipelines_executions_stack = PipelinesExecutionsStack(
+            self,
+            "PipelinesExecutions",
+            props=PipelinesExecutionsStackProps(
+                x_origin_verify_secret=props.x_origin_verify_secret,
+            ),
+        )
+        
+        self._pipelines_api = ApiGatewayPipelinesConstruct(
+            self,
+            "PipelinesApiGateway",
+            props=ApiGatewayPipelinesProps(
+                api_resource=api.root,
+                cognito_authorizer=self._api_authorizer,
+                x_origin_verify_secret=props.x_origin_verify_secret,
+                asset_table=props.asset_table,
+                connector_table=props.connector_table,
+                node_table=props.node_table,
+                pipeline_table=props.pipeline_table,
+                image_proxy_lambda=props.image_proxy_lambda,
+                image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
+                iac_assets_bucket=props.iac_assets_bucket,
+                external_payload_bucket=props.external_payload_bucket,
+                pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
+                open_search_endpoint=props.collection_endpoint,
+                vpc=props.vpc,
+                security_group=props.security_group,
+                ingest_event_bus=props.ingest_event_bus,
+                media_assets_bucket=props.media_assets_bucket,
+                get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
+                post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+            ),
+        )
+        
         ## pipelines deploy
         default_pipelines_template_dir = os.path.join(
             os.path.dirname(__file__), "..", "default_pipelines"
@@ -73,7 +153,6 @@ class PipelineStack(Stack):
                 audio_proxy_thumbnail_function_arn=props.audio_proxy_thumbnail_function_arn,
                 check_mediaconvert_status_function_arn=props.check_mediaconvert_status_function_arn,
             )
-            # print(rendered_pipeline)
             rendered_pipeline = json.loads(rendered_pipeline)
 
             # Replace check_status: true with the actual function ARN
@@ -151,12 +230,11 @@ class PipelineStack(Stack):
                 self,
                 f"InvokeLambda{pipeline_name.capitalize()}",
                 timeout=Duration.minutes(15),
-                # service_timeout=Duration.minutes(15),
                 on_create=cr.AwsSdkCall(
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": props.post_pipeline_lambda.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
                         "Payload": json.dumps(pipeline_data),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -167,7 +245,7 @@ class PipelineStack(Stack):
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": props.post_pipeline_lambda.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
                         "Payload": json.dumps(pipeline_data),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -178,10 +256,15 @@ class PipelineStack(Stack):
                     [
                         iam.PolicyStatement(
                             actions=["lambda:InvokeFunction"],
-                            resources=[props.post_pipeline_lambda.function_arn],
+                            resources=[self._pipelines_api.post_pipelines_handler.function_arn],
                         )
                     ]
                 ),
             )
 
             invoke_lambda.node.add_dependency(deployment)
+            
+
+    @property
+    def post_pipelinesv2_async_handler(self) -> lambda_.Function:
+        return self._pipelines_api.post_pipelinesv2_async_handler

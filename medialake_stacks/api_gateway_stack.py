@@ -25,11 +25,6 @@ from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayProps,
 )
 
-from medialake_constructs.api_gateway.api_gateway_pipelines import (
-    ApiGatewayPipelinesConstruct,
-    ApiGatewayPipelinesProps,
-)
-
 from config import config
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
@@ -46,11 +41,6 @@ from medialake_constructs.api_gateway.api_gateway_search import (
 from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
-)
-
-from medialake_stacks.pipelines_executions_stack import (
-    PipelinesExecutionsStack,
-    PipelinesExecutionsStackProps,
 )
 
 from medialake_constructs.api_gateway.api_gateway_nodes import (
@@ -146,41 +136,33 @@ class ApiGatewayStack(Stack):
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
             ),
         )
-        
-        self._pipelines_executions_stack = PipelinesExecutionsStack(
-            self,
-            "PipelinesExecutions",
-            props=PipelinesExecutionsStackProps(
-                x_origin_verify_secret=props.x_origin_verify_secret,
-            ),
-        )
 
-        self._pipeline_stack = ApiGatewayPipelinesConstruct(
-            self,
-            "Pipelines",
-            api_resource=api,
-            cognito_authorizer=self._api_gateway_authorizer,
-            ingest_event_bus=props.ingest_event_bus,
-            x_origin_verify_secret=props.x_origin_verify_secret,
-            iac_assets_bucket=props.iac_assets_bucket,
-            media_assets_bucket=props.media_assets_bucket,
-            props=ApiGatewayPipelinesProps(
-                asset_table=props.asset_table,
-                connector_table=self._connectors_api_gateway.connector_table,
-                node_table=props.node_table,
-                pipeline_table=props.pipeline_table,
-                image_proxy_lambda=props.image_proxy_lambda,
-                image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
-                iac_assets_bucket=props.iac_assets_bucket,
-                external_payload_bucket=props.external_payload_bucket,
-                pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
-                get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
-                post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
-                open_search_endpoint=props.collection_endpoint,
-                vpc=props.vpc,
-                security_group=props.security_group
-            ),
-        )
+        # self._pipeline_construct = ApiGatewayPipelinesConstruct(
+        #     self,
+        #     "Pipelines",
+        #     api_resource=api,
+        #     cognito_authorizer=self._api_gateway_authorizer,
+        #     ingest_event_bus=props.ingest_event_bus,
+        #     x_origin_verify_secret=props.x_origin_verify_secret,
+        #     iac_assets_bucket=props.iac_assets_bucket,
+        #     media_assets_bucket=props.media_assets_bucket,
+        #     props=ApiGatewayPipelinesProps(
+        #         asset_table=props.asset_table,
+        #         connector_table=self._connectors_api_gateway.connector_table,
+        #         node_table=props.node_table,
+        #         pipeline_table=props.pipeline_table,
+        #         image_proxy_lambda=props.image_proxy_lambda,
+        #         image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
+        #         iac_assets_bucket=props.iac_assets_bucket,
+        #         external_payload_bucket=props.external_payload_bucket,
+        #         pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
+        #         get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
+        #         post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+        #         open_search_endpoint=props.collection_endpoint,
+        #         vpc=props.vpc,
+        #         security_group=props.security_group
+        #     ),
+        # )
 
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(
@@ -232,7 +214,6 @@ class ApiGatewayStack(Stack):
         # These are the resources that the API Gateway deployment needs to wait for
         deployment_dependencies = [
             self._connectors_api_gateway,
-            self._pipeline_stack,
             self._search_construct,
             self._assets_construct,
             self._nodes_construct
@@ -259,29 +240,14 @@ class ApiGatewayStack(Stack):
     def connector_table(self) -> dynamodb.TableV2:
         return self._connectors_api_gateway.connector_table
         
-    def add_deployment_dependency(self, dependency: Construct):
-        """
-        Add a dependency to the API Gateway deployment.
-        This ensures the dependency is created before the API is deployed.
-        
-        Args:
-            dependency: The construct to add as a dependency
-        """
-        self._api_deployment.deployment.node.add_dependency(dependency)
-
     @property
     def x_origin_verify_secret(self) -> secretsmanager.Secret:
         # Return from props instead of internal constructs
         return self._props.x_origin_verify_secret
 
     # @property
-    # def cognito_authorizer(self) -> apigateway.CognitoUserPoolsAuthorizer:
-    #     # Return from props instead of internal constructs
-    #     return self._props.cognito_authorizer
-
-    @property
-    def pipelines_create_handler(self) -> lambda_.Function:
-        return self._pipeline_stack.pipelines_create_handler
+    # def pipelines_create_handler(self) -> lambda_.Function:
+    #     return self._pipeline_construct.pipelines_create_handler
     
     @property
     def connector_sync_lambda(self) -> lambda_.Function:
@@ -310,14 +276,15 @@ class ApiGatewayStack(Stack):
     @property
     def deployment_stage(self) -> apigateway.Stage:
         return self._api_deployment.stage
-        
-    def get_functions(self) -> list[lambda_.Function]:
-        """Return all Lambda functions in this stack that need warming."""
-        return [
-            # self._pipeline_stack.post_pipelines_handler.function,
-            # self._pipeline_stack.get_pipelines_handler.function,
-            # self._pipeline_stack.get_pipeline_id_handler.function,
-            # self._pipeline_stack.put_pipeline_id_handler.function,
-            # self._pipeline_stack.del_pipeline_id_handler.function,
-            # self._pipeline_stack.pipeline_trigger_lambda.function,
-        ]
+
+    # Paused dev - still on roadmap        
+    # def get_functions(self) -> list[lambda_.Function]:
+    #     """Return all Lambda functions in this stack that need warming."""
+    #     return [
+            # self._pipeline_construct.post_pipelines_handler.function,
+            # self._pipeline_construct.get_pipelines_handler.function,
+            # self._pipeline_construct.get_pipeline_id_handler.function,
+            # self._pipeline_construct.put_pipeline_id_handler.function,
+            # self._pipeline_construct.del_pipeline_id_handler.function,
+            # self._pipeline_construct.pipeline_trigger_lambda.function,
+        # ]

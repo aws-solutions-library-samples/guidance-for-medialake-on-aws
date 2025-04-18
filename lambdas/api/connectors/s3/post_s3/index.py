@@ -169,6 +169,9 @@ def setup_eventbridge_notifications(
 
     # Create EventBridge rule with comprehensive event pattern
     rule_name = f"medialake-{s3_bucket}-s3-events"
+    # Truncate rule name if it exceeds 63 characters (AWS limit is 64)
+    if len(rule_name) > 63:
+        rule_name = rule_name[:63]
     event_pattern = {
         "source": ["aws.s3"],
         "detail-type": [

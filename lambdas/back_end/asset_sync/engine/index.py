@@ -107,12 +107,6 @@ class AssetSyncEngine:
                 'resultsBucket': os.environ['RESULTS_BUCKET_NAME']
             })
 
-            s3control.update_job_status(
-                AccountId=account_id,
-                JobId=batch_job_id,
-                RequestedJobStatus='Ready'
-            )
-
             return batch_job_id
 
         except Exception as e:
@@ -209,7 +203,12 @@ def lambda_handler(event, context):
                 "batchJobId": batch_job_id
             }
         
-        raise ValueError("Unrecognized event format")
+        # Log unrecognized event and return gracefully instead of raising an error
+        logger.warning(f"Unrecognized event format: {json.dumps(event)}")
+        return {
+            "status": "skipped",
+            "message": "Unrecognized event format"
+        }
 
     except Exception as e:
         logger.error(f"Handler failed: {str(e)}", exc_info=True)

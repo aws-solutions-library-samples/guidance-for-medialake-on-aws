@@ -173,52 +173,6 @@ def get_state_machine_definition(
                     ]
                 },
                 "Next": "FinishState",
-                "Catch": [
-                    {
-                        "ErrorEquals": ["States.ALL"],
-                        "ResultPath": "$.error",
-                        "Next": "LogError"
-                    }
-                ]
-            },
-            "LogError": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::logs:putLogEvents",
-                "Parameters": {
-                    "LogGroupName": f"/aws/stepfunctions/medialake-pipeline-{pipeline_name.replace(' ', '-').lower()}",
-                    "LogStreamName.$": "$$.Execution.Name",
-                    "LogEvents": [
-                        {
-                            "Timestamp.$": "$$.State.EnteredTime",
-                            "Message.$": "States.Format('Execution failed with error: {}', $.error)"
-                        }
-                    ]
-                },
-                "Next": "PublishError"
-            },
-            "PublishError": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::events:putEvents",
-                "Parameters": {
-                    "Entries": [
-                        {
-                            "DetailType": "Pipeline Execution Failed",
-                            "Source": "medialake.pipeline",
-                            "EventBusName": os.environ["INGEST_EVENT_BUS"],
-                            "Detail": {
-                                "pipelineName": pipeline_name,
-                                "status": "FAILED",
-                                "error.$": "$.error"
-                            }
-                        }
-                    ]
-                },
-                "Next": "FailState"
-            },
-            "FailState": {
-                "Type": "Fail",
-                "Error": "PipelineExecutionFailed",
-                "Cause.$": "$.error.Cause"
             }
         },
     }
@@ -257,17 +211,10 @@ def get_state_machine_definition(
                         "MaxAttempts": 10,
                         "BackoffRate": 2.0
                     }
-                ],
-                "Catch": [
-                    {
-                        "ErrorEquals": ["States.ALL"],
-                        "ResultPath": "$.error",
-                        "Next": "LogError"
-                    }
                 ]
             }
         elif node_data["type"] == "choice":
-            state = {"Type": "Choice", "Choices": [], "Default": "LogError"}
+            state = {"Type": "Choice", "Choices": [], "Default": "FailState"}
             for edge in edges:
                 if edge["source"] == node["id"]:
                     condition = edge["data"].get("condition", {})
@@ -304,13 +251,6 @@ def get_state_machine_definition(
             state = {
                 "Type": "Wait",
                 "Seconds": node_data.get("seconds", 60),
-                "Catch": [
-                    {
-                        "ErrorEquals": ["States.ALL"],
-                        "ResultPath": "$.error",
-                        "Next": "LogError"
-                    }
-                ]
             }
         elif node_data["type"] == "succeed":
             state = {"Type": "Succeed"}
@@ -318,7 +258,6 @@ def get_state_machine_definition(
             state = {
                 "Type": "Fail",
                 "Cause": node_data.get("cause", "Pipeline execution failed"),
-                "Error": "TaskFailed"
             }
         else:
             raise ValueError(f"Unsupported node type: {node_data['type']}")
@@ -464,32 +403,11 @@ def create_state_machine(
 ) -> str:
     """Create Step Function state machine and return its ARN"""
     try:
-        log_group_name = f"/aws/states/{state_machine_name}"
-        
-        # Create log group if it doesn't exist
-        try:
-            logs_client = boto3.client('logs')
-            logs_client.create_log_group(logGroupName=log_group_name)
-            logger.info(f"Created log group: {log_group_name}")
-        except logs_client.exceptions.ResourceAlreadyExistsException:
-            logger.info(f"Log group already exists: {log_group_name}")
-        
         response = sfn_client.create_state_machine(
             name=state_machine_name,
             definition=json.dumps(definition),
             roleArn=role_arn,
             type="STANDARD",
-            loggingConfiguration={
-                'level': 'ERROR',
-                'includeExecutionData': True,
-                'destinations': [
-                    {
-                        'cloudWatchLogsLogGroup': {
-                            'logGroupArn': f"arn:aws:logs:{os.environ['AWS_REGION']}:{os.environ['AWS_ACCOUNT_ID']}:log-group:{log_group_name}:*"
-                        }
-                    }
-                ]
-            },
             tags=[{"key": k, "value": v} for k, v in tags.items()],
         )
         return response["stateMachineArn"]
@@ -605,23 +523,6 @@ def create_stepfunction_role(
             ],
         }
 
-        cloudwatch_logs_policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "logs:CreateLogGroup",
-                        "logs:CreateLogStream",
-                        "logs:PutLogEvents",
-                        "logs:DescribeLogGroups",
-                        "logs:DescribeLogStreams"
-                    ],
-                    "Resource": "arn:aws:logs:*:*:*"
-                }
-            ],
-        }
-
         iam_client.put_role_policy(
             RoleName=role_name,
             PolicyName=f"{role_name}-lambda-policy",
@@ -632,12 +533,6 @@ def create_stepfunction_role(
             RoleName=role_name,
             PolicyName=f"{role_name}-eventbridge-policy",
             PolicyDocument=json.dumps(eventbridge_policy),
-        )
-
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName=f"{role_name}-cloudwatch-logs-policy",
-            PolicyDocument=json.dumps(cloudwatch_logs_policy),
         )
 
         return response["Role"]["Arn"]
@@ -794,6 +689,19 @@ def check_resource_exists(
             return True, f"State Machine {state_machine_name} already exists"
         except sfn_client.exceptions.StateMachineDoesNotExist:
             pass
+
+        # Check Lambda Functions
+        # for lambda_name in lambda_names:
+        #     try:
+        #         lambda_client.get_function(FunctionName=lambda_name)
+        #         if check_event_source_mappings(lambda_name):
+        #             return (
+        #                 True,
+        #                 f"Lambda Function {lambda_name} with event source mappings already exists",
+        #             )
+        #         return True, f"Lambda Function {lambda_name} already exists"
+        #     except lambda_client.exceptions.ResourceNotFoundException:
+        #         pass
 
         # Check DynamoDB for pipeline name
         pipeline_table_name = os.environ.get("PIPELINES_TABLE_NAME")

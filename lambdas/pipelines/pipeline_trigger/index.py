@@ -9,9 +9,9 @@ from aws_lambda_powertools import Logger, Tracer, Metrics
 
 # Configuration variables
 MAX_CONCURRENT_EXECUTIONS = 1000
-MAX_API_RETRIES = 10
+MAX_API_RETRIES = 20
 BASE_BACKOFF = 0.5 # seconds
-EXECUTION_COUNT_CACHE_TTL = 10  # seconds
+EXECUTION_COUNT_CACHE_TTL = 20  # seconds
 
 logger = Logger()
 tracer = Tracer()
