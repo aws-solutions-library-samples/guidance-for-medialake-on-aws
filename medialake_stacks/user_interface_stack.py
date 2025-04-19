@@ -176,7 +176,7 @@ class UserInterfaceStack(Stack):
             self,
             "CreateUserHandler",
             on_create=cr.AwsSdkCall(
-                service="CognitoIdentityProvider",
+                service="CognitoIdentityServiceProvider",
                 action="adminCreateUser",
                 parameters={
                     "UserPoolId": props.cognito_user_pool_id,
@@ -201,8 +201,6 @@ class UserInterfaceStack(Stack):
                 ]
             ),
         )
-
-
 
         # Add dependency
         create_user_handler.node.add_dependency(self._ui)

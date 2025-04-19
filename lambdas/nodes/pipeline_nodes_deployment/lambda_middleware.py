@@ -218,7 +218,7 @@ class LambdaMiddleware:
             event["metadata"] = {}
         event["metadata"].update({"timestamp": int(time.time()), "service": self.service_name})
 
-        # --- New Code: Promote 'item' to 'payload' if not already standardized ---
+        # ---  Promote 'item' to 'payload' if not already standardized ---
         if "payload" not in event and "item" in event:
             # If pipelineAssets exist in item, they will now be part of the payload and later extracted
             event["payload"] = event.pop("item")
@@ -289,7 +289,7 @@ class LambdaMiddleware:
             self.logger.info(f"Found existing assets in original event: {existing_assets}")
         payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
 
-        # --- New Code: Check for DigitalSourceAsset in original event detail ---
+        # Check for DigitalSourceAsset in original event detail ---
         if original_event and "detail" in original_event:
             detail = original_event.get("detail", {})
             outputs = detail.get("outputs", {})
@@ -348,15 +348,14 @@ class LambdaMiddleware:
                         "item": {"bucket": self.external_payload_bucket, "key": s3_key},
                         "iteration": i
                     })
-                # In original snippet, there was a missing colon in the if-statement below.
-                if isinstance(output["payload"], dict) and "key" in output["payload"]:
-                    output["payload"] = {"externalTaskResults": references}
+      
+                output["payload"]["externalTaskResults"] = references
                 self.logger.info(f"Created {len(references)} references to S3 object")
             except Exception as e:
                 self.logger.error(f"Failed to write payload to S3: {str(e)}")
                 raise
 
-        # --- New Code: Move externalTaskId and externalTaskStatus from payload to metadata if present ---
+        # --- Move externalTaskId and externalTaskStatus from payload to metadata if present ---
         if "externalTaskId" in payload_content:
             metadata["externalTaskId"] = payload_content.pop("externalTaskId")
             self.logger.info(f"Carried over externalTaskId: {metadata['externalTaskId']}")
@@ -364,14 +363,14 @@ class LambdaMiddleware:
             metadata["externalTaskStatus"] = payload_content.pop("externalTaskStatus")
             self.logger.info(f"Carried over externalTaskStatus: {metadata['externalTaskStatus']}")
 
-        # --- New Code: Carry over start_time and end_time for Audio mediaType ---
+        # --- Carry over start_time and end_time for Audio mediaType ---
         original_item = original_event.get("item") or original_event.get("payload")
         if original_item and original_item.get("mediaType") == "Audio":
             for key in ["start_time", "end_time"]:
                 if key in original_item:
                     output["payload"][key] = original_item[key]
                     self.logger.info(f"Carried over {key} from original event")
-
+        print(output)
         return output
 
     def emit_event(
