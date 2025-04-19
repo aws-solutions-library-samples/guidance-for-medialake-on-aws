@@ -73,8 +73,8 @@ class CustomVpc(Construct):
             ]
 
             logger.info(f"Creating new VPC: {new_vpc_config.vpc_name}")
-            logger.debug(f"VPC CIDR: {new_vpc_config.cidr}")
-            logger.debug(f"Max AZs: {new_vpc_config.max_azs}")
+            logger.info(f"VPC CIDR: {new_vpc_config.cidr}")
+            logger.info(f"Max AZs: {new_vpc_config.max_azs}")
 
             self.vpc = ec2.Vpc(
                 self,
