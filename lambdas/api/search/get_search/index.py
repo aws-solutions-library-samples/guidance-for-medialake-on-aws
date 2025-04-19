@@ -229,7 +229,8 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 query["query"]["bool"]["must_not"] = [
                     {"term": {"embedding_scope": "clip"}}
                 ]
-            
+
+            # print(json.dumps(query))
             logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
             return query
         else:
@@ -626,69 +627,86 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
         if asset_id not in parent_assets:
             parent_hit = get_parent_asset(client, index_name, asset_id)
             if parent_hit:
-                highest_clip_score = max((clip["score"] for clip in clips_by_asset.get(asset_id, [])), default=0)
+                highest_clip_score = max(
+                    (clip["score"] for clip in clips_by_asset.get(asset_id, [])),
+                    default=0
+                )
                 parent_score = parent_hit["_score"]
-                logger.info(f"Original scores for orphaned asset {asset_id}: parent={parent_score}, highest_clip={highest_clip_score}, clip_count={len(clips_by_asset.get(asset_id, []))}")
-                use_clip_score = False
-                if highest_clip_score > parent_score:
-                    relevance_ratio = highest_clip_score / parent_score if parent_score > 0 else 2.0
-                    if relevance_ratio > 1.2:
-                        use_clip_score = True
-                        logger.info(f"Using clip score for orphaned asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
-                    else:
-                        logger.info(f"Clip not significantly more relevant for orphaned asset {asset_id}: parent={parent_score}, clip={highest_clip_score}, ratio={relevance_ratio:.2f}")
-                final_score = highest_clip_score if use_clip_score else parent_score
-                if final_score > 1.0:
-                    logger.info(f"Normalizing unusually high score for orphaned asset {asset_id}: {final_score} -> 1.0")
-                    final_score = 1.0
+
+                # logging before compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"parent_score={parent_score:.4f}  "
+                    f"highest_clip_score={highest_clip_score:.4f}"
+                )
+ 
+                # simple inheritance
+                final_score = highest_clip_score
+
+
+                # logging after compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"final_score={final_score:.4f}"
+                )
+
                 parent_assets[asset_id] = {
                     "source": parent_hit["_source"],
                     "score": final_score,
                     "hit": parent_hit
                 }
+
                 logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
 
     def process_asset_with_clips(asset_id):
         if asset_id in parent_assets:
             try:
-                result = process_search_hit(parent_assets[asset_id]["hit"])
+                parent_hit = parent_assets[asset_id]["hit"]
+                result = process_search_hit(parent_hit)
                 result_dict = result.model_dump(by_alias=True)
-                parent_score = result_dict.get("score", 0)
-                digital_source = result_dict.get("DigitalSourceAsset", {})
-                asset_type = digital_source.get("Type", "").lower()
+                parent_score = parent_hit["_score"]
+                asset_type = result_dict.get("DigitalSourceAsset", {}).get("Type", "unknown").lower()
+
+                # logging parent info
+                logger.info(
+                    f"[compute] asset={asset_id} "
+                    f"type={asset_type} "
+                    f"parent_score={parent_score:.4f}"
+                )
 
                 if asset_id in clips_by_asset:
-                    asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)
-                    highest_clip_score = asset_clips[0]["score"]
+                    asset_clips = clips_by_asset[asset_id]
+                    highest_clip_score = max(c["score"] for c in asset_clips)
 
-                    # Branch the logic based on asset type.
-                    if asset_type == "audio":
-                        # For audio, use the highest clip score directly as the asset score.
-                        combined_score = highest_clip_score
-                        logger.info(f"Audio asset {asset_id}: using highest clip score {highest_clip_score} as combined score.")
-                    else:
-                        # For video (or other types with their own embeddings), use a weighted average.
-                        relevance_ratio = (highest_clip_score / parent_score) if parent_score > 0 else 2.0
-                        if relevance_ratio > 1.2:
-                            combined_score = (0.5 * parent_score) + (0.5 * highest_clip_score)
-                            logger.info(f"Asset {asset_id}: Combining scores parent {parent_score} and clip {highest_clip_score} into {combined_score} (relevance ratio: {relevance_ratio:.2f}).")
-                        else:
-                            combined_score = parent_score
-                            logger.info(f"Asset {asset_id}: Keeping parent's score {parent_score} (relevance ratio: {relevance_ratio:.2f}).")
-                    
-                    # Ensure the score does not exceed 1.0.
-                    combined_score = min(combined_score, 1.0)
+                    # logging clip info
+                    logger.info(
+                        f"[compute] asset={asset_id} "
+                        f"highest_clip_score={highest_clip_score:.4f}"
+                    )
+
+                    # inherit the higher score
+                    combined_score = highest_clip_score
+                    # combined_score = max(parent_score, highest_clip_score)
+                    # combined_score = min(combined_score, 1.0)
                     result_dict["score"] = combined_score
 
-                    # Process and attach clips for transparency/debugging.
-                    result_dict["clips"] = [process_clip(clip_hit["hit"]) for clip_hit in asset_clips]
-                # Ensure the 'clips' key is always a list.
-                result_dict["clips"] = result_dict.get("clips") or []
+                    # logging final result
+                    logger.info(
+                        f"[compute] asset={asset_id} "
+                        f"final_score={combined_score:.4f}"
+                    )
+
+                    sorted_clips = sorted(asset_clips, key=lambda x: x["score"], reverse=True)
+                    result_dict["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
+                else:
+                    result_dict["clips"] = []
+
                 return result_dict
             except Exception as e:
                 logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
                 return None
         return None
+
 
     def process_standalone_hit(hit):
         try:
@@ -760,7 +778,7 @@ def perform_search(params: SearchParams) -> Dict:
 
     try:
         search_body = build_search_query(params)
-        logger.info("OpenSearch query body:", extra={"query": search_body})
+        # logger.info("OpenSearch query body:", extra={"query": search_body})
 
         response = client.search(body=search_body, index=index_name)
 

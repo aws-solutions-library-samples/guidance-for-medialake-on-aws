@@ -78,14 +78,21 @@ def lambda_handler(event, context):
                 payload = image_proxy_result.get("Payload", {})
                 body = payload.get("body", {})
 
+                # s3_bucket = (
+                #     body.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
+                # )
+                # s3_key = (
+                #     body.get("StorageInfo", {})
+                #     .get("PrimaryLocation", {})
+                #     .get("ObjectKey", {})
+                #     .get("FullPath")
+                # )
+
                 s3_bucket = (
-                    body.get("StorageInfo", {}).get("PrimaryLocation", {}).get("Bucket")
+                    body.get("bucket")
                 )
                 s3_key = (
-                    body.get("StorageInfo", {})
-                    .get("PrimaryLocation", {})
-                    .get("ObjectKey", {})
-                    .get("FullPath")
+                    body.get("key")
                 )
 
                 logger.info("Found image proxy information in ImageProxyResult")
