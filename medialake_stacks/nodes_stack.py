@@ -16,6 +16,7 @@ from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployme
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+import aws_cdk as cdk
 
 from config import config
 
@@ -25,7 +26,7 @@ class NodesStackProps:
     iac_bucket: s3.IBucket
 
 
-class NodesStack(Stack):
+class NodesStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, construct_id: str, props: NodesStackProps, **kwargs
     ) -> None:

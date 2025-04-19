@@ -1,5 +1,6 @@
 import secrets
 import string
+import aws_cdk as cdk
 
 from aws_cdk import (
     Stack,
@@ -48,19 +49,13 @@ from medialake_constructs.api_gateway.api_gateway_nodes import (
     ApiGatewayNodesProps,
 )
 
-from medialake_constructs.api_gateway.api_gateway_deployment_construct import (
-    ApiGatewayDeploymentConstruct,
-ApiGatewayDeploymentProps,
-)
+
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
-
 
 @dataclass
 class ApiGatewayStackProps:
     """Configuration for API Gateway Stack."""
-
-    # Base infrastructure resources
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.Bucket
     media_assets_bucket: S3Bucket
@@ -91,7 +86,7 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
 
 
-class ApiGatewayStack(Stack):
+class ApiGatewayStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, id: str, props: ApiGatewayStackProps, **kwargs
     ):
@@ -100,8 +95,6 @@ class ApiGatewayStack(Stack):
 
         # Store props for later use in property accessors
         self._props = props
-
-
 
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
@@ -117,7 +110,6 @@ class ApiGatewayStack(Stack):
             identity_source="method.request.header.Authorization",
             cognito_user_pools=[props.user_pool],
         )
-
 
         self._connectors_api_gateway = ConnectorsConstruct(
             self,
@@ -219,17 +211,6 @@ class ApiGatewayStack(Stack):
             self._nodes_construct
         ]
         
-        # Create a separate deployment for the API
-        # This ensures all resources are created before deploying the API
-        self._api_deployment = ApiGatewayDeploymentConstruct(
-            self,
-            "ApiDeployment",
-            props=ApiGatewayDeploymentProps(
-                rest_api=api,
-                waf_acl_arn=props.waf_acl_arn,
-                dependencies=deployment_dependencies,
-            )
-        )
 
     @property
     def rest_api(self) -> apigateway.RestApi:
@@ -245,37 +226,27 @@ class ApiGatewayStack(Stack):
         # Return from props instead of internal constructs
         return self._props.x_origin_verify_secret
 
-    # @property
-    # def pipelines_create_handler(self) -> lambda_.Function:
-    #     return self._pipeline_construct.pipelines_create_handler
-    
     @property
     def connector_sync_lambda(self) -> lambda_.Function:
         return self._connectors_api_gateway.connector_sync_lambda
     
     @property
-    def user_pool_arn(self) -> str:
-        # No longer accessing from cognito_construct
-        return self._props.user_pool.user_pool_arn
-    
-    @property
-    def identity_pool(self) -> str:
-        # This will need to be provided from props
-        return self._props.identity_pool
-    
-    @property
-    def user_pool_client(self) -> str:
-        # This will need to be provided from props
-        return self._props.user_pool_client
-    
-    @property
-    def user_pool_id(self) -> str:
-        # No longer accessing from cognito_construct
-        return self._props.user_pool.user_pool_id
+    def api_resources(self):
+        """Return a list of all important API resources for dependency tracking"""
+        resources = []
         
-    @property
-    def deployment_stage(self) -> apigateway.Stage:
-        return self._api_deployment.stage
+        # Add all resources that were created
+        # This is a simplified version - you may need to add more resources
+        if hasattr(self, '_asset_lambda_integration'):
+            resources.append(self._asset_lambda_integration)
+        if hasattr(self, '_pipeline_lambda_integration'):
+            resources.append(self._pipeline_lambda_integration)
+        if hasattr(self, '_connector_lambda_integration'):
+            resources.append(self._connector_lambda_integration)
+            
+        # Add any other important API resources here
+        
+        return resources
 
     # Paused dev - still on roadmap        
     # def get_functions(self) -> list[lambda_.Function]:

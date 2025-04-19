@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     Fn
 )
+import aws_cdk as cdk
+
 from constructs import Construct
 from dataclasses import dataclass
 
@@ -27,7 +29,7 @@ class UsersGroupsRolesStackProps:
     x_origin_verify_secret: secretsmanager.Secret
 
 
-class UsersGroupsRolesStack(Stack):
+class UsersGroupsRolesStack(cdk.NestedStack):
     """
     Stack for Users, Groups, and Roles API and management.
     This stack creates the users, groups, and roles API endpoints and all related resources.

@@ -1,6 +1,8 @@
 import secrets
 import string
 from dataclasses import dataclass
+import aws_cdk as cdk
+
 # from medialake_stacks.auth_stack import AuthStack
 from constructs import Construct
 from aws_cdk import (
@@ -174,7 +176,7 @@ class UserInterfaceStack(Stack):
             self,
             "CreateUserHandler",
             on_create=cr.AwsSdkCall(
-                service="CognitoIdentityServiceProvider",
+                service="CognitoIdentityProvider",
                 action="adminCreateUser",
                 parameters={
                     "UserPoolId": props.cognito_user_pool_id,
@@ -188,6 +190,7 @@ class UserInterfaceStack(Stack):
                     ],
                 },
                 physical_resource_id=cr.PhysicalResourceId.of("CreateUserHandler"),
+                ignore_error_codes_matching="UsernameExistsException|User account already exists",
             ),
             policy=cr.AwsCustomResourcePolicy.from_statements(
                 [
@@ -198,6 +201,8 @@ class UserInterfaceStack(Stack):
                 ]
             ),
         )
+
+
 
         # Add dependency
         create_user_handler.node.add_dependency(self._ui)

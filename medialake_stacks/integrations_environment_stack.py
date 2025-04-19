@@ -1,5 +1,6 @@
 import secrets
 import string
+import aws_cdk as cdk
 
 from aws_cdk import (
     Stack,
@@ -43,7 +44,7 @@ class IntegrationsEnvironmentStackProps:
     post_pipelines_v2_lambda: lambda_.Function
 
 
-class IntegrationsEnvironmentStack(Stack):
+class IntegrationsEnvironmentStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, id: str, props: IntegrationsEnvironmentStackProps, **kwargs
     ):

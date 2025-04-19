@@ -3,6 +3,8 @@ import os
 import glob
 from jinja2 import Environment, FileSystemLoader
 import time
+import aws_cdk as cdk
+
 
 from aws_cdk import (
     Stack,
@@ -63,7 +65,7 @@ class PipelineStackProps:
     collection_endpoint: str
 
 
-class PipelineStack(Stack):
+class PipelineStack(cdk.NestedStack):
     def __init__(
         self,
         scope: Construct,

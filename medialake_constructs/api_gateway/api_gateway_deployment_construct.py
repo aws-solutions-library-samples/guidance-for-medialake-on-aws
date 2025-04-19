@@ -4,16 +4,17 @@ from aws_cdk import (
     aws_logs as logs,
     aws_iam as iam,
     RemovalPolicy,
+    Fn,
 )
 from constructs import Construct
 from dataclasses import dataclass
 from config import config
+import time
 
 
 @dataclass
 class ApiGatewayDeploymentProps:
     """Properties for API Gateway Deployment Construct"""
-    rest_api: apigateway.RestApi
     waf_acl_arn: str
     dependencies: list = None  # List of resources that deployment depends on
 
@@ -54,18 +55,30 @@ class ApiGatewayDeploymentConstruct(Construct):
             user=True,
         )
 
+        # Import the API Gateway from CloudFormation outputs
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        
+        rest_api = apigateway.RestApi.from_rest_api_attributes(
+            self, 
+            "ImportedRestApi",
+            rest_api_id=api_id,
+            root_resource_id=root_resource_id
+        )
+
         # Create a deployment for the RestApi
         self._deployment = apigateway.Deployment(
             self,
             "ApiDeployment",
-            api=props.rest_api,
-            description="MediaLake API Deployment",
+            api=rest_api,
+            description=f"MediaLake API Deployment {int(time.time())}",
         )
 
         # Add dependencies if provided
         if props.dependencies:
             for dependency in props.dependencies:
                 self._deployment.node.add_dependency(dependency)
+                print(f"Added dependency to API deployment: {dependency.node.id}")
 
         # Create a stage for the deployment with the same configuration as original
         stage = apigateway.Stage(

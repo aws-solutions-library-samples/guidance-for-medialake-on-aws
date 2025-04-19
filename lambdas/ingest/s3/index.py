@@ -247,22 +247,16 @@ class AssetProcessor:
         self.processed_inventory_ids = set()
 
     def _decode_s3_event_key(self, encoded_key: str) -> str:
-        """Decode S3 event key by handling URL encoding and plus signs"""
-        # First decode any URL encoding (handles %20, %2B etc.)
-        decoded_key = urllib.parse.unquote(encoded_key)
-
-        # Then handle plus signs that represent spaces
-        decoded_key = decoded_key.replace("+", " ")
-
-        return decoded_key
+        """Decode S3 event key by handling URL encoding"""
+        # Just decode URL encoding without replacing literal '+' characters
+        # urllib.parse.unquote properly handles %20, %2B etc.
+        return urllib.parse.unquote(encoded_key)
 
     def _extract_file_extension(self, key: str) -> str:
-        """Extract file extension from key after URL decoding"""
-        # First decode the key
-        decoded_key = self._decode_s3_event_key(key)
-        
-        # Then extract the extension
-        return decoded_key.split(".")[-1].lower() if "." in decoded_key else ""
+        """Extract file extension from key"""
+        # The key should already be URL-decoded by the time it reaches this method
+        # Just extract the extension directly
+        return key.split(".")[-1].lower() if "." in key else ""
 
     @tracer.capture_method
     def _calculate_md5(self, bucket: str, key: str, chunk_size: int = 8192) -> str:
@@ -1075,6 +1069,10 @@ def process_records_in_parallel(processor: AssetProcessor, records: List[Dict], 
                 bucket, key, event_name = extract_s3_details_from_event(record)
                 
                 if bucket and key:
+                    # Debug log for keys containing special characters
+                    if '+' in key or '%' in key:
+                        logger.info(f"Key with special characters: {key}")
+                    
                     logger.info(f"Submitting task for bucket: {bucket}, key: {key}, event: {event_name}")
                     futures.append(
                         executor.submit(process_s3_event, processor, bucket, key, event_name)
@@ -1329,6 +1327,15 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             # Handle creation/modification/copy events - process all ObjectCreated events the same way
             logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
             
+            # Verify object exists in S3 before processing
+            try:
+                processor.s3.head_object(Bucket=bucket, Key=key)
+            except Exception as s3_error:
+                logger.error(f"S3 object verification failed for {bucket}/{key}: {str(s3_error)}")
+                # Log exact key for debugging to see if there are encoding issues
+                logger.error(f"Failed key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
+                raise
+            
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
             if result:
@@ -1344,6 +1351,8 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
         
     except Exception as e:
         logger.exception(f"Error in process_s3_event for {bucket}/{key}: {str(e)}")
+        # Log key details for troubleshooting
+        logger.error(f"Key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
         metrics.add_metric(name="ProcessingErrors", unit=MetricUnit.Count, value=1)
         # Track error duration too
         duration = (datetime.now() - start_time).total_seconds()
@@ -1370,7 +1379,7 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
     if "s3" in event_record:
         if "bucket" in event_record["s3"] and "object" in event_record["s3"]:
             bucket = event_record["s3"]["bucket"]["name"]
-            key = event_record["s3"]["object"]["key"]
+            key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
             event_name = event_record.get("eventName", "ObjectCreated:")
             return bucket, key, event_name
     
@@ -1384,7 +1393,7 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                 for record in body["Records"]:
                     if record.get("eventSource") == "aws:s3" and "s3" in record:
                         bucket = record["s3"]["bucket"]["name"]
-                        key = record["s3"]["object"]["key"]
+                        key = urllib.parse.unquote(record["s3"]["object"]["key"])
                         event_name = record.get("eventName", "ObjectCreated:")
                         # Log the extracted details for debugging
                         logger.info(f"Extracted from SQS S3 record: bucket={bucket}, key={key}, event={event_name}")
@@ -1409,6 +1418,10 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                         key = detail["object"].get("key")
                     elif isinstance(detail["object"], str):
                         key = detail["object"]
+                
+                # Apply URL decoding to the key if it exists
+                if key:
+                    key = urllib.parse.unquote(key)
                 
                 # Determine event type
                 event_name = "ObjectCreated:"

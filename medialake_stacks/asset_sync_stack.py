@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
+import aws_cdk as cdk
 
 from aws_cdk import (
     Duration,
@@ -33,7 +34,7 @@ class AssetSyncStackProps:
     ingest_event_bus: events.EventBus
 
 
-class AssetSyncStack(Stack):
+class AssetSyncStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, construct_id: str, props: AssetSyncStackProps, **kwargs
     ) -> None:

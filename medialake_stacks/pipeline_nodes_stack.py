@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_s3 as s3,
     custom_resources as cr,
 )
+import aws_cdk as cdk
 
 from constructs import Construct
 from dataclasses import dataclass
@@ -36,7 +37,7 @@ class PipelineNodesStackProps:
     media_assets_bucket: s3.IBucket
 
 
-class PipelineNodesStack(Stack):
+class PipelineNodesStack(cdk.NestedStack):
     def __init__(
         self,
         scope: Construct,

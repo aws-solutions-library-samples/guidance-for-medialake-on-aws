@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     Fn
 )
+import aws_cdk as cdk
 from constructs import Construct
 from dataclasses import dataclass
 from medialake_constructs.api_gateway.api_gateway_settings import (
@@ -24,7 +25,7 @@ class SettingsApiStackProps:
     system_settings_table_arn: str
 
 
-class SettingsApiStack(Stack):
+class SettingsApiStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, id: str, props: SettingsApiStackProps, **kwargs
     ):

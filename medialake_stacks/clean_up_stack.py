@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from constructs import Construct
+import aws_cdk as cdk
+
 from aws_cdk import (
     Stack,
     CustomResource,

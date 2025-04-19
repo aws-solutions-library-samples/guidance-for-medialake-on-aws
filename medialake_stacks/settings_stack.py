@@ -3,6 +3,8 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_iam as iam,
 )
+import aws_cdk as cdk
+
 from constructs import Construct
 from dataclasses import dataclass
 
@@ -18,7 +20,7 @@ class SettingsStackProps:
     pass
 
 
-class SettingsStack(Stack):
+class SettingsStack(cdk.NestedStack):
     def __init__(
         self, scope: Construct, id: str, props: SettingsStackProps, **kwargs
     ):

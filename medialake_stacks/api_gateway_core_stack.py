@@ -5,6 +5,8 @@ from aws_cdk import (
     RemovalPolicy,
     CfnOutput
 )
+import aws_cdk as cdk
+
 from constructs import Construct
 from dataclasses import dataclass
 
@@ -64,6 +66,11 @@ class ApiGatewayCoreStack(Stack):
         CfnOutput(self, "RootResourceId", 
             value=self._api_gateway.rest_api.rest_api_root_resource_id,
             export_name=f"{self.stack_name}-RootResourceId"
+        )
+        
+        CfnOutput(self, "ApiGatwayWAFACLARN", 
+            value=self._api_gateway.api_gateway_waf_acl.attr_arn,
+            export_name=f"{self.stack_name}-ApiGatwayWAFACLARN"
         )
 
     @property

@@ -13,6 +13,8 @@ from aws_cdk import (
     RemovalPolicy,
     CfnOutput,
 )
+import aws_cdk as cdk
+
 from config import config
 from medialake_constructs.shared_constructs.s3_logging import (
     add_s3_access_logging_policy,
@@ -62,11 +64,13 @@ class BaseInfrastructureStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
-        env = kwargs.get("env")
+        # env = kwargs.get("env")
         account = Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
-
+        parent_stack = cdk.Stack.of(self)
+        concrete_region = parent_stack.region
+        
         if config.s3.use_existing_buckets:
             # Import existing buckets
             self._access_logs_bucket = S3Bucket(
@@ -84,7 +88,7 @@ class BaseInfrastructureStack(Stack):
                 self,
                 "AccessLogsBucket",
                 props=S3BucketProps(
-                    bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{self.region}-{config.environment}".lower(),
+                    # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{region}-{config.environment}".lower(),
                     destroy_on_delete=config.environment != "prod",
                     intelligent_tiering_configurations=[
                         s3.IntelligentTieringConfiguration(
