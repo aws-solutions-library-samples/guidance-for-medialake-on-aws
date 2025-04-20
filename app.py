@@ -53,7 +53,6 @@ app = cdk.App()
 # us-east-1 environment, required for the WAF, certain configuration has to be deployed in us-east-1
 env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
 
-# Define environment once
 if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
     env = cdk.Environment(account=os.environ["CDK_DEFAULT_ACCOUNT"], region=os.environ["CDK_DEFAULT_REGION"])
 else:
@@ -70,7 +69,7 @@ else:
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
 
 
-base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure")
+base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
 
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
@@ -88,7 +87,7 @@ class MediaLakeStackProps:
     base_infrastructure: BaseInfrastructureStack
 
 class MediaLakeStack(cdk.Stack):
-    def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, env=env, **kwargs):
+    def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
         super().__init__(scope, id, **kwargs)
         
         settings_stack = SettingsStack(self, "MediaLakeSettings", props=SettingsStackProps())

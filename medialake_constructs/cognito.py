@@ -136,8 +136,6 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Create a unique hash based on stack name and environment
-
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
         unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
@@ -212,8 +210,8 @@ class CognitoConstruct(Construct):
                             cognito.OAuthScope.PROFILE,
                         ],
                         callback_urls=[
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/oauth2/idpresponse",  # OAuth callback
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse"  # SAML callback
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/oauth2/idpresponse",
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse"
                         ],
                         logout_urls=[
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",  

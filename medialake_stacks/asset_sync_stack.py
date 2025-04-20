@@ -91,6 +91,11 @@ class AssetSyncStack(cdk.NestedStack):
             assumed_by=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
         )
         
+        # Add S3 Full Access managed policy
+        self.batch_operations_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
+        )
+        
         # Grant necessary permissions to the batch operations role
         self.batch_operations_role.add_to_policy(
             iam.PolicyStatement(
@@ -102,12 +107,8 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:GetBucketLocation",
                     "s3:PutObject",
                     "s3:PutInventoryConfiguration",
-                    "s3:ListBucket",
-                    "s3:GetBucketInventoryConfiguration",
-                    "s3:HeadObject",
-                    "s3:GetObjectVersion",
                 ],
-                resources=["*"],  # Should be restricted in production
+                resources=["*"],
             )
         )
         
@@ -116,25 +117,6 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["lambda:InvokeFunction"],
                 resources=["*"],
-            )
-        )
-        
-        # Add specific permissions for manifest file access
-        self.batch_operations_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:ListBucket",
-                    "s3:PutObject",
-                    "s3:PutObjectTagging",
-                    "s3:PutObjectVersionTagging",
-                    "s3:DeleteObject",
-                    "s3:AbortMultipartUpload",
-                ],
-                resources=[
-                    self._results_bucket.bucket_arn,
-                    f"{self._results_bucket.bucket_arn}/*",
-                ],
             )
         )
 
@@ -501,29 +483,6 @@ class AssetSyncStack(cdk.NestedStack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
         )
-        
-        # Explicitly grant the batch operations role access to the results bucket
-        self._results_bucket.grant_read_write(self.batch_operations_role)
-        
-        # Update the manifest permissions with specific bucket ARN
-        self.batch_operations_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:ListBucket",
-                    "s3:PutObject",
-                    "s3:PutObjectTagging",
-                    "s3:PutObjectVersionTagging",
-                    "s3:DeleteObject",
-                    "s3:AbortMultipartUpload",
-                ],
-                resources=[
-                    self._results_bucket.bucket_arn,
-                    f"{self._results_bucket.bucket_arn}/*",
-                ],
-            )
-        )
-        
         return self._results_bucket
 
     @property
