@@ -139,6 +139,7 @@ class CognitoConstruct(Construct):
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
         unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+        self._domain_prefix = domain_prefix
         
         print(f"Domain prefix: {domain_prefix}")
         self._domain = self._user_pool.add_domain(
@@ -277,5 +278,5 @@ class CognitoConstruct(Construct):
         return self._identity_pool.identity_pool_id
     
     @property
-    def cognito_domai_prefix(self) -> str:
-        return self._domain.domain_prefix
+    def cognito_domain_prefix(self) -> str:
+        return self._domain_prefix
