@@ -74,7 +74,7 @@ base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure"
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
     access_log_bucket=base_infrastructure.access_log_bucket,
-    ),
+    ), env=env
 )
 
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
@@ -206,7 +206,7 @@ class MediaLakeStack(cdk.Stack):
 medialake_stack = MediaLakeStack(app, "MediaLakeStack",props=MediaLakeStackProps(
     api_gateway_core_stack=api_gateway_core_stack,
     base_infrastructure=base_infrastructure,
-    ))
+    ), env=env)
 medialake_stack.add_dependency(api_gateway_core_stack)
 
 # Get API resources for dependencies
@@ -217,7 +217,7 @@ api_gateway_deployment_stack = ApiGatewayDeploymentStack(
     "MediaLakeApiGatewayDeployment",
     props=ApiGatewayDeploymentStackProps(
         api_dependencies=[medialake_stack._api_gateway_stack] + api_resources,
-    ),
+    ), env=env
 )
 api_gateway_deployment_stack.add_dependency(api_gateway_core_stack)
 api_gateway_deployment_stack.add_dependency(medialake_stack)
@@ -234,7 +234,7 @@ user_interface_stack = UserInterfaceStack(
                 api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
                 access_log_bucket=base_infrastructure.access_log_bucket,
                 cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
-    ),
+    ), env=env
 )
 user_interface_stack.add_dependency(medialake_stack)
 
@@ -269,7 +269,7 @@ cleanup_stack = CleanupStack(
         ingest_event_bus=base_infrastructure.ingest_event_bus,
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=medialake_stack.connector_table,
-    ),
+    ), env=env
 )
 
 app.synth()

@@ -114,17 +114,7 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:GetJob",
                     "s3:GetJobStatus",
                     "s3:GetJobOutput",
-                    "s3:GetJobOutputLocation",
-                    "s3:GetJobReport",
-                    "s3:GetJobReportLocation",
-                    "s3:GetJobReportStatus",
-                    "s3:GetJobProgress",
-                    "s3:GetJobReport",
-                    "s3:GetJobReportLocation",
-                    "s3:GetJobReportStatus",
-                    "s3:GetJobReportOutput",
-                    "s3:GetJobReportOutputLocation",
-                    
+                    "s3:GetJobOutputLocation",                    
                 ],
                 resources=["*"],
             )
