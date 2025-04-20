@@ -16,10 +16,7 @@ from medialake_constructs.shared_constructs.s3_logging import (
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import (
-    S3ExpressOneZoneBucket,
-    S3ExpressOneZoneBucketProps,
-)
+
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (

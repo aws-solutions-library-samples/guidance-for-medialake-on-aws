@@ -3,16 +3,9 @@ from dataclasses import dataclass
 from constructs import Construct
 from aws_cdk import (
     Stack,
-    Fn,
-    Environment,
     aws_ec2 as ec2,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
-    aws_kms as kms,
-    # custom_resources as cr,
-    Duration,
-    RemovalPolicy,
-    CfnOutput,
 )
 from config import config
 from medialake_constructs.shared_constructs.s3_logging import (
@@ -20,20 +13,9 @@ from medialake_constructs.shared_constructs.s3_logging import (
 )
 
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from medialake_constructs.shared_constructs.s3_one_zone_express_bucket import (
-    S3ExpressOneZoneBucket,
-    S3ExpressOneZoneBucketProps,
-)
-from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
+
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
-from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
-    OpenSearchCluster,
-    OpenSearchClusterProps,
-)
-from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
-    OpenSearchIngestionPipeline,
-    OpenSearchIngestionPipelineProps,
-)
+
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 # Import the CDK logger
@@ -75,8 +57,6 @@ class SharedVPCStack(Stack):
         
         logger.debug(f"Stack environment: account={account}, region={region}")
 
-        # No need to set log level here anymore - it's handled globally
-        
         # Validate VPC configuration
         if not hasattr(config, 'vpc'):
             logger.error("VPC configuration is missing in config")
