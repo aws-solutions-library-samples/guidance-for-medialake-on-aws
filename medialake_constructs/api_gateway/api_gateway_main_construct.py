@@ -244,7 +244,8 @@ class ApiGatewayConstruct(Construct):
         
         # Add a utility method to add CORS OPTIONS methods to all resources
         # Do this before accessing other resources to avoid dependency issues
-        self._add_cors_options_to_all_resources(self.api_gateway_rest_api.root)
+        # Commenting out because this conflicts with default_cors_preflight_options at the API level
+        # self._add_cors_options_to_all_resources(self.api_gateway_rest_api.root)
         
         rest_api_log_group.grant_write(iam.ServicePrincipal("apigateway.amazonaws.com"))
 

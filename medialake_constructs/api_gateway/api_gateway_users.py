@@ -360,6 +360,7 @@ class UsersApi(Construct):
         # Add CORS support
         add_cors_options_method(users_resource)
         add_cors_options_method(users_user_resource)
-        add_cors_options_method(users_user_id_resources)
+        # users_user_id_resources already has CORS configuration through add_cors_preflight
+        # add_cors_options_method(users_user_id_resources)
         add_cors_options_method(users_user_id_disableuser_resource)
         add_cors_options_method(users_user_id_enableuser_resource)

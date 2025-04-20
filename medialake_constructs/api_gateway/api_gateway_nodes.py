@@ -54,8 +54,8 @@ class ApiGatewayNodesConstruct(Construct):
         props.pipelines_nodes_table.grant_read_data(self._get_nodeId_handler.function)
 
         # GET /nodes/methods/unconfigured
-        methods_resource = nodes_resource.add_resource("methods")
-        unconfigured_resource = methods_resource.add_resource("unconfigured")
+        root_methods_resource = nodes_resource.add_resource("methods")
+        unconfigured_resource = root_methods_resource.add_resource("unconfigured")
 
         unconfigured_resource.add_method(
             "GET",
@@ -100,8 +100,8 @@ class ApiGatewayNodesConstruct(Construct):
         )
 
         # GET /nodes/{id}/methods
-        methods_resource = node_id_resource.add_resource("methods")
-        methods_resource.add_method(
+        node_methods_resource = node_id_resource.add_resource("methods")
+        node_methods_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
@@ -110,7 +110,7 @@ class ApiGatewayNodesConstruct(Construct):
 
         # Add CORS support
         add_cors_options_method(nodes_resource)
-        add_cors_options_method(methods_resource)
+        add_cors_options_method(root_methods_resource)
         add_cors_options_method(unconfigured_resource)
         add_cors_options_method(node_id_resource)
-        add_cors_options_method(methods_resource)
+        add_cors_options_method(node_methods_resource)

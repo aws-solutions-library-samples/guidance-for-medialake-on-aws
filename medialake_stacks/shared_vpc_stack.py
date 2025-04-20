@@ -77,4 +77,3 @@ class SharedVPCStack(Stack):
         except Exception as e:
             logger.error(f"Failed to create VPC: {str(e)}")
             raise
-        
