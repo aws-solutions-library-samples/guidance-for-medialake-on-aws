@@ -371,12 +371,25 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:PutObject",
                     "s3:PutBucketInventoryConfiguration",
                     "s3:GetBucketLocation",
+                    "s3:GetBucketInventoryConfiguration",
+                    "s3:GetBucketInventory",
+                    "s3:PutJobTagging",
+                    "s3:GetJobTagging",
+                    "s3:GetJob",
+                    "s3:GetJobStatus",
+                    "s3:GetJobOutput",
+                    "s3:GetJobOutputLocation",
+                    "s3:GetJobReport",
+                    "s3:GetJobReportLocation",
+                    "s3:GetJobReportStatus",
+                    "s3:GetJobReportOutput",
+                    "s3:GetJobReportOutputLocation",
                 ],
-                resources=["*"],
+                    resources=["*"],
+                )
             )
-        )
 
-        # Add S3 control permissions for batch operations
+            # Add S3 control permissions for batch operations
         self._asset_sync_engine_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
