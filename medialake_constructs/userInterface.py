@@ -413,6 +413,8 @@ class UIConstruct(Construct):
             ],
         )
 
+        print(f"Cognito domain prefix: {props.cognito_domain_prefix}")
+        print(f"Cognito domain: {config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com")
         # Get SAML provider if configured
         saml_provider = next(
             (
@@ -442,12 +444,12 @@ class UIConstruct(Construct):
                     "userPoolClientId": props.cognito_user_pool_client_id,
                     "userPoolId": props.cognito_user_pool_id,
                     "identityPoolId": props.cognito_identity_pool,
-                    "domain": f"{config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
+                    "domain": f"{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
                     "loginWith": {
                         "username": True,
                         "email": True,
                         "oauth": {
-                            "domain": f"{config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
+                            "domain": f"{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
                             "scopes": ["email", "openid", "profile"],
                             "responseType": "code",
                             "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
