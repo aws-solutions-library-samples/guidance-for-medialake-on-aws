@@ -122,6 +122,8 @@ class CustomVpc(Construct):
         )
         logger.info("VPC Flow Logs successfully configured")
 
+        logger.info(f"Available AZs: {scope.availability_zones}")
+
     def get_subnet_ids(self, subnet_type: ec2.SubnetType) -> List[Dict[str, str]]:
         """Get subnet IDs and their availability zones for a specific subnet type"""
         logger.debug(f"Getting subnet IDs for subnet type: {subnet_type}")
