@@ -230,6 +230,7 @@ user_interface_stack = UserInterfaceStack(
                 cognito_user_pool_client_id=api_gateway_core_stack.user_pool_client,
                 cognito_identity_pool=api_gateway_core_stack.identity_pool,
                 cognito_user_pool_arn=api_gateway_core_stack.user_pool_arn,
+                cognito_domain_prefix=api_gateway_core_stack.cognito_domain_prefix,
                 api_gateway_rest_id=api_gateway_core_stack.rest_api.rest_api_id,
                 api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
                 access_log_bucket=base_infrastructure.access_log_bucket,

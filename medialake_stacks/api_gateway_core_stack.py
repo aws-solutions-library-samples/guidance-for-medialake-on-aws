@@ -107,4 +107,8 @@ class ApiGatewayCoreStack(Stack):
         
     @property
     def waf_acl_arn(self):
-        return self._api_gateway.api_gateway_waf_acl.attr_arn 
+        return self._api_gateway.api_gateway_waf_acl.attr_arn
+    
+    @property
+    def cognito_domain_prefix(self):
+        return self._cognito_construct.cognito_domain_prefix

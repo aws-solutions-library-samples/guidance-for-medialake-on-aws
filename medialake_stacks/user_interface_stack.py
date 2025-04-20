@@ -30,7 +30,7 @@ class UserInterfaceStackProps:
     cognito_identity_pool: str
     cognito_user_pool_arn: str
     cloudfront_waf_acl_arn: str
-
+    cognito_domain_prefix: str
 def generate_random_password(length=16):
     # Ensure at least one of each required character type
     lowercase = string.ascii_lowercase
@@ -98,7 +98,8 @@ class UserInterfaceStack(Stack):
                 api_gateway_rest_id=props.api_gateway_rest_id,
                 api_gateway_stage=props.api_gateway_stage,
                 access_log_bucket=props.access_log_bucket,
-                cloudfront_waf_acl_arn=waf_acl_arn,  # Use the looked-up ARN
+                cloudfront_waf_acl_arn=waf_acl_arn,
+                cognito_domain_prefix=props.cognito_domain_prefix,
             ),
         )
         

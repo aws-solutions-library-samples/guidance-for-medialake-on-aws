@@ -275,3 +275,7 @@ class CognitoConstruct(Construct):
     @property
     def identity_pool(self) -> str:
         return self._identity_pool.identity_pool_id
+    
+    @property
+    def cognito_domai_prefix(self) -> str:
+        return self._domain.domain_prefix

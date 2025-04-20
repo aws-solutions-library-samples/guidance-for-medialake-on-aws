@@ -81,6 +81,7 @@ class UIConstructProps:
     cognito_user_pool_client_id: str
     cloudfront_waf_acl_arn: str
     cognito_identity_pool: str
+    cognito_domain_prefix: str
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -441,12 +442,12 @@ class UIConstruct(Construct):
                     "userPoolClientId": props.cognito_user_pool_client_id,
                     "userPoolId": props.cognito_user_pool_id,
                     "identityPoolId": props.cognito_identity_pool,
-                    "domain": f"{config.resource_prefix}-{config.environment}.auth.{stack.region}.amazoncognito.com",
+                    "domain": f"{config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
                     "loginWith": {
                         "username": True,
                         "email": True,
                         "oauth": {
-                            "domain": f"{config.resource_prefix}-{config.environment}.auth.{stack.region}.amazoncognito.com",
+                            "domain": f"{config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
                             "scopes": ["email", "openid", "profile"],
                             "responseType": "code",
                             "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
