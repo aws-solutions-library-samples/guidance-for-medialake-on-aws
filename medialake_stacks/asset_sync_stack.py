@@ -102,6 +102,10 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:GetBucketLocation",
                     "s3:PutObject",
                     "s3:PutInventoryConfiguration",
+                    "s3:ListBucket",
+                    "s3:GetBucketInventoryConfiguration",
+                    "s3:HeadObject",
+                    "s3:GetObjectVersion",
                 ],
                 resources=["*"],  # Should be restricted in production
             )
@@ -112,6 +116,25 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["lambda:InvokeFunction"],
                 resources=["*"],
+            )
+        )
+        
+        # Add specific permissions for manifest file access
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:PutObject",
+                    "s3:PutObjectTagging",
+                    "s3:PutObjectVersionTagging",
+                    "s3:DeleteObject",
+                    "s3:AbortMultipartUpload",
+                ],
+                resources=[
+                    self._results_bucket.bucket_arn,
+                    f"{self._results_bucket.bucket_arn}/*",
+                ],
             )
         )
 
@@ -131,19 +154,6 @@ class AssetSyncStack(cdk.NestedStack):
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
             "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,
         }
-
-        # Create Lambda functions using existing construct
-        self._storage_sync_post_lambda = Lambda(
-            self,
-            "StorageSyncPostLambda",
-            LambdaConfig(
-                name="storage-sync-post",
-                entry="lambdas/api/storage/s3/sync/post_sync",
-                memory_size=1024,
-                timeout_minutes=15,
-                environment_variables=asset_sync_lambda_env,
-            ),
-        )
 
         # Create the Asset Sync Engine Lambda
         self._asset_sync_engine_lambda = Lambda(
@@ -316,9 +326,7 @@ class AssetSyncStack(cdk.NestedStack):
     def _grant_permissions(self, props: AssetSyncStackProps) -> None:
         """Grant necessary permissions to Lambda functions"""
         # Job table permissions
-        self._asset_sync_job_table.table.grant_read_write_data(
-            self._storage_sync_post_lambda.function
-        )
+
         self._asset_sync_job_table.table.grant_read_write_data(
             self._asset_sync_engine_lambda.function
         )
@@ -493,6 +501,29 @@ class AssetSyncStack(cdk.NestedStack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
         )
+        
+        # Explicitly grant the batch operations role access to the results bucket
+        self._results_bucket.grant_read_write(self.batch_operations_role)
+        
+        # Update the manifest permissions with specific bucket ARN
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:PutObject",
+                    "s3:PutObjectTagging",
+                    "s3:PutObjectVersionTagging",
+                    "s3:DeleteObject",
+                    "s3:AbortMultipartUpload",
+                ],
+                resources=[
+                    self._results_bucket.bucket_arn,
+                    f"{self._results_bucket.bucket_arn}/*",
+                ],
+            )
+        )
+        
         return self._results_bucket
 
     @property
@@ -510,7 +541,3 @@ class AssetSyncStack(cdk.NestedStack):
     @property
     def asset_sync_processor_lambda(self) -> lambda_.Function:
         return self._asset_sync_processor_lambda.function
-    @property
-    def storage_sync_post_lambda(self) -> lambda_.Function:
-        return self._storage_sync_post_lambda.function
-    
