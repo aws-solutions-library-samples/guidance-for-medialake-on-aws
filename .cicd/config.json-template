@@ -44,7 +44,7 @@
     "opensearch_cluster_settings": {
         "master_node_count": 3,
         "master_node_instance_type": "r7g.medium.search",
-        "data_node_count": 3,
+        "data_node_count": 2,
         "data_node_instance_type": "r7g.medium.search",
         "data_node_volume_size": 10,
         "data_node_volume_type": "gp3",

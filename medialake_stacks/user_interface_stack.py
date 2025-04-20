@@ -192,10 +192,20 @@ class UserInterfaceStack(Stack):
                 physical_resource_id=cr.PhysicalResourceId.of("CreateUserHandler"),
                 ignore_error_codes_matching="UsernameExistsException|User account already exists",
             ),
+            on_delete=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="adminDeleteUser",
+                parameters={
+                    "UserPoolId": props.cognito_user_pool_id,
+                    "Username": config.initial_user.email,
+                },
+                physical_resource_id=cr.PhysicalResourceId.of("DeleteUserHandler"),
+                ignore_error_codes_matching="UserNotFoundException|User does not exist",
+            ),
             policy=cr.AwsCustomResourcePolicy.from_statements(
                 [
                     iam.PolicyStatement(
-                        actions=["cognito-idp:AdminCreateUser"],
+                        actions=["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"],
                         resources=[props.cognito_user_pool_arn],
                     )
                 ]
