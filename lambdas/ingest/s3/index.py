@@ -16,6 +16,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.parser import parse, event_parser
 from decimal import Decimal
+from contextlib import contextmanager
 
 # Configure environment-specific logging
 def configure_logging():
@@ -245,6 +246,55 @@ class AssetProcessor:
         
         # Set to track processed inventory IDs to prevent duplicates
         self.processed_inventory_ids = set()
+        
+        # Add current asset tracking
+        self.current_asset_id = None
+        self.current_inventory_id = None
+
+    @contextmanager
+    def asset_context(self, asset_id=None, inventory_id=None):
+        """Context manager to set asset ID in logs for the duration of an operation"""
+        # Store previous values
+        previous_asset_id = self.current_asset_id
+        previous_inventory_id = self.current_inventory_id
+        
+        try:
+            # Set new values if provided
+            if asset_id:
+                self.current_asset_id = asset_id
+                logger.append_keys(assetID=asset_id)
+            if inventory_id:
+                self.current_inventory_id = inventory_id
+                logger.append_keys(inventoryID=inventory_id)
+            yield
+        finally:
+            # Restore previous values
+            self.current_asset_id = previous_asset_id
+            self.current_inventory_id = previous_inventory_id
+            # Update logger context
+            logger.append_keys(assetID=previous_asset_id, inventoryID=previous_inventory_id)
+    
+    def _log_with_asset_context(self, message, level="INFO", asset_id=None, inventory_id=None):
+        """Helper to log with asset context"""
+        asset_id = asset_id or self.current_asset_id
+        inventory_id = inventory_id or self.current_inventory_id
+        
+        context = {}
+        if asset_id:
+            context["assetID"] = asset_id
+        if inventory_id:
+            context["inventoryID"] = inventory_id
+            
+        if level.upper() == "INFO":
+            logger.info(message, **context)
+        elif level.upper() == "WARNING":
+            logger.warning(message, **context)
+        elif level.upper() == "ERROR":
+            logger.error(message, **context)
+        elif level.upper() == "CRITICAL":
+            logger.critical(message, **context)
+        else:
+            logger.info(message, **context)
 
     def _decode_s3_event_key(self, encoded_key: str) -> str:
         """Decode S3 event key by handling URL encoding"""
@@ -347,120 +397,124 @@ class AssetProcessor:
 
             # Check existing tags first - this is a fast path if object already processed
             if "InventoryID" in tags and "AssetID" in tags:
-                logger.info(f"Asset already fully processed: {tags['AssetID']}")
+                # Use the asset context for consistent logging
+                with self.asset_context(asset_id=tags["AssetID"], inventory_id=tags["InventoryID"]):
+                    self._log_with_asset_context(f"Asset already fully processed: {tags['AssetID']}")
                 
-                # Add logging to check if the record exists in DynamoDB
-                try:
-                    existing_record = self.dynamodb.get_item(
-                        Key={
-                            "InventoryID": tags["InventoryID"]
-                        }
-                    )
-                    if "Item" in existing_record:
-                        logger.info(f"Found existing record in DynamoDB: {json_serialize(existing_record['Item'])}")
-                        
-                        # Update the lastModifiedDate field but preserve originalIngestDate
-                        # Create updateExpression and attributeValues for update operation
-                        update_expression = "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
-                        expression_attribute_values = {":lastModDate": s3_last_modified_str}
-                        
-                        # Update only the lastModifiedDate
-                        self.dynamodb.update_item(
-                            Key={"InventoryID": tags["InventoryID"]},
-                            UpdateExpression=update_expression,
-                            ExpressionAttributeValues=expression_attribute_values
+                    # Add logging to check if the record exists in DynamoDB
+                    try:
+                        existing_record = self.dynamodb.get_item(
+                            Key={
+                                "InventoryID": tags["InventoryID"]
+                            }
                         )
-                        logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}")
-                    else:
-                        logger.warning(f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}")
-                        
-                        # Recreate the record if it doesn't exist in DynamoDB
-                        logger.info(f"Recreating DynamoDB record for tagged asset: {key}")
-                        
-                        # Calculate MD5 hash for the file
-                        md5_hash = self._calculate_md5(bucket, key)
-                        
-                        # Create metadata structure
-                        metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
-                        
-                        # Create DynamoDB entry using existing InventoryID and AssetID
-                        asset_id = tags["AssetID"]
-                        inventory_id = tags["InventoryID"]
-                        
-                        # Extract asset type from AssetID or content type
-                        if ":" in asset_id:
-                            parts = asset_id.split(":")
-                            if len(parts) >= 2:
-                                type_abbrev = parts[1]
-                                asset_type_map = {"img": "Image", "vid": "Video", "aud": "Audio"}
-                                asset_type = asset_type_map.get(type_abbrev, "Image")
+                        if "Item" in existing_record:
+                            self._log_with_asset_context(f"Found existing record in DynamoDB: {json_serialize(existing_record['Item'])}")
+                            
+                            # Update the lastModifiedDate field but preserve originalIngestDate
+                            # Create updateExpression and attributeValues for update operation
+                            update_expression = "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
+                            expression_attribute_values = {":lastModDate": s3_last_modified_str}
+                            
+                            # Update only the lastModifiedDate
+                            self.dynamodb.update_item(
+                                Key={"InventoryID": tags["InventoryID"]},
+                                UpdateExpression=update_expression,
+                                ExpressionAttributeValues=expression_attribute_values
+                            )
+                            self._log_with_asset_context(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}")
+                        else:
+                            self._log_with_asset_context(f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}", level="WARNING")
+                            
+                            # Recreate the record if it doesn't exist in DynamoDB
+                            self._log_with_asset_context(f"Recreating DynamoDB record for tagged asset: {key}")
+                            
+                            # Calculate MD5 hash for the file
+                            md5_hash = self._calculate_md5(bucket, key)
+                            
+                            # Create metadata structure
+                            metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                            
+                            # Create DynamoDB entry using existing InventoryID and AssetID
+                            asset_id = tags["AssetID"]
+                            inventory_id = tags["InventoryID"]
+                            
+                            # Extract asset type from AssetID or content type
+                            if ":" in asset_id:
+                                parts = asset_id.split(":")
+                                if len(parts) >= 2:
+                                    type_abbrev = parts[1]
+                                    asset_type_map = {"img": "Image", "vid": "Video", "aud": "Audio"}
+                                    asset_type = asset_type_map.get(type_abbrev, "Image")
+                                else:
+                                    content_type = response.get("ContentType", "")
+                                    file_ext = key.split(".")[-1] if "." in key else ""
+                                    asset_type = determine_asset_type(content_type, file_ext)
                             else:
                                 content_type = response.get("ContentType", "")
                                 file_ext = key.split(".")[-1] if "." in key else ""
                                 asset_type = determine_asset_type(content_type, file_ext)
-                        else:
-                            content_type = response.get("ContentType", "")
-                            file_ext = key.split(".")[-1] if "." in key else ""
-                            asset_type = determine_asset_type(content_type, file_ext)
-                        
-                        # Current time for ingest date
-                        current_time = datetime.utcnow().isoformat()
-                        
-                        # Create the item structure
-                        item = {
-                            "InventoryID": inventory_id,
-                            "FileHash": md5_hash,
-                            "StoragePath": f"{bucket}:{key}",
-                            "DigitalSourceAsset": {
-                                "ID": asset_id,
-                                "Type": asset_type,
-                                "CreateDate": datetime.utcnow().isoformat(),
-                                "IngestedAt": datetime.utcnow().isoformat(),
-                                "originalIngestDate": current_time,
-                                "lastModifiedDate": s3_last_modified_str,
-                                "MainRepresentation": {
-                                    "ID": f"{asset_id}:master",
+                            
+                            # Current time for ingest date
+                            current_time = datetime.utcnow().isoformat()
+                            
+                            # Create the item structure
+                            item = {
+                                "InventoryID": inventory_id,
+                                "FileHash": md5_hash,
+                                "StoragePath": f"{bucket}:{key}",
+                                "DigitalSourceAsset": {
+                                    "ID": asset_id,
                                     "Type": asset_type,
-                                    "Format": key.split(".")[-1].upper() if "." in key else "",
-                                    "Purpose": "master",
-                                    "StorageInfo": metadata["StorageInfo"],
+                                    "CreateDate": datetime.utcnow().isoformat(),
+                                    "IngestedAt": datetime.utcnow().isoformat(),
+                                    "originalIngestDate": current_time,
+                                    "lastModifiedDate": s3_last_modified_str,
+                                    "MainRepresentation": {
+                                        "ID": f"{asset_id}:master",
+                                        "Type": asset_type,
+                                        "Format": key.split(".")[-1].upper() if "." in key else "",
+                                        "Purpose": "master",
+                                        "StorageInfo": metadata["StorageInfo"],
+                                    },
                                 },
-                            },
-                            "DerivedRepresentations": [],
-                            "Metadata": metadata.get("Metadata"),
-                        }
-                        
-                        # Use batch writer for better DynamoDB performance
-                        try:
-                            self.dynamodb.put_item(Item=item)
-                            logger.info(f"Successfully recreated DynamoDB record for {inventory_id}")
+                                "DerivedRepresentations": [],
+                                "Metadata": metadata.get("Metadata"),
+                            }
                             
-                            # Verify the write with a get_item
-                            verification = self.dynamodb.get_item(
-                                Key={
-                                    "InventoryID": inventory_id
-                                }
-                            )
-                            if "Item" in verification:
-                                logger.info(f"Verification successful - recreated item exists in DynamoDB")
-                            else:
-                                logger.warning(f"Verification failed - recreated item not found in DynamoDB")
+                            # Use batch writer for better DynamoDB performance
+                            try:
+                                self.dynamodb.put_item(Item=item)
+                                self._log_with_asset_context(f"Successfully recreated DynamoDB record for {inventory_id}")
                                 
-                            # Publish event for the recreated record
-                            self.publish_event(
-                                inventory_id,
-                                asset_id,
-                                metadata,
-                            )
-                            
-                            return item
-                        except Exception as e:
-                            logger.exception(f"Error recreating DynamoDB record: {str(e)}")
-                except Exception as e:
-                    logger.exception(f"Error checking existing record in DynamoDB: {str(e)}")
-                
-                return None
-            
+                                # Verify the write with a get_item
+                                verification = self.dynamodb.get_item(
+                                    Key={
+                                        "InventoryID": inventory_id
+                                    }
+                                )
+                                if "Item" in verification:
+                                    self._log_with_asset_context(f"Verification successful - recreated item exists in DynamoDB")
+                                else:
+                                    self._log_with_asset_context(f"Verification failed - recreated item not found in DynamoDB", level="WARNING")
+                                    
+                                # Publish event for the recreated record
+                                self.publish_event(
+                                    inventory_id,
+                                    asset_id,
+                                    metadata,
+                                )
+                                
+                                return item
+                            except Exception as e:
+                                self._log_with_asset_context(f"Error recreating DynamoDB record: {str(e)}", level="ERROR")
+                                logger.exception(f"Error recreating DynamoDB record: {str(e)}")
+                    except Exception as e:
+                        self._log_with_asset_context(f"Error checking existing record in DynamoDB: {str(e)}", level="ERROR")
+                        logger.exception(f"Error checking existing record in DynamoDB: {str(e)}")
+                    
+                    return None
+
             # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
             
@@ -850,85 +904,86 @@ class AssetProcessor:
     @tracer.capture_method
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
         """Publish event to EventBridge with optimized serialization"""
-        try:
-            # Extract content type information
-            content_type = (
-                metadata.get("Metadata", {})
-                .get("Embedded", {})
-                .get("S3", {})
-                .get("ContentType", "")
-            )
-            # Get file extension from the object key
-            object_key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
-            file_ext = self._extract_file_extension(object_key)
-            
-            # Use more accurate asset type detection
-            asset_type = determine_asset_type(content_type, file_ext)
+        with self.asset_context(asset_id=asset_id, inventory_id=inventory_id):
+            try:
+                # Extract content type information
+                content_type = (
+                    metadata.get("Metadata", {})
+                    .get("Embedded", {})
+                    .get("S3", {})
+                    .get("ContentType", "")
+                )
+                # Get file extension from the object key
+                object_key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+                file_ext = self._extract_file_extension(object_key)
+                
+                # Use more accurate asset type detection
+                asset_type = determine_asset_type(content_type, file_ext)
 
-            # Get timestamp once for reuse
-            timestamp = datetime.utcnow().isoformat()
-            
-            # Get last modified date from S3 metadata if available
-            s3_last_modified = (
-                metadata.get("Metadata", {})
-                .get("Embedded", {})
-                .get("S3", {})
-                .get("LastModified", timestamp)
-            )
+                # Get timestamp once for reuse
+                timestamp = datetime.utcnow().isoformat()
+                
+                # Get last modified date from S3 metadata if available
+                s3_last_modified = (
+                    metadata.get("Metadata", {})
+                    .get("Embedded", {})
+                    .get("S3", {})
+                    .get("LastModified", timestamp)
+                )
 
-            # Construct event detail
-            event_detail = {
-                "InventoryID": inventory_id,
-                "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
-                    "Hash"
-                ]["MD5Hash"],
-                "DigitalSourceAsset": {
-                    "ID": asset_id,
-                    "Type": asset_type,
-                    "CreateDate": timestamp,
-                    "originalIngestDate": timestamp,
-                    "lastModifiedDate": s3_last_modified,
-                    "MainRepresentation": {
-                        "ID": f"{asset_id}:master",
+                # Construct event detail
+                event_detail = {
+                    "InventoryID": inventory_id,
+                    "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
+                        "Hash"
+                    ]["MD5Hash"],
+                    "DigitalSourceAsset": {
+                        "ID": asset_id,
                         "Type": asset_type,
-                        "Format": file_ext.upper(),
-                        "Purpose": "master",
-                        "StorageInfo": metadata["StorageInfo"],
+                        "CreateDate": timestamp,
+                        "originalIngestDate": timestamp,
+                        "lastModifiedDate": s3_last_modified,
+                        "MainRepresentation": {
+                            "ID": f"{asset_id}:master",
+                            "Type": asset_type,
+                            "Format": file_ext.upper(),
+                            "Purpose": "master",
+                            "StorageInfo": metadata["StorageInfo"],
+                        },
                     },
-                },
-                "DerivedRepresentations": [],
-                "Metadata": metadata.get("Metadata"),
-            }
+                    "DerivedRepresentations": [],
+                    "Metadata": metadata.get("Metadata"),
+                }
 
-            # Use optimized JSON serialization
-            event_json = json_serialize(event_detail)
-            logger.info(f"Publishing event with detail size: {len(event_json)} bytes")
+                # Use optimized JSON serialization
+                event_json = json_serialize(event_detail)
+                self._log_with_asset_context(f"Publishing event with detail size: {len(event_json)} bytes")
 
-            # Publish to EventBridge
-            response = self.eventbridge.put_events(
-                Entries=[
-                    {
-                        "Source": "custom.asset.processor",
-                        "DetailType": "AssetCreated",
-                        "Detail": event_json,
-                        "EventBusName": os.environ["EVENT_BUS_NAME"],
-                    }
-                ]
-            )
+                # Publish to EventBridge
+                response = self.eventbridge.put_events(
+                    Entries=[
+                        {
+                            "Source": "custom.asset.processor",
+                            "DetailType": "AssetCreated",
+                            "Detail": event_json,
+                            "EventBusName": os.environ["EVENT_BUS_NAME"],
+                        }
+                    ]
+                )
 
-            # Log only relevant parts of the response
-            if "FailedEntryCount" in response and response["FailedEntryCount"] > 0:
-                logger.error(f"EventBridge publish failed: {json_serialize(response)}")
-            else:
-                logger.info(f"EventBridge publish successful")
+                # Log only relevant parts of the response
+                if "FailedEntryCount" in response and response["FailedEntryCount"] > 0:
+                    self._log_with_asset_context(f"EventBridge publish failed: {json_serialize(response)}", level="ERROR")
+                else:
+                    self._log_with_asset_context(f"EventBridge publish successful")
 
-            # Add metrics
-            metrics.add_metric(name="EventsPublished", unit=MetricUnit.Count, value=1)
+                # Add metrics
+                metrics.add_metric(name="EventsPublished", unit=MetricUnit.Count, value=1)
 
-        except Exception as e:
-            logger.exception(f"Error publishing event: {str(e)}")
-            metrics.add_metric(name="EventPublishErrors", unit=MetricUnit.Count, value=1)
-            raise
+            except Exception as e:
+                self._log_with_asset_context(f"Error publishing event: {str(e)}", level="ERROR")
+                metrics.add_metric(name="EventPublishErrors", unit=MetricUnit.Count, value=1)
+                raise
 
     @tracer.capture_method
     def delete_asset(self, bucket: str, key: str, is_delete_event: bool = True) -> None:
@@ -1329,6 +1384,19 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             
             # Verify object exists in S3 before processing
             try:
+                # Try to get tags to identify asset early for logging
+                try:
+                    tag_response = processor.s3.get_object_tagging(Bucket=bucket, Key=key)
+                    tags = {tag["Key"]: tag["Value"] for tag in tag_response.get("TagSet", [])}
+                    
+                    if "AssetID" in tags and "InventoryID" in tags:
+                        # Add asset context for early logging
+                        logger.append_keys(assetID=tags["AssetID"], inventoryID=tags["InventoryID"])
+                        logger.info(f"Processing existing tagged asset: {tags['AssetID']}")
+                except Exception:
+                    # Continue without tags, not critical
+                    pass
+                    
                 processor.s3.head_object(Bucket=bucket, Key=key)
             except Exception as s3_error:
                 logger.error(f"S3 object verification failed for {bucket}/{key}: {str(s3_error)}")
@@ -1339,6 +1407,11 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
             if result:
+                # Add asset information to context for logging
+                logger.append_keys(
+                    assetID=result['DigitalSourceAsset']['ID'], 
+                    inventoryID=result['InventoryID']
+                )
                 metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
                 metrics.add_metric(name="CreationEvents", unit=MetricUnit.Count, value=1)
                 logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
