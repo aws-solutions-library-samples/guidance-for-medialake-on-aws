@@ -180,23 +180,13 @@ class CognitoConstruct(Construct):
                     provider_details={
                         "MetadataURL": provider.identity_provider_metadata_url,
                         "MetadataFile": provider.identity_provider_metadata_path,
-                        "IDPSignout": "true",  # Enable IdP-initiated sign out
                     },
                     attribute_mapping={
                         # Standard mappings
                         "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
                         "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
                         "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-                        "name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
-                        
-                        # Microsoft AD specific attributes
                         "custom:role": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
-                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
-                        
-                        # Common SAML attributes
-                        "custom:username": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
-                        "custom:department": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/department",
-                        "custom:organization": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/organization",
                     },
                     idp_identifiers=[provider.identity_provider_name],
                 )

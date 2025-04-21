@@ -478,14 +478,8 @@ class UIConstruct(Construct):
                             "responseType": "code",
                             "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
                             "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
-                            "federationTarget": "COGNITO_USER_POOLS",
-                            "flowType": "AUTH_CODE"
+
                         }
-                    },
-                    "federatedIdentities": {
-                        "callbackUrl": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                        "federatedIdpName": saml_provider_name,
-                        "enableFederation": bool(saml_provider_name)
                     }
                 }
             },
