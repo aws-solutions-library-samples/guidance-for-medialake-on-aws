@@ -7,6 +7,7 @@ from aws_cdk import (
     RemovalPolicy,
     CfnOutput,
     Stack,
+    custom_resources as cr,
 )
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
@@ -47,6 +48,9 @@ class CognitoConstruct(Construct):
 
         # Use provided props or create default props
         self.props = props or CognitoProps()
+        
+        # Store the placeholder for CloudFront domain that we'll update later
+        self._cloudfront_domain = None
 
         # Create Lambda functions
         self._cognito_trigger_lambda = Lambda(
@@ -176,12 +180,23 @@ class CognitoConstruct(Construct):
                     provider_details={
                         "MetadataURL": provider.identity_provider_metadata_url,
                         "MetadataFile": provider.identity_provider_metadata_path,
+                        "IDPSignout": "true",  # Enable IdP-initiated sign out
                     },
                     attribute_mapping={
+                        # Standard mappings
                         "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
                         "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
                         "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+                        "name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+                        
+                        # Microsoft AD specific attributes
                         "custom:role": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
+                        
+                        # Common SAML attributes
+                        "custom:username": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+                        "custom:department": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/department",
+                        "custom:organization": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/organization",
                     },
                     idp_identifiers=[provider.identity_provider_name],
                 )
@@ -212,12 +227,12 @@ class CognitoConstruct(Construct):
                         ],
                         callback_urls=[
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/oauth2/idpresponse",
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse"
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse",
                         ],
                         logout_urls=[
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",  
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",  
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/sign-in"  
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/sign-in",
                         ],
                     ),
                 }
@@ -280,3 +295,57 @@ class CognitoConstruct(Construct):
     @property
     def cognito_domain_prefix(self) -> str:
         return self._domain_prefix
+        
+    def update_callback_urls(self, cloudfront_domain: str) -> None:
+        """
+        Updates the callback URLs for the Cognito User Pool Client with the CloudFront domain.
+        This should be called after the CloudFront distribution is created.
+        
+        Args:
+            cloudfront_domain: The CloudFront distribution domain name
+        """
+        if not cloudfront_domain:
+            return
+            
+        self._cloudfront_domain = cloudfront_domain
+        
+        # Use AWS SDK to update the user pool client
+        custom_resource = cr.AwsCustomResource(
+            self,
+            "UpdateUserPoolClientCallbacks",
+            on_update=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="updateUserPoolClient",
+                parameters={
+                    "UserPoolId": self._user_pool.user_pool_id,
+                    "ClientId": self._user_pool_client.user_pool_client_id,
+                    "CallbackURLs": [
+                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
+                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
+                        f"https://{cloudfront_domain}",
+                        f"https://{cloudfront_domain}/",
+                        f"https://{cloudfront_domain}/login",
+                    ],
+                    "LogoutURLs": [
+                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com",
+                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/",
+                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
+                        f"https://{cloudfront_domain}",
+                        f"https://{cloudfront_domain}/",
+                        f"https://{cloudfront_domain}/sign-in",
+                    ],
+                    "AllowedOAuthFlows": ["code", "implicit"],
+                    "AllowedOAuthScopes": ["email", "openid", "profile"],
+                    "AllowedOAuthFlowsUserPoolClient": True,
+                    "SupportedIdentityProviders": ["COGNITO"] + [
+                        provider.identity_provider_name 
+                        for provider in config.authZ.identity_providers 
+                        if provider.identity_provider_method == "saml"
+                    ],
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-cognito-callback-urls-update"),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
+            ),
+        )

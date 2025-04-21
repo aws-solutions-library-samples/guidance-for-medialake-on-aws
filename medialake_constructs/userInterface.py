@@ -82,6 +82,7 @@ class UIConstructProps:
     cloudfront_waf_acl_arn: str
     cognito_identity_pool: str
     cognito_domain_prefix: str
+    cognito_construct: Optional[Construct] = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -388,6 +389,24 @@ class UIConstruct(Construct):
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
+                # Add special behavior for SAML auth callback paths
+                "saml2/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{props.cognito_domain_prefix}.auth.{scope.region}.amazoncognito.com",
+                        origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
+                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+                    ),
+                    cache_policy=cloudfront.CachePolicy(
+                        self, 
+                        "SAMLAuthCachePolicy",
+                        default_ttl=Duration.seconds(0),
+                        min_ttl=Duration.seconds(0),
+                        max_ttl=Duration.seconds(0)
+                    ),
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+                ),
             },
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             ssl_support_method=cloudfront.SSLMethod.SNI,
@@ -425,6 +444,11 @@ class UIConstruct(Construct):
             None,
         )
         
+        # Check if there's a SAML provider and extract the name safely
+        saml_provider_name = ""
+        if saml_provider and hasattr(saml_provider, 'identity_provider_name'):
+            saml_provider_name = saml_provider.identity_provider_name
+
         config_content = {
             "region": stack.region,
             "Auth": {
@@ -453,8 +477,15 @@ class UIConstruct(Construct):
                             "scopes": ["email", "openid", "profile"],
                             "responseType": "code",
                             "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                            "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in"
+                            "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                            "federationTarget": "COGNITO_USER_POOLS",
+                            "flowType": "AUTH_CODE"
                         }
+                    },
+                    "federatedIdentities": {
+                        "callbackUrl": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
+                        "federatedIdpName": saml_provider_name,
+                        "enableFederation": bool(saml_provider_name)
                     }
                 }
             },
@@ -511,6 +542,53 @@ class UIConstruct(Construct):
             ])
         )
 
+
+        _ = cr.AwsCustomResource(
+            self,
+            "UpdateUserPoolClientCallbacks",
+            on_update=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="updateUserPoolClient",
+                parameters={
+                    "UserPoolId": props.cognito_user_pool_id,
+                    "ClientId": props.cognito_user_pool_client_id,
+                    "CallbackURLs": [
+                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
+                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}/",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}/login",
+                        f"https://localhost:5173",
+                        f"https://localhost:5173/",
+                        f"https://localhost:5173/login"
+                    ],
+                    "LogoutURLs": [
+                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com",
+                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/",
+                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}/",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                        f"https://localhost:5173",
+                        f"https://localhost:5173/",
+                        f"https://localhost:5173/login"
+                    ],
+                    "AllowedOAuthFlows": ["code", "implicit"],
+                    "AllowedOAuthScopes": ["email", "openid", "profile"],
+                    "AllowedOAuthFlowsUserPoolClient": True,
+                    "SupportedIdentityProviders": ["COGNITO"] + [
+                        provider.identity_provider_name 
+                        for provider in config.authZ.identity_providers 
+                        if provider.identity_provider_method == "saml"
+                    ],
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-cognito-callback-urls-update"),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
+            ),
+        )
+        
         # Add dependencies
         config_resource.node.add_dependency(self.cloudfront_distribution)
         config_resource.node.add_dependency(medialake_ui_s3_bucket)
