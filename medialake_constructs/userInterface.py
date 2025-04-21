@@ -557,7 +557,7 @@ class UIConstruct(Construct):
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
                         f"https://{self.cloudfront_distribution.distribution_domain_name}",
                         f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}/login",
+                        f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
                         f"https://localhost:5173/login"
