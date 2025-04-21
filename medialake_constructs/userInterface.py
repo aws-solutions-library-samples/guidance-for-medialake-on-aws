@@ -389,24 +389,6 @@ class UIConstruct(Construct):
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
-                # Add special behavior for SAML auth callback paths
-                "saml2/*": cloudfront.BehaviorOptions(
-                    origin=origins.HttpOrigin(
-                        f"{props.cognito_domain_prefix}.auth.{scope.region}.amazoncognito.com",
-                        origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
-                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
-                    ),
-                    cache_policy=cloudfront.CachePolicy(
-                        self, 
-                        "SAMLAuthCachePolicy",
-                        default_ttl=Duration.seconds(0),
-                        min_ttl=Duration.seconds(0),
-                        max_ttl=Duration.seconds(0)
-                    ),
-                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
-                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
-                ),
             },
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             ssl_support_method=cloudfront.SSLMethod.SNI,
