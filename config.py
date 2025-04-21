@@ -16,7 +16,7 @@ import os
 
 
 def validate_opensearch_instance_type(instance_type: str) -> str:
-    valid_prefixes = ["c5", "c6g", "m5", "m6g", "r5", "r6g", "r7g", "t3", "i3", "i3en"]
+    valid_prefixes = ["c5", "c6g", "m5", "m6g", "r5", "r6g", "r7g", "r7gd", "t3", "i3", "i3en"]
     valid_suffixes = [
         "medium",
         "large",
