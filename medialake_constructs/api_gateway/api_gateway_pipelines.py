@@ -40,8 +40,8 @@ class ApiGatewayPipelinesProps:
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
-    image_proxy_lambda: lambda_.IFunction
-    image_metadata_extractor_lambda: lambda_.IFunction
+    # image_proxy_lambda: lambda_.IFunction
+    # image_metadata_extractor_lambda: lambda_.IFunction
     open_search_endpoint: str
     api_resource: apigateway.IResource
     ingest_event_bus: events.EventBus
@@ -614,8 +614,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
-                "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
+                # "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
+                # "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA": self.image_metadata_extractor_lambda_deployment.deployment_key,
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
                 "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,

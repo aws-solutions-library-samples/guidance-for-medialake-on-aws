@@ -16,6 +16,11 @@ from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployme
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PowertoolsLayer, PowertoolsLayerConfig,
+    PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
+    PyamlLayer, ShortuuidLayer
+)
 import aws_cdk as cdk
 
 from config import config
@@ -50,15 +55,83 @@ class NodesStack(cdk.NestedStack):
             retain_on_delete=False,
         )
 
+        # Create Lambda Layers
+        self.powertools_layer = PowertoolsLayer(self, "PowertoolsLayer", PowertoolsLayerConfig())
+        self.ffmpeg_layer = FFmpegLayer(self, "FFmpegLayer")
+        self.pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
+        self.shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
+        self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
+        self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
+        self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+        
         # Node Lambda Deployments
+
+        self.check_mediaconvert_status_lambda_deployment = LambdaDeployment(
+            self,
+            "CheckMediaconvertStatusLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "check_mediaconvert_status"],
+        )
+
+
+        self.image_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "ImageProxyLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "image_proxy"],
+        )
+        
+        self.image_thumbnail_lambda_deployment = LambdaDeployment(
+            self,
+            "ImageThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "image_thumbnail"],
+        )
+
+        self.video_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoProxyLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_proxy"],
+        )
+        
+        self.video_thumbnail_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_thumbnail"],
+        )
+
+        self.audio_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioProxyLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_proxy"],
+        )
+        
+        self.audio_thumbnail_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_thumbnail"],
+        )
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "ImageMetadataExtractorLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
+            runtime="nodejs18.x",
             code_path=["lambdas", "nodes", "image_metadata_extractor"],
         )
+        
         self.video_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "VideoMetadataExtractorLambdaDeployment",
@@ -153,8 +226,22 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "debug_input"],
         )
+        
+        self.pipeline_input_formatter_lambda_deployment = LambdaDeployment(
+            self,
+            "PipelineInputFormatterLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "pipeline_input_formatter"],
+        )
 
-
+        self.pipeline_trigger_lambda_deployment = LambdaDeployment(
+            self,
+            "PipelineTriggerLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "pipelines", "pipeline_trigger"],
+        )
         
         # Add FFmpeg layer to the audio splitter Lambda
         self.audio_splitter_lambda_deployment = LambdaDeployment(
@@ -249,6 +336,16 @@ class NodesStack(cdk.NestedStack):
                     "NODES_TABLE": self._pipelines_nodes_table.table_name,
                     "NODES_BUCKET": self._pipelines_nodes_bucket.bucket_name,
                     "SERVICE_NAME": "pipeline-nodes-deployer",
+                    # Layer ARNs for automatic layer attachment
+                    "POWERTOOLS_LAYER_ARN": self.powertools_layer.layer.layer_version_arn,
+                    "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
+                    "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
+                    # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,
+                    # "OPENSEARCH_LAYER_ARN": self.opensearch_layer.layer.layer_version_arn,
+                    "SHORTUUID_LAYER_ARN": self.shortuuid_layer.layer.layer_version_arn,
+                    "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
+                    "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
+                    "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn,
                 },
             ),
         )
