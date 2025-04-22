@@ -227,3 +227,86 @@ class GraphAnalyzer:
             logger.info(f"Built processor chain for Map {map_id}: {chain}")
             
         return choice_true_targets, choice_false_targets, map_processor_chains
+        
+    def find_first_and_last_lambdas(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Find the first and last non-trigger, non-flow nodes in the execution path.
+        
+        Returns:
+            Tuple of (first_node_id, last_node_id)
+        """
+        # Get the root node
+        root_node_id = self.get_root_node()
+        if not root_node_id:
+            return None, None
+        
+        # Find the first non-trigger, non-flow node
+        first_node_id = None
+        current_id = root_node_id
+        visited = set()
+        
+        # BFS to find the first lambda node
+        queue = [current_id]
+        while queue and not first_node_id:
+            current_id = queue.pop(0)
+            if current_id in visited:
+                continue
+                
+            visited.add(current_id)
+            current_node = self.node_id_to_node.get(current_id)
+            
+            if not current_node:
+                continue
+                
+            # Skip trigger and flow nodes
+            if (current_node.data.type.lower() != "trigger" and
+                current_node.data.type.lower() != "flow"):
+                first_node_id = current_id
+                break
+                
+            # Add children to queue
+            if current_id in self.graph:
+                queue.extend(self.graph[current_id])
+        
+        # Find the last lambda node by traversing the entire graph
+        last_node_id = None
+        all_lambda_nodes = []
+        
+        for node_id, node in self.node_id_to_node.items():
+            if (node.data.type.lower() != "trigger" and
+                node.data.type.lower() != "flow"):
+                all_lambda_nodes.append(node_id)
+        
+        # If there are no lambda nodes, return None, None
+        if not all_lambda_nodes:
+            return None, None
+            
+        # If there's only one lambda node, it's both first and last
+        if len(all_lambda_nodes) == 1:
+            return all_lambda_nodes[0], all_lambda_nodes[0]
+        
+        # Find the last lambda node (one with no outgoing edges to other lambdas)
+        lambda_node_set = set(all_lambda_nodes)
+        for node_id in all_lambda_nodes:
+            has_lambda_children = False
+            if node_id in self.graph:
+                for child_id in self.graph[node_id]:
+                    child_node = self.node_id_to_node.get(child_id)
+                    if (child_node and
+                        child_node.data.type.lower() != "trigger" and
+                        child_node.data.type.lower() != "flow"):
+                        has_lambda_children = True
+                        break
+            
+            if not has_lambda_children:
+                last_node_id = node_id
+                break
+        
+        # If we couldn't find a last node, use the last one in the list
+        if not last_node_id and all_lambda_nodes:
+            last_node_id = all_lambda_nodes[-1]
+        
+        logger.info(f"Identified first lambda node: {first_node_id}")
+        logger.info(f"Identified last lambda node: {last_node_id}")
+        
+        return first_node_id, last_node_id

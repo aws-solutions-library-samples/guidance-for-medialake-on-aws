@@ -1,7 +1,7 @@
 import json
 import os
 import glob
-from jinja2 import Environment, FileSystemLoader
+# from jinja2 import Environment, FileSystemLoader
 import time
 import aws_cdk as cdk
 
@@ -124,147 +124,133 @@ class PipelineStack(cdk.NestedStack):
             ),
         )
         
-        ## pipelines deploy
-        default_pipelines_template_dir = os.path.join(
-            os.path.dirname(__file__), "..", "default_pipelines"
+         ## pipelines deploy
+        # Get all JSON files from the pipeline library directory
+        pipeline_library_dir = os.path.join(
+            os.path.dirname(__file__), "..", "s3_bucket_assets", "pipeline_library"
         )
-        jinja_env = Environment(
-            loader=FileSystemLoader(default_pipelines_template_dir), autoescape=True
-        )
-
-        # Find all Jinja2 templates in the default_pipelines directory
-        template_files = glob.glob(
-            os.path.join(default_pipelines_template_dir, "*.jinja2")
+        
+        pipeline_files = glob.glob(
+            os.path.join(pipeline_library_dir, "*.json")
         )
 
-        # for template_file in template_files:
-        #     timestamp = int(time.time())
-
-        #     template_name = os.path.basename(template_file)
-        #     pipeline_name = template_name.replace(".jinja2", "")
-
-        #     template = jinja_env.get_template(template_name)
-
-        #     rendered_pipeline = template.render(
-        #         trigger_node_function_arn=props.trigger_node_function_arn,
-        #         image_metadata_extractor_function_arn=props.image_metadata_extractor_function_arn,
-        #         image_proxy_function_arn=props.image_proxy_function_arn,
-        #         video_metadata_extractor_function_arn=props.video_metadata_extractor_function_arn,
-        #         video_proxy_thumbnail_function_arn=props.video_proxy_thumbnail_function_arn,
-        #         audio_metadata_extractor_function_arn=props.audio_metadata_extractor_function_arn,
-        #         audio_proxy_thumbnail_function_arn=props.audio_proxy_thumbnail_function_arn,
-        #         check_mediaconvert_status_function_arn=props.check_mediaconvert_status_function_arn,
-        #     )
-        #     rendered_pipeline = json.loads(rendered_pipeline)
-
-        #     # Replace check_status: true with the actual function ARN
-        #     for node in rendered_pipeline["definition"]["nodes"]:
-        #         if node.get("data", {}).get("check_status") == True:
-        #             node["data"][
-        #                 "lambda_arn"
-        #             ] = props.check_mediaconvert_status_function_arn
-        #             del node["data"]["check_status"]
-
-        #     pipeline_json = Stack.of(self).to_json_string(rendered_pipeline)
-        #     pipeline_file_name = f"{pipeline_name}.json"
-
-        #     deployment = cr.AwsCustomResource(
-        #         self,
-        #         f"Create{pipeline_name.capitalize()}Json",
-        #         on_create=cr.AwsSdkCall(
-        #             service="S3",
-        #             action="putObject",
-        #             parameters={
-        #                 "Bucket": props.iac_assets_bucket.bucket_name,
-        #                 "Key": pipeline_file_name,
-        #                 "Body": pipeline_json,
-        #                 "ContentType": "application/json",
-        #             },
-        #             physical_resource_id=cr.PhysicalResourceId.of(
-        #                 f"Create{pipeline_name.capitalize()}Json-{timestamp}"
-        #             ),
-        #         ),
-        #         on_update=cr.AwsSdkCall(
-        #             service="S3",
-        #             action="putObject",
-        #             parameters={
-        #                 "Bucket": props.iac_assets_bucket.bucket_name,
-        #                 "Key": pipeline_file_name,
-        #                 "Body": pipeline_json,
-        #                 "ContentType": "application/json",
-        #             },
-        #             physical_resource_id=cr.PhysicalResourceId.of(
-        #                 f"Create{pipeline_name.capitalize()}Json-{timestamp}"
-        #             ),
-        #         ),
-        #         policy=cr.AwsCustomResourcePolicy.from_statements(
-        #             [
-        #                 iam.PolicyStatement(
-        #                     actions=["s3:PutObject"],
-        #                     resources=[f"{props.iac_assets_bucket.bucket_arn}/*"],
-        #                 ),
-        #                 iam.PolicyStatement(
-        #                     actions=[
-        #                         "kms:Encrypt",
-        #                         "kms:Decrypt",
-        #                         "kms:ReEncrypt*",
-        #                         "kms:GenerateDataKey*",
-        #                         "kms:DescribeKey",
-        #                     ],
-        #                     resources=[
-        #                         props.iac_assets_bucket.bucket.encryption_key.key_arn
-        #                     ],
-        #                 ),
-        #             ]
-        #         ),
-        #     )
-
-        #     pipeline_data = {
-        #         "httpMethod": "POST",
-        #         "path": "/pipelines",
-        #         "definitionFile": {
-        #             "bucket": props.iac_assets_bucket.bucket_name,
-        #             "key": pipeline_file_name,
-        #         },
-        #     }
-
-        #     invoke_lambda = cr.AwsCustomResource(
-        #         self,
-        #         f"InvokeLambda{pipeline_name.capitalize()}",
-        #         timeout=Duration.minutes(15),
-        #         on_create=cr.AwsSdkCall(
-        #             service="Lambda",
-        #             action="invoke",
-        #             parameters={
-        #                 "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
-        #                 "Payload": json.dumps(pipeline_data),
-        #             },
-        #             physical_resource_id=cr.PhysicalResourceId.of(
-        #                 f"InvokeLambda{pipeline_name.capitalize()}-{timestamp}"
-        #             ),
-        #         ),
-        #         on_update=cr.AwsSdkCall(
-        #             service="Lambda",
-        #             action="invoke",
-        #             parameters={
-        #                 "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
-        #                 "Payload": json.dumps(pipeline_data),
-        #             },
-        #             physical_resource_id=cr.PhysicalResourceId.of(
-        #                 f"UpdateLambda{pipeline_name.capitalize()}-{timestamp}"
-        #             ),
-        #         ),
-        #         policy=cr.AwsCustomResourcePolicy.from_statements(
-        #             [
-        #                 iam.PolicyStatement(
-        #                     actions=["lambda:InvokeFunction"],
-        #                     resources=[self._pipelines_api.post_pipelines_handler.function_arn],
-        #                 )
-        #             ]
-        #         ),
-        #     )
-
-        #     invoke_lambda.node.add_dependency(deployment)
+        for pipeline_file in pipeline_files:
+            timestamp = int(time.time())
+            
+            # Get the filename without path
+            pipeline_filename = os.path.basename(pipeline_file)
+            
+            # Read the file content
+            with open(pipeline_file, 'r') as file:
+                pipeline_content = file.read()
+                
+            # Parse the JSON to extract the pipeline name
+            pipeline_data_json = json.loads(pipeline_content)
+            pipeline_name = pipeline_data_json.get("name", os.path.splitext(pipeline_filename)[0])
+            
+            # Upload the pipeline definition to the deployment bucket
+            deployment = cr.AwsCustomResource(
+                self,
+                f"Create{pipeline_name.replace(' ', '')}Json",
+                on_create=cr.AwsSdkCall(
+                    service="S3",
+                    action="putObject",
+                    parameters={
+                        "Bucket": props.iac_assets_bucket.bucket_name,
+                        "Key": f"pipeline_library/{pipeline_filename}",
+                        "Body": pipeline_content,
+                        "ContentType": "application/json",
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"Create{pipeline_name.replace(' ', '')}Json-{timestamp}"
+                    ),
+                ),
+                on_update=cr.AwsSdkCall(
+                    service="S3",
+                    action="putObject",
+                    parameters={
+                        "Bucket": props.iac_assets_bucket.bucket_name,
+                        "Key": f"pipeline_library/{pipeline_filename}",
+                        "Body": pipeline_content,
+                        "ContentType": "application/json",
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"Create{pipeline_name.replace(' ', '')}Json-{timestamp}"
+                    ),
+                ),
+                policy=cr.AwsCustomResourcePolicy.from_statements(
+                    [
+                        iam.PolicyStatement(
+                            actions=["s3:GetObject", "s3:PutObject", "s3:CopyObject", "s3:ListBucket"],
+                            resources=[
+                                f"{props.iac_assets_bucket.bucket_arn}",
+                                f"{props.iac_assets_bucket.bucket_arn}/*"
+                            ],
+                        ),
+                        iam.PolicyStatement(
+                            actions=[
+                                "kms:Encrypt",
+                                "kms:Decrypt",
+                                "kms:ReEncrypt*",
+                                "kms:GenerateDataKey*",
+                                "kms:DescribeKey",
+                            ],
+                            resources=[
+                                props.iac_assets_bucket.bucket.encryption_key.key_arn
+                            ],
+                        ),
+                    ]
+                ),
+            )
+            
+            # Invoke the post_pipeline_v2 Lambda to create the pipeline
+            lambda_payload = {
+                "httpMethod": "POST",
+                "path": "/pipelines/v2",
+                "definitionFile": {
+                    "bucket": props.iac_assets_bucket.bucket_name,
+                    "key": f"pipeline_library/{pipeline_filename}",
+                },
+                "loadFromS3": True
+            }
+            
+            invoke_lambda = cr.AwsCustomResource(
+                self,
+                f"InvokeLambda{pipeline_name.replace(' ', '')}",
+                timeout=Duration.minutes(15),
+                on_create=cr.AwsSdkCall(
+                    service="Lambda",
+                    action="invoke",
+                    parameters={
+                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
+                        "Payload": json.dumps(lambda_payload),
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"InvokeLambda{pipeline_name.replace(' ', '')}-{timestamp}"
+                    ),
+                ),
+                on_update=cr.AwsSdkCall(
+                    service="Lambda",
+                    action="invoke",
+                    parameters={
+                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
+                        "Payload": json.dumps(lambda_payload),
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"UpdateLambda{pipeline_name.replace(' ', '')}-{timestamp}"
+                    ),
+                ),
+                policy=cr.AwsCustomResourcePolicy.from_statements(
+                    [
+                        iam.PolicyStatement(
+                            actions=["lambda:InvokeFunction"],
+                            resources=[self._pipelines_api.post_pipelines_handler.function_arn],
+                        )
+                    ]
+                ),
+            )
+            
+            # invoke_lambda.node.add_dependency(deployment)
             
 
     @property

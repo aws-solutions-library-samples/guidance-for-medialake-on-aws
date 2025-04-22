@@ -6,6 +6,7 @@ NODE_TABLE = os.environ.get("NODE_TABLE")
 PIPELINES_TABLE = os.environ.get("PIPELINES_TABLE")
 IAC_ASSETS_BUCKET = os.environ.get("IAC_ASSETS_BUCKET")
 NODE_TEMPLATES_BUCKET = os.environ.get("NODE_TEMPLATES_BUCKET")
+EXTERNAL_PAYLOAD_BUCKET = os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
 INGEST_EVENT_BUS_NAME = os.environ.get("INGEST_EVENT_BUS_NAME")
 MEDIALAKE_ASSET_TABLE = os.environ.get("MEDIALAKE_ASSET_TABLE")
 MEDIA_ASSETS_BUCKET_NAME = os.environ.get("MEDIA_ASSETS_BUCKET_NAME")
@@ -14,6 +15,7 @@ OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT")
 OPENSEARCH_VPC_SUBNET_IDS = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
 OPENSEARCH_SECURITY_GROUP_ID = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+resource_prefix = os.environ.get("RESOURCE_PREFIX")
 
 # Validate required environment variables
 required_env_vars = [

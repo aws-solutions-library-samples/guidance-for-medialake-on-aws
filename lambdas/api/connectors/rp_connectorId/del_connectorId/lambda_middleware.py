@@ -230,20 +230,28 @@ class LambdaMiddleware:
         Wraps the handler result in the standardized output format.
         If InventoryID exists in the event, adds it to the assets array.
         If the payload is too large, stores it in S3 and returns a reference.
+        
+        The output structure will be:
+        {
+            "metadata": { ... },
+            "payload": {
+                "metadata": { ... },
+                "originalEvent": { ... }
+            }
+        }
         """
-        if not self.standardize_payloads:
-            return result
-
-        # Ensure the handler's result is a dict; otherwise, wrap it.
+        # Ensure the handler's result is a dict; if not, wrap it.
         payload_content = result if isinstance(result, dict) else {"data": result}
 
-        # Determine the incoming stepStatus from the event metadata.
-        incoming_status = (original_event.get("metadata", {}).get("stepStatus")
-                        if original_event and "stepStatus" in original_event.get("metadata", {})
-                        else "InProgress")
+        # Determine the incoming stepStatus from the original event metadata.
+        incoming_status = (
+            original_event.get("metadata", {}).get("stepStatus")
+            if original_event and "stepStatus" in original_event.get("metadata", {})
+            else "InProgress"
+        )
         updated_status = "Completed" if incoming_status == "InProgress" else incoming_status
 
-        # Build new metadata according to the required standard.
+        # Build the top-level metadata object.
         metadata = {
             "service": self.service_name,
             "stepName": original_event.get("metadata", {}).get("stepName", "assetRegistration") if original_event else "assetRegistration",
@@ -279,7 +287,7 @@ class LambdaMiddleware:
         else:
             self.logger.warning("pipelineAssets found but not a list; ignoring.")
 
-        # Preserve existing assets array if it exists.
+        # Preserve existing assets if found.
         existing_assets = []
         if "assets" in payload_content:
             existing_assets = payload_content["assets"]
@@ -287,35 +295,17 @@ class LambdaMiddleware:
         elif original_event and "payload" in original_event and "assets" in original_event["payload"]:
             existing_assets = original_event["payload"]["assets"]
             self.logger.info(f"Found existing assets in original event: {existing_assets}")
-        payload_content["assets"] = existing_assets if isinstance(existing_assets, list) else []
+        if not isinstance(existing_assets, list):
+            existing_assets = []
 
-        # Check for DigitalSourceAsset in original event detail ---
-        if original_event and "detail" in original_event:
-            detail = original_event.get("detail", {})
-            outputs = detail.get("outputs", {})
-            input_data = outputs.get("input", {})
-            digital_source_asset = input_data.get("DigitalSourceAsset", {})
-            asset_id = digital_source_asset.get("ID")
-            asset_location = ""
-            main_representation = digital_source_asset.get("MainRepresentation", {})
-            storage_info = main_representation.get("StorageInfo", None)
-            if storage_info:
-                primary_location = storage_info.get("PrimaryLocation", {})
-                asset_location = primary_location if primary_location else ""
-            if asset_id:
-                self.logger.info(f"Found DigitalSourceAsset ID in event: {asset_id}")
-                self.logger.info(f"Asset location: {asset_location}")
-                asset_exists = any(asset.get("assetId") == asset_id for asset in metadata["pipelineAssets"])
-                if not asset_exists:
-                    metadata["pipelineAssets"].append({
-                        "assetId": asset_id,
-                        "assetLocation": asset_location
-                    })
-                    self.logger.info(f"Added asset to pipelineAssets array: {asset_id}")
-                else:
-                    self.logger.info(f"Asset ID already exists in pipelineAssets array: {asset_id}")
+        # Build the new flattened payload structure.
+        # Instead of extracting a "detail", include all of the original event.
+        flattened_payload = {
+            "metadata": payload_content.get("metadata", {}),
+            "originalEvent": original_event if original_event is not None else payload_content,
+        }
 
-        output = {"metadata": metadata, "payload": payload_content}
+        output = {"metadata": metadata, "payload": flattened_payload}
 
         # Check if the output size exceeds the maximum allowed size.
         output_size = len(json.dumps(output).encode("utf-8"))
@@ -348,14 +338,14 @@ class LambdaMiddleware:
                         "item": {"bucket": self.external_payload_bucket, "key": s3_key},
                         "iteration": i
                     })
-      
-                output["payload"]["externalTaskResults"] = references
+                if isinstance(output["payload"], dict) and "key" in output["payload"]:
+                    output["payload"] = {"externalTaskResults": references}
                 self.logger.info(f"Created {len(references)} references to S3 object")
             except Exception as e:
                 self.logger.error(f"Failed to write payload to S3: {str(e)}")
                 raise
 
-        # --- Move externalTaskId and externalTaskStatus from payload to metadata if present ---
+        # Move externalTaskId and externalTaskStatus from payload to metadata if present.
         if "externalTaskId" in payload_content:
             metadata["externalTaskId"] = payload_content.pop("externalTaskId")
             self.logger.info(f"Carried over externalTaskId: {metadata['externalTaskId']}")
@@ -363,8 +353,8 @@ class LambdaMiddleware:
             metadata["externalTaskStatus"] = payload_content.pop("externalTaskStatus")
             self.logger.info(f"Carried over externalTaskStatus: {metadata['externalTaskStatus']}")
 
-        # --- Carry over start_time and end_time for Audio mediaType ---
-        original_item = original_event.get("item") or original_event.get("payload")
+        # Carry over start_time and end_time for Audio mediaType if applicable.
+        original_item = original_event.get("item") or original_event.get("payload") if original_event else None
         if original_item and original_item.get("mediaType") == "Audio":
             for key in ["start_time", "end_time"]:
                 if key in original_item:

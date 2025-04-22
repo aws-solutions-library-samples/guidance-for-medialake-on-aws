@@ -172,10 +172,16 @@ class StateDefinitionFactory:
                         "Resource": lambda_arn,
                         "Retry": [
                             {
+                                "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                                "IntervalSeconds": 1,
+                                "MaxAttempts": 5,
+                                "BackoffRate": 2.0
+                            },
+                            {
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
                                 "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
-                                "BackoffRate": 2.0,
+                                "BackoffRate": 2.0
                             }
                         ],
                     }
@@ -326,6 +332,12 @@ class StateDefinitionFactory:
                         "Resource": processor_lambda_arn,
                         "Retry": [
                             {
+                                "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                                "IntervalSeconds": 1,
+                                "MaxAttempts": 5,
+                                "BackoffRate": 2.0
+                            },
+                            {
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
                                 "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
@@ -429,7 +441,21 @@ class StateDefinitionFactory:
                     "End": True,
                     "Parameters": {
                         "item.$": "$$.Map.Item.Value"
-                    }
+                    },
+                    "Retry": [
+                        {
+                            "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                            "IntervalSeconds": 1,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        },
+                        {
+                            "ErrorEquals": ["States.ALL"],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        }
+                    ]
                 }
                 
                 # Only add MaxConcurrency if it's not zero
@@ -467,7 +493,21 @@ class StateDefinitionFactory:
                     # Add Parameters with InputPath to handle potential path mismatches
                     "Parameters": {
                         "item.$": "$$.Map.Item.Value"
-                    }
+                    },
+                    "Retry": [
+                        {
+                            "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                            "IntervalSeconds": 1,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        },
+                        {
+                            "ErrorEquals": ["States.ALL"],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        }
+                    ]
                 }
                 
                 # Only add MaxConcurrency if it's not zero

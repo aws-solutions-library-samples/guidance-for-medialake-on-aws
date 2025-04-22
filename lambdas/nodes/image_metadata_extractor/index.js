@@ -1,24 +1,22 @@
-const AWS     = require('aws-sdk');
-const s3      = new AWS.S3();
-const dynamo  = new AWS.DynamoDB();
-const exifr   = require('exifr');
-const xml2js  = require('xml2js');
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
+const dynamoDB = new AWS.DynamoDB();
+const exifr = require('exifr');
+const xml2js = require('xml2js');
+const { lambdaMiddleware } = require('./middleware'); // adjust path if needed
 
 const MEDIALAKE_ASSET_TABLE  = process.env.MEDIALAKE_ASSET_TABLE;
 const UNSUPPORTED_EXTENSIONS = ['.webp'];
 
-// ——— Helpers for clipping long byte arrays & strings ———
-
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function sliceArray(arr, limit) {
   const size   = Math.min(arr.length, limit);
   const values = arr.slice(0, size);
   return size < arr.length ? [values, arr.length - size] : [values, 0];
 }
-
 function formatBytes(arr) {
   return arr.map(v => v.toString(16).padStart(2, '0')).join(' ');
 }
-
 function clipBytes(uint8arr, limit = 60) {
   const arr              = Array.from(uint8arr);
   const [values, remain] = sliceArray(arr, limit);
@@ -26,7 +24,6 @@ function clipBytes(uint8arr, limit = 60) {
   if (remain > 0) out += `\n... and ${remain} more`;
   return out;
 }
-
 function clipString(str, limit = 300) {
   const arr              = str.split('');
   const [values, remain] = sliceArray(arr, limit);
@@ -34,16 +31,12 @@ function clipString(str, limit = 300) {
   if (remain > 0) out += `\n... and ${remain} more`;
   return out;
 }
-
-// ——— Case‑prettify & float→decimal helpers ———
-
-function prettyCase(string) {
-  return string
+function prettyCase(key) {
+  return key
     .match(/([A-Z]+(?=[A-Z][a-z]))|([A-Z][a-z]+)|([0-9]+)|([a-z]+)|([A-Z]+)/g)
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .map(s => s[0].toUpperCase() + s.slice(1))
     .join(' ');
 }
-
 const convertFloatsToDecimals = obj => {
   if (obj == null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(convertFloatsToDecimals);
@@ -81,16 +74,17 @@ function normalizeDateTimeString(str) {
 function sanitizeMetadata(obj) {
   if (obj == null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
+  return Object.entries(obj).reduce((out, [k, v]) => {
     if (typeof v === 'string') {
-      if (/^0000-00-00/.test(v)) continue;  // drop placeholders
-      let s = normalizeDateString(v);
-      s     = normalizeDateTimeString(s);
-      if (!isNaN(Date.parse(s))) {
-        out[k] = s
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-          .replace(/[\\"']/g, '\\$&');
+      // Skip placeholder dates
+      if (!/^0000-00-00/.test(v)) {
+        let s = normalizeDateString(v);
+        s     = normalizeDateTimeString(s);
+        if (!isNaN(Date.parse(s))) {
+          out[k] = s
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+            .replace(/[\\"']/g, '\\$&');
+        }
       }
       // otherwise skip non-date strings
     } else if (v instanceof Uint8Array) {
@@ -99,8 +93,8 @@ function sanitizeMetadata(obj) {
       const nested = sanitizeMetadata(v);
       if (nested !== undefined) out[k] = nested;
     }
-  }
-  return out;
+    return out;
+  }, {});
 }
 
 // ——— Base64‑blob detection & removal ———
@@ -149,11 +143,10 @@ function removeBase64Fields(obj) {
 function forceAllObjects(x) {
   if (x == null || typeof x !== 'object') return { value: x };
   if (Array.isArray(x)) return x.map(forceAllObjects);
-  const out = {};
-  for (const [k, v] of Object.entries(x)) {
+  return Object.entries(x).reduce((out, [k, v]) => {
     out[k] = forceAllObjects(v);
-  }
-  return out;
+    return out;
+  }, {});
 }
 
 // ——— EXIF & SVG extraction pipelines ———
@@ -172,10 +165,10 @@ async function extractOrganizedMetadata(buffer) {
 function organizeMetadata(raw) {
   const out  = {};
   const seen = new Set();
-  for (const [segment, data] of Object.entries(raw)) {
-    if (segment === 'errors') continue;
+  for (const [seg, data] of Object.entries(raw)) {
+    if (seg === 'errors') continue;
     if (data && typeof data === 'object') {
-      out[segment] = {};
+      out[seg] = {};
       for (const [k, v] of Object.entries(data)) {
         if (!seen.has(k)) {
           let val = v instanceof Uint8Array
@@ -183,22 +176,23 @@ function organizeMetadata(raw) {
                     : typeof v === 'string'
                       ? clipString(v)
                       : v;
-          out[segment][prettyCase(k)] = val;
+          out[seg][prettyCase(k)] = val;
           seen.add(k);
         }
       }
     } else {
-      out[segment] = data;
+      out[seg] = data;
     }
   }
   return out;
 }
 
+// This function was already defined above, removing duplicate
+
 async function extractSvgMetadata(buffer) {
-  const xml = buffer.toString('utf8');
   try {
     const doc = await new xml2js.Parser({ explicitArray: false })
-                               .parseStringPromise(xml);
+                               .parseStringPromise(buffer);
     return doc.svg?.metadata || null;
   } catch {
     return null;
@@ -248,15 +242,17 @@ exports.lambda_handler = async (event) => {
     const converted  = convertFloatsToDecimals(newMeta);
     const marshalled = AWS.DynamoDB.Converter.marshall(converted);
 
+    // update DynamoDB
     const updateParams = {
       TableName: MEDIALAKE_ASSET_TABLE,
       Key: { InventoryID: { S: inventoryId } },
       UpdateExpression: 'SET Metadata = :m',
-      ExpressionAttributeValues: { ':m': { M: marshalled } }
+      ExpressionAttributeValues: { ':m': { M: marshalled } },
+      ReturnValues: 'UPDATED_NEW'
     };
 
     try {
-      await dynamo.updateItem(updateParams).promise();
+      await dynamoDB.updateItem(updateParams).promise();
     } catch (updateErr) {
       if (
         updateErr.code === 'ValidationException' &&
@@ -270,10 +266,37 @@ exports.lambda_handler = async (event) => {
       throw updateErr;
     }
 
-    return { statusCode: 200, body: JSON.stringify({ inventoryId }) };
+    console.log(`Updated metadata for ${inventoryId}`);
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        inventoryId,
+        message: 'Metadata extracted and stored successfully',
+      }),
+    };
 
   } catch (err) {
-    console.error('Processing failed for', inventoryId, err);
-    // throw err;
+    console.error('Handler error:', err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Error extracting or storing image metadata',
+        message: err.message,
+        stack: err.stack,
+      }),
+    };
   }
 };
+
+// ── Export wrapped handler ───────────────────────────────────────────────────
+const baseHandler = exports.lambda_handler;
+exports.lambda_handler = lambdaMiddleware({
+  eventBusName: process.env.EVENT_BUS_NAME || 'default-event-bus',
+  metricsNamespace: process.env.METRICS_NAMESPACE || 'MediaLake',
+  cleanupS3: true,
+  largePayloadBucket: process.env.EXTERNAL_PAYLOAD_BUCKET,
+  externalPayloadBucket: process.env.EXTERNAL_PAYLOAD_BUCKET,
+  maxRetries: 3,
+  standardizePayloads: true,
+  maxResponseSize: 240 * 1024, // 240 KB
+})(baseHandler);

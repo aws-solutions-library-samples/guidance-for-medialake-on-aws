@@ -1,12 +1,14 @@
 import json
+import time
+import shortuuid
 from typing import Dict, Any, Optional
 
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import INGEST_EVENT_BUS_NAME, NODE_TEMPLATES_BUCKET
+from config import INGEST_EVENT_BUS_NAME, NODE_TEMPLATES_BUCKET, IAC_ASSETS_BUCKET, resource_prefix
 from iam_operations import get_events_role_arn
-from lambda_operations import read_yaml_from_s3
+from lambda_operations import read_yaml_from_s3, get_zip_file_key
 
 # Initialize logger
 logger = Logger()
@@ -30,7 +32,14 @@ def get_event_pattern_for_rule(
     pattern = {"source": ["custom.asset.processor"]}
 
     # Add specific pattern based on rule name
-    if rule_name == "video_ingested":
+    if rule_name == "ingest_completed":
+        pattern.update(
+            {
+                "detail-type": ["AssetCreated"],
+                "detail": {"DigitalSourceAsset": {"MainRepresentation": {}}},
+            }
+        )
+    elif rule_name == "video_ingested":
         pattern.update(
             {
                 "detail-type": ["AssetCreated"],
@@ -81,9 +90,16 @@ def get_event_pattern_for_rule(
         
         # Only include MainRepresentation if asset_format is not empty
         if asset_format and asset_format.strip():
-            digital_source_asset["MainRepresentation"] = {"Format": [asset_format.upper()]}
+            # Handle comma-delimited formats
+            if "," in asset_format:
+                # Split by comma, trim whitespace, convert to uppercase, and filter out empty items
+                format_array = [fmt.strip().upper() for fmt in asset_format.split(",") if fmt.strip()]
+                if format_array:  # Only add if there are non-empty items
+                    digital_source_asset["MainRepresentation"] = {"Format": format_array}
+            else:
+                digital_source_asset["MainRepresentation"] = {"Format": [asset_format.upper()]}
         
-        # Add StorageInfo path if prefix is specified
+        # Add StorageInfo path if prefix is specified and not empty
         if asset_prefix and asset_prefix.strip():
             # Create MainRepresentation if it doesn't exist yet
             if "MainRepresentation" not in digital_source_asset:
@@ -117,9 +133,16 @@ def get_event_pattern_for_rule(
         target_pipeline = node.data.configuration.get("pipeline_name", "")
         pattern.update({"detail-type": ["WorkflowCompleted"]})
 
-        # Add pipeline name filter if specified
-        if target_pipeline:
-            pattern["detail"] = {"pipeline_name": [target_pipeline]}
+        # Add pipeline name filter if specified and not empty
+        if target_pipeline and target_pipeline.strip():
+            # Handle comma-delimited pipeline names
+            if "," in target_pipeline:
+                # Split by comma, trim whitespace, and filter out empty items
+                pipeline_array = [name.strip() for name in target_pipeline.split(",") if name.strip()]
+                if pipeline_array:  # Only add if there are non-empty items
+                    pattern["detail"] = {"pipeline_name": pipeline_array}
+            else:
+                pattern["detail"] = {"pipeline_name": [target_pipeline]}
 
     # Add any additional filters from node configuration
     for param in node.data.configuration:
@@ -138,19 +161,155 @@ def get_event_pattern_for_rule(
                 if isinstance(node.data.configuration[param], dict):
                     # For dictionaries, add each key-value pair directly to detail
                     for key, value in node.data.configuration[param].items():
-                        pattern["detail"][key] = [value]
+                        # Skip empty parameters or empty strings
+                        if value is not None and value != "":
+                            # Handle comma-delimited values
+                            if isinstance(value, str) and "," in value:
+                                # Split by comma, trim whitespace, and filter out empty items
+                                if key == "Format":
+                                    # Convert Format values to uppercase
+                                    value_array = [item.strip().upper() for item in value.split(",") if item.strip()]
+                                    # For ingest_completed rule, place Format in the correct nested structure
+                                    if rule_name == "ingest_completed" and value_array:
+                                        if "DigitalSourceAsset" not in pattern["detail"]:
+                                            pattern["detail"]["DigitalSourceAsset"] = {}
+                                        if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                            pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                        pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = value_array
+                                    elif value_array:  # Only add if there are non-empty items
+                                        pattern["detail"][key] = value_array
+                                else:
+                                    value_array = [item.strip() for item in value.split(",") if item.strip()]
+                                    if value_array:  # Only add if there are non-empty items
+                                        pattern["detail"][key] = value_array
+                            else:
+                                # Convert Format values to uppercase
+                                if key == "Format" and isinstance(value, str):
+                                    # For ingest_completed rule, place Format in the correct nested structure
+                                    if rule_name == "ingest_completed":
+                                        if "DigitalSourceAsset" not in pattern["detail"]:
+                                            pattern["detail"]["DigitalSourceAsset"] = {}
+                                        if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                            pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                        pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [value.upper()]
+                                    else:
+                                        pattern["detail"][key] = [value.upper()]
+                                else:
+                                    pattern["detail"][key] = [value]
                 elif isinstance(node.data.configuration[param], list):
                     # For lists of dictionaries, extract and flatten
                     for item in node.data.configuration[param]:
                         if isinstance(item, dict):
                             for key, value in item.items():
-                                pattern["detail"][key] = [value]
+                                # Skip empty parameters or empty strings
+                                if value is not None and value != "":
+                                    # Handle comma-delimited values
+                                    if isinstance(value, str) and "," in value:
+                                        # Split by comma, trim whitespace, and filter out empty items
+                                        if key == "Format":
+                                            # Convert Format values to uppercase
+                                            value_array = [item.strip().upper() for item in value.split(",") if item.strip()]
+                                            # For ingest_completed rule, place Format in the correct nested structure
+                                            if rule_name == "ingest_completed" and value_array:
+                                                if "DigitalSourceAsset" not in pattern["detail"]:
+                                                    pattern["detail"]["DigitalSourceAsset"] = {}
+                                                if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                                pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = value_array
+                                            elif value_array:  # Only add if there are non-empty items
+                                                pattern["detail"][key] = value_array
+                                        else:
+                                            value_array = [item.strip() for item in value.split(",") if item.strip()]
+                                            if value_array:  # Only add if there are non-empty items
+                                                pattern["detail"][key] = value_array
+                                    else:
+                                        # Convert Format values to uppercase
+                                        if key == "Format" and isinstance(value, str):
+                                            # For ingest_completed rule, place Format in the correct nested structure
+                                            if rule_name == "ingest_completed":
+                                                if "DigitalSourceAsset" not in pattern["detail"]:
+                                                    pattern["detail"]["DigitalSourceAsset"] = {}
+                                                if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                                pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [value.upper()]
+                                            else:
+                                                pattern["detail"][key] = [value.upper()]
+                                        else:
+                                            pattern["detail"][key] = [value]
                 else:
-                    # For simple values, add as is
-                    pattern["detail"][param] = [node.data.configuration[param]]
+                    # For simple values, add as is if not empty
+                    if node.data.configuration[param] is not None and node.data.configuration[param] != "":
+                        # Handle comma-delimited values
+                        value = node.data.configuration[param]
+                        if isinstance(value, str) and "," in value:
+                            # Split by comma, trim whitespace, and filter out empty items
+                            if param == "Format":
+                                # Convert Format values to uppercase
+                                value_array = [item.strip().upper() for item in value.split(",") if item.strip()]
+                                # For ingest_completed rule, place Format in the correct nested structure
+                                if rule_name == "ingest_completed" and value_array:
+                                    if "DigitalSourceAsset" not in pattern["detail"]:
+                                        pattern["detail"]["DigitalSourceAsset"] = {}
+                                    if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                        pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = value_array
+                                elif value_array:  # Only add if there are non-empty items
+                                    pattern["detail"][param] = value_array
+                            else:
+                                value_array = [item.strip() for item in value.split(",") if item.strip()]
+                                if value_array:  # Only add if there are non-empty items
+                                    pattern["detail"][param] = value_array
+                        else:
+                            # Convert Format values to uppercase
+                            if param == "Format" and isinstance(value, str):
+                                # For ingest_completed rule, place Format in the correct nested structure
+                                if rule_name == "ingest_completed":
+                                    if "DigitalSourceAsset" not in pattern["detail"]:
+                                        pattern["detail"]["DigitalSourceAsset"] = {}
+                                    if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                        pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [value.upper()]
+                                else:
+                                    pattern["detail"][param] = [value.upper()]
+                            else:
+                                pattern["detail"][param] = [value]
             else:
-                # For all other parameters, add as is
-                pattern["detail"][param] = [node.data.configuration[param]]
+                # For all other parameters, add as is if not empty
+                if node.data.configuration[param] is not None and node.data.configuration[param] != "":
+                    # Handle comma-delimited values
+                    value = node.data.configuration[param]
+                    if isinstance(value, str) and "," in value:
+                        # Split by comma, trim whitespace, and filter out empty items
+                        if param == "Format":
+                            # Convert Format values to uppercase
+                            value_array = [item.strip().upper() for item in value.split(",") if item.strip()]
+                            # For ingest_completed rule, place Format in the correct nested structure
+                            if rule_name == "ingest_completed" and value_array:
+                                if "DigitalSourceAsset" not in pattern["detail"]:
+                                    pattern["detail"]["DigitalSourceAsset"] = {}
+                                if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = value_array
+                            elif value_array:  # Only add if there are non-empty items
+                                pattern["detail"][param] = value_array
+                        else:
+                            value_array = [item.strip() for item in value.split(",") if item.strip()]
+                            if value_array:  # Only add if there are non-empty items
+                                pattern["detail"][param] = value_array
+                    else:
+                        # Convert Format values to uppercase
+                        if param == "Format" and isinstance(value, str):
+                            # For ingest_completed rule, place Format in the correct nested structure
+                            if rule_name == "ingest_completed":
+                                if "DigitalSourceAsset" not in pattern["detail"]:
+                                    pattern["detail"]["DigitalSourceAsset"] = {}
+                                if "MainRepresentation" not in pattern["detail"]["DigitalSourceAsset"]:
+                                    pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"] = {}
+                                pattern["detail"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [value.upper()]
+                            else:
+                                pattern["detail"][param] = [value.upper()]
+                        else:
+                            pattern["detail"][param] = [value]
 
     return pattern
 
@@ -225,19 +384,122 @@ def create_eventbridge_rule(
             Description=f"Rule for pipeline {pipeline_name}, node {node.data.label}",
         )
 
-        # Create or get IAM role for EventBridge to invoke Step Functions
+        # Create or get IAM role for EventBridge to invoke Lambda
         role_arn = get_events_role_arn(sanitized_pipeline_name)
-
-        # Set the Step Function as the target
+        
+        # Create a unique trigger lambda name for this pipeline
+        uuid_short = shortuuid.uuid()[:8]
+        trigger_lambda_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_{uuid_short}"
+        
+        # Create the trigger lambda function
+        lambda_client = boto3.client("lambda")
+        
+        # Check if the trigger lambda already exists
+        try:
+            # Try to get the function
+            response = lambda_client.get_function(FunctionName=trigger_lambda_name)
+            trigger_lambda_arn = response["Configuration"]["FunctionArn"]
+            logger.info(f"Trigger lambda {trigger_lambda_name} already exists")
+        except lambda_client.exceptions.ResourceNotFoundException:
+            # Create the trigger lambda
+            logger.info(f"Creating trigger lambda {trigger_lambda_name}")
+            
+            # Get the zip file key for the pipeline_trigger Lambda
+            zip_file_prefix = "lambda-code/nodes/utility/PipelineTriggerLambdaDeployment"
+            try:
+                zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
+                logger.info(f"Found zip file for pipeline_trigger: {zip_file_key}")
+            except Exception as e:
+                logger.error(f"Failed to find zip file for pipeline_trigger: {e}")
+                return None
+            
+            # Create a role for the trigger lambda
+            iam_client = boto3.client("iam")
+            role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
+            
+            # Create the role
+            trust_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "lambda.amazonaws.com"},
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            }
+            
+            try:
+                response = iam_client.create_role(
+                    RoleName=role_name,
+                    AssumeRolePolicyDocument=json.dumps(trust_policy)
+                )
+                role_arn = response["Role"]["Arn"]
+                
+                # Attach policies
+                iam_client.attach_role_policy(
+                    RoleName=role_name,
+                    PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                )
+                
+                # Add policy to allow invoking Step Functions
+                policy_document = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "states:StartExecution",
+                                "states:ListExecutions"
+                            ],
+                            "Resource": [state_machine_arn]
+                        }
+                    ]
+                }
+                
+                iam_client.put_role_policy(
+                    RoleName=role_name,
+                    PolicyName=f"{role_name}_policy",
+                    PolicyDocument=json.dumps(policy_document)
+                )
+                
+                # Wait for role to propagate
+                time.sleep(10)
+                
+                # Create the Lambda function
+                response = lambda_client.create_function(
+                    FunctionName=trigger_lambda_name,
+                    Runtime="python3.12",
+                    Role=role_arn,
+                    Handler="index.lambda_handler",
+                    Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
+                    Timeout=300,
+                    MemorySize=1024,
+                    Environment={
+                        "Variables": {
+                            "MAX_CONCURRENT_EXECUTIONS": "1000",
+                            "PIPELINE_NAME": pipeline_name
+                        }
+                    }
+                )
+                
+                trigger_lambda_arn = response["FunctionArn"]
+                logger.info(f"Created trigger lambda with ARN: {trigger_lambda_arn}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create trigger lambda: {e}")
+                return None
+        
+        # Set the trigger lambda as the target instead of the Step Function directly
         events_client.put_targets(
             Rule=unique_rule_name,
             EventBusName=event_bus_name,
             Targets=[
                 {
                     "Id": f"{sanitized_pipeline_name}-target",
-                    "Arn": state_machine_arn,
+                    "Arn": trigger_lambda_arn,
                     "RoleArn": role_arn,
-                    # Add input transformer to include metadata about the trigger
+                    # Add input transformer to include metadata about the trigger and the Step Function ARN
                     "InputTransformer": {
                         "InputPathsMap": {
                             "detail": "$.detail",
@@ -247,12 +509,22 @@ def create_eventbridge_rule(
                         },
                         "InputTemplate": json.dumps(
                             {
-                                "detail": "<detail>",
-                                "source": "<source>",
-                                "detailType": "<detailType>",
-                                "time": "<time>",
-                                "triggerNode": node.data.id,
-                                "pipelineName": pipeline_name,
+                                "Records": [
+                                    {
+                                        "body": json.dumps({
+                                            "Asset": {
+                                                "detail": "<detail>",
+                                                "source": "<source>",
+                                                "detailType": "<detailType>",
+                                                "time": "<time>",
+                                                "triggerNode": node.data.id,
+                                                "pipelineName": pipeline_name,
+                                                "InventoryID": "${detail.DigitalSourceAsset.InventoryID}"
+                                            },
+                                            "StateMachineArn": state_machine_arn
+                                        })
+                                    }
+                                ]
                             }
                         )
                         .replace('"<detail>"', "<detail>")

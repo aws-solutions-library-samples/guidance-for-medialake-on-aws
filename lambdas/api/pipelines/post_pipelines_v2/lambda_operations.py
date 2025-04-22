@@ -3,7 +3,7 @@ import re
 import time
 import yaml
 import traceback
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import shortuuid
 
 import boto3
@@ -192,14 +192,72 @@ def delete_lambda_function(function_name: str) -> None:
     except lambda_client.exceptions.ResourceNotFoundException:
         logger.debug(f"Lambda function {function_name} does not exist")
 
+def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str, Any]) -> List[str]:
+    """
+    Determine which layers to attach to a Lambda function based on its YAML configuration.
+    
+    Args:
+        node_id: ID of the node
+        node_type: Type of the node (e.g., "utility", "integration")
+        yaml_data: YAML configuration data
+        
+    Returns:
+        List of layer ARNs to attach
+    """
+    layers = []
+    
+    # First, try to get layers from DynamoDB
+    try:
+        # Get the layers item from DynamoDB
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(os.environ["NODE_TABLE"])
+        response = table.get_item(Key={"pk": f"NODE#{node_id}", "sk": "LAYERS"})
+        
+        if "Item" in response and "layers" in response["Item"]:
+            # Add each layer ARN to the list
+            for layer_name, layer_arn in response["Item"]["layers"].items():
+                layers.append(layer_arn)
+                logger.info(f"Adding layer {layer_name} (ARN: {layer_arn}) from DynamoDB to Lambda function for node {node_id}")
+    except Exception as e:
+        logger.warning(f"Error retrieving layers from DynamoDB for node {node_id}: {e}")
+    
+    # # If no layers were found in DynamoDB, fall back to environment variables
+    # if not layers:
+    #     # Get Lambda configuration from YAML
+    #     lambda_config = yaml_data["node"]["integration"]["config"]["lambda"]
+        
+    #     # Check if layers are defined in the YAML
+    #     if "layers" in lambda_config:
+    #         for layer_name in lambda_config["layers"]:
+    #             # Convert layer name to environment variable name (e.g., "CairoSvg" -> "CAIROSVG_LAYER_ARN")
+    #             env_var_name = f"{layer_name.upper()}_LAYER_ARN"
+    #             layer_arn = os.environ.get(env_var_name)
+                
+    #             if layer_arn:
+    #                 layers.append(layer_arn)
+    #                 logger.info(f"Adding layer {layer_name} (ARN: {layer_arn}) from environment to Lambda function for node {node_id}")
+    #             else:
+    #                 logger.warning(f"Layer {layer_name} specified in YAML but environment variable {env_var_name} not found")
+    
+    # Always add the Powertools layer for all Lambda functions if not already specified
+    if not any("POWERTOOLS_LAYER_ARN" in layer for layer in layers):
+        powertools_layer_arn = os.environ.get("POWERTOOLS_LAYER_ARN")
+        if powertools_layer_arn:
+            layers.append(powertools_layer_arn)
+            logger.info(f"Adding default Powertools layer to Lambda function for node {node_id}")
+    
+    return layers
 
-def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
+
+def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False) -> Optional[str]:
     """
     Create or update a Lambda function for a node.
 
     Args:
         pipeline_name: Name of the pipeline
         node: Node object containing configuration
+        is_first: Whether this is the first lambda in the pipeline
+        is_last: Whether this is the last lambda in the pipeline
 
     Returns:
         ARN of the created Lambda function, or None if creation was skipped
@@ -345,6 +403,11 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     "Publish": True,
                 }
 
+                # Determine which layers to attach
+                layers = determine_layers_for_node(node.data.id, node.data.type.lower(), yaml_data)
+                if layers:
+                    create_function_params["Layers"] = layers
+                    logger.info(f"Attaching layers to Lambda function {function_name}: {layers}")
 
 
                 # Common environment variables for all Lambda functions
@@ -354,6 +417,15 @@ def create_lambda_function(pipeline_name: str, node: Any) -> Optional[str]:
                     "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE
                 }
+                
+                # Add IS_FIRST and IS_LAST if applicable
+                if is_first:
+                    common_env_vars["IS_FIRST"] = "true"
+                    logger.info(f"Marking lambda {function_name} as first lambda in pipeline")
+                
+                if is_last:
+                    common_env_vars["IS_LAST"] = "true"
+                    logger.info(f"Marking lambda {function_name} as last lambda in pipeline")
 
                 # Only include additional Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":

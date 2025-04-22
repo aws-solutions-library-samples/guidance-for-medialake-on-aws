@@ -8,6 +8,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from models import PipelineDefinition
 from lambda_operations import create_lambda_function
 from step_functions_builder import build_step_function_definition, create_step_function
+from s3_loader import load_pipeline_from_s3
 
 from eventbridge import create_eventbridge_rule, delete_eventbridge_rule
 from dynamodb_operations import (
@@ -23,25 +24,85 @@ logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="PostPipeliNeV2")
 
+def transform_pipeline_data(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform pipeline data to match the expected format for PipelineDefinition.
+    
+    This function:
+    1. Converts numeric width and height values to strings
+    2. Adds an 'id' field to each node's data object based on the nodeId field
+    
+    Args:
+        pipeline_data: The pipeline data to transform
+        
+    Returns:
+        The transformed pipeline data
+    """
+    logger.info("Transforming pipeline data to match expected format")
+    
+    # Make a deep copy to avoid modifying the original
+    transformed_data = json.loads(json.dumps(pipeline_data))
+    
+    # Transform nodes
+    if "configuration" in transformed_data and "nodes" in transformed_data["configuration"]:
+        for node in transformed_data["configuration"]["nodes"]:
+            # Convert width and height to strings
+            if "width" in node and isinstance(node["width"], int):
+                node["width"] = str(node["width"])
+            if "height" in node and isinstance(node["height"], int):
+                node["height"] = str(node["height"])
+            
+            # Add id field to data object based on nodeId
+            if "data" in node and "nodeId" in node["data"] and "id" not in node["data"]:
+                node["data"]["id"] = node["data"]["nodeId"]
+    
+    logger.info("Pipeline data transformation complete")
+    return transformed_data
+
 def parse_pipeline_definition(event: Dict[str, Any]) -> PipelineDefinition:
     """
     Parse pipeline definition from event input.
 
-    This function handles both direct pipeline definitions and those wrapped in a "body" field
-    (like from API Gateway events).
+    This function handles:
+    1. Direct pipeline definitions at the top level
+    2. Pipeline definitions wrapped in a "body" field (API Gateway style)
+    3. Pipeline definitions stored in S3 (referenced by definitionFile and loadFromS3 flag)
     """
     logger.info("Parsing pipeline definition from event")
+    logger.info(f"Event: {event}")
+    
+    # Check if we should load from S3
+    if event.get("loadFromS3") is True and "definitionFile" in event:
+        logger.info("Loading pipeline definition from S3")
+        definition_file = event.get("definitionFile", {})
+        bucket = definition_file.get("bucket")
+        key = definition_file.get("key")
+        
+        if not bucket or not key:
+            raise ValueError("Missing bucket or key in definitionFile")
+        
+        logger.info(f"Loading pipeline definition from S3: {bucket}/{key}")
+        pipeline_data = load_pipeline_from_s3(bucket, key)
+        logger.info(f"Successfully loaded pipeline definition from S3")
+        
+        # Transform the pipeline data to match the expected format
+        transformed_data = transform_pipeline_data(pipeline_data)
+        return PipelineDefinition(**transformed_data)
     
     # Check if the event has the required pipeline fields at the top level
     if all(key in event for key in ["name", "description", "configuration"]):
         logger.info("Pipeline definition found at top level of event")
-        pipeline = PipelineDefinition(**event)
+        # Transform the pipeline data to match the expected format
+        transformed_data = transform_pipeline_data(event)
+        pipeline = PipelineDefinition(**transformed_data)
     else:
         # Try to extract from body field (API Gateway style)
         logger.info("Trying to extract pipeline definition from event body")
         body_str = event.get("body", "{}")
         body = body_str if isinstance(body_str, dict) else json.loads(body_str)
-        pipeline = PipelineDefinition(**body)
+        # Transform the pipeline data to match the expected format
+        transformed_body = transform_pipeline_data(body)
+        pipeline = PipelineDefinition(**transformed_body)
     
     logger.debug(f"Parsed pipeline definition: {pipeline}")
     return pipeline
@@ -116,6 +177,15 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             lambda_arns = {}
             total_nodes = len(pipeline.configuration.nodes)
             processed_nodes = 0
+            
+            # Create a graph analyzer to identify first and last lambdas
+            graph_analyzer = GraphAnalyzer(pipeline)
+            graph_analyzer.analyze()
+            first_lambda_node_id, last_lambda_node_id = graph_analyzer.find_first_and_last_lambdas()
+            
+            logger.info(f"Identified first lambda node: {first_lambda_node_id}")
+            logger.info(f"Identified last lambda node: {last_lambda_node_id}")
+            
             for node in pipeline.configuration.nodes:
                 processed_nodes += 1
                 node_id = node.data.id
@@ -126,7 +196,11 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 logger.info(f"Processing node {processed_nodes}/{total_nodes} with id: {node_id}, type: {node_type}")
                 logger.debug(f"Node details: {node}")
                 
-                lambda_arn = create_lambda_function(pipeline_name, node)
+                # Check if this is the first or last lambda
+                is_first = (node.id == first_lambda_node_id)
+                is_last = (node.id == last_lambda_node_id)
+                
+                lambda_arn = create_lambda_function(pipeline_name, node, is_first=is_first, is_last=is_last)
                 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
                 lambda_key = node.data.id
