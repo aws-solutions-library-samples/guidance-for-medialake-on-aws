@@ -1,5 +1,10 @@
 {
   "dependencies": {
     "cdk": "^2.164.1"
-  }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.14.1"
+  },
+  "scripts": {}
 }

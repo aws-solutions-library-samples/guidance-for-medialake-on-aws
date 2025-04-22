@@ -294,6 +294,16 @@ class AssetSyncProcessor:
             
             logger.info(f"Found {len(objects)} objects in chunk {chunk_index}")
             
+            # Post the number of objects in the chunk to CloudWatch metrics
+            metrics.add_metric(
+                name="ObjectsPerChunk",
+                unit=MetricUnit.Count,
+                value=len(objects)
+            )
+            # Add dimensions for job ID and chunk index
+            metrics.add_dimension(name="JobId", value=self.job_id)
+            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
+            
             # Fetch tags for objects to determine if they need processing
             with ThreadPoolExecutor(max_workers=min(MAX_THREADS, len(objects))) as executor:
                 futures = [
@@ -316,6 +326,16 @@ class AssetSyncProcessor:
             objects_to_process = self._filter_objects_to_process(objects)
             
             logger.info(f"Found {len(objects_to_process)} objects that need processing in chunk {chunk_index}")
+            
+            # Post the number of objects that need processing to CloudWatch metrics
+            metrics.add_metric(
+                name="ObjectsToProcess",
+                unit=MetricUnit.Count,
+                value=len(objects_to_process)
+            )
+            # Add dimensions for job ID and chunk index
+            metrics.add_dimension(name="JobId", value=self.job_id)
+            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
             
             # Process objects
             results = self._process_objects(objects_to_process)
@@ -486,6 +506,30 @@ class AssetSyncProcessor:
         
         logger.info(f"Processing complete: {results['successful']} successful, {results['failed']} failed")
         
+        # Post processing metrics to CloudWatch
+        metrics.add_metric(
+            name="SuccessfullyProcessedObjects",
+            unit=MetricUnit.Count,
+            value=results['successful']
+        )
+        metrics.add_metric(
+            name="FailedProcessedObjects",
+            unit=MetricUnit.Count,
+            value=results['failed']
+        )
+        metrics.add_metric(
+            name="CopyOperations",
+            unit=MetricUnit.Count,
+            value=results['copy_operations']
+        )
+        metrics.add_metric(
+            name="PutOperations",
+            unit=MetricUnit.Count,
+            value=results['put_operations']
+        )
+        # Add dimensions for job ID
+        metrics.add_dimension(name="JobId", value=self.job_id)
+        
         return results
         
     def _process_object(self, obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -533,6 +577,14 @@ class AssetSyncProcessor:
             
             logger.info(f"Successfully copied object {object_key}")
             
+            # Record successful object processing metric
+            metrics.add_metric(
+                name="SingleObjectProcessingSuccess",
+                unit=MetricUnit.Count,
+                value=1
+            )
+            metrics.add_dimension(name="JobId", value=self.job_id)
+            
             # Return success result
             return {
                 'status': 'success',
@@ -554,6 +606,14 @@ class AssetSyncProcessor:
                     bucket_name=self.bucket_name
                 )
             )
+            
+            # Record failed object processing metric
+            metrics.add_metric(
+                name="SingleObjectProcessingFailure",
+                unit=MetricUnit.Count,
+                value=1
+            )
+            metrics.add_dimension(name="JobId", value=self.job_id)
             
             # Return error result
             return {
@@ -611,8 +671,25 @@ def lambda_handler(event, context):
                         try:
                             result = processor.process_chunk(chunk_key, chunk_index, total_chunks)
                             logger.info(f"Processed chunk: {result}")
+                            
+                            # Record successful chunk processing metric
+                            metrics.add_metric(
+                                name="ChunkProcessingSuccess", 
+                                unit=MetricUnit.Count,
+                                value=1
+                            )
+                            metrics.add_dimension(name="JobId", value=job_id)
+                            
                         except Exception as e:
                             logger.error(f"Error processing chunk: {str(e)}", exc_info=True)
+                            
+                            # Record chunk processing error metric
+                            metrics.add_metric(
+                                name="ChunkProcessingErrors", 
+                                unit=MetricUnit.Count,
+                                value=1
+                            )
+                            metrics.add_dimension(name="JobId", value=job_id)
                             
                             # Update job status to failed if this is a critical error
                             if chunk_index == total_chunks:
@@ -627,6 +704,20 @@ def lambda_handler(event, context):
                 except Exception as e:
                     logger.error(f"Error processing SQS record: {str(e)}", exc_info=True)
                     
+                    # Record SQS processing errors
+                    metrics.add_metric(
+                        name="SQSProcessingErrors",
+                        unit=MetricUnit.Count,
+                        value=1
+                    )
+                    
+            # Add metrics for SQS message processing
+            metrics.add_metric(
+                name="ProcessedSQSMessages",
+                unit=MetricUnit.Count,
+                value=len(event['Records'])
+            )
+            
             return {"status": "success", "message": f"Processed {len(event['Records'])} SQS messages"}
                 
         elif 'tasks' in event or 'task' in event or 'job' in event:
@@ -724,6 +815,21 @@ def lambda_handler(event, context):
                     logger.info(f"Processing task {task_id}")
                     
                     result = processor.process_s3_batch_operation(task)
+                    
+                    # Record batch operation processing success/failure
+                    if result.get('resultCode') == 'Succeeded':
+                        metrics.add_metric(
+                            name="BatchOperationSuccesses",
+                            unit=MetricUnit.Count,
+                            value=1
+                        )
+                    else:
+                        metrics.add_metric(
+                            name="BatchOperationErrors",
+                            unit=MetricUnit.Count,
+                            value=1
+                        )
+                    
                     results.append({
                         'taskId': task_id,
                         'resultCode': result.get('resultCode', 'PermanentFailure'),
@@ -731,6 +837,14 @@ def lambda_handler(event, context):
                     })
                 except Exception as e:
                     logger.error(f"Error processing task: {str(e)}", exc_info=True)
+                    
+                    # Record batch operation processing errors
+                    metrics.add_metric(
+                        name="BatchOperationErrors",
+                        unit=MetricUnit.Count,
+                        value=1
+                    )
+                    
                     results.append({
                         'taskId': task.get('taskId', 'unknown'),
                         'resultCode': 'PermanentFailure',

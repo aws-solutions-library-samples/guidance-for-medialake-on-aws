@@ -1,37 +1,18 @@
 import { test, expect } from '@playwright/test';
 
-test('simple passing test', async () => {
-  // Simple test that doesn't require navigation
-  expect(true).toBeTruthy();
-  console.log('Test is running successfully!');
+test('has title', async ({ page }) => {
+  await page.goto('https://playwright.dev/');
+
+  // Expect a title "to contain" a substring.
+  await expect(page).toHaveTitle(/Playwright/);
 });
 
-// Other tests are commented out until we have the web server running
-/*
-test('homepage loads', async ({ page }) => {
-  await page.goto('http://localhost:3000');
-  
-  // Check if title contains MediaLake
-  const title = await page.title();
-  expect(title).toContain('MediaLake');
-  
-  // This is just a placeholder assertion that will always pass
-  expect(true).toBeTruthy();
-});
+test('get started link', async ({ page }) => {
+  await page.goto('https://playwright.dev/');
 
-test('navigation works', async ({ page }) => {
-  // This test will eventually test navigation functionality
-  // await page.goto('http://localhost:3000');
-  // await page.click('nav >> text=Features');
-  // expect(page.url()).toContain('/features');
-  
-  // This is just a placeholder assertion that will always pass
-  expect(true).toBeTruthy();
-});
+  // Click the get started link.
+  await page.getByRole('link', { name: 'Get started' }).click();
 
-test('mock API test', async () => {
-  // This is a placeholder for API testing
-  // Will be implemented with proper API mock testing later
-  expect(true).toBeTruthy();
+  // Expects page to have a heading with the name of Installation.
+  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
 });
-*/ 
