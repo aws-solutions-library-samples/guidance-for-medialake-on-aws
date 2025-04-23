@@ -9,6 +9,7 @@ from models import PipelineDefinition
 from lambda_operations import create_lambda_function
 from step_functions_builder import build_step_function_definition, create_step_function
 from s3_loader import load_pipeline_from_s3
+from graph_utils import GraphAnalyzer
 
 from eventbridge import create_eventbridge_rule, delete_eventbridge_rule
 from dynamodb_operations import (

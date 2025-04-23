@@ -626,127 +626,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "GLOBAL_PREFIX": config.resource_prefix,
             },
         )
-        self._post_pipelines_handler = Lambda(
-            self,
-            "PostPipelinesHandler",
-            config=post_pipelines_lambda_config,
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "sqs:CreateQueue",
-                    "sqs:GetQueueAttributes",
-                    "sqs:TagQueue",
-                    "sqs:setqueueattributes",
-                    "sqs:DeleteQueue",
-                ],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "iam:TagRole",
-                    "iam:CreateRole",
-                    "iam:AttachRolePolicy",
-                    "iam:ListAttachedRolePolicies",
-                    "iam:PassRole",
-                    "iam:PutRolePolicy",
-                    "iam:GetRolePolicy",
-                    "iam:GetRole",
-                    "iam:ListRolePolicies",  # for rollback
-                    "iam:DetachRolePolicy",  # for rollback
-                    "iam:DeleteRolePolicy",  # for rollback
-                    "iam:DeleteRole",  # for rollback
-                ],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "lambda:CreateFunction",
-                    "lambda:TagResource",
-                    "lambda:GetLayerVersion",
-                    "lambda:GetFunction",
-                    "lambda:CreateEventSourceMapping",
-                    "lambda:UpdateFunctionConfiguration",
-                    "lambda:DeleteFunction",  # For rollback
-                ],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "states:CreateStateMachine",
-                    "states:TagResource",
-                    "states:DescribeStateMachine",
-                    "states:DeleteStateMachine",  # For rollback
-                ],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:PutItem", "dynamodb:Scan"],
-                resources=[props.pipeline_table.table_arn],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:Scan"],
-                resources=[props.connector_table.table_arn],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "events:TagResource",
-                    "events:PutRule",
-                    "events:PutTargets",
-                    "events:DescribeRule",
-                    "events:DeleteRule",
-                ],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
-                resources=["*"],
-            )
-        )
-
-        self._post_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    # "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                ],
-                resources=["*"],
-            )
-        )
-
-        props.iac_assets_bucket.bucket.grant_read_write(
-            self._post_pipelines_handler.function
-        )
-
-        pipelines_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(self._post_pipelines_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
+       
 
         # Pipeline ID specific endpoints
         pipeline_id_resource = pipelines_resource.add_resource("{pipelineId}")
@@ -933,13 +813,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         add_cors_options_method(execution_id_resource)
         add_cors_options_method(retry_resource)
 
-    @property
-    def pipelines_create_handler(self) -> lambda_.Function:
-        return self._post_pipelines_handler
 
-    @property
-    def post_pipelines_handler(self) -> Lambda:
-        return self._post_pipelines_handler
 
     @property
     def post_pipelines_async_handler(self) -> Lambda:

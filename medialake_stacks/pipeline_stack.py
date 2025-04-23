@@ -222,7 +222,7 @@ class PipelineStack(cdk.NestedStack):
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelinesv2_async_handler.function_name,
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -233,7 +233,7 @@ class PipelineStack(cdk.NestedStack):
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": self._pipelines_api.post_pipelines_handler.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelinesv2_async_handler.function_name,
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -244,7 +244,7 @@ class PipelineStack(cdk.NestedStack):
                     [
                         iam.PolicyStatement(
                             actions=["lambda:InvokeFunction"],
-                            resources=[self._pipelines_api.post_pipelines_handler.function_arn],
+                            resources=[self._pipelines_api.post_pipelinesv2_async_handler.function_arn],
                         )
                     ]
                 ),
