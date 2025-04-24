@@ -1,5 +1,6 @@
 {
   "dependencies": {
     "cdk": "^2.164.1"
-  }
+  },
+  "scripts": {}
 }

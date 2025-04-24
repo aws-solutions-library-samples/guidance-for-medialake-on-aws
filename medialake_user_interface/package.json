@@ -76,7 +76,7 @@
     ]
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "^1.52.0",
     "@trivago/prettier-plugin-sort-imports": "^5.2.1",
     "@types/node": "^22.13.9",
     "@types/react": "^18.3.11",

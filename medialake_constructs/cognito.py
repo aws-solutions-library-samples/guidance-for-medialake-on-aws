@@ -128,6 +128,18 @@ class CognitoConstruct(Construct):
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
             ),
+            "schema": [
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="groups",
+                    attribute_data_type="String",
+                    mutable=True,
+                    required=False,
+                    string_attribute_constraints=cognito.CfnUserPool.StringAttributeConstraintsProperty(
+                        min_length="1",
+                        max_length="2048"
+                    )
+                )
+            ],
         }
 
         # Create the user pool with all properties
@@ -187,6 +199,7 @@ class CognitoConstruct(Construct):
                         "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
                         "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
                         "custom:role": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
                     },
                     idp_identifiers=[provider.identity_provider_name],
                 )
