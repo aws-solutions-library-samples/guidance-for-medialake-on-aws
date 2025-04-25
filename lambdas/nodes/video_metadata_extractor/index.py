@@ -198,47 +198,60 @@ def sanitize_metadata(metadata):
     def sanitize_value(value):
         if isinstance(value, str):
             # Skip placeholder dates
-            if not value.startswith("0000-00-00"):
-                # Try to normalize date strings
-                s = normalize_date_string(value)
-                s = normalize_date_time_string(s)
+            if value.startswith("0000-00-00"):
+                return None
                 
-                # Check if it's a valid date
-                try:
-                    from datetime import datetime
-                    datetime.fromisoformat(s.replace('Z', '+00:00'))
-                    # It's a valid date, sanitize it
-                    return (
-                        ''.join(char for char in s if ord(char) >= 32)
-                        .encode('ascii', 'ignore')
-                        .decode('ascii')
-                        .replace('\\', '\\\\')
-                        .replace('"', '\\"')
-                        .replace("'", "\\'")
-                    )
-                except ValueError:
-                    # Not a date, use regular sanitization
-                    pass
+            # Try to normalize date strings
+            normalized_value = normalize_date_string(value)
+            normalized_value = normalize_date_time_string(normalized_value)
             
-            # Regular string sanitization
-            return (
-                ''.join(char for char in value if ord(char) >= 32)
-                .encode('ascii', 'ignore')
-                .decode('ascii')
-                .replace('\\', '\\\\')
-                .replace('"', '\\"')
-                .replace("'", "\\'")
-                .replace('\0', '\\0')
-            )
-        elif isinstance(value, bytes):
-            # Handle bytes objects (Python equivalent of Uint8Array)
+            # If it's a valid date, sanitize and return it
+            try:
+                import datetime
+                datetime.datetime.fromisoformat(normalized_value.replace('Z', '+00:00'))
+                # It's a valid date, sanitize and return
+                return (
+                    "".join(char for char in normalized_value if ord(char) >= 32)
+                    .encode("ascii", "ignore")
+                    .decode("ascii")
+                    .replace("\\", "\\\\")
+                    .replace('"', '\\"')
+                    .replace("'", "\\'")
+                    .replace("\0", "\\0")
+                )
+            except (ValueError, TypeError):
+                # Not a date, apply regular sanitization
+                return (
+                    "".join(char for char in value if ord(char) >= 32)
+                    .encode("ascii", "ignore")
+                    .decode("ascii")
+                    .replace("\\", "\\\\")
+                    .replace('"', '\\"')
+                    .replace("'", "\\'")
+                    .replace("\0", "\\0")
+                )
+        elif isinstance(value, (bytes, bytearray)):
+            # Handle binary data similar to Uint8Array in JS
             return clip_bytes(value)
         elif isinstance(value, dict):
-            return sanitize_dict(value)
+            # Special handling for complex objects with binary data
+            if "Dt" in value and "#value" in value and value.get("Dt") == "binary.base64":
+                # This is a binary object with base64 encoding, convert to string
+                return f"Binary data: {value.get('#value', '')[:30]}..."
+            
+            # Regular dictionary processing
+            sanitized_dict = sanitize_dict(value)
+            # If empty after sanitization, return None
+            return sanitized_dict if sanitized_dict else None
         elif isinstance(value, list):
-            return [sanitize_value(item) for item in value]
+            sanitized_list = [sanitize_value(item) for item in value if sanitize_value(item) is not None]
+            # If empty after sanitization, return None
+            return sanitized_list if sanitized_list else None
         else:
-            return value
+            # Convert all other values to strings to ensure they're indexable
+            if value is not None:
+                return str(value)
+            return None
 
     def sanitize_dict(d):
         result = {}
@@ -254,20 +267,124 @@ def sanitize_metadata(metadata):
         # Convert from snake_case or camel_case to CamelCase
         return "".join(word.capitalize() for word in key.split("_"))
 
-    # First sanitize the metadata
-    sanitized = {k.capitalize(): sanitize_value(v) for k, v in metadata.items()}
+    # First pass: sanitize the metadata
+    sanitized = {k.capitalize(): sanitize_value(v) for k, v in metadata.items() if sanitize_value(v) is not None}
     
-    # Then remove any base64 fields
+    # Second pass: remove base64 blobs
     remove_base64_fields(sanitized)
+    
+    # Third pass: force all leaf values to be simple types
+    sanitized = force_simple_values(sanitized)
     
     return sanitized
 
+def force_simple_values(obj):
+    """Ensure all complex objects are converted to simple types that OpenSearch can index"""
+    if obj is None:
+        return None
+    
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    
+    if isinstance(obj, (bytes, bytearray)):
+        return clip_bytes(obj)
+    
+    if isinstance(obj, list):
+        return [force_simple_values(item) for item in obj if item is not None]
+    
+    if isinstance(obj, dict):
+        # Check for special binary object format
+        if "Dt" in obj and "#value" in obj:
+            return f"Binary data: {str(obj.get('#value', ''))[:30]}..."
+        
+        # Process regular dictionaries
+        result = {}
+        for k, v in obj.items():
+            processed_value = force_simple_values(v)
+            if processed_value is not None:
+                result[k] = processed_value
+        return result
+    
+    # Default: convert to string
+    return str(obj)
+
+def normalize_date_string(s):
+    """Normalize date strings in format YYYY-M-D to YYYY-MM-DD"""
+    import re
+    m = re.match(r'^(\d{4})-(\d{1,2})-(\d{1,2})$', s)
+    if m:
+        y, mn, d = m.groups()
+        return f"{y}-{mn.zfill(2)}-{d.zfill(2)}"
+    return s
+
+def normalize_date_time_string(s):
+    """Normalize datetime strings"""
+    import re
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{3})Z$', s)
+    if m:
+        date, hh, mm, ms = m.groups()
+        return f"{date}T{hh}:{mm}:00.{ms}Z"
+    return s
+
+def clip_bytes(byte_data, limit=60):
+    """Format byte arrays similar to clipBytes in JS"""
+    if not byte_data:
+        return ""
+    
+    # Convert to hex representation
+    hex_values = [f"{b:02x}" for b in byte_data[:limit]]
+    result = " ".join(hex_values)
+    
+    # Add indication of remaining bytes
+    if len(byte_data) > limit:
+        result += f"\n... and {len(byte_data) - limit} more"
+    
+    return result
+
+def is_likely_base64(s):
+    """Check if a string is likely a base64 encoded blob"""
+    import re
+    return (
+        isinstance(s, str) and
+        len(s) > 100 and
+        bool(re.match(r'^[A-Za-z0-9+/]+={0,2}$', s))
+    )
+
+def remove_base64_fields(obj):
+    """Recursively remove base64 blobs from the metadata"""
+    if isinstance(obj, list):
+        # Filter out base64 string items
+        filtered = []
+        for item in obj:
+            if is_likely_base64(item):
+                continue
+            elif item and isinstance(item, (dict, list)):
+                remove_base64_fields(item)
+                filtered.append(item)
+            else:
+                filtered.append(item)
+        
+        # Clear and repopulate the list
+        obj.clear()
+        obj.extend(filtered)
+    
+    elif isinstance(obj, dict):
+        # Process dictionary items
+        keys_to_delete = []
+        for key, val in obj.items():
+            if is_likely_base64(val):
+                keys_to_delete.append(key)
+            elif isinstance(val, list) and all(is_likely_base64(el) for el in val):
+                keys_to_delete.append(key)
+            else:
+                remove_base64_fields(val)
+        
+        # Delete identified keys
+        for key in keys_to_delete:
+            del obj[key]
 
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
 
-)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):

@@ -1,84 +1,41 @@
-import { test, expect } from '../../playwright/fixtures/auth-fixture';
+import { test, expect } from '@playwright/test';
 
-/**
- * Test suite for login functionality
- */
-test.describe('MediaLake Login', () => {
-  
-  /**
-   * Test to verify manual login functionality targeting the specific email input
-   */
-  test('should allow manual login with specific selectors', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('/');
+test('login with credentials', async ({ page }) => {
+  await page.goto('http://localhost:5173/');
+  await page.waitForSelector('input[name="username"]');
+  await page.fill('input[name="username"]', 'mne-medialake@amazon.com');
+  await page.fill('input[name="password"]', 'ChangeMe123!');
+  await page.click('.amplify-button[type="submit"]');
+  await page.waitForURL('http://localhost:5173/');
+  await expect(page.locator('h1')).toContainText('MediaLake', { timeout: 10000 });
+});
 
-    // Wait for login form to load
-    await page.waitForSelector('.amplify-input.amplify-field-group__control');
-
-    // Find the email input by its class and ID
-    const emailInput = page.locator('.amplify-input.amplify-field-group__control#amplify-id-\\:r9\\:');
-    await expect(emailInput).toBeVisible();
-
-    // Enter credentials
-    await emailInput.fill('mne-medialake@amazon.com');
-    
-    // Find and fill password field with the specific ID
-    const passwordInput = page.locator('#amplify-id-\\:rc\\:');
-    await expect(passwordInput).toBeVisible();
-    await passwordInput.fill('ChangeMe123!');
-
-    // Click the login button
-    await page.locator('button[type="submit"]').click();
-
-    // Wait for redirect after successful login - adjust selector based on your application
-    await page.waitForSelector('.sidebar', { timeout: 10000 });
-
-    // Verify successful login by checking for an element that would only be visible after login
-    await expect(page.locator('.sidebar')).toBeVisible();
-    
-    // Additional verification - check for user profile or username display
-    const userProfileElement = page.locator('.user-profile, .username');
-    if (await userProfileElement.count() > 0) {
-      await expect(userProfileElement).toBeVisible();
-    }
-  });
-
-  /**
-   * Test to verify login with invalid credentials
-   */
-  test('should display error message for invalid credentials', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('/');
-
-    // Wait for login form to load
-    await page.waitForSelector('.amplify-input.amplify-field-group__control');
-
-    // Find the email input by its class and ID
-    const emailInput = page.locator('.amplify-input.amplify-field-group__control#amplify-id-\\:r9\\:');
-    
-    // Enter invalid credentials
-    await emailInput.fill('invalid@example.com');
-    
-    // Find and fill password field with the specific ID
-    const passwordInput = page.locator('#amplify-id-\\:rc\\:');
-    await passwordInput.fill('WrongPassword123!');
-
-    // Click the login button
-    await page.locator('button[type="submit"]').click();
-
-    // Wait for and verify error message
-    const errorMessage = page.locator('.amplify-alert--error, [role="alert"]');
-    await expect(errorMessage).toBeVisible({ timeout: 5000 });
-  });
-  
-  /**
-   * Test to verify the automated auth fixture works
-   */
-  test('should login automatically using auth fixture', async ({ authenticatedPage }) => {
-    // Navigate to a protected page
-    await authenticatedPage.goto('/dashboard');
-    
-    // Verify we're logged in by checking for elements that should be visible
-    await expect(authenticatedPage.locator('.sidebar')).toBeVisible();
-  });
+test('test', async ({ page }) => {
+  await page.goto('http://localhost:5173/sign-in');
+  await page.getByRole('textbox', { name: 'Email' }).click();
+  await page.getByRole('textbox', { name: 'Email' }).fill('mne-medialake@amazon.com');
+  await page.getByRole('textbox', { name: 'Password' }).click();
+  await page.getByRole('textbox', { name: 'Password' }).fill('ChangeMe123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'User Management' }).click();
+  await page.getByRole('button', { name: 'Add User' }).click();
+  await page.waitForTimeout(1000);
+  await page.getByRole('textbox', { name: 'First Name' }).click();
+  await page.getByRole('textbox', { name: 'First Name' }).fill('load');
+  await page.getByRole('textbox', { name: 'First Name' }).press('Tab');
+  await page.getByRole('button', { name: 'Enter the user\'s first name' }).press('Tab');
+  await page.getByRole('textbox', { name: 'Last Name' }).fill('user');
+  await page.getByRole('textbox', { name: 'Email' }).click();
+  await page.getByRole('textbox', { name: 'Email' }).fill('medialake+testuser@amazon.com');
+  await page.getByLabel('', { exact: true }).click();
+  await page.getByRole('option', { name: 'Admin' }).click();
+  await page.locator('#menu-roles div').first().click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.waitForTimeout(20000); // Wait for 2 seconds
+  await page.getByText('Add User').click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('row', { name: 'load user medialake+testuser@' }).getByLabel('Delete').click();
+  await page.getByRole('button').click();
+  await page.getByRole('button', { name: 'System Settings' }).click();
 });

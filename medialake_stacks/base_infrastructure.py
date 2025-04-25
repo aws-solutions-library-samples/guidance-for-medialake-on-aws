@@ -575,20 +575,20 @@ class BaseInfrastructureStack(Stack):
             description="Retained Asset Table GSIs",
         )
 
-        CfnOutput(
-            self,
-            "RetainedAssetV2Table",
-            value=f"{self._assetv2_table.table_name}|{self._assetv2_table.table_arn}",
-            description="Retained Asset V2 Table (Name|ARN)",
-        )
+        # CfnOutput(
+        #     self,
+        #     "RetainedAssetV2Table",
+        #     value=f"{self._assetv2_table.table_name}|{self._assetv2_table.table_arn}",
+        #     description="Retained Asset V2 Table (Name|ARN)",
+        # )
 
         # Asset V2 Table GSIs
-        CfnOutput(
-            self,
-            "RetainedAssetV2TableGSIs",
-            value="GSI1,GSI2,GSI3,GSI4,GSI5,GSI6",
-            description="Retained Asset V2 Table GSIs",
-        )
+        # CfnOutput(
+        #     self,
+        #     "RetainedAssetV2TableGSIs",
+        #     value="GSI1,GSI2,GSI3,GSI4,GSI5,GSI6",
+        #     description="Retained Asset V2 Table GSIs",
+        # )
 
         # OpenSearch Cluster Outputs
         CfnOutput(

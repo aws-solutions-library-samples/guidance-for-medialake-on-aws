@@ -208,13 +208,10 @@ class OpenSearchCluster(Construct):
             )
             collection_endpoint = config.opensearch_cluster_settings.domain_endpoint
         else:
-            # Create a new domain using CfnDomain
-            # Define EBS options based on instance type
-            ebs_options = None
-            if not props.data_node_instance_type.startswith("R7gd.") or not any(
-                props.data_node_instance_type == instance_type
-                for instance_type in ["R7gd.large.search", "R7gd.xlarge.search", "R7gd.2xlarge.search"]
-            ):
+            ebs_options = opensearch.CfnDomain.EBSOptionsProperty(
+                    ebs_enabled=False
+                )
+            if not props.data_node_instance_type.lower().startswith("r7gd"):
                 ebs_options = opensearch.CfnDomain.EBSOptionsProperty(
                     ebs_enabled=True,
                     volume_size=props.volume_size,

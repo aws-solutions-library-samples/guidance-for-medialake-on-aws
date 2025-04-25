@@ -518,7 +518,6 @@ class UIConstruct(Construct):
             ])
         )
 
-
         _ = cr.AwsCustomResource(
             self,
             "UpdateUserPoolClientCallbacks",

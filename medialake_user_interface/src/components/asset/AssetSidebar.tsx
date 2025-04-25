@@ -73,7 +73,9 @@ interface AssetSidebarProps {
     comments?: any[];
     onAddComment?: (comment: string) => void;
     videoViewerRef?: RefObject<VideoViewerRef>;
-    assetId?: string; // Add optional assetId prop
+    assetId?: string; 
+    asset?: any;       
+    assetType?: string; 
 }
 
 
@@ -86,7 +88,9 @@ interface AssetMarkersProps {
     onMarkerAdd?: () => void; 
     videoViewerRef?: RefObject<VideoViewerRef>; // Add this
     markers?: MarkerInfo[];
-    setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;    
+    setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;
+    asset: any;
+    assetType: string;
 }
 
 interface AssetCollaborationProps {
@@ -246,10 +250,9 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef }) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef,asset,assetType }) => {
     // Store all marker references in a Map
     const markerRefsMap = useRef(new Map<string, PeriodMarker>());
-
     // Set up subscriptions for all markers
     useEffect(() => {
         const subscriptions: any[] = [];
@@ -363,7 +366,106 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoV
         }
     };
 
-    return (
+// Helper function to convert timecode to seconds
+const timecodeToSeconds = (timecode: string): number => {
+    // Split the timecode into components
+    const [hours, minutes, seconds, frames] = timecode.split(':').map(Number);
+    
+    // Assuming 25 frames per second (adjust if different)
+    const framesPerSecond = 25;
+    
+    // Convert to seconds
+    return (hours * 3600) + (minutes * 60) + seconds + (frames / framesPerSecond);
+};
+
+useEffect(() => {
+    if (!videoViewerRef?.current || !asset?.clips || !Array.isArray(asset.clips)) return;
+
+    const timer = setTimeout(() => {
+        try {
+            const lane = videoViewerRef.current?.getMarkerLane();
+            if (!lane) {
+                console.warn('Marker lane is not available');
+                return;
+            }
+
+            const firstThreeClips = asset.clips.slice(0, 3);
+            
+            firstThreeClips.forEach((clip, index) => {
+                // Convert timecodes to seconds
+                const startSeconds = timecodeToSeconds(clip.start_timecode);
+                const endSeconds = timecodeToSeconds(clip.end_timecode);
+
+                console.log(`Clip ${index + 1} times:`, {
+                    original: {
+                        start: clip.start_timecode,
+                        end: clip.end_timecode
+                    },
+                    converted: {
+                        start: startSeconds,
+                        end: endSeconds
+                    }
+                });
+
+                const newId = (markers.length + index + 1).toString();
+                
+                const periodMarker = new PeriodMarker({
+                    timeObservation: { 
+                        start: startSeconds, 
+                        end: endSeconds 
+                    },
+                    editable: true,
+                    id: newId,
+                    style: {
+                        ...PERIOD_MARKER_STYLE,
+                        color: randomHexColor(),
+                    },
+                });
+                
+                markerRefsMap.current.set(newId, periodMarker);
+                
+                const subscription = periodMarker.onChange$.subscribe({
+                    next: (event) => {
+                        setMarkers(prevMarkers => 
+                            prevMarkers.map(marker => 
+                                marker.id === newId
+                                    ? {
+                                        ...marker,
+                                        timeObservation: {
+                                            start: event.timeObservation.start,
+                                            end: event.timeObservation.end
+                                        }
+                                      }
+                                    : marker
+                            )
+                        );
+                    }
+                });
+                
+                lane.addMarker(periodMarker);
+
+                setMarkers(prev => [...prev, {
+                    id: newId,
+                    timeObservation: {
+                        start: startSeconds,
+                        end: endSeconds
+                    },
+                    style: {
+                        color: periodMarker.style.color
+                    }
+                }]);
+            });
+
+        } catch (error) {
+            console.error('Error adding clip markers:', error);
+        }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+}, [videoViewerRef, asset]);
+
+    
+    return ( 
         <Box sx={{ p: 2 }}>
             <Button 
                 variant="contained" 
@@ -668,7 +770,7 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
         </Box>
     );
 };
-export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, versions = [], comments = [], onAddComment, assetId }) => {
+export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, versions = [], comments = [], onAddComment, assetId,asset,assetType}) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
     const [markers, setMarkers] = useState<MarkerInfo[]>([]);
@@ -765,6 +867,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, vers
                         videoViewerRef= {videoViewerRef}
                         markers = {markers}
                         setMarkers = {setMarkers}
+                        asset={asset}
+                        assetType={assetType}
                         
                     />
                 )}
