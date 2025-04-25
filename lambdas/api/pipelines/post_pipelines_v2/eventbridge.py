@@ -1,5 +1,6 @@
 import json
 import time
+import re
 import shortuuid
 from typing import Dict, Any, Optional
 
@@ -315,8 +316,8 @@ def get_event_pattern_for_rule(
 
 
 def create_eventbridge_rule(
-    pipeline_name: str, node: Any, state_machine_arn: str, active: bool = True
-) -> Optional[str]:
+    pipeline_name: str, node: Any, state_machine_arn: str, active: bool = True, execution_uuid: str = None
+) -> Optional[Dict[str, Any]]:
     """
     Create an EventBridge rule for a trigger node.
 
@@ -325,9 +326,16 @@ def create_eventbridge_rule(
         node: Node object containing configuration
         state_machine_arn: ARN of the state machine to target
         active: Whether the rule should be enabled (True) or disabled (False)
+        execution_uuid: UUID to use for consistent naming across resources
 
     Returns:
-        ARN of the created rule, or None if creation was skipped
+        Dictionary containing:
+        - rule_arn: ARN of the created EventBridge rule
+        - role_arn: ARN of the IAM role created for EventBridge
+        - trigger_lambda_arn: ARN of the Lambda function created for the trigger
+        - queue_arn: ARN of the SQS queue created
+        - event_source_mapping_uuid: UUID of the event source mapping
+        Or None if creation was skipped
     """
     logger.info(f"Creating EventBridge rule for trigger node: {node.id}")
 
@@ -376,21 +384,31 @@ def create_eventbridge_rule(
         event_bus_name = INGEST_EVENT_BUS_NAME
 
         # Create the rule
-        response = events_client.put_rule(
+        rule_response = events_client.put_rule(
             Name=unique_rule_name,
             EventPattern=json.dumps(event_pattern),
             State="ENABLED" if active else "DISABLED",
             EventBusName=event_bus_name,
             Description=f"Rule for pipeline {pipeline_name}, node {node.data.label}",
         )
+        
+        # Store the rule ARN for later return
+        rule_arn = rule_response.get("RuleArn")
+        logger.info(f"Created EventBridge rule with ARN: {rule_arn}")
 
         # Create or get IAM role for EventBridge to invoke Lambda
         role_arn = get_events_role_arn(sanitized_pipeline_name)
         
         # Create a unique trigger lambda name for this pipeline
-        uuid_short = shortuuid.uuid()[:8]
-        trigger_lambda_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_{uuid_short}"
         
+        parts = re.split(r'[^A-Za-z0-9]+', pipeline_name)
+
+        # Take the first character of each non-empty part, uppercase it, join
+        abvr=  ''.join(p[0].upper() for p in parts if p)
+        uuid = execution_uuid if execution_uuid else shortuuid.uuid()
+        trigger_lambda_name = f"{resource_prefix}_{abvr}_{uuid}_trigger".lower()
+
+
         # Create the trigger lambda function
         lambda_client = boto3.client("lambda")
         
@@ -417,6 +435,26 @@ def create_eventbridge_rule(
             iam_client = boto3.client("iam")
             role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
             
+            # Check if role already exists
+            try:
+                existing_role = iam_client.get_role(RoleName=role_name)
+                logger.info(f"Found existing role {role_name}, deleting it")
+                
+                # Import delete_role and wait_for_role_deletion from iam_operations
+                from iam_operations import delete_role, wait_for_role_deletion
+                
+                # Delete the existing role
+                delete_role(role_name)
+                
+                # Wait for role deletion to complete
+                wait_for_role_deletion(role_name)
+                logger.info(f"Successfully deleted existing role {role_name}")
+            except iam_client.exceptions.NoSuchEntityException:
+                logger.info(f"Role {role_name} does not exist, will create new role")
+            except Exception as e:
+                logger.error(f"Error checking/deleting existing role {role_name}: {e}")
+                return None
+            
             # Create the role
             trust_policy = {
                 "Version": "2012-10-17",
@@ -435,6 +473,7 @@ def create_eventbridge_rule(
                     AssumeRolePolicyDocument=json.dumps(trust_policy)
                 )
                 role_arn = response["Role"]["Arn"]
+                logger.info(f"Successfully created role {role_name}")
                 
                 # Attach policies
                 iam_client.attach_role_policy(
@@ -442,7 +481,7 @@ def create_eventbridge_rule(
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
                 )
                 
-                # Add policy to allow invoking Step Functions
+                # Add policy to allow invoking Step Functions and receiving SQS messages
                 policy_document = {
                     "Version": "2012-10-17",
                     "Statement": [
@@ -453,6 +492,16 @@ def create_eventbridge_rule(
                                 "states:ListExecutions"
                             ],
                             "Resource": [state_machine_arn]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "sqs:ReceiveMessage",
+                                "sqs:DeleteMessage",
+                                "sqs:GetQueueAttributes",
+                                "sqs:ChangeMessageVisibility"
+                            ],
+                            "Resource": "*"  # Will be restricted to the specific queue once it's created
                         }
                     ]
                 }
@@ -478,7 +527,9 @@ def create_eventbridge_rule(
                     Environment={
                         "Variables": {
                             "MAX_CONCURRENT_EXECUTIONS": "1000",
-                            "PIPELINE_NAME": pipeline_name
+                            "PIPELINE_NAME": pipeline_name,
+                            "SERVICE": "Trigger",  # node Title
+                            "STEP_NAME": "Pipeline Trigger"  # friendly name of the node
                         }
                     }
                 )
@@ -490,15 +541,147 @@ def create_eventbridge_rule(
                 logger.error(f"Failed to create trigger lambda: {e}")
                 return None
         
-        # Set the trigger lambda as the target instead of the Step Function directly
+        # Create an SQS queue for the pipeline
+        sqs_client = boto3.client('sqs')
+        queue_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_queue"
+        queue_url = None
+        queue_arn = None
+        max_retries = 3
+        retry_delay = 60  # AWS requires 60 seconds after deleting a queue before creating one with the same name
+        
+        # Check if the queue already exists and delete it
+        try:
+            # List queues with the name prefix to find if it exists
+            response = sqs_client.list_queues(QueueNamePrefix=queue_name)
+            if 'QueueUrls' in response and response['QueueUrls']:
+                queue_url = response['QueueUrls'][0]
+                logger.info(f"Found existing SQS queue: {queue_url}")
+                
+                # Get the queue ARN
+                queue_attrs = sqs_client.get_queue_attributes(
+                    QueueUrl=queue_url,
+                    AttributeNames=['QueueArn']
+                )
+                queue_arn = queue_attrs['Attributes']['QueueArn']
+                
+                # Find and delete any event source mappings to Lambda functions
+                try:
+                    # List event source mappings for this queue
+                    mapping_response = lambda_client.list_event_source_mappings(
+                        EventSourceArn=queue_arn
+                    )
+                    
+                    # Delete each event source mapping
+                    for mapping in mapping_response.get('EventSourceMappings', []):
+                        mapping_uuid = mapping['UUID']
+                        lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
+                        logger.info(f"Deleted event source mapping {mapping_uuid} for queue {queue_arn}")
+                except Exception as mapping_error:
+                    logger.warning(f"Error deleting event source mappings for queue {queue_arn}: {mapping_error}")
+                
+                # Delete the queue
+                sqs_client.delete_queue(QueueUrl=queue_url)
+                logger.info(f"Deleted existing SQS queue: {queue_url}")
+                
+                # AWS requires waiting 60 seconds after deleting a queue before creating one with the same name
+                logger.info(f"Waiting {retry_delay} seconds for queue deletion to propagate (AWS requirement)...")
+                time.sleep(retry_delay)
+            
+            # Create a new SQS queue with retry logic
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Creating new SQS queue: {queue_name} (attempt {attempt+1}/{max_retries})")
+                    response = sqs_client.create_queue(
+                        QueueName=queue_name,
+                        Attributes={
+                            'VisibilityTimeout': '300',  # 5 minutes
+                            'MessageRetentionPeriod': '86400'  # 1 day
+                        }
+                    )
+                    queue_url = response['QueueUrl']
+                    
+                    # Get the queue ARN
+                    queue_attrs = sqs_client.get_queue_attributes(
+                        QueueUrl=queue_url,
+                        AttributeNames=['QueueArn']
+                    )
+                    queue_arn = queue_attrs['Attributes']['QueueArn']
+                    logger.info(f"Created new SQS queue with ARN: {queue_arn}")
+                    break  # Success, exit the retry loop
+                    
+                except sqs_client.exceptions.QueueDeletedRecently as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Queue {queue_name} was recently deleted. Waiting {retry_delay} seconds before retry...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.error(f"Failed to create queue after {max_retries} attempts: {e}")
+                        raise
+                except Exception as e:
+                    logger.error(f"Error creating SQS queue: {e}")
+                    raise
+            
+            # Check if an event source mapping already exists for this Lambda function and queue
+            existing_mappings = lambda_client.list_event_source_mappings(
+                FunctionName=trigger_lambda_name,
+                EventSourceArn=queue_arn
+            )
+            
+            if existing_mappings.get("EventSourceMappings"):
+                logger.info(f"Event source mapping already exists for Lambda {trigger_lambda_name} and queue {queue_arn}")
+                # Use the existing mapping
+                event_source_mapping_uuid = existing_mappings["EventSourceMappings"][0]["UUID"]
+                logger.info(f"Using existing event source mapping: {event_source_mapping_uuid}")
+            else:
+                # Set up Lambda trigger from SQS queue
+                response = lambda_client.create_event_source_mapping(
+                    EventSourceArn=queue_arn,
+                    FunctionName=trigger_lambda_name,
+                    Enabled=True,
+                    BatchSize=1
+                )
+                event_source_mapping_uuid = response.get("UUID")
+                logger.info(f"Created new event source mapping {event_source_mapping_uuid} from SQS queue to Lambda function")
+        except Exception as e:
+            logger.error(f"Error creating/finding SQS queue: {e}")
+            return None
+        
+        # Create a policy to allow EventBridge to send messages to the SQS queue
+        sqs_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Service": "events.amazonaws.com"},
+                    "Action": "sqs:SendMessage",
+                    "Resource": queue_arn,
+                    "Condition": {
+                        "ArnEquals": {"aws:SourceArn": rule_arn}
+                    }
+                }
+            ]
+        }
+        
+        # Set the policy on the SQS queue
+        try:
+            sqs_client.set_queue_attributes(
+                QueueUrl=queue_url,
+                Attributes={
+                    'Policy': json.dumps(sqs_policy)
+                }
+            )
+            logger.info(f"Set policy on SQS queue to allow EventBridge to send messages")
+        except Exception as e:
+            logger.error(f"Error setting policy on SQS queue: {e}")
+            return None
+        
+        # Set the SQS queue as the target for the EventBridge rule
         events_client.put_targets(
             Rule=unique_rule_name,
             EventBusName=event_bus_name,
             Targets=[
                 {
                     "Id": f"{sanitized_pipeline_name}-target",
-                    "Arn": trigger_lambda_arn,
-                    "RoleArn": role_arn,
+                    "Arn": queue_arn,
                     # Add input transformer to include metadata about the trigger and the Step Function ARN
                     "InputTransformer": {
                         "InputPathsMap": {
@@ -509,22 +692,19 @@ def create_eventbridge_rule(
                         },
                         "InputTemplate": json.dumps(
                             {
-                                "Records": [
-                                    {
-                                        "body": json.dumps({
-                                            "Asset": {
-                                                "detail": "<detail>",
-                                                "source": "<source>",
-                                                "detailType": "<detailType>",
-                                                "time": "<time>",
-                                                "triggerNode": node.data.id,
-                                                "pipelineName": pipeline_name,
-                                                "InventoryID": "${detail.DigitalSourceAsset.InventoryID}"
-                                            },
-                                            "StateMachineArn": state_machine_arn
-                                        })
-                                    }
-                                ]
+                                "Asset": {
+                                    "detail": "<detail>",
+                                    "source": "<source>",
+                                    "detailType": "<detailType>",
+                                    "time": "<time>",
+                                    "triggerNode": node.data.id,
+                                    "pipelineName": pipeline_name,
+                                    "pipelineExecutionId.$":"$$.Execution.Id",
+                                    "pipelineExecutionStart.$":"$$.Execution.StartTime",
+                                    "pipelineId": state_machine_arn,
+                                    
+                                },
+                                "StateMachineArn": state_machine_arn
                             }
                         )
                         .replace('"<detail>"', "<detail>")
@@ -536,8 +716,18 @@ def create_eventbridge_rule(
             ],
         )
 
+        # We already have the event source mapping UUID from earlier
+        if not event_source_mapping_uuid:
+            logger.warning(f"No event source mapping UUID found for Lambda {trigger_lambda_name} and queue {queue_arn}")
+
         logger.info(f"Created EventBridge rule {unique_rule_name} for node {node.id}")
-        return response["RuleArn"]
+        return {
+            "rule_arn": rule_arn,
+            "role_arn": role_arn,
+            "trigger_lambda_arn": trigger_lambda_arn,
+            "queue_arn": queue_arn,
+            "event_source_mapping_uuid": event_source_mapping_uuid
+        }
 
     except Exception as e:
         logger.exception(f"Failed to create EventBridge rule for node {node.id}: {e}")
@@ -574,26 +764,87 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
 
 def delete_eventbridge_rule(rule_name: str) -> None:
     """
-    Delete an EventBridge rule and its targets.
+    Delete an EventBridge rule, its targets, and associated resources (SQS queue, event source mapping).
 
     Args:
         rule_name: Name of the rule
     """
     events_client = boto3.client("events")
+    sqs_client = boto3.client("sqs")
+    lambda_client = boto3.client("lambda")
     event_bus_name = INGEST_EVENT_BUS_NAME
 
     try:
-        # First remove targets
-        # Extract a sanitized target ID from the rule name
-        target_id = f"{rule_name}-target"
+        # Extract the pipeline name from the rule name (it's usually the first part)
+        parts = rule_name.split('-')
+        if len(parts) > 0:
+            # Use just the first part (pipeline name) for the target ID and queue name
+            pipeline_part = parts[0]
+            target_id = f"{pipeline_part}-target"
+            queue_name = f"{resource_prefix}_{pipeline_part}_trigger_queue"
+        else:
+            # Fallback to a simple target ID if we can't extract the pipeline name
+            target_id = "rule-target"
+            queue_name = f"{resource_prefix}_trigger_queue"
+            
+        logger.info(f"Removing target with ID: {target_id} from rule: {rule_name}")
+        
+        # Find and delete the SQS queue
+        try:
+            # Find the queue URL
+            response = sqs_client.list_queues(QueueNamePrefix=queue_name)
+            if 'QueueUrls' in response and response['QueueUrls']:
+                queue_url = response['QueueUrls'][0]
+                
+                # Get the queue ARN
+                queue_attrs = sqs_client.get_queue_attributes(
+                    QueueUrl=queue_url,
+                    AttributeNames=['QueueArn']
+                )
+                queue_arn = queue_attrs['Attributes']['QueueArn']
+                
+                # Find and delete any event source mappings to Lambda functions
+                try:
+                    # List event source mappings for this queue
+                    response = lambda_client.list_event_source_mappings(
+                        EventSourceArn=queue_arn
+                    )
+                    
+                    # Delete each event source mapping
+                    for mapping in response.get('EventSourceMappings', []):
+                        mapping_uuid = mapping['UUID']
+                        lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
+                        logger.info(f"Deleted event source mapping {mapping_uuid} for queue {queue_arn}")
+                except Exception as mapping_error:
+                    logger.warning(f"Error deleting event source mappings for queue {queue_arn}: {mapping_error}")
+                
+                # Delete the queue
+                sqs_client.delete_queue(QueueUrl=queue_url)
+                logger.info(f"Deleted SQS queue: {queue_url}")
+            else:
+                logger.info(f"No SQS queue found with name prefix: {queue_name}")
+        except Exception as queue_error:
+            logger.warning(f"Error deleting SQS queue: {queue_error}")
+        
+        # Remove targets from the rule
+        try:
+            events_client.remove_targets(
+                Rule=rule_name, EventBusName=event_bus_name, Ids=[target_id]
+            )
+        except events_client.exceptions.ResourceNotFoundException:
+            logger.info(f"No targets found for rule {rule_name}, proceeding with deletion")
+        except Exception as target_error:
+            logger.warning(f"Error removing targets for rule {rule_name}: {target_error}")
+            # Try with a simpler target ID as a fallback
+            try:
+                events_client.remove_targets(
+                    Rule=rule_name, EventBusName=event_bus_name, Ids=["target"]
+                )
+            except Exception as simple_target_error:
+                logger.warning(f"Error removing simple target for rule {rule_name}: {simple_target_error}")
 
-        events_client.remove_targets(
-            Rule=rule_name, EventBusName=event_bus_name, Ids=[target_id]
-        )
-
-        # Then delete the rule
+        # Delete the rule
         events_client.delete_rule(Name=rule_name, EventBusName=event_bus_name)
-
         logger.info(f"Deleted EventBridge rule: {rule_name}")
     except Exception as e:
         logger.error(f"Error deleting EventBridge rule {rule_name}: {e}")

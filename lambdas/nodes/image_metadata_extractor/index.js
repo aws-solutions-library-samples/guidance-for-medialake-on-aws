@@ -3,7 +3,7 @@ const s3 = new AWS.S3();
 const dynamoDB = new AWS.DynamoDB();
 const exifr = require('exifr');
 const xml2js = require('xml2js');
-const { lambdaMiddleware } = require('./middleware'); // adjust path if needed
+const { lambdaMiddleware } = require('./lambda_middleware'); // adjust path if needed
 
 const MEDIALAKE_ASSET_TABLE  = process.env.MEDIALAKE_ASSET_TABLE;
 const UNSUPPORTED_EXTENSIONS = ['.webp'];
@@ -217,16 +217,20 @@ async function processImageFile(bucket, key) {
 exports.lambda_handler = async (event) => {
   console.log('Received event:', JSON.stringify(event));
 
-  const inventoryId = event.input?.InventoryID;
+  // unwrap EventBridge “detail”
+  const payload = event.input?.detail ?? event.input;
+
+  const inventoryId = payload.InventoryID;
   if (!inventoryId) {
     throw new Error('Missing InventoryID');
   }
 
-  const loc = event.input?.DigitalSourceAsset
-             ?.MainRepresentation
-             ?.StorageInfo
-             ?.PrimaryLocation;
+  const loc = payload.DigitalSourceAsset
+    ?.MainRepresentation
+    ?.StorageInfo
+    ?.PrimaryLocation;
   if (!loc?.Bucket || !loc.ObjectKey?.FullPath) {
+    console.error('Unexpected payload shape:', JSON.stringify(payload));
     throw new Error('Missing StorageInfo.PrimaryLocation');
   }
 

@@ -44,7 +44,7 @@ class PipelineStackProps:
     # video_proxy_thumbnail_function_arn: str
     # audio_metadata_extractor_function_arn: str
     # audio_proxy_thumbnail_function_arn: str
-    # check_mediaconvert_status_function_arn: str
+    # check_media_convert_status_function_arn: str
     cognito_user_pool: cognito.UserPool
     cognito_app_client: cognito.UserPoolClient
     asset_table: dynamodb.TableV2
@@ -127,7 +127,7 @@ class PipelineStack(cdk.NestedStack):
          ## pipelines deploy
         # Get all JSON files from the pipeline library directory
         pipeline_library_dir = os.path.join(
-            os.path.dirname(__file__), "..", "s3_bucket_assets", "pipeline_library"
+            os.path.dirname(__file__), "..", "s3_bucket_assets", "pipeline_library", "default"
         )
         
         pipeline_files = glob.glob(

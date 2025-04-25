@@ -24,7 +24,7 @@ logger = Logger()
 resource_prefix = os.environ["RESOURCE_PREFIX"]
 
 
-def sanitize_function_name(pipeline_name, node_label, version):
+def sanitize_function_name(pipeline_name, node_label, version, execution_uuid=None):
     """
     Create a sanitized Lambda function name from pipeline name, node label, and version.
 
@@ -32,13 +32,18 @@ def sanitize_function_name(pipeline_name, node_label, version):
         pipeline_name: Name of the pipeline
         node_label: Label of the node
         version: Version string
+        execution_uuid: Optional UUID to use for consistent naming across resources
 
     Returns:
         A sanitized function name suitable for AWS Lambda
     """
     # Combine the components
-    uuid = shortuuid.uuid()
-    raw_name = f"{resource_prefix}_{uuid}_{node_label}_{version}".lower()
+    parts = re.split(r'[^A-Za-z0-9]+', pipeline_name)
+
+    # Take the first character of each non-empty part, uppercase it, join
+    abvr=  ''.join(p[0].upper() for p in parts if p)
+    uuid = execution_uuid if execution_uuid else shortuuid.uuid()
+    raw_name = f"{resource_prefix}_{abvr}_{uuid}_{node_label}_{version}".lower()
 
     # Replace spaces with hyphens
     raw_name = raw_name.replace(" ", "-")
@@ -246,10 +251,17 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
             layers.append(powertools_layer_arn)
             logger.info(f"Adding default Powertools layer to Lambda function for node {node_id}")
     
+    # Always add the Common Libraries layer for all Lambda functions if not already specified
+    if not any("COMMONLIBS_LAYER_ARN" in layer for layer in layers):
+        commonlibs_layer_arn = os.environ.get("COMMONLIBS_LAYER_ARN")
+        if commonlibs_layer_arn:
+            layers.append(commonlibs_layer_arn)
+            logger.info(f"Adding Common Libraries layer to Lambda function for node {node_id}")
+    
     return layers
 
 
-def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False) -> Optional[str]:
+def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False, execution_uuid: str = None) -> Optional[Dict[str, str]]:
     """
     Create or update a Lambda function for a node.
 
@@ -258,9 +270,13 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
         node: Node object containing configuration
         is_first: Whether this is the first lambda in the pipeline
         is_last: Whether this is the last lambda in the pipeline
+        execution_uuid: UUID to use for consistent naming across resources
 
     Returns:
-        ARN of the created Lambda function, or None if creation was skipped
+        Dictionary containing:
+        - function_arn: ARN of the created Lambda function
+        - role_arn: ARN of the IAM role created for the Lambda function
+        Or None if creation was skipped
     """
     # Skip Lambda creation for flow-type and trigger-type nodes
     if node.data.type.lower() == "flow" or node.data.type.lower() == "trigger":
@@ -287,7 +303,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
     
     # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
     candidate = f"{base_name}_{operation_id}" if operation_id and operation_id not in base_name else base_name
-    function_name = sanitize_function_name(pipeline_name, candidate, version)
+    function_name = sanitize_function_name(pipeline_name, candidate, version, execution_uuid)
     logger.debug(f"Lambda function name generated: {function_name}")
 
     # Read YAML file from S3
@@ -415,7 +431,11 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                     "EXTERNAL_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
                     "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
                     "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
-                    "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE
+                    "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
+                    # Add required environment variables
+                    "SERVICE": node.data.id,  # node Title
+                    "STEP_NAME": node.data.label,  # friendly name of the node
+                    "PIPELINE_NAME": pipeline_name  # name of the pipeline
                 }
                 
                 # Add IS_FIRST and IS_LAST if applicable
@@ -577,7 +597,10 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                 logger.info(f"Waiting {backoff_time} seconds before retry")
                 time.sleep(backoff_time)
 
-        return function_arn
+        return {
+            "function_arn": function_arn,
+            "role_arn": role_arn
+        }
     except Exception as e:
         # Use logger.exception which automatically includes the traceback
         logger.exception(

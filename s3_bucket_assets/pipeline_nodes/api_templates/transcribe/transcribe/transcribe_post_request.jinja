@@ -1,0 +1,17 @@
+{
+  "TranscriptionJobName": "{{ variables.job_name }}",
+  "Media": {
+    "MediaFileUri": "s3://{{ variables.s3_bucket }}/{{ variables.s3_key }}"
+  },
+  "MediaFormat": "{{ variables.media_format }}",
+  "IdentifyLanguage": true,
+  "OutputBucketName": "{{ variables.output_bucket }}",
+  "OutputKey": "{{ variables.s3_bucket }}/{{ variables.s3_path }}/transcription",
+  "Subtitles": {
+    "Formats": ["vtt"]
+  },
+  "JobExecutionSettings": {
+    "AllowDeferredExecution": true,
+    "DataAccessRoleArn": "{{ variables.transcribe_role_arn }}"
+  }
+}

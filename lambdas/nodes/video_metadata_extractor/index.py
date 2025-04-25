@@ -5,6 +5,7 @@ import os
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
+from lambda_middleware import lambda_middleware
 
 from pymediainfo import MediaInfo
 
@@ -121,19 +122,117 @@ def clean_asset_id(input_string: str) -> str:
     return f"asset:uuid:{uuid}"
 
 
+def normalize_date_string(s):
+    """Normalize date strings in format YYYY-M-D to YYYY-MM-DD"""
+    import re
+    m = re.match(r'^(\d{4})-(\d{1,2})-(\d{1,2})$', s)
+    if m:
+        y, mn, d = m.groups()
+        return f"{y}-{mn.zfill(2)}-{d.zfill(2)}"
+    return s
+
+
+def normalize_date_time_string(s):
+    """Normalize datetime strings with milliseconds"""
+    import re
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{3})Z$', s)
+    if m:
+        date, hh, mm, ms = m.groups()
+        return f"{date}T{hh}:{mm}:00.{ms}Z"
+    return s
+
+
+def is_likely_base64(s):
+    """Check if a string is likely a base64-encoded blob"""
+    import re
+    return (
+        isinstance(s, str) and
+        len(s) > 100 and
+        bool(re.match(r'^[A-Za-z0-9+/]+={0,2}$', s))
+    )
+
+
+def remove_base64_fields(obj):
+    """Recursively remove base64 blobs from objects and arrays"""
+    if isinstance(obj, list):
+        # Filter out base64 string items
+        filtered = []
+        for item in obj:
+            if is_likely_base64(item):
+                continue
+            elif item and isinstance(item, (dict, list)):
+                remove_base64_fields(item)
+                filtered.append(item)
+            else:
+                filtered.append(item)
+        obj.clear()
+        obj.extend(filtered)
+    elif isinstance(obj, dict):
+        keys_to_delete = []
+        for key, val in obj.items():
+            if is_likely_base64(val):
+                keys_to_delete.append(key)
+            elif isinstance(val, list) and all(is_likely_base64(el) for el in val):
+                keys_to_delete.append(key)
+            else:
+                remove_base64_fields(val)
+        
+        for key in keys_to_delete:
+            del obj[key]
+
+
+def clip_bytes(byte_data, limit=60):
+    """Format bytes data for readability, similar to clipBytes in JS"""
+    arr = list(byte_data)
+    values = arr[:min(len(arr), limit)]
+    remain = max(0, len(arr) - limit)
+    
+    out = ' '.join(f'{b:02x}' for b in values)
+    if remain > 0:
+        out += f"\n... and {remain} more"
+    return out
+
+
 def sanitize_metadata(metadata):
+    """Enhanced metadata sanitization function"""
     def sanitize_value(value):
         if isinstance(value, str):
-            # Remove control characters and escape special characters
+            # Skip placeholder dates
+            if not value.startswith("0000-00-00"):
+                # Try to normalize date strings
+                s = normalize_date_string(value)
+                s = normalize_date_time_string(s)
+                
+                # Check if it's a valid date
+                try:
+                    from datetime import datetime
+                    datetime.fromisoformat(s.replace('Z', '+00:00'))
+                    # It's a valid date, sanitize it
+                    return (
+                        ''.join(char for char in s if ord(char) >= 32)
+                        .encode('ascii', 'ignore')
+                        .decode('ascii')
+                        .replace('\\', '\\\\')
+                        .replace('"', '\\"')
+                        .replace("'", "\\'")
+                    )
+                except ValueError:
+                    # Not a date, use regular sanitization
+                    pass
+            
+            # Regular string sanitization
             return (
-                "".join(char for char in value if ord(char) >= 32)
-                .encode("ascii", "ignore")
-                .decode("ascii")
-                .replace("\\", "\\\\")
+                ''.join(char for char in value if ord(char) >= 32)
+                .encode('ascii', 'ignore')
+                .decode('ascii')
+                .replace('\\', '\\\\')
                 .replace('"', '\\"')
                 .replace("'", "\\'")
-                .replace("\0", "\\0")
+                .replace('\0', '\\0')
             )
+        elif isinstance(value, bytes):
+            # Handle bytes objects (Python equivalent of Uint8Array)
+            return clip_bytes(value)
         elif isinstance(value, dict):
             return sanitize_dict(value)
         elif isinstance(value, list):
@@ -142,7 +241,12 @@ def sanitize_metadata(metadata):
             return value
 
     def sanitize_dict(d):
-        return {sanitize_key(k): sanitize_value(v) for k, v in d.items()}
+        result = {}
+        for k, v in d.items():
+            sanitized_value = sanitize_value(v)
+            if sanitized_value is not None:
+                result[sanitize_key(k)] = sanitized_value
+        return result
 
     def sanitize_key(key):
         # Remove '@' and capitalize the first letter
@@ -150,11 +254,20 @@ def sanitize_metadata(metadata):
         # Convert from snake_case or camel_case to CamelCase
         return "".join(word.capitalize() for word in key.split("_"))
 
-    # Capitalize the main keys (General, Video, Audio)
-    return {k.capitalize(): sanitize_value(v) for k, v in metadata.items()}
+    # First sanitize the metadata
+    sanitized = {k.capitalize(): sanitize_value(v) for k, v in metadata.items()}
+    
+    # Then remove any base64 fields
+    remove_base64_fields(sanitized)
+    
+    return sanitized
 
 
 
+@lambda_middleware(
+    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
+
+)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
@@ -252,7 +365,11 @@ def lambda_handler(event, context):
             Key={"InventoryID": clean_inventory_id}
         ).get("Item", {})
         existing_metadata = existing_item.get("Metadata", {}).get("EmbeddedMetadata", {})
+        # Sanitize the new metadata
         sanitized_merged_output = sanitize_metadata(merged_output)
+        
+        # Remove any deep-nested base64 blobs
+        remove_base64_fields(sanitized_merged_output)
 
         # Merge existing metadata with new metadata
         merged_metadata = {**existing_metadata, **sanitized_merged_output}

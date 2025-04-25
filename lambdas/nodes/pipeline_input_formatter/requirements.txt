@@ -1,4 +1,0 @@
-aws-lambda-powertools
-boto3
-typing-extensions
-aws-xray-sdk

@@ -47,8 +47,9 @@ interface CustomNodeData {
     label: string;
     icon: React.ReactNode;
     inputTypes: string[];
-    outputTypes: string[];
+    outputTypes: string[] | { name: string; description: string; }[];
     nodeId: string;
+    id?: string; // Add id property for backward compatibility
     description: string;
     configuration?: any;
     onDelete?: (id: string) => void;
@@ -65,8 +66,29 @@ const edgeTypes = {
     custom: CustomEdge,
 };
 
+// Track the highest node ID to ensure we generate unique IDs
 let id = 0;
-const getId = () => `dndnode_${id++}`;
+const getId = () => {
+    // Generate a new unique ID
+    return `dndnode_${id++}`;
+};
+
+// Function to update the ID counter based on existing nodes
+const updateIdCounter = (existingNodes) => {
+    if (!existingNodes || existingNodes.length === 0) return;
+    
+    // Find the highest numeric ID from existing dndnodes
+    existingNodes.forEach(node => {
+        if (node.id && node.id.startsWith('dndnode_')) {
+            const nodeIdNum = parseInt(node.id.replace('dndnode_', ''), 10);
+            if (!isNaN(nodeIdNum) && nodeIdNum >= id) {
+                id = nodeIdNum + 1;
+            }
+        }
+    });
+    
+    console.log(`[PipelineEditorPage] Updated ID counter to ${id}`);
+};
 
 const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
     id: node.id,
@@ -78,7 +100,8 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
     width: node.width?.toString() || '180',
     height: node.height?.toString() || '40',
     data: {
-        id: node.data.nodeId,
+        id: node.data.id || node.data.nodeId, // Use id if available, otherwise use nodeId
+        nodeId: node.data.nodeId || node.data.id, // Use nodeId if available, otherwise use id
         type: node.data.type,
         label: node.data.label,
         description: node.data.description || '',
@@ -698,6 +721,17 @@ const PipelineEditorContent = () => {
                 setIsImporting(state.showImporting !== undefined ? state.showImporting : true);
                 
                 try {
+                    // Check if nodes and edges are under a configuration property
+                    const importedFlow = { ...state.importedFlow };
+                    if (importedFlow.configuration && importedFlow.configuration.nodes && importedFlow.configuration.edges) {
+                        console.log('[PipelineEditorPage] Found nodes and edges under configuration property');
+                        // Move nodes and edges to the top level
+                        importedFlow.nodes = importedFlow.configuration.nodes;
+                        importedFlow.edges = importedFlow.configuration.edges;
+                        // Update the state.importedFlow reference
+                        state.importedFlow = importedFlow;
+                    }
+                    
                     // Check if the flow uses the nodes/edges structure
                     if (state.importedFlow.nodes && state.importedFlow.edges) {
                         // Ensure each edge has a data field with at least a text property
@@ -715,16 +749,25 @@ const PipelineEditorContent = () => {
                             return edge;
                         });
                         
-                        const fixedNodes = state.importedFlow.nodes.map((node: any) => ({
-                            ...node,
-                            data: {
+                        const fixedNodes = state.importedFlow.nodes.map((node: any) => {
+                            // Ensure node.data has both id and nodeId properties
+                            const updatedData = {
                                 ...node.data,
+                                // If id is missing but nodeId exists, copy nodeId to id
+                                id: node.data.id || node.data.nodeId,
+                                // If nodeId is missing but id exists, copy id to nodeId
+                                nodeId: node.data.nodeId || node.data.id,
                                 // Fix icon if needed
                                 icon: node.data.icon && typeof node.data.icon === 'object' && node.data.icon.props
                                     ? getNodeIcon(node.data.type)
                                     : node.data.icon,
-                            },
-                        }));
+                            };
+                            
+                            return {
+                                ...node,
+                                data: updatedData,
+                            };
+                        });
                         
                         // Store the imported flow data for later use
                         setImportedFlowData({
@@ -740,6 +783,8 @@ const PipelineEditorContent = () => {
                             if (validationResult.isValid) {
                                 console.log('[PipelineEditorPage] All integration IDs are valid');
                                 // All integration IDs are valid, proceed with import
+                                // Update ID counter to avoid conflicts with existing nodes
+                                updateIdCounter(fixedNodes);
                                 setNodes(fixedNodes);
                                 setEdges(fixedEdges);
                                 
@@ -773,6 +818,8 @@ const PipelineEditorContent = () => {
                         } catch (validationError) {
                             console.error('[PipelineEditorPage] Error validating integration IDs:', validationError);
                             // Proceed with import without validation
+                            // Update ID counter to avoid conflicts with existing nodes
+                            updateIdCounter(fixedNodes);
                             setNodes(fixedNodes);
                             setEdges(fixedEdges);
                             
@@ -846,6 +893,8 @@ const PipelineEditorContent = () => {
                 }));
                 
                 // Apply the updated nodes
+                // Update ID counter to avoid conflicts with existing nodes
+                updateIdCounter(updatedReactFlowNodes);
                 setNodes(updatedReactFlowNodes);
                 setEdges(importedFlowData.edges);
                 
@@ -877,6 +926,8 @@ const PipelineEditorContent = () => {
             !pipelineInitialized.current) {
 
             console.log('[PipelineEditorPage] Initializing ReactFlow from pipeline configuration');
+            // Update ID counter to avoid conflicts with existing nodes
+            updateIdCounter(pipeline.configuration.nodes);
             console.log('[PipelineEditorPage] Configuration nodes:', pipeline.configuration.nodes);
             console.log('[PipelineEditorPage] Configuration edges:', pipeline.configuration.edges);
 

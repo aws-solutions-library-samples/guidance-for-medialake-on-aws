@@ -165,7 +165,7 @@ class MediaLakeStack(cdk.Stack):
             # audio_metadata_extractor_function_arn=pipeline_nodes_stack.audio_metadata_extractor_function_arn,
             # video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
             # audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
-            # check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
+            # check_media_convert_status_function_arn=pipeline_nodes_stack.check_media_convert_status_function_arn,
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             asset_table=props.base_infrastructure.asset_table,

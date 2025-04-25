@@ -1,4 +1,5 @@
 import json
+import shortuuid
 from typing import Dict, Any
 
 from aws_lambda_powertools import Logger, Tracer, Metrics
@@ -160,6 +161,10 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
         else:
             logger.info(f"Using provided pipeline_id: {pipeline_id}, skipping name check")
         
+        # Generate a single UUID for all resources in this execution
+        execution_uuid = shortuuid.uuid()
+        logger.info(f"Generated execution UUID: {execution_uuid} for consistent resource naming")
+        
         # If pipeline_id is not provided, create a new pipeline record
         if not pipeline_id:
             # Create new pipeline record with initial status
@@ -176,6 +181,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             logger.info(f"Starting resource creation for pipeline {pipeline_name}")
             
             lambda_arns = {}
+            lambda_role_arns = {}
             total_nodes = len(pipeline.configuration.nodes)
             processed_nodes = 0
             
@@ -201,7 +207,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 is_first = (node.id == first_lambda_node_id)
                 is_last = (node.id == last_lambda_node_id)
                 
-                lambda_arn = create_lambda_function(pipeline_name, node, is_first=is_first, is_last=is_last)
+                lambda_result = create_lambda_function(pipeline_name, node, is_first=is_first, is_last=is_last, execution_uuid=execution_uuid)
                 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
                 lambda_key = node.data.id
@@ -210,10 +216,12 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     if "operationId" in node.data.configuration and node.data.configuration["operationId"]:
                         lambda_key = f"{lambda_key}_{node.data.configuration['operationId']}"
                 
-                lambda_arns[lambda_key] = lambda_arn
+                if lambda_result:
+                    lambda_arns[lambda_key] = lambda_result["function_arn"]
+                    lambda_role_arns[lambda_key] = lambda_result["role_arn"]
                 
                 # Update status after node processing is complete
-                if lambda_arn:
+                if lambda_result:
                     # update_pipeline_status(pipeline_id, f"NODE {node_id} LAMBDA CREATED")
                     logger.info(f"Lambda function created for node {node_id}")
                 else:
@@ -241,8 +249,9 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             
             update_pipeline_status(pipeline_id, "CREATING STATE MACHINE")
             logger.info(f"Creating state machine for pipeline {pipeline_name}")
-            sfn_response = create_step_function(pipeline_name, state_machine_definition)
-            state_machine_arn = sfn_response.get("stateMachineArn")
+            sfn_result = create_step_function(pipeline_name, state_machine_definition)
+            state_machine_arn = sfn_result["response"].get("stateMachineArn")
+            sfn_role_arn = sfn_result["role_arn"]
             logger.info(f"State machine created with ARN: {state_machine_arn}")
             
             update_pipeline_status(pipeline_id, "STATE MACHINE CREATED")
@@ -252,6 +261,10 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             update_pipeline_status(pipeline_id, "CREATING EVENT RULES")
             logger.info(f"Creating EventBridge rules for trigger nodes in pipeline {pipeline_name}")
             eventbridge_rule_arns = {}
+            eventbridge_role_arns = {}
+            trigger_lambda_arns = {}
+            sqs_queue_arns = {}
+            event_source_mapping_uuids = {}
             trigger_nodes = [node for node in pipeline.configuration.nodes if node.data.type.lower() == "trigger"]
             total_triggers = len(trigger_nodes)
             processed_triggers = 0
@@ -261,10 +274,15 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     update_pipeline_status(pipeline_id, f"CREATING EVENT RULE {processed_triggers}/{total_triggers}")
                     logger.info(f"Creating EventBridge rule for trigger node {processed_triggers}/{total_triggers}: {node.data.id}")
                     try:
-                        rule_arn = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active)
-                        if rule_arn:
-                            eventbridge_rule_arns[node.data.id] = rule_arn
-                            logger.info(f"Added EventBridge rule {rule_arn} for node {node.data.id} with active={pipeline.active}")
+                        rule_result = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active, execution_uuid=execution_uuid)
+                        if rule_result:
+                            eventbridge_rule_arns[node.data.id] = rule_result["rule_arn"]
+                            eventbridge_role_arns[node.data.id] = rule_result["role_arn"]
+                            trigger_lambda_arns[node.data.id] = rule_result["trigger_lambda_arn"]
+                            sqs_queue_arns[node.data.id] = rule_result["queue_arn"]
+                            if rule_result["event_source_mapping_uuid"]:
+                                event_source_mapping_uuids[node.data.id] = rule_result["event_source_mapping_uuid"]
+                            logger.info(f"Added EventBridge rule {rule_result['rule_arn']} for node {node.data.id} with active={pipeline.active}")
                     except Exception as e:
                         logger.error(f"Failed to create EventBridge rule for node {node.data.id}: {e}")
             
@@ -278,14 +296,20 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             update_pipeline_status(pipeline_id, "FINALIZING DEPLOYMENT")
             logger.info(f"Finalizing deployment for pipeline {pipeline_name}")
             
-            # Update pipeline info in DynamoDB with DEPLOYED status
+            # Update pipeline info in DynamoDB with DEPLOYED status and all resource ARNs
             pipeline_id = store_pipeline_info(
                 pipeline,
                 state_machine_arn,
                 lambda_arns,
                 eventbridge_rule_arns,
                 pipeline_id,
-                active=pipeline.active  # Pass the active field from the pipeline definition
+                active=pipeline.active,  # Pass the active field from the pipeline definition
+                sfn_role_arn=sfn_role_arn,
+                lambda_role_arns=lambda_role_arns,
+                eventbridge_role_arns=eventbridge_role_arns,
+                trigger_lambda_arns=trigger_lambda_arns,
+                sqs_queue_arns=sqs_queue_arns,
+                event_source_mapping_uuids=event_source_mapping_uuids
             )
             
             update_pipeline_status(pipeline_id, "DEPLOYED")

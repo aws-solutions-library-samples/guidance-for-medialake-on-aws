@@ -19,7 +19,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer
+    PyamlLayer, ShortuuidLayer, CommonLibrariesLayer
 )
 import aws_cdk as cdk
 
@@ -63,15 +63,17 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+        self.commonlibs_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
+        
         
         # Node Lambda Deployments
 
-        self.check_mediaconvert_status_lambda_deployment = LambdaDeployment(
+        self.check_media_convert_status_lambda_deployment = LambdaDeployment(
             self,
-            "CheckMediaconvertStatusLambdaDeployment",
+            "CheckMediaConvertStatusLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "check_mediaconvert_status"],
+            code_path=["lambdas", "nodes", "check_media_convert_status"],
         )
 
 
@@ -226,15 +228,15 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "debug_input"],
         )
-        
-        self.pipeline_input_formatter_lambda_deployment = LambdaDeployment(
+
+        self.publish_event_lambda_deployment = LambdaDeployment(
             self,
-            "PipelineInputFormatterLambdaDeployment",
+            "PublishEventLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "pipeline_input_formatter"],
+            code_path=["lambdas", "nodes", "publish_event"],
         )
-
+      
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",
@@ -329,15 +331,16 @@ class NodesStack(cdk.NestedStack):
             "NodesProcessor",
             LambdaConfig(
                 name=f"{config.resource_prefix}-nodes-processor",
-                entry="lambdas/nodes/pipeline_nodes_deployment",
+                entry="lambdas/back_end/pipeline_nodes_deployment",
                 memory_size=256,
+                layers=[self.commonlibs_layer.layer_version],
                 timeout_minutes=15,
                 environment_variables={
                     "NODES_TABLE": self._pipelines_nodes_table.table_name,
                     "NODES_BUCKET": self._pipelines_nodes_bucket.bucket_name,
                     "SERVICE_NAME": "pipeline-nodes-deployer",
                     # Layer ARNs for automatic layer attachment
-                    "POWERTOOLS_LAYER_ARN": self.powertools_layer.layer.layer_version_arn,
+                    "POWERTOOLS_LAYER_ARN": self.powertools_layer.layer_version_arn,
                     "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
                     "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
                     # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,
@@ -346,6 +349,7 @@ class NodesStack(cdk.NestedStack):
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn,
+                    "COMMONLIBS_LAYER_ARN": self.commonlibs_layer.layer_version_arn
                 },
             ),
         )

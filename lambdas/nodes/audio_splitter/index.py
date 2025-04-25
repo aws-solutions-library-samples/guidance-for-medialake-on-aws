@@ -78,7 +78,7 @@ def get_audio_duration(file_path: str) -> float:
 
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
+
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler

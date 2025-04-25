@@ -1,0 +1,425 @@
+{
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 336,
+          "y": 176
+        },
+        "data": {
+          "nodeId": "trigger_ingest_completed",
+          "label": "Ingest Completed (trigger)",
+          "description": "This step will trigger after ingest is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Prefix": "",
+              "Format": "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG"
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 336,
+          "y": 176
+        }
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 336,
+          "y": 352
+        },
+        "data": {
+          "nodeId": "image_thumbnail",
+          "label": "Image Thumbnail (extract)",
+          "description": "Create an image thumbnail from an image file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "image"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "0": {
+                "name": "output_bucket",
+                "schema": {
+                  "type": "string",
+                  "description": "S3 bucket name for output"
+                },
+                "in": "body",
+                "required": true
+              },
+              "1": {
+                "name": "width",
+                "schema": {
+                  "type": "integer",
+                  "description": "Width of the thumbnail in pixels"
+                },
+                "in": "body",
+                "required": false
+              },
+              "2": {
+                "name": "height",
+                "schema": {
+                  "type": "integer",
+                  "description": "Height of the thumbnail in pixels"
+                },
+                "in": "body",
+                "required": false
+              },
+              "3": {
+                "name": "crop",
+                "schema": {
+                  "type": "boolean",
+                  "description": "Whether to crop the image to fit the dimensions",
+                  "default": false
+                },
+                "in": "body",
+                "required": false
+              },
+              "output_bucket": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 113,
+        "positionAbsolute": {
+          "x": 336,
+          "y": 352
+        }
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 848,
+          "y": 176
+        },
+        "data": {
+          "nodeId": "image_proxy",
+          "label": "Image Proxy (extract)",
+          "description": "Create an image proxy from an image file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "image"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "0": {
+                "name": "output_bucket",
+                "schema": {
+                  "type": "string",
+                  "description": "S3 bucket name for output"
+                },
+                "in": "body",
+                "required": true
+              },
+              "output_bucket": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 113,
+        "positionAbsolute": {
+          "x": 848,
+          "y": 176
+        }
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 592,
+          "y": 176
+        },
+        "data": {
+          "nodeId": "image_metadata_extractor",
+          "label": "Image Metadata Extractor (extract)",
+          "description": "Extract metadata from an image file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "image"
+          ],
+          "outputTypes": [
+            {
+              "name": "metadata",
+              "description": "Output type: metadata"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "0": {
+                "name": "S3 File Location",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {
+                      "type": "string",
+                      "description": "S3 bucket name"
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "S3 object key"
+                    }
+                  },
+                  "required": [
+                    "bucket",
+                    "key"
+                  ]
+                },
+                "in": "body",
+                "required": true
+              },
+              "S3 File Location": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 592,
+          "y": 176
+        }
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 848,
+          "y": 352
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113,
+        "positionAbsolute": {
+          "x": 848,
+          "y": 352
+        }
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 592,
+          "y": 368
+        },
+        "data": {
+          "nodeId": "publish_event",
+          "label": "Publish Event (generate)",
+          "description": "Publish event on the given eventBus",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "generate",
+            "parameters": {
+              "0": {
+                "name": "EventBus ARN",
+                "schema": {
+                  "type": "string"
+                },
+                "default": "${INGEST_EVENT_BUS_NAME}",
+                "in": "body",
+                "required": true
+              },
+              "EventBus ARN": "${INGEST_EVENT_BUS_NAME}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 592,
+          "y": 368
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_3",
+        "source": "dndnode_0",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_0-dndnode_3"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-image"
+      },
+      {
+        "id": "dndnode_3-dndnode_2",
+        "source": "dndnode_3",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_3-dndnode_2"
+        },
+        "sourceHandle": "metadata",
+        "targetHandle": "input-image"
+      },
+      {
+        "id": "dndnode_2-dndnode_1",
+        "source": "dndnode_2",
+        "target": "dndnode_1",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_2-dndnode_1"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-image"
+      },
+      {
+        "id": "dndnode_1-dndnode_4",
+        "source": "dndnode_5",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_1-dndnode_4"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_1-dndnode_5",
+        "source": "dndnode_1",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      }
+    ],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    },
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  },
+  "name": "Default Image Pipeline",
+  "description": "Default pipeline for processing image assets",
+  "active": true
+}

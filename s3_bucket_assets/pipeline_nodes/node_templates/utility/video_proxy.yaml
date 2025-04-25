@@ -1,0 +1,59 @@
+spec: v1.0.0
+node:
+  id: video_proxy
+  title: Video Proxy
+  description: Create an video proxy
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/VideoProxyLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - '*'
+                
+actions:
+  extract:
+    summary: Create a video proxy
+    description: Create a video proxy from a video file stored in S3
+    operationId: createVideoProxy
+    parameters:
+      - in: body
+        name: output_bucket
+        required: true
+        schema:
+          type: string
+          description: S3 bucket name for output
+    x-requestMapping: processor/video_proxy/extract/
+    x-responseMapping: processor/video_proxy/extract/
+    connections:
+      incoming:
+        type: [video]
+      outgoing:
+        type: [any]

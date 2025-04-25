@@ -1,1 +1,4 @@
+aws-xray-sdk
 aws-lambda-powertools
+boto3
+jinja2

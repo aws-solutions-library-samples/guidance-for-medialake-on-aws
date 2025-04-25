@@ -6,7 +6,6 @@ import os
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 import time
-from lambda_utils import logger, lambda_handler_decorator
 
 VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
 
@@ -30,7 +29,7 @@ def create_index_with_retry(
         bool: True if index creation was successful, False otherwise
     """
     url = f"{host}/{index_name}"
-    logger.info(f"Creating OpenSearch index", extra={"url": url, "index_name": index_name})
+    print(f"Creating OpenSearch index - url: {url}, index_name: {index_name}")
 
     for attempt in range(max_retries):
         try:
@@ -43,81 +42,36 @@ def create_index_with_retry(
             SigV4Auth(credentials, service, region).add_auth(req)
             req = req.prepare()
 
-            logger.info("Sending request to OpenSearch", extra={
-                "method": req.method,
-                "url": req.url,
-                "attempt": attempt + 1,
-                "max_retries": max_retries
-            })
+            print(f"Sending request to OpenSearch - method: {req.method}, url: {req.url}, attempt: {attempt + 1}, max_retries: {max_retries}")
             
             response = request(
                 method=req.method, url=req.url, headers=req.headers, data=req.body
             )
 
             if response.status_code == 200:
-                logger.info(
-                    "Index creation successful",
-                    extra={
-                        "index_name": index_name,
-                        "status_code": response.status_code,
-                        "response": response.text
-                    }
-                )
+                print(f"Index creation successful - index_name: {index_name}, status_code: {response.status_code}, response: {response.text}")
                 return True
             else:
                 if (
                     response.json()["error"]["root_cause"][0]["type"]
                     == "resource_already_exists_exception"
                 ):
-                    logger.info(
-                        "Index already exists",
-                        extra={
-                            "index_name": index_name,
-                            "status_code": response.status_code
-                        }
-                    )
+                    print(f"Index already exists - index_name: {index_name}, status_code: {response.status_code}")
                     return True
                 
-                logger.error(
-                    "Failed to create OpenSearch index",
-                    extra={
-                        "index_name": index_name,
-                        "status_code": response.status_code,
-                        "response": response.text,
-                        "attempt": attempt + 1,
-                        "max_retries": max_retries
-                    }
-                )
+                print(f"Failed to create OpenSearch index - index_name: {index_name}, status_code: {response.status_code}, response: {response.text}, attempt: {attempt + 1}, max_retries: {max_retries}")
 
         except Exception as e:
-            logger.error(
-                "Error creating OpenSearch index",
-                extra={
-                    "index_name": index_name,
-                    "error": str(e),
-                    "attempt": attempt + 1,
-                    "max_retries": max_retries
-                },
-                exc_info=True
-            )
+            print(f"Error creating OpenSearch index - index_name: {index_name}, error: {str(e)}, attempt: {attempt + 1}, max_retries: {max_retries}")
 
         # Exponential backoff
         backoff_time = 2**attempt
-        logger.info(
-            "Retrying index creation after backoff",
-            extra={
-                "index_name": index_name,
-                "attempt": attempt + 1,
-                "max_retries": max_retries,
-                "backoff_seconds": backoff_time
-            }
-        )
+        print(f"Retrying index creation after backoff - index_name: {index_name}, attempt: {attempt + 1}, max_retries: {max_retries}, backoff_seconds: {backoff_time}")
         time.sleep(backoff_time)
 
     return False
 
 
-@lambda_handler_decorator(cors=True)
 def handler(event, context):
     """
     Lambda handler for creating OpenSearch indexes
@@ -129,14 +83,14 @@ def handler(event, context):
     Returns:
         dict: Response indicating success or failure
     """
-    logger.info("Received event", extra={"event": event})
+    print(f"Received event: {event}")
 
     if event["RequestType"] == "Create":
         host = os.environ["COLLECTION_ENDPOINT"]
-        logger.info("Retrieved collection endpoint", extra={"host": host})
+        print(f"Retrieved collection endpoint - host: {host}")
 
         index_names = os.environ["INDEX_NAMES"]
-        logger.info("Retrieved index names", extra={"index_names": index_names})
+        print(f"Retrieved index names - index_names: {index_names}")
 
         headers = {
             "content-type": "application/json",
@@ -219,30 +173,23 @@ def handler(event, context):
         service = os.environ["SCOPE"]
         credentials = boto3.Session().get_credentials()
 
-        logger.info(
-            "Preparing to create indexes",
-            extra={
-                "region": region,
-                "service": service,
-                "vector_dimension": VECTOR_DIMENSION
-            }
-        )
+        print(f"Preparing to create indexes - region: {region}, service: {service}, vector_dimension: {VECTOR_DIMENSION}")
 
         indexes = index_names.split(",")
-        logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
+        print(f"Creating {len(indexes)} indexes - indexes: {indexes}")
         
         for index_name in indexes:
-            logger.info(f"Processing index", extra={"index_name": index_name})
+            print(f"Processing index - index_name: {index_name}")
             success = create_index_with_retry(
                 host, index_name, payload, headers, credentials, service, region
             )
             if not success:
                 error_msg = f"Failed to create index {index_name} after multiple retries"
-                logger.error(error_msg)
+                print(f"ERROR: {error_msg}")
                 raise Exception(error_msg)
             
-        logger.info("Successfully created all indexes")
+        print("Successfully created all indexes")
         return {"statusCode": 200, "body": "All indexes created successfully"}
     else:
-        logger.info(f"Skipping non-Create request type", extra={"RequestType": event["RequestType"]})
+        print(f"Skipping non-Create request type - RequestType: {event['RequestType']}")
         return {"statusCode": 200, "body": f"Skipped {event['RequestType']} request"}

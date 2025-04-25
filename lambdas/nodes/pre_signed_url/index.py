@@ -17,7 +17,7 @@ s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("LARGE_PAYLOAD_BUCKET")
+
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler

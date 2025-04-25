@@ -1,0 +1,12 @@
+{
+  "externalJobId": "{{ variables.externalJobId }}",
+  "externalJobStatus": "{{ variables.externalJobStatus }}",
+  "externalJobResult": "{{ variables.externalJobResult }}"
+  {% if variables.status == "COMPLETE" %}
+  ,
+  "proxy": {{ variables.proxy|jsonify }},
+  {% if variables.thumbnail is defined and variables.thumbnail %}
+  "thumbnail": {{ variables.thumbnail|jsonify }}
+  {% endif %}
+  {% endif %}
+}

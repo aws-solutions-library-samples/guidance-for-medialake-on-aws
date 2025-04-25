@@ -1,382 +1,392 @@
 {
-  "nodes": [
-    {
-      "id": "dndnode_0",
-      "type": "custom",
-      "position": {
-        "x": 432,
-        "y": 256
-      },
-      "data": {
-        "nodeId": "trigger_image_processing_completed",
-        "label": "Image Processing Completed (trigger)",
-        "description": "This step will trigger after image processing is completed",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 256
         },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "image",
-            "description": "Output type: image"
-          }
-        ],
-        "type": "TRIGGER",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "trigger",
-          "parameters": {
-            "Image Type": "",
-            "Prefix": ""
-          },
-          "requestMapping": null,
-          "responseMapping": null
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 432,
-        "y": 256
-      }
-    },
-    {
-      "id": "dndnode_1",
-      "type": "custom",
-      "position": {
-        "x": 432,
-        "y": 416
-      },
-      "data": {
-        "nodeId": "pre_signed_url",
-        "label": "Presigned URL Generator (generate)",
-        "description": "Generate a pre-signed URL for S3 object access",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "presigned_url",
-            "description": "Output type: presigned_url"
-          }
-        ],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "generate",
-          "parameters": {
-            "0": {
-              "name": "URL Validity Duration",
-              "schema": {
-                "type": "number"
-              },
-              "default": "3600",
-              "in": "body",
-              "required": true
+        "data": {
+          "nodeId": "trigger_image_processing_completed",
+          "label": "Image Processing Completed (trigger)",
+          "description": "This step will trigger after image processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
             },
-            "URL Validity Duration": "3600"
-          }
-        }
-      },
-      "width": 200,
-      "height": 100,
-      "positionAbsolute": {
-        "x": 432,
-        "y": 416
-      }
-    },
-    {
-      "id": "dndnode_2",
-      "type": "custom",
-      "position": {
-        "x": 432,
-        "y": 560
-      },
-      "data": {
-        "nodeId": "twelve_labs",
-        "label": "Twelve Labs (post)",
-        "description": "Generate image or audio embeddings",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
+            "_owner": null,
+            "_store": {}
           },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [],
-        "outputTypes": [],
-        "type": "INTEGRATION",
-        "configuration": {
-          "path": "/embed",
-          "method": "post",
-          "requestMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
-          "responseMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
-          "integrationId": "de8d6022-f939-4588-afbd-30af9354eeb5",
-          "operationId": "generateImageOrAudioEmbeddings",
-          "parameters": {
-            "0": {
-              "name": "nodeId",
-              "schema": {
-                "type": "string"
-              },
-              "in": "query",
-              "required": true
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "image",
+              "description": "Output type: image"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Image Type": "",
+              "Prefix": ""
             },
-            "nodeId": ""
+            "requestMapping": null,
+            "responseMapping": null
           }
-        }
-      },
-      "width": 200,
-      "height": 100,
-      "positionAbsolute": {
-        "x": 432,
-        "y": 560
-      }
-    },
-    {
-      "id": "dndnode_3",
-      "type": "custom",
-      "position": {
-        "x": 416,
-        "y": 736
-      },
-      "data": {
-        "nodeId": "map",
-        "label": "Map (map)",
-        "description": "This step will iterate over an array of items and execute the same steps for each item",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
         },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "Processor",
-            "description": "json payload item processor"
-          },
-          {
-            "name": "Next",
-            "description": "output to the next node"
-          }
-        ],
-        "type": "FLOW",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "map",
-          "parameters": {
-            "0": {
-              "name": "ItemsPath",
-              "schema": {
-                "type": "string",
-                "description": "JSONPath that identifies the array to iterate over"
-              },
-              "default": "$.payload.externalTaskStatus",
-              "in": "body",
-              "required": true
-            },
-            "ItemsPath": "$.payload.externalTaskStatus"
-          }
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 432,
+          "y": 256
         }
       },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 416,
-        "y": 736
-      }
-    },
-    {
-      "id": "dndnode_4",
-      "type": "custom",
-      "position": {
-        "x": 432,
-        "y": 880
-      },
-      "data": {
-        "nodeId": "success",
-        "label": "Success",
-        "description": "This step will end the execution with a success status",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 416
         },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [],
-        "type": "FLOW",
-        "configuration": {
-          "method": "success",
-          "parameters": {}
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 432,
-        "y": 880
-      }
-    },
-    {
-      "id": "dndnode_5",
-      "type": "custom",
-      "position": {
-        "x": 688,
-        "y": 608
-      },
-      "data": {
-        "nodeId": "embedding_store",
-        "label": "Embedding Store (store)",
-        "description": "Store embeddings in OpenSearch for semantic search",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
+        "data": {
+          "nodeId": "pre_signed_url",
+          "label": "Presigned URL Generator (generate)",
+          "description": "Generate a pre-signed URL for S3 object access",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
           },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "store",
-          "parameters": {
-            "0": {
-              "name": "Index Name",
-              "schema": {
-                "type": "string"
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "presigned_url",
+              "description": "Output type: presigned_url"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "generate",
+            "parameters": {
+              "0": {
+                "name": "URL Validity Duration",
+                "schema": {
+                  "type": "number"
+                },
+                "default": "3600",
+                "in": "body",
+                "required": true
               },
-              "default": "media",
-              "in": "body",
-              "required": false
-            },
-            "1": {
-              "name": "Content Type",
-              "schema": {
-                "type": "string",
-                "enum": [
-                  "video",
-                  "audio",
-                  "image"
-                ]
-              },
-              "default": "video",
-              "in": "body",
-              "required": false
-            },
-            "Index Name": "media",
-            "Content Type": "image"
+              "URL Validity Duration": "3600"
+            }
           }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 432,
+          "y": 416
         }
       },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 688,
-        "y": 608
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "twelve_labs",
+          "label": "Twelve Labs (post)",
+          "description": "Generate image or audio embeddings",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/embed",
+            "method": "post",
+            "requestMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "responseMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "integrationId": "de8d6022-f939-4588-afbd-30af9354eeb5",
+            "operationId": "generateImageOrAudioEmbeddings",
+            "parameters": {
+              "0": {
+                "name": "nodeId",
+                "schema": {
+                  "type": "string"
+                },
+                "in": "query",
+                "required": true
+              },
+              "nodeId": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 432,
+          "y": 560
+        }
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 416,
+          "y": 736
+        },
+        "data": {
+          "nodeId": "map",
+          "label": "Map (map)",
+          "description": "This step will iterate over an array of items and execute the same steps for each item",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Processor",
+              "description": "json payload item processor"
+            },
+            {
+              "name": "Next",
+              "description": "output to the next node"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "map",
+            "parameters": {
+              "0": {
+                "name": "ItemsPath",
+                "schema": {
+                  "type": "string",
+                  "description": "JSONPath that identifies the array to iterate over"
+                },
+                "default": "$.payload.externalTaskStatus",
+                "in": "body",
+                "required": true
+              },
+              "ItemsPath": "$.payload.externalTaskStatus"
+            }
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 416,
+          "y": 736
+        }
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 880
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 432,
+          "y": 880
+        }
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 688,
+          "y": 608
+        },
+        "data": {
+          "nodeId": "embedding_store",
+          "label": "Embedding Store (store)",
+          "description": "Store embeddings in OpenSearch for semantic search",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "store",
+            "parameters": {
+              "0": {
+                "name": "Index Name",
+                "schema": {
+                  "type": "string"
+                },
+                "default": "media",
+                "in": "body",
+                "required": false
+              },
+              "1": {
+                "name": "Content Type",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "audio",
+                    "image"
+                  ]
+                },
+                "default": "video",
+                "in": "body",
+                "required": false
+              },
+              "Index Name": "media",
+              "Content Type": "image"
+            }
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 688,
+          "y": 608
+        }
       }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "image",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Next",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_5",
+        "source": "dndnode_3",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Processor",
+        "targetHandle": "input-any"
+      }
+    ],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    },
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
     }
-  ],
-  "edges": [
-    {
-      "id": "dndnode_0-dndnode_1",
-      "source": "dndnode_0",
-      "target": "dndnode_1",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "image",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_1-dndnode_2",
-      "source": "dndnode_1",
-      "target": "dndnode_2",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "presigned_url",
-      "targetHandle": "input-default"
-    },
-    {
-      "id": "dndnode_3-dndnode_4",
-      "source": "dndnode_3",
-      "target": "dndnode_4",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "Next",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_2-dndnode_3",
-      "source": "dndnode_2",
-      "target": "dndnode_3",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "default",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_3-dndnode_5",
-      "source": "dndnode_3",
-      "target": "dndnode_5",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "Processor",
-      "targetHandle": "input-any"
-    }
-  ],
-  "viewport": {
-    "x": 0,
-    "y": 0,
-    "zoom": 1
-  }
+  },
+  "name": "TwelveLabs Image Embeddings",
+  "description": "",
+  "active": true
 }

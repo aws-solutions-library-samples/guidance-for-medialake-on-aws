@@ -30,12 +30,16 @@ class PowertoolsLayer(Construct):
 
         stack = Stack.of(self)
 
-        self.layer = lambda_.LayerVersion.from_layer_version_arn(
+        self.layer_version = lambda_.LayerVersion.from_layer_version_arn(
             self,
             "PowertoolsLayer",
             f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:4",
         )
         # f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
+    
+    @property
+    def layer_version_arn(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer_version_arn
 
 
 class JinjaLambdaLayer(Construct):
@@ -360,6 +364,83 @@ class PyamlLayer(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
+
+
+# Original implementation (creates a new layer for each Lambda function)
+class CommonLibrariesLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        # Define the Lambda layer
+        self.layer = LambdaLayer(
+            self,
+            "CommonLibrariesLayer",
+            config=LambdaLayerConfig(
+                entry="lambdas/common_libraries",
+                description="A Lambda layer with common utilities for Lambda functions",
+            ),
+        )
+
+    @property
+    def layer_version_arn(self) -> str:
+        return self.layer.layer_version_arn
+        
+    # Add a property to directly access the layer version
+    @property
+    def layer_version(self) -> lambda_.LayerVersion:
+        return self.layer.layer
+
+# Singleton implementation to ensure only one layer is created per stack
+# class CommonLibrariesLayer(Construct):
+#     # Dictionary to store instances by stack ID
+#     _instances_by_stack = {}
+#     # Dictionary to store the actual layer objects by stack ID
+#     _layer_instances_by_stack = {}
+    
+#     def __init__(self, scope: Construct, id: str, **kwargs):
+#         # Always call the parent constructor to ensure proper JSII initialization
+#         super().__init__(scope, id, **kwargs)
+        
+#         # Get the stack of the current scope
+#         from aws_cdk import Stack
+#         current_stack = Stack.of(scope)
+#         stack_id = current_stack.stack_id
+        
+#         # Store this instance for future reference
+#         CommonLibrariesLayer._instances_by_stack[stack_id] = self
+        
+#         # Check if we already have a layer for this stack
+#         if stack_id in CommonLibrariesLayer._layer_instances_by_stack:
+#             # We don't create a new layer, but we'll return the existing one via the property
+#             pass
+#         else:
+#             # Create a new layer
+#             layer = LambdaLayer(
+#                 self,
+#                 "CommonLibrariesLayer",
+#                 config=LambdaLayerConfig(
+#                     entry="lambdas/common_libraries",
+#                     description="A Lambda layer with common utilities for Lambda functions",
+#                 ),
+#             )
+#             # Store the layer for future use
+#             CommonLibrariesLayer._layer_instances_by_stack[stack_id] = layer
+    
+#     @property
+#     def layer(self):
+#         """Get the shared layer instance for this stack"""
+#         from aws_cdk import Stack
+#         current_stack = Stack.of(self)
+#         stack_id = current_stack.stack_id
+#         return CommonLibrariesLayer._layer_instances_by_stack[stack_id].layer
+    
+#     @property
+#     def layer_version_arn(self) -> str:
+#         """Get the layer version ARN for the shared layer instance"""
+#         from aws_cdk import Stack
+#         current_stack = Stack.of(self)
+#         stack_id = current_stack.stack_id
+#         return CommonLibrariesLayer._layer_instances_by_stack[stack_id].layer.layer_version_arn
 
 
 class ShortuuidLayer(Construct):

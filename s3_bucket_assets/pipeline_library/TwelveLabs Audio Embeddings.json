@@ -1,532 +1,534 @@
 {
-  "nodes": [
-    {
-      "id": "dndnode_0",
-      "type": "custom",
-      "position": {
-        "x": 352,
-        "y": 368
-      },
-      "data": {
-        "nodeId": "map",
-        "label": "Map (map)",
-        "description": "This step will iterate over an array of items and execute the same steps for each item",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 352,
+          "y": 368
         },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "Processor",
-            "description": "json payload item processor"
+        "data": {
+          "nodeId": "map",
+          "label": "Map (map)",
+          "description": "This step will iterate over an array of items and execute the same steps for each item",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
           },
-          {
-            "name": "Next",
-            "description": "output to the next node"
-          }
-        ],
-        "type": "FLOW",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "map",
-          "parameters": {
-            "0": {
-              "name": "ItemsPath",
-              "schema": {
-                "type": "string",
-                "description": "JSONPath that identifies the array to iterate over"
-              },
-              "default": "$.payload.externalTaskStatus",
-              "in": "body",
-              "required": true
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Processor",
+              "description": "json payload item processor"
             },
-            "1": {
-              "name": "ConcurrencyLimit",
-              "schema": {
-                "type": "number",
-                "description": "JSONPath that identifies the array to iterate over"
+            {
+              "name": "Next",
+              "description": "output to the next node"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "map",
+            "parameters": {
+              "0": {
+                "name": "ItemsPath",
+                "schema": {
+                  "type": "string",
+                  "description": "JSONPath that identifies the array to iterate over"
+                },
+                "default": "$.payload.externalTaskStatus",
+                "in": "body",
+                "required": true
               },
-              "default": 0,
-              "label": "Concurrency Limit",
-              "in": "body",
-              "required": false
-            },
-            "ConcurrencyLimit": 1,
-            "ItemsPath": "$.payload.externalTaskStatus"
+              "1": {
+                "name": "ConcurrencyLimit",
+                "schema": {
+                  "type": "number",
+                  "description": "JSONPath that identifies the array to iterate over"
+                },
+                "default": 0,
+                "label": "Concurrency Limit",
+                "in": "body",
+                "required": false
+              },
+              "ConcurrencyLimit": 1,
+              "ItemsPath": "$.payload.externalTaskStatus"
+            }
           }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 352,
+          "y": 368
         }
       },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 352,
-        "y": 368
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 352,
+          "y": 176
+        },
+        "data": {
+          "nodeId": "trigger_audio_processing_completed",
+          "label": "Audio Processing Completed (trigger)",
+          "description": "This step will trigger after audio processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "audio",
+              "description": "Output type: audio"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Audio Type": "",
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 352,
+          "y": 176
+        }
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 528,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 528,
+          "y": 560
+        }
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 608,
+          "y": 128
+        },
+        "data": {
+          "nodeId": "pre_signed_url",
+          "label": "Presigned URL Generator (generate)",
+          "description": "Generate a pre-signed URL for S3 object access",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "presigned_url",
+              "description": "Output type: presigned_url"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "generate",
+            "parameters": {
+              "0": {
+                "name": "URL Validity Duration",
+                "schema": {
+                  "type": "number"
+                },
+                "default": 3600,
+                "in": "body",
+                "required": true
+              },
+              "URL Validity Duration": 3600
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 608,
+          "y": 128
+        }
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 880,
+          "y": 112
+        },
+        "data": {
+          "nodeId": "audio_splitter",
+          "label": "Audio Splitter (split)",
+          "description": "Splits audio files into MP3 chunks of configurable duration",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "audio"
+          ],
+          "outputTypes": [
+            {
+              "name": "audio",
+              "description": "Output type: audio"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "split",
+            "parameters": {
+              "0": {
+                "name": "Chunk Duration",
+                "schema": {
+                  "type": "number"
+                },
+                "default": 10,
+                "in": "body",
+                "required": true
+              },
+              "Chunk Duration": 10
+            }
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 880,
+          "y": 112
+        }
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 640,
+          "y": 368
+        },
+        "data": {
+          "nodeId": "pre_signed_url",
+          "label": "Presigned URL Generator (generate)",
+          "description": "Generate a pre-signed URL for S3 object access",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "presigned_url",
+              "description": "Output type: presigned_url"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "generate",
+            "parameters": {
+              "0": {
+                "name": "URL Validity Duration",
+                "schema": {
+                  "type": "number"
+                },
+                "default": 3600,
+                "in": "body",
+                "required": true
+              },
+              "URL Validity Duration": 3600
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 640,
+          "y": 368
+        }
+      },
+      {
+        "id": "dndnode_6",
+        "type": "custom",
+        "position": {
+          "x": 880,
+          "y": 320
+        },
+        "data": {
+          "nodeId": "twelve_labs",
+          "label": "Twelve Labs (post)",
+          "description": "Generate image or audio embeddings",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/embed",
+            "method": "post",
+            "requestMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "responseMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "integrationId": "1c56a940-21a4-4d8b-a1e0-18545f791c2e",
+            "operationId": "generateImageOrAudioEmbeddings",
+            "parameters": {
+              "0": {
+                "name": "nodeId",
+                "schema": {
+                  "type": "string"
+                },
+                "in": "query",
+                "required": true
+              },
+              "nodeId": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "positionAbsolute": {
+          "x": 880,
+          "y": 320
+        }
+      },
+      {
+        "id": "dndnode_7",
+        "type": "custom",
+        "position": {
+          "x": 1056,
+          "y": 480
+        },
+        "data": {
+          "nodeId": "embedding_store",
+          "label": "Embedding Store (store)",
+          "description": "Store embeddings in OpenSearch for semantic search",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null,
+            "_store": {}
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "store",
+            "parameters": {
+              "0": {
+                "name": "Index Name",
+                "schema": {
+                  "type": "string"
+                },
+                "default": "media",
+                "in": "body",
+                "required": false
+              },
+              "1": {
+                "name": "Content Type",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "audio",
+                    "image"
+                  ]
+                },
+                "default": "video",
+                "in": "body",
+                "required": false
+              },
+              "Index Name": "media",
+              "Content Type": "audio"
+            }
+          }
+        },
+        "width": 200,
+        "height": 112,
+        "positionAbsolute": {
+          "x": 1056,
+          "y": 480
+        }
       }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_1-dndnode_3",
+        "source": "dndnode_1",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "audio",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-audio"
+      },
+      {
+        "id": "dndnode_4-dndnode_0",
+        "source": "dndnode_4",
+        "target": "dndnode_0",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "audio",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_0-dndnode_5",
+        "source": "dndnode_0",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Processor",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_0-dndnode_2",
+        "source": "dndnode_0",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Next",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_5-dndnode_6",
+        "source": "dndnode_5",
+        "target": "dndnode_6",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_6-dndnode_7",
+        "source": "dndnode_6",
+        "target": "dndnode_7",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      }
+    ],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
     },
-    {
-      "id": "dndnode_1",
-      "type": "custom",
-      "position": {
-        "x": 352,
-        "y": 176
-      },
-      "data": {
-        "nodeId": "trigger_audio_processing_completed",
-        "label": "Audio Processing Completed (trigger)",
-        "description": "This step will trigger after audio processing is completed",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "audio",
-            "description": "Output type: audio"
-          }
-        ],
-        "type": "TRIGGER",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "trigger",
-          "parameters": {
-            "Audio Type": "",
-            "Prefix": ""
-          },
-          "requestMapping": null,
-          "responseMapping": null
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 352,
-        "y": 176
-      }
-    },
-    {
-      "id": "dndnode_2",
-      "type": "custom",
-      "position": {
-        "x": 528,
-        "y": 560
-      },
-      "data": {
-        "nodeId": "success",
-        "label": "Success",
-        "description": "This step will end the execution with a success status",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [],
-        "type": "FLOW",
-        "configuration": {
-          "method": "success",
-          "parameters": {}
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 528,
-        "y": 560
-      }
-    },
-    {
-      "id": "dndnode_3",
-      "type": "custom",
-      "position": {
-        "x": 608,
-        "y": 128
-      },
-      "data": {
-        "nodeId": "pre_signed_url",
-        "label": "Presigned URL Generator (generate)",
-        "description": "Generate a pre-signed URL for S3 object access",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "presigned_url",
-            "description": "Output type: presigned_url"
-          }
-        ],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "generate",
-          "parameters": {
-            "0": {
-              "name": "URL Validity Duration",
-              "schema": {
-                "type": "number"
-              },
-              "default": 3600,
-              "in": "body",
-              "required": true
-            },
-            "URL Validity Duration": 3600
-          }
-        }
-      },
-      "width": 200,
-      "height": 100,
-      "positionAbsolute": {
-        "x": 608,
-        "y": 128
-      }
-    },
-    {
-      "id": "dndnode_4",
-      "type": "custom",
-      "position": {
-        "x": 880,
-        "y": 112
-      },
-      "data": {
-        "nodeId": "audio_splitter",
-        "label": "Audio Splitter (split)",
-        "description": "Splits audio files into MP3 chunks of configurable duration",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "audio"
-        ],
-        "outputTypes": [
-          {
-            "name": "audio",
-            "description": "Output type: audio"
-          }
-        ],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "split",
-          "parameters": {
-            "0": {
-              "name": "Chunk Duration",
-              "schema": {
-                "type": "number"
-              },
-              "default": 10,
-              "in": "body",
-              "required": true
-            },
-            "Chunk Duration": 10
-          }
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 880,
-        "y": 112
-      }
-    },
-    {
-      "id": "dndnode_5",
-      "type": "custom",
-      "position": {
-        "x": 640,
-        "y": 368
-      },
-      "data": {
-        "nodeId": "pre_signed_url",
-        "label": "Presigned URL Generator (generate)",
-        "description": "Generate a pre-signed URL for S3 object access",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [
-          {
-            "name": "presigned_url",
-            "description": "Output type: presigned_url"
-          }
-        ],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "generate",
-          "parameters": {
-            "0": {
-              "name": "URL Validity Duration",
-              "schema": {
-                "type": "number"
-              },
-              "default": 3600,
-              "in": "body",
-              "required": true
-            },
-            "URL Validity Duration": 3600
-          }
-        }
-      },
-      "width": 200,
-      "height": 100,
-      "positionAbsolute": {
-        "x": 640,
-        "y": 368
-      }
-    },
-    {
-      "id": "dndnode_6",
-      "type": "custom",
-      "position": {
-        "x": 880,
-        "y": 320
-      },
-      "data": {
-        "nodeId": "twelve_labs",
-        "label": "Twelve Labs (post)",
-        "description": "Generate image or audio embeddings",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [],
-        "outputTypes": [],
-        "type": "INTEGRATION",
-        "configuration": {
-          "path": "/embed",
-          "method": "post",
-          "requestMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
-          "responseMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
-          "integrationId": "1c56a940-21a4-4d8b-a1e0-18545f791c2e",
-          "operationId": "generateImageOrAudioEmbeddings",
-          "parameters": {
-            "0": {
-              "name": "nodeId",
-              "schema": {
-                "type": "string"
-              },
-              "in": "query",
-              "required": true
-            },
-            "nodeId": ""
-          }
-        }
-      },
-      "width": 200,
-      "height": 100,
-      "positionAbsolute": {
-        "x": 880,
-        "y": 320
-      }
-    },
-    {
-      "id": "dndnode_7",
-      "type": "custom",
-      "position": {
-        "x": 1056,
-        "y": 480
-      },
-      "data": {
-        "nodeId": "embedding_store",
-        "label": "Embedding Store (store)",
-        "description": "Store embeddings in OpenSearch for semantic search",
-        "icon": {
-          "key": null,
-          "ref": null,
-          "props": {
-            "size": 20
-          },
-          "_owner": null,
-          "_store": {}
-        },
-        "inputTypes": [
-          "any"
-        ],
-        "outputTypes": [],
-        "type": "UTILITY",
-        "configuration": {
-          "path": "",
-          "operationId": "",
-          "method": "store",
-          "parameters": {
-            "0": {
-              "name": "Index Name",
-              "schema": {
-                "type": "string"
-              },
-              "default": "media",
-              "in": "body",
-              "required": false
-            },
-            "1": {
-              "name": "Content Type",
-              "schema": {
-                "type": "string",
-                "enum": [
-                  "video",
-                  "audio",
-                  "image"
-                ]
-              },
-              "default": "video",
-              "in": "body",
-              "required": false
-            },
-            "Index Name": "media",
-            "Content Type": "audio"
-          }
-        }
-      },
-      "width": 200,
-      "height": 112,
-      "positionAbsolute": {
-        "x": 1056,
-        "y": 480
-      }
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
     }
-  ],
-  "edges": [
-    {
-      "id": "dndnode_1-dndnode_3",
-      "source": "dndnode_1",
-      "target": "dndnode_3",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "audio",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_3-dndnode_4",
-      "source": "dndnode_3",
-      "target": "dndnode_4",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "presigned_url",
-      "targetHandle": "input-audio"
-    },
-    {
-      "id": "dndnode_4-dndnode_0",
-      "source": "dndnode_4",
-      "target": "dndnode_0",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "audio",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_0-dndnode_5",
-      "source": "dndnode_0",
-      "target": "dndnode_5",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "Processor",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_0-dndnode_2",
-      "source": "dndnode_0",
-      "target": "dndnode_2",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "Next",
-      "targetHandle": "input-any"
-    },
-    {
-      "id": "dndnode_5-dndnode_6",
-      "source": "dndnode_5",
-      "target": "dndnode_6",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "presigned_url",
-      "targetHandle": "input-default"
-    },
-    {
-      "id": "dndnode_6-dndnode_7",
-      "source": "dndnode_6",
-      "target": "dndnode_7",
-      "type": "custom",
-      "data": {
-        "text": "Connected"
-      },
-      "sourceHandle": "default",
-      "targetHandle": "input-any"
-    }
-  ],
-  "viewport": {
-    "x": 0,
-    "y": 0,
-    "zoom": 1
-  },
-  "settings": {
-    "autoStart": false,
-    "retryAttempts": 3,
-    "timeout": 3600
   },
   "name": "TwelveLabs Audio Embeddings",
   "description": "",

@@ -8,7 +8,7 @@ node:
   integration:
     config:
       aws_event_bridge:
-        aws_eventbridge_rule: vide_trigger
+        aws_eventbridge_rule: workflow_completed_trigger
 actions:
   trigger:
     summary: Trigger after a workflow is completed

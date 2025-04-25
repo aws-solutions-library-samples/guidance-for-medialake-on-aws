@@ -1,0 +1,36 @@
+spec: v1.0.0
+node:
+  id: check_media_convert_status
+  title: Check MediaConvert Status
+  description: Checks MediaConvert Job Status
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/CheckMediaConvertStatusLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - mediaconvert:GetJob
+                - mediaconvert:ListJobs
+              resources:
+                - ${PROXY_QUEUE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:GetJob
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:jobs/*
+                
+actions:
+  extract:
+    summary: Check MediaConvert Status
+    description: Checks MediaConvert Job Status
+    operationId: checkMediaConvertStatus
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

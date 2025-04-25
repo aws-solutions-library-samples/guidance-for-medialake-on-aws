@@ -18,7 +18,6 @@ from constructs import Construct
 from config import config
 from typing import Optional
 
-from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
@@ -27,6 +26,9 @@ from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 from medialake_constructs.shared_constructs.lambda_layers import (
     PyamlLayer,
     ShortuuidLayer,
+    PowertoolsLayer,
+    CommonLibrariesLayer,
+    PowertoolsLayerConfig
 )
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
@@ -40,8 +42,6 @@ class ApiGatewayPipelinesProps:
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
-    # image_proxy_lambda: lambda_.IFunction
-    # image_metadata_extractor_lambda: lambda_.IFunction
     open_search_endpoint: str
     api_resource: apigateway.IResource
     ingest_event_bus: events.EventBus
@@ -86,6 +86,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                         "dynamodb:*",
                         "events:*",
                         "states:*",
+                        "logs:*",
                     ],
                     resources=["*"],
                 ),
@@ -237,6 +238,11 @@ class ApiGatewayPipelinesConstruct(Construct):
         ## Pipelines v2
         pyaml_layer = PyamlLayer(self, "PyamlLayer")
         shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
+        powertools_layer_config = PowertoolsLayerConfig()
+        powertools_layer = PowertoolsLayer(
+            self, "PowertoolsLayer", config=powertools_layer_config
+        )
+        commonlibs_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
 
         # POST /api/pipelines V2
         post_pipelines_v2_lambda_config = LambdaConfig(
@@ -260,6 +266,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "OPENSEARCH_VPC_SUBNET_IDS": ','.join([subnet.subnet_id for subnet in props.vpc.private_subnets]),
                 "OPENSEARCH_SECURITY_GROUP_ID": props.security_group.security_group_id,
                 "ACCOUNT_ID": self.account_id,
+                "POWERTOOLS_LAYER_ARN":  powertools_layer.layer_version_arn,
+                "COMMONLIBS_LAYER_ARN": commonlibs_layer.layer_version_arn
             },
         )
         
@@ -288,6 +296,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "sqs:TagQueue",
                     "sqs:setqueueattributes",
                     "sqs:DeleteQueue",
+                    "sqs:listqueues"
                 ],
                 resources=["*"],
             )
@@ -333,7 +342,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "lambda:CreateEventSourceMapping",
                     "lambda:UpdateFunctionConfiguration",
                     "lambda:GetFunctionConfiguration",
-                    # "lambda:UpdateFunctionCode",
+                    "lambda:ListEventSourceMappings",
                     "lambda:DeleteFunction",  # For rollback
                 ],
                 resources=["*"],
@@ -555,6 +564,14 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "events:DeleteRule",
                     "events:DescribeRule",
                     "events:ListTargetsByRule",
+                ],
+                resources=["*"],
+            )
+        )
+        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:deletequeue",
                 ],
                 resources=["*"],
             )

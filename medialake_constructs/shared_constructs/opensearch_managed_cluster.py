@@ -21,9 +21,8 @@ from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from constructs import Construct
 
 from config import config
-from medialake_constructs.shared_constructs.layer_base import (
-    LambdaLayer,
-    LambdaLayerConfig,
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PowertoolsLayer, PowertoolsLayerConfig,CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -302,7 +301,7 @@ class OpenSearchCluster(Construct):
         )
 
         should_create_index = not config.opensearch_cluster_settings.domain_endpoint
-
+        self.commonlibs_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
         if should_create_index:
             # Create Lambda function for index creation
             create_index_lambda = Lambda(
@@ -312,6 +311,7 @@ class OpenSearchCluster(Construct):
                     entry="lambdas/back_end/create_oss_index",
                     lambda_handler="handler",
                     vpc=props.vpc,
+                    layers=[self.commonlibs_layer.layer],
                     security_groups=[props.security_group],
                     timeout_minutes=1,
                     environment_variables={

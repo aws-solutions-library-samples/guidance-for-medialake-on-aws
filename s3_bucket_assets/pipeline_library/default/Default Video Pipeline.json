@@ -1,0 +1,698 @@
+{
+  "name": "Default Video Pipeline",
+  "description": "",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_10",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 96
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "method": "trigger",
+            "parameters": {
+              "Video Type": "MP4,MOV,AVI,MKV,WEBM,MXF",
+              "Prefix": ""
+            },
+            "path": "",
+            "operationId": "",
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "id": "trigger_video_processing_completed"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": true,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_11",
+        "type": "custom",
+        "position": {
+          "x": 624,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "video_proxy",
+          "label": "Video Proxy (extract)",
+          "description": "Create a video proxy from a video file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "video"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "extract",
+            "parameters": {
+              "output_bucket": ""
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "video_proxy"
+        },
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_12",
+        "type": "custom",
+        "position": {
+          "x": 640,
+          "y": 752
+        },
+        "data": {
+          "nodeId": "video_thumbnail",
+          "label": "Video Thumbnail (extract)",
+          "description": "Create a thumbnail image from a video file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "video"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "extract",
+            "parameters": {
+              "output_bucket": ""
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "video_thumbnail"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_13",
+        "type": "custom",
+        "position": {
+          "x": 624,
+          "y": 96
+        },
+        "data": {
+          "nodeId": "video_metadata_extractor",
+          "label": "Video Metadata Extractor (extract)",
+          "description": "Extract metadata from an video file stored in S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "video"
+          ],
+          "outputTypes": [
+            {
+              "name": "metadata",
+              "description": "Output type: metadata"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "extract",
+            "parameters": {
+              "S3 File Location": ""
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "video_metadata_extractor"
+        },
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_14",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "check_media_convert_status",
+          "label": "Check MediaConvert Status",
+          "description": "Checks MediaConvert Job Status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "extract",
+            "parameters": {}
+          },
+          "id": "check_media_convert_status"
+        },
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_16",
+        "type": "custom",
+        "position": {
+          "x": 960,
+          "y": 928
+        },
+        "data": {
+          "nodeId": "publish_event",
+          "label": "Publish Event (generate)",
+          "description": "Publish event on the given eventBus",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "generate",
+            "parameters": {
+              "EventBus ARN": "${INGEST_EVENT_BUS_NAME}"
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "publish_event"
+        },
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_17",
+        "type": "custom",
+        "position": {
+          "x": 1232,
+          "y": 928
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "id": "success"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_18",
+        "type": "custom",
+        "position": {
+          "x": 640,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          },
+          "id": "choice"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_19",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 928
+        },
+        "data": {
+          "nodeId": "check_media_convert_status",
+          "label": "Check MediaConvert Status",
+          "description": "Checks MediaConvert Job Status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "extract",
+            "parameters": {}
+          },
+          "id": "check_media_convert_status"
+        },
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_20",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 1120
+        },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "This step will wait for a specific duration before moving to the next step",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "wait",
+            "parameters": {
+              "Duration": 15
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "wait"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_21",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 592
+        },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "This step will wait for a specific duration before moving to the next step",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "wait",
+            "parameters": {
+              "Duration": 15
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "wait"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "dndnode_22",
+        "type": "custom",
+        "position": {
+          "x": 624,
+          "y": 928
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          },
+          "id": "choice"
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "source": "dndnode_11",
+        "sourceHandle": "any",
+        "target": "dndnode_14",
+        "targetHandle": "input-any",
+        "id": "dndnode_11-dndnode_14",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_11-dndnode_14",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_12",
+        "sourceHandle": "any",
+        "target": "dndnode_19",
+        "targetHandle": "input-any",
+        "id": "dndnode_12-dndnode_19",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_12-dndnode_19",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_13",
+        "sourceHandle": "metadata",
+        "target": "dndnode_11",
+        "targetHandle": "input-video",
+        "id": "dndnode_13-dndnode_11",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_13-dndnode_11",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_18",
+        "sourceHandle": "Completed",
+        "target": "dndnode_12",
+        "targetHandle": "input-video",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "reactflow__edge-dndnode_18Completed-dndnode_12input-video",
+          "type": "custom"
+        },
+        "selected": false,
+        "id": "reactflow__edge-dndnode_18Completed-dndnode_12input-video"
+      },
+      {
+        "source": "dndnode_22",
+        "sourceHandle": "In Progress",
+        "target": "dndnode_20",
+        "targetHandle": "input-any",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "reactflow__edge-dndnode_22In Progress-dndnode_20input-any",
+          "type": "custom"
+        },
+        "id": "reactflow__edge-dndnode_22In Progress-dndnode_20input-any"
+      },
+      {
+        "source": "dndnode_19",
+        "sourceHandle": "any",
+        "target": "dndnode_22",
+        "targetHandle": "input-any",
+        "id": "dndnode_19-dndnode_22",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_19-dndnode_22",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_20",
+        "sourceHandle": "any",
+        "target": "dndnode_19",
+        "targetHandle": "input-any",
+        "id": "dndnode_20-dndnode_19",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_20-dndnode_19",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_14",
+        "sourceHandle": "any",
+        "target": "dndnode_18",
+        "targetHandle": "input-any",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "reactflow__edge-dndnode_14any-dndnode_18input-any",
+          "type": "custom"
+        },
+        "id": "reactflow__edge-dndnode_14any-dndnode_18input-any"
+      },
+      {
+        "source": "dndnode_18",
+        "sourceHandle": "In Progress",
+        "target": "dndnode_21",
+        "targetHandle": "input-any",
+        "id": "dndnode_18-dndnode_21",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_18-dndnode_21",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_21",
+        "sourceHandle": "any",
+        "target": "dndnode_14",
+        "targetHandle": "input-any",
+        "id": "dndnode_21-dndnode_14",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_21-dndnode_14",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_22",
+        "sourceHandle": "Completed",
+        "target": "dndnode_16",
+        "targetHandle": "input-any",
+        "id": "dndnode_22-dndnode_16",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_22-dndnode_16",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_16",
+        "sourceHandle": "any",
+        "target": "dndnode_17",
+        "targetHandle": "input-any",
+        "id": "dndnode_16-dndnode_17",
+        "type": "custom",
+        "data": {
+          "text": "Connected",
+          "id": "dndnode_16-dndnode_17",
+          "type": "custom"
+        }
+      },
+      {
+        "source": "dndnode_10",
+        "sourceHandle": "video",
+        "target": "dndnode_13",
+        "targetHandle": "input-video",
+        "id": "dndnode_10-dndnode_13",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        }
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

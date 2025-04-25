@@ -198,13 +198,13 @@ class PipelineNodesStack(cdk.NestedStack):
             ),
         )
 
-        self._check_mediaconvert_status = Lambda(
+        self._check_media_convert_status = Lambda(
             self,
             "CheckMediaconvertStatusNode",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_check_mediaconvert_status_node",
+                name=f"{config.resource_prefix}_check_media_convert_status_node",
                 timeout_minutes=15,
-                entry="lambdas/nodes/check_mediaconvert_status",
+                entry="lambdas/nodes/check_media_convert_status",
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
@@ -213,7 +213,7 @@ class PipelineNodesStack(cdk.NestedStack):
             ),
         )
 
-        self._check_mediaconvert_status.function.add_to_role_policy(
+        self._check_media_convert_status.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:GetJob",
@@ -245,7 +245,7 @@ class PipelineNodesStack(cdk.NestedStack):
             )
         )
 
-        self._check_mediaconvert_status.function.add_to_role_policy(
+        self._check_media_convert_status.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:ListJobs",
@@ -254,7 +254,7 @@ class PipelineNodesStack(cdk.NestedStack):
             )
         )
 
-        self._check_mediaconvert_status.function.add_to_role_policy(
+        self._check_media_convert_status.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "mediaconvert:GetJob",
@@ -653,8 +653,8 @@ class PipelineNodesStack(cdk.NestedStack):
                 "PutRequest": {
                     "Item": {
                         "id": unique_id(),
-                        "name": {"S": "check_mediaconvert_status"},
-                        "arn": {"S": self._check_mediaconvert_status.function_arn},
+                        "name": {"S": "check_media_convert_status"},
+                        "arn": {"S": self._check_media_convert_status.function_arn},
                         "description": {"S": "Checks the status of MediaConvert jobs"},
                     }
                 }
@@ -849,12 +849,12 @@ class PipelineNodesStack(cdk.NestedStack):
         return self._video_proxy_thumbnail_lambda.function_arn
 
     @property
-    def check_mediaconvert_status_lambda(self) -> lambda_.Function:
-        return self._check_mediaconvert_status
+    def check_media_convert_status_lambda(self) -> lambda_.Function:
+        return self._check_media_convert_status
 
     @property
-    def check_mediaconvert_status_function_arn(self) -> str:
-        return self._check_mediaconvert_status.function_arn
+    def check_media_convert_status_function_arn(self) -> str:
+        return self._check_media_convert_status.function_arn
 
     @property
     def audio_metadata_extractor_lambda(self) -> lambda_.Function:
@@ -884,7 +884,7 @@ class PipelineNodesStack(cdk.NestedStack):
             self._image_metadata_extractor_lambda.function,
             self._image_proxy_lambda.function,
             self._video_proxy_thumbnail_lambda.function,
-            self._check_mediaconvert_status.function,
+            self._check_media_convert_status.function,
             self._audio_metadata_extractor_lambda.function,
             self._audio_proxy_thumbnail_lambda.function,
         ]
