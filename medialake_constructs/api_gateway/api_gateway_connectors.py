@@ -270,10 +270,12 @@ class ConnectorsConstruct(Construct):
                 actions=[
                     "lambda:DeleteFunction",
                     "lambda:DeleteEventSourceMapping",
+                    "lambda:ListEventSourceMappings",
                     "sqs:DeleteQueue",
                     "s3:DeleteBucketNotification",
                     "s3:ListBucket",
                     "s3:GetBucketLocation",
+                    "s3:DeleteBucket",
                 ],
                 resources=[
                     f"arn:aws:lambda:*:{account_id}:function:*",
@@ -342,13 +344,9 @@ class ConnectorsConstruct(Construct):
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
-                    "pipes:CreatePipe",
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
                     "pipes:ListPipes",
-                    "pipes:StartPipe",
-                    "pipes:StopPipe",
-                    "pipes:UpdatePipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
@@ -685,6 +683,7 @@ class ConnectorsConstruct(Construct):
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
         
         # Add CORS support to child API resources (not root)
+        add_cors_options_method(connectors_resource)
         add_cors_options_method(connector_id_resource)
         add_cors_options_method(connector_s3_resource)
         add_cors_options_method(s3_sync_connector_resource)

@@ -283,7 +283,12 @@ def setup_eventbridge_notifications(
     created_resources.append(("queue_policy", queue_url))
 
     # Add SQS as target for the EventBridge rule
-    target_id = f"SQSTarget-{s3_bucket}"
+    # Ensure Target ID does not exceed 64 characters - Rely on AWS validation
+    # max_target_id_bucket_len = 54 # 64 (max) - 10 (prefix 'SQSTarget-')
+    # truncated_bucket_for_target = s3_bucket[:max_target_id_bucket_len]
+    # target_id = f"SQSTarget-{truncated_bucket_for_target}"
+    target_id = f"SQSTarget-{s3_bucket}" # Use full bucket name
+    
     eventbridge.put_targets(
         Rule=rule_name,
         Targets=[
@@ -1046,11 +1051,23 @@ def create_connector(createconnector: S3Connector) -> dict:
 
         # ---- Store Connector in DynamoDB ----
         connector_table = dynamodb.Table(MEDIALAKE_CONNECTOR_TABLE)
+        # Ensure all required fields are populated for the DynamoDB item
         item = {
             "id": connector_id,
             "name": connector_name,
             "description": connector_description,
             "type": "s3",
+            # Top-level fields required by frontend/example
+            "storageIdentifier": s3_bucket,
+            "region": bucket_region,
+            "status": "active",
+            "integrationMethod": integration_method,
+            "sqsArn": queue_arn, 
+            "lambdaArn": lambda_arn,
+            "iamRoleArn": iam_role_arn,
+            "queueUrl": queue_url, # Add queueUrl if available
+            "objectPrefix": object_prefix, 
+            # Existing nested configuration (keep for potential internal use)
             "configuration": {
                 "bucket": s3_bucket,
                 "region": bucket_region,
@@ -1059,12 +1076,24 @@ def create_connector(createconnector: S3Connector) -> dict:
                 "queueArn": queue_arn,
                 "lambdaArn": lambda_arn,
                 "iamRoleArn": iam_role_arn,
-                "eventSourceArn": event_source_arn, # Store pipe or queue arn
-                "eventSourceType": event_source_type, # Store type (Pipe or SQS)
+                "eventSourceArn": event_source_arn,
+                "eventSourceType": event_source_type,
+                "queueUrl": queue_url, # Also store queueUrl here for consistency
             },
+            # Add settings object
+            "settings": {
+                "bucket": s3_bucket,
+                "region": bucket_region,
+                "path": object_prefix, # Use objectPrefix for path, assuming similarity
+            },
+             # Add usage object (initialize as 0)
+            "usage": {
+                "total": 0
+            },
+            # Add flag indicating how bucket was created
+            "creationType": bucket_type, # 'new' or 'existing'
             "createdAt": datetime.utcnow().isoformat(),
             "updatedAt": datetime.utcnow().isoformat(),
-            "status": "active", # Set status
         }
         logger.info(f"Storing connector details in DynamoDB: {item}")
         connector_table.put_item(Item=item)
@@ -1100,7 +1129,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             eventbridge_cleanup = boto3.client("events", region_name=bucket_region)
             pipes_cleanup_client = boto3.client("pipes", region_name=bucket_region)
         else:
-            # Use default region clients if bucket_region wasn't set (e.g., error occurred before region determination)
+            # Use default region clients if bucket_region wasn't set (e.g., error occurred very early)
              logger.warning("Bucket region not determined before error, using default region clients for cleanup.")
              s3_cleanup_client = s3_client_default_region
              # Note: Other regional clients might fail if the error happened very early

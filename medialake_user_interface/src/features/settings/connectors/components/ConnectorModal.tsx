@@ -12,7 +12,6 @@ import {
     Select,
     FormControl,
     InputLabel,
-    Alert,
     Stepper,
     Step,
     StepLabel,
@@ -32,6 +31,9 @@ import {
     Add as AddIcon,
     Delete as DeleteIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import ApiStatusModal from '@/components/ApiStatusModal';
+import { useApiMutationHandler } from '@/shared/hooks/useApiMutationHandler';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets } from '@/api/hooks/useConnectors';
 import { useGetAWSRegions } from '@/api/hooks/useAWSRegions';
@@ -97,6 +99,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     isCreating,
 }) => {
     const theme = useTheme();
+    const { t } = useTranslation();
+    const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
     const [activeStep, setActiveStep] = useState(0);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -105,12 +109,12 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [s3ConnectorType, setS3ConnectorType] = useState('');
     const [configuration, setConfiguration] = useState<Record<string, any>>({});
     const [objectPrefixes, setObjectPrefixes] = useState<string[]>(['']);
-    const [error, setError] = useState('');
     const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const { data: s3BucketsResponse, isLoading: isLoadingBuckets, refetch: refetchBuckets } = useGetS3Buckets();
     const buckets = s3BucketsResponse?.data?.buckets || [];
     const [awsRegion, setAwsRegion] = useState('');
+    const [bucketNameError, setBucketNameError] = useState('');
 
     useEffect(() => {
         if (editingConnector) {
@@ -140,6 +144,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             setObjectPrefixes(['']);
             setActiveStep(0);
             setAwsRegion('');
+            setBucketNameError('');
         } else {
             setName('');
             setType('');
@@ -148,6 +153,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             setObjectPrefixes(['']);
             setActiveStep(0);
             setAwsRegion('');
+            setBucketNameError('');
         }
     }, [editingConnector, open]);
 
@@ -186,12 +192,48 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         setInfoAnchorEl(null);
     };
 
+    // S3 Bucket Name Validation Logic
+    const validateBucketName = (name: string): string => {
+        if (!name) return 'Bucket name is required.';
+        if (name.length < 3 || name.length > 63) {
+            return 'Bucket name must be between 3 and 63 characters long.';
+        }
+        if (!/^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(name)) {
+            return 'Bucket name can only contain lowercase letters, numbers, dots (.), and hyphens (-). Must start and end with a letter or number.';
+        }
+        if (name.includes('..') || name.includes('.-') || name.includes('-.')) {
+            return 'Bucket name cannot contain consecutive periods or periods adjacent to hyphens.';
+        }
+        if (/^(\d{1,3}\.){3}\d{1,3}$/.test(name)) {
+            return 'Bucket name cannot be formatted as an IP address.';
+        }
+        if (name.startsWith('xn--')) {
+            return 'Bucket name cannot start with \'xn--\'.';
+        }
+         if (name.endsWith('-s3alias')) {
+            return 'Bucket name cannot end with \'-s3alias\'.';
+        }
+        return ''; // No error
+    };
+
+    const handleBucketNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const newName = event.target.value;
+        setConfiguration({ ...configuration, bucket: newName });
+        const errorMsg = validateBucketName(newName);
+        setBucketNameError(errorMsg);
+    };
+
     const handleSaveInternal = async () => {
+        // Perform validation before attempting to save
+        const bucketValidationError = bucketType === 'new' ? validateBucketName(configuration.bucket || '') : '';
+        if (bucketValidationError) {
+            setBucketNameError(bucketValidationError);
+            return; // Stop submission if bucket name is invalid
+        }
         if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && (!configuration.bucket || !awsRegion))))) {
-            setError('Please fill in all required fields, including Bucket Name and Region for new buckets.');
+            alert('Please fill in all required fields, including Bucket Name and Region for new buckets.');
             return;
         }
-        setError('');
 
         // Filter out empty prefixes
         const filteredPrefixes = objectPrefixes.filter(prefix => prefix.trim() !== '');
@@ -215,12 +257,22 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             },
         };
 
-        try {
-            await onSave(connectorData);
-            onClose();
-        } catch (err) {
-            setError('Failed to create connector');
-        }
+        await handleMutation(
+            {
+                mutation: {
+                    mutateAsync: onSave,
+                } as any,
+                actionMessages: {
+                    loading: editingConnector ? t('connectors.apiMessages.updating.loading') : t('connectors.apiMessages.creating.loading'),
+                    success: editingConnector ? t('connectors.apiMessages.updating.success') : t('connectors.apiMessages.creating.success'),
+                    error: editingConnector ? t('connectors.apiMessages.updating.error') : t('connectors.apiMessages.creating.error'),
+                },
+                onSuccess: () => {
+                    onClose();
+                },
+            },
+            connectorData
+        );
     };
 
     const renderS3BucketTypeSelection = () => (
@@ -417,10 +469,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                             <TextField
                                 label="New Bucket Name"
                                 value={configuration.bucket || ''}
-                                onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                                onChange={handleBucketNameChange}
                                 fullWidth
                                 required
-                                helperText="Bucket name must be globally unique, follow S3 naming rules."
+                                error={!!bucketNameError}
+                                helperText={bucketNameError || 'Bucket name must be globally unique, follow S3 naming rules.'}
                             />
                             <FormControl fullWidth required>
                                 <InputLabel>AWS Region</InputLabel>
@@ -499,8 +552,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 <Box
                                     key={connectorType.value}
                                     onClick={() => {
-                                        setType(connectorType.value);
-                                        handleNext();
+                                        // Disable FSx for now
+                                        if (connectorType.value !== 'fsx') {
+                                            setType(connectorType.value);
+                                            handleNext();
+                                        }
                                     }}
                                     sx={{
                                         height: '120px',
@@ -510,7 +566,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                         alignItems: 'center',
                                         border: `1px solid ${theme.palette.divider}`,
                                         borderRadius: '8px',
-                                        cursor: 'pointer',
+                                        // Disable FSx styling and interaction
+                                        cursor: connectorType.value === 'fsx' ? 'not-allowed' : 'pointer',
+                                        opacity: connectorType.value === 'fsx' ? 0.5 : 1,
+                                        pointerEvents: connectorType.value === 'fsx' ? 'none' : 'auto',
                                         transition: 'all 0.2s',
                                         '&:hover': {
                                             borderColor: connectorType.colorHex,
@@ -577,30 +636,24 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         </Stepper>
                     )}
 
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                            {error}
-                        </Alert>
-                    )}
-
                     {renderStepContent(activeStep)}
                 </DialogContent>
 
                 <DialogActions sx={{ p: 2, gap: 1 }}>
                     {!editingConnector && activeStep > 0 && (
-                        <Button onClick={handleBack} disabled={isCreating}>
+                        <Button onClick={handleBack} disabled={apiStatus.status === 'loading'}>
                             Back
                         </Button>
                     )}
-                    <Button onClick={onClose} color="inherit" disabled={isCreating}>
+                    <Button onClick={onClose} color="inherit" disabled={apiStatus.status === 'loading'}>
                         Cancel
                     </Button>
                     {(activeStep === steps.length - 1 || editingConnector) ? (
                         <Button
                             variant="contained"
                             onClick={handleSaveInternal}
-                            disabled={isCreating}
-                            startIcon={isCreating ? <CircularProgress size={20} /> : null}
+                            disabled={apiStatus.status === 'loading' || (bucketType === 'new' && !!bucketNameError)}
+                            startIcon={apiStatus.status === 'loading' ? <CircularProgress size={20} /> : null}
                             sx={{
                                 backgroundColor: theme.palette.primary.main,
                                 '&:hover': {
@@ -614,7 +667,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         <Button
                             variant="contained"
                             onClick={handleNext}
-                            disabled={!type || (activeStep === 1 && !bucketType) || isCreating}
+                            disabled={!type || (activeStep === 1 && !bucketType) || apiStatus.status === 'loading' || (bucketType === 'new' && !!bucketNameError)}
                         >
                             Next
                         </Button>
@@ -647,6 +700,18 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     </Box>
                 </Popover>
             </Dialog>
+
+            {/* Render the ApiStatusModal only when not idle */}
+            {apiStatus.status !== 'idle' && (
+                <ApiStatusModal
+                    open={apiStatus.show}
+                    // Status is now guaranteed not to be 'idle' here
+                    status={apiStatus.status}
+                    action={apiStatus.action}
+                    message={apiStatus.message}
+                    onClose={closeApiStatus}
+                />
+            )}
         </>
     );
 };
