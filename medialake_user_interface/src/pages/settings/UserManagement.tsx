@@ -7,6 +7,7 @@ import UserList from '@/features/settings/usermanagement/components/UserList';
 import UserForm from '@/features/settings/usermanagement/components/UserForm';
 import ApiStatusModal from '@/components/ApiStatusModal';
 import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useDisableUser, useEnableUser } from '@/api/hooks/useUsers';
+import { useApiMutationHandler } from '@/shared/hooks/useApiMutationHandler';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/api/types/api.types';
 
 const availableRoles = ['Admin', 'Editor', 'Viewer'];
@@ -15,21 +16,11 @@ const UserManagement: React.FC = () => {
     const { t } = useTranslation();
     const [openUserForm, setOpenUserForm] = useState(false);
     const [editingUser, setEditingUser] = useState<User | undefined>();
-    const [error, setError] = useState<string | null>(null);
     const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
     const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
-    const [apiStatus, setApiStatus] = useState<{
-        show: boolean;
-        status: 'loading' | 'success' | 'error';
-        action: string;
-        message?: string;
-    }>({
-        show: false,
-        status: 'loading',
-        action: '',
-    });
+    
+    const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
-    // API Hooks
     const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
     const createUserMutation = useCreateUser();
     const updateUserMutation = useUpdateUser();
@@ -43,136 +34,84 @@ const UserManagement: React.FC = () => {
     };
 
     const handleEditUser = (user: User) => {
-        console.log('Edit user data:', user);
-        const normalizedUser = {
-            ...user,
-            given_name: user.given_name || '',
-        };
-        setEditingUser(normalizedUser);
+        setEditingUser(user);
         setOpenUserForm(true);
     };
 
     const handleSaveUser = async (userData: CreateUserRequest) => {
         const isNewUser = !editingUser;
-        const action = isNewUser ? 'Creating user...' : 'Updating user...';
-
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action,
-        });
         setOpenUserForm(false);
 
-        try {
-            if (editingUser) {
-                const updateData: UpdateUserRequest = {
-                    username: userData.username,
-                    email: userData.email,
-                    enabled: userData.enabled,
-                    groups: userData.groups,
-                    roles: userData.roles,
-                    given_name: userData.given_name,
-                    family_name: userData.family_name,
-                };
-                const result = await updateUserMutation.mutateAsync({
-                    username: editingUser.username,
-                    updates: updateData
-                });
-
-                setApiStatus({
-                    show: true,
-                    status: 'success',
-                    action: 'User Updated',
-                    message: 'User has been successfully updated',
-                });
-
-                return result;
-            } else {
-                const result = await createUserMutation.mutateAsync(userData);
-
-                setApiStatus({
-                    show: true,
-                    status: 'success',
-                    action: 'User Created',
-                    message: 'New user has been successfully created',
-                });
-
-                return result;
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'An error occurred while saving the user';
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: isNewUser ? 'User Creation Failed' : 'User Update Failed',
-                message: errorMessage,
-            });
-            console.error('Error saving user:', error);
-            throw error;
+        if (isNewUser) {
+            await handleMutation(
+                {
+                    mutation: createUserMutation,
+                    actionMessages: {
+                        loading: t('users.apiMessages.creating.loading'),
+                        success: t('users.apiMessages.creating.success'),
+                        successMessage: t('users.apiMessages.creating.successMessage'),
+                        error: t('users.apiMessages.creating.error'),
+                    },
+                    onSuccess: () => { /* Optional: Trigger refetch or other actions */ },
+                },
+                userData
+            );
+        } else if (editingUser) {
+            const updateData: UpdateUserRequest = {
+                username: editingUser.username,
+                email: userData.email,
+                enabled: userData.enabled,
+                groups: userData.groups,
+                roles: userData.roles,
+                given_name: userData.given_name,
+                family_name: userData.family_name,
+            };
+            await handleMutation(
+                {
+                    mutation: updateUserMutation,
+                    actionMessages: {
+                        loading: t('users.apiMessages.updating.loading'),
+                        success: t('users.apiMessages.updating.success'),
+                        successMessage: t('users.apiMessages.updating.successMessage'),
+                        error: t('users.apiMessages.updating.error'),
+                    },
+                },
+                updateData 
+            );
         }
     };
 
     const handleDeleteUser = async (username: string) => {
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action: 'Deleting user...',
-        });
-
-        try {
-            await deleteUserMutation.mutateAsync(username);
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: 'User Deleted',
-                message: 'User has been successfully deleted',
-            });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'An error occurred while deleting the user';
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: 'User Deletion Failed',
-                message: errorMessage,
-            });
-            console.error('Error deleting user:', error);
-        }
+        await handleMutation(
+            {
+                mutation: deleteUserMutation,
+                actionMessages: {
+                    loading: t('users.apiMessages.deleting.loading'),
+                    success: t('users.apiMessages.deleting.success'),
+                    successMessage: t('users.apiMessages.deleting.successMessage'),
+                    error: t('users.apiMessages.deleting.error'),
+                },
+            },
+            username
+        );
     };
 
     const handleToggleUserStatus = async (username: string, newEnabled: boolean) => {
-        const action = newEnabled ? 'Enabling user...' : 'Disabling user...';
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action,
-        });
+        const mutation = newEnabled ? enableUserMutation : disableUserMutation;
+        const actionKey = newEnabled ? 'enabling' : 'disabling';
 
-        try {
-            if (newEnabled) {
-                await enableUserMutation.mutateAsync(username);
-            } else {
-                await disableUserMutation.mutateAsync(username);
-            }
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: newEnabled ? 'User Enabled' : 'User Disabled',
-                message: `User has been successfully ${newEnabled ? 'enabled' : 'disabled'}`,
-            });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'An error occurred while updating user status';
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: 'Status Update Failed',
-                message: errorMessage,
-            });
-            console.error('Error toggling user status:', error);
-        }
-    };
-
-    const handleCloseApiStatus = () => {
-        setApiStatus(prev => ({ ...prev, show: false }));
+        await handleMutation(
+            {
+                mutation: mutation,
+                actionMessages: {
+                    loading: t(`users.apiMessages.${actionKey}.loading`),
+                    success: t(`users.apiMessages.${actionKey}.success`),
+                    successMessage: t(`users.apiMessages.${actionKey}.successMessage`),
+                    error: t(`users.apiMessages.${actionKey}.error`),
+                },
+            },
+            username
+        );
     };
 
     return (
@@ -255,10 +194,10 @@ const UserManagement: React.FC = () => {
 
             <ApiStatusModal
                 open={apiStatus.show}
-                status={apiStatus.status}
+                status={apiStatus.status === 'idle' ? 'loading' : apiStatus.status}
                 action={apiStatus.action}
                 message={apiStatus.message}
-                onClose={handleCloseApiStatus}
+                onClose={closeApiStatus}
             />
         </Box>
     );

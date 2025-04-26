@@ -16,6 +16,7 @@ export interface User {
   email_verified: string;
   given_name: string | null;
   family_name: string | null;
+  name?: string;
   groups: string[];
   roles?: string[];
 }

@@ -813,7 +813,6 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-
         pipeline_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_pipeline_id_handler.function),

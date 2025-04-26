@@ -106,7 +106,6 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        
         settings_api_stack = SettingsApiStack(self, "MediaLakeSettingsApi", props=SettingsApiStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
@@ -115,7 +114,6 @@ class MediaLakeStack(cdk.Stack):
             system_settings_table_arn=settings_stack.system_settings_table_arn,
             ),
         )
-        # settings_api_stack.add_dependency(settings_stack)
         
         users_groups_roles_stack = UsersGroupsRolesStack(self, "MediaLakeUsersGroupsRolesStack", props=UsersGroupsRolesStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
@@ -239,16 +237,6 @@ user_interface_stack = UserInterfaceStack(
 )
 user_interface_stack.add_dependency(medialake_stack)
 
-        # cleanup_stack.add_dependency(api_gateway_stack)
-        # cleanup_stack.add_dependency(users_groups_roles_stack)
-        # cleanup_stack.add_dependency(settings_api_stack)
-        # cleanup_stack.add_dependency(settings_stack)
-        # cleanup_stack.add_dependency(base_infrastructure)
-        # cleanup_stack.add_dependency(pipeline_nodes_stack)
-        # cleanup_stack.add_dependency(pipeline_stack)
-        # cleanup_stack.add_dependency(nodes_stack)
-        # cleanup_stack.add_dependency(user_interface_stack)
-
 if config.resource_application_tag:
     cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
@@ -259,9 +247,7 @@ if config.resource_application_tag:
 #     description="URL for the MediaLake User Interface",
 # )
 
-
 medialake_stack.add_dependency(cloudfront_waf_stack)
-
 
 cleanup_stack = CleanupStack(
     app,
@@ -291,18 +277,6 @@ app.synth()
 
 # if lambda_warmer:
 #     cleanup_stack.add_dependency(lambda_warmer)
-
-# Add dependencies to the monitoring stack
-# monitoring_stack.add_dependency(base_infrastructure)
-# monitoring_stack.add_dependency(nodes_stack)
-# monitoring_stack.add_dependency(pipeline_nodes_stack)
-# monitoring_stack.add_dependency(asset_sync_stack)
-# monitoring_stack.add_dependency(api_gateway_stack)
-# monitoring_stack.add_dependency(pipeline_stack)
-# if lambda_warmer:
-#     monitoring_stack.add_dependency(lambda_warmer)
-
-
 
 # cdk.CfnOutput(
 #     monitoring_stack,
