@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
 import { useGetS3Buckets } from '@/api/hooks/useConnectors';
+import { useGetAWSRegions } from '@/api/hooks/useAWSRegions';
 
 
 interface ConnectorModalProps {
@@ -64,6 +65,30 @@ const S3_INTEGRATION_METHODS = [
     { value: 's3Notifications' as const, label: 'S3 Event Notifications' },
 ] as const;
 
+const AWS_REGIONS = [
+    { value: 'us-east-1', label: 'US East (N. Virginia)' },
+    { value: 'us-east-2', label: 'US East (Ohio)' },
+    { value: 'us-west-1', label: 'US West (N. California)' },
+    { value: 'us-west-2', label: 'US West (Oregon)' },
+    { value: 'af-south-1', label: 'Africa (Cape Town)' },
+    { value: 'ap-east-1', label: 'Asia Pacific (Hong Kong)' },
+    { value: 'ap-south-1', label: 'Asia Pacific (Mumbai)' },
+    { value: 'ap-northeast-3', label: 'Asia Pacific (Osaka)' },
+    { value: 'ap-northeast-2', label: 'Asia Pacific (Seoul)' },
+    { value: 'ap-southeast-1', label: 'Asia Pacific (Singapore)' },
+    { value: 'ap-southeast-2', label: 'Asia Pacific (Sydney)' },
+    { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
+    { value: 'ca-central-1', label: 'Canada (Central)' },
+    { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
+    { value: 'eu-west-1', label: 'Europe (Ireland)' },
+    { value: 'eu-west-2', label: 'Europe (London)' },
+    { value: 'eu-south-1', label: 'Europe (Milan)' },
+    { value: 'eu-west-3', label: 'Europe (Paris)' },
+    { value: 'eu-north-1', label: 'Europe (Stockholm)' },
+    { value: 'me-south-1', label: 'Middle East (Bahrain)' },
+    { value: 'sa-east-1', label: 'South America (São Paulo)' },
+];
+
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
     open,
     onClose,
@@ -85,6 +110,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const [showAdvanced, setShowAdvanced] = useState(false);
     const { data: s3BucketsResponse, isLoading: isLoadingBuckets, refetch: refetchBuckets } = useGetS3Buckets();
     const buckets = s3BucketsResponse?.data?.buckets || [];
+    const [awsRegion, setAwsRegion] = useState('');
 
     useEffect(() => {
         if (editingConnector) {
@@ -109,6 +135,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             }
             
             setActiveStep(2);
+            setBucketType('');
+            setConfiguration({});
+            setObjectPrefixes(['']);
+            setActiveStep(0);
+            setAwsRegion('');
         } else {
             setName('');
             setType('');
@@ -116,6 +147,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             setConfiguration({});
             setObjectPrefixes(['']);
             setActiveStep(0);
+            setAwsRegion('');
         }
     }, [editingConnector, open]);
 
@@ -155,10 +187,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     };
 
     const handleSaveInternal = async () => {
-        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.bucket || !configuration.integrationMethod))) {
-            setError('Please fill in all required fields');
+        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && (!configuration.bucket || !awsRegion))))) {
+            setError('Please fill in all required fields, including Bucket Name and Region for new buckets.');
             return;
         }
+        setError('');
 
         // Filter out empty prefixes
         const filteredPrefixes = objectPrefixes.filter(prefix => prefix.trim() !== '');
@@ -172,6 +205,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 connectorType: s3ConnectorType,
                 s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3Notifications',
                 objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
+                ...(bucketType === 'new' && {
+                    bucketType: 'new',
+                    region: awsRegion,
+                }),
+                ...(bucketType === 'existing' && {
+                    bucketType: 'existing',
+                }),
             },
         };
 
@@ -373,14 +413,30 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                         </Box>
                     )}
                     {bucketType === 'new' && (
-                        <TextField
-                            label="New Bucket Name"
-                            value={configuration.bucket || ''}
-                            onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
-                            fullWidth
-                            required
-                            helperText="Bucket name must be unique across all AWS accounts"
-                        />
+                        <>
+                            <TextField
+                                label="New Bucket Name"
+                                value={configuration.bucket || ''}
+                                onChange={(e) => setConfiguration({ ...configuration, bucket: e.target.value })}
+                                fullWidth
+                                required
+                                helperText="Bucket name must be globally unique, follow S3 naming rules."
+                            />
+                            <FormControl fullWidth required>
+                                <InputLabel>AWS Region</InputLabel>
+                                <Select
+                                    value={awsRegion}
+                                    label="AWS Region"
+                                    onChange={(e) => setAwsRegion(e.target.value)}
+                                >
+                                    {AWS_REGIONS.map((region) => (
+                                        <MenuItem key={region.value} value={region.value}>
+                                            {region.label} ({region.value})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </>
                     )}
                 </>
             )}

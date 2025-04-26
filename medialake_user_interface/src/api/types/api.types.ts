@@ -275,3 +275,9 @@ export interface UserResponse {
     user: User;
   }
 }
+
+// AWS Specific Types
+export interface AWSRegion {
+    value: string;
+    label: string;
+}

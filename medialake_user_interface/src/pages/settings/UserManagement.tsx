@@ -76,7 +76,10 @@ const UserManagement: React.FC = () => {
                         error: t('users.apiMessages.updating.error'),
                     },
                 },
-                updateData 
+                { 
+                    username: editingUser.username, 
+                    updates: updateData 
+                }
             );
         }
     };
