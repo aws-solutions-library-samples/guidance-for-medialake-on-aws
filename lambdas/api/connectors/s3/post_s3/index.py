@@ -632,6 +632,11 @@ def create_eventbridge_pipe(
 
     # Create the pipe
     pipe_name = f"{resource_name_prefix}-pipe"
+    # Ensure pipe name doesn't exceed 64 characters (AWS limitation)
+    if len(pipe_name) > 64:
+        pipe_name = pipe_name[:64]
+        logger.info(f"Truncated pipe name to: {pipe_name}")
+        
     response = pipes.create_pipe(
         Name=pipe_name,
         RoleArn=pipe_role_arn,
@@ -1021,6 +1026,14 @@ def create_connector(createconnector: S3Connector) -> dict:
              # Using Pipes for EventBridge -> Lambda
             logger.info(f"Creating EventBridge Pipe for {queue_arn} -> {lambda_arn}")
             pipe_name_prefix = f"{RESOURCE_PREFIX}-s3-connector-{s3_bucket}"
+            # Ensure pipe name doesn't exceed 64 characters (AWS limitation)
+            if len(pipe_name_prefix) > 60:  # Leave room for '-pipe' suffix
+                # Truncate the prefix but keep the beginning and some of bucket name for readability
+                prefix_length = min(20, len(RESOURCE_PREFIX))
+                suffix_length = 60 - prefix_length - 12  # 12 for "-s3-connector-" 
+                pipe_name_prefix = f"{RESOURCE_PREFIX[:prefix_length]}-s3-connector-{s3_bucket[:suffix_length]}"
+                logger.info(f"Truncated pipe name prefix to: {pipe_name_prefix}")
+            
             pipe_name, pipe_arn = create_eventbridge_pipe(
                 pipe_name_prefix,
                 queue_arn,
@@ -1092,8 +1105,8 @@ def create_connector(createconnector: S3Connector) -> dict:
             },
             # Add flag indicating how bucket was created
             "creationType": bucket_type, # 'new' or 'existing'
-            "createdAt": datetime.utcnow().isoformat(),
-            "updatedAt": datetime.utcnow().isoformat(),
+            "createdAt": int(datetime.utcnow().timestamp()),
+            "updatedAt": int(datetime.utcnow().timestamp()),
         }
         logger.info(f"Storing connector details in DynamoDB: {item}")
         connector_table.put_item(Item=item)
