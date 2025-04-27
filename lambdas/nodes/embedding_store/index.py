@@ -296,6 +296,17 @@ def lambda_handler(event, context):
         
     except Exception as e:
         error_message = f"Error storing embedding: {str(e)}"
+        
+        # Check if this is an audio clip with duration less than 10 seconds causing the specific error
+        if (scope == "audio" and
+            "RequestError(400, 'x_content_parse_exception', '[1:72] [bool] failed to parse field [must]')" in str(e) and
+            'start_time' in item and 'end_time' in item):
+            
+            duration = item['end_time'] - item['start_time']
+            if duration < 10:
+                error_message = f"Audio clip duration is less than 10 seconds ({duration:.2f}s). No embeddings were found."
+                logger.error(error_message)
+        
         logger.exception(error_message)
         return {
             "statusCode": 500,
