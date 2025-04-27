@@ -29,7 +29,7 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   playheadVisible: true,
   playheadFill: '#000',
   playheadLineWidth: 2,
-  playheadSymbolHeight: 10,
+  playheadSymbolHeight:10,
   playheadScrubberHeight: 10,
   playheadTextFill: 'rgb(0,0,0, 0)', // opacity 0
   playheadTextYOffset: -15,
@@ -90,6 +90,6 @@ export const SCRUBBER_LANE_STYLE_DARK: Partial<ScrubberLaneStyle> = {
 
 export const PERIOD_MARKER_STYLE: Partial<PeriodMarkerStyle> = {
   color: randomHexColor(),
-  symbolSize: 30,
+  symbolSize: 10,
   symbolType: 'circle'
 };

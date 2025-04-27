@@ -142,7 +142,8 @@ const SearchPage: React.FC = () => {
         navigate(`${pathPrefix}${asset.InventoryID}`, {
             state: { 
                 assetType: asset.DigitalSourceAsset.Type,
-                searchTerm: currentQuery
+                searchTerm: currentQuery,
+                asset: asset
             }
         });
     }, [navigate, currentQuery]);

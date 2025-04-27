@@ -290,7 +290,7 @@
     z-index: 100
 }
 
-.omakase-timeline-overlay .omakase-timeline-timecode {
+.omakase-timeline-overlay {
     position: absolute;
     padding-left: 10px;
     padding-top: 10px;
@@ -765,3 +765,6 @@ media-controller .lower-control-bar .end-container {
     margin-left: 8px;
 }
 
+.omakase-timeline-timecode {
+    display: none;
+  }

@@ -684,7 +684,12 @@ const RelatedItemsTab: React.FC<{
     );
 };
 
-const VideoDetailContent: React.FC = () => {
+const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
+    asset,
+    assetType
+}
+
+) => {
     const videoViewerRef = useRef<VideoViewerRef>(null);
     console.log("Parent videoViewerRef:", videoViewerRef); // Debug log
     const { id } = useParams<{ id: string }>();
@@ -1067,16 +1072,31 @@ const VideoDetailContent: React.FC = () => {
                 onAddComment={handleAddComment}
                 videoViewerRef={videoViewerRef}
                 assetId={assetData?.data?.asset?.InventoryID}
+                asset={asset} 
+                assetType={assetType} 
             />
         </Box>
     );
 };
 
+interface VideoDetailContentProps {
+    asset: any;
+    assetType: string;
+}
+
 const VideoDetailPage: React.FC = () => {
+    const location = useLocation();
+    const { assetType, searchTerm, asset } = location.state;
+    console.log('Asset type: ',assetType); // The DigitalSourceAsset.Type
+    console.log('SearchTerm: ',searchTerm); // The currentQuery value
+    console.log('Asset: ',asset); // The full asset object
     return (
         <RecentlyViewedProvider>
             <RightSidebarProvider>
-                <VideoDetailContent />
+                <VideoDetailContent 
+                    asset={asset}
+                    assetType={assetType}
+                />
             </RightSidebarProvider>
         </RecentlyViewedProvider>
     );
