@@ -6,6 +6,7 @@
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.5",
     "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/credential-providers": "^3.797.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@byomakase/omakase-player": "^0.15.1-SNAPSHOT.1741774199",
     "@emotion/react": "^11.13.3",
