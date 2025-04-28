@@ -928,6 +928,9 @@ class ApiGatewayPipelinesConstruct(Construct):
         
         # Add CORS support to all pipeline API resources
         add_cors_options_method(pipelines_resource)
+        add_cors_options_method(pipelines_v2_resource)
+        add_cors_options_method(pipelines_executions_resource)
+        add_cors_options_method(pipelines_v2_status_resource)
         add_cors_options_method(pipeline_id_resource)
         add_cors_options_method(execution_id_resource)
         add_cors_options_method(retry_resource)
