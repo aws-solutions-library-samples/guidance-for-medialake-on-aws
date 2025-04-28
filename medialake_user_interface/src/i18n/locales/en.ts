@@ -232,6 +232,38 @@ export default {
         actions: {
             addUser: 'Add User'
         },
+        apiMessages: {
+            creating: {
+                loading: 'Creating user...',
+                success: 'User Created',
+                successMessage: 'New user has been successfully created.',
+                error: 'User Creation Failed'
+            },
+            updating: {
+                loading: 'Updating user...',
+                success: 'User Updated',
+                successMessage: 'User has been successfully updated.',
+                error: 'User Update Failed'
+            },
+            deleting: {
+                loading: 'Deleting user...',
+                success: 'User Deleted',
+                successMessage: 'User has been successfully deleted.',
+                error: 'User Deletion Failed'
+            },
+            enabling: {
+                loading: 'Enabling user...',
+                success: 'User Enabled',
+                successMessage: 'User has been successfully enabled.',
+                error: 'User Enable Failed'
+            },
+            disabling: {
+                loading: 'Disabling user...',
+                success: 'User Disabled',
+                successMessage: 'User has been successfully disabled.',
+                error: 'User Disable Failed'
+            }
+        },
         form: {
             title: {
                 add: 'Add User'

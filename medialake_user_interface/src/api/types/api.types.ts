@@ -16,6 +16,7 @@ export interface User {
   email_verified: string;
   given_name: string | null;
   family_name: string | null;
+  name?: string;
   groups: string[];
   roles?: string[];
 }
@@ -273,4 +274,10 @@ export interface UserResponse {
   data: {
     user: User;
   }
+}
+
+// AWS Specific Types
+export interface AWSRegion {
+    value: string;
+    label: string;
 }

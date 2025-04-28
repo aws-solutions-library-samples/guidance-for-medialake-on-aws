@@ -16,7 +16,7 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Email' }).fill('mne-medialake@amazon.com');
   await page.getByRole('textbox', { name: 'Password' }).click();
   await page.getByRole('textbox', { name: 'Password' }).fill('ChangeMe123!');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'User Management' }).click();
   await page.getByRole('button', { name: 'Add User' }).click();
