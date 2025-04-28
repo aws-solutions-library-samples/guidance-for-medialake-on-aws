@@ -21,7 +21,8 @@ import {
     FilterList as FilterListIcon,
     DateRange as DateRangeIcon,
     Category as CategoryIcon,
-    Storage as StorageIcon 
+    Storage as StorageIcon,
+    CloudUpload as CloudUploadIcon 
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
@@ -30,6 +31,7 @@ import { useTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
 import { useDirection } from './contexts/DirectionContext';
 import { drawerWidth, collapsedDrawerWidth } from './constants';
+import { S3UploaderModal } from './features/upload';
 
 interface SearchTag {
     key: string;
@@ -48,6 +50,7 @@ function TopBar() {
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
     const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
     const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
@@ -69,6 +72,14 @@ function TopBar() {
 
     const handleFilterClose = () => {
         setFilterAnchorEl(null);
+    };
+
+    const handleOpenUploadModal = () => {
+        setIsUploadModalOpen(true);
+    };
+
+    const handleCloseUploadModal = () => {
+        setIsUploadModalOpen(false);
     };
 
     const createTagFromInput = (input: string): boolean => {
@@ -143,6 +154,12 @@ function TopBar() {
         setIsSemanticSearch(event.target.checked);
     };
 
+    const handleUploadComplete = (files: any[]) => {
+        console.log('Upload completed:', files);
+        handleCloseUploadModal();
+        // You could add a notification or other feedback here
+    };
+
     return (
         <Box sx={{ 
             display: 'flex',
@@ -157,6 +174,23 @@ function TopBar() {
                 width: '100%',
                 bgcolor: 'transparent',
             }}>
+                {/* Upload Button */}
+                <IconButton
+                    size="small"
+                    onClick={handleOpenUploadModal}
+                    sx={{
+                        color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        '&:hover': {
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                        }
+                    }}
+                >
+                    <CloudUploadIcon />
+                </IconButton>
+
                 {/* Tags */}
                 {searchTags.map((tag, index) => (
                     <Chip
@@ -297,6 +331,15 @@ function TopBar() {
                     />
                 </Box>
             </Box>
+
+            {/* Upload Modal */}
+            <S3UploaderModal
+                open={isUploadModalOpen}
+                onClose={handleCloseUploadModal}
+                onUploadComplete={handleUploadComplete}
+                title={t('upload.title', 'Upload Media Files')}
+                description={t('upload.description', 'Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.')}
+            />
         </Box>
     );
 }
