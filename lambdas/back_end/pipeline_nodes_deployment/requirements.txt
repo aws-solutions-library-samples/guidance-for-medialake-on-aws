@@ -1,5 +1,2 @@
 crhelper
 PyYAML
-aws-xray-sdk
-aws-lambda-powertools
-fastjsonschema

@@ -131,23 +131,63 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
         # Check if pipeline_id is provided in the event
         pipeline_id = event.get("pipeline_id")
         
+        # If pipeline_id is provided, this is an update operation
+        if pipeline_id:
+            logger.info(f"Using provided pipeline_id: {pipeline_id} for pipeline update")
+            
+            # Get the existing pipeline
+            existing_pipeline = get_pipeline_by_id(pipeline_id)
+            if not existing_pipeline:
+                error_body = {
+                    "error": "Pipeline not found",
+                    "details": f"No pipeline with ID '{pipeline_id}' exists."
+                }
+                logger.info(f"Rejecting pipeline update - ID does not exist: {pipeline_id}")
+                return {
+                    "statusCode": 404,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps(error_body),
+                }
+                
+            # Clean up existing resources before creating new ones
+            logger.info(f"Cleaning up existing resources for pipeline: {pipeline_id}")
+            for resource_type, resource_arn in existing_pipeline.get("dependentResources", []):
+                if resource_type == "eventbridge_rule":
+                    rule_name = resource_arn.split("/")[-1]  # Extract rule name from ARN
+                    try:
+                        delete_eventbridge_rule(rule_name)
+                        logger.info(f"Deleted existing EventBridge rule: {rule_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete EventBridge rule {rule_name}: {e}")
+                        
+                if resource_type == "lambda":
+                    # Extract function name from ARN
+                    function_name = resource_arn.split(":")[-1]
+                    try:
+                        lambda_client = boto3.client("lambda")
+                        lambda_client.delete_function(FunctionName=function_name)
+                        logger.info(f"Deleted existing Lambda function: {function_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete Lambda function {function_name}: {e}")
+                        
+                if resource_type == "step_function":
+                    # Extract state machine name from ARN
+                    state_machine_name = resource_arn.split(":")[-1]
+                    try:
+                        delete_step_function(state_machine_name)
+                        logger.info(f"Deleted existing Step Function: {state_machine_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete Step Function {state_machine_name}: {e}")
         # If pipeline_id is not provided, check if a pipeline with this name already exists
-        if not pipeline_id:
+        else:
             existing_pipeline = get_pipeline_by_name(pipeline_name)
             if existing_pipeline:
-                # Clean up existing EventBridge rules if updating a pipeline
-                for resource_type, resource_arn in existing_pipeline.get("dependentResources", []):
-                    if resource_type == "eventbridge_rule":
-                        rule_name = resource_arn.split("/")[-1]  # Extract rule name from ARN
-                        try:
-                            delete_eventbridge_rule(rule_name)
-                            logger.info(f"Deleted existing EventBridge rule: {rule_name}")
-                        except Exception as e:
-                            logger.error(f"Failed to delete EventBridge rule {rule_name}: {e}")
-
                 error_body = {
                     "error": "Pipeline name already exists",
-                    "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name.",
+                    "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name or update the existing pipeline.",
                 }
                 logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
                 return {
@@ -158,8 +198,6 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     },
                     "body": json.dumps(error_body),
                 }
-        else:
-            logger.info(f"Using provided pipeline_id: {pipeline_id}, skipping name check")
         
         # Generate a single UUID for all resources in this execution
         execution_uuid = shortuuid.uuid()
@@ -315,8 +353,10 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             update_pipeline_status(pipeline_id, "DEPLOYED")
             logger.info(f"Pipeline {pipeline_name} successfully deployed with ID: {pipeline_id}")
 
+            # Determine if this was an update or create operation
+            operation = "updated" if event.get("pipeline_id") else "created"
             response_body = {
-                "message": "Pipeline created successfully",
+                "message": f"Pipeline {operation} successfully",
                 "pipeline_id": pipeline_id,
                 "pipeline_name": pipeline_name,
                 "state_machine_arn": state_machine_arn,

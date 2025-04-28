@@ -12,9 +12,9 @@
           "y": 380
         },
         "data": {
-          "nodeId": "trigger_audio_processing_completed",
-          "label": "Audio Processing Completed (trigger)",
-          "description": "This step will trigger after audio processing is completed",
+          "nodeId": "trigger_ingest_completed",
+          "label": "Ingest Completed (trigger)",
+          "description": "This step will trigger after ingest is completed",
           "icon": {
             "key": null,
             "ref": null,
@@ -28,25 +28,26 @@
           ],
           "outputTypes": [
             {
-              "name": "audio",
-              "description": "Output type: audio"
+              "name": "any",
+              "description": "Output type: any"
             }
           ],
           "type": "TRIGGER",
           "configuration": {
-            "path": "",
-            "operationId": "",
             "method": "trigger",
             "parameters": {
-              "Audio Type": "WAV,AIFF,AIF,MP3,PCM,M4A",
-              "Prefix": ""
+              "Prefix": "",
+              "Format": "WAV, AIFF, AIF, MP3, PCM, M4A"
             },
+            "path": "",
+            "operationId": "",
             "requestMapping": null,
             "responseMapping": null
-          }
+          },
+          "id": "trigger_ingest_completed"
         },
         "width": 200,
-        "height": 113
+        "height": 100
       },
       {
         "id": "dndnode_1",
@@ -82,7 +83,8 @@
             "operationId": "extractAudioMetadata",
             "method": "extract",
             "parameters": {}
-          }
+          },
+          "id": "audio_metadata_extractor"
         },
         "width": 200,
         "height": 100,
@@ -98,7 +100,7 @@
         },
         "data": {
           "nodeId": "check_media_convert_status",
-          "label": "Check MediaConvert Status",
+          "label": "Check MediaConvert Status (check)",
           "description": "Checks the status of MediaConvert jobs",
           "icon": {
             "key": null,
@@ -119,15 +121,19 @@
           ],
           "type": "UTILITY",
           "configuration": {
-            "path": "",
-            "operationId": "checkStatus",
             "method": "check",
-            "parameters": {}
-          }
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            },
+            "path": "",
+            "operationId": "checkStatus"
+          },
+          "id": "check_media_convert_status"
         },
         "width": 200,
         "height": 100,
-        "selected": false,
+        "selected": true,
         "dragging": false
       },
       {
@@ -164,7 +170,8 @@
             "parameters": {
               "seconds": "60"
             }
-          }
+          },
+          "id": "wait"
         },
         "width": 200,
         "height": 100,
@@ -198,11 +205,12 @@
           "configuration": {
             "method": "success",
             "parameters": {}
-          }
+          },
+          "id": "success"
         },
         "width": 200,
         "height": 113,
-        "selected": true,
+        "selected": false,
         "dragging": false
       },
       {
@@ -241,7 +249,8 @@
           "configuration": {
             "method": "choice",
             "parameters": {}
-          }
+          },
+          "id": "choice"
         },
         "width": 200,
         "height": 113,
@@ -257,7 +266,7 @@
         },
         "data": {
           "nodeId": "audio_proxy",
-          "label": "Audio Proxy (extract)",
+          "label": "Audio Proxy (extract) (extract) (extract) (extract)",
           "description": "Create an audio proxy from an audio file stored in S3",
           "icon": {
             "key": null,
@@ -280,11 +289,14 @@
           "configuration": {
             "method": "extract",
             "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}",
               "output_bucket": ""
             },
             "path": "",
             "operationId": ""
-          }
+          },
+          "id": "audio_proxy"
         },
         "width": 200,
         "height": 113,
@@ -327,7 +339,8 @@
             },
             "path": "",
             "operationId": ""
-          }
+          },
+          "id": "publish_event"
         },
         "width": 200,
         "height": 100,
@@ -370,7 +383,9 @@
         "id": "dndnode_1-dndnode_23",
         "type": "custom",
         "data": {
-          "text": "Connected"
+          "text": "Connected",
+          "id": "dndnode_1-dndnode_23",
+          "type": "custom"
         }
       },
       {
@@ -381,7 +396,9 @@
         "id": "dndnode_23-dndnode_3",
         "type": "custom",
         "data": {
-          "text": "Connected"
+          "text": "Connected",
+          "id": "dndnode_23-dndnode_3",
+          "type": "custom"
         }
       },
       {
@@ -392,7 +409,9 @@
         "id": "dndnode_3-dndnode_8",
         "type": "custom",
         "data": {
-          "text": "Connected"
+          "text": "Connected",
+          "id": "dndnode_3-dndnode_8",
+          "type": "custom"
         }
       },
       {
@@ -403,7 +422,9 @@
         "id": "dndnode_5-dndnode_3",
         "type": "custom",
         "data": {
-          "text": "Connected"
+          "text": "Connected",
+          "id": "dndnode_5-dndnode_3",
+          "type": "custom"
         }
       },
       {
@@ -427,7 +448,9 @@
         "id": "dndnode_24-dndnode_6",
         "type": "custom",
         "data": {
-          "text": "Connected"
+          "text": "Connected",
+          "id": "dndnode_24-dndnode_6",
+          "type": "custom"
         }
       }
     ],

@@ -266,7 +266,7 @@ class StateDefinitionFactory:
             
             # Ensure we have at least one choice in the Choices array
             if not choices:
-                choices = [{"variable": "$.metadata.externalTaskStatus", "value": "ready"}]
+                choices = [{"variable": "$.metadata.externalJobStatus", "value": "Completed"}]
             
             # For Choice states, we'll set placeholder Next values that will be updated later
             # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
@@ -274,8 +274,8 @@ class StateDefinitionFactory:
                 "Type": "Choice",
                 "Choices": [
                     {
-                        "Variable": choice.get("variable", "$.metadata.externalTaskStatus"),
-                        "StringEquals": choice.get("value", "ready"),
+                        "Variable": choice.get("variable", "$.metadata.externalJobStatus"),
+                        "StringEquals": choice.get("value", "Completed"),
                         "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
                     }
                     for choice in choices

@@ -1,19 +1,14 @@
 import React from 'react';
 import {
     Box,
-    Typography,
     IconButton,
     useTheme,
-    alpha,
     TextField,
 } from '@mui/material';
 import {
-    ViewColumn as ViewColumnIcon,
     FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { SearchField } from '../../../components/common/SearchField';
-import { TableDensityToggle } from '../../../components/common/table/TableDensityToggle';
 
 interface PipelineToolbarProps {
     onFilterChange: (filter: string) => void;

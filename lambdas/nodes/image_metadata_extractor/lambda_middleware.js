@@ -18,60 +18,100 @@ class LambdaMiddleware {
     this.s3 = new AWS.S3();
     this.eb = new AWS.EventBridge();
 
-    this.service = process.env.SERVICE || 'undefined_service';
-    this.stepName = process.env.STEP_NAME || 'undefined_step';
-    this.pipeName = process.env.PIPELINE_NAME || 'undefined_pipeline';
-    this.isFirst = (process.env.IS_FIRST || 'false').toLowerCase() === 'true';
-    this.isLast = (process.env.IS_LAST || 'false').toLowerCase() === 'true';
+    this.service   = process.env.SERVICE        || 'undefined_service';
+    this.stepName  = process.env.STEP_NAME      || 'undefined_step';
+    this.pipeName  = process.env.PIPELINE_NAME  || 'undefined_pipeline';
+    this.isFirst   = (process.env.IS_FIRST || 'false').toLowerCase() === 'true';
+    this.isLast    = (process.env.IS_LAST  || 'false').toLowerCase() === 'true';
   }
 
+  /* ───────────── helpers ───────────── */
   _trueOriginal(ev) {
     let cur = ev.originalEvent || ev;
     while (cur && cur.payload && cur.payload.event) cur = cur.payload.event;
     return cur;
   }
 
+  /* ───────────── formatter ───────────── */
   async _format(result, orig, stepStart) {
-    const data = typeof result === 'object' ? { ...result } : { value: result };
-    const extId = data.externalJobId || '';
+    /* ── business data (strip external-job fields) ─────────────────── */
+    const data =
+      result && typeof result === 'object' ? { ...result } : { value: result };
+
+    const extId = data.externalJobId     || '';
     const extSt = data.externalJobStatus || '';
     const extRs = data.externalJobResult || '';
     delete data.externalJobId;
     delete data.externalJobStatus;
     delete data.externalJobResult;
 
+    /* ── metadata block ─────────────────────────────────────────────── */
+    const now = Date.now() / 1000;
     const meta = {
       service: this.service,
       stepName: this.stepName,
       stepStatus: 'Completed',
       stepResult: 'Success',
-      pipelineTraceId: orig.metadata?.pipelineTraceId || uuidv4(),
-      stepExecutionStartTime: orig.metadata?.stepExecutionStartTime || stepStart,
-      stepExecutionEndTime: Date.now() / 1000,
-      stepExecutionDuration: +((Date.now() / 1000) - stepStart).toFixed(3),
+
+      pipelineTraceId:
+        orig.metadata?.pipelineTraceId || uuidv4(),
+      stepExecutionStartTime:
+        orig.metadata?.stepExecutionStartTime || stepStart,
+      stepExecutionEndTime: now,
+      stepExecutionDuration: +(now - stepStart).toFixed(3),
+
       pipelineExecutionStartTime: orig.pipelineExecutionStartTime || '',
-      pipelineExecutionEndTime: this.isLast ? Date.now() / 1000 : '',
+      pipelineExecutionEndTime:   this.isLast ? now : '',
+
       pipelineName: this.pipeName,
       pipelineStatus: this.isFirst
         ? 'Started'
         : this.isLast
         ? 'Completed'
         : 'InProgress',
-      pipelineId: orig.pipelineId || '',
+
+      pipelineId:         orig.pipelineId         || '',
       pipelineExecutionId: orig.pipelineExecutionId || '',
-      externalJobResult: extRs,
-      externalJobId: extId,
-      externalJobStatus: extSt,
+
+      externalJobResult:  extRs,
+      externalJobId:      extId,
+      externalJobStatus:  extSt,
+
       stepExternalPayload: 'False',
       stepExternalPayloadLocation: {},
     };
 
-    let payload = { data, assets: [orig] };
+    /* ── isolate the current asset detail ───────────────────────────── */
+    const asset =
+      orig?.input?.detail   // events wrapped by Step Functions
+        ?? orig?.detail     // already-flattened events
+        ?? orig;            // fallback – leave untouched
+
+    /* ── carry over previous assets, then append the current one ────── */
+    let prevAssets = [];
+
+    if (orig && typeof orig === 'object') {
+      if (Array.isArray(orig.payload?.assets)) {
+        prevAssets = cloneDeep(orig.payload.assets);
+      } else if (Array.isArray(orig.assets)) {
+        prevAssets = cloneDeep(orig.assets);
+      }
+    }
+
+    const assets = [
+      ...prevAssets,
+      ...(asset ? [cloneDeep(asset)] : []),
+    ];
+
+    let payload = { data, assets };
+
+    /* ── off-load oversized payloads to S3 ──────────────────────────── */
     const raw = Buffer.from(JSON.stringify(payload));
     if (raw.length > this.maxResponseSize) {
       const key = `${
         meta.pipelineExecutionId || 'unknown'
       }/${uuidv4()}-payload.json`;
+
       await this.s3
         .putObject({
           Bucket: this.externalPayloadBucket,
@@ -79,17 +119,19 @@ class LambdaMiddleware {
           Body: raw,
         })
         .promise();
+
       meta.stepExternalPayload = 'True';
       meta.stepExternalPayloadLocation = {
         bucket: this.externalPayloadBucket,
         key,
       };
-      payload.data = {};
+      payload.data = {}; // shrink inline payload
     }
 
     return { metadata: meta, payload };
   }
 
+  /* ───────────── publisher ───────────── */
   async _publish(out) {
     try {
       await this.eb
@@ -109,13 +151,16 @@ class LambdaMiddleware {
     }
   }
 
+  /* ───────────── wrapper ───────────── */
   middleware(handler) {
     return async (event, ctx) => {
-      const orig = cloneDeep(this._trueOriginal(event));
+      const orig  = cloneDeep(this._trueOriginal(event));
       const start = Date.now() / 1000;
 
       let retries = 0,
-        res;
+          res;
+
+      /* retry-with-backoff loop */
       while (true) {
         try {
           res = await handler(event, ctx);
@@ -138,7 +183,7 @@ class LambdaMiddleware {
   }
 }
 
-/* -------- factory + exports -------- */
+/* ─────────── factory + exports ─────────── */
 function lambdaMiddleware(options = {}) {
   const mw = new LambdaMiddleware(options);
   return (handler) => mw.middleware(handler);

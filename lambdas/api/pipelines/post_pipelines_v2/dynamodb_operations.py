@@ -543,7 +543,38 @@ def store_pipeline_info(
     logger.info("Storing/updating pipeline information in DynamoDB")
     
     if pipeline_id:
-        # Update existing pipeline with DEPLOYED status
+        # Update existing pipeline with DEPLOYED status and new definition
+        logger.info(f"Updating existing pipeline with ID: {pipeline_id}")
+        
+        # Update the pipeline definition
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(PIPELINES_TABLE)
+        now_iso = datetime.utcnow().isoformat()
+        
+        try:
+            # Update the definition and name fields
+            table.update_item(
+                Key={"id": pipeline_id},
+                UpdateExpression="SET #def = :def, #name = :name, #desc = :desc, #up = :updated",
+                ExpressionAttributeNames={
+                    "#def": "definition",
+                    "#name": "name",
+                    "#desc": "description",
+                    "#up": "updatedAt"
+                },
+                ExpressionAttributeValues={
+                    ":def": pipeline.dict(),
+                    ":name": pipeline.name,
+                    ":desc": pipeline.description,
+                    ":updated": now_iso
+                }
+            )
+            logger.info(f"Successfully updated definition for pipeline {pipeline_id}")
+        except Exception as e:
+            logger.exception(f"Failed to update pipeline definition: {e}")
+            raise
+        
+        # Update the pipeline status and resources
         update_pipeline_status(
             pipeline_id,
             "DEPLOYED",

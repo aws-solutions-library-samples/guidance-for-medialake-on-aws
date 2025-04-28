@@ -49,7 +49,7 @@ def translate_event_to_request(event):
         # Get MediaConvert role ARN and queue from environment variables
         # These would typically be passed in the event or retrieved from environment variables
         mediaconvert_role_arn = event.get("mediaconvert_role_arn", "${MEDIACONVERT_ROLE_ARN}")
-        mediaconvert_queue = event.get("mediaconvert_queue", "${MEDIACONVERT_QUEUE}")
+        mediaconvert_queue_arn = event.get("mediaconvert_queue_arn", "${MEDIACONVERT_QUEUE_ARN}")
         
         return {
             "input_bucket": input_bucket,
@@ -57,7 +57,7 @@ def translate_event_to_request(event):
             "output_bucket": output_bucket,
             "output_key": output_key,
             "mediaconvert_role_arn": mediaconvert_role_arn,
-            "mediaconvert_queue": mediaconvert_queue,
+            "mediaconvert_queue_arn": mediaconvert_queue_arn,
             "inventory_id": inventory_id,
             "asset_id": asset_id
         }

@@ -178,7 +178,7 @@ class PipelineNodesStack(cdk.NestedStack):
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
-                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
+                    "mediaconvert_queue_arn": proxy_queue.queue_arn,
                 },
             ),
         )
@@ -193,7 +193,7 @@ class PipelineNodesStack(cdk.NestedStack):
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
-                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
+                    "mediaconvert_queue_arn": proxy_queue.queue_arn,
                 },
             ),
         )
@@ -208,7 +208,7 @@ class PipelineNodesStack(cdk.NestedStack):
                 environment_variables={
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIACONVERT_ROLE_ARN": self.mediaconvert_role.role_arn,
-                    "MEDIACONVERT_QUEUE": proxy_queue.queue_arn,
+                    "mediaconvert_queue_arn": proxy_queue.queue_arn,
                 },
             ),
         )

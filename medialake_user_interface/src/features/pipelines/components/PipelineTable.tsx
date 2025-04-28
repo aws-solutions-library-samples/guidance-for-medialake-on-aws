@@ -5,16 +5,13 @@ import {
     CircularProgress,
     Tooltip,
     Typography,
-    Chip,
-    FormControlLabel
+    Chip
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon,
-    PowerSettingsNew as PowerOnIcon,
-    PowerOff as PowerOffIcon
+    Stop as StopIcon
 } from '@mui/icons-material';
 import {
     useReactTable,
@@ -29,7 +26,6 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
 import { ResizableTable } from '@/components/common/table/ResizableTable';
 import { TableCellContent } from '@/components/common/table/TableCellContent';
-import { IconSwitch } from '@/components/common';
 import { TriggerTypeChips } from './TriggerTypeChips';
 import { PipelineStatusCell } from './PipelineStatusCell';
 import type { Pipeline } from '../types/pipelines.types';

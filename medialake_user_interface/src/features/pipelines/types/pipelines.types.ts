@@ -141,6 +141,7 @@ export interface UpdatePipelineDto {
     description?: string;
     configuration?: PipelineConfiguration;
     active?: boolean; // New optional field
+    updateDeployed?: boolean; // Flag to indicate updating a deployed pipeline
 }
 
 export interface SearchMetadata {

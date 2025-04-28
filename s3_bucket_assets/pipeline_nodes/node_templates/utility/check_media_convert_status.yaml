@@ -14,21 +14,46 @@ node:
           statements:
             - effect: Allow
               actions:
-                - mediaconvert:GetJob
-                - mediaconvert:ListJobs
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               resources:
-                - ${PROXY_QUEUE_ARN}
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - mediaconvert:ListJobs
+                - mediaconvert:GetJob
+              resources:
+                - ${MEDIACONVERT_QUEUE_ARN}
             - effect: Allow
               actions:
                 - mediaconvert:GetJob
               resources:
                 - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:jobs/*
-                
+            - effect: Allow
+              actions:
+                - mediaconvert:ListJobs
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:queues/*
+
 actions:
   extract:
     summary: Check MediaConvert Status
     description: Checks MediaConvert Job Status
     operationId: checkMediaConvertStatus
+    parameters:
+      - in: body
+        name: MediaConvert Queue Arn
+        required: true
+        default: ${MEDIACONVERT_QUEUE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: MediaConvert Role Arn
+        required: true
+        default: ${MEDIACONVERT_ROLE_ARN}
+        schema:
+          type: string
     connections:
       incoming:
         type: [any]

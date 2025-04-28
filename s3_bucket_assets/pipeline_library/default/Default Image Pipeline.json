@@ -1,4 +1,7 @@
 {
+  "name": "Default Image Pipeline",
+  "description": "",
+  "active": true,
   "configuration": {
     "nodes": [
       {
@@ -31,23 +34,19 @@
           ],
           "type": "TRIGGER",
           "configuration": {
-            "path": "",
-            "operationId": "",
             "method": "trigger",
             "parameters": {
               "Prefix": "",
               "Format": "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG"
             },
+            "path": "",
+            "operationId": "",
             "requestMapping": null,
             "responseMapping": null
           }
         },
         "width": 200,
-        "height": 100,
-        "positionAbsolute": {
-          "x": 336,
-          "y": 176
-        }
+        "height": 100
       },
       {
         "id": "dndnode_1",
@@ -83,53 +82,12 @@
             "operationId": "",
             "method": "extract",
             "parameters": {
-              "0": {
-                "name": "output_bucket",
-                "schema": {
-                  "type": "string",
-                  "description": "S3 bucket name for output"
-                },
-                "in": "body",
-                "required": true
-              },
-              "1": {
-                "name": "width",
-                "schema": {
-                  "type": "integer",
-                  "description": "Width of the thumbnail in pixels"
-                },
-                "in": "body",
-                "required": false
-              },
-              "2": {
-                "name": "height",
-                "schema": {
-                  "type": "integer",
-                  "description": "Height of the thumbnail in pixels"
-                },
-                "in": "body",
-                "required": false
-              },
-              "3": {
-                "name": "crop",
-                "schema": {
-                  "type": "boolean",
-                  "description": "Whether to crop the image to fit the dimensions",
-                  "default": false
-                },
-                "in": "body",
-                "required": false
-              },
               "output_bucket": ""
             }
           }
         },
         "width": 200,
-        "height": 113,
-        "positionAbsolute": {
-          "x": 336,
-          "y": 352
-        }
+        "height": 113
       },
       {
         "id": "dndnode_2",
@@ -165,25 +123,12 @@
             "operationId": "",
             "method": "extract",
             "parameters": {
-              "0": {
-                "name": "output_bucket",
-                "schema": {
-                  "type": "string",
-                  "description": "S3 bucket name for output"
-                },
-                "in": "body",
-                "required": true
-              },
               "output_bucket": ""
             }
           }
         },
         "width": 200,
-        "height": 113,
-        "positionAbsolute": {
-          "x": 848,
-          "y": 176
-        }
+        "height": 113
       },
       {
         "id": "dndnode_3",
@@ -219,38 +164,12 @@
             "operationId": "",
             "method": "extract",
             "parameters": {
-              "0": {
-                "name": "S3 File Location",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "bucket": {
-                      "type": "string",
-                      "description": "S3 bucket name"
-                    },
-                    "key": {
-                      "type": "string",
-                      "description": "S3 object key"
-                    }
-                  },
-                  "required": [
-                    "bucket",
-                    "key"
-                  ]
-                },
-                "in": "body",
-                "required": true
-              },
               "S3 File Location": ""
             }
           }
         },
         "width": 200,
-        "height": 100,
-        "positionAbsolute": {
-          "x": 592,
-          "y": 176
-        }
+        "height": 100
       },
       {
         "id": "dndnode_4",
@@ -282,65 +201,7 @@
           }
         },
         "width": 200,
-        "height": 113,
-        "positionAbsolute": {
-          "x": 848,
-          "y": 352
-        }
-      },
-      {
-        "id": "dndnode_5",
-        "type": "custom",
-        "position": {
-          "x": 592,
-          "y": 368
-        },
-        "data": {
-          "nodeId": "publish_event",
-          "label": "Publish Event (generate)",
-          "description": "Publish event on the given eventBus",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "generate",
-            "parameters": {
-              "0": {
-                "name": "EventBus ARN",
-                "schema": {
-                  "type": "string"
-                },
-                "default": "${INGEST_EVENT_BUS_NAME}",
-                "in": "body",
-                "required": true
-              },
-              "EventBus ARN": "${INGEST_EVENT_BUS_NAME}"
-            }
-          }
-        },
-        "width": 200,
-        "height": 100,
-        "positionAbsolute": {
-          "x": 592,
-          "y": 368
-        }
+        "height": 113
       }
     ],
     "edges": [
@@ -384,42 +245,21 @@
         "targetHandle": "input-image"
       },
       {
-        "id": "dndnode_1-dndnode_4",
-        "source": "dndnode_5",
-        "target": "dndnode_4",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_1-dndnode_4"
-        },
-        "sourceHandle": "any",
-        "targetHandle": "input-any"
-      },
-      {
-        "id": "dndnode_1-dndnode_5",
         "source": "dndnode_1",
-        "target": "dndnode_5",
+        "sourceHandle": "any",
+        "target": "dndnode_4",
+        "targetHandle": "input-any",
+        "id": "dndnode_1-dndnode_4",
         "type": "custom",
         "data": {
           "text": "Connected"
-        },
-        "sourceHandle": "any",
-        "targetHandle": "input-any"
+        }
       }
     ],
-    "viewport": {
-      "x": 0,
-      "y": 0,
-      "zoom": 1
-    },
     "settings": {
       "autoStart": false,
       "retryAttempts": 3,
       "timeout": 3600
     }
-  },
-  "name": "Default Image Pipeline",
-  "description": "Default pipeline for processing image assets",
-  "active": true
+  }
 }

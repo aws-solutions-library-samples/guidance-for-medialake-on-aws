@@ -1,4 +1,4 @@
-import boto3, io, os
+import boto3, io, os, json
 from PIL import Image, ExifTags
 import cairosvg
 from aws_lambda_powertools import Logger, Tracer
@@ -7,6 +7,7 @@ from lambda_middleware import lambda_middleware
 
 logger  = Logger()
 tracer  = Tracer()
+
 s3      = boto3.client("s3")
 dynamo  = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
@@ -19,6 +20,7 @@ def get_image_rotation(image):
     except Exception as e:
         logger.warning(f"Error getting image rotation: {e}")
         return 0
+
 
 def create_thumbnail(img, w, h, crop=False):
     rot = get_image_rotation(img)
@@ -42,17 +44,21 @@ def create_thumbnail(img, w, h, crop=False):
 
     return img
 
+
 def create_proxy(img):
     rot = get_image_rotation(img)
     return img.rotate(rot, expand=True) if rot else img
+
 
 def clean_asset_id(input_string: str) -> str:
     parts = input_string.split(":")
     uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
+
 def _raise(msg):  # tiny helper
     raise ValueError(msg)
+
 
 def _resolve_dims(w, h, iw, ih):
     if w is None:
@@ -61,51 +67,84 @@ def _resolve_dims(w, h, iw, ih):
         h = int(w * (ih / iw))
     return int(w), int(h)
 
+
+def _extract_from_event(event: dict):
+    """
+    Returns a tuple:
+      (asset_dict, mode, width, height, crop_flag)
+    Works with both the “old” and “new” event formats.
+    """
+    payload = event.get("payload", {})
+    assets  = payload.get("assets") or _raise("Missing payload.assets")
+    asset   = assets[0]                      # single-asset assumption
+
+    # ── OLD shape ────────────────────────────────────────────────────────────
+    if "input" in asset:                    # → asset["input"]["detail"]
+        raw_input   = asset["input"]
+        detail      = raw_input["detail"]
+        mode        = raw_input.get("mode", "proxy")
+        width       = raw_input.get("width")
+        height      = raw_input.get("height")
+        crop        = bool(raw_input.get("crop", False))
+    # ── NEW shape (your sample) ──────────────────────────────────────────────
+    else:                                   # asset itself is the detail
+        detail      = asset
+        mode        = payload.get("mode", "proxy")
+        width       = payload.get("width")
+        height      = payload.get("height")
+        crop        = bool(payload.get("crop", False))
+
+    return detail, mode, width, height, crop
+
+
 # ── Lambda ──────────────────────────────────────────────────────────────────────
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-,
 )
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
     """
-    Expected event shape (new-only):
+    Accepts either of these shapes:
 
-    event["payload"]["assets"] = [ { "input": { "detail": {...}, ... } } ]
+    • OLD:
+      event["payload"]["assets"][0] = { "input": { "detail": {...}, "mode": … } }
+
+    • NEW (example you posted):
+      event["payload"]["assets"][0] = { "InventoryID": …, "DigitalSourceAsset": … }
+      Thumbnail / crop settings (if any) are expected at payload-root level.
+
     """
+    # ── pull out the interesting pieces ──────────────────────────────────────
+    detail, mode, width, height, crop = _extract_from_event(event)
 
-    asset           = event["payload"]["assets"][0]          # single-asset assumption
-    raw_input       = asset["input"]
-    detail          = raw_input["detail"]
-    dsa             = detail["DigitalSourceAsset"]
-    location        = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+    dsa      = detail["DigitalSourceAsset"]
+    location = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
 
-    bucket          = location.get("Bucket")            or _raise("Missing bucket")
-    key             = location.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
-    inv_id          = detail.get("InventoryID")               or _raise("Missing InventoryID")
-    mode            = raw_input.get("mode", "proxy")
+    bucket   = location.get("Bucket") \
+               or _raise("DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket missing")
+    key      = location.get("ObjectKey", {}).get("FullPath") \
+               or _raise("DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath missing")
+    inv_id   = detail.get("InventoryID") or _raise("InventoryID missing")
 
-    out_bucket      = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("Missing MEDIA_ASSETS_BUCKET_NAME")
+    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
 
-    # ── fetch source ────────────────────────────────────────────────────────────
+    # ── fetch source ─────────────────────────────────────────────────────────
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = cairosvg.svg2png(bytestring=body)
 
     img = Image.open(io.BytesIO(body))
 
-    # ── process image ───────────────────────────────────────────────────────────
+    # ── process image ────────────────────────────────────────────────────────
     if mode == "thumbnail":
-        w = raw_input.get("width")
-        h = raw_input.get("height")
-        if w is None and h is None:
+        if width is None and height is None:
             _raise("Both width and height cannot be None for thumbnail")
-        w, h = _resolve_dims(w, h, img.width, img.height)
-        proc = create_thumbnail(img, w, h, crop=bool(raw_input.get("crop", False)))
+        width, height = _resolve_dims(width, height, img.width, img.height)
+        proc = create_thumbnail(img, width, height, crop=crop)
     elif mode == "proxy":
-        proc = create_proxy(img)
-        w, h = proc.size
+        proc   = create_proxy(img)
+        width, height = proc.size
     else:
         _raise(f"Invalid mode: {mode}")
 
@@ -120,7 +159,7 @@ def lambda_handler(event, context: LambdaContext):
     new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
     s3.put_object(Bucket=out_bucket, Key=new_key, Body=data, ContentType=f"image/{ext}")
 
-    # ── update DynamoDB ─────────────────────────────────────────────────────────
+    # ── update DynamoDB ──────────────────────────────────────────────────────
     try:
         asset_id = clean_asset_id(inv_id)
         resp     = dynamo.get_item(Key={"InventoryID": asset_id})
@@ -144,7 +183,7 @@ def lambda_handler(event, context: LambdaContext):
                 }
             },
             **(
-                {"ImageSpec": {"Resolution": {"Width": w, "Height": h}}}
+                {"ImageSpec": {"Resolution": {"Width": width, "Height": height}}}
                 if mode == "thumbnail"
                 else {}
             ),
@@ -161,10 +200,10 @@ def lambda_handler(event, context: LambdaContext):
 
     return {
         "statusCode": 200,
-        "body": {
+        "body": json.dumps({
             "bucket": out_bucket,
             "key": new_key,
             "mode": mode,
             "format": fmt,
-        },
+        }),
     }

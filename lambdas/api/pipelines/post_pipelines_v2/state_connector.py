@@ -157,8 +157,8 @@ class StateConnector:
             # If Choices is empty or Default is not set, set them with the target
             if "Choices" not in source_state or not source_state["Choices"]:
                 source_state["Choices"] = [{
-                    "Variable": "$.metadata.externalTaskStatus",
-                    "StringEquals": "ready",
+                    "Variable": "$.metadata.externalJobStatus",
+                    "StringEquals": "Completed",
                     "Next": target_state_name
                 }]
             

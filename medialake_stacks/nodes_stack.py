@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_iam as iam,
     RemovalPolicy,
     CustomResource,
+    aws_lambda as lambda_,
 )
 
 from constructs import Construct
@@ -19,7 +20,11 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer, CommonLibrariesLayer
+    PyamlLayer, ShortuuidLayer
+)
+from medialake_constructs.shared_constructs.mediaconvert import (
+    MediaConvert,
+    MediaConvertProps,
 )
 import aws_cdk as cdk
 
@@ -63,7 +68,6 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
-        self.commonlibs_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
         
         
         # Node Lambda Deployments
@@ -95,18 +99,10 @@ class NodesStack(cdk.NestedStack):
 
         self.video_proxy_lambda_deployment = LambdaDeployment(
             self,
-            "VideoProxyLambdaDeployment",
+            "VideoProxyAndThumbnailLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "video_proxy"],
-        )
-        
-        self.video_thumbnail_lambda_deployment = LambdaDeployment(
-            self,
-            "VideoThumbnailLambdaDeployment",
-            destination_bucket=props.iac_bucket.bucket,
-            parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "video_thumbnail"],
+            code_path=["lambdas", "nodes", "video_proxy_and_thumbnail"],
         )
 
         self.audio_proxy_lambda_deployment = LambdaDeployment(
@@ -333,14 +329,13 @@ class NodesStack(cdk.NestedStack):
                 name=f"{config.resource_prefix}-nodes-processor",
                 entry="lambdas/back_end/pipeline_nodes_deployment",
                 memory_size=256,
-                layers=[self.commonlibs_layer.layer_version],
                 timeout_minutes=15,
                 environment_variables={
                     "NODES_TABLE": self._pipelines_nodes_table.table_name,
                     "NODES_BUCKET": self._pipelines_nodes_bucket.bucket_name,
                     "SERVICE_NAME": "pipeline-nodes-deployer",
                     # Layer ARNs for automatic layer attachment
-                    "POWERTOOLS_LAYER_ARN": self.powertools_layer.layer_version_arn,
+                    "POWERTOOLS_LAYER_ARN":  self.powertools_layer.layer.layer_version_arn,
                     "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
                     "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
                     # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,
@@ -348,8 +343,7 @@ class NodesStack(cdk.NestedStack):
                     "SHORTUUID_LAYER_ARN": self.shortuuid_layer.layer.layer_version_arn,
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
-                    "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn,
-                    "COMMONLIBS_LAYER_ARN": self.commonlibs_layer.layer_version_arn
+                    "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn
                 },
             ),
         )
@@ -380,6 +374,69 @@ class NodesStack(cdk.NestedStack):
         )
 
         self.resource.node.add_dependency(bucket_deployment)
+        
+        # Create MediaConvert role and queue
+        self.mediaconvert_role = self.create_mediaconvert_role()
+        
+        self.proxy_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeProxyMediaConvertQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for proxy MediaConvert jobs",
+                name="MediaLakeProxyQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+    def create_mediaconvert_role(self):
+        mediaconvert_role = iam.Role(
+            self,
+            "MediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_MediaConvert_Role",
+            description="IAM role for MediaConvert",
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
+        return mediaconvert_role
 
     @property
     def pipelines_nodes_table(self) -> dynamodb.TableV2:
@@ -388,3 +445,11 @@ class NodesStack(cdk.NestedStack):
     @property
     def pipelines_nodes_templates_bucket(self) -> S3Bucket:
         return self._pipelines_nodes_bucket.bucket
+        
+    @property
+    def mediaconvert_role_arn(self) -> str:
+        return self.mediaconvert_role.role_arn
+        
+    @property
+    def mediaconvert_queue_arn(self) -> str:
+        return self.proxy_queue.queue_arn

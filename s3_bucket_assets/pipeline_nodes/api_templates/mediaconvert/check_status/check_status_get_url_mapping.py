@@ -1,50 +1,25 @@
-def translate_event_to_request(event):
+def translate_event_to_request(event: dict) -> dict:
     """
-    Extract the MediaConvert job ID from the event.
-    
-    Expected structure:
+    Build the parameters that will be substituted into
+    `check_status_get_url.jinja`.
+
+    The MediaConvert Job-ID is now provided by the pipeline in
+    `event["metadata"]["externalJobId"]`.
+
+    Returns
+    -------
     {
-        "previous_task_output": {
-            "VideoProxyandThumbnailResult": {
-                "Payload": {
-                    "body": {
-                        "JobId": "..."
-                    }
-                }
-            }
-        }
-        OR
-        "previous_task_output": {
-            "AudioProxyandThumbnailResult": {
-                "Payload": {
-                    "body": {
-                        "JobId": "..."
-                    }
-                }
-            }
-        }
+        "job_id":  "<job-id>",
+        "region":  "<aws-region>"   # defaults to us-east-1
     }
     """
     try:
-        # Check if we have video or audio result
-        if "VideoProxyandThumbnailResult" in event["previous_task_output"]:
-            proxy_and_thumbnail_result = event["previous_task_output"]["VideoProxyandThumbnailResult"]
-        elif "AudioProxyandThumbnailResult" in event["previous_task_output"]:
-            proxy_and_thumbnail_result = event["previous_task_output"]["AudioProxyandThumbnailResult"]
-        else:
-            raise ValueError("Neither VideoProxyandThumbnailResult nor AudioProxyandThumbnailResult found in event")
-        
-        # Parse the payload body if it's a string
-        payload_body = proxy_and_thumbnail_result["Payload"]["body"]
-        if isinstance(payload_body, str):
-            import json
-            payload_body = json.loads(payload_body)
-        
-        job_id = payload_body["JobId"]
-        
-        return {
-            "job_id": job_id,
-            "region": "us-east-1"  # Default region, can be overridden if needed
-        }
-    except Exception as e:
-        raise ValueError(f"Error extracting job ID from event: {str(e)}")
+        job_id = event["metadata"]["externalJobId"]
+    except KeyError as exc:
+        raise ValueError("metadata.externalJobId missing from event") from exc
+
+    # Prefer the region captured in metadata (if your workflow sets it),
+    # otherwise fall back to a fixed default.
+    region = event.get("metadata", {}).get("awsRegion", "us-east-1")
+
+    return {"job_id": job_id, "region": region}

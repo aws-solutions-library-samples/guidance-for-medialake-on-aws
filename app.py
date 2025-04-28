@@ -183,6 +183,8 @@ class MediaLakeStack(cdk.Stack):
             media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
             collection_endpoint=props.base_infrastructure.collection_endpoint,
+            mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
+            mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
         

@@ -12,6 +12,7 @@ node:
         runtime: python3.12
         layers:
           - PyMediaInfo
+          - FFProbe
         iam_policy:
           statements:
             - effect: Allow
@@ -26,6 +27,7 @@ node:
               actions:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
+                - dynamodb:UpdateItem
               resources:
                 - ${MEDIALAKE_ASSET_TABLE}
             - effect: Allow
@@ -36,6 +38,11 @@ node:
             - effect: Allow
               actions:
                 - kms:GenerateDataKey
+              resources:
+                - '*'
+            - effect: Allow
+              actions:
+                - s3:GetObject
               resources:
                 - '*'
                 

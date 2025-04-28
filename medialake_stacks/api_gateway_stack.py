@@ -129,32 +129,7 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
-        # self._pipeline_construct = ApiGatewayPipelinesConstruct(
-        #     self,
-        #     "Pipelines",
-        #     api_resource=api,
-        #     cognito_authorizer=self._api_gateway_authorizer,
-        #     ingest_event_bus=props.ingest_event_bus,
-        #     x_origin_verify_secret=props.x_origin_verify_secret,
-        #     iac_assets_bucket=props.iac_assets_bucket,
-        #     media_assets_bucket=props.media_assets_bucket,
-        #     props=ApiGatewayPipelinesProps(
-        #         asset_table=props.asset_table,
-        #         connector_table=self._connectors_api_gateway.connector_table,
-        #         node_table=props.node_table,
-        #         pipeline_table=props.pipeline_table,
-        #         image_proxy_lambda=props.image_proxy_lambda,
-        #         image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
-        #         iac_assets_bucket=props.iac_assets_bucket,
-        #         external_payload_bucket=props.external_payload_bucket,
-        #         pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
-        #         get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
-        #         post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
-        #         open_search_endpoint=props.collection_endpoint,
-        #         vpc=props.vpc,
-        #         security_group=props.security_group
-        #     ),
-        # )
+       
 
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(

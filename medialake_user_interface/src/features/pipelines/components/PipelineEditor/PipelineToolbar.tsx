@@ -44,6 +44,8 @@ export interface PipelineToolbarProps {
   onDelete?: () => void;
   // Add prop for pipeline status
   status?: string;
+  // Add prop to determine if we're editing an existing pipeline
+  isEditMode?: boolean;
 }
 
 const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
@@ -59,6 +61,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   updateFormData,
   onDelete,
   status,
+  isEditMode = false,
 }) => {
   const navigate = useNavigate();
   const { isCollapsed: isLeftSidebarCollapsed } = useSidebar();
@@ -1066,8 +1069,15 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             color="primary"
             onClick={onSave}
             disabled={isLoading || !pipelineName.trim()}
+            sx={{
+              '&.Mui-disabled': {
+                opacity: 1,
+                color: 'text.disabled',
+                backgroundColor: 'action.disabledBackground',
+              }
+            }}
           >
-            {isLoading ? 'Saving...' : 'Save'}
+            {isLoading ? 'Saving...' : isEditMode ? 'Update' : 'Save'}
           </Button>
 
           {/* Cancel Button */}
@@ -1075,12 +1085,19 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             variant="outlined"
             color="inherit"
             onClick={handleCancel}
+            sx={{
+              '&.Mui-disabled': {
+                opacity: 1,
+                borderColor: 'action.disabledBackground',
+                color: 'text.disabled',
+              }
+            }}
           >
             Cancel
           </Button>
         </Box>
 
-      {/* Center - Status and Active Switch */}
+      {/* Center - Status */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {/* Show status chip if status is provided */}
           {status && (
@@ -1105,7 +1122,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               {status}
             </Box>
           )}
+        </Box>
 
+        {/* Right side - Active/Inactive Toggle, Import and Delete */}
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            '& .MuiButton-root': commonStyles,
+          }}
+        >
           {/* Active/Inactive Toggle */}
           <FormControlLabel
             control={
@@ -1115,7 +1141,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
                 color="primary"
                 onIcon={<ToggleOnIcon fontSize="large" />}
                 offIcon={<ToggleOffIcon fontSize="large" />}
-                onColor="#2e7d32"
+                onColor="#2b6cb0"
                 offColor="#757575"
                 trackOnColor="#b2ebf2"
                 trackOffColor="#cfd8dc"
@@ -1123,16 +1149,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             }
             label={active ? "Active" : "Inactive"}
           />
-        </Box>
-
-        {/* Right side - Import and Delete */}
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{
-            '& .MuiButton-root': commonStyles,
-          }}
-        >
           {/* Hidden file input for import */}
           <input
             type="file"

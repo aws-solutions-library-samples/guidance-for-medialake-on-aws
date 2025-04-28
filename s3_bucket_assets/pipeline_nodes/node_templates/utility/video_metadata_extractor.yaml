@@ -10,6 +10,9 @@ node:
       lambda:
         handler: utility/VideoMetadataExtractorLambdaDeployment
         runtime: python3.12
+        layers:
+          - PyMediaInfo
+          - FFProbe
         iam_policy:
           statements:
             - effect: Allow
@@ -20,6 +23,11 @@ node:
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - '*'
             - effect: Allow
               actions:
                 - dynamodb:GetItem
@@ -44,6 +52,7 @@ actions:
     description: Extract metadata from an video file stored in S3
     operationId: extractVideoMetadata
     parameters:
+
       - in: body
         name: S3 File Location
         required: true
@@ -59,8 +68,6 @@ actions:
           required:
             - bucket
             - key
-    x-requestMapping: processor/video_metadata_extractor/extract/
-    x-responseMapping: processor/video_metadata_extractor/extract/
     connections:
       incoming:
         type: [video]

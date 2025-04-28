@@ -78,6 +78,7 @@ const PipelinesPage: React.FC = () => {
     const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
     const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
     const [isDeletingInProgress, setIsDeletingInProgress] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         severity: 'info' as 'info' | 'success' | 'error' | 'warning',
@@ -126,7 +127,10 @@ const PipelinesPage: React.FC = () => {
     
     // Handle refresh
     const handleRefresh = () => {
-        refetch();
+        setIsRefreshing(true);
+        refetch().finally(() => {
+            setIsRefreshing(false);
+        });
     };
 
     // Handle edit pipeline
@@ -341,7 +345,7 @@ const PipelinesPage: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3.5 }}>
                             <IconButton
                                 onClick={handleRefresh}
-                                disabled={isLoading}
+                                disabled={isLoading || isRefreshing}
                                 sx={{
                                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                     '&:hover': {
@@ -350,7 +354,19 @@ const PipelinesPage: React.FC = () => {
                                 }}
                                 title={t('common.refresh')}
                             >
-                                <RefreshIcon />
+                                <RefreshIcon 
+                                    sx={{
+                                        animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                                        '@keyframes spin': {
+                                            '0%': {
+                                                transform: 'rotate(0deg)',
+                                            },
+                                            '100%': {
+                                                transform: 'rotate(360deg)',
+                                            },
+                                        },
+                                    }}
+                                />
                             </IconButton>
                             <ButtonGroup
                                 variant="contained"

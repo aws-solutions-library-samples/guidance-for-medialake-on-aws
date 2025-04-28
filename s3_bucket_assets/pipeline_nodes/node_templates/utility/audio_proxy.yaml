@@ -14,6 +14,23 @@ node:
           statements:
             - effect: Allow
               actions:
+                - iam:PassRole
+              resources:
+                - ${MEDIACONVERT_ROLE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:CreateJob
+                - mediaconvert:ListJobs
+                - mediaconvert:GetJob
+              resources:
+                - ${MEDIACONVERT_QUEUE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:DescribeEndpoints
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:endpoints/*
+            - effect: Allow
+              actions:
                 - s3:ListBucket
                 - s3:GetObject
                 - s3:PutObject
@@ -44,6 +61,18 @@ actions:
     description: Create an audio proxy from an audio file stored in S3
     operationId: createAudioProxy
     parameters:
+      - in: body
+        name: MediaConvert Queue Arn
+        required: true
+        default: ${MEDIACONVERT_QUEUE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: MediaConvert Role Arn
+        required: true
+        default: ${MEDIACONVERT_ROLE_ARN}
+        schema:
+          type: string
       - in: body
         name: output_bucket
         required: true

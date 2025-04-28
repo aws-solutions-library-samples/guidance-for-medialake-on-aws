@@ -41,7 +41,6 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
     PowertoolsLayerConfig,
     PynamoDbLambdaLayer,
-    CommonLibrariesLayer,
 )
 from aws_lambda_powertools import Logger
 
@@ -64,13 +63,13 @@ def validate_lambda_resources_names(base_name: str) -> str:
     Validates and constructs Lambda resource names.
     """
     logger = Logger()
-    logger.info(f"Validating lambda resource names - base_name: {base_name}")
+    logger.debug(f"Validating lambda resource names - base_name: {base_name}")
 
     # Combine base_name and id
     lambda_full_name = (
         f"{env_config.resource_prefix}_{base_name}_{env_config.environment}"
     )
-    logger.info(f"Generated lambda_full_name: {lambda_full_name}")
+    logger.debug(f"Generated lambda_full_name: {lambda_full_name}")
 
     # Check if the base_name is empty
     if not base_name:
@@ -106,7 +105,7 @@ def validate_lambda_resources_names(base_name: str) -> str:
             f"maximum length of {MAX_LOG_GROUP_NAME_LENGTH} characters"
         )
 
-    logger.info(f"Lambda resource names validated successfully: {lambda_full_name}")
+    logger.debug(f"Lambda resource names validated successfully: {lambda_full_name}")
     return lambda_full_name
 
 
@@ -191,7 +190,7 @@ class Lambda(Construct):
         super().__init__(scope, construct_id, **kwargs)
 
         logger = Logger()
-        logger.info(f"Initializing Lambda construct with config: {config}")
+        logger.debug(f"Initializing Lambda construct with config: {config}")
 
         # Validate config values
         if config.memory_size < 128 or config.memory_size > 10240:
@@ -203,37 +202,30 @@ class Lambda(Construct):
             raise ValueError("Timeout must be between 1 and 15 minutes")
 
         stack = Stack.of(self)
-        logger.info(f"Using stack region: {stack.region}")
+        logger.debug(f"Using stack region: {stack.region}")
 
         if config.name is not None:
             lambda_function_name = validate_lambda_resources_names(config.name)
         else:
             lambda_function_name = f"{construct_id}-{env_config.environment}"
-        logger.info(f"Validated function name: {lambda_function_name}")
+        logger.debug(f"Validated function name: {lambda_function_name}")
 
         # Create powertools layer
-        logger.info("Creating PowerTools layer")
+        logger.debug("Creating PowerTools layer")
         power_tools_layer_config = PowertoolsLayerConfig()
         powertools_layer = PowertoolsLayer(
             self, "PowertoolsLayer", config=power_tools_layer_config
         )
-        
-        # Create common libraries layer
-        logger.info("Creating CommonLibraries layer")
-        common_libraries_layer = CommonLibrariesLayer(
-            self, "CommonLibrariesLayer"
-        )
-        
-        layer_objects = [powertools_layer, common_libraries_layer.layer]
+        layer_objects = [powertools_layer.layer]
 
         # Add layers from config
         if config.layers:
-            logger.info(f"Adding {len(config.layers)} additional layers")
+            logger.debug(f"Adding {len(config.layers)} additional layers")
             layer_objects.extend(config.layers)
 
         # Create Log Group
         log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
-        logger.info(f"Creating log group: {log_group_name}")
+        logger.debug(f"Creating log group: {log_group_name}")
         lambda_log_group = logs.LogGroup(
             self,
             "LambdaLogGroup",
@@ -243,7 +235,7 @@ class Lambda(Construct):
         lambda_log_group.apply_removal_policy(config.log_removal_policy)
 
         # Create IAM role
-        logger.info("Setting up IAM role")
+        logger.debug("Setting up IAM role")
 
         ## Creation of IAM role for Lambda function
         role_id = f"{lambda_function_name}ExecutionRole"
@@ -252,14 +244,14 @@ class Lambda(Construct):
         }
 
         if config.iam_role_name:
-            logger.info(f"Using custom role name: {config.iam_role_name}")
+            logger.debug(f"Using custom role name: {config.iam_role_name}")
             # Truncate role name if it exceeds 64 characters
             role_name = (
                 config.iam_role_name[:MAX_ROLE_NAME_LENGTH]
                 if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH
                 else config.iam_role_name
             )
-            logger.info(f"Final role name after truncation: {role_name}")
+            logger.debug(f"Final role name after truncation: {role_name}")
             role_props["role_name"] = role_name
         else:
             # Handle default role name truncation
@@ -269,23 +261,23 @@ class Lambda(Construct):
                 if len(default_role_name) > MAX_ROLE_NAME_LENGTH
                 else default_role_name
             )
-            logger.info(f"Using default role name after truncation: {role_name}")
+            logger.debug(f"Using default role name after truncation: {role_name}")
             role_props["role_name"] = role_name
 
         if config.iam_role_boundary_policy:
-            logger.info("Adding boundary permissions to role")
+            logger.debug("Adding boundary permissions to role")
             role_props["permissions_boundary"] = config.iam_role_boundary_policy
 
         self._lambda_role = iam.Role(self, role_id, **role_props)
 
-        logger.info("Adding AWSLambdaBasicExecutionRole to Lambda role")
+        logger.debug("Adding AWSLambdaBasicExecutionRole to Lambda role")
         self._lambda_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
                 "service-role/AWSLambdaBasicExecutionRole"
             )
         )
         # Prepare common Lambda props
-        logger.info("Preparing Lambda function properties")
+        logger.debug("Preparing Lambda function properties")
         common_lambda_props = {
             "function_name": lambda_function_name,
             "handler": config.lambda_handler,
@@ -302,12 +294,12 @@ class Lambda(Construct):
 
         # Add reserved concurrent executions if provided
         if config.reserved_concurrent_executions is not None:
-            logger.info(f"Setting reserved concurrent executions to {config.reserved_concurrent_executions}")
+            logger.debug(f"Setting reserved concurrent executions to {config.reserved_concurrent_executions}")
             common_lambda_props["reserved_concurrent_executions"] = config.reserved_concurrent_executions
 
         # Add environment variables if provided
         if config.environment_variables:
-            logger.info("Adding environment variables")
+            logger.debug("Adding environment variables")
             lambda_environment_variables = config.environment_variables
             lambda_environment_variables["RESOURCE_PREFIX"] = env_config.resource_prefix
             lambda_environment_variables["ENVIRONMENT"] = env_config.environment
@@ -325,12 +317,12 @@ class Lambda(Construct):
 
         # Add VPC if provided
         if config.vpc:
-            logger.info(f"Adding VPC configuration: {config.vpc}")
+            logger.debug(f"Adding VPC configuration: {config.vpc}")
             common_lambda_props["vpc"] = config.vpc
 
         # Add Security Groups if provided
         if config.security_groups:
-            logger.info(f"Adding security groups: {config.security_groups}")
+            logger.debug(f"Adding security groups: {config.security_groups}")
             if not config.vpc:
                 logger.error("Security groups provided without VPC configuration")
                 raise ValueError(
@@ -345,7 +337,7 @@ class Lambda(Construct):
         # Collect common libraries
         entry_path = Path(common_lambda_props["entry"])
         common_libs = self._collect_common_libraries(entry_path)
-        logger.info(f"Found common libraries: {common_libs}")
+        logger.debug(f"Found common libraries: {common_libs}")
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
@@ -366,25 +358,24 @@ class Lambda(Construct):
         Returns a dictionary mapping file names to their full paths,
         with more specific (closer to lambda) libraries taking precedence.
         """
-        # Commented out common libraries collection
-        # common_libs = {}
-        # current_path = entry_path
+        common_libs = {}
+        current_path = entry_path
 
-        # # Walk up the directory tree until we reach the lambdas directory
-        # while "lambdas" in str(current_path):
-        #     common_lib_path = current_path / "common_libraries"
-        #     if common_lib_path.exists():
-        #         # Collect all files in the common_libraries directory
-        #         for file_path in common_lib_path.rglob("*"):
-        #             if file_path.is_file():
-        #                 # Use the relative path from common_libraries as the key
-        #                 rel_path = file_path.relative_to(common_lib_path)
-        #                 # Only add if we haven't seen this file before (more specific ones take precedence)
-        #                 if str(rel_path) not in common_libs:
-        #                     common_libs[str(rel_path)] = str(file_path)
-        #     current_path = current_path.parent
+        # Walk up the directory tree until we reach the lambdas directory
+        while "lambdas" in str(current_path):
+            common_lib_path = current_path / "common_libraries"
+            if common_lib_path.exists():
+                # Collect all files in the common_libraries directory
+                for file_path in common_lib_path.rglob("*"):
+                    if file_path.is_file():
+                        # Use the relative path from common_libraries as the key
+                        rel_path = file_path.relative_to(common_lib_path)
+                        # Only add if we haven't seen this file before (more specific ones take precedence)
+                        if str(rel_path) not in common_libs:
+                            common_libs[str(rel_path)] = str(file_path)
+            current_path = current_path.parent
 
-        return {}
+        return common_libs
 
     def _copy_common_libraries(
         self, common_libs: Dict[str, str], target_dir: Path
@@ -392,25 +383,23 @@ class Lambda(Construct):
         """
         Copy common libraries to the target directory, flattening the structure.
         """
-        # Commented out common libraries copying
-        # import shutil
-        # logger = Logger()
+        import shutil
+        logger = Logger()
   
-        # logger.info(f"Ensuring target directory exists: {target_dir}")
-        # target_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Ensuring target directory exists: {target_dir}")
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-        # # Copy each file
-        # for rel_path, source_path in common_libs.items():
-        #     target_file = Path(rel_path).name
-        #     target_path = target_dir / target_file
-        #     logger.info(f"Copying common library file from {source_path} to {target_path}")
-        #     try:
-        #         shutil.copy2(source_path, target_path)
-        #         logger.info(f"Successfully copied {source_path} to {target_path}")
-        #     except Exception as e:
-        #         logger.error(f"Error copying {source_path} to {target_path}: {e}")
-        #         raise
-        pass
+        # Copy each file
+        for rel_path, source_path in common_libs.items():
+            target_file = Path(rel_path).name
+            target_path = target_dir / target_file
+            logger.debug(f"Copying common library file from {source_path} to {target_path}")
+            try:
+                shutil.copy2(source_path, target_path)
+                logger.debug(f"Successfully copied {source_path} to {target_path}")
+            except Exception as e:
+                logger.error(f"Error copying {source_path} to {target_path}: {e}")
+                raise
 
 
     def _create_nodejs_function(self, props: dict, common_libs: dict):
@@ -421,9 +410,9 @@ class Lambda(Construct):
         props["project_root"] = props["entry"]
         props["deps_lock_file_path"] = os.path.join(props["entry"], "lock.json")
 
-        # # Copy common libraries to entry directory
-        # if common_libs:
-        #     self._copy_common_libraries(common_libs, Path(props["project_root"]))
+        # Copy common libraries to entry directory
+        if common_libs:
+            self._copy_common_libraries(common_libs, Path(props["project_root"]))
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -452,7 +441,7 @@ class Lambda(Construct):
                 self,
                 "StandardNodeJSLambda",
                 bundling=NodeJSBundlingOptions(
-                    node_modules=["exifr", "aws-sdk", "xml2js", "lodash"],
+                    node_modules=["exifr", "aws-sdk", "xml2js"],
                     force_docker_bundling=True,
                 ),
                 **props,
@@ -482,8 +471,8 @@ class Lambda(Construct):
 
         # Copy common libraries
 
-        # if common_libs:
-        #     self._copy_common_libraries(common_libs, entry_path)
+        if common_libs:
+            self._copy_common_libraries(common_libs, entry_path)
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -557,7 +546,7 @@ class Lambda(Construct):
             })
         """
         logger = Logger()
-        logger.info(f"Adding/updating environment variables: {new_variables}")
+        logger.debug(f"Adding/updating environment variables: {new_variables}")
 
         # Get current environment variables
         current_env = dict(self._function.get_environment() or {})

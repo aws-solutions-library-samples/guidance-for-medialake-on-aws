@@ -12,9 +12,9 @@
           "y": 96
         },
         "data": {
-          "nodeId": "trigger_video_processing_completed",
-          "label": "Video Processing Completed (trigger)",
-          "description": "This step will trigger after video processing is completed",
+          "nodeId": "trigger_ingest_completed",
+          "label": "Ingest Completed (trigger)",
+          "description": "This step will trigger after ingest is completed",
           "icon": {
             "key": null,
             "ref": null,
@@ -28,116 +28,25 @@
           ],
           "outputTypes": [
             {
-              "name": "video",
-              "description": "Output type: video"
+              "name": "any",
+              "description": "Output type: any"
             }
           ],
           "type": "TRIGGER",
           "configuration": {
-            "method": "trigger",
-            "parameters": {
-              "Video Type": "MP4,MOV,AVI,MKV,WEBM,MXF",
-              "Prefix": ""
-            },
             "path": "",
             "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Prefix": "",
+              "Format": "MP4, MOV, AVI, MKV, WEBM, MXF"
+            },
             "requestMapping": null,
             "responseMapping": null
-          },
-          "id": "trigger_video_processing_completed"
+          }
         },
         "width": 200,
-        "height": 113,
-        "selected": true,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_11",
-        "type": "custom",
-        "position": {
-          "x": 624,
-          "y": 256
-        },
-        "data": {
-          "nodeId": "video_proxy",
-          "label": "Video Proxy (extract)",
-          "description": "Create a video proxy from a video file stored in S3",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "video"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "method": "extract",
-            "parameters": {
-              "output_bucket": ""
-            },
-            "path": "",
-            "operationId": ""
-          },
-          "id": "video_proxy"
-        },
-        "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_12",
-        "type": "custom",
-        "position": {
-          "x": 640,
-          "y": 752
-        },
-        "data": {
-          "nodeId": "video_thumbnail",
-          "label": "Video Thumbnail (extract)",
-          "description": "Create a thumbnail image from a video file stored in S3",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "video"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "method": "extract",
-            "parameters": {
-              "output_bucket": ""
-            },
-            "path": "",
-            "operationId": ""
-          },
-          "id": "video_thumbnail"
-        },
-        "width": 200,
-        "height": 113,
-        "selected": false,
-        "dragging": false
+        "height": 100
       },
       {
         "id": "dndnode_13",
@@ -148,7 +57,7 @@
         },
         "data": {
           "nodeId": "video_metadata_extractor",
-          "label": "Video Metadata Extractor (extract)",
+          "label": "Video Metadata Extractor (extract) (extract)",
           "description": "Extract metadata from an video file stored in S3",
           "icon": {
             "key": null,
@@ -169,19 +78,16 @@
           ],
           "type": "UTILITY",
           "configuration": {
+            "path": "",
+            "operationId": "",
             "method": "extract",
             "parameters": {
               "S3 File Location": ""
-            },
-            "path": "",
-            "operationId": ""
-          },
-          "id": "video_metadata_extractor"
+            }
+          }
         },
         "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
+        "height": 100
       },
       {
         "id": "dndnode_14",
@@ -192,7 +98,7 @@
         },
         "data": {
           "nodeId": "check_media_convert_status",
-          "label": "Check MediaConvert Status",
+          "label": "Check MediaConvert Status (extract)",
           "description": "Checks MediaConvert Job Status",
           "icon": {
             "key": null,
@@ -213,66 +119,24 @@
           ],
           "type": "UTILITY",
           "configuration": {
-            "method": "extract",
-            "parameters": {}
-          },
-          "id": "check_media_convert_status"
-        },
-        "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_16",
-        "type": "custom",
-        "position": {
-          "x": 960,
-          "y": 928
-        },
-        "data": {
-          "nodeId": "publish_event",
-          "label": "Publish Event (generate)",
-          "description": "Publish event on the given eventBus",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "method": "generate",
-            "parameters": {
-              "EventBus ARN": "${INGEST_EVENT_BUS_NAME}"
-            },
             "path": "",
-            "operationId": ""
-          },
-          "id": "publish_event"
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            }
+          }
         },
         "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
+        "height": 100
       },
       {
         "id": "dndnode_17",
         "type": "custom",
         "position": {
-          "x": 1232,
-          "y": 928
+          "x": 928,
+          "y": 432
         },
         "data": {
           "nodeId": "success",
@@ -294,8 +158,7 @@
           "configuration": {
             "method": "success",
             "parameters": {}
-          },
-          "id": "success"
+          }
         },
         "width": 200,
         "height": 113,
@@ -338,97 +201,10 @@
           "configuration": {
             "method": "choice",
             "parameters": {}
-          },
-          "id": "choice"
+          }
         },
         "width": 200,
-        "height": 113,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_19",
-        "type": "custom",
-        "position": {
-          "x": 368,
-          "y": 928
-        },
-        "data": {
-          "nodeId": "check_media_convert_status",
-          "label": "Check MediaConvert Status",
-          "description": "Checks MediaConvert Job Status",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "method": "extract",
-            "parameters": {}
-          },
-          "id": "check_media_convert_status"
-        },
-        "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_20",
-        "type": "custom",
-        "position": {
-          "x": 368,
-          "y": 1120
-        },
-        "data": {
-          "nodeId": "wait",
-          "label": "Wait (wait)",
-          "description": "This step will wait for a specific duration before moving to the next step",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "method": "wait",
-            "parameters": {
-              "Duration": 15
-            },
-            "path": "",
-            "operationId": ""
-          },
-          "id": "wait"
-        },
-        "width": 200,
-        "height": 113,
-        "selected": false,
-        "dragging": false
+        "height": 113
       },
       {
         "id": "dndnode_21",
@@ -460,31 +236,28 @@
           ],
           "type": "FLOW",
           "configuration": {
+            "path": "",
+            "operationId": "",
             "method": "wait",
             "parameters": {
-              "Duration": 15
-            },
-            "path": "",
-            "operationId": ""
-          },
-          "id": "wait"
+              "Duration": "15"
+            }
+          }
         },
         "width": 200,
-        "height": 113,
-        "selected": false,
-        "dragging": false
+        "height": 113
       },
       {
-        "id": "dndnode_22",
+        "id": "dndnode_25",
         "type": "custom",
         "position": {
-          "x": 624,
-          "y": 928
+          "x": 480,
+          "y": 256
         },
         "data": {
-          "nodeId": "choice",
-          "label": "Choice",
-          "description": "This step will branch the workflow based on a condition",
+          "nodeId": "video_proxy_and_thumbnail",
+          "label": "Video Proxy and Thumbnail (extract)",
+          "description": "Create a video proxy and thumbnail from a video file stored in S3",
           "icon": {
             "key": null,
             "ref": null,
@@ -494,24 +267,25 @@
             "_owner": null
           },
           "inputTypes": [
-            "any"
+            "video"
           ],
           "outputTypes": [
             {
-              "name": "Completed",
-              "description": "Path taken when condition evaluates to true"
-            },
-            {
-              "name": "In Progress",
-              "description": "Path taken when condition evaluates to false"
+              "name": "any",
+              "description": "Output type: any"
             }
           ],
-          "type": "FLOW",
+          "type": "UTILITY",
           "configuration": {
-            "method": "choice",
-            "parameters": {}
-          },
-          "id": "choice"
+            "method": "extract",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}",
+              "output_bucket": ""
+            },
+            "path": "",
+            "operationId": ""
+          }
         },
         "width": 200,
         "height": 113,
@@ -521,168 +295,85 @@
     ],
     "edges": [
       {
-        "source": "dndnode_11",
-        "sourceHandle": "any",
-        "target": "dndnode_14",
-        "targetHandle": "input-any",
-        "id": "dndnode_11-dndnode_14",
+        "id": "reactflow__edge-dndnode_14any-dndnode_18input-any",
+        "source": "dndnode_14",
+        "target": "dndnode_18",
         "type": "custom",
         "data": {
+          "type": "custom",
           "text": "Connected",
-          "id": "dndnode_11-dndnode_14",
-          "type": "custom"
-        }
+          "id": "reactflow__edge-dndnode_14any-dndnode_18input-any"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
       },
       {
-        "source": "dndnode_12",
-        "sourceHandle": "any",
-        "target": "dndnode_19",
-        "targetHandle": "input-any",
-        "id": "dndnode_12-dndnode_19",
+        "id": "dndnode_18-dndnode_21",
+        "source": "dndnode_18",
+        "target": "dndnode_21",
         "type": "custom",
         "data": {
+          "type": "custom",
           "text": "Connected",
-          "id": "dndnode_12-dndnode_19",
-          "type": "custom"
+          "id": "dndnode_18-dndnode_21"
+        },
+        "sourceHandle": "In Progress",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_21-dndnode_14",
+        "source": "dndnode_21",
+        "target": "dndnode_14",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_21-dndnode_14"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_10-dndnode_13",
+        "source": "dndnode_10",
+        "target": "dndnode_13",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_10-dndnode_13"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-video"
+      },
+      {
+        "source": "dndnode_18",
+        "sourceHandle": "Completed",
+        "target": "dndnode_17",
+        "targetHandle": "input-any",
+        "id": "dndnode_18-dndnode_17",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
         }
       },
       {
         "source": "dndnode_13",
         "sourceHandle": "metadata",
-        "target": "dndnode_11",
+        "target": "dndnode_25",
         "targetHandle": "input-video",
-        "id": "dndnode_13-dndnode_11",
+        "id": "dndnode_13-dndnode_25",
         "type": "custom",
         "data": {
-          "text": "Connected",
-          "id": "dndnode_13-dndnode_11",
-          "type": "custom"
+          "text": "Connected"
         }
       },
       {
-        "source": "dndnode_18",
-        "sourceHandle": "Completed",
-        "target": "dndnode_12",
-        "targetHandle": "input-video",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "reactflow__edge-dndnode_18Completed-dndnode_12input-video",
-          "type": "custom"
-        },
-        "selected": false,
-        "id": "reactflow__edge-dndnode_18Completed-dndnode_12input-video"
-      },
-      {
-        "source": "dndnode_22",
-        "sourceHandle": "In Progress",
-        "target": "dndnode_20",
-        "targetHandle": "input-any",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "reactflow__edge-dndnode_22In Progress-dndnode_20input-any",
-          "type": "custom"
-        },
-        "id": "reactflow__edge-dndnode_22In Progress-dndnode_20input-any"
-      },
-      {
-        "source": "dndnode_19",
-        "sourceHandle": "any",
-        "target": "dndnode_22",
-        "targetHandle": "input-any",
-        "id": "dndnode_19-dndnode_22",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_19-dndnode_22",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_20",
-        "sourceHandle": "any",
-        "target": "dndnode_19",
-        "targetHandle": "input-any",
-        "id": "dndnode_20-dndnode_19",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_20-dndnode_19",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_14",
-        "sourceHandle": "any",
-        "target": "dndnode_18",
-        "targetHandle": "input-any",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "reactflow__edge-dndnode_14any-dndnode_18input-any",
-          "type": "custom"
-        },
-        "id": "reactflow__edge-dndnode_14any-dndnode_18input-any"
-      },
-      {
-        "source": "dndnode_18",
-        "sourceHandle": "In Progress",
-        "target": "dndnode_21",
-        "targetHandle": "input-any",
-        "id": "dndnode_18-dndnode_21",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_18-dndnode_21",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_21",
+        "source": "dndnode_25",
         "sourceHandle": "any",
         "target": "dndnode_14",
         "targetHandle": "input-any",
-        "id": "dndnode_21-dndnode_14",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_21-dndnode_14",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_22",
-        "sourceHandle": "Completed",
-        "target": "dndnode_16",
-        "targetHandle": "input-any",
-        "id": "dndnode_22-dndnode_16",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_22-dndnode_16",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_16",
-        "sourceHandle": "any",
-        "target": "dndnode_17",
-        "targetHandle": "input-any",
-        "id": "dndnode_16-dndnode_17",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_16-dndnode_17",
-          "type": "custom"
-        }
-      },
-      {
-        "source": "dndnode_10",
-        "sourceHandle": "video",
-        "target": "dndnode_13",
-        "targetHandle": "input-video",
-        "id": "dndnode_10-dndnode_13",
+        "id": "dndnode_25-dndnode_14",
         "type": "custom",
         "data": {
           "text": "Connected"

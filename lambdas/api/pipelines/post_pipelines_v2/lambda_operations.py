@@ -226,37 +226,13 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
     except Exception as e:
         logger.warning(f"Error retrieving layers from DynamoDB for node {node_id}: {e}")
     
-    # # If no layers were found in DynamoDB, fall back to environment variables
-    # if not layers:
-    #     # Get Lambda configuration from YAML
-    #     lambda_config = yaml_data["node"]["integration"]["config"]["lambda"]
-        
-    #     # Check if layers are defined in the YAML
-    #     if "layers" in lambda_config:
-    #         for layer_name in lambda_config["layers"]:
-    #             # Convert layer name to environment variable name (e.g., "CairoSvg" -> "CAIROSVG_LAYER_ARN")
-    #             env_var_name = f"{layer_name.upper()}_LAYER_ARN"
-    #             layer_arn = os.environ.get(env_var_name)
-                
-    #             if layer_arn:
-    #                 layers.append(layer_arn)
-    #                 logger.info(f"Adding layer {layer_name} (ARN: {layer_arn}) from environment to Lambda function for node {node_id}")
-    #             else:
-    #                 logger.warning(f"Layer {layer_name} specified in YAML but environment variable {env_var_name} not found")
-    
+   
     # Always add the Powertools layer for all Lambda functions if not already specified
     if not any("POWERTOOLS_LAYER_ARN" in layer for layer in layers):
         powertools_layer_arn = os.environ.get("POWERTOOLS_LAYER_ARN")
         if powertools_layer_arn:
             layers.append(powertools_layer_arn)
             logger.info(f"Adding default Powertools layer to Lambda function for node {node_id}")
-    
-    # Always add the Common Libraries layer for all Lambda functions if not already specified
-    if not any("COMMONLIBS_LAYER_ARN" in layer for layer in layers):
-        commonlibs_layer_arn = os.environ.get("COMMONLIBS_LAYER_ARN")
-        if commonlibs_layer_arn:
-            layers.append(commonlibs_layer_arn)
-            logger.info(f"Adding Common Libraries layer to Lambda function for node {node_id}")
     
     return layers
 
@@ -432,6 +408,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                     "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
                     "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
+                    "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
                     # Add required environment variables
                     "SERVICE": node.data.id,  # node Title
                     "STEP_NAME": node.data.label,  # friendly name of the node
@@ -473,7 +450,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                             else os.environ.get("API_AUTH_TYPE", "")
                         ),
                         "API_SERVICE_NAME": node.data.id,
-                        "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
+                        
                         "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
                         "API_CUSTOM_CODE": os.environ.get("API_CUSTOM_CODE", "false"),
                         **(
@@ -494,24 +471,16 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
                 if node.data.type.lower() == "utility" and node.data.id == 'embedding_store':
-                    # Extract Index Name and Content Type from node configuration
-                    # index_name = node.data.configuration.get("Index Name", "media")
-                    # content_type = node.data.configuration.get("Content Type", "text")
-                    
+
                     env_vars = {
                         **common_env_vars,  # Include common env vars
                         "OPENSEARCH_ENDPOINT": os.environ.get(
                             "OPENSEARCH_ENDPOINT"
-                        ),
-                        # "INDEX_NAME": index_name,
-                        # "CONTENT_TYPE": content_type
+                        )
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
                     
-                    # logger.info(f"Added environment variables for embedding_store Lambda: INDEX_NAME={index_name}, CONTENT_TYPE={content_type}")
-                    
-                    # Add VPC configuration for the embedding_store Lambda to access OpenSearch
-                    # OPENSEARCH_VPC_SUBNET_IDS contains a comma-separated list of subnet IDs
+                   
                     subnet_ids = OPENSEARCH_VPC_SUBNET_IDS.split(',') if OPENSEARCH_VPC_SUBNET_IDS else []
                     create_function_params["VpcConfig"] = {
                         "SubnetIds": subnet_ids,
@@ -541,6 +510,42 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                         # Get the parameter value or default if not available
                         if param_value:
                             env_var_value = str(param_value)
+                            
+                            # Check if the value is in the format ${VARIABLE_NAME}
+                            
+                            # Check for standard environment variables
+                            var_match = re.match(r'^\${([A-Za-z0-9_]+)}$', env_var_value)
+                            # Check for CloudFormation parameters (AWS::Region, AWS::AccountId)
+                            cf_match = re.match(r'^\${(AWS::Region|AWS::AccountId)}$', env_var_value)
+                            
+                            if cf_match:
+                                # Handle CloudFormation parameters
+                                cf_param = cf_match.group(1)
+                                if cf_param == "AWS::Region":
+                                    # Get the current AWS region
+                                    region = boto3.session.Session().region_name
+                                    env_var_value = str(region)
+                                    logger.info(f"Replaced CloudFormation parameter {param_value} with region: {env_var_value}")
+                                elif cf_param == "AWS::AccountId":
+                                    # Get the current AWS account ID
+                                    sts_client = boto3.client('sts')
+                                    account_id = sts_client.get_caller_identity()["Account"]
+                                    env_var_value = str(account_id)
+                                    logger.info(f"Replaced CloudFormation parameter {param_value} with account ID: {env_var_value}")
+                            elif var_match:
+                                # Extract the variable name
+                                config_var_name = var_match.group(1)
+                                # Try to get the value from the config module
+                                import config
+                                if hasattr(config, config_var_name):
+                                    config_value = getattr(config, config_var_name)
+                                    if config_value is not None:
+                                        env_var_value = str(config_value)
+                                        logger.info(f"Replaced variable reference {param_value} with value from config: {env_var_value}")
+                                    else:
+                                        logger.warning(f"Config variable {config_var_name} exists but is None, using original value")
+                                else:
+                                    logger.warning(f"Config variable {config_var_name} not found in config module, using original value")
                         else:
                             # Find the parameter definition to get the default value
                             for def_key, def_value in node.data.configuration['parameters'].items():

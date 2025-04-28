@@ -646,7 +646,14 @@ const PipelineEditorContent = () => {
         setApiStatusModalOpen(true);
 
         if (pipelineId && pipelineId !== 'new') {
-            updatePipeline.mutate({ id: pipelineId, data: formData });
+            // Add updateDeployed flag for deployed pipelines
+            updatePipeline.mutate({
+                id: pipelineId,
+                data: {
+                    ...formData,
+                    updateDeployed: true // Flag to indicate updating a deployed pipeline
+                }
+            });
         } else {
             createPipeline.mutate(formData);
         }
@@ -1390,6 +1397,7 @@ const PipelineEditorContent = () => {
                 active={formData.active !== undefined ? formData.active : true}
                 onActiveChange={handleActiveChange}
                 status={pipeline?.deploymentStatus}
+                isEditMode={!!pipelineId && pipelineId !== 'new'}
                 updateFormData={(importedNodes, importedEdges) => {
                     // Convert imported React Flow nodes to pipeline nodes
                     const pipelineNodes = importedNodes.map(node => convertToPipelineNode(node));

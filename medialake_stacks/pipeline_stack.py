@@ -63,6 +63,8 @@ class PipelineStackProps:
     media_assets_bucket: s3.IBucket
     x_origin_verify_secret: secretsmanager.Secret
     collection_endpoint: str
+    mediaconvert_queue_arn: str
+    mediaconvert_role_arn: str
 
 
 class PipelineStack(cdk.NestedStack):
@@ -109,8 +111,8 @@ class PipelineStack(cdk.NestedStack):
                 connector_table=props.connector_table,
                 node_table=props.node_table,
                 pipeline_table=props.pipeline_table,
-                # image_proxy_lambda=props.image_proxy_lambda,
-                # image_metadata_extractor_lambda=props.image_metadata_extractor_lambda,
+                mediaconvert_queue_arn = props.mediaconvert_queue_arn,
+                mediaconvert_role_arn = props.mediaconvert_role_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
                 external_payload_bucket=props.external_payload_bucket,
                 pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,

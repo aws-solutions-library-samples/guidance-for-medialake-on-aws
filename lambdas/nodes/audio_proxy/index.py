@@ -1,268 +1,246 @@
-import boto3
+"""
+Audio proxy – MediaConvert trigger Lambda
+• Handles both legacy {"input": …} and new {"payload": {"assets": …}} events
+• Builds request / response via Jinja templates stored in S3
+• Caches MediaConvert endpoint in DynamoDB
+"""
+
 import os
 import json
 import time
 import random
-import ast
 import importlib.util
 from datetime import datetime, timedelta
+from typing import Dict, Any, List
+
+import boto3
 from botocore.exceptions import ClientError
-from typing import Dict, Any, Optional
 from jinja2 import Environment, FileSystemLoader
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
 
+# ── Powertools ────────────────────────────────────────────────────────────
 logger = Logger()
 tracer = Tracer()
+
+# ── AWS clients ───────────────────────────────────────────────────────────
 s3_client = boto3.client("s3")
 
+# ── constants ─────────────────────────────────────────────────────────────
 DYNAMODB_TABLE_NAME = "MediaConvertEndpointsCache"
-CACHE_KEY = "mediaconvert-endpoints"
-CACHE_TTL_SECONDS = 3600  # 1 hour
+CACHE_KEY            = "mediaconvert-endpoints"
+CACHE_TTL_SECONDS    = 3600  # 1 h
 
+# ── tiny util ─────────────────────────────────────────────────────────────
+def _raise(msg: str):
+    raise RuntimeError(msg)
 
-def clean_asset_id(input_string: str) -> str:
-    parts = input_string.split(":")
-    uuid = parts[-1]
-    if uuid == "master":
-        uuid = parts[-2]
+# ── helper functions ──────────────────────────────────────────────────────
+def clean_asset_id(asset_str: str) -> str:
+    """
+    Convert any asset URN/ARN into the canonical “asset:uuid:<uuid>” form,
+    stripping trailing “:master” if present.
+    """
+    parts = asset_str.split(":")
+    uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
 
-def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str, event: dict):
-    try:
-        response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
-        file_content = response["Body"].read().decode("utf-8")
-        spec = importlib.util.spec_from_loader("dynamic_module", loader=None)
-        module = importlib.util.module_from_spec(spec)
-        exec(file_content, module.__dict__)
-        if not hasattr(module, function_name):
-            raise AttributeError(f"Function '{function_name}' not found in the downloaded file.")
-        dynamic_function = getattr(module, function_name)
-        result = dynamic_function(event)
-        return result
-    except ClientError as e:
-        error_code = e.response["Error"]["Code"]
-        if error_code == "NoSuchKey":
-            logger.error(f"The object {key} does not exist in bucket {bucket}.")
-        elif error_code == "NoSuchBucket":
-            logger.error(f"The bucket {bucket} does not exist.")
-        else:
-            logger.error(f"An S3 error occurred: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-        raise
+def load_and_execute_function_from_s3(bucket: str, key: str,
+                                      fn_name: str,
+                                      event: Dict[str, Any]) -> Any:
+    """
+    Download a .py file from S3, exec() it in a dynamic module, and invoke the
+    requested function with `event`. Raises if the function is missing.
+    """
+    obj   = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
+    code  = obj["Body"].read().decode()
+
+    spec  = importlib.util.spec_from_loader("dynamic_module", loader=None)
+    mod   = importlib.util.module_from_spec(spec)
+    exec(code, mod.__dict__)
+
+    if not hasattr(mod, fn_name):
+        raise AttributeError(f"{fn_name} not found in {key}")
+    return getattr(mod, fn_name)(event)
 
 
 def download_s3_object(bucket: str, key: str) -> str:
-    try:
-        response = s3_client.get_object(Bucket=bucket, Key=key)
-        return response["Body"].read().decode("utf-8")
-    except ClientError as e:
-        logger.error(f"Error downloading S3 object: {e}")
-        raise
+    obj = s3_client.get_object(Bucket=bucket, Key=key)
+    return obj["Body"].read().decode()
 
 
-def create_request_body(s3_templates, api_template_bucket, event):
-    logger.info("Building a request body")
-    function_name = "translate_event_to_request"
-    request_template_path = f"api_templates/{s3_templates['request_template']}"
-    mapping_path = s3_templates["mapping_file"]
-    logger.info(f"{api_template_bucket} {request_template_path}")
-    request_template = download_s3_object(api_template_bucket, request_template_path)
-    mapping = load_and_execute_function_from_s3(api_template_bucket, mapping_path, function_name, event)
-    env = Environment(loader=FileSystemLoader("/tmp/"))
-    env.filters["jsonify"] = json.dumps
-    query_template = env.from_string(request_template)
-    request_body = query_template.render(variables=mapping)
-    request_body = json.loads(request_body)
-    return request_body
-
-
-def create_response_output(s3_templates, api_template_bucket, response_body, event):
-    function_name = "translate_event_to_request"
-    response_template_path = f"api_templates/{s3_templates['response_template']}"
-    response_mapping_path = s3_templates["response_mapping_file"]
-    response_template = download_s3_object(api_template_bucket, response_template_path)
-    response_mapping = load_and_execute_function_from_s3(
-        api_template_bucket,
-        response_mapping_path,
-        function_name,
-        {"response_body": response_body, "event": event}
+def create_request_body(tmpl_paths: Dict[str, str],
+                        tmpl_bucket: str,
+                        event: Dict[str, Any]) -> Dict[str, Any]:
+    tmpl_text = download_s3_object(tmpl_bucket,
+                                   f"api_templates/{tmpl_paths['request_template']}")
+    mapping   = load_and_execute_function_from_s3(
+        tmpl_bucket,
+        tmpl_paths["mapping_file"],
+        "translate_event_to_request",
+        event,
     )
+
     env = Environment(loader=FileSystemLoader("/tmp/"))
     env.filters["jsonify"] = json.dumps
-    query_template = env.from_string(response_template)
-    response_output = query_template.render(variables=response_mapping)
-    dict_output = json.loads(response_output)
-    return dict_output
+    rendered = env.from_string(tmpl_text).render(variables=mapping)
+    return json.loads(rendered)
 
 
-def build_s3_templates_path(service_name: str, resource: str, method: str) -> dict:
-    """Build paths to the S3 templates for the given service, resource, and method."""
-    resource_name = resource.split("/")[-1]
-    file_prefix = f"{resource_name}_{method.lower()}"
-    
+def create_response_output(tmpl_paths: Dict[str, str],
+                           tmpl_bucket: str,
+                           response_body: Dict[str, Any],
+                           event: Dict[str, Any]) -> Dict[str, Any]:
+    tmpl_text = download_s3_object(tmpl_bucket,
+                                   f"api_templates/{tmpl_paths['response_template']}")
+    mapping   = load_and_execute_function_from_s3(
+        tmpl_bucket,
+        tmpl_paths["response_mapping_file"],
+        "translate_event_to_request",
+        {"response_body": response_body, "event": event},
+    )
+
+    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env.filters["jsonify"] = json.dumps
+    rendered = env.from_string(tmpl_text).render(variables=mapping)
+    return json.loads(rendered)
+
+
+def build_s3_templates_path(service: str, resource: str,
+                            method: str) -> Dict[str, str]:
+    base = f"{resource.split('/')[-1]}_{method.lower()}"
     return {
-        "request_template": f"{service_name}/{resource}/{file_prefix}_request.jinja",
-        "mapping_file": f"{service_name}/{resource}/{file_prefix}_request_mapping.py",
-        "response_template": f"{service_name}/{resource}/{file_prefix}_response.jinja",
-        "response_mapping_file": f"{service_name}/{resource}/{file_prefix}_response_mapping.py",
+        "request_template":  f"{service}/{resource}/{base}_request.jinja",
+        "mapping_file":      f"{service}/{resource}/{base}_request_mapping.py",
+        "response_template": f"{service}/{resource}/{base}_response.jinja",
+        "response_mapping_file":
+            f"{service}/{resource}/{base}_response_mapping.py",
     }
 
+# ── MediaConvert endpoint caching ─────────────────────────────────────────
+def _cache_table():
+    return boto3.resource("dynamodb").Table(DYNAMODB_TABLE_NAME)
 
-def get_cached_endpoint():
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+
+def get_cached_endpoint() -> str | None:
     try:
-        response = table.get_item(Key={"CacheKey": CACHE_KEY})
-        if "Item" in response:
-            item = response["Item"]
-            if datetime.now() < datetime.fromisoformat(item["ExpirationTime"]):
-                return item["Endpoints"]
+        item = _cache_table().get_item(Key={"CacheKey": CACHE_KEY}).get("Item")
+        if item and datetime.utcnow() < datetime.fromisoformat(item["ExpirationTime"]):
+            return item["Endpoints"]
     except Exception as e:
-        logger.exception("Error retrieving cached endpoint", extra={"error": str(e)})
+        logger.warning("Cache read failed", extra={"error": str(e)})
     return None
 
 
-def update_cached_endpoint(endpoints):
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(DYNAMODB_TABLE_NAME)
-    expiration_time = datetime.now() + timedelta(seconds=CACHE_TTL_SECONDS)
+def update_cached_endpoint(url: str) -> None:
     try:
-        table.put_item(
-            Item={
-                "CacheKey": CACHE_KEY,
-                "Endpoints": endpoints,
-                "ExpirationTime": expiration_time.isoformat(),
-            }
-        )
+        _cache_table().put_item(Item={
+            "CacheKey": CACHE_KEY,
+            "Endpoints": url,
+            "ExpirationTime": (datetime.utcnow() +
+                               timedelta(seconds=CACHE_TTL_SECONDS)
+                               ).isoformat(),
+        })
     except Exception as e:
-        logger.exception("Error updating cached endpoint", extra={"error": str(e)})
+        logger.warning("Cache write failed", extra={"error": str(e)})
 
 
-def get_mediaconvert_endpoint():
-    cached_endpoints = get_cached_endpoint()
-    if cached_endpoints:
+def get_mediaconvert_endpoint() -> str:
+    cached = get_cached_endpoint()
+    if cached:
         logger.info("Using cached MediaConvert endpoint")
-        return cached_endpoints
-    mediaconvert = boto3.client("mediaconvert", region_name="us-east-1")
-    max_retries = 60
-    base_delay = 1  # Start with a 1-second delay
-    for attempt in range(max_retries):
+        return cached
+
+    mc = boto3.client("mediaconvert", region_name="us-east-1")
+    for attempt in range(60):
         try:
-            endpoints = mediaconvert.describe_endpoints()
-            update_cached_endpoint(endpoints["Endpoints"][0]["Url"])
-            return endpoints["Endpoints"][0]["Url"]
+            url = mc.describe_endpoints()["Endpoints"][0]["Url"]
+            update_cached_endpoint(url)
+            return url
         except ClientError as e:
-            if e.response["Error"]["Code"] == "TooManyRequestsException":
-                if attempt == max_retries - 1:
-                    logger.exception(
-                        "Max retries reached when describing MediaConvert endpoints",
-                        extra={"error": str(e)},
-                    )
-                    raise
-                else:
-                    delay = (2**attempt * base_delay) + (random.randint(0, 1000) / 1000)
-                    logger.warning(f"TooManyRequests, retrying in {delay:.2f} seconds")
-                    time.sleep(delay)
-            else:
-                logger.exception(
-                    "Error describing MediaConvert endpoints", extra={"error": str(e)}
-                )
+            if e.response["Error"]["Code"] != "TooManyRequestsException":
                 raise
-    raise Exception("Failed to get MediaConvert endpoint after multiple retries")
+            delay = (2 ** attempt) + random.random()
+            logger.warning(f"Rate-limited, retrying in {delay:.2f}s")
+            time.sleep(delay)
+    _raise("Unable to obtain MediaConvert endpoint after retries")
 
+# ── event-format shim ─────────────────────────────────────────────────────
+def _extract_asset(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize event to always expose:
+        • event['input']   – asset dict (for Jinja mappings)
+        • returns the asset dict
+    Works with legacy {'input': …} and new {'payload': {'assets': …}} formats.
+    """
+    if "input" in event:
+        return event["input"]
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-)
+    assets: List[dict] = event.get("payload", {}).get("assets", [])
+    if not assets:
+        _raise("Event missing assets list")
+    asset = assets[0]
+    event["input"] = asset
+    return asset
+
+# ── Lambda handler ────────────────────────────────────────────────────────
+@lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME",
+                                                 "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
-def lambda_handler(event, context: LambdaContext):
+def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
     try:
-        mediaconvert_queue = os.environ["MEDIACONVERT_QUEUE"]
-        table_name = os.environ["MEDIALAKE_ASSET_TABLE"]
-        dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table(table_name)
-        api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
+        asset = _extract_asset(event)
 
-        input_data = event.get("input", {}).get("DigitalSourceAsset", {})
-        inventory_id = event.get("input", {}).get("InventoryID")
+        # basic fields
+        inventory_id    = asset.get("InventoryID") or _raise("InventoryID missing")
+        source_asset    = asset.get("DigitalSourceAsset", {})
+        main_repr       = source_asset.get("MainRepresentation", {})
+        storage_info    = main_repr.get("StorageInfo", {})
+        primary_loc     = storage_info.get("PrimaryLocation", {})
+
+        bucket          = primary_loc.get("Bucket")
+        key             = primary_loc.get("ObjectKey", {}).get("FullPath")
+        output_bucket   = (event.get("output_bucket") or
+                           os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or
+                           _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing"))
+
+        if not all([bucket, key]):
+            _raise("Missing S3 location details in event")
+
+        # identifiers
         clean_inventory_id = clean_asset_id(inventory_id)
-        main_representation = input_data.get("MainRepresentation", {})
-        master_asset_id = input_data.get("ID")
-        asset_id = clean_asset_id(master_asset_id)
-        storage_info = main_representation.get("StorageInfo", {})
-        primary_location = storage_info.get("PrimaryLocation", {})
-        bucket = primary_location.get("Bucket")
-        key = primary_location.get("ObjectKey", {}).get("FullPath")
 
-        output_bucket = event.get("output_bucket")
-
-        if not all([key, bucket, output_bucket]):
-            return {
-                "externalJobResult": "Failed",
-                "externalJobStatus": "Started",
-                "error": "Missing required parameters"
-            }
-
-        # Build the S3 template paths
-        s3_templates = build_s3_templates_path(
-            service_name="mediaconvert",
+        # template paths
+        s3_tmpl = build_s3_templates_path(
+            service="mediaconvert",
             resource="audio_proxy",
-            method="post"
+            method="post",
         )
 
-        # Add MediaConvert role ARN and queue to the event
-        event["mediaconvert_role_arn"] = os.environ["MEDIACONVERT_ROLE_ARN"]
-        event["mediaconvert_queue"] = mediaconvert_queue
+        # Slate extra vars for mapping Jinja
+        event.update({
+            "mediaconvert_role_arn":  os.environ["MEDIACONVERT_ROLE_ARN"],
+            "mediaconvert_queue_arn": os.environ["MEDIACONVERT_QUEUE_ARN"],
+            "output_bucket":          output_bucket,
+        })
 
-        # Create the request body using the template
-        try:
-            job_settings = create_request_body(s3_templates, api_template_bucket, event)
-        except Exception as e:
-            logger.error(f"Error creating request body: {str(e)}")
-            return {
-                "externalJobResult": "Failed",
-                "externalJobStatus": "Started",
-                "error": f"Error creating request body: {str(e)}"
-            }
+        api_tmpl_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
+        job_settings    = create_request_body(s3_tmpl, api_tmpl_bucket, event)
 
-        # Get MediaConvert endpoint
-        mediaconvert_endpoint = get_mediaconvert_endpoint()
-        mediaconvert = boto3.client("mediaconvert", endpoint_url=mediaconvert_endpoint)
+        # submit job
+        mc_endpoint = get_mediaconvert_endpoint()
+        mc_client   = boto3.client("mediaconvert", endpoint_url=mc_endpoint)
+        response    = mc_client.create_job(**job_settings)
 
-        # Create the MediaConvert job
-        response = mediaconvert.create_job(**job_settings)
-        
-        # Process the response using the template
-        try:
-            result = create_response_output(s3_templates, api_template_bucket, response, event)
-            return result
-        except Exception as e:
-            logger.error(f"Error processing response: {str(e)}")
-            job_id = response.get("Job", {}).get("Id", "")
-            return {
-                "externalJobId": job_id,
-                "externalJobStatus": "Started",
-                "externalJobResult": "Success" if job_id else "Failed",
-                "error": f"Error processing response: {str(e)}"
-            }
+        return create_response_output(s3_tmpl, api_tmpl_bucket, response, event)
 
     except Exception as e:
-        logger.exception(
-            "Error processing audio",
-            extra={
-                "inventory_id": clean_inventory_id if 'clean_inventory_id' in locals() else None,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            },
-        )
+        logger.exception("Processing failed", extra={"error": str(e)})
         return {
-            "externalJobResult": "Failed",
-            "externalJobStatus": "Started",
-            "error": f"Error processing audio: {str(e)}"
+            "externalJobResult":  "Failed",
+            "externalJobStatus":  "Started",
+            "error":              f"Error processing audio: {e}"
         }
