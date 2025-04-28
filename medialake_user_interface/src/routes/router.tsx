@@ -7,6 +7,7 @@ import { RouteErrorBoundary } from '@/shared/ui/errors';
 import Home from '@/pages/Home';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
+import UploadDemo from '@/pages/UploadDemo';
 import { S3Explorer } from '@/features/home/S3Explorer';
 import { ExecutionsPage } from '@/features/executions';
 import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
@@ -56,6 +57,10 @@ export const router = createBrowserRouter([
             {
                 path: 'assets',
                 element: <AssetsPage />
+            },
+            {
+                path: 'assets/upload',
+                element: <UploadDemo />
             },
             {
                 path: 'executions',

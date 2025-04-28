@@ -726,6 +726,11 @@ class ConnectorsConstruct(Construct):
         
         add_cors_options_method(aws_resource)
         add_cors_options_method(regions_resource)
+        add_cors_options_method(connector_id_resource)
+        add_cors_options_method(connector_s3_resource)
+        add_cors_options_method(s3_sync_connector_resource)
+        add_cors_options_method(s3_explorer_resource)
+        add_cors_options_method(s3_explorer_connector_resource)
 
     @property
     def connector_table(self) -> dynamodb.TableV2:
