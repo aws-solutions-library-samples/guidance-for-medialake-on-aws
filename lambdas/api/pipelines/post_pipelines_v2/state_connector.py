@@ -29,7 +29,8 @@ class StateConnector:
         self.choice_branch_targets = {}  # Map from target state name to source Choice state name
         self.map_processor_chains = map_processor_chains or {}  # Map from Map node ID to list of processor node IDs
         
-    def connect_states(self, edges: List[Any], choice_true_targets: Dict[str, str], choice_false_targets: Dict[str, str]) -> None:
+    def connect_states(self, edges: List[Any], choice_true_targets: Dict[str, str],
+                      choice_false_targets: Dict[str, str], choice_fail_targets: Dict[str, str] = None) -> None:
         """
         Connect states based on edges in the pipeline.
         
@@ -37,7 +38,11 @@ class StateConnector:
             edges: List of edges from the pipeline
             choice_true_targets: Dictionary mapping Choice node IDs to their "true" target node IDs
             choice_false_targets: Dictionary mapping Choice node IDs to their "false" target node IDs
+            choice_fail_targets: Dictionary mapping Choice node IDs to their "fail" target node IDs
         """
+        # Initialize choice_fail_targets if not provided
+        if choice_fail_targets is None:
+            choice_fail_targets = {}
         logger.info("Connecting states based on edges")
         
         # Connect states based on edges
@@ -70,8 +75,8 @@ class StateConnector:
                     
                 # Handle Choice states specially
                 if source_state.get("Type") == "Choice":
-                    self._connect_choice_state(source_id, target_id, source_state_name, target_state_name, source_handle, 
-                                              choice_true_targets, choice_false_targets)
+                    self._connect_choice_state(source_id, target_id, source_state_name, target_state_name, source_handle,
+                                               choice_true_targets, choice_false_targets, choice_fail_targets)
                 # Handle Map states specially
                 elif source_state.get("Type") == "Map":
                     self._connect_map_state(source_id, target_id, source_state_name, target_state_name, source_handle)
@@ -85,9 +90,13 @@ class StateConnector:
                     source_state["Next"] = target_state_name
                     logger.info(f"Connected {source_state_name} -> {target_state_name}")
                     
-    def _connect_choice_state(self, source_id: str, target_id: str, source_state_name: str, 
-                             target_state_name: str, source_handle: Optional[str], 
-                             choice_true_targets: Dict[str, str], choice_false_targets: Dict[str, str]) -> None:
+    def _connect_choice_state(self, source_id: str, target_id: str, source_state_name: str,
+                              target_state_name: str, source_handle: Optional[str],
+                              choice_true_targets: Dict[str, str], choice_false_targets: Dict[str, str],
+                              choice_fail_targets: Optional[Dict[str, str]] = None) -> None:
+        # Initialize choice_fail_targets if not provided
+        if choice_fail_targets is None:
+            choice_fail_targets = {}
         """
         Connect a Choice state to its target states.
         
@@ -102,28 +111,62 @@ class StateConnector:
         """
         source_state = self.states[source_state_name]
         
-        # Check if this node has identified true/false targets from the first pass
-        if source_id in choice_true_targets and source_id in choice_false_targets:
+        # Check if this node has identified true/false/fail targets from the first pass
+        has_true_target = source_id in choice_true_targets
+        has_false_target = source_id in choice_false_targets
+        has_fail_target = source_id in choice_fail_targets
+        
+        if has_true_target and has_false_target:
             true_target_id = choice_true_targets[source_id]
             false_target_id = choice_false_targets[source_id]
             
             true_target_state = self.node_id_to_state_name.get(true_target_id)
             false_target_state = self.node_id_to_state_name.get(false_target_id)
             
+            # Get fail target if available
+            fail_target_state = None
+            if has_fail_target:
+                fail_target_id = choice_fail_targets[source_id]
+                fail_target_state = self.node_id_to_state_name.get(fail_target_id)
+                logger.info(f"Found fail target for Choice state {source_state_name}: {fail_target_state}")
+            
             if true_target_state and false_target_state:
                 # Set the Choices array to point to the true target
                 if "Choices" in source_state and source_state["Choices"]:
+                    # First choice is for "Completed" status
                     for choice in source_state["Choices"]:
-                        choice["Next"] = true_target_state
-                        logger.info(f"Set Choice true path: {source_state_name} -> {true_target_state}")
+                        if choice.get("StringEquals") == "Completed":
+                            choice["Next"] = true_target_state
+                            logger.info(f"Set Choice true path: {source_state_name} -> {true_target_state}")
                 
                 # Set the Default to point to the false target
                 source_state["Default"] = false_target_state
                 logger.info(f"Set Choice false path: {source_state_name} -> {false_target_state}")
                 
+                # Add a Fail condition if we have a fail target
+                if fail_target_state:
+                    # Check if we already have a Fail condition
+                    has_fail_condition = False
+                    for choice in source_state["Choices"]:
+                        if choice.get("StringEquals") == "Failed":
+                            choice["Next"] = fail_target_state
+                            has_fail_condition = True
+                            logger.info(f"Updated existing Fail condition in Choice state {source_state_name} to point to {fail_target_state}")
+                    
+                    # If no Fail condition exists, add one
+                    if not has_fail_condition:
+                        source_state["Choices"].append({
+                            "Variable": "$.metadata.externalJobStatus",
+                            "StringEquals": "Failed",
+                            "Next": fail_target_state
+                        })
+                        logger.info(f"Added Fail condition to Choice state {source_state_name} pointing to {fail_target_state}")
+                
                 # Track these targets as Choice branch targets
                 self.choice_branch_targets[true_target_state] = source_state_name
                 self.choice_branch_targets[false_target_state] = source_state_name
+                if fail_target_state:
+                    self.choice_branch_targets[fail_target_state] = source_state_name
                 
                 return
         
@@ -149,6 +192,32 @@ class StateConnector:
             # Track this target as a Choice branch target
             self.choice_branch_targets[target_state_name] = source_state_name
             logger.info(f"Tracking Choice branch target: {target_state_name} from {source_state_name}")
+        
+        elif source_handle == "Fail":
+            # This is the "Fail" path from the Choice
+            # We need to add a new choice condition for the Fail path
+            if "Choices" in source_state:
+                # Check if we already have a Fail condition
+                has_fail_condition = False
+                for choice in source_state["Choices"]:
+                    if choice.get("StringEquals") == "Failed":
+                        choice["Next"] = target_state_name
+                        has_fail_condition = True
+                        logger.info(f"Updated existing Fail condition in Choice state {source_state_name} to point to {target_state_name}")
+                        break
+                
+                # If no Fail condition exists, add one
+                if not has_fail_condition:
+                    source_state["Choices"].append({
+                        "Variable": "$.metadata.externalJobStatus",
+                        "StringEquals": "Failed",
+                        "Next": target_state_name
+                    })
+                    logger.info(f"Added Fail condition to Choice state {source_state_name} pointing to {target_state_name}")
+            
+            # Track this target as a Choice branch target
+            self.choice_branch_targets[target_state_name] = source_state_name
+            logger.info(f"Tracking Choice Fail branch target: {target_state_name} from {source_state_name}")
         
         else:
             # If no sourceHandle but it's a Choice state, this might be a regular connection

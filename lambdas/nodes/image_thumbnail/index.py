@@ -1,6 +1,7 @@
 import boto3, io, os, json
 from PIL import Image, ExifTags
 import cairosvg
+from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
@@ -21,7 +22,6 @@ def get_image_rotation(image):
         logger.warning(f"Error getting image rotation: {e}")
         return 0
 
-
 def create_thumbnail(img, w, h, crop=False):
     rot = get_image_rotation(img)
     if rot:
@@ -29,12 +29,12 @@ def create_thumbnail(img, w, h, crop=False):
 
     if crop:
         tgt_ratio, img_ratio = w / h, img.width / img.height
-        if img_ratio > tgt_ratio:  # crop width
+        if img_ratio > tgt_ratio:
             new_w = int(h * img_ratio)
             img   = img.resize((new_w, h))
             left  = (new_w - w) // 2
             img   = img.crop((left, 0, left + w, h))
-        else:                       # crop height
+        else:
             new_h = int(w / img_ratio)
             img   = img.resize((w, new_h))
             top   = (new_h - h) // 2
@@ -44,16 +44,13 @@ def create_thumbnail(img, w, h, crop=False):
 
     return img
 
-
 def clean_asset_id(raw: str) -> str:
     parts = raw.split(":")
     uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
-
 def _raise(msg: str):
     raise ValueError(msg)
-
 
 def _resolve_dims(w, h, iw, ih):
     if w is None:
@@ -62,28 +59,17 @@ def _resolve_dims(w, h, iw, ih):
         h = int(w * (ih / iw))
     return int(w), int(h)
 
-
 def _extract_from_event(event):
-    """
-    Returns tuple (detail, width, height, crop_flag).
-
-    Handles BOTH formats:
-      • OLD:  payload.assets[0] = { "input": { "detail": {...}, "width": … } }
-      • NEW:  payload.assets[0] = { "InventoryID": …, ... }
-              (thumb params live at payload-root level)
-    """
     payload = event.get("payload") or _raise("Missing payload")
     assets  = payload.get("assets")  or _raise("Missing payload.assets")
     asset   = assets[0]
 
-    # old shape (your original code)
     if "input" in asset:
         inp     = asset["input"]
         detail  = inp.get("detail") or _raise("asset.input.detail missing")
         width   = inp.get("width")
         height  = inp.get("height")
         crop    = bool(inp.get("crop", False))
-    # new shape (sample event)
     else:
         detail  = asset
         width   = payload.get("width")
@@ -92,7 +78,6 @@ def _extract_from_event(event):
 
     return detail, width, height, crop
 
-
 # ── Lambda ──────────────────────────────────────────────────────────────────────
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
@@ -100,29 +85,29 @@ def _extract_from_event(event):
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
-    # ── pull out fields no matter the shape ───────────────────────────────────
     detail, width, height, crop = _extract_from_event(event)
 
-    inv_id    = detail.get("InventoryID") or _raise("Missing InventoryID")
-    asset_id  = clean_asset_id(inv_id)
-
-    loc       = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
-    bucket    = loc.get("Bucket") or _raise("Missing bucket")
-    key       = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
-
+    # ── default to max 300px width if neither provided ────────────────────────
     if width is None and height is None:
-        return {"statusCode": 400, "body": "Both width and height cannot be None for thumbnail creation"}
+        width = 300
+        height = None
+
+    inv_id   = detail.get("InventoryID") or _raise("Missing InventoryID")
+    asset_id = clean_asset_id(inv_id)
+
+    loc    = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+    bucket = loc.get("Bucket") or _raise("Missing bucket")
+    key    = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
 
     # ── fetch & build PIL image ───────────────────────────────────────────────
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = cairosvg.svg2png(bytestring=body)
-    img  = Image.open(io.BytesIO(body))
+    img = Image.open(io.BytesIO(body))
 
     width, height = _resolve_dims(width, height, img.width, img.height)
     thumb = create_thumbnail(img, width, height, crop=crop)
 
-    # always write PNG
     fmt, ext = "PNG", "png"
     if thumb.mode not in ("RGB", "RGBA"):
         thumb = thumb.convert("RGB")
@@ -132,15 +117,29 @@ def lambda_handler(event, context: LambdaContext):
 
     out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
     out_key    = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
-    s3.put_object(Bucket=out_bucket, Key=out_key, Body=data, ContentType=f"image/{ext}")
+
+    # ── delete old thumbnail ───────────────────────────────────────────────────
+    try:
+        s3.delete_object(Bucket=out_bucket, Key=out_key)
+        logger.info("Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key})
+    except ClientError as err:
+        logger.warning("No existing thumbnail to delete or delete failed", extra={"error": str(err)})
+
+    # ── upload new thumbnail ───────────────────────────────────────────────────
+    s3.put_object(
+        Bucket=out_bucket,
+        Key=out_key,
+        Body=data,
+        ContentType=f"image/{ext}"
+    )
 
     # ── update DynamoDB ───────────────────────────────────────────────────────
     try:
-        resp      = dynamo.get_item(Key={"InventoryID": asset_id})
-        cur_reps  = resp.get("Item", {}).get("DerivedRepresentations", [])
-        cur_reps  = [r for r in cur_reps if r.get("Purpose") != "thumbnail"]  # keep only non-thumbs
+        resp     = dynamo.get_item(Key={"InventoryID": asset_id})
+        cur_reps = resp.get("Item", {}).get("DerivedRepresentations", [])
+        cur_reps = [r for r in cur_reps if r.get("Purpose") != "thumbnail"]
 
-        new_rep   = {
+        new_rep = {
             "ID": f"{asset_id}:thumbnail",
             "Type": "Image",
             "Format": fmt,

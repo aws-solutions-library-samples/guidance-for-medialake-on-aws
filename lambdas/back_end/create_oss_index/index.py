@@ -143,77 +143,35 @@ def handler(event, context):
             "accept": "application/json",
         }
 
-        # payload = {
-        #         "settings": {
-        #             "index": {
-        #                 "knn": True,
-        #                 "mapping.total_fields.limit": 3000
-        #             }
-        #         },
-        #         "mappings": {
-        #             "properties": {
-        #                 "type": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "document_id": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "asset_id": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "start_timecode": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "end_timecode": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "embedding_scope": {
-        #                     "type": "keyword"
-        #                 },
-        #                 "embedding": {
-        #                     "type": "knn_vector",
-        #                     "dimension": VECTOR_DIMENSION,
-        #                     "method": {
-        #                         "name": "hnsw",
-        #                         "space_type": "cosinesimil",
-        #                         "engine": "nmslib",
-        #                     }
-        #                 }
-        #             }
-        #         }
-        #     }
+      
 
         payload = {
             "settings": {
-                "index": {
-                "knn": True,
-                "mapping.total_fields.limit": 6000
-                }
+                "index.knn": True,
+                "index.mapping.total_fields.limit": 6000
             },
             "mappings": {
                 "properties": {
-                    "type":        {"type":"keyword"},
-                    "document_id": {"type":"keyword"},
-                    "asset_id":    {"type":"keyword"},
-                    "start_timecode": {"type":"keyword"},
-                    "end_timecode":   {"type":"keyword"},
-                    "embedding_scope":{"type":"keyword"},
-                    "embedding": {
-                    "type": "knn_vector",
+                "type":             {"type": "keyword"},
+                "document_id":      {"type": "keyword"},
+                "asset_id":         {"type": "keyword"},
+                "start_timecode":   {"type": "keyword"},
+                "end_timecode":     {"type": "keyword"},
+                "embedding_scope":  {"type": "keyword"},
+                "embedding": {
+                    "type":      "knn_vector",
                     "dimension": VECTOR_DIMENSION,
                     "method": {
-                        "name": "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine": "nmslib"
+                    "name":       "hnsw",
+                    "space_type": "cosinesimil",
+                    "engine":     "nmslib"
                     }
-                    },
-                    "EmbeddedMetadata": {
-                        "type": "object",
-                        "dynamic": True
-                    }
+                },
+                "EmbeddedMetadata": {"type": "object", "dynamic": True}
                 }
             }
         }
+
 
         region = os.environ["REGION"]
         service = os.environ["SCOPE"]

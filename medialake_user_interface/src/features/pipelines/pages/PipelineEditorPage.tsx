@@ -20,6 +20,7 @@ import { Box, Modal, Typography, TextField, Stack, Dialog, DialogTitle, DialogCo
 import ApiStatusModal from '@/components/ApiStatusModal';
 import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from 'react-icons/fa';
 import { PipelineDeleteDialog } from '../components';
+import { PipelineUpdateConfirmationDialog } from '../components/PipelineUpdateConfirmationDialog';
 import { useGetPipeline, useCreatePipeline, useUpdatePipeline, useGetPipelineStatus } from '../api/pipelinesController';
 import queryClient from '@/api/queryClient';
 import { useGetNode } from '@/shared/nodes/api/nodesController';
@@ -34,13 +35,13 @@ import {
     Sidebar,
     NodeConfigurationForm,
     PipelineToolbar,
-    JobStatusNode
+    // JobStatusNode
 } from '../components/PipelineEditor';
 import type { PipelineToolbarProps } from '../components/PipelineEditor/PipelineToolbar';
 import IntegrationValidationDialog from '../components/IntegrationValidationDialog';
 import { Node as NodeType, NodeConfiguration, NodeMethod } from '../types';
 import { RightSidebarProvider, useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
-import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
+// import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -59,7 +60,7 @@ interface CustomNodeData {
 
 const nodeTypes = {
     custom: CustomNode,
-    jobStatusNode: JobStatusNode
+    // jobStatusNode: JobStatusNode
 };
 
 const edgeTypes = {
@@ -451,6 +452,9 @@ const PipelineEditorContent = () => {
         userInput: '',
     });
     
+    // Update confirmation dialog state
+    const [updateConfirmationOpen, setUpdateConfirmationOpen] = useState(false);
+    
     // State for pipeline creation status tracking
     const [creatingPipelineId, setCreatingPipelineId] = useState<string | null>(null);
     const [executionArn, setExecutionArn] = useState<string | null>(null);
@@ -639,10 +643,21 @@ const PipelineEditorContent = () => {
             positionAbsolute: node.positionAbsolute
         })));
 
+        // If we're updating an existing pipeline, show confirmation dialog
+        if (pipelineId && pipelineId !== 'new') {
+            setUpdateConfirmationOpen(true);
+        } else {
+            // For new pipelines, proceed directly
+            proceedWithSave();
+        }
+    };
+
+    // Function to proceed with saving after confirmation
+    const proceedWithSave = () => {
         // Show the ApiStatusModal in loading state
         setApiStatusModalState('loading');
-        setApiStatusModalAction('Creating Pipeline');
-        setApiStatusModalMessage('Please wait while we create your pipeline...');
+        setApiStatusModalAction(pipelineId && pipelineId !== 'new' ? 'Updating Pipeline' : 'Creating Pipeline');
+        setApiStatusModalMessage('Please wait...');
         setApiStatusModalOpen(true);
 
         if (pipelineId && pipelineId !== 'new') {
@@ -1160,11 +1175,11 @@ const PipelineEditorContent = () => {
             });
 
             // Check if this is our special job status node
-            const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
+            // const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
 
             const newReactFlowNode: Node<CustomNodeData> = {
                 id: getId(),
-                type: isJobStatusNode ? 'jobStatusNode' : 'custom',
+                type: 'custom', // Removed jobStatusNode type
                 position,
                 data: {
                     nodeId: nodeData.id,
@@ -1648,6 +1663,16 @@ const PipelineEditorContent = () => {
                 }}
                 onUserInputChange={(input) => setDeleteDialog(prev => ({ ...prev, userInput: input }))}
                 isDeleting={false}
+            />
+
+            {/* Pipeline Update Confirmation Dialog */}
+            <PipelineUpdateConfirmationDialog
+                open={updateConfirmationOpen}
+                onClose={() => setUpdateConfirmationOpen(false)}
+                onConfirm={() => {
+                    setUpdateConfirmationOpen(false);
+                    proceedWithSave();
+                }}
             />
         </Box>
     );

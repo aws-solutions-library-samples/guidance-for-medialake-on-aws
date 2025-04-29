@@ -35,6 +35,18 @@ node:
                 - mediaconvert:ListJobs
               resources:
                 - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:queues/*
+            - effect: Allow
+              actions:
+                - mediaconvert:DescribeEndpoints
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:endpoints/*
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
 
 actions:
   extract:

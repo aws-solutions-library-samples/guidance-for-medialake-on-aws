@@ -21,7 +21,7 @@ actions:
         schema:
           type: string
           description: Error code for the failure
-          default: "FlowFailure"
+          default: "Failed"
       - in: body
         name: Cause
         required: false

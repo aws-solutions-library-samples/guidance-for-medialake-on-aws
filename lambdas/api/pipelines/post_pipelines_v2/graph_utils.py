@@ -167,16 +167,17 @@ class GraphAnalyzer:
         dfs(start_node)
         return path
         
-    def find_special_edges(self) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, List[str]]]:
+    def find_special_edges(self) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, List[str]]]:
         """
         Find special edge types in the pipeline.
         
         Returns:
-            Tuple of (choice_true_targets, choice_false_targets, map_processor_chains)
+            Tuple of (choice_true_targets, choice_false_targets, choice_fail_targets, map_processor_chains)
             where map_processor_chains maps Map node IDs to lists of node IDs in their processor chains
         """
         choice_true_targets = {}  # Maps Choice node ID to its "true" target node ID
         choice_false_targets = {}  # Maps Choice node ID to its "false" target node ID
+        choice_fail_targets = {}  # Maps Choice node ID to its "fail" target node ID
         map_processor_chains = {}  # Maps Map node ID to a list of node IDs in its processor chain
         
         # First identify the initial processor nodes for each Map
@@ -205,6 +206,9 @@ class GraphAnalyzer:
                 elif source_handle == "In Progress":
                     choice_false_targets[source_id] = target_id
                     logger.info(f"Identified Choice false path: {source_id} -> {target_id}")
+                elif source_handle == "Fail":
+                    choice_fail_targets[source_id] = target_id
+                    logger.info(f"Identified Choice fail path: {source_id} -> {target_id}")
                     
             # Handle Map node edges
             if source_node.data.type.lower() == "flow" and source_node.data.id == "map":
@@ -226,7 +230,7 @@ class GraphAnalyzer:
             map_processor_chains[map_id] = chain
             logger.info(f"Built processor chain for Map {map_id}: {chain}")
             
-        return choice_true_targets, choice_false_targets, map_processor_chains
+        return choice_true_targets, choice_false_targets, choice_fail_targets, map_processor_chains
         
     def find_first_and_last_lambdas(self) -> Tuple[Optional[str], Optional[str]]:
         """

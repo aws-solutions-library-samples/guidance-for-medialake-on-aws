@@ -10,15 +10,16 @@ node:
       aws_eventbridge:
         aws_eventbridge_rule: pipeline_execution_completed
         event_pattern:
-          source: ["medialake.pipeline"]
-          detail-type: ["Pipeline Execution Completed"]
           detail:
-            outputs:
-              input:
-                DigitalSourceAsset:
-                  Type: ["Image"]
-                  MainRepresentation:
-                    Format: ["${Image Type}"]
+            metadata:
+              pipelineName: ["Default Image Pipeline"]
+              pipelineStatus: ["Completed"]
+            payload:
+              assets:
+                - DigitalSourceAsset:
+                    Type: ["Image"]
+                    MainRepresentation:
+                      Format: ["${Image Type}"]
 actions:
   trigger:
     summary: Trigger after image processing is completed

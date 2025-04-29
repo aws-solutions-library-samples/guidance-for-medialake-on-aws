@@ -19,9 +19,12 @@ node:
                 - s3:ListBucket
                 - s3:GetObject
                 - s3:PutObject
+                - s3:DeleteObject
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+                - arn:aws:s3:::*/*
+                - arn:aws:s3:::*
             - effect: Allow
               actions:
                 - dynamodb:GetItem

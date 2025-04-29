@@ -61,7 +61,7 @@ class StateMachineBuilder:
         root_node_id = self.graph_analyzer.get_root_node()
         
         # Step 3: Find special edge types
-        choice_true_targets, choice_false_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
+        choice_true_targets, choice_false_targets, choice_fail_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
         
         # Step 4: Create state definitions for each node
         self.states = self.state_factory.create_state_definitions(
@@ -83,7 +83,8 @@ class StateMachineBuilder:
         state_connector.connect_states(
             self.pipeline.configuration.edges,
             choice_true_targets,
-            choice_false_targets
+            choice_false_targets,
+            choice_fail_targets
         )
         
         # Step 7: Find execution path
