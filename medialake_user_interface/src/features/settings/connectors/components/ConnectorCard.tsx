@@ -246,11 +246,11 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 <CardContent sx={{ flexGrow: 1 }}>
 
                     <Typography variant="body2" >
-                        <strong>Bucket:</strong> {connector.storageIdentifier}
+                        <strong>Bucket:</strong> {connector.storageIdentifier || connector.configuration?.bucket}
                     </Typography>
-                    {connector.region && (
+                    {(connector.region || connector.configuration?.region) && (
                         <Typography variant="body2">
-                            <strong>Region:</strong> {connector.region}
+                            <strong>Region:</strong> {connector.region || connector.configuration?.region}
                         </Typography>
                     )}
                     {connector.description && (
@@ -294,15 +294,16 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             </>
                         ) : null
                     )}
-                    {connector.usage?.total !== undefined && (
+                    {(connector.integrationMethod || connector.configuration?.s3IntegrationMethod) && (
                         <Typography variant="body2" >
-                            <strong>Integration Method:</strong> {connector.integrationMethod}
+                            <strong>Integration Method:</strong> {connector.integrationMethod || connector.configuration?.s3IntegrationMethod}
                         </Typography>
                     )}
                     <Box sx={{ mt: 2 }}>
 
                         <Typography 
                             variant="body2" 
+                            component="div"
                             onClick={canToggleSeconds ? toggleSeconds : undefined}
                             sx={{ 
                                 display: 'flex', 

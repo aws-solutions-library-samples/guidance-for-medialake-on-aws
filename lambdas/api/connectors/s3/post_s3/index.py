@@ -7,7 +7,7 @@ import random
 import boto3
 import traceback
 from datetime import datetime
-from typing import List, Any
+from typing import List, Any, Optional
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
@@ -19,7 +19,7 @@ from aws_lambda_powertools.event_handler import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -27,23 +27,72 @@ tracer = Tracer()
 logger = Logger()
 app = APIGatewayRestResolver(enable_validation=True)
 
+# Get required env vars
+MEDIALAKE_CONNECTOR_TABLE = os.environ["MEDIALAKE_CONNECTOR_TABLE"]
+IAC_ASSETS_BUCKET = os.environ["IAC_ASSETS_BUCKET"]
+S3_CONNECTOR_LAMBDA = os.environ["S3_CONNECTOR_LAMBDA"]
+INGEST_MEDIA_PROCESSOR_LAYER = os.environ["INGEST_MEDIA_PROCESSOR_LAYER"]
+INGEST_EVENT_BUS = os.environ["INGEST_EVENT_BUS"]
+MEDIALAKE_ASSET_TABLE = os.environ["MEDIALAKE_ASSET_TABLE"]
+MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX = os.environ[
+    "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX"
+]
+MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX = os.environ[
+    "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX"
+]
+MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX = os.environ[
+    "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX"
+]
+RESOURCE_PREFIX = os.environ["RESOURCE_PREFIX"]
+RESOURCE_APPLICATION_TAG = os.environ["RESOURCE_APPLICATION_TAG"]
+
+
 # Initialize AWS Clients S3 client - region will be determined per bucket
-s3_client = boto3.client("s3")
+s3_client_default_region = boto3.client("s3")  # Keep one for region listing etc.
 dynamodb = boto3.resource("dynamodb")
 iam_client = boto3.client("iam")
 pipes = boto3.client("pipes")
+lambda_client = boto3.client("lambda")
 
 
 class S3ConnectorConfig(BaseModel):
-    bucket: str
+    # Make bucket optional initially, will be validated based on bucketType
+    bucket: Optional[str] = None
     s3IntegrationMethod: str
     objectPrefix: list[str] | None = None
+    # Add fields for new bucket creation
+    bucketType: str  # 'new' or 'existing'
+    region: Optional[str] = None  # Required if bucketType is 'new'
+
+    @field_validator("bucket")
+    @classmethod
+    def bucket_required_for_existing(cls, v, values):
+        if values.data.get("bucketType") == "existing" and not v:
+            raise ValueError("Bucket name is required for existing buckets.")
+        return v
+
+    @field_validator("bucket")
+    @classmethod
+    def bucket_required_for_new(cls, v, values):
+        if values.data.get("bucketType") == "new" and not v:
+            raise ValueError("Bucket name is required for new buckets.")
+        # Add basic S3 bucket name validation (can be more comprehensive)
+        if v and (len(v) < 3 or len(v) > 63 or not v.islower() or v.startswith('-') or v.endswith('-')):
+            raise ValueError("Invalid S3 bucket name format.")
+        return v
+
+    @field_validator("region")
+    @classmethod
+    def region_required_for_new(cls, v, values):
+        if values.data.get("bucketType") == "new" and not v:
+            raise ValueError("Region is required when creating a new bucket.")
+        return v
 
 
 class S3Connector(BaseModel):
     configuration: S3ConnectorConfig
     name: str
-    type: str
+    type: str  # Should always be 's3' for this endpoint
     description: str | None = None
 
 
@@ -234,7 +283,12 @@ def setup_eventbridge_notifications(
     created_resources.append(("queue_policy", queue_url))
 
     # Add SQS as target for the EventBridge rule
-    target_id = f"SQSTarget-{s3_bucket}"
+    # Ensure Target ID does not exceed 64 characters - Rely on AWS validation
+    # max_target_id_bucket_len = 54 # 64 (max) - 10 (prefix 'SQSTarget-')
+    # truncated_bucket_for_target = s3_bucket[:max_target_id_bucket_len]
+    # target_id = f"SQSTarget-{truncated_bucket_for_target}"
+    target_id = f"SQSTarget-{s3_bucket}" # Use full bucket name
+    
     eventbridge.put_targets(
         Rule=rule_name,
         Targets=[
@@ -578,6 +632,11 @@ def create_eventbridge_pipe(
 
     # Create the pipe
     pipe_name = f"{resource_name_prefix}-pipe"
+    # Ensure pipe name doesn't exceed 64 characters (AWS limitation)
+    if len(pipe_name) > 64:
+        pipe_name = pipe_name[:64]
+        logger.info(f"Truncated pipe name to: {pipe_name}")
+        
     response = pipes.create_pipe(
         Name=pipe_name,
         RoleArn=pipe_role_arn,
@@ -599,103 +658,271 @@ def create_eventbridge_pipe(
     return pipe_arn, pipe_role_arn
 
 
+def get_bucket_region(bucket_name):
+    """Get the AWS region for a given S3 bucket."""
+    try:
+        response = s3_client_default_region.get_bucket_location(Bucket=bucket_name)
+        region = response.get("LocationConstraint")
+        # Buckets in us-east-1 return None, handle this
+        return region if region is not None else "us-east-1"
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchBucket":
+            logger.error(f"Bucket {bucket_name} does not exist.")
+            raise ValueError(f"Bucket {bucket_name} does not exist.")
+        elif e.response["Error"]["Code"] == "AccessDenied":
+            logger.error(f"Access denied when trying to get location for bucket {bucket_name}. Assuming default region.")
+            # Fallback or re-raise depending on requirements
+            # For now, let's assume the lambda region if access denied, though this is not ideal
+            return os.environ.get("AWS_REGION", "us-east-1")
+        else:
+            logger.error(f"Error getting bucket location for {bucket_name}: {e}")
+            raise
+
+
+def create_s3_bucket(bucket_name: str, region: str):
+    """Creates an S3 bucket with secure defaults."""
+    s3_regional_client = boto3.client("s3", region_name=region)
+    try:
+        logger.info(f"Attempting to create bucket '{bucket_name}' in region '{region}'")
+        create_bucket_config = {}
+        # us-east-1 does not require LocationConstraint
+        if region != "us-east-1":
+            create_bucket_config = {"CreateBucketConfiguration": {"LocationConstraint": region}}
+
+        s3_regional_client.create_bucket(
+            Bucket=bucket_name,
+            **create_bucket_config,
+            # ACL='private', # Default is private, explicit setting often not needed/recommended
+            # ObjectLockEnabledForBucket=False # Default is false
+        )
+        logger.info(f"Successfully created bucket '{bucket_name}'")
+
+        # Wait briefly for bucket to become available for policy application
+        time.sleep(5)
+
+        # Apply Block Public Access
+        logger.info(f"Applying Block Public Access settings to '{bucket_name}'")
+        s3_regional_client.put_public_access_block(
+            Bucket=bucket_name,
+            PublicAccessBlockConfiguration={
+                'BlockPublicAcls': True,
+                'IgnorePublicAcls': True,
+                'BlockPublicPolicy': True,
+                'RestrictPublicBuckets': True
+            }
+        )
+        logger.info(f"Applied Block Public Access to '{bucket_name}'")
+
+        # Apply Default Encryption (SSE-S3)
+        logger.info(f"Applying default SSE-S3 encryption to '{bucket_name}'")
+        s3_regional_client.put_bucket_encryption(
+            Bucket=bucket_name,
+            ServerSideEncryptionConfiguration={
+                'Rules': [
+                    {
+                        'ApplyServerSideEncryptionByDefault': {
+                            'SSEAlgorithm': 'AES256'
+                        }
+                    },
+                ]
+            }
+        )
+        logger.info(f"Applied default encryption to '{bucket_name}'")
+
+        return True
+
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code")
+        if error_code == "BucketAlreadyOwnedByYou":
+            logger.warning(
+                f"Bucket '{bucket_name}' already exists and is owned by you. Proceeding."
+            )
+            # Verify region matches if possible
+            try:
+                existing_region = get_bucket_region(bucket_name)
+                if existing_region != region:
+                     logger.error(f"Existing bucket '{bucket_name}' is in region '{existing_region}', but requested region was '{region}'")
+                     raise ValueError(f"Bucket exists in a different region ({existing_region}).")
+                # Optionally check encryption and public access block status here
+                return True # Treat as success if it exists and is owned by you in the correct region
+            except Exception as check_err:
+                 logger.error(f"Could not verify existing bucket '{bucket_name}' details: {check_err}")
+                 raise ValueError(f"Could not verify existing bucket '{bucket_name}'.")
+
+        elif error_code == "BucketAlreadyExists":
+            logger.error(
+                f"Bucket name '{bucket_name}' is already taken by another account."
+            )
+            raise ValueError(
+                f"Bucket name '{bucket_name}' is unavailable. Please choose a different name."
+            )
+        else:
+            logger.error(f"Failed to create or configure bucket '{bucket_name}': {e}")
+            raise
+
+
 @app.post("/connectors/s3")
 def create_connector(createconnector: S3Connector) -> dict:
-    created_resources = []
+    """Creates an S3 connector, optionally creating the S3 bucket first."""
+    request_body = createconnector.model_dump()
+    logger.info(f"Received request to create S3 connector: {request_body}")
+
+    connector_id = str(uuid.uuid4())
+    connector_name = request_body["name"]
+    connector_description = request_body.get("description", "")
+    config = request_body["configuration"]
+    s3_bucket = config["bucket"]
+    integration_method = config["s3IntegrationMethod"]
+    bucket_type = config["bucketType"]
+    region = config.get("region")
+    object_prefix = config.get("objectPrefix") or [] # Ensure it's a list
+
+    created_resources = [] # Keep track of resources created for potential rollback
+    # Initialize variables that might not be assigned before use in finally/except
+    bucket_region = None
+    queue_arn = None
+    lambda_arn = None
+    iam_role_arn = None
+    event_source_arn = None 
+    event_source_type = None
+
     try:
-        s3_bucket = createconnector.configuration.bucket
+        # ---- Bucket Handling ----
+        if bucket_type == "new":
+            if not region:
+                 # This should be caught by pydantic, but double-check
+                 raise ValueError("Region is required to create a new bucket.")
+            if not s3_bucket:
+                # This should be caught by pydantic, but double-check
+                raise ValueError("Bucket name is required to create a new bucket.")
 
-        # Check for existing connector
-        existing_connector = check_existing_connector(s3_bucket)
-        if existing_connector:
-            return {
-                "status": "400",
-                "message": f"Connector already exists for bucket {s3_bucket}",
-                "data": {},
-            }
+            logger.info(f"Request to create a new bucket: {s3_bucket} in region {region}")
+            # Call the create_s3_bucket function
+            create_s3_bucket(s3_bucket, region)
+            # Bucket creation includes secure defaults (Block Public Access, SSE-S3)
+            created_resources.append(("s3_bucket", s3_bucket))
+            bucket_region = region # Use the specified region
+            logger.info(f"Successfully created and configured new bucket: {s3_bucket}")
 
-        # medialake_tag = os.environ.get('MEDIALAKE_TAG', 'medialake')
-        medialake_tag = "medialake"
-        # Get deployment configuration from environment variables
-        deployment_bucket = os.environ.get("IAC_ASSETS_BUCKET")
-        deployment_zip: str | None = os.environ.get("S3_CONNECTOR_LAMBDA")
+        elif bucket_type == "existing":
+            if not s3_bucket:
+                 # This should be caught by pydantic, but double-check
+                 raise ValueError("Bucket name is required for existing buckets.")
+            logger.info(f"Request for existing bucket: {s3_bucket}")
+            # Get region for existing bucket
+            bucket_region = get_bucket_region(s3_bucket)
+            logger.info(f"Determined region for existing bucket '{s3_bucket}': {bucket_region}")
+            # Check if connector already exists for this bucket
+            existing = check_existing_connector(s3_bucket)
+            if existing:
+                logger.warning(
+                    f"Connector already exists for bucket {s3_bucket} with ID: {existing['id']}"
+                )
+                return {
+                    "statusCode": 409,
+                    "body": json.dumps(
+                        {
+                            "message": "Connector already exists for this S3 bucket",
+                            "connector_id": existing["id"],
+                        }
+                    ),
+                }
+        else:
+             raise ValueError(f"Invalid bucketType specified: {bucket_type}")
 
-        # Generate unique ID and timestamps
-        connector_id = str(uuid.uuid4())
-        current_time = datetime.utcnow().isoformat(timespec="seconds")
+        # Re-initialize clients with the determined/specified region for regional operations
+        logger.info(f"Initializing regional clients for region: {bucket_region}")
+        s3_regional_client = boto3.client("s3", region_name=bucket_region)
+        sqs_regional_client = boto3.client("sqs", region_name=bucket_region)
+        lambda_regional_client = boto3.client("lambda", region_name=bucket_region)
+        pipes_regional_client = boto3.client("pipes", region_name=bucket_region)
 
-        def generate_suffix():
-            """Generate a 6-digit alphanumeric suffix"""
-            return "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        # ---- IAM Role Creation ----
+        # Define role name based on prefix, bucket, and connector ID
+        base_role_name = f"{RESOURCE_PREFIX}-{s3_bucket}-{connector_id[:8]}"
+        iam_role_name = (base_role_name[:63] + "R") if len(base_role_name) > 63 else base_role_name
 
-        # Get request variables from request body
-        connector_name = createconnector.name
-        connector_description = createconnector.description
-        integration_method = createconnector.configuration.s3IntegrationMethod
-        object_prefix = createconnector.configuration.objectPrefix
+        logger.info(f"Creating IAM role: {iam_role_name}")
+        kms_key_arn = get_bucket_kms_key(s3_regional_client, s3_bucket)
+        iam_role_arn = create_lambda_iam_role(iam_client, iam_role_name, kms_key_arn)
+        created_resources.append(("iam_role", iam_role_name))
+        logger.info(f"Successfully created IAM role: {iam_role_arn}")
 
-        suffix = generate_suffix()
+        # Wait for IAM role propagation
+        if not wait_for_iam_role_propagation(iam_client, iam_role_name):
+            raise Exception(f"IAM role {iam_role_name} did not propagate in time.")
 
-        # Create resource specific name prefix
-        resource_name_prefix = (
-            f"{os.environ.get('RESOURCE_PREFIX')}_connector_{s3_bucket}"
-        )
-        # Ensure the total length does not exceed 64 characters
-        max_prefix_length = 64 - len(suffix) - 1
-        if len(resource_name_prefix) > max_prefix_length:
-            resource_name_prefix = resource_name_prefix[:max_prefix_length]
-
-        target_function_name = f"{resource_name_prefix}_{suffix}"
-
-        # Validate S3 bucket exists and get its region
-        try:
-            bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
-            bucket_region = bucket_location["LocationConstraint"]
-            bucket_region = bucket_region or "us-east-1"
-        except s3_client.exceptions.ClientError:
-            return {
-                "status": "400",
-                "message": (
-                    f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
-                ),
-                "data": {},
-            }
-
-        # Initialize S3, SQS, and Lambda clients in the bucket's region
-        s3 = boto3.client("s3", region_name=bucket_region)
-        sqs = boto3.client("sqs", region_name=bucket_region)
-        lambda_client = boto3.client(
-            "lambda",
-            config=Config(
-                region_name=bucket_region, s3={"addressing_style": "virtual"}
-            ),
-        )
-
-        # Set up notifications based on integration method
-        queue_url = None
-        queue_arn = None
+        # ---- Event Notification Setup ----
         if integration_method == "eventbridge":
+            logger.info(f"Setting up EventBridge notifications for bucket: {s3_bucket}")
             queue_url, queue_arn = setup_eventbridge_notifications(
                 s3_bucket, bucket_region, created_resources, object_prefix
             )
-        elif integration_method in ["s3Notifications"]:
-            # Set up S3 event notifications
-            # Create SQS queue in the same region as the bucket
-            queue_name = f"-connector-{s3_bucket}-notifications"
-            response = sqs.create_queue(
-                QueueName=queue_name, Attributes={"VisibilityTimeout": "360"}
-            )
-            queue_url = response["QueueUrl"]
-            created_resources.append(("sqs_queue", queue_url))
+            logger.info(f"EventBridge setup complete. Queue URL: {queue_url}")
 
-            # Get queue ARN
-            response = sqs.get_queue_attributes(
+            # Attach policy allowing SQS read/delete to the Lambda role
+            sqs_policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "sqs:ReceiveMessage",
+                            "sqs:DeleteMessage",
+                            "sqs:GetQueueAttributes",
+                        ],
+                        "Resource": queue_arn,
+                    }
+                ],
+            }
+            policy_name = f"{iam_role_name}-SQSPolicy"
+            iam_client.put_role_policy(
+                RoleName=iam_role_name,
+                PolicyName=policy_name,
+                PolicyDocument=json.dumps(sqs_policy_document),
+            )
+            created_resources.append(("iam_role_policy", (iam_role_name, policy_name)))
+            logger.info(f"Attached SQS policy '{policy_name}' to role '{iam_role_name}'")
+
+        elif integration_method == "s3Notifications":
+            logger.info(f"Setting up S3 Event Notifications for bucket: {s3_bucket}")
+            # Check for existing notifications that might conflict
+            if check_existing_s3_notifications(s3_regional_client, s3_bucket):
+                 logger.warning(f"Bucket {s3_bucket} already has S3 event notifications configured. Overwriting/adding is not directly supported via this method. Manual check advised.")
+                 # Decide how to handle this - error out, or attempt to merge (complex)
+                 # For now, let's raise an error to prevent unexpected behavior
+                 raise ValueError("Bucket already has S3 event notifications. Cannot automatically configure.")
+
+            # Create SQS queue for S3 notifications
+            sanitized_bucket = ''.join(c for c in s3_bucket if c.isalnum() or c in '-_')
+            max_queue_name_length = 75 # 80 - 5 (.fifo)
+            base_queue_name = f"medialake-connector-{sanitized_bucket}-s3notif"
+            if len(base_queue_name) > max_queue_name_length:
+                base_queue_name = base_queue_name[:max_queue_name_length]
+            queue_name = f"{base_queue_name}.fifo"
+
+            logger.info(f"Creating FIFO queue for S3 Notifications: {queue_name}")
+            queue_response = sqs_regional_client.create_queue(
+                QueueName=queue_name,
+                Attributes={
+                    "VisibilityTimeout": "360",
+                    "FifoQueue": "true",
+                    "ContentBasedDeduplication": "true",
+                    "DeduplicationScope": "queue",
+                    "FifoThroughputLimit": "perQueue",
+                },
+            )
+            queue_url = queue_response["QueueUrl"]
+            queue_attributes = sqs_regional_client.get_queue_attributes(
                 QueueUrl=queue_url, AttributeNames=["QueueArn"]
             )
-            queue_arn = response["Attributes"]["QueueArn"]
+            queue_arn = queue_attributes["Attributes"]["QueueArn"]
+            created_resources.append(("sqs_queue", queue_url))
+            logger.info(f"Created SQS Queue for S3 Notifications: {queue_url}")
 
-            # Set up SQS queue policy
-            queue_policy = {
+            # Add policy to SQS queue to allow S3 to send messages
+            account_id = boto3.client("sts").get_caller_identity()["Account"]
+            sqs_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
                     {
@@ -704,386 +931,389 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "Action": "sqs:SendMessage",
                         "Resource": queue_arn,
                         "Condition": {
-                            "ArnLike": {"aws:SourceArn": f"arn:aws:s3:::{s3_bucket}"}
+                            "ArnLike": {"aws:SourceArn": f"arn:aws:s3:::{s3_bucket}"},
+                            "StringEquals": {"aws:SourceAccount": account_id},
                         },
                     }
                 ],
             }
-            sqs.set_queue_attributes(
-                QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+            sqs_regional_client.set_queue_attributes(
+                QueueUrl=queue_url, Attributes={"Policy": json.dumps(sqs_policy)}
             )
             created_resources.append(("queue_policy", queue_url))
+            logger.info(f"Set SQS policy for queue: {queue_url}")
 
-            errors = update_bucket_notifications(
-                s3=s3_client,
-                s3_bucket=s3_bucket,
-                connector_id=connector_id,
-                queue_arn=queue_arn,
-                object_prefix=object_prefix
+            # Update bucket notifications to send to the SQS queue
+            update_bucket_notifications(s3_regional_client, s3_bucket, connector_id, queue_arn, object_prefix)
+            created_resources.append(("s3_notification_config", s3_bucket))
+            logger.info(f"Configured S3 bucket notifications for: {s3_bucket}")
+
+            # Attach policy allowing SQS read/delete to the Lambda role (same as EventBridge)
+            sqs_policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "sqs:ReceiveMessage",
+                            "sqs:DeleteMessage",
+                            "sqs:GetQueueAttributes",
+                        ],
+                        "Resource": queue_arn,
+                    }
+                ],
+            }
+            policy_name = f"{iam_role_name}-SQSPolicy"
+            iam_client.put_role_policy(
+                RoleName=iam_role_name,
+                PolicyName=policy_name,
+                PolicyDocument=json.dumps(sqs_policy_document),
             )
-            if not errors:
-                created_resources.append(("bucket_notification", s3_bucket))
-            else:
-                logger.info(f"Encountered errors: {errors}")
-                raise Exception(
-                    f"Error: Failed to set up notifications for bucket {s3_bucket}: {errors}"
-                )
+            created_resources.append(("iam_role_policy", (iam_role_name, policy_name)))
+            logger.info(f"Attached SQS policy '{policy_name}' to role '{iam_role_name}'")
 
-            created_resources.append(("bucket_notification", s3_bucket))
         else:
-            raise ValueError(f"Invalid integration method: {integration_method}")
+            raise ValueError(f"Unsupported integration method: {integration_method}")
 
-        if queue_url is None or queue_arn is None:
-            raise ValueError(
-                f"Failed to set up notifications: queue_url or queue_arn is None for integration method {integration_method}"
+
+        # ---- Lambda Function Deployment ----
+        # Generate a unique suffix for the Lambda function name
+        def generate_suffix(length=8):
+            return "".join(
+                random.choices(string.ascii_lowercase + string.digits, k=length)
             )
 
-        # Deploy lambda if environment variables are set
-        try:
-            # Get the Lambda environment variable
-            ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
-            medialake_asset_table = os.environ.get("MEDIALAKE_ASSET_TABLE")
-            asset_table_file_hash_index_arn = os.environ.get(
-                "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX"
-            )
-            asset_table_asset_id_index_arn = os.environ.get(
-                "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX"
-            )
-            asset_table_s3_path_index_arn = os.environ.get(
-                "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX"
-            )
-            layer_arn = os.environ.get("INGEST_MEDIA_PROCESSOR_LAYER")
+        # Define Lambda function name based on prefix, bucket, and suffix
+        base_lambda_name = f"{RESOURCE_PREFIX}-s3-connector-{s3_bucket}"
+        lambda_suffix = generate_suffix()
+        lambda_function_name = f"{base_lambda_name[:55]}-{lambda_suffix}" # Keep under 64 chars
 
-            # Create Lambda execution, IAM roles for Lambda
-            role_name = f"{resource_name_prefix}-role"
-            bucket_kms_key = get_bucket_kms_key(s3_client, s3_bucket)
-            lambda_role_arn = create_lambda_iam_role(
-                iam_client, role_name, bucket_kms_key
-            )
-            created_resources.append(("iam_role", role_name))
+        logger.info(f"Creating Lambda function: {lambda_function_name}")
+        lambda_env_vars = {
+            "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
+            "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX,
+            "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX,
+            "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX,
+            "POWERTOOLS_SERVICE_NAME": "s3-connector",
+            "LOG_LEVEL": "INFO",
+            "INGEST_EVENT_BUS": INGEST_EVENT_BUS,
+            "CONNECTOR_ID": connector_id, # Pass connector ID
+            "S3_BUCKET_NAME": s3_bucket, # Pass bucket name
+        }
 
-            # Wait for role to be available
+        lambda_response = lambda_regional_client.create_function(
+            FunctionName=lambda_function_name,
+            Runtime="python3.11",
+            Role=iam_role_arn,
+            Handler="index.lambda_handler",
+            Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": S3_CONNECTOR_LAMBDA},
+            Description=f"MediaLake S3 connector function for {s3_bucket}",
+            Timeout=300,
+            MemorySize=256,
+            Publish=True,
+            Environment={"Variables": lambda_env_vars},
+            Layers=[INGEST_MEDIA_PROCESSOR_LAYER],
+            Architectures=["arm64"],
+            Tags={RESOURCE_APPLICATION_TAG: "medialake"},
+            EphemeralStorage={'Size': 1024} # Add ephemeral storage
+        )
+        lambda_arn = lambda_response["FunctionArn"]
+        created_resources.append(("lambda_function", lambda_function_name))
+        logger.info(f"Successfully created Lambda function: {lambda_arn}")
 
-            # Attach policies to the role
-            iam_client.attach_role_policy(
-                RoleName=role_name,
-                PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            )
-            created_resources.append(
-                ("role_policy", (role_name, "AWSLambdaBasicExecutionRole"))
-            )
-
-            # Create custom policy for SQS permissions
-            sqs_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "sqs:ReceiveMessage",
-                            "sqs:DeleteMessage",
-                            "sqs:GetQueueAttributes",
-                            "sqs:ChangeMessageVisibility",
-                        ],
-                        "Resource": queue_arn,
-                    }
-                ],
-            }
-
-            # Define the policy ARN
-            policy_arn = (
-                "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-            )
-
-            # Attach policies to the role
-            iam_client.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
-
-            # Attach policies to the role
-            iam_client.attach_role_policy(
-                RoleName=role_name,
-                PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            )
-
-            # Create custom policy for SQS permissions
-            sqs_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "sqs:ReceiveMessage",
-                            "sqs:DeleteMessage",
-                            "sqs:GetQueueAttributes",
-                            "sqs:ChangeMessageVisibility",
-                        ],
-                        "Resource": queue_arn,
-                    }
-                ],
-            }
-
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy",
-                PolicyDocument=json.dumps(sqs_policy),
-            )
-            created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
-            )
-            # Create custom policy for S3 permissions
-            s3_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:PutObjectTagging",
-                            "s3:GetObjectTagging",
-                            "s3:GetBucketLocation",
-                            "s3:GetObject",
-                            "s3:ListBucket",
-                        ],
-                        "Resource": [
-                            f"arn:aws:s3:::{s3_bucket}",
-                            f"arn:aws:s3:::{s3_bucket}/*",
-                        ],
-                    }
-                ],
-            }
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-s3-policy",
-                PolicyDocument=json.dumps(s3_policy),
-            )
-            created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-s3-policy"))
-            )
-
-            # Create custom policy for EventBridge permissions
-            eventbridge_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": ["events:PutEvents"],
-                        "Resource": f"arn:aws:events:{bucket_region}:{boto3.client('sts').get_caller_identity()['Account']}:event-bus/{ingest_event_bus}",
-                    }
-                ],
-            }
-
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-eventbridge-policy",
-                PolicyDocument=json.dumps(eventbridge_policy),
-            )
-            created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-eventbridge-policy"))
-            )
-
-            # Create custom policy for DynamoDB permissions
-            dynamodb_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "dynamodb:GetItem",
-                            "dynamodb:PutItem",
-                            "dynamodb:UpdateItem",
-                            "dynamodb:DeleteItem",
-                            "dynamodb:Query",
-                            "dynamodb:Scan",
-                            "dynamodb:BatchWriteItem",
-                            "dynamodb:BatchGetItem",
-                            "dynamodb:DescribeTable"
-                        ],
-                        "Resource": [
-                            medialake_asset_table,
-                            asset_table_file_hash_index_arn,
-                            asset_table_asset_id_index_arn,
-                            asset_table_s3_path_index_arn,
-                        ],
-                    }
-                ],
-            }
-
-            iam_client.put_role_policy(
-                RoleName=role_name,
-                PolicyName=f"{role_name}-dynamodb-policy",
-                PolicyDocument=json.dumps(dynamodb_policy),
-            )
-            created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-dynamodb-policy"))
-            )
-
-            ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
-
-            # Get current AWS account ID
-            account_id = boto3.client("sts").get_caller_identity()["Account"]
-            # Construct AWS SDK Python layer ARN using current account
-            aws_sdk_layer_arn = f"arn:aws:lambda:{bucket_region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:2"
-            # Get any existing layers
-            layers = [layer_arn] if layer_arn else []
-            # Add AWS SDK layer
-            layers.append(aws_sdk_layer_arn)
-            # Wait for policy attachment to propagate
-            if not wait_for_iam_role_propagation(iam_client, role_name):
-                raise Exception(f"IAM role {role_name} did not propagate in time")
-
-            if not wait_for_policy_attachment(iam_client, role_name, policy_arn):
-                raise Exception(
-                    f"Policy {policy_arn} did not attach to role {role_name} in time"
-                )
-
-            # Deploy the lambda with proper S3 configuration
-            create_function_response = lambda_client.create_function(
-                FunctionName=target_function_name,
-                Runtime="python3.12",
-                Role=lambda_role_arn,
-                Handler="index.handler",
-                Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-                Publish=True,
-                Tags={"medialake": medialake_tag},
-                Environment={
-                    "Variables": {
-                        "INGEST_EVENT_BUS": ingest_event_bus,
-                        "MEDIALAKE_ASSET_TABLE": medialake_asset_table,
-                        "POWERTOOLS_SERVICE_NAME": "asset-processor",
-                        "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
-                        "ASSETS_TABLE": medialake_asset_table,
-                        "EVENT_BUS_NAME": ingest_event_bus,
-                    }
-                },
-                Layers=layers,  # Updated to include both custom and AWS SDK layers
-                Timeout=900,  # Maximum timeout: 15 minutes
-                MemorySize=10240,  # Maximum memory: 10GB
-                EphemeralStorage={"Size": 10240},  # Maximum ephemeral storage: 10GB
-            )
-            logger.info(f"Deployed new lambda function: {target_function_name}")
-            lambda_arn = create_function_response["FunctionArn"]
-            created_resources.append(("lambda_function", target_function_name))
-
-            # Instead of creating event source mapping, create EventBridge Pipe
-            pipe_arn, pipe_role_arn = create_eventbridge_pipe(
-                resource_name_prefix,
+        # ---- Event Source Mapping / Pipe Creation ----
+        if integration_method == "eventbridge":
+             # Using Pipes for EventBridge -> Lambda
+            logger.info(f"Creating EventBridge Pipe for {queue_arn} -> {lambda_arn}")
+            pipe_name_prefix = f"{RESOURCE_PREFIX}-s3-connector-{s3_bucket}"
+            # Ensure pipe name doesn't exceed 64 characters (AWS limitation)
+            if len(pipe_name_prefix) > 60:  # Leave room for '-pipe' suffix
+                # Truncate the prefix but keep the beginning and some of bucket name for readability
+                prefix_length = min(20, len(RESOURCE_PREFIX))
+                suffix_length = 60 - prefix_length - 12  # 12 for "-s3-connector-" 
+                pipe_name_prefix = f"{RESOURCE_PREFIX[:prefix_length]}-s3-connector-{s3_bucket[:suffix_length]}"
+                logger.info(f"Truncated pipe name prefix to: {pipe_name_prefix}")
+            
+            pipe_name, pipe_arn = create_eventbridge_pipe(
+                pipe_name_prefix,
                 queue_arn,
                 lambda_arn,
                 bucket_region,
                 created_resources,
             )
-            logger.info(f"Created EventBridge Pipe: {pipe_arn} with role: {pipe_role_arn}")
-        except Exception as e:
-            logger.error(f"Failed to deploy/configure lambda: {str(e)}")
-            raise
+            logger.info(f"Created EventBridge Pipe: {pipe_arn}")
+            event_source_arn = pipe_arn # Store pipe ARN as event source
+            event_source_type = "Pipe"
 
-        # Save the connector details in DynamoDB
-        table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
-        if not table_name:
-            return {
-                "status": "500",
-                "message": (
-                    "MEDIALAKE_CONNECTOR_TABLE environment variable is not set"
-                ),
-                "data": {},
-            }
+        elif integration_method == "s3Notifications":
+             # Using Lambda Event Source Mapping for SQS -> Lambda
+            logger.info(f"Creating Lambda Event Source Mapping for {queue_arn} -> {lambda_arn}")
+            esm_response = lambda_regional_client.create_event_source_mapping(
+                EventSourceArn=queue_arn,
+                FunctionName=lambda_arn,
+                Enabled=True,
+                BatchSize=10, # Process up to 10 messages at once
+                MaximumBatchingWindowInSeconds=1, # Wait up to 1 second
+                FunctionResponseTypes=['ReportBatchItemFailures'] # Enable partial batch failure reporting
+            )
+            esm_uuid = esm_response["UUID"]
+            created_resources.append(("event_source_mapping", esm_uuid))
+            logger.info(f"Created Event Source Mapping: {esm_uuid}")
+            event_source_arn = queue_arn # Store queue ARN as event source
+            event_source_type = "SQS"
 
-        table = dynamodb.Table(table_name)
-        connector_item = {
+        # ---- Store Connector in DynamoDB ----
+        connector_table = dynamodb.Table(MEDIALAKE_CONNECTOR_TABLE)
+        # Ensure all required fields are populated for the DynamoDB item
+        item = {
             "id": connector_id,
             "name": connector_name,
-            "status": "active",
             "description": connector_description,
-            "type": createconnector.type,
-            "createdAt": current_time,
-            "updatedAt": current_time,
+            "type": "s3",
+            # Top-level fields required by frontend/example
             "storageIdentifier": s3_bucket,
-            "integrationMethod": integration_method,
-            "sqsArn": queue_arn,
             "region": bucket_region,
-            "queueUrl": queue_url,
+            "status": "active",
+            "integrationMethod": integration_method,
+            "sqsArn": queue_arn, 
             "lambdaArn": lambda_arn,
-            "iamRoleArn": lambda_role_arn,
-            "objectPrefix": object_prefix,
-            "pipeArn": pipe_arn,
-            "pipeRoleArn": pipe_role_arn
+            "iamRoleArn": iam_role_arn,
+            "queueUrl": queue_url, # Add queueUrl if available
+            "objectPrefix": object_prefix, 
+            # Existing nested configuration (keep for potential internal use)
+            "configuration": {
+                "bucket": s3_bucket,
+                "region": bucket_region,
+                "s3IntegrationMethod": integration_method,
+                "objectPrefix": object_prefix,
+                "queueArn": queue_arn,
+                "lambdaArn": lambda_arn,
+                "iamRoleArn": iam_role_arn,
+                "eventSourceArn": event_source_arn,
+                "eventSourceType": event_source_type,
+                "queueUrl": queue_url, # Also store queueUrl here for consistency
+            },
+            # Add settings object
+            "settings": {
+                "bucket": s3_bucket,
+                "region": bucket_region,
+                "path": object_prefix, # Use objectPrefix for path, assuming similarity
+            },
+             # Add usage object (initialize as 0)
+            "usage": {
+                "total": 0
+            },
+            # Add flag indicating how bucket was created
+            "creationType": bucket_type, # 'new' or 'existing'
+            "createdAt": int(datetime.utcnow().timestamp()),
+            "updatedAt": int(datetime.utcnow().timestamp()),
+        }
+        logger.info(f"Storing connector details in DynamoDB: {item}")
+        connector_table.put_item(Item=item)
+
+        logger.info(f"Successfully created connector {connector_id} for bucket {s3_bucket}")
+        return {
+            "statusCode": 201,
+            "body": json.dumps(
+                {
+                    "message": "Connector created successfully",
+                    "connector_id": connector_id,
+                    "details": item, # Return full details
+                }
+            ),
         }
 
-        table.put_item(Item=connector_item)
-        created_resources.append(("dynamodb_item", (table_name, connector_id)))
+    except (ClientError, ValueError, Exception) as e:
+        logger.error(f"Error creating connector: {traceback.format_exc()}")
+        # ---- Rollback Logic ----
+        logger.warning(f"Initiating rollback due to error: {e}")
+        
+        # Initialize cleanup clients if region was determined
+        s3_cleanup_client = None
+        sqs_cleanup_client = None
+        lambda_cleanup_client = None
+        eventbridge_cleanup = None
+        pipes_cleanup_client = None
+        if 'bucket_region' in locals() and bucket_region: # Check if bucket_region was set
+            logger.info(f"Initializing cleanup clients for region: {bucket_region}")
+            s3_cleanup_client = boto3.client("s3", region_name=bucket_region)
+            sqs_cleanup_client = boto3.client("sqs", region_name=bucket_region)
+            lambda_cleanup_client = boto3.client("lambda", region_name=bucket_region)
+            eventbridge_cleanup = boto3.client("events", region_name=bucket_region)
+            pipes_cleanup_client = boto3.client("pipes", region_name=bucket_region)
+        else:
+            # Use default region clients if bucket_region wasn't set (e.g., error occurred very early)
+             logger.warning("Bucket region not determined before error, using default region clients for cleanup.")
+             s3_cleanup_client = s3_client_default_region
+             # Note: Other regional clients might fail if the error happened very early
+             # and the required region is not the default.
+             # Consider adding region info to created_resources tuples if possible.
+             sqs_cleanup_client = boto3.client("sqs")
+             lambda_cleanup_client = boto3.client("lambda")
+             eventbridge_cleanup = boto3.client("events")
+             pipes_cleanup_client = boto3.client("pipes")
 
-        logger.info(f"Created connector '{connector_name}' for bucket '{s3_bucket}'")
-
-        return {"status": "200", "message": "ok", "data": connector_item}
-
-    except Exception as e:
-        eventbridge = boto3.client("events")
-        pipes_client = boto3.client("pipes")
-        logger.exception(f"Unexpected error: {str(e)}")
-        error_traceback = traceback.format_exc()
-
-        # Clean up created resources in reverse order
-        for resource_type, resource_id in reversed(created_resources):
+        # Reverse the order of created_resources for proper cleanup
+        for resource_type, resource_identifier in reversed(created_resources):
             try:
-                if resource_type == "eventbridge_pipe":
-                    pipes_client.delete_pipe(Name=resource_id)
-                    logger.info(f"Deleted EventBridge Pipe: {resource_id}")
-                elif resource_type == "eventbridge_target":
-                    rule_name, target_id = resource_id
-                    eventbridge.remove_targets(Rule=rule_name, Ids=[target_id])
-                elif resource_type == "eventbridge_rule":
-                    eventbridge.delete_rule(Name=resource_id)
-                elif resource_type == "eventbridge_config":
-                    # Remove EventBridge configuration from bucket
-                    s3.put_bucket_notification_configuration(
-                        Bucket=resource_id, NotificationConfiguration={}
-                    )
-                elif resource_type == "dynamodb_item":
-                    table_name, item_id = resource_id
-                    table = dynamodb.Table(table_name)
-                    table.delete_item(Key={"id": item_id})
-                elif resource_type == "bucket_notification":
-                    s3.put_bucket_notification_configuration(
-                        Bucket=resource_id, NotificationConfiguration={}
-                    )
-                elif resource_type == "queue_policy":
-                    sqs.set_queue_attributes(
-                        QueueUrl=resource_id, Attributes={"Policy": ""}
-                    )
-                elif resource_type == "event_source_mapping":
-                    lambda_client.delete_event_source_mapping(UUID=resource_id)
-                elif resource_type == "lambda_function":
-                    lambda_client.delete_function(FunctionName=resource_id)
-                elif resource_type == "inline_policy":
-                    role_name, policy_name = resource_id
-                    iam_client.delete_role_policy(
-                        RoleName=role_name, PolicyName=policy_name
-                    )
-                elif resource_type == "role_policy":
-                    role_name, policy_name = resource_id
-                    iam_client.detach_role_policy(
-                        RoleName=role_name,
-                        PolicyArn=f"arn:aws:iam::aws:policy/service-role/{policy_name}",
-                    )
-                elif resource_type == "iam_role":
-                    iam_client.delete_role(RoleName=resource_id)
-                elif resource_type == "sqs_queue":
-                    sqs.delete_queue(QueueUrl=resource_id)
-                logger.info(f"Cleaned up {resource_type}: {resource_id}")
-            except Exception as cleanup_error:
-                logger.error(
-                    f"Error cleaning up {resource_type} {resource_id}: {str(cleanup_error)}"
-                )
+                logger.info(f"Attempting to delete {resource_type}: {resource_identifier}")
+                if resource_type == "s3_bucket":
+                    # Only delete if bucketType was 'new'
+                    if bucket_type == 'new':
+                        # Check if bucket is empty before deleting (best practice)
+                        # Use the s3_cleanup_client initialized above
+                        if not s3_cleanup_client:
+                             logger.error("S3 cleanup client not initialized, cannot delete bucket.")
+                             continue
+                        # If creating a new bucket, region is known
+                        s3_new_bucket_cleanup_client = boto3.client("s3", region_name=region) 
+                        try:
+                             # List objects - if any exist, deletion will fail unless forced/emptied
+                            response = s3_new_bucket_cleanup_client.list_objects_v2(Bucket=resource_identifier, MaxKeys=1)
+                            if 'Contents' in response and len(response['Contents']) > 0:
+                                logger.warning(f"Bucket {resource_identifier} is not empty. Skipping deletion.")
+                            else:
+                                s3_new_bucket_cleanup_client.delete_bucket(Bucket=resource_identifier)
+                                logger.info(f"Deleted S3 bucket: {resource_identifier}")
+                        except ClientError as bucket_del_err:
+                             logger.error(f"Failed to delete bucket {resource_identifier} during rollback: {bucket_del_err}")
+                    else:
+                        logger.info(f"Skipping deletion of existing S3 bucket: {resource_identifier}")
 
+                elif resource_type == "iam_role":
+                    role_name = resource_identifier
+                    # Detach policies first
+                    try:
+                        attached_policies = iam_client.list_attached_role_policies(RoleName=role_name).get('AttachedPolicies', [])
+                        for policy in attached_policies:
+                            iam_client.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+                        inline_policies = iam_client.list_role_policies(RoleName=role_name).get('PolicyNames', [])
+                        for policy_name in inline_policies:
+                            iam_client.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+                    except ClientError as policy_err:
+                         logger.error(f"Failed to detach/delete policies for role {role_name}: {policy_err}")
+                    # Delete role
+                    iam_client.delete_role(RoleName=role_name)
+                    logger.info(f"Deleted IAM role: {role_name}")
+
+                elif resource_type == "iam_role_policy":
+                     # Policy deletion handled by role deletion
+                     pass
+
+                elif resource_type == "eventbridge_config":
+                    bucket_name = resource_identifier
+                    # Use the s3_cleanup_client initialized above
+                    if not s3_cleanup_client:
+                        logger.error("S3 cleanup client not initialized, cannot remove EventBridge config.")
+                        continue
+                    try:
+                        config = s3_cleanup_client.get_bucket_notification_configuration(Bucket=bucket_name)
+                        config.pop('ResponseMetadata', None)
+                        config.pop('EventBridgeConfiguration', None) # Remove EB config
+                        if not any(config.values()): # If no other configs exist, delete
+                            s3_cleanup_client.delete_bucket_notification(Bucket=bucket_name)
+                        else: # Otherwise, put back config without EB
+                            s3_cleanup_client.put_bucket_notification_configuration(Bucket=bucket_name, NotificationConfiguration=config)
+                        logger.info(f"Removed EventBridge config from bucket: {bucket_name}")
+                    except ClientError as eb_config_err:
+                         logger.error(f"Failed to remove EventBridge config from {bucket_name}: {eb_config_err}")
+
+                elif resource_type == "sqs_queue":
+                    queue_url = resource_identifier
+                    # Use the sqs_cleanup_client initialized above
+                    if not sqs_cleanup_client:
+                        logger.error("SQS cleanup client not initialized, cannot delete queue.")
+                        continue
+                    sqs_cleanup_client.delete_queue(QueueUrl=queue_url)
+                    logger.info(f"Deleted SQS queue: {queue_url}")
+
+                elif resource_type == "eventbridge_rule":
+                    rule_name = resource_identifier
+                    # Use the eventbridge_cleanup client initialized above
+                    if not eventbridge_cleanup:
+                         logger.error("EventBridge cleanup client not initialized, cannot delete rule.")
+                         continue
+                    # Remove targets first
+                    targets = eventbridge_cleanup.list_targets_by_rule(Rule=rule_name).get('Targets', [])
+                    if targets:
+                        eventbridge_cleanup.remove_targets(Rule=rule_name, Ids=[t['Id'] for t in targets])
+                    eventbridge_cleanup.delete_rule(Name=rule_name)
+                    logger.info(f"Deleted EventBridge rule: {rule_name}")
+
+                # queue_policy is attached to SQS, deleted with queue
+                # eventbridge_target deleted with rule
+
+                elif resource_type == "s3_notification_config":
+                    bucket_name = resource_identifier
+                    # Use the s3_cleanup_client initialized above
+                    if not s3_cleanup_client:
+                        logger.error("S3 cleanup client not initialized, cannot handle S3 notification config.")
+                        continue
+                    # Attempt to remove the specific configuration added by this connector
+                    # This is complex if other configs exist. Simple deletion might be too aggressive.
+                    logger.warning(f"Rollback: Manual removal of S3 notification config for connector on bucket {bucket_name} might be needed.")
+                    # try:
+                    #     s3_cleanup_client.delete_bucket_notification(Bucket=bucket_name) # This deletes ALL notifications
+                    #     logger.info(f"Deleted S3 notification config for bucket: {bucket_name}")
+                    # except ClientError as s3_notif_err:
+                    #     logger.error(f"Failed to delete S3 notification config for {bucket_name}: {s3_notif_err}")
+
+                elif resource_type == "lambda_function":
+                    function_name = resource_identifier
+                    # Use the lambda_cleanup_client initialized above
+                    if not lambda_cleanup_client:
+                         logger.error("Lambda cleanup client not initialized, cannot delete function.")
+                         continue
+                    lambda_cleanup_client.delete_function(FunctionName=function_name)
+                    logger.info(f"Deleted Lambda function: {function_name}")
+
+                elif resource_type == "event_source_mapping":
+                    esm_uuid = resource_identifier
+                    # Use the lambda_cleanup_client initialized above
+                    if not lambda_cleanup_client:
+                         logger.error("Lambda cleanup client not initialized, cannot delete ESM.")
+                         continue
+                    lambda_cleanup_client.delete_event_source_mapping(UUID=esm_uuid)
+                    logger.info(f"Deleted Event Source Mapping: {esm_uuid}")
+
+                elif resource_type == "pipe":
+                    pipe_name = resource_identifier
+                    # Use the pipes_cleanup_client initialized above
+                    if not pipes_cleanup_client:
+                         logger.error("Pipes cleanup client not initialized, cannot delete pipe.")
+                         continue
+                    # Stop pipe first if running
+                    try:
+                        pipe_info = pipes_cleanup_client.describe_pipe(Name=pipe_name)
+                        if pipe_info.get('CurrentState') == 'RUNNING':
+                            pipes_cleanup_client.stop_pipe(Name=pipe_name)
+                            time.sleep(5) # Allow time to stop
+                    except ClientError as desc_err:
+                        logger.warning(f"Could not describe pipe {pipe_name} before deletion: {desc_err}")
+                    pipes_cleanup_client.delete_pipe(Name=pipe_name)
+                    logger.info(f"Deleted Pipe: {pipe_name}")
+
+            except ClientError as rollback_err:
+                logger.error(
+                    f"Failed to delete {resource_type} {resource_identifier} during rollback: {rollback_err}"
+                )
+        # End Rollback Loop
+
+        # Return error response
         return {
-            "status": "400",
-            "message": str(e),
-            "data": {
-                "traceback": error_traceback,
-                "created_resources": created_resources,
-            },
+            "statusCode": 500,
+            "body": json.dumps(
+                {
+                    "message": f"Failed to create connector: {str(e)}",
+                    "error": traceback.format_exc()
+                 }
+            ),
         }
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
+    """Lambda handler function"""
+    # logger.info(f"Received event: {json.dumps(event)}")
     return app.resolve(event, context)

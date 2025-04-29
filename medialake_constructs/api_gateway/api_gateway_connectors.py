@@ -270,10 +270,12 @@ class ConnectorsConstruct(Construct):
                 actions=[
                     "lambda:DeleteFunction",
                     "lambda:DeleteEventSourceMapping",
+                    "lambda:ListEventSourceMappings",
                     "sqs:DeleteQueue",
                     "s3:DeleteBucketNotification",
                     "s3:ListBucket",
                     "s3:GetBucketLocation",
+                    "s3:DeleteBucket",
                 ],
                 resources=[
                     f"arn:aws:lambda:*:{account_id}:function:*",
@@ -342,13 +344,9 @@ class ConnectorsConstruct(Construct):
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
-                    "pipes:CreatePipe",
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
                     "pipes:ListPipes",
-                    "pipes:StartPipe",
-                    "pipes:StopPipe",
-                    "pipes:UpdatePipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
@@ -464,6 +462,12 @@ class ConnectorsConstruct(Construct):
                     "s3:GetBucketEncryption",
                     "s3:GetBucketPolicy",
                     "s3:GetEncryptionConfiguration",
+                    "s3:CreateBucket",
+                    "s3:PutBucketPublicAccessBlock",
+                    "s3:PutEncryptionConfiguration",
+                    "s3:GetBucketPublicAccessBlock",
+                    "s3:DeleteBucket",
+                    "s3:ListObjectsV2",
                 ],
                 resources=["arn:aws:s3:::*"],
             )
@@ -679,6 +683,48 @@ class ConnectorsConstruct(Construct):
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
         
         # Add CORS support to child API resources (not root)
+        add_cors_options_method(connectors_resource)
+        add_cors_options_method(connector_id_resource)
+        add_cors_options_method(connector_s3_resource)
+        add_cors_options_method(s3_sync_connector_resource)
+        add_cors_options_method(s3_explorer_resource)
+        add_cors_options_method(s3_explorer_connector_resource)
+
+        # ---- AWS Resources Endpoint ----
+        aws_resource = props.api_resource.root.add_resource("aws")
+        regions_resource = aws_resource.add_resource("regions")
+
+        get_regions_lambda = Lambda(
+            self,
+            "GetAWSRegionsLambda",
+            config=LambdaConfig(
+                name="aws_regions_get",
+                entry="lambdas/api/aws/get_regions",
+                environment_variables={
+                     "X_ORIGIN_VERIFY_SECRET_ARN": (
+                        props.x_origin_verify_secret.secret_arn
+                    ), # If needed for auth/verification
+                },
+            ),
+        )
+        
+        # Grant permission to describe regions
+        get_regions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ec2:DescribeRegions"],
+                resources=["*"], # ec2:DescribeRegions requires "*"
+            )
+        )
+        
+        regions_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(get_regions_lambda.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO, # Or appropriate auth
+            authorizer=props.cognito_authorizer,
+        )
+        
+        add_cors_options_method(aws_resource)
+        add_cors_options_method(regions_resource)
         add_cors_options_method(connector_id_resource)
         add_cors_options_method(connector_s3_resource)
         add_cors_options_method(s3_sync_connector_resource)

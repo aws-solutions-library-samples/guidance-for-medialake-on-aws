@@ -31,32 +31,40 @@ export const UserForm: React.FC<UserFormProps> = ({
 }) => {
     const { t } = useTranslation();
     
-    // Reset the form when the user prop changes to ensure values are updated
-    React.useEffect(() => {
-        if (user && open) {
-            console.log('Setting form with user data:', user);
-            // Access name field which is used in the table but not in the type definition
-            const userWithExtendedFields = user as any;
-            const givenName = user.given_name || userWithExtendedFields.name || '';
-            console.log('First name field value:', givenName);
-            
-            form.reset({
-                given_name: givenName,
+    const form = useFormWithValidation<UserFormData>({
+        defaultValues: user
+            ? {
+                given_name: user.given_name || user.name || '',
                 family_name: user.family_name || '',
                 email: user.email || '',
                 email_verified: user.email_verified === 'true',
                 roles: user.roles || [],
                 enabled: user.enabled ?? true,
-            });
-        }
-    }, [user, open]);
-    
-    const form = useFormWithValidation<UserFormData>({
-        defaultValues: createUserFormDefaults,
+            }
+            : createUserFormDefaults,
         validationSchema: userFormSchema,
         mode: 'onChange',
         translationPrefix: 'users.form',
     });
+
+    React.useEffect(() => {
+        if (open) {
+            const defaultVals = user
+                ? {
+                    given_name: user.given_name || user.name || '',
+                    family_name: user.family_name || '',
+                    email: user.email || '',
+                    email_verified: user.email_verified === 'true',
+                    roles: user.roles || [],
+                    enabled: user.enabled ?? true,
+                  }
+                : createUserFormDefaults;
+            form.reset(defaultVals);
+        } else {
+            // Optionally reset to blank defaults when closed, if desired
+            // form.reset(createUserFormDefaults);
+        }
+    }, [user, open, form.reset]);
 
     const handleSubmit = async (data: UserFormData) => {
         try {
