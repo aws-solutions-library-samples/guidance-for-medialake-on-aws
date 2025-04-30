@@ -249,6 +249,9 @@ if config.resource_application_tag:
 
 medialake_stack.add_dependency(cloudfront_waf_stack)
 
+
+
+
 cleanup_stack = CleanupStack(
     app,
     "MediaLakeCleanupStack",
@@ -258,6 +261,11 @@ cleanup_stack = CleanupStack(
         connector_table=medialake_stack.connector_table,
     ), env=env
 )
+
+cleanup_stack.add_dependency(medialake_stack)
+cleanup_stack.add_dependency(user_interface_stack)
+cleanup_stack.add_dependency(api_gateway_deployment_stack)
+cleanup_stack.add_dependency(api_gateway_core_stack)
 
 app.synth()
 

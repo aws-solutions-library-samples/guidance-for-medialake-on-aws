@@ -59,14 +59,55 @@ export const useApiMutationHandler = <
             return result; // Allow chaining or further actions
         } catch (error) {
             const typedError = error as TMutError; // Cast error
-            const errorMessage = typedError instanceof Error ? typedError.message : 'An unknown error occurred.';
             console.error(`${actionMessages.error}:`, error); // Log the original error
+
+            let displayMessage = 'An unknown error occurred.';
+
+            // Check if it looks like an Axios error with a response body
+            if (typeof typedError === 'object' && typedError !== null && 'response' in typedError) {
+                const response = (typedError as any).response;
+                if (response?.data) {
+                    try {
+                        let responseData = response.data;
+                        // Attempt to parse if data is a string (API Gateway sometimes does this)
+                        if (typeof responseData === 'string') {
+                            responseData = JSON.parse(responseData);
+                        }
+                        // Check if parsed data has a message property
+                        if (typeof responseData === 'object' && responseData !== null && 'message' in responseData) {
+                            displayMessage = responseData.message || displayMessage;
+                        } else if (typeof responseData === 'string') { 
+                            // If after parsing it's just a string, use that
+                            displayMessage = responseData;
+                        } else if (response?.statusText) {
+                             // Fallback to status text if no message in body
+                             displayMessage = response.statusText;
+                        }
+                    } catch (parseError) {
+                        console.error("Failed to parse error response data:", parseError);
+                        // Fallback if parsing fails or data is not as expected
+                        if (response?.statusText) {
+                            displayMessage = response.statusText;
+                        } else if (typedError instanceof Error) {
+                            displayMessage = typedError.message;
+                        }
+                    }
+                } else if (response?.statusText) {
+                    // Use status text if no data field
+                    displayMessage = response.statusText;
+                } else if (typedError instanceof Error) {
+                    displayMessage = typedError.message;
+                }
+            } else if (typedError instanceof Error) {
+                 // Standard Error object
+                displayMessage = typedError.message;
+            }
 
             setApiStatus({
                 show: true,
                 status: 'error',
                 action: actionMessages.error,
-                message: errorMessage,
+                message: displayMessage, // Use the extracted or default message
             });
             if (onError) {
                 onError(typedError);
