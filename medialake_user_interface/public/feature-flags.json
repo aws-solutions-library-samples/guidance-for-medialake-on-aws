@@ -1,0 +1,10 @@
+{
+  "user-favorites-enabled": {
+    "value": false,
+    "variant": "on"
+  },
+  "file-upload-enabled": {
+    "value": false,
+    "variant": "on"
+  }
+}

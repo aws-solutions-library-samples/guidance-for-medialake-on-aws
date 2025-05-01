@@ -52,6 +52,9 @@ export interface AssetResultsViewProps<T> {
   onEditNameComplete: (asset: T, save: boolean) => void;
   editingAssetId?: string;
   editedName?: string;
+  // Favorite functionality
+  isAssetFavorited?: (assetId: string) => boolean;
+  onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
   // Functions to extract data from asset objects
@@ -96,6 +99,8 @@ function AssetResultsView<T>({
   onEditNameComplete,
   editingAssetId,
   editedName,
+  isAssetFavorited,
+  onFavoriteToggle,
   error,
   isLoading,
   getAssetId,
@@ -272,6 +277,8 @@ function AssetResultsView<T>({
           onEditNameComplete={onEditNameComplete}
           editingAssetId={editingAssetId}
           editedName={editedName}
+          isAssetFavorited={isAssetFavorited}
+          onFavoriteToggle={onFavoriteToggle}
           getAssetId={getAssetId}
           getAssetName={getAssetName}
           getAssetType={getAssetType}

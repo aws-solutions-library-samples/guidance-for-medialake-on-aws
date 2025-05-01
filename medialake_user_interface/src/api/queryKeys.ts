@@ -34,7 +34,7 @@ export const QUERY_KEYS = {
     SEARCH: {
         all: ['search'] as const,
         lists: () => [...QUERY_KEYS.SEARCH.all, 'list'] as const,
-        list: (query: string, page: number, pageSize: number, isSemantic: boolean) => 
+        list: (query: string, page: number, pageSize: number, isSemantic: boolean) =>
             [...QUERY_KEYS.SEARCH.lists(), { query, page, pageSize, isSemantic }] as const,
     },
     ASSETS: {
@@ -50,6 +50,11 @@ export const QUERY_KEYS = {
         list: (filters: string) => [...QUERY_KEYS.USERS.lists(), { filters }] as const,
         details: () => [...QUERY_KEYS.USERS.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.USERS.details(), id] as const,
+    },
+    FAVORITES: {
+        all: ['favorites'] as const,
+        lists: () => [...QUERY_KEYS.FAVORITES.all, 'list'] as const,
+        list: (itemType?: string) => [...QUERY_KEYS.FAVORITES.lists(), { itemType }] as const,
     },
     ROLES: {
         all: ['roles'] as const,

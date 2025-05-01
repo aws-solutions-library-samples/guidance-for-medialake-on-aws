@@ -214,6 +214,8 @@ function AssetResults<T extends AssetBase>({
                 editedName={editedName}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
+                isFavorite={false} // Default to false since we don't have favorite info here
+                onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in AssetResults')}
             />
         </Grid>
     );

@@ -33,6 +33,8 @@ class DynamoDBProps:
     global_secondary_indexes: Optional[list[dynamodb.GlobalSecondaryIndexPropsV2]] = (
         None
     )
+    billing_mode: Optional[dynamodb.Billing] = None
+    ttl_attribute: Optional[str] = None
 
 
 class DynamoDB(Construct):
@@ -80,7 +82,12 @@ class DynamoDB(Construct):
                 ),
                 "dynamo_stream": props.stream,
                 "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
+                "billing": props.billing_mode or dynamodb.Billing.on_demand(),
             }
+            
+            # Add TTL attribute if provided
+            if props.ttl_attribute:
+                table_props["time_to_live_attribute"] = props.ttl_attribute
 
             # Add sort key if provided
             if props.sort_key_name and props.sort_key_type:

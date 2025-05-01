@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Button, Container, Paper, Typography } from '@mui/material';
+import { Box, Button, Container, Paper, Typography, Alert } from '@mui/material';
 import { S3UploaderModal } from '../features/upload';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 
 const UploadDemo: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -16,6 +18,22 @@ const UploadDemo: React.FC = () => {
   const handleUploadComplete = (files: any[]) => {
     console.log('Upload completed for files:', files);
   };
+
+  // If file upload is disabled, show a message
+  if (!isFileUploadEnabled) {
+    return (
+      <Container maxWidth="lg">
+        <Paper sx={{ p: 4, mt: 4 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            S3 Upload System
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            The file upload feature is currently disabled. Please contact your administrator for more information.
+          </Alert>
+        </Paper>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg">
@@ -47,9 +65,9 @@ const UploadDemo: React.FC = () => {
           </Box>
         </Box>
         <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Button 
-            variant="contained" 
-            color="primary" 
+          <Button
+            variant="contained"
+            color="primary"
             size="large"
             onClick={handleOpenModal}
           >
@@ -69,4 +87,4 @@ const UploadDemo: React.FC = () => {
   );
 };
 
-export default UploadDemo; 
+export default UploadDemo;

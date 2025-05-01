@@ -276,6 +276,8 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                     aspectRatio={aspectRatio}
                                     thumbnailScale={thumbnailScale}
                                     showMetadata={showMetadata}
+                                    isFavorite={false} // Default to false since we don't have favorite info here
+                                    onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in UnifiedResultsView')}
                                 />
                             </Grid>
                         ))}
@@ -321,6 +323,8 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                             aspectRatio={aspectRatio}
                                             thumbnailScale={thumbnailScale}
                                             showMetadata={showMetadata}
+                                            isFavorite={false} // Default to false since we don't have favorite info here
+                                            onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in UnifiedResultsView')}
                                         />
                                     </Grid>
                                 ))}

@@ -96,6 +96,9 @@ const ProfilePage: React.FC = () => {
     }, [t]);
 
     const { data: userProfile, isLoading, error } = useGetUser(userId || '');
+    
+    // Debug logging to see the actual structure of userProfile
+    console.log('User Profile Data Structure:', JSON.stringify(userProfile, null, 2));
 
     if (isLoading) {
         return (
@@ -129,10 +132,14 @@ const ProfilePage: React.FC = () => {
 
     const unavailable = t('common.error', 'Unavailable');
     const email = userProfile.data?.attributes?.email || unavailable;
-    const firstName = userProfile.data?.attributes?.given_name || unavailable;
-    const lastName = userProfile.data?.attributes?.family_name || unavailable;
+    const firstName = userProfile.data?.attributes?.given_name || '';
+    const lastName = userProfile.data?.attributes?.family_name || '';
     const username = userProfile.data?.username || unavailable;
     const userStatus = userProfile.data?.user_status || unavailable;
+    
+    // Messages for missing name fields
+    const noFirstNameMsg = t('profile.noFirstName', 'User doesn\'t have a first name configured');
+    const noLastNameMsg = t('profile.noLastName', 'User doesn\'t have a last name configured');
 
     return (
         <ThemeProvider theme={rtlTheme}>
@@ -165,9 +172,11 @@ const ProfilePage: React.FC = () => {
                         >
                             {email !== unavailable ? email[0].toUpperCase() : 'U'}
                         </Avatar>
-                        <Typography variant="h5" gutterBottom sx={{ textAlign: isRTL ? 'center' : 'center' }}>
-                            {`${firstName} ${lastName}`}
-                        </Typography>
+                        {(firstName || lastName) && (
+                            <Typography variant="h5" gutterBottom sx={{ textAlign: isRTL ? 'center' : 'center' }}>
+                                {`${firstName} ${lastName}`.trim()}
+                            </Typography>
+                        )}
                         <Typography variant="body2" color="text.secondary" gutterBottom sx={{ textAlign: isRTL ? 'center' : 'center' }}>
                             {email}
                         </Typography>
@@ -204,7 +213,7 @@ const ProfilePage: React.FC = () => {
                                 </ListItemIcon>
                                 <ListItemText
                                     primary={t('users.form.fields.given_name.label', 'First Name')}
-                                    secondary={firstName}
+                                    secondary={firstName ? firstName : noFirstNameMsg}
                                     primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                 />
@@ -215,7 +224,7 @@ const ProfilePage: React.FC = () => {
                                 </ListItemIcon>
                                 <ListItemText
                                     primary={t('users.form.fields.family_name.label', 'Last Name')}
-                                    secondary={lastName}
+                                    secondary={lastName ? lastName : noLastNameMsg}
                                     primaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                     secondaryTypographyProps={{ align: isRTL ? 'right' : 'left' }}
                                 />

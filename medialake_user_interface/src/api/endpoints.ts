@@ -18,5 +18,9 @@ export const API_ENDPOINTS = {
     SYSTEM_SETTINGS: {
         GET: '/settings/system',
         SEARCH: '/settings/system/search'
+    },
+    FAVORITES: {
+        BASE: '/users/favorites',
+        DELETE: (itemType: string, itemId: string) => `/users/favorites/${itemType}/${itemId}`
     }
 };

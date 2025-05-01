@@ -51,6 +51,8 @@ export const useGetUser = (userId: string) => {
         queryKey: QUERY_KEYS.USERS.detail(userId),
         queryFn: async () => {
             const { data } = await apiClient.get<UserProfileResponse>(`${API_ENDPOINTS.USER}/${userId}`);
+            // Debug logging to see the raw API response
+            console.log('Raw API Response from useGetUser:', JSON.stringify(data, null, 2));
             return data;
         },
         enabled: !!userId,
