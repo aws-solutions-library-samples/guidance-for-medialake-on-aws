@@ -94,20 +94,20 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
             enableSorting: true,
             size: 150
         }),
-        columnHelper.accessor('system', {
-            header: 'System',
-            cell: info => (
-                <TableCellContent variant="secondary">
-                    <Chip
-                        label={info.getValue() ? 'Yes' : 'No'}
-                        size="small"
-                        color={info.getValue() ? 'success' : 'default'}
-                    />
-                </TableCellContent>
-            ),
-            enableSorting: true,
-            size: 100
-        }),
+        // columnHelper.accessor('system', {
+        //     header: 'System',
+        //     cell: info => (
+        //         <TableCellContent variant="secondary">
+        //             <Chip
+        //                 label={info.getValue() ? 'Yes' : 'No'}
+        //                 size="small"
+        //                 color={info.getValue() ? 'success' : 'default'}
+        //             />
+        //         </TableCellContent>
+        //     ),
+        //     enableSorting: true,
+        //     size: 100
+        // }),
         columnHelper.accessor('deploymentStatus', {
             header: 'Status',
             cell: info => {

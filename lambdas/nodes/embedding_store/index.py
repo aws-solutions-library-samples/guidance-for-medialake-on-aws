@@ -7,308 +7,235 @@ from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth, exceptions
-
 from lambda_middleware import lambda_middleware
 from nodes_utils import seconds_to_smpte
+import botocore
+import importlib.util
+from jinja2 import Environment, FileSystemLoader
 
-# Initialize Powertools
+# ────── Powertools ──────
 logger = Logger()
 tracer = Tracer()
 
-# OpenSearch configuration
-OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
-INDEX_NAME = os.environ.get("INDEX_NAME", "media")
-CONTENT_TYPE = os.environ.get("CONTENT_TYPE", "video").lower()
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+# ────── AWS clients ──────
+s3_client = boto3.client("s3")
+mc        = boto3.client("mediaconvert", region_name="us-east-1")
 
-# Initialize AWS session and clients
-session = boto3.Session()
-credentials = session.get_credentials()
-auth = AWSV4SignerAuth(credentials, AWS_REGION, 'es')  # 'es' for managed OpenSearch service
+# ────── helper: retry get_job on throttling ──────
+def get_job_with_retry(job_id: str, max_retries: int = 5) -> Dict[str, Any]:
+    attempt = 0
+    while True:
+        try:
+            return mc.get_job(Id=job_id)
+        except botocore.exceptions.ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code == "TooManyRequestsException" and attempt < max_retries:
+                attempt += 1
+                backoff = (2 ** attempt) + random.random()
+                logger.warning(f"Throttled (attempt {attempt}/{max_retries}), retrying in {backoff:.1f}s")
+                time.sleep(backoff)
+                continue
+            logger.error(f"get_job failed: {e}")
+            raise
 
-def get_opensearch_client():
-    """Initialize and return an OpenSearch client"""
-    if not OPENSEARCH_ENDPOINT:
-        logger.warning("OPENSEARCH_ENDPOINT environment variable not set")
-        return None
+# ────── other helpers (unchanged) ──────
+def clean_asset_id(input_string: str) -> str:
+    parts = input_string.split(":")
+    uuid = parts[-1] if parts[-1] != "master" else parts[-2]
+    return f"asset:uuid:{uuid}"
 
-    parsed = urlparse(OPENSEARCH_ENDPOINT)
-    host = parsed.netloc if parsed.scheme else OPENSEARCH_ENDPOINT
+def download_s3_object(bucket: str, key: str) -> str:
+    obj = s3_client.get_object(Bucket=bucket, Key=key)
+    return obj["Body"].read().decode("utf-8")
 
-    client = OpenSearch(
-        hosts=[{'host': host, 'port': 443}],
-        http_auth=auth,
-        use_ssl=True,
-        verify_certs=True,
-        connection_class=RequestsHttpConnection,
-        timeout=60,
-        http_compress=True,
-        retry_on_timeout=True,
-        max_retries=3
+def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str, event: dict):
+    code = download_s3_object(bucket, f"api_templates/{key}")
+    spec = importlib.util.spec_from_loader("dynamic_module", loader=None)
+    module = importlib.util.module_from_spec(spec)
+    exec(code, module.__dict__)
+    if not hasattr(module, function_name):
+        raise AttributeError(f"{function_name} not found in {key}")
+    return getattr(module, function_name)(event)
+
+def build_s3_templates_path(service: str, resource: str, method: str) -> dict:
+    resource_name = resource.split("/")[-1]
+    prefix = f"{resource_name}_{method.lower()}"
+    return {
+        "url_template":          f"{service}/{resource}/{prefix}_url.jinja",
+        "url_mapping_file":      f"{service}/{resource}/{prefix}_url_mapping.py",
+        "response_template":     f"{service}/{resource}/{prefix}_response.jinja",
+        "response_mapping_file": f"{service}/{resource}/{prefix}_response_mapping.py",
+    }
+
+def create_custom_url(s3_templates, bucket, event):
+    tmpl_str = download_s3_object(bucket, f"api_templates/{s3_templates['url_template']}")
+    mapping  = load_and_execute_function_from_s3(bucket, s3_templates["url_mapping_file"], "translate_event_to_request", event)
+    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env.filters["jsonify"] = json.dumps
+    return env.from_string(tmpl_str).render(variables=mapping)
+
+def create_response_output(s3_templates, bucket, response_body, event):
+    tmpl_str = download_s3_object(bucket, f"api_templates/{s3_templates['response_template']}")
+    mapping  = load_and_execute_function_from_s3(
+        bucket,
+        s3_templates["response_mapping_file"],
+        "translate_event_to_request",
+        {"response_body": response_body, "event": event}
     )
-    return client
+    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env.filters["jsonify"] = json.dumps
+    return json.loads(env.from_string(tmpl_str).render(variables=mapping))
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
-)
+
+# ────── Lambda handler ──────
+@lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
-def lambda_handler(event, context):
-    try:
-        logger.info("Received event", extra={"event": event})
-        item = event.get("item", {})
-        if not item:
-            item = event.get("payload", {})
-            if not item:
-                logger.warning("No embedding item found in event")
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "No embedding item found in event"})
+def lambda_handler(event: Dict[str, Any], context: LambdaContext):
+    table               = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+    api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
+
+    # ── pull job-id ──
+    job_id = event.get("metadata", {}).get("externalJobId")
+    if not job_id:
+        raise ValueError("metadata.externalJobId not present in event")
+
+    # ── asset basics ──
+    assets       = event.get("payload", {}).get("assets", [])
+    if not assets:
+        raise ValueError("payload.assets array missing/empty")
+
+    asset_obj    = assets[0]
+    media_type   = asset_obj["DigitalSourceAsset"]["Type"]   # 'Audio' / 'Video'
+    inventory_id = asset_obj["InventoryID"]
+    asset_id     = clean_asset_id(asset_obj["DigitalSourceAsset"]["ID"])
+    clean_inv_id = clean_asset_id(inventory_id)
+
+    # ── build & call API URL ──
+    s3_templates = build_s3_templates_path("mediaconvert", "check_status", "get")
+    api_full_url = create_custom_url(s3_templates, api_template_bucket, event)
+
+    # ── get_job with retry ──
+    response = get_job_with_retry(job_id)
+    logger.info(response)
+
+    # ── translate response ──
+    result = create_response_output(s3_templates, api_template_bucket, response, event)
+
+    # ── on COMPLETE, append reps to DDB ──
+    if response["Job"]["Status"] == "COMPLETE":
+        dest       = response["Job"]["Settings"]["OutputGroups"][0]["OutputGroupSettings"]["FileGroupSettings"]["Destination"]
+        out_bucket = dest.split("s3://")[1].split("/")[0]
+        base_path  = dest.split(f"s3://{out_bucket}/")[1].rstrip("/")
+
+        reps: List[Dict[str, Any]] = []
+        if media_type == "Video":
+            proxy_group  = response["Job"]["Settings"]["OutputGroups"][0]
+            proxy_output = proxy_group.get("Outputs", [{}])[0]
+            name_mod     = proxy_output.get("NameModifier", "")
+            proxy_ext    = ".mp4"
+            proxy_path   = f"{base_path}{name_mod}{proxy_ext}"
+            thumb_path   = f"{base_path}_thumbnail.0000000.jpg"
+
+            reps.extend([
+                {
+                    "ID":      f"{asset_id}:proxy",
+                    "Type":    media_type,
+                    "Format":  "MP4",
+                    "Purpose": "proxy",
+                    "StorageInfo": {
+                        "PrimaryLocation": {
+                            "Bucket": out_bucket,
+                            "ObjectKey": {"FullPath": proxy_path},
+                            "FileInfo": {"Size": 5_000_000},
+                            "Provider": "aws",
+                            "Status":   "active",
+                            "StorageType": "s3",
+                        }
+                    },
+                },
+                {
+                    "ID":      f"{asset_id}:thumbnail",
+                    "Type":    "Image",
+                    "Format":  "JPEG",
+                    "Purpose": "thumbnail",
+                    "ImageSpec": {"Resolution": {"Height": 400, "Width": 300}},
+                    "StorageInfo": {
+                        "PrimaryLocation": {
+                            "Bucket": out_bucket,
+                            "ObjectKey": {"FullPath": thumb_path},
+                            "FileInfo": {"Size": 12_670},
+                            "Provider": "aws",
+                            "Status":   "active",
+                            "StorageType": "s3",
+                        }
+                    },
                 }
-        
-        asset_id = item.get("assetId")
-        if asset_id is None:
-            # Attempt to get asset_id from metadata.pipelineAssets
-            metadata = item.get("metadata", {})
-            pipeline_assets = metadata.get("pipelineAssets", [])
-            if pipeline_assets and isinstance(pipeline_assets, list):
-                asset_id = pipeline_assets[0].get("assetId")
-            # If still not found, try payload.externalTaskResults
-            if asset_id is None:
-                external_results = item.get("externalTaskResults", [])
-                if external_results and isinstance(external_results, list):
-                    asset_id = external_results[0].get("assetId")
-        
-        scope = item.get("embedding_scope")
-        if scope is None:
-            # Attempt to get embedding_scope from externalTaskResults if available
-            external_results = item.get("externalTaskResults", [])
-            if isinstance(external_results, list):
-                for result in external_results:
-                    scope = result.get("embedding_scope")
-                    if scope is not None:
-                        break
-        
-        embedding_vector = item.get("float")
-        if not embedding_vector or not isinstance(embedding_vector, list):
-            external_results = item.get("externalTaskResults", [])
-            if isinstance(external_results, list):
-                for result in external_results:
-                    embedding_vector = result.get("float")
-                    if embedding_vector and isinstance(embedding_vector, list):
-                        break
-        
-        client = get_opensearch_client()
-        if not client:
-            logger.info("OpenSearch client not available, skipping index creation and document storage")
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "message": "Embedding processed (OpenSearch not available)",
-                    "asset_id": asset_id,
-                    "vector_length": len(embedding_vector)
-                })
-            }
-        
-        # Build the document to be stored/updated.
-        document = {
-            "type": CONTENT_TYPE,
-            "embedding": embedding_vector,
-            "embedding_scope": scope,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-        if scope == "clip" or scope == "audio":
-            end_offset_sec = 0
-            start_offset_sec = 0
-           
-            if scope == "clip":
-                start_offset_sec = item["start_offset_sec"]
-                end_offset_sec = item["end_offset_sec"]
-            if scope == "audio":
-                start_offset_sec = item["start_time"]
-                end_offset_sec = item["end_time"]
-            document["embedding_scope"] = "clip"
-            # For clips, store the original asset_id and add timecodes.
-            document["DigitalSourceAsset"] = {"ID": asset_id}
-            document["start_timecode"] = seconds_to_smpte(start_offset_sec)
-            document["end_timecode"] = seconds_to_smpte(end_offset_sec)
-
-            # Index the document without a forced refresh.
-            response = client.index(index=INDEX_NAME, body=document)
-            document_id = response.get("_id", "unknown")
-            logger.info(f"Successfully created new document for clip: {response}")
-
+            ])
         else:
-            # Search for an existing document by DigitalSourceAsset.ID
-            search_query = {
-                "query": {
-                    "bool": {
-                        "must": [
-                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
-                            {"exists": {"field": "InventoryID"}},
-                            {"exists": {"field": "DerivedRepresentations.ID"}}
-                        ]
+            # AUDIO path...
+            for grp in response["Job"]["Settings"]["OutputGroups"]:
+                outs = grp.get("Outputs", [])
+                if outs and outs[0].get("AudioDescriptions"):
+                    audio_output = outs[0]
+                    break
+            else:
+                raise RuntimeError("No audio Outputs found in job")
+
+            name_mod   = audio_output.get("NameModifier", "")
+            codec      = audio_output["AudioDescriptions"][0]["CodecSettings"]["Codec"]
+            ext        = f".{codec.lower()}"
+            proxy_path = f"{base_path}{name_mod}{ext}"
+
+            reps.append({
+                "ID":      f"{asset_id}:proxy",
+                "Type":    media_type,
+                "Format":  codec,
+                "Purpose": "proxy",
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "Bucket": out_bucket,
+                        "ObjectKey": {"FullPath": proxy_path},
+                        "FileInfo": {"Size": 5_000_000},
+                        "Provider": "aws",
+                        "Status":   "active",
+                        "StorageType": "s3",
                     }
-                }
-            }
-
-            start_time = time.time()
-            search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            # Retry search for up to 2 minutes if the document is not found.
-            while search_response["hits"]["total"]["value"] == 0 and (time.time() - start_time) < 120:
-                logger.info("Document not found, refreshing index and retrying search...")
-                client.indices.refresh(index=INDEX_NAME)
-                time.sleep(5)
-                search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            
-            if search_response["hits"]["total"]["value"] == 0:
-                error_msg = (f"No existing document found with DigitalSourceAsset.ID={asset_id} "
-                             f"in index {INDEX_NAME} after retrying for 2 minutes")
-                logger.error(error_msg)
-                return {
-                    "statusCode": 404,
-                    "body": json.dumps({"error": error_msg})
-                }
-            
-            # Extract the document ID.
-            existing_doc_id = search_response["hits"]["hits"][0]["_id"]
-            logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
-            
-            # Retrieve current document for sequence number and primary term.
-            existing_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-            current_seq_no = existing_doc.get("_seq_no")
-            current_primary_term = existing_doc.get("_primary_term")
-            
-            # Include DigitalSourceAsset in the document.
-            document["DigitalSourceAsset"] = {"ID": asset_id}
-            
-            # Log the document before update
-            logger.info("Document before update: %s", json.dumps(document))
-            
-            # Retry loop for update with conflict error handling
-            max_update_retries = 50
-            update_attempt = 0
-            while update_attempt < max_update_retries:
-                try:
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    logger.info(f"Successfully updated document with optimistic concurrency: {response}")
-                    break  # Exit the loop if the update succeeded
-                except exceptions.ConflictError as ce:
-                    update_attempt += 1
-                    logger.error(f"Conflict detected on attempt {update_attempt}: {ce}")
-                    # Get the latest sequence number and primary term before retrying
-                    updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    time.sleep(1)  # Short delay before retrying
-
-            if update_attempt == max_update_retries:
-                error_msg = "Failed to update document due to conflict errors after 50 attempts"
-                logger.error(error_msg)
-                return {
-                    "statusCode": 409,
-                    "body": json.dumps({"error": error_msg})
-                }
-            
-            # Validation loop: ensure the updated document has the "embedding_scope" field.
-            max_validation_attempts = 50
-            validation_attempt = 0
-            while validation_attempt < max_validation_attempts:
-                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                source = updated_doc.get("_source", {})
-                if "embedding_scope" in source:
-                    logger.info("Validation succeeded: 'embedding_scope' field found in updated document.")
-                    break
-                else:
-                    logger.warning("Validation failed: 'embedding_scope' field not found. Re-updating document.")
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    validation_attempt += 1
-                    time.sleep(5)  # Pause briefly before checking again
-
-            if validation_attempt == max_validation_attempts:
-                error_msg = "Failed to validate the update after multiple attempts. 'embedding_scope' field missing."
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            
-            # **** New DerivedRepresentations Count Validation Loop ****
-            # This loop will repeatedly retrieve the document and count the number of items in DerivedRepresentations.
-            # If the count is not exactly 2, it will re-update the document and try again.
-            max_dr_validation_attempts = 50
-            dr_validation_attempt = 0
-            while dr_validation_attempt < max_dr_validation_attempts:
-                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                source = updated_doc.get("_source", {})
-                dr = source.get("DerivedRepresentations", [])
-                actual_count = len(dr) if isinstance(dr, list) else 0
-                if isinstance(dr, list) and actual_count == 2:
-                    logger.info("Validation succeeded: 'DerivedRepresentations' count is 2.")
-                    break
-                else:
-                    logger.warning(
-                        f"Validation failed: 'DerivedRepresentations' count is not 2 (actual count: {actual_count}). Retrying update..."
-                    )
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    dr_validation_attempt += 1
-                    time.sleep(5)
-            if dr_validation_attempt == max_dr_validation_attempts:
-                error_msg = "Failed to validate 'DerivedRepresentations' count after multiple attempts."
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            # **** End of DerivedRepresentations Validation Loop ****
-            
-            # Log the final updated document after validation
-            logger.info("Document after update validation: %s", json.dumps(updated_doc))
-            document_id = existing_doc_id
-        
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "message": "Embedding stored successfully",
-                "index": INDEX_NAME,
-                "document_id": document_id,
-                "asset_id": asset_id if scope != "clip" else "Generated by OpenSearch"
+                },
             })
-        }
-        
+
+        # write to DynamoDB
+        try:
+            table.update_item(
+                Key={"InventoryID": clean_inv_id},
+                UpdateExpression=(
+                    "SET DerivedRepresentations = list_append(if_not_exists(DerivedRepresentations, :empty), :r)"
+                ),
+                ConditionExpression=(
+                    "attribute_not_exists(DerivedRepresentations) "
+                    "OR NOT contains(DerivedRepresentations, :proxy_id)"
+                ),
+                ExpressionAttributeValues={
+                    ":r": reps,
+                    ":empty": [],
+                    ":proxy_id": reps[0]["ID"],
+                },
+                ReturnValues="UPDATED_NEW",
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                logger.info("Proxy already present, skipping DynamoDB update")
+            else:
+                raise
+
+    # ── FETCH UPDATED DYNAMO RECORD ─────────────────────────────────────────
+    try:
+        ddb_resp     = table.get_item(Key={"InventoryID": clean_inv_id})
+        updated_item = ddb_resp.get("Item", {})
     except Exception as e:
-        error_message = f"Error storing embedding: {str(e)}"
-        
-        # Check if this is an audio clip with duration less than 10 seconds causing the specific error
-        if (scope == "audio" and
-            "RequestError(400, 'x_content_parse_exception', '[1:72] [bool] failed to parse field [must]')" in str(e) and
-            'start_time' in item and 'end_time' in item):
-            
-            duration = item['end_time'] - item['start_time']
-            if duration < 10:
-                error_message = f"Audio clip duration is less than 10 seconds ({duration:.2f}s). No embeddings were found."
-                logger.error(error_message)
-        
-        logger.exception(error_message)
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": error_message})
-        }
+        logger.warning("Failed to fetch updated DynamoDB item", extra={"error": str(e)})
+        updated_item = {}
+
+    # ── RETURN including updatedAsset ────────────────────────────────────────
+    result.setdefault("updatedAsset", updated_item)
+    return result

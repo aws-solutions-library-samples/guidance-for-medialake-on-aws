@@ -64,20 +64,20 @@ export const usePipelineColumns = ({
                     );
                 },
             }),
-            columnHelper.accessor('system', {
-                header: 'System',
-                size: 100,
-                enableSorting: true,
-                cell: info => (
-                    <TableCellContent variant="secondary">
-                        <Chip
-                            label={info.getValue() ? 'Yes' : 'No'}
-                            size="small"
-                            color={info.getValue() ? 'success' : 'default'}
-                        />
-                    </TableCellContent>
-                ),
-            }),
+            // columnHelper.accessor('system', {
+            //     header: 'System',
+            //     size: 100,
+            //     enableSorting: true,
+            //     cell: info => (
+            //         <TableCellContent variant="secondary">
+            //             <Chip
+            //                 label={info.getValue() ? 'Yes' : 'No'}
+            //                 size="small"
+            //                 color={info.getValue() ? 'success' : 'default'}
+            //             />
+            //         </TableCellContent>
+            //     ),
+            // }),
             columnHelper.accessor('deploymentStatus', {
                 header: 'Status',
                 size: 150, // Increased size to accommodate the switch

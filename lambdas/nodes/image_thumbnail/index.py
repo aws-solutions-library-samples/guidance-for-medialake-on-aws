@@ -1,84 +1,112 @@
-import boto3, io, os, json
+# thumbnail_step.py
+import boto3
+import io
+import os
+import json
+from decimal import Decimal
+
 from PIL import Image, ExifTags
 import cairosvg
+
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
 
-logger  = Logger()
-tracer  = Tracer()
+logger = Logger()
+tracer = Tracer()
 
-s3      = boto3.client("s3")
-dynamo  = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+s3 = boto3.client("s3")
+dynamo = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
-# ── helpers ─────────────────────────────────────────────────────────────────────
+
 def get_image_rotation(image):
     try:
         exif = image._getexif() or {}
-        key  = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
+        key = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
         return {1: 0, 3: 180, 6: 270, 8: 90}.get(exif.get(key, 1), 0)
     except Exception as e:
         logger.warning(f"Error getting image rotation: {e}")
         return 0
 
+
 def create_thumbnail(img, w, h, crop=False):
+    if w < 1 or h < 1:
+        raise ValueError(f"Invalid thumbnail size {w}×{h}")
     rot = get_image_rotation(img)
     if rot:
         img = img.rotate(rot, expand=True)
-
     if crop:
         tgt_ratio, img_ratio = w / h, img.width / img.height
         if img_ratio > tgt_ratio:
             new_w = int(h * img_ratio)
-            img   = img.resize((new_w, h))
-            left  = (new_w - w) // 2
-            img   = img.crop((left, 0, left + w, h))
+            img = img.resize((new_w, h))
+            left = (new_w - w) // 2
+            img = img.crop((left, 0, left + w, h))
         else:
             new_h = int(w / img_ratio)
-            img   = img.resize((w, new_h))
-            top   = (new_h - h) // 2
-            img   = img.crop((0, top, w, top + h))
+            img = img.resize((w, new_h))
+            top = (new_h - h) // 2
+            img = img.crop((0, top, w, top + h))
     else:
         img.thumbnail((w, h))
-
     return img
+
 
 def clean_asset_id(raw: str) -> str:
     parts = raw.split(":")
-    uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
-    return f"asset:uuid:{uuid}"
+    uuid_part = parts[-1] if parts[-1] != "master" else parts[-2]
+    return f"asset:uuid:{uuid_part}"
+
 
 def _raise(msg: str):
     raise ValueError(msg)
 
+
 def _resolve_dims(w, h, iw, ih):
+    if w is None or w <= 0:
+        w = None
+    if h is None or h <= 0:
+        h = None
+    if w is None and h is None:
+        return iw, ih
     if w is None:
         w = int(h * (iw / ih))
     elif h is None:
         h = int(w * (ih / iw))
-    return int(w), int(h)
+    return max(1, int(w)), max(1, int(h))
+
 
 def _extract_from_event(event):
     payload = event.get("payload") or _raise("Missing payload")
-    assets  = payload.get("assets")  or _raise("Missing payload.assets")
-    asset   = assets[0]
+    assets = payload.get("assets") or _raise("Missing payload.assets")
+    asset = assets[0]
 
-    if "input" in asset:
-        inp     = asset["input"]
-        detail  = inp.get("detail") or _raise("asset.input.detail missing")
-        width   = inp.get("width")
-        height  = inp.get("height")
-        crop    = bool(inp.get("crop", False))
-    else:
-        detail  = asset
-        width   = payload.get("width")
-        height  = payload.get("height")
-        crop    = bool(payload.get("crop", False))
+    detail = asset
+    width = payload.get("width")
+    height = payload.get("height")
+    crop = bool(payload.get("crop", False))
 
     return detail, width, height, crop
 
-# ── Lambda ──────────────────────────────────────────────────────────────────────
+
+def _convert_decimals(obj):
+    """
+    Recursively walk through the returned Dynamo item and convert any
+    Decimal to int (if whole) or float.
+    """
+    if isinstance(obj, list):
+        return [_convert_decimals(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _convert_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        # choose int if no fractional part
+        if obj % 1 == 0:
+            return int(obj)
+        return float(obj)
+    return obj
+
+
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
 )
@@ -87,19 +115,17 @@ def _extract_from_event(event):
 def lambda_handler(event, context: LambdaContext):
     detail, width, height, crop = _extract_from_event(event)
 
-    # ── default to max 300px width if neither provided ────────────────────────
     if width is None and height is None:
         width = 300
         height = None
 
-    inv_id   = detail.get("InventoryID") or _raise("Missing InventoryID")
+    inv_id = detail.get("InventoryID") or _raise("Missing InventoryID")
     asset_id = clean_asset_id(inv_id)
 
-    loc    = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+    loc = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
     bucket = loc.get("Bucket") or _raise("Missing bucket")
-    key    = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
+    key = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
 
-    # ── fetch & build PIL image ───────────────────────────────────────────────
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = cairosvg.svg2png(bytestring=body)
@@ -116,16 +142,14 @@ def lambda_handler(event, context: LambdaContext):
     data = buf.getvalue()
 
     out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
-    out_key    = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
+    out_key = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
 
-    # ── delete old thumbnail ───────────────────────────────────────────────────
     try:
         s3.delete_object(Bucket=out_bucket, Key=out_key)
         logger.info("Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key})
     except ClientError as err:
         logger.warning("No existing thumbnail to delete or delete failed", extra={"error": str(err)})
 
-    # ── upload new thumbnail ───────────────────────────────────────────────────
     s3.put_object(
         Bucket=out_bucket,
         Key=out_key,
@@ -133,9 +157,9 @@ def lambda_handler(event, context: LambdaContext):
         ContentType=f"image/{ext}"
     )
 
-    # ── update DynamoDB ───────────────────────────────────────────────────────
+    # update DynamoDB record
     try:
-        resp     = dynamo.get_item(Key={"InventoryID": asset_id})
+        resp = dynamo.get_item(Key={"InventoryID": asset_id})
         cur_reps = resp.get("Item", {}).get("DerivedRepresentations", [])
         cur_reps = [r for r in cur_reps if r.get("Purpose") != "thumbnail"]
 
@@ -166,6 +190,11 @@ def lambda_handler(event, context: LambdaContext):
         logger.exception("Error updating DynamoDB")
         raise
 
+    # fetch back the updated record and return as updatedAsset
+    updated_item = dynamo.get_item(Key={"InventoryID": asset_id})["Item"]
+    # Convert any Decimal instances so JSON serialization will work
+    updated_item = _convert_decimals(updated_item)
+
     return {
         "statusCode": 200,
         "body": json.dumps({
@@ -174,4 +203,5 @@ def lambda_handler(event, context: LambdaContext):
             "mode": "thumbnail",
             "format": fmt,
         }),
+        "updatedAsset": updated_item,
     }

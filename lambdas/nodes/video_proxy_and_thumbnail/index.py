@@ -9,6 +9,7 @@ Video-proxy + thumbnail trigger Lambda (no DynamoDB cache)
 
 import os
 import json
+import decimal 
 import time
 import random
 import importlib.util
@@ -23,14 +24,25 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
 
 # ── Powertools & clients ─────────────────────────────────────────────────────
-logger = Logger()
-tracer = Tracer()
-s3     = boto3.client("s3")
+logger   = Logger()
+tracer   = Tracer()
+s3       = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
+asset_table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
 
 def _raise(msg: str):
     raise RuntimeError(msg)
 
+def _strip_decimals(obj):
+    """Recursively convert Decimal → int/float so the Lambda JSON encoder is happy."""
+    if isinstance(obj, list):
+        return [_strip_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, decimal.Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
 
 def get_mediaconvert_endpoint() -> str:
     override = os.getenv("MEDIACONVERT_ENDPOINT_URL")
@@ -176,10 +188,24 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
         if not dest.startswith("s3://") or "None" in dest:
             _raise(f"Invalid destination rendered: {dest}")
 
-        mc            = boto3.client("mediaconvert", endpoint_url=get_mediaconvert_endpoint())
-        job_response  = create_job_with_retry(mc, job_settings)
+        mc           = boto3.client("mediaconvert", endpoint_url=get_mediaconvert_endpoint())
+        job_response = create_job_with_retry(mc, job_settings)
 
-        return _render_response(paths, tmpl_bucket, job_response, event)
+        # render the API response
+        result = _render_response(paths, tmpl_bucket, job_response, event)
+
+        # ── FETCH UPDATED DYNAMODB RECORD ────────────────────────────────────
+        try:
+            inv_id        = asset["InventoryID"]
+            ddb_resp      = asset_table.get_item(Key={"InventoryID": inv_id})
+            updated_item  = ddb_resp.get("Item", {})
+        except Exception as e:
+            logger.warning("Failed to fetch updated DynamoDB item", extra={"error": str(e)})
+            updated_item = {}
+
+        # cleanse Decimals so the Lambda JSON encoder won’t choke
+        result["updatedAsset"] = _strip_decimals(updated_item)
+        return result
 
     except Exception as e:
         logger.exception("Video proxy + thumbnail failed", extra={"error": str(e)})

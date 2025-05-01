@@ -14,23 +14,14 @@ node:
             metadata:
               pipelineName: ["Default Image Pipeline"]
               pipelineStatus: ["Completed"]
-            payload:
-              assets:
-                - DigitalSourceAsset:
-                    Type: ["Image"]
-                    MainRepresentation:
-                      Format: ["${Image Type}"]
+
 actions:
   trigger:
     summary: Trigger after image processing is completed
     description: This step will trigger after image processing is completed
     operationId: triggerImageProcessingCompleted
     parameters:
-      - in: body
-        name: Image Type
-        required: false
-        schema:
-          type: string
+
       - in: body
         name: Prefix
         required: false

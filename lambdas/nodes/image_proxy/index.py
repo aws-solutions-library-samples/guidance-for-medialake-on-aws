@@ -1,4 +1,4 @@
-import boto3, io, os, json
+import boto3, io, os, json, decimal
 from PIL import Image, ExifTags
 import cairosvg
 from aws_lambda_powertools import Logger, Tracer
@@ -11,7 +11,7 @@ tracer  = Tracer()
 s3      = boto3.client("s3")
 dynamo  = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
-# ── helpers ─────────────────────────────────────────────────────────────────────
+# ── helpers ────────────────────────────────────────────────────────────────
 def get_image_rotation(image):
     try:
         exif = image._getexif() or {}
@@ -52,8 +52,7 @@ def clean_asset_id(input_string: str) -> str:
     uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
-def _raise(msg):  # tiny helper
-    raise ValueError(msg)
+def _raise(msg): raise ValueError(msg)
 
 def _resolve_dims(w, h, iw, ih):
     if w is None:
@@ -63,37 +62,32 @@ def _resolve_dims(w, h, iw, ih):
     return int(w), int(h)
 
 def _extract_from_event(event: dict):
-    """
-    Returns a tuple:
-      (asset_dict, mode, width, height, crop_flag)
-    Works with both the “old” and “new” event formats.
-    """
     payload = event.get("payload", {})
     assets  = payload.get("assets") or _raise("Missing payload.assets")
     asset   = assets[0]  # single-asset assumption
 
-    # ── OLD shape ────────────────────────────────────────────────────────────
-    if "input" in asset:
-        raw_input   = asset["input"]
-        detail      = raw_input["detail"]
-        mode        = raw_input.get("mode", "proxy")
-        width       = raw_input.get("width")
-        height      = raw_input.get("height")
-        crop        = bool(raw_input.get("crop", False))
-    # ── NEW shape ──────────────────────────────────────────────────────────────
-    else:
-        detail      = asset
-        mode        = payload.get("mode", "proxy")
-        width       = payload.get("width")
-        height      = payload.get("height")
-        crop        = bool(payload.get("crop", False))
+    detail      = asset
+    mode        = payload.get("mode", "proxy")
+    width       = payload.get("width")
+    height      = payload.get("height")
+    crop        = bool(payload.get("crop", False))
 
     return detail, mode, width, height, crop
 
+def _strip_decimals(obj):
+    """
+    Recursively convert Decimals → int/float so json.dumps works.
+    """
+    if isinstance(obj, list):
+        return [_strip_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, decimal.Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-)
+
+@lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
@@ -111,13 +105,13 @@ def lambda_handler(event, context: LambdaContext):
     out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") \
                  or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
 
-    # ── fetch source ─────────────────────────────────────────────────────────
+    # ── fetch source ───────────────────────────────────────────────────────
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = cairosvg.svg2png(bytestring=body)
     img = Image.open(io.BytesIO(body))
 
-    # ── process image ────────────────────────────────────────────────────────
+    # ── process image ──────────────────────────────────────────────────────
     if mode == "thumbnail":
         if width is None and height is None:
             _raise("Both width and height cannot be None for thumbnail")
@@ -139,13 +133,13 @@ def lambda_handler(event, context: LambdaContext):
 
     new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
 
-    # ── fetch existing reps & split out to_delete ───────────────────────────
-    resp         = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
-    existing     = resp.get("Item", {}).get("DerivedRepresentations", [])
-    to_delete    = [r for r in existing if r.get("Purpose") == mode]
-    cur_reps     = [r for r in existing if r.get("Purpose") != mode]
+    # ── fetch existing reps & split out to_delete ──────────────────────────
+    resp      = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
+    existing  = resp.get("Item", {}).get("DerivedRepresentations", [])
+    to_delete = [r for r in existing if r.get("Purpose") == mode]
+    cur_reps  = [r for r in existing if r.get("Purpose") != mode]
 
-    # ── upload new image ─────────────────────────────────────────────────────
+    # ── upload new image ───────────────────────────────────────────────────
     s3.put_object(
         Bucket=out_bucket,
         Key=new_key,
@@ -153,7 +147,7 @@ def lambda_handler(event, context: LambdaContext):
         ContentType=f"image/{ext}"
     )
 
-    # ── delete old S3 objects for this mode ─────────────────────────────────
+    # ── delete old S3 objects for this mode ───────────────────────────────
     for old in to_delete:
         old_bucket = old["StorageInfo"]["PrimaryLocation"]["Bucket"]
         old_key    = old["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
@@ -161,11 +155,11 @@ def lambda_handler(event, context: LambdaContext):
             s3.delete_object(Bucket=old_bucket, Key=old_key)
             logger.info("Deleted old representation",
                         extra={"mode": mode, "bucket": old_bucket, "key": old_key})
-        except ClientError as err:
+        except Exception as err:
             logger.warning("Failed to delete old representation",
                            extra={"error": str(err), "bucket": old_bucket, "key": old_key})
 
-    # ── update DynamoDB ──────────────────────────────────────────────────────
+    # ── update DynamoDB ────────────────────────────────────────────────────
     new_rep = {
         "ID": f"{clean_asset_id(inv_id)}:{mode}",
         "Type": "Image",
@@ -191,16 +185,23 @@ def lambda_handler(event, context: LambdaContext):
             UpdateExpression="SET DerivedRepresentations = :dr",
             ExpressionAttributeValues={":dr": cur_reps + [new_rep]},
         )
+        # ── immediately fetch the updated record ───────────────────────────
+        get_resp     = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
+        updated_item = get_resp.get("Item", {})
     except Exception:
         logger.exception("Error updating DynamoDB")
         raise
 
+    # ── clean Decimals so json.dumps will not choke ───────────────────────
+    safe_item = _strip_decimals(updated_item)
+
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "bucket": out_bucket,
-            "key":    new_key,
-            "mode":   mode,
-            "format": fmt,
+            "bucket":       out_bucket,
+            "key":          new_key,
+            "mode":         mode,
+            "format":       fmt,
+            "updatedAsset": safe_item,
         }),
     }

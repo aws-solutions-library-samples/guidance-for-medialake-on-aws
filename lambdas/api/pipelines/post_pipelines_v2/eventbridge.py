@@ -2,6 +2,7 @@ import json
 import time
 import re
 import shortuuid
+import copy
 from typing import Dict, Any, Optional
 
 import boto3
@@ -15,8 +16,152 @@ from lambda_operations import read_yaml_from_s3, get_zip_file_key
 logger = Logger()
 
 
+def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, Any]:
+    """
+    Process parameter substitutions in the event pattern and ensure it's
+    compatible with EventBridge.
+    
+    Args:
+        pattern: Event pattern dictionary
+        node: Node object containing configuration
+        
+    Returns:
+        Processed event pattern with parameter substitutions
+    """
+    # Get parameters from node configuration
+    parameters = node.data.configuration.get("parameters", {})
+    
+    # Find format parameters
+    format_value = None
+    for param_name, param_value in parameters.items():
+        if param_name == "Format" and param_value:
+            format_value = param_value
+            logger.info(f"Found Format parameter with value: {format_value}")
+            break
+        elif param_name in ["Image Type", "Video Type", "Audio Type"] and param_value:
+            format_value = param_value
+            logger.info(f"Found {param_name} parameter with value: {format_value}")
+            break
+    
+    # Deep copy the pattern to avoid modifying the original
+    result = copy.deepcopy(pattern)
+    
+    # Check if this is a pipeline_execution_completed rule
+    is_pipeline_execution = "pipeline_execution_completed" in str(result)
+    
+    # For pipeline_execution_completed, we need to transform the structure
+    # because EventBridge doesn't support the nested array of objects
+    if is_pipeline_execution and "detail" in result and "payload" in result["detail"] and "assets" in result["detail"]["payload"]:
+        # Create a new pattern that EventBridge can understand
+        new_pattern = {
+            "source": ["medialake.pipeline"],
+            "detail-type": ["Pipeline Execution Completed"],
+            "detail": {
+                "metadata": result["detail"]["metadata"]
+            }
+        }
+        
+        # Extract the DigitalSourceAsset information
+        assets = result["detail"]["payload"]["assets"]
+        if isinstance(assets, list) and len(assets) > 0 and isinstance(assets[0], dict) and "DigitalSourceAsset" in assets[0]:
+            digital_source_asset = assets[0]["DigitalSourceAsset"]
+            
+            # Add to the outputs structure
+            new_pattern["detail"]["outputs"] = {
+                "input": {
+                    "DigitalSourceAsset": {}
+                }
+            }
+            
+            # Copy Type if it exists
+            if "Type" in digital_source_asset:
+                new_pattern["detail"]["outputs"]["input"]["DigitalSourceAsset"]["Type"] = digital_source_asset["Type"]
+            
+            # Handle MainRepresentation and Format
+            if "MainRepresentation" in digital_source_asset:
+                main_rep = digital_source_asset["MainRepresentation"]
+                
+                # Only include Format if it exists and we have a format_value
+                if "Format" in main_rep and format_value:
+                    new_pattern["detail"]["outputs"]["input"]["DigitalSourceAsset"]["MainRepresentation"] = {
+                        "Format": []
+                    }
+                    
+                    # Process Format value
+                    if "," in format_value:
+                        # Split by comma, trim whitespace, convert to uppercase, and filter out empty items
+                        new_pattern["detail"]["outputs"]["input"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [
+                            item.strip().upper() for item in format_value.split(",") if item.strip()
+                        ]
+                    else:
+                        new_pattern["detail"]["outputs"]["input"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [format_value.upper()]
+        
+        # Use the transformed pattern
+        result = new_pattern
+        logger.info(f"Transformed pattern for pipeline_execution_completed: {json.dumps(result)}")
+        return result
+    
+    # Process placeholders in the pattern
+    def replace_placeholders(obj):
+        if isinstance(obj, dict):
+            for key, value in list(obj.items()):
+                if isinstance(value, dict):
+                    replace_placeholders(value)
+                elif isinstance(value, list):
+                    for i, item in enumerate(obj[key]):
+                        if isinstance(item, dict):
+                            replace_placeholders(item)
+                        elif isinstance(item, str) and item.startswith("${") and item.endswith("}"):
+                            param_name = item[2:-1]
+                            if param_name in parameters and parameters[param_name]:
+                                param_value = parameters[param_name]
+                                logger.info(f"Replacing {param_name} with {param_value}")
+                                if "," in param_value:
+                                    obj[key][i] = [v.strip().upper() for v in param_value.split(",") if v.strip()]
+                                else:
+                                    obj[key][i] = param_value.upper()
+                elif isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                    param_name = value[2:-1]
+                    if param_name in parameters and parameters[param_name]:
+                        param_value = parameters[param_name]
+                        logger.info(f"Replacing {param_name} with {param_value}")
+                        if "," in param_value:
+                            obj[key] = [v.strip().upper() for v in param_value.split(",") if v.strip()]
+                        else:
+                            obj[key] = param_value.upper()
+    
+    # Special handling for Format in MainRepresentation
+    if "detail" in result and "DigitalSourceAsset" in result["detail"] and "MainRepresentation" in result["detail"]["DigitalSourceAsset"]:
+        main_rep = result["detail"]["DigitalSourceAsset"]["MainRepresentation"]
+        if "Format" in main_rep:
+            formats = main_rep["Format"]
+            if isinstance(formats, list) and len(formats) == 1 and formats[0].startswith("${"):
+                # This is a placeholder for Format
+                param_name = formats[0][2:-1]  # Extract name from ${param_name}
+                
+                # Check if we have a Format parameter or use the format_value we found earlier
+                param_value = parameters.get(param_name, format_value)
+                
+                if param_value:
+                    logger.info(f"Replacing Format placeholder with {param_value}")
+                    if "," in param_value:
+                        main_rep["Format"] = [v.strip().upper() for v in param_value.split(",") if v.strip()]
+                    else:
+                        main_rep["Format"] = [param_value.upper()]
+    
+    # Process any remaining placeholders
+    replace_placeholders(result)
+    
+    # Only add source if it's not already in the pattern and not a pipeline_execution rule
+    if "source" not in result and not is_pipeline_execution:
+        result["source"] = ["custom.asset.processor"]
+    
+    logger.info(f"Processed event pattern: {json.dumps(result)}")
+    return result
+
+
 def get_event_pattern_for_rule(
-    rule_name: str, node: Any, pipeline_name: str
+    rule_name: str, node: Any, pipeline_name: str, yaml_data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     Get the event pattern for a specific rule type.
@@ -25,13 +170,95 @@ def get_event_pattern_for_rule(
         rule_name: Name of the rule
         node: Node object containing configuration
         pipeline_name: Name of the pipeline
+        yaml_data: Optional YAML data containing the event pattern
 
     Returns:
         Event pattern dictionary for the rule
     """
-    # Base pattern
-    pattern = {"source": ["custom.asset.processor"]}
-
+    # Check if YAML data contains an event pattern
+    if yaml_data and "node" in yaml_data and "integration" in yaml_data["node"] and \
+       "config" in yaml_data["node"]["integration"] and "aws_eventbridge" in yaml_data["node"]["integration"]["config"] and \
+       "event_pattern" in yaml_data["node"]["integration"]["config"]["aws_eventbridge"]:
+        
+        # Use the event pattern from YAML
+        yaml_pattern = yaml_data["node"]["integration"]["config"]["aws_eventbridge"]["event_pattern"]
+        logger.info(f"Using event pattern from YAML: {yaml_pattern}")
+        
+        # Special handling for pipeline_execution_completed rule
+        if rule_name == "pipeline_execution_completed":
+            # Create a flattened pattern that EventBridge can understand
+            pattern = {
+                "detail": {}
+            }
+            
+            # Only add source and detail-type if they're in the original YAML
+            if "source" in yaml_pattern:
+                pattern["source"] = yaml_pattern["source"]
+            
+            if "detail-type" in yaml_pattern:
+                pattern["detail-type"] = yaml_pattern["detail-type"]
+            
+            # Copy metadata if it exists
+            if "detail" in yaml_pattern and "metadata" in yaml_pattern["detail"]:
+                pattern["detail"]["metadata"] = yaml_pattern["detail"]["metadata"]
+            
+            # Preserve the original structure with payload.assets
+            if "detail" in yaml_pattern and "payload" in yaml_pattern["detail"] and "assets" in yaml_pattern["detail"]["payload"]:
+                # Copy the payload structure directly
+                pattern["detail"]["payload"] = copy.deepcopy(yaml_pattern["detail"]["payload"])
+                
+                # Get the DigitalSourceAsset directly from assets
+                if "DigitalSourceAsset" in pattern["detail"]["payload"]["assets"]:
+                    digital_source_asset = pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]
+                    
+                    # Get format parameter value
+                    format_value = None
+                    for param_name, param_value in node.data.configuration.get("parameters", {}).items():
+                        if param_name in ["Format", "Image Type", "Video Type", "Audio Type"] and param_value:
+                            format_value = param_value
+                            logger.info(f"Found {param_name} parameter with value: {format_value}")
+                            break
+                    
+                    # If we don't have a format value, remove MainRepresentation and Format
+                    if not format_value and "MainRepresentation" in digital_source_asset:
+                        if "Format" in digital_source_asset["MainRepresentation"]:
+                            logger.info("No format value provided, removing Format field")
+                            del pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]["MainRepresentation"]["Format"]
+                        
+                        # If MainRepresentation is now empty, remove it too
+                        if not pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]["MainRepresentation"]:
+                            logger.info("MainRepresentation is empty, removing it")
+                            del pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]["MainRepresentation"]
+                    # If we have a format value, update it
+                    elif format_value and "MainRepresentation" in digital_source_asset:
+                        # Process Format value
+                        if "," in format_value:
+                            # Split by comma, trim whitespace, convert to uppercase, and filter out empty items
+                            pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [
+                                item.strip().upper() for item in format_value.split(",") if item.strip()
+                            ]
+                        else:
+                            pattern["detail"]["payload"]["assets"]["DigitalSourceAsset"]["MainRepresentation"]["Format"] = [format_value.upper()]
+            
+            logger.info(f"Created flattened pattern for pipeline_execution_completed: {json.dumps(pattern)}")
+            return pattern
+        else:
+            # For other rules, use the pattern from YAML
+            pattern = copy.deepcopy(yaml_pattern)
+            
+            # Don't add source if not present
+            
+            # Process parameter substitutions
+            pattern = process_pattern_parameters(pattern, node)
+            
+            return pattern
+    
+    # Fall back to existing logic if no pattern in YAML
+    logger.info(f"No event pattern found in YAML, using built-in pattern for rule: {rule_name}")
+    
+    # Base pattern without source
+    pattern = {}
+    
     # Add specific pattern based on rule name
     if rule_name == "ingest_completed":
         pattern.update(
@@ -84,12 +311,12 @@ def get_event_pattern_for_rule(
         if asset_prefix:
             logger.info(f"Using prefix path: {asset_prefix}")
         
-        # Create the base pattern with appropriate asset type and format
+        # Create the base pattern with appropriate asset type
         digital_source_asset = {
             "Type": [asset_type],
         }
         
-        # Only include MainRepresentation if asset_format is not empty
+        # Only include MainRepresentation and Format if asset_format is not empty
         if asset_format and asset_format.strip():
             # Handle comma-delimited formats
             if "," in asset_format:
@@ -99,6 +326,8 @@ def get_event_pattern_for_rule(
                     digital_source_asset["MainRepresentation"] = {"Format": format_array}
             else:
                 digital_source_asset["MainRepresentation"] = {"Format": [asset_format.upper()]}
+        else:
+            logger.info(f"No format value provided for {asset_type} asset, omitting MainRepresentation and Format")
         
         # Add StorageInfo path if prefix is specified and not empty
         if asset_prefix and asset_prefix.strip():
@@ -118,12 +347,14 @@ def get_event_pattern_for_rule(
         
         logger.info(f"Created digital source asset pattern: {digital_source_asset}")
         
-        # Override the source for pipeline execution completed events
+        # Create a pattern without source and detail-type, using the original structure
         pattern = {
-            "source": ["medialake.pipeline"],
-            "detail-type": ["Pipeline Execution Completed"],
             "detail": {
-                "outputs": {"input": {"DigitalSourceAsset": digital_source_asset}},
+                "payload": {
+                    "assets": {
+                        "DigitalSourceAsset": digital_source_asset
+                    }
+                },
             },
         }
         
@@ -374,8 +605,14 @@ def create_eventbridge_rule(
             :64
         ]  # Ensure name is not too long
 
-        # Get event pattern based on rule name and node configuration
-        event_pattern = get_event_pattern_for_rule(rule_name, node, pipeline_name)
+        # Get event pattern based on rule name and node configuration, passing the YAML data
+        event_pattern = get_event_pattern_for_rule(rule_name, node, pipeline_name, yaml_data)
+
+        # Log the event pattern without adding any fields
+        logger.info(f"Using event pattern for rule {unique_rule_name}: {json.dumps(event_pattern)}")
+        
+        # Log the final event pattern
+        logger.info(f"Final event pattern for rule {unique_rule_name}: {json.dumps(event_pattern)}")
 
         # Create the EventBridge rule
         events_client = boto3.client("events")
@@ -529,7 +766,8 @@ def create_eventbridge_rule(
                             "MAX_CONCURRENT_EXECUTIONS": "1000",
                             "PIPELINE_NAME": pipeline_name,
                             "SERVICE": "Trigger",  # node Title
-                            "STEP_NAME": "Pipeline Trigger"  # friendly name of the node
+                            "STEP_NAME": "Pipeline Trigger",  # friendly name of the node
+                            "DEFAULT_STATE_MACHINE_ARN": state_machine_arn  # Add default state machine ARN
                         }
                     }
                 )
@@ -682,36 +920,7 @@ def create_eventbridge_rule(
                 {
                     "Id": f"{sanitized_pipeline_name}-target",
                     "Arn": queue_arn,
-                    # Add input transformer to include metadata about the trigger and the Step Function ARN
-                    "InputTransformer": {
-                        "InputPathsMap": {
-                            "detail": "$.detail",
-                            "source": "$.source",
-                            "detailType": "$.detail-type",
-                            "time": "$.time",
-                        },
-                        "InputTemplate": json.dumps(
-                            {
-                                "Asset": {
-                                    "detail": "<detail>",
-                                    "source": "<source>",
-                                    "detailType": "<detailType>",
-                                    "time": "<time>",
-                                    "triggerNode": node.data.id,
-                                    "pipelineName": pipeline_name,
-                                    "pipelineExecutionId.$":"$$.Execution.Id",
-                                    "pipelineExecutionStart.$":"$$.Execution.StartTime",
-                                    "pipelineId": state_machine_arn,
-                                    
-                                },
-                                "StateMachineArn": state_machine_arn
-                            }
-                        )
-                        .replace('"<detail>"', "<detail>")
-                        .replace('"<source>"', "<source>")
-                        .replace('"<detailType>"', "<detailType>")
-                        .replace('"<time>"', "<time>"),
-                    },
+                    # Use matched event directly without input transformer
                 }
             ],
         )
