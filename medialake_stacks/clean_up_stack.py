@@ -187,5 +187,5 @@ class CleanupStack(Stack):
             properties={
                 "Version": "1.0.0",
             },
-            removal_policy=RemovalPolicy.DESTROY,  # needed for Delete request type on CDK destroy
+            removal_policy=RemovalPolicy.DESTROY,
         )

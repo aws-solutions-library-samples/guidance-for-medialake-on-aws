@@ -14,6 +14,17 @@ export default {
         connectors: 'Connectors',
         selectConnector: 'Select a connector'
       },
+    assets: {
+        "favorite": "Favorite",
+        "unfavorite": "Unfavorite",
+        "rename": "Rename",
+        "delete": "Delete",
+        "download": "Download",
+        "share": "Share",
+        "viewDetails": "View Details",
+        "retry": "Retry",
+        "retryFromCurrent": "Retry from current position",
+    },
     assetExplorer: {
         noConnectorSelected: 'Select a connector to view assets',
         noAssetsFound: 'No assets found for this connector',
@@ -72,7 +83,9 @@ export default {
         pushNotifications: 'Push Notifications',
         changePassword: 'Change Password',
         twoFactorAuth: 'Two-Factor Authentication',
-        appearance: 'Appearance'
+        appearance: 'Appearance',
+        noFirstName: 'User doesn\'t have a first name configured',
+        noLastName: 'User doesn\'t have a last name configured'
     },
     app: {
         loading: 'Loading...',

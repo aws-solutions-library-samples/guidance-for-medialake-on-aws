@@ -1,8 +1,9 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import AppConfigured from './components/app-configured';
 import { Amplify } from 'aws-amplify';
 import { useTranslation } from 'react-i18next';
+import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 
 // Import and initialize i18next configuration
 import './i18n/i18n';
@@ -13,29 +14,63 @@ const LoadingFallback = () => {
   return <>{t('app.loading', 'Loading...')}</>;
 };
 
-// Initialize Amplify with the configuration from aws-exports.json
-fetch('/aws-exports.json')
-  .then(response => response.json())
-  .then(awsConfig => {
-    Amplify.configure({
-      Auth: {
-        Cognito: {
-          userPoolId: awsConfig.Auth.Cognito.userPoolId,
-          userPoolClientId: awsConfig.Auth.Cognito.userPoolClientId,
-          identityPoolId: awsConfig.Auth.Cognito.identityPoolId,
-        }
-      },
-      API: awsConfig.API
-    });
+// App component that initializes feature flags and renders AppConfigured
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const { t } = useTranslation();
 
-    ReactDOM.createRoot(document.getElementById('root')).render(
+  useEffect(() => {
+    // Initialize AWS configuration
+    const initializeApp = async () => {
+      try {
+        await initializeAWS();
+        setIsLoading(false);
+      } catch (error) {
+        console.error(t('app.errors.loadingConfig', 'Error loading configuration:'), error);
+        setIsLoading(false);
+      }
+    };
+    
+    const initializeAWS = async () => {
+      try {
+        // Fetch AWS configuration
+        const awsResponse = await fetch('/aws-exports.json');
+        const awsConfig = await awsResponse.json();
+        
+        // Configure Amplify
+        Amplify.configure({
+          Auth: {
+            Cognito: {
+              userPoolId: awsConfig.Auth.Cognito.userPoolId,
+              userPoolClientId: awsConfig.Auth.Cognito.userPoolClientId,
+              identityPoolId: awsConfig.Auth.Cognito.identityPoolId,
+            }
+          },
+          API: awsConfig.API
+        });
+        
+        return true;
+      } catch (error) {
+        console.error('Error loading AWS configuration:', error);
+        throw error;
+      }
+    };
 
-        <Suspense fallback={<LoadingFallback />}>
-          <AppConfigured />
-        </Suspense>
+    initializeApp();
+  }, [t]);
 
-    )
-  })
-  .catch(error => {
-    console.error(useTranslation().t('app.errors.loadingConfig', 'Error loading AWS configuration:'), error);
-  });
+  if (isLoading) {
+    return <LoadingFallback />;
+  }
+
+  return (
+    <FeatureFlagsProvider>
+      <Suspense fallback={<LoadingFallback />}>
+        <AppConfigured />
+      </Suspense>
+    </FeatureFlagsProvider>
+  );
+};
+
+// Render the app
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);

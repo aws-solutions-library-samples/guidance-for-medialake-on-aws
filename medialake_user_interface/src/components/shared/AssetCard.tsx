@@ -3,6 +3,8 @@ import { Box, Typography, IconButton, TextField, Button, CircularProgress } from
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { AssetAudio } from '../asset';
 
 export interface AssetField {
@@ -35,6 +37,8 @@ export interface AssetCardProps {
     thumbnailScale?: 'fit' | 'fill';
     showMetadata?: boolean;
     menuOpen?: boolean; // Add prop to track menu state from parent
+    isFavorite?: boolean; // Whether the asset is favorited
+    onFavoriteToggle?: (event: React.MouseEvent<HTMLElement>) => void; // Callback when favorite is toggled
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -61,8 +65,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
     thumbnailScale = 'fill',
     showMetadata = true,
     menuOpen = false, // Default to false
+    isFavorite = false,
+    onFavoriteToggle,
 }) => {
- 
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
@@ -239,14 +244,57 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     />
                 )}
 
+                {/* Position favorite button at the top left of the card - only visible on hover */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        left: 8,
+                        zIndex: 1000, // Keep high z-index to ensure it's above other elements
+                        opacity: shouldShowButtons ? (isFavorite ? 1 : 0.7) : 0, // Only visible when hovering
+                        transition: 'opacity 0.2s ease-in-out',
+                        pointerEvents: shouldShowButtons ? 'auto' : 'none', // Ensure button is clickable only when visible
+                        '&:hover': {
+                            opacity: shouldShowButtons ? 1 : 0,
+                        }
+                    }}
+                    onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
+                >
+                    <IconButton
+                        size="small"
+                        onClick={(e) => {
+                            console.log('Favorite icon clicked for asset:', id);
+                            console.log('onFavoriteToggle exists:', !!onFavoriteToggle);
+                            if (onFavoriteToggle) {
+                                console.log('Calling onFavoriteToggle');
+                                onFavoriteToggle(e);
+                            } else {
+                                console.log('No onFavoriteToggle callback provided');
+                            }
+                        }}
+                        sx={{
+                            bgcolor: 'background.paper',
+                            '&:hover': {
+                                bgcolor: 'background.default',
+                            }
+                        }}
+                    >
+                        {isFavorite ? (
+                            <FavoriteIcon fontSize="small" color="error" />
+                        ) : (
+                            <FavoriteBorderIcon fontSize="small" />
+                        )}
+                    </IconButton>
+                </Box>
+
                 {/* Position buttons at the top right of the card, visible on hover or when menu is open */}
                 <Box
-                    sx={{ 
-                        position: 'absolute', 
-                        top: 8, 
-                        right: 8, 
-                        display: 'flex', 
-                        gap: 1, 
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        display: 'flex',
+                        gap: 1,
                         zIndex: 10, // Increased z-index to ensure buttons are above other elements
                         opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
                         transition: 'opacity 0.2s ease-in-out',
@@ -257,7 +305,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     <IconButton
                         size="small"
                         onClick={handleDeleteClick}
-                        sx={{ 
+                        sx={{
                             bgcolor: 'background.paper',
                             '&:hover': {
                                 bgcolor: 'background.default',
@@ -269,7 +317,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     <IconButton
                         size="small"
                         onClick={handleMenuClick}
-                        sx={{ 
+                        sx={{
                             bgcolor: 'background.paper',
                             '&:hover': {
                                 bgcolor: 'background.default',

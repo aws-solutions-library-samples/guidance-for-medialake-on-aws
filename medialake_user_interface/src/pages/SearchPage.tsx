@@ -20,6 +20,7 @@ import SearchFilters from '../components/search/SearchFilters';
 import ModularUnifiedResultsView from '../components/search/ModularUnifiedResultsView';
 import { useSearch } from '../api/hooks/useSearch';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
+import { useGetFavorites, useAddFavorite, useRemoveFavorite } from '../api/hooks/useFavorites';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -134,6 +135,42 @@ const SearchPage: React.FC = () => {
         menuAnchorEl,
         selectedAsset,
     } = useAssetOperations<AssetItem>();
+
+    // Favorites functionality
+    const { data: favorites } = useGetFavorites("ASSET");
+    const { mutate: addFavorite } = useAddFavorite();
+    const { mutate: removeFavorite } = useRemoveFavorite();
+
+    const isAssetFavorited = useCallback((assetId: string) => {
+        if (!favorites) return false;
+        return favorites.some(favorite => favorite.itemId === assetId);
+    }, [favorites]);
+
+    const handleFavoriteToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+        const assetId = asset.InventoryID;
+        
+        console.log('Toggling favorite for asset:', assetId);
+        console.log('Current favorites state:', favorites);
+        
+        if (isAssetFavorited(assetId)) {
+            console.log('Removing favorite for asset:', assetId);
+            removeFavorite({ itemType: "ASSET", itemId: assetId });
+        } else {
+            console.log('Adding favorite for asset:', assetId);
+            const favoriteData = {
+                itemId: assetId,
+                itemType: "ASSET" as const, // Use const assertion to fix type error
+                metadata: {
+                    name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+                    assetType: asset.DigitalSourceAsset.Type, // Note: using assetType to match what Favorites.tsx expects
+                    thumbnailUrl: asset.thumbnailUrl || ""
+                }
+            };
+            console.log('Favorite data being sent:', favoriteData);
+            addFavorite(favoriteData);
+        }
+    }, [isAssetFavorited, addFavorite, removeFavorite, favorites]);
 
     const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -467,6 +504,8 @@ const SearchPage: React.FC = () => {
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
+                                isAssetFavorited={isAssetFavorited}
+                                onFavoriteToggle={handleFavoriteToggle}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message

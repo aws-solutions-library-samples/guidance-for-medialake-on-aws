@@ -18,6 +18,9 @@ interface AssetGridViewProps<T> {
   onEditNameComplete: (asset: T, save: boolean) => void;
   editingAssetId?: string;
   editedName?: string;
+  // Favorite functionality
+  isAssetFavorited?: (assetId: string) => boolean;
+  onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -43,6 +46,8 @@ function AssetGridView<T>({
   onEditNameComplete,
   editingAssetId,
   editedName,
+  isAssetFavorited,
+  onFavoriteToggle,
   getAssetId,
   getAssetName,
   getAssetType,
@@ -102,6 +107,8 @@ function AssetGridView<T>({
               aspectRatio={aspectRatio}
               thumbnailScale={thumbnailScale}
               showMetadata={showMetadata}
+              isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
+              onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
             />
           </Grid>
         ))}
@@ -147,6 +154,8 @@ function AssetGridView<T>({
                   aspectRatio={aspectRatio}
                   thumbnailScale={thumbnailScale}
                   showMetadata={showMetadata}
+                  isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
+                  onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
                 />
               </Grid>
             ))}

@@ -110,6 +110,8 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                             aspectRatio="square"
                             thumbnailScale="fill"
                             showMetadata={true}
+                            isFavorite={false} // Default to false since we don't have favorite info here
+                            onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in RelatedItemsView')}
                         />
                     </Grid>
                 ))}

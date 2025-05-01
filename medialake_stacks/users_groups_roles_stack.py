@@ -3,6 +3,8 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_cognito as cognito,
     aws_secretsmanager as secretsmanager,
+    aws_dynamodb as dynamodb,
+    RemovalPolicy,
     Fn
 )
 import aws_cdk as cdk
@@ -18,7 +20,13 @@ from medialake_constructs.api_gateway.api_gateway_roles import (
     RolesApi,
     RolesApiProps,
 )
+from medialake_constructs.api_gateway.api_gateway_upsf import (
+    UPSFApi,
+    UPSFApiProps,
+)
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from config import config
 
 
 @dataclass
@@ -48,6 +56,126 @@ class UsersGroupsRolesStack(cdk.NestedStack):
             rest_api_id=api_id,
             root_resource_id=root_resource_id
         )
+        
+        # Create the DynamoDB tables for User/Sharing Features
+        
+        # 1. User Table
+        user_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-user-{config.environment}",
+            partition_key_name="userId",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="itemKey",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand(),
+            global_secondary_indexes=[
+                # GSI1 (FavoritesByType)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI1",
+                    partition_key=dynamodb.Attribute(
+                        name="userId",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="gsi1Sk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                ),
+                # GSI2 (FavoritesAcrossUsers)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI2",
+                    partition_key=dynamodb.Attribute(
+                        name="gsi2Pk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="gsi2Sk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                )
+            ]
+        )
+        self._user_table = DynamoDB(self, "UserTable", user_table_props)
+        
+        # 2. Sharing Table
+        sharing_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-collections-{config.environment}",
+            partition_key_name="pk",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="sk",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand(),
+            ttl_attribute="expiresAt",
+            global_secondary_indexes=[
+                # GSI1 (ResourceTypeGSI)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI1",
+                    partition_key=dynamodb.Attribute(
+                        name="resourceType",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="pk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                ),
+                # GSI2 (PrincipalTypeGSI)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI2",
+                    partition_key=dynamodb.Attribute(
+                        name="principalType",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="pk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                ),
+                # GSI3 (CreatedByGSI)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI3",
+                    partition_key=dynamodb.Attribute(
+                        name="createdBy",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="createdAt",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                )
+            ]
+        )
+        self._sharing_table = DynamoDB(self, "SharingTable", sharing_table_props)
+        
+        # 3. Permissions Table
+        permissions_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-permissions-{config.environment}",
+            partition_key_name="pk",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="sk",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand()
+        )
+        self._permissions_table = DynamoDB(self, "PermissionsTable", permissions_table_props)
+        
+        # 4. Settings Table
+        settings_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-settings-{config.environment}",
+            partition_key_name="pk",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="sk",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand()
+        )
+        self._settings_table = DynamoDB(self, "SettingsTable", settings_table_props)
         
         self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
             self, 
@@ -79,6 +207,19 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                 x_origin_verify_secret=props.x_origin_verify_secret,
             ),
         )
+        
+        # Create the UPSF API construct
+        self._upsf_api = UPSFApi(
+            self,
+            "UPSFApi",
+            props=UPSFApiProps(
+                api_resource=api.root,
+                cognito_authorizer=self._api_authorizer,
+                cognito_user_pool=props.cognito_user_pool,
+                x_origin_verify_secret=props.x_origin_verify_secret,
+                user_table=self._user_table.table,
+            ),
+        )
     
     @property
     def users_api(self):
@@ -93,4 +234,24 @@ class UsersGroupsRolesStack(cdk.NestedStack):
     @property
     def roles_metrics_table(self):
         """Return the roles metrics table from the construct"""
-        return self._roles_api._roles_metrics_table 
+        return self._roles_api._roles_metrics_table
+    
+    @property
+    def user_table(self):
+        """Return the user table"""
+        return self._user_table.table
+    
+    @property
+    def sharing_table(self):
+        """Return the sharing table"""
+        return self._sharing_table.table
+    
+    @property
+    def permissions_table(self):
+        """Return the permissions table"""
+        return self._permissions_table.table
+    
+    @property
+    def settings_table(self):
+        """Return the settings table"""
+        return self._settings_table.table

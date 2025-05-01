@@ -44,6 +44,9 @@ interface ModularUnifiedResultsViewProps {
   onEditNameComplete: (asset: AssetItem, save: boolean) => void;
   editingAssetId?: string;
   editedName?: string;
+  // Favorite functionality
+  isAssetFavorited?: (assetId: string) => boolean;
+  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -80,6 +83,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   onEditNameComplete,
   editingAssetId,
   editedName,
+  isAssetFavorited,
+  onFavoriteToggle,
   onGroupByTypeChange,
   onPageSizeChange,
   error,
@@ -139,6 +144,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onEditNameComplete={onEditNameComplete}
       editingAssetId={editingAssetId}
       editedName={editedName}
+      isAssetFavorited={isAssetFavorited}
+      onFavoriteToggle={onFavoriteToggle}
       error={error}
       isLoading={isLoading}
       getAssetId={(asset) => asset.InventoryID}

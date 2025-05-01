@@ -9,6 +9,7 @@ import { formatDate } from '@/utils/dateFormat';
 import ModularUnifiedResultsView from '@/components/search/ModularUnifiedResultsView';
 import { useConnectorAssets, type AssetItem, type ConnectorAssetsResponse } from '@/api/hooks/useConnectorAssets';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
+import { useGetFavorites, useAddFavorite, useRemoveFavorite } from '@/api/hooks/useFavorites';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 
 interface AssetExplorerProps {
@@ -25,10 +26,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [assetType, setAssetType] = useState<string | undefined>(undefined);
-  
-  // For debugging
-  console.log('AssetExplorer props:', { connectorId, bucketName });
-  
+   
   // UI state
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>('medium');
@@ -51,6 +49,48 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     sortDirection,
     assetType
   }) as { data: ConnectorAssetsResponse | undefined; isLoading: boolean; error: any };
+
+  // Favorites functionality
+  const { data: favorites, isLoading: isFavoritesLoading } = useGetFavorites('ASSET');
+  const { mutate: addFavorite } = useAddFavorite();
+  const { mutate: removeFavorite } = useRemoveFavorite();
+
+  // Check if an asset is favorited
+  const isAssetFavorited = (assetId: string) => {
+    if (!favorites) return false;
+    return favorites.some(favorite => favorite.itemId === assetId);
+  };
+
+  // Handle favorite toggle
+  const handleFavoriteToggle = (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    console.log('handleFavoriteToggle called with asset:', asset.InventoryID);
+    
+    const assetId = asset.InventoryID;
+    const isFavorited = isAssetFavorited(assetId);
+    console.log('Current favorite status:', isFavorited);
+    
+    try {
+      if (isFavorited) {
+        console.log('Removing favorite:', assetId);
+        removeFavorite({ itemId: assetId, itemType: 'ASSET' });
+      } else {
+        console.log('Adding favorite:', assetId);
+        addFavorite({
+          itemId: assetId,
+          itemType: 'ASSET',
+          metadata: {
+            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            assetType: asset.DigitalSourceAsset.Type,
+            thumbnailUrl: asset.thumbnailUrl || '',
+            format: asset.DigitalSourceAsset.MainRepresentation.Format
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   // Asset operations
   const {
@@ -305,11 +345,13 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
             onEditNameComplete={handleNameEditComplete}
             editingAssetId={editingAssetId}
             editedName={editedName}
+            isAssetFavorited={isAssetFavorited}
+            onFavoriteToggle={handleFavoriteToggle}
             error={error ? {
               status: error.name || 'Error',
               message: error.message || 'Failed to load assets'
             } : undefined}
-            isLoading={isLoading}
+            isLoading={isLoading || isFavoritesLoading}
           />
         </Box>
       )}
