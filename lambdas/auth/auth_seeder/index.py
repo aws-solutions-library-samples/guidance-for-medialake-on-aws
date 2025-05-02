@@ -1,0 +1,208 @@
+"""
+Authorization Table Seeder Lambda for Media Lake.
+
+This Lambda function is triggered by a CloudFormation Custom Resource
+and seeds the default system permission sets (Administrator, Editor, Viewer)
+into the DynamoDB authorization table.
+"""
+
+import os
+import json
+import boto3
+import datetime
+from typing import Dict, Any, Optional
+from aws_lambda_powertools import Logger
+from crhelper import CfnResource
+
+# Initialize powertools
+logger = Logger()
+
+# Initialize resources
+helper = CfnResource(json_logging=True, log_level="DEBUG", boto_level="CRITICAL")
+dynamodb = boto3.resource("dynamodb")
+
+# Get environment variables
+AUTH_TABLE_NAME = os.environ.get("AUTH_TABLE_NAME")
+
+# Constants for DynamoDB keys
+PREFIX_PERMISSION_SET = "PS#"
+PREFIX_METADATA = "METADATA"
+
+# Default permission sets definitions
+DEFAULT_PERMISSION_SETS = [
+    {
+        "id": "administrator",
+        "name": "Administrator",
+        "description": "Full access to all system features and resources",
+        "isSystem": True,
+        "permissions": {
+            "assets.view": True,
+            "assets.edit": True,
+            "assets.delete": True,
+            "pipelines.view": True,
+            "pipelines.edit": True,
+            "pipelines.delete": True,
+            "collections.view": True,
+            "collections.edit": True,
+            "collections.delete": True,
+            "admin.full": True
+        }
+    },
+    {
+        "id": "editor",
+        "name": "Editor",
+        "description": "Can view, edit, and manage assets and pipelines, but cannot perform administrative actions",
+        "isSystem": True,
+        "effectiveRole": "Editor",
+        "permissions": {
+            "assets.view": True,
+            "assets.edit": True,
+            "assets.delete": True,
+            "pipelines.view": True,
+            "pipelines.edit": True,
+            "pipelines.delete": False,
+            "collections.view": True,
+            "collections.edit": True,
+            "collections.delete": False,
+            "admin.full": False
+        }
+    },
+    {
+        "id": "viewer",
+        "name": "Viewer",
+        "description": "Read-only access to assets, pipelines, and collections",
+        "isSystem": True,
+        "effectiveRole": "Viewer",
+        "permissions": {
+            "assets.view": True,
+            "assets.edit": False,
+            "assets.delete": False,
+            "pipelines.view": True,
+            "pipelines.edit": False,
+            "pipelines.delete": False,
+            "collections.view": True,
+            "collections.edit": False,
+            "collections.delete": False,
+            "admin.full": False
+        }
+    }
+]
+
+def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
+    """
+    Seed a permission set into the DynamoDB authorization table.
+    
+    Args:
+        permission_set: Permission set definition
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Initialize DynamoDB table
+        table = dynamodb.Table(AUTH_TABLE_NAME)
+        
+        # Generate timestamps
+        current_time = datetime.datetime.now().isoformat()
+        
+        # Prepare DynamoDB item
+        item = {
+            "PK": f"{PREFIX_PERMISSION_SET}{permission_set['id']}",
+            "SK": PREFIX_METADATA,
+            "name": permission_set["name"],
+            "description": permission_set["description"],
+            "isSystem": permission_set["isSystem"],
+            "permissions": permission_set["permissions"],
+            "createdAt": current_time,
+            "updatedAt": current_time,
+        }
+        
+        # Add effectiveRole if present
+        if "effectiveRole" in permission_set:
+            item["effectiveRole"] = permission_set["effectiveRole"]
+        
+        # Check if the permission set already exists
+        response = table.get_item(
+            Key={
+                "PK": item["PK"],
+                "SK": item["SK"]
+            }
+        )
+        
+        if "Item" in response:
+            logger.info(f"Permission set {permission_set['id']} already exists, updating it")
+            # Update the existing item
+            table.put_item(Item=item)
+        else:
+            logger.info(f"Creating permission set {permission_set['id']}")
+            # Create a new item
+            table.put_item(Item=item)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error seeding permission set {permission_set['id']}: {str(e)}")
+        return False
+
+@helper.create
+def create_handler(event: Dict[str, Any], context: Any) -> None:
+    """
+    Handle the creation of the default permission sets.
+    
+    Args:
+        event: CloudFormation Custom Resource event
+        context: Lambda context
+    """
+    logger.info("Creating default permission sets")
+    
+    success_count = 0
+    failure_count = 0
+    
+    for permission_set in DEFAULT_PERMISSION_SETS:
+        if seed_permission_set(permission_set):
+            success_count += 1
+        else:
+            failure_count += 1
+    
+    logger.info(f"Permission set seeding completed: {success_count} succeeded, {failure_count} failed")
+
+@helper.update
+def update_handler(event: Dict[str, Any], context: Any) -> None:
+    """
+    Handle updates to the custom resource.
+    
+    Args:
+        event: CloudFormation Custom Resource event
+        context: Lambda context
+    """
+    logger.info("Update operation - ensuring default permission sets exist")
+    # For updates, we'll just ensure the default permission sets exist
+    create_handler(event, context)
+
+@helper.delete
+def delete_handler(event: Dict[str, Any], context: Any) -> None:
+    """
+    Handle the deletion of the custom resource.
+    
+    Args:
+        event: CloudFormation Custom Resource event
+        context: Lambda context
+    """
+    # We don't delete the default permission sets when the stack is deleted
+    logger.info("Delete operation - not removing default permission sets")
+    pass
+
+@logger.inject_lambda_context
+def lambda_handler(event: Dict[str, Any], context: Any) -> None:
+    """
+    Lambda handler to process CloudFormation Custom Resource events.
+    
+    Args:
+        event: CloudFormation Custom Resource event
+        context: Lambda context
+    """
+    try:
+        logger.info(f"Received event: {json.dumps(event)}")
+        helper(event, context)
+    except Exception as e:
+        logger.exception(f"Error in lambda_handler: {str(e)}")
+        helper.init_failure(e)

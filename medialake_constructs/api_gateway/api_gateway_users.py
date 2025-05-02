@@ -130,7 +130,7 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "GET",
             api_gateway_get_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
             authorizer=props.cognito_authorizer,
         )
 
@@ -191,7 +191,7 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "PUT",
             api_gateway_put_users_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
             authorizer=props.cognito_authorizer,
         )
 
@@ -214,7 +214,7 @@ class UsersApi(Construct):
         users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(users_user_post_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
             authorizer=props.cognito_authorizer,
         )
 
@@ -295,7 +295,7 @@ class UsersApi(Construct):
         users_user_id_disableuser_resource.add_method(
             "POST",
             api_post_users_user_id_disableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
             authorizer=props.cognito_authorizer,
         )
 
@@ -353,7 +353,7 @@ class UsersApi(Construct):
         users_user_id_enableuser_resource.add_method(
             "POST",
             api_post_users_user_id_enableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
             authorizer=props.cognito_authorizer,
         )
 

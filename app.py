@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.api_gateway_core_stack import ApiGatewayCoreStack, ApiGatewayCoreStackProps
 from medialake_stacks.users_groups_roles_stack import UsersGroupsRolesStack, UsersGroupsRolesStackProps
+from medialake_stacks.authorization_stack import AuthorizationStack, AuthorizationStackProps
+from medialake_stacks.auth_lambda_stack import AuthLambdaStack, AuthLambdaStackProps
+from medialake_constructs.auth_lambda_construct import AuthLambdaConstruct, AuthLambdaConstructProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
@@ -32,10 +35,6 @@ from medialake_stacks.pipeline_nodes_stack import (
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
-from medialake_constructs.api_gateway.api_gateway_deployment_construct import (
-    ApiGatewayDeploymentConstruct,
-ApiGatewayDeploymentProps,
-)
 from medialake_stacks.api_gateway_deployment_stack import ApiGatewayDeploymentStack, ApiGatewayDeploymentStackProps
 
 # from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
@@ -80,15 +79,39 @@ api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", pro
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
+
+# Create the Auth Lambda Stack
+
+# Create the Authorization Stack
+authorization_stack = AuthorizationStack(
+    app,
+    "MediaLakeAuthorizationStack",
+    props=AuthorizationStackProps(
+        cognito_user_pool=api_gateway_core_stack.user_pool,
+        # custom_authorizer_lambda=auth_lambda_stack.custom_authorizer_lambda,
+    ),
+    env=env
+)
         
-@dataclass 
+@dataclass
 class MediaLakeStackProps:
     api_gateway_core_stack: ApiGatewayCoreStack
     base_infrastructure: BaseInfrastructureStack
+    authorization_stack: AuthorizationStack
 
 class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
         super().__init__(scope, id, **kwargs)
+        
+        auth_lambda_stack = AuthLambdaStack(
+            self,
+            "MediaLakeAuthLambdaStack",
+            props=AuthLambdaStackProps(
+                auth_table_name=authorization_stack._auth_table.table_name,
+                avp_policy_store_id=authorization_stack._policy_store.attr_policy_store_id,
+                avp_policy_store_arn="sadfasdfsdfa",
+            )
+        )
         
         settings_stack = SettingsStack(self, "MediaLakeSettings", props=SettingsStackProps())
         nodes_stack = NodesStack(self, "MediaLakeNodes", props=NodesStackProps(
@@ -119,6 +142,7 @@ class MediaLakeStack(cdk.Stack):
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+            # authorizer_lambda=authorization_stack.authorizer_lambda,
             ),
         )
 
@@ -204,6 +228,7 @@ class MediaLakeStack(cdk.Stack):
 medialake_stack = MediaLakeStack(app, "MediaLakeStack",props=MediaLakeStackProps(
     api_gateway_core_stack=api_gateway_core_stack,
     base_infrastructure=base_infrastructure,
+    authorization_stack=authorization_stack,
     ), env=env)
 medialake_stack.add_dependency(api_gateway_core_stack)
 

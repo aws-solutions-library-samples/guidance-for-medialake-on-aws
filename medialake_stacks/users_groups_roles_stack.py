@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
+    aws_lambda as lambda_,
     RemovalPolicy,
     Fn
 )
@@ -16,14 +17,12 @@ from medialake_constructs.api_gateway.api_gateway_users import (
     UsersApi,
     UsersApiProps,
 )
-from medialake_constructs.api_gateway.api_gateway_roles import (
-    RolesApi,
-    RolesApiProps,
-)
+
 from medialake_constructs.api_gateway.api_gateway_upsf import (
     UPSFApi,
     UPSFApiProps,
 )
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from config import config
@@ -35,6 +34,7 @@ class UsersGroupsRolesStackProps:
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     x_origin_verify_secret: secretsmanager.Secret
+    # authorizer_lambda: lambda_.Function
 
 
 class UsersGroupsRolesStack(cdk.NestedStack):
@@ -57,6 +57,26 @@ class UsersGroupsRolesStack(cdk.NestedStack):
             root_resource_id=root_resource_id
         )
         
+        self._users_groups_roles_authorizer_lambda = Lambda(
+            self,
+            "UsersGroupsRolesAuthorizerLambda",
+            config=LambdaConfig(
+                name="users_api_authorizer",
+                entry="lambdas/auth/custom_authorizer",
+                memory_size=256,
+                timeout_minutes=1,
+                # environment_variables=common_env_vars,
+            ),
+        )
+        
+        self._api_authorizer = apigateway.RequestAuthorizer(
+            self,
+            "CustomApiAuthorizer",
+            handler=self._users_groups_roles_authorizer_lambda.function,
+            identity_sources=["method.request.header.Authorization"],
+            results_cache_ttl=cdk.Duration.minutes(5),
+        )
+                
         # Create the DynamoDB tables for User/Sharing Features
         
         # 1. User Table
@@ -177,12 +197,7 @@ class UsersGroupsRolesStack(cdk.NestedStack):
         )
         self._settings_table = DynamoDB(self, "SettingsTable", settings_table_props)
         
-        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self, 
-            "UsersGroupsRolesApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
+
 
         # Create Users API construct
         self._users_api = UsersApi(
@@ -197,16 +212,16 @@ class UsersGroupsRolesStack(cdk.NestedStack):
         )
 
         # Create the Roles API construct
-        self._roles_api = RolesApi(
-            self,
-            "RolesApi",
-            props=RolesApiProps(
-                api_resource=api.root,
-                cognito_authorizer=self._api_authorizer,
-                cognito_user_pool=props.cognito_user_pool,
-                x_origin_verify_secret=props.x_origin_verify_secret,
-            ),
-        )
+        # self._roles_api = RolesApi(
+        #     self,
+        #     "RolesApi",
+        #     props=RolesApiProps(
+        #         api_resource=api.root,
+        #         cognito_authorizer=self._api_authorizer,
+        #         cognito_user_pool=props.cognito_user_pool,
+        #         x_origin_verify_secret=props.x_origin_verify_secret,
+        #     ),
+        # )
         
         # Create the UPSF API construct
         self._upsf_api = UPSFApi(
@@ -220,6 +235,7 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                 user_table=self._user_table.table,
             ),
         )
+        
     
     @property
     def users_api(self):
@@ -231,10 +247,10 @@ class UsersGroupsRolesStack(cdk.NestedStack):
         """Return the roles table from the construct"""
         return self._roles_api._roles_table.table
     
-    @property
-    def roles_metrics_table(self):
-        """Return the roles metrics table from the construct"""
-        return self._roles_api._roles_metrics_table
+    # @property
+    # def roles_metrics_table(self):
+    #     """Return the roles metrics table from the construct"""
+    #     return self._roles_api._roles_metrics_table
     
     @property
     def user_table(self):
@@ -246,7 +262,7 @@ class UsersGroupsRolesStack(cdk.NestedStack):
         """Return the sharing table"""
         return self._sharing_table.table
     
-    @property
+    # @property
     def permissions_table(self):
         """Return the permissions table"""
         return self._permissions_table.table
@@ -255,3 +271,8 @@ class UsersGroupsRolesStack(cdk.NestedStack):
     def settings_table(self):
         """Return the settings table"""
         return self._settings_table.table
+        
+    # @property
+    # def api_authorizer(self):
+    #     """Return the API authorizer"""
+    #     return self._api_authorizer

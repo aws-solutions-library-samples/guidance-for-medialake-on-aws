@@ -690,7 +690,6 @@ class ConnectorsConstruct(Construct):
         add_cors_options_method(s3_explorer_resource)
         add_cors_options_method(s3_explorer_connector_resource)
 
-        # ---- AWS Resources Endpoint ----
         aws_resource = props.api_resource.root.add_resource("aws")
         regions_resource = aws_resource.add_resource("regions")
 
@@ -698,12 +697,12 @@ class ConnectorsConstruct(Construct):
             self,
             "GetAWSRegionsLambda",
             config=LambdaConfig(
-                name="aws_regions_get",
+                name="regions-get",
                 entry="lambdas/api/aws/get_regions",
                 environment_variables={
                      "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
-                    ), # If needed for auth/verification
+                    ),
                 },
             ),
         )
@@ -712,14 +711,14 @@ class ConnectorsConstruct(Construct):
         get_regions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["ec2:DescribeRegions"],
-                resources=["*"], # ec2:DescribeRegions requires "*"
+                resources=["*"],
             )
         )
         
         regions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_regions_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO, # Or appropriate auth
+            authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
         
