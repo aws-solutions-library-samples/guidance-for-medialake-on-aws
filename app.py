@@ -109,7 +109,7 @@ class MediaLakeStack(cdk.Stack):
             props=AuthLambdaStackProps(
                 auth_table_name=authorization_stack._auth_table.table_name,
                 avp_policy_store_id=authorization_stack._policy_store.attr_policy_store_id,
-                avp_policy_store_arn="sadfasdfsdfa",
+                avp_policy_store_arn=f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{props.authorization_stack.policy_store.attr_policy_store_id}",
             )
         )
         
