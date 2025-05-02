@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.api_gateway_core_stack import ApiGatewayCoreStack, ApiGatewayCoreStackProps
 from medialake_stacks.users_groups_roles_stack import UsersGroupsRolesStack, UsersGroupsRolesStackProps
+from medialake_stacks.authorization_stack import AuthorizationStack, AuthorizationStackProps
+from medialake_stacks.auth_lambda_stack import AuthLambdaStack, AuthLambdaStackProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
@@ -81,10 +83,11 @@ waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
         
-@dataclass 
+@dataclass
 class MediaLakeStackProps:
     api_gateway_core_stack: ApiGatewayCoreStack
     base_infrastructure: BaseInfrastructureStack
+    authorization_stack: AuthorizationStack
 
 class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
@@ -115,10 +118,23 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         
+        # Create the Auth Lambda Stack
+        auth_lambda_stack = AuthLambdaStack(
+            self,
+            "MediaLakeAuthLambdaStack",
+            props=AuthLambdaStackProps(
+                auth_table_name=props.authorization_stack.auth_table.table_name,
+                avp_policy_store_id=props.authorization_stack.policy_store.attr_policy_store_id,
+                avp_policy_store_arn=f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{props.authorization_stack.policy_store.attr_policy_store_id}",
+            )
+        )
+        
         users_groups_roles_stack = UsersGroupsRolesStack(self, "MediaLakeUsersGroupsRolesStack", props=UsersGroupsRolesStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+            custom_authorizer_lambda=auth_lambda_stack.custom_authorizer_lambda,
+            auth_table=props.authorization_stack.auth_table,
             ),
         )
 
@@ -204,6 +220,7 @@ class MediaLakeStack(cdk.Stack):
 medialake_stack = MediaLakeStack(app, "MediaLakeStack",props=MediaLakeStackProps(
     api_gateway_core_stack=api_gateway_core_stack,
     base_infrastructure=base_infrastructure,
+    authorization_stack=authorization_stack,
     ), env=env)
 medialake_stack.add_dependency(api_gateway_core_stack)
 

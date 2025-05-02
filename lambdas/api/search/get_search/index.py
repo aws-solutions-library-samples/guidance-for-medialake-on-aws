@@ -287,8 +287,8 @@ def build_search_query(params: SearchParams) -> Dict:
                             "fields": name_fields,
                             "type": "best_fields",
                             "fuzziness": "AUTO",
-                            "prefix_length": 1,
-                            "minimum_should_match": "20%",
+                            "prefix_length": 10,
+                            "minimum_should_match": "80%",
                             "boost": 2
                         }
                     },

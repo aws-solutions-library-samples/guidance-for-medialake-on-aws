@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_secretsmanager as secretsmanager,
     aws_dynamodb as dynamodb,
+    aws_lambda as lambda_,
     RemovalPolicy,
     Fn
 )
@@ -24,6 +25,10 @@ from medialake_constructs.api_gateway.api_gateway_upsf import (
     UPSFApi,
     UPSFApiProps,
 )
+from medialake_constructs.api_gateway.api_gateway_authorization import (
+    AuthorizationApi,
+    AuthorizationApiProps,
+)
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from config import config
@@ -35,6 +40,8 @@ class UsersGroupsRolesStackProps:
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     x_origin_verify_secret: secretsmanager.Secret
+    custom_authorizer_lambda: lambda_.Function
+    auth_table: dynamodb.Table
 
 
 class UsersGroupsRolesStack(cdk.NestedStack):
@@ -177,11 +184,13 @@ class UsersGroupsRolesStack(cdk.NestedStack):
         )
         self._settings_table = DynamoDB(self, "SettingsTable", settings_table_props)
         
-        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self, 
-            "UsersGroupsRolesApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
+        # Create a RequestAuthorizer using the CustomApiAuthorizerLambda
+        self._api_authorizer = apigateway.RequestAuthorizer(
+            self,
+            "CustomApiAuthorizer",
+            handler=props.custom_authorizer_lambda,
+            identity_sources=["method.request.header.Authorization"],
+            results_cache_ttl=cdk.Duration.minutes(5),
         )
 
         # Create Users API construct
@@ -220,6 +229,19 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                 user_table=self._user_table.table,
             ),
         )
+        
+        # Create the Authorization API construct
+        self._authorization_api = AuthorizationApi(
+            self,
+            "AuthorizationApi",
+            props=AuthorizationApiProps(
+                api_resource=api.root,
+                cognito_authorizer=self._api_authorizer,
+                cognito_user_pool=props.cognito_user_pool,
+                x_origin_verify_secret=props.x_origin_verify_secret,
+                auth_table=props.auth_table,
+            ),
+        )
     
     @property
     def users_api(self):
@@ -255,3 +277,13 @@ class UsersGroupsRolesStack(cdk.NestedStack):
     def settings_table(self):
         """Return the settings table"""
         return self._settings_table.table
+        
+    @property
+    def api_authorizer(self):
+        """Return the API authorizer"""
+        return self._api_authorizer
+        
+    @property
+    def authorization_api(self):
+        """Return the authorization API"""
+        return self._authorization_api
