@@ -37,7 +37,7 @@
             "method": "trigger",
             "parameters": {
               "Prefix": "",
-              "Format": "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG"
+              "Format": "PSD, TIF, JPG, JPEG, PNG, WEBP, GIF, SVG"
             },
             "path": "",
             "operationId": "",

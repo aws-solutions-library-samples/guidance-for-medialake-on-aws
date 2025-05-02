@@ -33,8 +33,8 @@ class LambdaMiddleware:
         if not self.event_bus_name:
             raise ValueError("EVENT_BUS_NAME env-var (or arg) required")
 
-        self.external_payload_bucket = (
-            external_payload_bucket or os.getenv("EXTERNAL_PAYLOAD_BUCKET")
+        self.external_payload_bucket = external_payload_bucket or os.getenv(
+            "EXTERNAL_PAYLOAD_BUCKET"
         )
         if not self.external_payload_bucket:
             raise ValueError("EXTERNAL_PAYLOAD_BUCKET env-var required")
@@ -67,7 +67,7 @@ class LambdaMiddleware:
         return cur
 
     def _standardize_input(self, ev: Dict[str, Any]) -> Dict[str, Any]:
-        # 1) Already standardized?
+        # ── 1) Top-level object already standardised ──────────────────────────────
         if (
             isinstance(ev, dict)
             and isinstance(ev.get("metadata"), dict)
@@ -77,8 +77,29 @@ class LambdaMiddleware:
         ):
             return ev
 
-        # 2) EventBridge envelope?
-        if isinstance(ev.get("detail"), dict) and not ev.get("payload") and not ev.get("assets"):
+        # ── 1b) EventBridge envelope **whose `detail` is already standardised** ───
+        #     (this is the case that was being double-wrapped)
+        if isinstance(ev.get("detail"), dict):
+            detail = ev["detail"]
+            if (
+                isinstance(detail.get("metadata"), dict)
+                and isinstance(detail.get("payload"), dict)
+                and "data" in detail["payload"]
+                and "assets" in detail["payload"]
+            ):
+                # Bubble up execution / pipeline IDs if they were set on the envelope
+                detail.setdefault(
+                    "pipelineExecutionId", ev.get("pipelineExecutionId", "")
+                )
+                detail.setdefault("pipelineId", ev.get("pipelineId", ""))
+                return detail
+
+        # ── 2) Plain EventBridge envelope (detail *not* standardised) ─────────────
+        if (
+            isinstance(ev.get("detail"), dict)
+            and not ev.get("payload")
+            and not ev.get("assets")
+        ):
             meta = {
                 "service": self.service,
                 "stepName": self.step_name,
@@ -95,17 +116,21 @@ class LambdaMiddleware:
                 },
             }
 
-        # 3) Fallback: wrap entire event in data, carry any existing assets
+        # ── 3) Fallback: wrap entire event in `data`, carry over any existing assets
         meta = {
             "service": self.service,
             "stepName": self.step_name,
             "pipelineName": self.pipe_name,
-            "pipelineTraceId": ev.get("metadata", {}).get("pipelineTraceId", str(uuid.uuid4())),
+            "pipelineTraceId": ev.get("metadata", {}).get(
+                "pipelineTraceId", str(uuid.uuid4())
+            ),
             "pipelineExecutionId": ev.get("pipelineExecutionId", ""),
             "pipelineId": ev.get("pipelineId", ""),
         }
         payload: Dict[str, Any] = {"data": ev, "assets": []}
-        if isinstance(ev.get("payload"), dict) and isinstance(ev["payload"].get("assets"), list):
+        if isinstance(ev.get("payload"), dict) and isinstance(
+            ev["payload"].get("assets"), list
+        ):
             payload["assets"] = copy.deepcopy(ev["payload"]["assets"])
         elif isinstance(ev.get("assets"), list):
             payload["assets"] = copy.deepcopy(ev["assets"])
@@ -115,31 +140,50 @@ class LambdaMiddleware:
     def _make_output(
         self, result: Any, orig: Dict[str, Any], step_start: float
     ) -> Dict[str, Any]:
+        """
+        Build the outbound {metadata, payload:{data,assets}} object that the current
+        Lambda step will publish.  Key points:
+
+        • Preserves the incoming pipeline trace ID (or creates a new one)
+        • Collapses any nested {metadata,payload} object that arrived in
+        EventBridge `detail` so we don’t double-wrap
+        • Optionally accepts a handler-supplied  `updatedAsset` that replaces the
+        implicit aggregation logic
+        • Spills `payload` to S3 if it would exceed `self.max_response_size`
+        """
         now = time.time()
         data = result if isinstance(result, dict) else {"value": result}
 
-        # strip external-job fields
+        # ── strip external-job keys from `data`  ────────────────────────────────
         ext_id = data.pop("externalJobId", "")
         ext_st = data.pop("externalJobStatus", "")
         ext_rs = data.pop("externalJobResult", "")
         if not ext_id:
             ext_id = orig.get("metadata", {}).get("externalJobId", "")
 
+        # ── build outbound metadata  ────────────────────────────────────────────
         prev_meta = orig.get("metadata", {})
+        status_is_completed = self.is_last and (
+            ext_st == "" or ext_st.lower() == "completed"
+        )  # ← new rule
         meta = {
             "service": self.service,
             "stepName": self.step_name,
             "stepStatus": "Completed",
             "stepResult": "Success",
             "pipelineTraceId": prev_meta.get("pipelineTraceId", str(uuid.uuid4())),
-            "stepExecutionStartTime": prev_meta.get("stepExecutionStartTime", step_start),
+            "stepExecutionStartTime": prev_meta.get(
+                "stepExecutionStartTime", step_start
+            ),
             "stepExecutionEndTime": now,
             "stepExecutionDuration": round(now - step_start, 3),
             "pipelineExecutionStartTime": orig.get("pipelineExecutionStartTime", ""),
             "pipelineExecutionEndTime": now if self.is_last else "",
             "pipelineName": self.pipe_name,
             "pipelineStatus": (
-                "Started" if self.is_first else ("Completed" if self.is_last else "InProgress")
+                "Started"
+                if self.is_first
+                else "Completed" if status_is_completed else "InProgress"
             ),
             "pipelineId": orig.get("pipelineId", ""),
             "pipelineExecutionId": orig.get("pipelineExecutionId", ""),
@@ -150,37 +194,61 @@ class LambdaMiddleware:
             "stepExternalPayloadLocation": {},
         }
 
-        # if handler returned updatedAsset, use that alone
+        # ── utility: flatten a standardised object to its inner assets ──────────
+        def _inner_assets(obj: Any) -> list:
+            """
+            If *obj* is already in {metadata,payload:{data,assets}} form,
+            return a deep copy of payload.assets; otherwise return [deepcopy(obj)].
+            """
+            if (
+                isinstance(obj, dict)
+                and isinstance(obj.get("metadata"), dict)
+                and isinstance(obj.get("payload"), dict)
+                and isinstance(obj["payload"].get("assets"), list)
+            ):
+                return copy.deepcopy(obj["payload"]["assets"])
+            return [copy.deepcopy(obj)]
+
+        # ── assemble `assets`  ──────────────────────────────────────────────────
         if isinstance(result, dict) and "updatedAsset" in result:
+            # handler explicitly replaced / created a single asset
             assets = [copy.deepcopy(result.pop("updatedAsset"))]
+
         else:
-            # otherwise aggregate from orig
-            asset = (
+            # asset that arrived inside EventBridge.detail (may be None)
+            asset_from_detail = (
                 orig.get("input", {}).get("detail")
                 if isinstance(orig, dict) and "input" in orig
-                else orig.get("detail") if isinstance(orig, dict)
-                else orig
+                else orig.get("detail") if isinstance(orig, dict) else orig
             )
-            prev_assets = []
+
+            # assets already present on the incoming event, if any
+            prev_assets: list = []
             if isinstance(orig, dict):
-                if (
-                    isinstance(orig.get("payload"), dict)
-                    and isinstance(orig["payload"].get("assets"), list)
+                if isinstance(orig.get("payload"), dict) and isinstance(
+                    orig["payload"].get("assets"), list
                 ):
                     prev_assets = copy.deepcopy(orig["payload"]["assets"])
                 elif isinstance(orig.get("assets"), list):
                     prev_assets = copy.deepcopy(orig["assets"])
-            assets = prev_assets + ([copy.deepcopy(asset)] if asset else [])
+
+            # flatten to avoid double-wrapping and concatenate
+            assets = prev_assets + (
+                _inner_assets(asset_from_detail) if asset_from_detail else []
+            )
 
         payload = {"data": data, "assets": assets}
 
-        # off-load if too big
+        # ── off-load to S3 if payload is too large ──────────────────────────────
         raw = json.dumps(payload).encode()
         if len(raw) > self.max_response_size:
             key = f"{meta['pipelineExecutionId'] or 'unknown'}/{uuid.uuid4()}-payload.json"
             self.s3.put_object(Bucket=self.external_payload_bucket, Key=key, Body=raw)
             meta["stepExternalPayload"] = "True"
-            meta["stepExternalPayloadLocation"] = {"bucket": self.external_payload_bucket, "key": key}
+            meta["stepExternalPayloadLocation"] = {
+                "bucket": self.external_payload_bucket,
+                "key": key,
+            }
             payload["data"] = {}
 
         return {"metadata": meta, "payload": payload}
@@ -218,7 +286,7 @@ class LambdaMiddleware:
                 except Exception:
                     if retries < self.max_retries:
                         retries += 1
-                        time.sleep(min(2 ** retries, 30))
+                        time.sleep(min(2**retries, 30))
                         continue
                     raise
 

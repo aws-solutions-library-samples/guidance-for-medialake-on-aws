@@ -128,7 +128,7 @@ export const usePipelineColumns = ({
                                         }
                                         // label={pipeline.active !== false ? "Active" : "Inactive"}
                                         label=""
-                                        sx={{ mt: 1, ml: 0 }}
+                                        sx={{ mt: 0, ml: 0 }}
                                     />
                                 )}
                             </Box>

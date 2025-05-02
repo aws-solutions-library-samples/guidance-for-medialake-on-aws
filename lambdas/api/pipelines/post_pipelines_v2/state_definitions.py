@@ -436,7 +436,7 @@ class StateDefinitionFactory:
                 # Store them as metadata in the state definition
                 map_state = {
                     "Type": "Map",
-                    "ItemsPath": "$.payload.externalTaskResults",
+                    "ItemsPath": "$.payload.data",
                     "Iterator": iterator,
                     "End": True,
                     "Parameters": {

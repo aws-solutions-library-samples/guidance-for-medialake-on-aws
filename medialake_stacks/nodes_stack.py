@@ -70,6 +70,7 @@ class NodesStack(cdk.NestedStack):
         self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
         
         
+        
         # Node Lambda Deployments
 
         self.check_media_convert_status_lambda_deployment = LambdaDeployment(
@@ -344,6 +345,7 @@ class NodesStack(cdk.NestedStack):
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn
+                    
                 },
             ),
         )

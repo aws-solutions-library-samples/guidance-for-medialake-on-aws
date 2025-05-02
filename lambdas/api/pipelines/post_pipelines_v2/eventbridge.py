@@ -547,7 +547,7 @@ def get_event_pattern_for_rule(
 
 
 def create_eventbridge_rule(
-    pipeline_name: str, node: Any, state_machine_arn: str, active: bool = True, execution_uuid: str = None
+    pipeline_name: str, node: Any, state_machine_arn: str, active: bool = True
 ) -> Optional[Dict[str, Any]]:
     """
     Create an EventBridge rule for a trigger node.
@@ -557,7 +557,6 @@ def create_eventbridge_rule(
         node: Node object containing configuration
         state_machine_arn: ARN of the state machine to target
         active: Whether the rule should be enabled (True) or disabled (False)
-        execution_uuid: UUID to use for consistent naming across resources
 
     Returns:
         Dictionary containing:
@@ -642,7 +641,7 @@ def create_eventbridge_rule(
 
         # Take the first character of each non-empty part, uppercase it, join
         abvr=  ''.join(p[0].upper() for p in parts if p)
-        uuid = execution_uuid if execution_uuid else shortuuid.uuid()
+        uuid = shortuuid.uuid()
         trigger_lambda_name = f"{resource_prefix}_{abvr}_{uuid}_trigger".lower()
 
 

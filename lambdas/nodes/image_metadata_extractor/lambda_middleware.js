@@ -9,7 +9,7 @@ class LambdaMiddleware {
    * • Publishes to EventBridge (bus = EVENT_BUS_NAME)
    * • Standardizes incoming events into {metadata, payload:{data, assets}}
    *   - skips if already in that shape
-   *   - if looks like EventBridge (has top-level detail), moves detail → assets, data = {}
+   *   - if looks like EventBridge (has top-level detail), normalises it
    *   - otherwise wraps full event in data and carries any existing assets
    * • Honors handler-returned `updatedAsset` to override assets
    */
@@ -40,7 +40,12 @@ class LambdaMiddleware {
   // ───────────── unwrap helper ─────────────
   _trueOriginal(ev) {
     let cur = ev.originalEvent || ev;
-    while (cur && cur.payload && typeof cur.payload === 'object' && cur.payload.event) {
+    while (
+      cur &&
+      cur.payload &&
+      typeof cur.payload === 'object' &&
+      cur.payload.event
+    ) {
       cur = cur.payload.event;
     }
     return cur;
@@ -48,19 +53,40 @@ class LambdaMiddleware {
 
   // ─────────── standardize input helper ───────────
   _standardizeInput(ev) {
-    // 1) Already standardized?
+    // 1) Already standardised
     if (
       ev &&
       typeof ev === 'object' &&
-      ev.metadata && typeof ev.metadata === 'object' &&
-      ev.payload  && typeof ev.payload  === 'object' &&
+      ev.metadata &&
+      typeof ev.metadata === 'object' &&
+      ev.payload &&
+      typeof ev.payload === 'object' &&
       Object.prototype.hasOwnProperty.call(ev.payload, 'data') &&
       Object.prototype.hasOwnProperty.call(ev.payload, 'assets')
     ) {
       return ev;
     }
 
-    // 2) EventBridge envelope?
+    // 1b) EventBridge envelope *whose detail is already standardised*
+    if (ev.detail && typeof ev.detail === 'object') {
+      const detail = ev.detail;
+      if (
+        detail.metadata &&
+        typeof detail.metadata === 'object' &&
+        detail.payload &&
+        typeof detail.payload === 'object' &&
+        Object.prototype.hasOwnProperty.call(detail.payload, 'data') &&
+        Object.prototype.hasOwnProperty.call(detail.payload, 'assets')
+      ) {
+        // Bubble up execution / pipeline IDs if present on the outer envelope
+        detail.pipelineExecutionId =
+          detail.pipelineExecutionId || ev.pipelineExecutionId || '';
+        detail.pipelineId = detail.pipelineId || ev.pipelineId || '';
+        return detail;
+      }
+    }
+
+    // 2) Plain EventBridge envelope (detail *not* standardised)
     if (ev.detail && typeof ev.detail === 'object' && !ev.payload && !ev.assets) {
       const meta = {
         service: this.service,
@@ -74,7 +100,7 @@ class LambdaMiddleware {
         metadata: meta,
         payload: {
           data: {},
-          assets: [ cloneDeep(ev.detail) ],
+          assets: [cloneDeep(ev.detail)],
         },
       };
     }
@@ -101,64 +127,64 @@ class LambdaMiddleware {
 
   // ─────────── formatter ───────────
   async _format(result, orig, stepStart) {
-    // clone or wrap handler result
     const data =
-      result && typeof result === 'object'
-        ? { ...result }
-        : { value: result };
+      result && typeof result === 'object' ? { ...result } : { value: result };
 
-    // strip external-job fields
-    let extId = data.externalJobId || '';
+    // ── strip external-job fields ──────────────────────────────────────
+    let extId = data.externalJobId     || '';
     let extSt = data.externalJobStatus || '';
     let extRs = data.externalJobResult || '';
     delete data.externalJobId;
     delete data.externalJobStatus;
     delete data.externalJobResult;
 
-    const now = Date.now() / 1000;
+    const now      = Date.now() / 1000;
     const prevMeta = orig.metadata || {};
 
     const meta = {
-      service: this.service,
-      stepName: this.stepName,
-      stepStatus: 'Completed',
-      stepResult: 'Success',
-
-      pipelineTraceId:
-        prevMeta.pipelineTraceId || uuidv4(),
-      stepExecutionStartTime:
-        prevMeta.stepExecutionStartTime || stepStart,
-      stepExecutionEndTime: now,
-      stepExecutionDuration: +(now - stepStart).toFixed(3),
-
+      service:                this.service,
+      stepName:               this.stepName,
+      stepStatus:             'Completed',
+      stepResult:             'Success',
+      pipelineTraceId:        prevMeta.pipelineTraceId || uuidv4(),
+      stepExecutionStartTime: prevMeta.stepExecutionStartTime || stepStart,
+      stepExecutionEndTime:   now,
+      stepExecutionDuration:  +(now - stepStart).toFixed(3),
       pipelineExecutionStartTime: orig.pipelineExecutionStartTime || '',
-      pipelineExecutionEndTime: this.isLast ? now : '',
-
-      pipelineName: this.pipeName,
-      pipelineStatus: this.isFirst
-        ? 'Started'
-        : this.isLast
-        ? 'Completed'
-        : 'InProgress',
-
-      pipelineId: orig.pipelineId || '',
-      pipelineExecutionId: orig.pipelineExecutionId || '',
-
-      externalJobResult: extRs,
-      externalJobId: extId || prevMeta.externalJobId || '',
-      externalJobStatus: extSt,
-
-      stepExternalPayload: 'False',
+      pipelineExecutionEndTime:   this.isLast ? now : '',
+      pipelineName:           this.pipeName,
+      pipelineStatus:         this.isFirst ? 'Started'
+                          : this.isLast  ? 'Completed'
+                          : 'InProgress',
+      pipelineId:             orig.pipelineId          || '',
+      pipelineExecutionId:    orig.pipelineExecutionId || '',
+      externalJobResult:      extRs,
+      externalJobId:          extId || prevMeta.externalJobId || '',
+      externalJobStatus:      extSt,
+      stepExternalPayload:    'False',
       stepExternalPayloadLocation: {},
     };
 
-    // assets: prefer handler-returned updatedAsset
+    // ── helper: flatten a standardised object to its inner assets ─────
+    const innerAssets = (obj) => {
+      if (
+        obj && typeof obj === 'object' &&
+        obj.metadata && typeof obj.metadata === 'object' &&
+        obj.payload && typeof obj.payload === 'object' &&
+        Array.isArray(obj.payload.assets)
+      ) {
+        return cloneDeep(obj.payload.assets);
+      }
+      return [cloneDeep(obj)];
+    };
+
+    // ── assemble `assets` ──────────────────────────────────────────────
     let assets;
     if (result && typeof result === 'object' && result.updatedAsset) {
-      assets = [ cloneDeep(result.updatedAsset) ];
-      delete result.updatedAsset;
+      assets = [cloneDeep(result.updatedAsset)];
+      delete data.updatedAsset;            // don’t leak this into `data`
     } else {
-      const asset =
+      const assetFromDetail =
         (orig.input && orig.input.detail) ||
         orig.detail ||
         orig;
@@ -169,12 +195,16 @@ class LambdaMiddleware {
       } else if (Array.isArray(orig.assets)) {
         prevAssets = cloneDeep(orig.assets);
       }
-      assets = [...prevAssets, ...(asset ? [cloneDeep(asset)] : [])];
+
+      assets = [
+        ...prevAssets,
+        ...(assetFromDetail ? innerAssets(assetFromDetail) : []),
+      ];
     }
 
     let payload = { data, assets };
 
-    // off-load oversized payloads to S3
+    // ── off-load oversized payloads to S3 ──────────────────────────────
     const raw = Buffer.from(JSON.stringify(payload));
     if (raw.length > this.maxResponseSize) {
       const key = `${
@@ -184,8 +214,8 @@ class LambdaMiddleware {
       await this.s3
         .putObject({
           Bucket: this.externalPayloadBucket,
-          Key: key,
-          Body: raw,
+          Key:    key,
+          Body:   raw,
         })
         .promise();
 
@@ -196,6 +226,7 @@ class LambdaMiddleware {
 
     return { metadata: meta, payload };
   }
+
 
   // ─────────── publisher ───────────
   async _publish(out) {
@@ -220,16 +251,14 @@ class LambdaMiddleware {
   // ─────────── wrapper ───────────
   middleware(handler) {
     return async (event, ctx) => {
-      // 1. unwrap raw for output logic
       const raw = this._trueOriginal(event);
       const orig = cloneDeep(raw);
 
-      // 2. standardize input only if needed
       const standardEvent = this._standardizeInput(orig);
 
-      // 3. invoke handler with retry
       const start = Date.now() / 1000;
-      let retries = 0, result;
+      let retries = 0,
+        result;
       while (true) {
         try {
           result = await handler(standardEvent, ctx);
@@ -237,14 +266,13 @@ class LambdaMiddleware {
         } catch (err) {
           if (retries++ < this.maxRetries) {
             const backoff = Math.min(2 ** retries * 1000, 30000);
-            await new Promise(r => setTimeout(r, backoff));
+            await new Promise((r) => setTimeout(r, backoff));
             continue;
           }
           throw err;
         }
       }
 
-      // 4. build & publish output
       const out = await this._format(result, orig, start);
       await this._publish(out);
       return out;
@@ -255,7 +283,7 @@ class LambdaMiddleware {
 // factory + exports
 function lambdaMiddleware(options = {}) {
   const mw = new LambdaMiddleware(options);
-  return handler => mw.middleware(handler);
+  return (handler) => mw.middleware(handler);
 }
 
 module.exports = { lambdaMiddleware, LambdaMiddleware };

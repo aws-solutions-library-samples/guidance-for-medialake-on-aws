@@ -199,9 +199,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     "body": json.dumps(error_body),
                 }
         
-        # Generate a single UUID for all resources in this execution
-        execution_uuid = shortuuid.uuid()
-        logger.info(f"Generated execution UUID: {execution_uuid} for consistent resource naming")
+        # No execution_uuid generation
         
         # If pipeline_id is not provided, create a new pipeline record
         if not pipeline_id:
@@ -245,7 +243,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 is_first = (node.id == first_lambda_node_id)
                 is_last = (node.id == last_lambda_node_id)
                 
-                lambda_result = create_lambda_function(pipeline_name, node, is_first=is_first, is_last=is_last, execution_uuid=execution_uuid)
+                lambda_result = create_lambda_function(pipeline_name, node, is_first=is_first, is_last=is_last)
                 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
                 lambda_key = node.data.id
@@ -312,7 +310,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     update_pipeline_status(pipeline_id, f"CREATING EVENT RULE {processed_triggers}/{total_triggers}")
                     logger.info(f"Creating EventBridge rule for trigger node {processed_triggers}/{total_triggers}: {node.data.id}")
                     try:
-                        rule_result = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active, execution_uuid=execution_uuid)
+                        rule_result = create_eventbridge_rule(pipeline_name, node, state_machine_arn, active=pipeline.active)
                         if rule_result:
                             eventbridge_rule_arns[node.data.id] = rule_result["rule_arn"]
                             eventbridge_role_arns[node.data.id] = rule_result["role_arn"]

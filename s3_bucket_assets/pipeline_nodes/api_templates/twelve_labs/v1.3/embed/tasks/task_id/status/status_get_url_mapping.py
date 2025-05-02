@@ -1,6 +1,13 @@
 def translate_event_to_request(event):
     """
-    Translate the Lambda event into variables for the API request.
-    Customize this function based on your specific event structure and API requirements.
+    Build the variables dict for status_get_url.jinja
+    using the value already stored in metadata.externalJobId.
     """
-    return {"task_id": event["metadata"]["externalTaskId"]}
+
+    task_id = event.get("metadata", {}).get("externalJobId")
+    if not task_id:
+        raise KeyError(
+            "metadata.externalJobId is missing—cannot build Twelve Labs status URL"
+        )
+
+    return {"task_id": task_id}

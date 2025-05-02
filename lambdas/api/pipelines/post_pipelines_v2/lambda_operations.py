@@ -24,7 +24,7 @@ logger = Logger()
 resource_prefix = os.environ["RESOURCE_PREFIX"]
 
 
-def sanitize_function_name(pipeline_name, node_label, version, execution_uuid=None):
+def sanitize_function_name(pipeline_name, node_label, version):
     """
     Create a sanitized Lambda function name from pipeline name, node label, and version.
 
@@ -32,7 +32,6 @@ def sanitize_function_name(pipeline_name, node_label, version, execution_uuid=No
         pipeline_name: Name of the pipeline
         node_label: Label of the node
         version: Version string
-        execution_uuid: Optional UUID to use for consistent naming across resources
 
     Returns:
         A sanitized function name suitable for AWS Lambda
@@ -42,8 +41,13 @@ def sanitize_function_name(pipeline_name, node_label, version, execution_uuid=No
 
     # Take the first character of each non-empty part, uppercase it, join
     abvr=  ''.join(p[0].upper() for p in parts if p)
-    uuid = execution_uuid if execution_uuid else shortuuid.uuid()
-    raw_name = f"{resource_prefix}_{abvr}_{uuid}_{node_label}_{version}".lower()
+    uuid = shortuuid.uuid()
+    print(resource_prefix)
+    print(abvr)
+    print(node_label)
+    print(version)
+    
+    raw_name = f"{resource_prefix}_{abvr}_{node_label}_{version}_{uuid}".lower()
 
     # Replace spaces with hyphens
     raw_name = raw_name.replace(" ", "-")
@@ -237,7 +241,7 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
     return layers
 
 
-def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False, execution_uuid: str = None) -> Optional[Dict[str, str]]:
+def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False) -> Optional[Dict[str, str]]:
     """
     Create or update a Lambda function for a node.
 
@@ -279,7 +283,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
     
     # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
     candidate = f"{base_name}_{operation_id}" if operation_id and operation_id not in base_name else base_name
-    function_name = sanitize_function_name(pipeline_name, candidate, version, execution_uuid)
+    function_name = sanitize_function_name(pipeline_name, candidate, version)
     logger.debug(f"Lambda function name generated: {function_name}")
 
     # Read YAML file from S3

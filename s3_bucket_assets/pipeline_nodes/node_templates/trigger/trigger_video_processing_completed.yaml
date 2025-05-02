@@ -12,7 +12,7 @@ node:
         event_pattern:
           detail:
             metadata:
-              pipelineName: ["Default Image Pipeline"]
+              pipelineName: ["Default Video Pipeline"]
               pipelineStatus: ["Completed"]
 
 actions:

@@ -43,8 +43,7 @@
             },
             "requestMapping": null,
             "responseMapping": null
-          },
-          "id": "trigger_image_processing_completed"
+          }
         },
         "width": 200,
         "height": 113
@@ -83,15 +82,12 @@
             "operationId": "",
             "method": "generate",
             "parameters": {
-              "URL Validity Duration": 3600
+              "URL Validity Duration": "3600"
             }
-          },
-          "id": "pre_signed_url"
+          }
         },
         "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
+        "height": 100
       },
       {
         "id": "dndnode_2",
@@ -125,104 +121,17 @@
             "parameters": {
               "nodeId": ""
             }
-          },
-          "id": "twelve_labs"
+          }
         },
         "width": 200,
-        "height": 100,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_3",
-        "type": "custom",
-        "position": {
-          "x": 688,
-          "y": 416
-        },
-        "data": {
-          "nodeId": "map",
-          "label": "Map (map)",
-          "description": "This step will iterate over an array of items and execute the same steps for each item",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "Processor",
-              "description": "json payload item processor"
-            },
-            {
-              "name": "Next",
-              "description": "output to the next node"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "map",
-            "parameters": {
-              "ItemsPath": "$.payload.externalTaskStatus",
-              "ConcurrencyLimit": 1
-            }
-          },
-          "id": "map"
-        },
-        "width": 200,
-        "height": 113,
-        "selected": false,
-        "dragging": false
-      },
-      {
-        "id": "dndnode_4",
-        "type": "custom",
-        "position": {
-          "x": 928,
-          "y": 576
-        },
-        "data": {
-          "nodeId": "success",
-          "label": "Success",
-          "description": "This step will end the execution with a success status",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [],
-          "type": "FLOW",
-          "configuration": {
-            "method": "success",
-            "parameters": {}
-          },
-          "id": "success"
-        },
-        "width": 200,
-        "height": 113,
-        "selected": true,
-        "dragging": false
+        "height": 100
       },
       {
         "id": "dndnode_5",
         "type": "custom",
         "position": {
-          "x": 928,
-          "y": 416
+          "x": 1168,
+          "y": 256
         },
         "data": {
           "nodeId": "embedding_store",
@@ -249,12 +158,11 @@
               "Index Name": "media",
               "Content Type": "image"
             }
-          },
-          "id": "embedding_store"
+          }
         },
         "width": 200,
         "height": 113,
-        "selected": false,
+        "selected": true,
         "dragging": false
       }
     ],
@@ -265,9 +173,9 @@
         "target": "dndnode_1",
         "type": "custom",
         "data": {
+          "type": "custom",
           "text": "Connected",
-          "id": "dndnode_0-dndnode_1",
-          "type": "custom"
+          "id": "dndnode_0-dndnode_1"
         },
         "sourceHandle": "image",
         "targetHandle": "input-any"
@@ -278,51 +186,23 @@
         "target": "dndnode_2",
         "type": "custom",
         "data": {
+          "type": "custom",
           "text": "Connected",
-          "id": "dndnode_1-dndnode_2",
-          "type": "custom"
+          "id": "dndnode_1-dndnode_2"
         },
         "sourceHandle": "presigned_url",
         "targetHandle": "input-default"
       },
       {
-        "id": "dndnode_3-dndnode_4",
-        "source": "dndnode_3",
-        "target": "dndnode_4",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_3-dndnode_4",
-          "type": "custom"
-        },
-        "sourceHandle": "Next",
-        "targetHandle": "input-any"
-      },
-      {
-        "id": "dndnode_2-dndnode_3",
         "source": "dndnode_2",
-        "target": "dndnode_3",
-        "type": "custom",
-        "data": {
-          "text": "Connected",
-          "id": "dndnode_2-dndnode_3",
-          "type": "custom"
-        },
         "sourceHandle": "default",
-        "targetHandle": "input-any"
-      },
-      {
-        "id": "dndnode_3-dndnode_5",
-        "source": "dndnode_3",
         "target": "dndnode_5",
+        "targetHandle": "input-any",
+        "id": "dndnode_2-dndnode_5",
         "type": "custom",
         "data": {
-          "text": "Connected",
-          "id": "dndnode_3-dndnode_5",
-          "type": "custom"
-        },
-        "sourceHandle": "Processor",
-        "targetHandle": "input-any"
+          "text": "Connected"
+        }
       }
     ],
     "settings": {
