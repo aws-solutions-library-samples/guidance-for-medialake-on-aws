@@ -16,7 +16,7 @@ def translate_event_to_request(response_body_and_event):
     }
     
     # Determine job result based on status
-    job_result = "Success" if task_status == "ready" else "Failed"
+    job_result = "Success" if task_status == "ready" else "inProgress"
     
     return {
         "task_id": task_id,

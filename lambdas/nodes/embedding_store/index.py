@@ -8,7 +8,12 @@ from typing import Any, Dict, List, Optional
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth, exceptions
+from opensearchpy import (
+    OpenSearch,
+    RequestsHttpConnection,
+    AWSV4SignerAuth,
+    exceptions,
+)
 
 from lambda_middleware import lambda_middleware
 from nodes_utils import seconds_to_smpte
@@ -49,55 +54,99 @@ def get_opensearch_client():
         max_retries=3,
     )
 
-
 # ── Helper extraction functions ──────────────────────────────────────────────
-def extract_asset_id(container: dict) -> str | None:
+def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Return the first DigitalSourceAsset.ID we can find.
-    • Primary: payload.assets[ ].DigitalSourceAsset.ID
-    • Fallback: payload.DigitalSourceAsset.ID
-    If none found → return None (handler will raise 400).
+    Return payload.data.item if present (new Twelve Labs shape).
     """
-    # Look inside each asset in the array
+    if isinstance(container.get("data"), dict):
+        itm = container["data"].get("item")
+        if isinstance(itm, dict):
+            return itm
+    return None
+
+
+def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # 👈 NEW
+    """
+    Return payload.map.item when present (audio segmentation metadata).
+    """
+    m = container.get("map")
+    if isinstance(m, dict) and isinstance(m.get("item"), dict):
+        return m["item"]
+    return None
+
+
+def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
+    """
+    Locate the first asset ID, in order of priority:
+
+    1. payload.data.item.asset_id          (new shape – PRIMARY)
+    2. payload.map.item.asset_id           (audio map – SECONDARY)  # 👈 NEW
+    3. payload.assets[ ].DigitalSourceAsset.ID
+    4. payload.DigitalSourceAsset.ID
+    """
+    itm = _item(container)
+    if itm and itm.get("asset_id"):
+        return itm["asset_id"]
+
+    m_itm = _map_item(container)                                     # 👈 NEW
+    if m_itm and m_itm.get("asset_id"):                              # 👈 NEW
+        return m_itm["asset_id"]                                     # 👈 NEW
+
     for asset in container.get("assets", []):
         dsa_id = asset.get("DigitalSourceAsset", {}).get("ID")
         if dsa_id:
             return dsa_id
 
-    # Single-object fallback
     return container.get("DigitalSourceAsset", {}).get("ID")
 
 
 def extract_scope(container: Dict[str, Any]) -> Optional[str]:
-    scope = container.get("embedding_scope")
-    if scope:
-        return scope
+    """
+    1. payload.data.item.embedding_scope   (new shape – PRIMARY)
+    2. payload.embedding_scope
+    3. payload.externalTaskResults[*].embedding_scope
+    """
+    itm = _item(container)
+    if itm and itm.get("embedding_scope"):
+        return itm["embedding_scope"]
+
+    if container.get("embedding_scope"):
+        return container["embedding_scope"]
+
     for res in container.get("externalTaskResults", []):
         if "embedding_scope" in res:
             return res["embedding_scope"]
+
     return None
 
 
 def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
     """
-    Primary: payload.data.float   (new Twelve Labs shape)
-    Fallback: top-level float or externalTaskResults[*].float (legacy)
+    1. payload.data.item.float             (new shape – PRIMARY)
+    2. payload.data.float
+    3. payload.float
+    4. payload.externalTaskResults[*].float
     """
-    if isinstance(container.get("data"), dict):
-        vec = container["data"].get("float")
-        if isinstance(vec, list) and vec:
-            return vec
+    itm = _item(container)
+    if itm and isinstance(itm.get("float"), list) and itm["float"]:
+        return itm["float"]
 
-    vec = container.get("float")
-    if isinstance(vec, list) and vec:
-        return vec
+    if (
+        isinstance(container.get("data"), dict)
+        and isinstance(container["data"].get("float"), list)
+        and container["data"]["float"]
+    ):
+        return container["data"]["float"]
+
+    if isinstance(container.get("float"), list) and container["float"]:
+        return container["float"]
 
     for res in container.get("externalTaskResults", []):
-        vec = res.get("float")
-        if isinstance(vec, list) and vec:
-            return vec
-    return None
+        if isinstance(res.get("float"), list) and res["float"]:
+            return res["float"]
 
+    return None
 
 # ── Small helpers for early exits ────────────────────────────────────────────
 def _bad_request(msg: str):
@@ -105,7 +154,7 @@ def _bad_request(msg: str):
     return {"statusCode": 400, "body": json.dumps({"error": msg})}
 
 
-def _ok_no_op(vector: List | None, asset_id: str | None):
+def _ok_no_op(vector: Optional[List], asset_id: Optional[str]):
     return {
         "statusCode": 200,
         "body": json.dumps(
@@ -116,7 +165,6 @@ def _ok_no_op(vector: List | None, asset_id: str | None):
             }
         ),
     }
-
 
 # ── Lambda entrypoint ────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
@@ -157,18 +205,32 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
         # ── Clip / audio scopes – create a new document ────────────────────────
         if scope in {"clip", "audio"}:
+            # --------------------------------------------------------------
+            # Where to grab segment timing?
+            #  • clip  -> payload.data.item
+            #  • audio -> payload.map.item  (preferred) OR payload.data.item
+            # --------------------------------------------------------------
+            itm: Dict[str, Any] = {}
+
             if scope == "clip":
-                start_sec = payload.get("start_offset_sec", 0)
-                end_sec   = payload.get("end_offset_sec",   0)
-            else:
-                start_sec = payload.get("start_time", 0)
-                end_sec   = payload.get("end_time",   0)
+                itm = _item(payload) or {}
+                start_sec        = itm.get("start_offset_sec", 0)
+                end_sec          = itm.get("end_offset_sec",   0)
+                embedding_option = itm.get("embedding_option")
+            else:  # audio
+                itm = _map_item(payload) or _item(payload) or {}        # 👈 NEW
+                start_sec = itm.get("start_time", 0)                    # 👈 NEW
+                end_sec   = itm.get("end_time",   0)                    # 👈 NEW
+                embedding_option = None  # audio: not stored
 
             document |= {
                 "DigitalSourceAsset": {"ID": asset_id},
                 "start_timecode":     seconds_to_smpte(start_sec),
                 "end_timecode":       seconds_to_smpte(end_sec),
             }
+
+            if embedding_option is not None:
+                document["embedding_option"] = embedding_option
 
             res = client.index(index=INDEX_NAME, body=document)
             return {
@@ -183,7 +245,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 ),
             }
 
-        # ── Non-clip / non-audio scopes – update existing document ────────────
+        # ── Non‑clip / non‑audio scopes – update existing document ────────────
         search_query = {
             "query": {
                 "bool": {
@@ -249,7 +311,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             ),
         }
 
-    # ── Un-handled errors raise a RuntimeError (as requested) ────────────────
+    # ── Un‑handled errors raise a RuntimeError (as requested) ────────────────
     except Exception as exc:
         logger.exception("Error storing embedding")
         raise RuntimeError("Error storing embedding") from exc

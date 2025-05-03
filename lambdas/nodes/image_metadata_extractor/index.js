@@ -199,7 +199,6 @@ async function processImageFile(bucket, key) {
 }
 
 // ─── Lambda handler for latest event shape ───────────────────────────────────
-
 exports.lambda_handler = async (event) => {
   console.log('Received event:', JSON.stringify(event));
 
@@ -211,56 +210,65 @@ exports.lambda_handler = async (event) => {
   const results = [];
 
   for (const asset of assets) {
-    const inventoryId = asset.InventoryID;
-    if (!inventoryId) {
-      console.warn('Skipping asset without InventoryID:', JSON.stringify(asset));
+    // ── 1) pull the ID ────────────────────────────────────────────────
+    const digitalSourceAssetId =
+      asset.DigitalSourceAsset?.ID ?? asset.DigitalSourceAssetID;
+  
+    if (!digitalSourceAssetId) {
+      console.warn(
+        'Skipping asset without DigitalSourceAssetID:',
+        JSON.stringify(asset),
+      );
       continue;
     }
-
-    const loc = asset.DigitalSourceAsset
-      ?.MainRepresentation
-      ?.StorageInfo
-      ?.PrimaryLocation;
-
+  
+    // ── 2) locate the object in S3 ────────────────────────────────────
+    const loc =
+      asset.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation;
+  
     if (!loc?.Bucket || !loc.ObjectKey?.FullPath) {
-      console.error('Skipping asset with missing S3 location:', JSON.stringify(asset));
+      console.error(
+        'Skipping asset with missing S3 location:',
+        JSON.stringify(asset),
+      );
       continue;
     }
-
+  
     try {
-      const rawMeta = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
-      let cleaned   = sanitizeMetadata(rawMeta);
+      // ── 3) extract & clean metadata ────────────────────────────────
+      const rawMeta     = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
+      let   cleaned     = sanitizeMetadata(rawMeta);
       removeBase64Fields(cleaned);
-
-      const forced     = forceAllObjects(cleaned);
-      const newMeta    = { CustomMetadata: forced };
-      const converted  = convertFloatsToDecimals(newMeta);
-      const marshalled = AWS.DynamoDB.Converter.marshall(converted);
-
-      // 1) update
+  
+      const forced      = forceAllObjects(cleaned);
+      const newMeta     = { CustomMetadata: forced };
+      const converted   = convertFloatsToDecimals(newMeta);
+      const marshalled  = AWS.DynamoDB.Converter.marshall(converted);
+  
+      // ── 4) update the item in DynamoDB ──────────────────────────────
       await dynamoDB.updateItem({
         TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { InventoryID: { S: inventoryId } },
+        Key: { DigitalSourceAssetID: { S: digitalSourceAssetId } },
         UpdateExpression: 'SET Metadata = :m',
         ExpressionAttributeValues: { ':m': { M: marshalled } },
-        ReturnValues: 'UPDATED_NEW'
+        ReturnValues: 'UPDATED_NEW',
       }).promise();
-
-      // 2) fetch the full updated item
-      const getResp = await dynamoDB.getItem({
+  
+      // ── 5) read back the full updated item (optional) ───────────────
+      const getResp      = await dynamoDB.getItem({
         TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { InventoryID: { S: inventoryId } }
+        Key: { DigitalSourceAssetID: { S: digitalSourceAssetId } },
       }).promise();
       const updatedAsset = AWS.DynamoDB.Converter.unmarshall(getResp.Item);
-
-      console.log(`Updated metadata for ${inventoryId}`);
-      results.push({ inventoryId, status: 'OK', updatedAsset });
-
+  
+      console.log(`Updated metadata for ${digitalSourceAssetId}`);
+      results.push({ digitalSourceAssetId, status: 'OK', updatedAsset });
     } catch (err) {
-      console.error(`Error processing ${inventoryId}:`, err);
-      results.push({ inventoryId, status: 'ERROR', message: err.message });
+      console.error(`Error processing ${digitalSourceAssetId}:`, err);
+      results.push({ digitalSourceAssetId, status: 'ERROR', message: err.message });
     }
   }
+  
 
   return {
     statusCode: 200,

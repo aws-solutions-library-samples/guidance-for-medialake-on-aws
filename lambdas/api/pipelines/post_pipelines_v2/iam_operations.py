@@ -396,6 +396,13 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
             },
             {
                 "Effect": "Allow",
+                "Action": ["dynamodb:GetItem"],
+                "Resource": [
+                    MEDIALAKE_ASSET_TABLE,
+                ],
+            },
+            {
+                "Effect": "Allow",
                 "Action": ["events:PutEvents"],
                 "Resource": [
                     f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{INGEST_EVENT_BUS_NAME}",

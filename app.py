@@ -25,10 +25,7 @@ from medialake_stacks.pipeline_stack import (
     PipelineStack,
     PipelineStackProps,
 )
-# from medialake_stacks.pipeline_nodes_stack import (
-#     PipelineNodesStack,
-#     PipelineNodesStackProps,
-# )
+
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
@@ -95,11 +92,7 @@ class MediaLakeStack(cdk.Stack):
             iac_bucket=props.base_infrastructure.iac_assets_bucket,
             ),
         )
-        # pipeline_nodes_stack = PipelineNodesStack(self, "MediaLakePipelineNodes", props=PipelineNodesStackProps(
-        #     media_assets_bucket=props.base_infrastructure.media_assets_bucket,
-        #     asset_table=props.base_infrastructure.asset_table,
-        #     ),
-        # )
+
         asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
             asset_table=props.base_infrastructure.asset_table,
             ingest_event_bus=props.base_infrastructure.ingest_event_bus,

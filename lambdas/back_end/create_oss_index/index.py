@@ -147,8 +147,10 @@ def handler(event, context):
 
         payload = {
             "settings": {
-                "index.knn": True,
-                "index.mapping.total_fields.limit": 6000
+                "index": {
+                    "knn": True,
+                    "mapping.total_fields.limit": 6000
+                }
             },
             "mappings": {
                 "properties": {

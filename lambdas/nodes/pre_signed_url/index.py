@@ -62,7 +62,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
     """
     Generate a pre-signed S3 URL for the *selected* representation in the event.
     """
-    logger.debug("Incoming event: %s", json.dumps(event))
+    logger.info("Incoming event", extra={"event": event})
+
 
     try:
         # ── 1. Extract bucket/key/mediaType from the new shape ────────────

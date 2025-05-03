@@ -35,6 +35,7 @@ class StateMachineBuilder:
         self.lambda_arns = lambda_arns
         self.resource_prefix = resource_prefix
         self.graph_analyzer = GraphAnalyzer(pipeline)
+        # Initialize without first_lambda_node_id, will set it later
         self.state_factory = StateDefinitionFactory(pipeline, lambda_arns)
         self.validator = StateMachineValidator()
         
@@ -62,6 +63,13 @@ class StateMachineBuilder:
         
         # Step 3: Find special edge types
         choice_true_targets, choice_false_targets, choice_fail_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
+        
+        # Step 3.5: Find first and last Lambda nodes
+        first_lambda_node_id, last_lambda_node_id = self.graph_analyzer.find_first_and_last_lambdas()
+        logger.info(f"Identified first lambda node for execution context properties: {first_lambda_node_id}")
+        
+        # Update the state factory with the first Lambda node ID
+        self.state_factory.first_lambda_node_id = first_lambda_node_id
         
         # Step 4: Create state definitions for each node
         self.states = self.state_factory.create_state_definitions(
