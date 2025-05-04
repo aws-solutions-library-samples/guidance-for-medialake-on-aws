@@ -10,7 +10,7 @@ import boto3
 from aws_lambda_powertools import Logger
 
 from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID, MEDIA_ASSETS_BUCKET_NAME, MEDIALAKE_ASSET_TABLE
-from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name
+from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name, create_service_roles_from_yaml
 from dynamodb_operations import (
     get_node_info,
     get_node_method,
@@ -42,10 +42,6 @@ def sanitize_function_name(pipeline_name, node_label, version):
     # Take the first character of each non-empty part, uppercase it, join
     abvr=  ''.join(p[0].upper() for p in parts if p)
     uuid = shortuuid.uuid()
-    print(resource_prefix)
-    print(abvr)
-    print(node_label)
-    print(version)
     
     raw_name = f"{resource_prefix}_{abvr}_{node_label}_{version}_{uuid}".lower()
 
@@ -201,6 +197,75 @@ def delete_lambda_function(function_name: str) -> None:
     except lambda_client.exceptions.ResourceNotFoundException:
         logger.debug(f"Lambda function {function_name} does not exist")
 
+def create_service_roles_from_yaml(pipeline_name: str, node_id: str, yaml_data: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Create service roles defined in the YAML configuration.
+    
+    Args:
+        pipeline_name: Name of the pipeline
+        node_id: ID of the node
+        yaml_data: YAML configuration data
+        
+    Returns:
+        Dictionary mapping role names to role ARNs
+    """
+    from iam_operations import create_service_role
+    
+    service_roles = {}
+    
+    # Check if service_roles is defined in the YAML
+    service_roles_config = (
+        yaml_data.get("node", {})
+        .get("integration", {})
+        .get("config", {})
+        .get("service_roles", [])
+    ) or (
+        yaml_data.get("node", {})
+        .get("utility", {})
+        .get("config", {})
+        .get("service_roles", [])
+    )
+    
+    if not service_roles_config:
+        logger.info(f"No service roles defined in YAML for node {node_id}")
+        return service_roles
+    
+    logger.info(f"Found {len(service_roles_config)} service roles defined in YAML for node {node_id}")
+    
+    # Create each service role
+    for role_config in service_roles_config:
+        role_name = role_config.get("name", "default_service_role")
+        service_principal = role_config.get("service")
+        
+        if not service_principal:
+            logger.warning(f"Service principal not specified for role {role_name}, skipping")
+            continue
+        
+        # Extract policy statements
+        policy_statements = []
+        for policy in role_config.get("policies", []):
+            policy_statements.extend(policy.get("statements", []))
+        
+        if not policy_statements:
+            logger.warning(f"No policy statements found for role {role_name}, creating role with no permissions")
+        
+        # Create the service role
+        try:
+            role_arn = create_service_role(
+                pipeline_name=pipeline_name,
+                node_id=node_id,
+                service_principal=service_principal,
+                policy_statements=policy_statements,
+                role_name_suffix=role_name
+            )
+            
+            service_roles[role_name] = role_arn
+            logger.info(f"Created service role {role_name} with ARN: {role_arn}")
+        except Exception as e:
+            logger.error(f"Failed to create service role {role_name}: {e}")
+    
+    return service_roles
+
 def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str, Any]) -> List[str]:
     """
     Determine which layers to attach to a Lambda function based on its YAML configuration.
@@ -241,7 +306,7 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
     return layers
 
 
-def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False) -> Optional[Dict[str, str]]:
+def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False) -> Optional[Dict[str, Any]]:
     """
     Create or update a Lambda function for a node.
 
@@ -256,6 +321,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
         Dictionary containing:
         - function_arn: ARN of the created Lambda function
         - role_arn: ARN of the IAM role created for the Lambda function
+        - service_roles: Dictionary mapping service role names to ARNs (if any)
         Or None if creation was skipped
     """
     # Skip Lambda creation for flow-type and trigger-type nodes
@@ -290,6 +356,11 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
     yaml_file_path = f"node_templates/{node.data.type.lower()}/{node.data.id}.yaml"
     yaml_data = read_yaml_from_s3(NODE_TEMPLATES_BUCKET, yaml_file_path)
     logger.debug(yaml_data)
+    
+    # Create service roles defined in the YAML
+    service_roles = create_service_roles_from_yaml(pipeline_name, node.data.id, yaml_data)
+    if service_roles:
+        logger.info(f"Created {len(service_roles)} service roles for node {node.data.id}")
 
     # Get API service URL from OpenAPI spec if available
     api_service_url = os.environ.get("API_SERVICE_URL", "")
@@ -493,8 +564,19 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                     logger.info(f"Added VPC configuration to embedding_store Lambda: Subnets={subnet_ids}, SecurityGroup={OPENSEARCH_SECURITY_GROUP_ID}")
                 # For all other node types, just add the common environment variables
                 elif node.data.type.lower() != "integration":  # Integration nodes already handled above
-                    create_function_params["Environment"] = {"Variables": common_env_vars}
-                    logger.info(f"Added common environment variables to {node.data.type} Lambda function: {function_name}")
+                    env_vars = common_env_vars.copy()
+                    
+                    # Add service role ARNs to environment variables if available
+                    if service_roles:
+                        for role_name, role_arn in service_roles.items():
+                            # Create a standardized environment variable name for the service role
+                            # Convert to uppercase and replace spaces with underscores
+                            env_var_name = f"{role_name.upper().replace(' ', '_')}_ROLE_ARN"
+                            env_vars[env_var_name] = role_arn
+                            logger.info(f"Added {env_var_name} to Lambda environment variables: {role_arn}")
+                    
+                    create_function_params["Environment"] = {"Variables": env_vars}
+                    logger.info(f"Added environment variables to {node.data.type} Lambda function: {function_name}")
                 
                 # Add any parameters from node.data.configuration as environment variables
                 if hasattr(node.data, 'configuration') and 'parameters' in node.data.configuration:
@@ -608,7 +690,8 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
 
         return {
             "function_arn": function_arn,
-            "role_arn": role_arn
+            "role_arn": role_arn,
+            "service_roles": service_roles
         }
     except Exception as e:
         # Use logger.exception which automatically includes the traceback

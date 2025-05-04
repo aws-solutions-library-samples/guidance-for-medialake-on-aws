@@ -218,6 +218,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             
             lambda_arns = {}
             lambda_role_arns = {}
+            service_role_arns = {}  # Dictionary to collect service roles
             total_nodes = len(pipeline.configuration.nodes)
             processed_nodes = 0
             
@@ -255,6 +256,13 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 if lambda_result:
                     lambda_arns[lambda_key] = lambda_result["function_arn"]
                     lambda_role_arns[lambda_key] = lambda_result["role_arn"]
+                    
+                    # Collect service roles if available
+                    if "service_roles" in lambda_result and lambda_result["service_roles"]:
+                        if node.data.id not in service_role_arns:
+                            service_role_arns[node.data.id] = {}
+                        service_role_arns[node.data.id].update(lambda_result["service_roles"])
+                        logger.info(f"Collected {len(lambda_result['service_roles'])} service roles for node {node.data.id}")
                 
                 # Update status after node processing is complete
                 if lambda_result:
@@ -345,7 +353,8 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 eventbridge_role_arns=eventbridge_role_arns,
                 trigger_lambda_arns=trigger_lambda_arns,
                 sqs_queue_arns=sqs_queue_arns,
-                event_source_mapping_uuids=event_source_mapping_uuids
+                event_source_mapping_uuids=event_source_mapping_uuids,
+                service_role_arns=service_role_arns
             )
             
             update_pipeline_status(pipeline_id, "DEPLOYED")

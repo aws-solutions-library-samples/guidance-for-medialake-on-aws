@@ -264,7 +264,7 @@ def cleanup_pipeline_resources(
                 else:
                     results["eventbridge_rules"]["failed"].append(resource_arn)
                     
-            elif resource_type == "iam_role" or resource_type == "lambda_role" or resource_type == "sfn_role" or resource_type == "events_role":
+            elif resource_type == "iam_role" or resource_type == "lambda_role" or resource_type == "sfn_role" or resource_type == "events_role" or resource_type == "service_role":
                 success = delete_iam_role(resource_arn)
                 if success:
                     results["iam_roles"]["success"].append(resource_arn)

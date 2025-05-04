@@ -155,6 +155,18 @@ def lambda_handler(event, context):
             }
 
         # Start the transcription job
+        logger.info("Job Settings", extra={"job_settings": job_settings})
+        
+        # Log specific important fields for debugging
+        logger.info("Critical job settings", extra={
+            "TranscriptionJobName": job_settings.get("TranscriptionJobName", ""),
+            "MediaFileUri": job_settings.get("Media", {}).get("MediaFileUri", ""),
+            "MediaFormat": job_settings.get("MediaFormat", ""),
+            "OutputBucketName": job_settings.get("OutputBucketName", ""),
+            "OutputKey": job_settings.get("OutputKey", ""),
+            "DataAccessRoleArn": job_settings.get("JobExecutionSettings", {}).get("DataAccessRoleArn", "")
+        })
+        
         job = transcribe_client.start_transcription_job(**job_settings)
         
         # Process the response using the template

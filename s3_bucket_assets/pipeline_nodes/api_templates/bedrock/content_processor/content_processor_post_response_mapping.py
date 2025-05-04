@@ -1,9 +1,9 @@
 def translate_event_to_request(response_body_and_event):
     """
-    Transform the transcription summary response.
+    Transform the Bedrock content processing response.
     
     Args:
-        response_body_and_event: Dict containing the summary response and the original event
+        response_body_and_event: Dict containing the processing response and the original event
         
     Returns:
         Dict with the transformed response
@@ -21,8 +21,8 @@ def translate_event_to_request(response_body_and_event):
     
     inventory_id = payload_body.get("inventory_id", "")
     
-    # Extract summary information
-    summary_s3_uri = response_body.get("summary_s3_uri", "")
+    # Extract result information
+    result = response_body.get("result", "")
     status = response_body.get("status", "FAILED")
     
     # Map status to external job status
@@ -40,10 +40,10 @@ def translate_event_to_request(response_body_and_event):
     # Create the response
     result = {
         "statusCode": 200 if status == "SUCCEEDED" else 500,
-        "summary_s3_uri": summary_s3_uri,
+        "result": result,
         "status": status,
         "inventory_id": inventory_id,
-        "externalJobId": f"summary-{inventory_id}",
+        "externalJobId": f"bedrock-{inventory_id}",
         "externalJobStatus": mapped_status,
         "externalJobResult": job_result
     }

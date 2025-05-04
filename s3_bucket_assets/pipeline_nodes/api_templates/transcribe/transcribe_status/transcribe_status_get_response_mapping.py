@@ -1,93 +1,82 @@
 def translate_event_to_request(response_body_and_event):
     """
     Transform the transcription job status response.
-    
+
     Args:
         response_body_and_event: Dict containing the transcription response and the original event
-        
+
     Returns:
         Dict with the transformed response
     """
     response_body = response_body_and_event["response_body"]
     event = response_body_and_event["event"]
-    
-    # Extract job details from the response
+
+    # Extract job details
     transcription_job = response_body.get("TranscriptionJob", {})
     job_name = transcription_job.get("TranscriptionJobName", "")
     status = transcription_job.get("TranscriptionJobStatus", "")
-    
-    # Extract asset ID from the event
+
+    # Extract inventory_id from the first asset in the original event payload
     payload = event.get("payload", {})
-    if isinstance(payload.get("body"), str):
-        import json
-        payload_body = json.loads(payload["body"])
+    assets = payload.get("assets", [])
+    if isinstance(assets, list) and assets:
+        inventory_id = assets[0].get("InventoryID", "")
     else:
-        payload_body = payload.get("body", {})
-    
-    asset_id = payload_body.get("asset_id", "")
-    
-    # Initialize result with basic information
+        inventory_id = ""
+
+    # Build base result
     result = {
+        "statusCode": 200,
+        "inventory_id": inventory_id,
         "status": status,
-        "asset_id": asset_id,
         "transcription": {
             "job_name": job_name
-        },
-        "statusCode": 200
+        }
     }
-    
-    # Set external task status
-    payload_external_status = "not_ready"
-    
-    # If job is completed, extract additional information
+
+    # If completed, pull transcript info
     if status == "COMPLETED":
-        # Extract language code
         detected_language = transcription_job.get("LanguageCode", "")
-        
-        # Extract transcript file URI
         transcript_uri = transcription_job.get("Transcript", {}).get("TranscriptFileUri", "")
-        
-        # Parse S3 URI to get bucket and key
+        # parse S3 URI
         import re
-        match = re.match(r"https://s3\.(?:[a-z0-9-]{4,})\.amazonaws\.com/([a-z0-9-\.]{1,})/(.*)", transcript_uri)
-        if match:
-            bucket = match.group(1)
-            s3_key = match.group(2)
-            
-            # Read transcript from S3
-            try:
-                # This would normally be done by reading from S3, but we'll simulate it here
-                transcript = "Transcript content would be read from S3"
-                
-                # Add transcript information to result
-                result["transcription"]["transcript"] = transcript
-                result["transcription"]["detected_language"] = detected_language
-                result["transcription"]["object"] = {
-                    "bucket": bucket,
-                    "key": s3_key
-                }
-                payload_external_status = "ready"
-            except Exception as e:
-                result["error"] = f"Error reading transcript: {str(e)}"
-    elif status == "FAILED":
+        m = re.match(r"https://s3\.(?:[a-z0-9-]+)\.amazonaws\.com/([^/]+)/(.*)", transcript_uri)
+        if m:
+            bucket, s3_key = m.group(1), m.group(2)
+            # (in your real code you'd read S3; here we simulate)
+            transcript = "…actual transcript text from S3…"
+            result["transcription"].update({
+                "transcript": transcript,
+                "detected_language": detected_language,
+                "object": {"bucket": bucket, "key": s3_key}
+            })
+
+    # If failed, include an error
+    if status == "FAILED":
         result["error"] = "Transcription failed"
-        result["statusCode"] = 500
-    
-    # Add external task status
-    result["externalTaskStatus"] = payload_external_status
-    
-    # Map status to external job status
+
+    # External-task readiness
+    result["externalTaskStatus"] = "ready" if status == "COMPLETED" else "not_ready"
+
+    # Map job status → your pipeline’s externalJobStatus
     status_mapping = {
-        "COMPLETED": "Completed",
-        "IN_PROGRESS": "inProgress",
-        "QUEUED": "Started",
+        "COMPLETED":  "Completed",
+        "IN_PROGRESS":"inProgress",
+        "QUEUED":     "Started",
         "PROCESSING": "inProgress",
-        "FAILED": "Started"  # Even if failed, we use "Started" as per requirements
+        "FAILED":     "Failed"
     }
-    
-    # Add external job fields
-    result["externalJobId"] = job_name
     result["externalJobStatus"] = status_mapping.get(status, "Started")
-    result["externalJobResult"] = "Success" if status == "COMPLETED" else "Failed"
-    
+
+    # Only mark Success/Failed once done; otherwise “Running”
+    if status == "COMPLETED":
+        result["externalJobResult"] = "Success"
+    elif status == "FAILED":
+        result["externalJobResult"] = "Failed"
+    else:
+        result["externalJobResult"] = "Running"
+
+    # Always include the job’s externalJobId
+    result["externalJobId"] = job_name
+
     return result

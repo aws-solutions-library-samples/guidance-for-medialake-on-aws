@@ -173,25 +173,56 @@ def lambda_handler(event, context):
 
         # Create the request body using the template
         try:
+            logger.info("Creating request body with event structure", extra={"event_keys": list(event.keys())})
+            if "payload" in event:
+                logger.info("Payload structure", extra={"payload_keys": list(event["payload"].keys())})
+            if "metadata" in event:
+                logger.info("Metadata structure", extra={"metadata_keys": list(event["metadata"].keys())})
+            
             request_params, mapping = create_request_body(s3_templates, api_template_bucket, event)
+            logger.info("Successfully created request params", extra={"request_params": request_params})
         except Exception as e:
-            logger.error(f"Error creating request body: {str(e)}")
+            error_msg = f"Error creating request body: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             return {
                 "statusCode": 500,
-                "body": json.dumps({"error": f"Error creating request body: {str(e)}"})
+                "body": json.dumps({"error": error_msg})
             }
 
         # Get the transcription job status
         job_name = request_params.get("TranscriptionJobName")
-        status = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
+        if not job_name:
+            error_msg = "TranscriptionJobName is missing in request parameters"
+            logger.error(error_msg)
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": error_msg})
+            }
+            
+        logger.info(f"Getting transcription job status for job: {job_name}")
+        try:
+            status = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
+            logger.info("Successfully retrieved transcription job status",
+                        extra={"job_status": status['TranscriptionJob']['TranscriptionJobStatus']})
+        except Exception as e:
+            error_msg = f"Error getting transcription job status: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": error_msg})
+            }
         
         # If job is completed, update DynamoDB
         status_value = status['TranscriptionJob']['TranscriptionJobStatus']
+
         if status_value == 'COMPLETED':
-            # Extract asset ID from the event
-            payload = json.loads(event['payload']['body'])
-            asset_id = payload.get("asset_id")
-            
+             # Extract inventory_id from the original pipeline input
+            data_block = event.get("payload", {}).get("data", {})
+            body = data_block.get("body", {})
+            # sometimes body is a JSON string
+            if isinstance(body, str):
+                body = json.loads(body)
+            inventory_id = body.get("inventory_id")  
             # Extract transcript URI
             transcript_uri = status['TranscriptionJob']['Transcript']['TranscriptFileUri']
             bucket, s3_key = http_to_s3_comps(transcript_uri)
@@ -199,7 +230,7 @@ def lambda_handler(event, context):
             # Store a reference to the transcription file in the DynamoDB asset table
             table = dynamodb.Table(os.getenv("MEDIALAKE_ASSET_TABLE"))
             table.update_item(
-                Key={"InventoryID": asset_id},
+                Key={"InventoryID": inventory_id},
                 UpdateExpression="SET TranscriptionS3Uri = :val",
                 ExpressionAttributeValues={":val": f"s3://{bucket}/{s3_key}"}
             )
@@ -211,13 +242,16 @@ def lambda_handler(event, context):
         
         # Process the response using the template
         try:
+            logger.info("Creating response output")
             result = create_response_output(s3_templates, api_template_bucket, status, event, mapping)
+            logger.info("Successfully created response output")
             return result
         except Exception as e:
-            logger.error(f"Error processing response: {str(e)}")
+            error_msg = f"Error processing response: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             return {
                 "statusCode": 500,
-                "body": json.dumps({"error": f"Error processing response: {str(e)}"})
+                "body": json.dumps({"error": error_msg})
             }
         
     except Exception as e:

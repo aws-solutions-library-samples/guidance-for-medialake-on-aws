@@ -28,7 +28,20 @@ node:
                 - dynamodb:UpdateItem
               resources:
                 - ${MEDIALAKE_ASSET_TABLE}
-
+      service_roles:
+        - name: transcribe_service_role
+          service: transcribe.amazonaws.com
+          policies:
+            - name: s3
+              statements:
+                - effect: Allow
+                  actions:
+                    - s3:PutObject
+                    - s3:ListBucket
+                    - s3:GetObject
+                    - s3:DeleteObject
+                  resources:
+                    - "*"  # This could be more specific in production
 actions:
   transcribe_status:
     summary: Transcription Job Status

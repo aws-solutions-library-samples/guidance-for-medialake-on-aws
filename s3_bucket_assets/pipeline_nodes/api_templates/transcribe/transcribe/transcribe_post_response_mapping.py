@@ -18,33 +18,37 @@ def translate_event_to_request(response_body_and_event):
     
     # Map transcription job status to external status
     status_mapping = {
-        "COMPLETED": "Completed",
-        "IN_PROGRESS": "inProgress",
-        "QUEUED": "Started",
-        "PROCESSING": "inProgress"
+        "COMPLETED":  "Completed",
+        "IN_PROGRESS":"inProgress",
+        "QUEUED":     "Started",
+        "PROCESSING": "inProgress",
+        "FAILED":     "Failed"
     }
-    
     mapped_status = status_mapping.get(status, "Started")
     
     # Determine job result
     job_result = "Success" if job_name else "Failed"
     
-    # Get the inventory ID from the event
-    input_data = event.get("detail", {}).get("outputs", {}).get("input", {})
-    inventory_id = input_data.get("InventoryID", "")
+    # Get the inventory ID from the first asset in the payload
+    payload = event.get("payload", {})
+    assets  = payload.get("assets", [])
+    if isinstance(assets, list) and assets:
+        inventory_id = assets[0].get("InventoryID", "")
+    else:
+        inventory_id = ""
     
-    # Create the response
+    # Build the response
     result = {
-        "externalJobId": job_name,
+        "externalJobId":     job_name,
         "externalJobStatus": mapped_status,
         "externalJobResult": job_result,
-        "message": f"Successfully started transcription job",
-        "asset_id": inventory_id,
+        "message":           "Successfully started transcription job",
+        "inventory_id":      inventory_id,
         "transcription": {
-            "engine": "AMAZON_TRANSCRIBE",
-            "id": job_name,
-            "status": status,
-            "job_name": job_name
+            "engine":  "AMAZON_TRANSCRIBE",
+            "id":      job_name,
+            "status":  status,
+            "job_name":job_name
         }
     }
     
