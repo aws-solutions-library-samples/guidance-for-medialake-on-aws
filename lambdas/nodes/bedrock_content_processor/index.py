@@ -2,19 +2,27 @@ import boto3
 import os
 import json
 import datetime
-import ast
+import base64
+import mimetypes
 import importlib.util
+from urllib.parse import urlparse
+from decimal import Decimal
+from typing import Any, Callable, Dict, Union
+from botocore.exceptions import ClientError
+
 from aws_lambda_powertools import Logger, Tracer
 from lambda_middleware import lambda_middleware
-from decimal import Decimal
-from typing import Dict, Any
-from botocore.exceptions import ClientError
-from urllib.parse import urlparse
 from jinja2 import Environment, FileSystemLoader
 
 # Initialize Powertools
 logger = Logger()
 tracer = Tracer()
+
+
+ImagePayload = Dict[str, str]
+
+def get_s3_bytes(bucket: str, key: str) -> bytes:
+    return s3.Object(bucket, key).get()["Body"].read()
 
 # Default prompts
 DEFAULT_PROMPTS = {
@@ -61,291 +69,375 @@ DEFAULT_PROMPTS = {
     )
 }
 
-# Initialize AWS clients
-s3 = boto3.resource('s3')
-s3_client = boto3.client('s3')
-bedrock_runtime_client = boto3.client("bedrock-runtime")
-dynamodb = boto3.resource('dynamodb')
+def _anthropic_builder(
+    instr: str,
+    content: Union[str, ImagePayload]
+) -> Dict[str, Any]:
+    # Always chat-style messages, support image or text
+    if isinstance(content, dict):
+        # image + follow-up text
+        return {
+            "anthropic_version": "bedrock-2023-05-31",
+            "system": "You are an expert in processing and analyzing content",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": content["mime"],
+                            "data": content["b64"]
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": instr
+                    }
+                ]
+            }],
+            "max_tokens": 2000,
+            "temperature": 1,
+            "top_p": 0.999
+        }
+    else:
+        # pure text
+        return {
+            "anthropic_version": "bedrock-2023-05-31",
+            "system": "You are an expert in processing and analyzing content",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": instr + "\n\ncontent: " + content }
+                ]
+            }],
+            "max_tokens": 2000,
+            "temperature": 1,
+            "top_p": 0.999
+        }
 
+def _nova_converse_builder(instr: str, content: Union[str, ImagePayload]) -> Dict[str, Any]:
+    # Build content blocks according to modality
+    if isinstance(content, dict):
+        # Image payload
+        blocks = [
+            {
+                "image": {
+                    "format": content["mime"].split("/")[-1] or "png",
+                    "source": {"bytes": content["b64"]}
+                }
+            },
+            { "text": instr }
+        ]
+    else:
+        # Pure text
+        blocks = [{ "text": instr + "\n\ncontent: " + content }]
+
+    return {
+        "schemaVersion": "messages-v1",
+        "system": [
+            { "text": "You are an expert in processing and analyzing content" }
+        ],
+        "messages": [
+            { "role": "user", "content": blocks }
+        ],
+        "inferenceConfig": {
+            "maxTokens": 2000,
+            "temperature": 1,
+            "topP": 0.999
+        }
+    }
+
+
+
+def _titan_text_builder(instr: str, txt: str) -> Dict[str, Any]:
+    return {
+        "inputText": f"User: {instr}\nBot:",
+        "textGenerationConfig": {
+            "maxTokenCount": 2000,
+            "temperature": 1,
+            "topP": 0.999,
+            "stopSequences": []
+        }
+    }
+
+def _generic_prompt_builder(instr: str, txt: str) -> Dict[str, Any]:
+    return {
+        "prompt": instr + "\n\ncontent: " + txt,
+        "max_tokens": 2000,
+        "temperature": 1,
+        "top_p": 0.999
+    }
+
+# === 2) Map model IDs to builders ===
+
+MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
+    "anthropic":            _anthropic_builder,
+    "amazon.nova-lite":     _nova_converse_builder,
+    "amazon.nova-premier":  _nova_converse_builder,
+    "amazon.nova-pro":      _nova_converse_builder,
+    "titan-text-express":   _titan_text_builder,
+    "titan-text-lite":      _titan_text_builder,
+    "titan-text-premier":   _titan_text_builder,
+    "meta.llama3":          _generic_prompt_builder,
+    "meta.llama4":          _generic_prompt_builder,
+    "pixtral-large":        _generic_prompt_builder,
+    "mistral.pixtral-large":_generic_prompt_builder,
+}
+
+# === 3) Central body‐builder ===
+
+def build_bedrock_body(
+    model_id: str,
+    instr: str,
+    content: Union[str, ImagePayload]
+) -> str:
+    """
+    Chooses the correct builder based on model_id substring.
+    `content` may be a plain text string or an ImagePayload dict.
+    """
+    lower = model_id.lower()
+    for key, builder in MODEL_BODY_BUILDERS.items():
+        if key in lower:
+            return json.dumps(builder(instr, content))
+    # fallback generic
+    return json.dumps(_generic_prompt_builder(instr, content if isinstance(content, str) else ""))
+
+
+
+def _strip_decimals(obj):
+    """Recursively convert Decimal → int/float so JSON serialization works."""
+    if isinstance(obj, list):
+        return [_strip_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
+
+# Initialize AWS clients
+s3 = boto3.resource("s3")
+s3_client = boto3.client("s3")
+bedrock_runtime_client = boto3.client("bedrock-runtime")
+dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, Decimal) or isinstance(obj, datetime.datetime):
+        if isinstance(obj, (Decimal, datetime.datetime)):
             return str(obj)
         return super().default(obj)
 
-def parse_s3_uri(s3_uri):
-    """Parse an S3 URI into bucket and key."""
+def parse_s3_uri(s3_uri: str):
     parsed = urlparse(s3_uri)
-    if parsed.scheme != 's3':
+    if parsed.scheme != "s3":
         raise ValueError(f"Not an S3 URI: {s3_uri}")
-    bucket = parsed.netloc
-    key = parsed.path.lstrip('/')
-    return bucket, key
+    return parsed.netloc, parsed.path.lstrip("/")
 
-def get_asset_details(asset_id):
-    """Get asset details from DynamoDB."""
+def get_asset_details(asset_id: str) -> Dict[str, Any]:
     try:
-        response = table.get_item(Key={"InventoryID": asset_id})
-        return response.get("Item", {})
-    except Exception as e:
-        logger.error(f"Error getting asset details: {str(e)}")
+        resp = table.get_item(Key={"InventoryID": asset_id})
+        return resp.get("Item", {})
+    except ClientError as e:
+        logger.error(f"Error getting asset details: {e}")
         raise
 
-def get_file_content(s3_uri):
-    """Get file content from S3."""
-    try:
-        bucket, key = parse_s3_uri(s3_uri)
-        obj = s3.Object(bucket, key)
-        content = obj.get()['Body'].read().decode('utf-8')
-        return content
-    except Exception as e:
-        logger.error(f"Error getting file content: {str(e)}")
-        raise
+def get_file_content(s3_uri: str) -> str:
+    bucket, key = parse_s3_uri(s3_uri)
+    obj = s3.Object(bucket, key)
+    return obj.get()["Body"].read().decode("utf-8")
 
-def build_s3_templates_path(service_name, resource, method):
-    """Build S3 template paths."""
+def build_s3_templates_path(service_name: str, resource: str, method: str) -> Dict[str, str]:
+    base = f"api_templates/{service_name}/{resource}/{resource}_{method}"
     return {
-        "request_template": f"api_templates/{service_name}/{resource}/{resource}_{method}_request.jinja",
-        "request_mapping": f"api_templates/{service_name}/{resource}/{resource}_{method}_request_mapping.py",
-        "response_template": f"api_templates/{service_name}/{resource}/{resource}_{method}_response.jinja",
-        "response_mapping": f"api_templates/{service_name}/{resource}/{resource}_{method}_response_mapping.py",
+        "request_template":   f"{base}_request.jinja",
+        "request_mapping":    f"{base}_request_mapping.py",
+        "response_template":  f"{base}_response.jinja",
+        "response_mapping":   f"{base}_response_mapping.py",
     }
 
-def create_request_body(s3_templates, api_template_bucket, event):
-    """Create request body using templates."""
-    try:
-        # Get the request mapping module
-        request_mapping_obj = s3.Object(api_template_bucket, s3_templates["request_mapping"])
-        request_mapping_code = request_mapping_obj.get()['Body'].read().decode('utf-8')
-        
-        # Create a module from the code
-        spec = importlib.util.spec_from_loader('request_mapping', loader=None)
-        request_mapping_module = importlib.util.module_from_spec(spec)
-        exec(request_mapping_code, request_mapping_module.__dict__)
-        
-        # Call the translate_event_to_request function
-        mapping = request_mapping_module.translate_event_to_request(event)
-        
-        # Get the request template
-        request_template_obj = s3.Object(api_template_bucket, s3_templates["request_template"])
-        request_template = request_template_obj.get()['Body'].read().decode('utf-8')
-        
-        # Render the template
-        env = Environment(loader=FileSystemLoader('/'))
-        template = env.from_string(request_template)
-        rendered_template = template.render(variables=mapping)
-        
-        # Parse the rendered template
-        request_params = json.loads(rendered_template)
-        
-        return request_params, mapping
-    except Exception as e:
-        logger.error(f"Error creating request body: {str(e)}")
-        raise
+def create_request_body(s3_templates, bucket_name: str, event: dict):
 
-def create_response_output(s3_templates, api_template_bucket, result, event, mapping):
-    """Create response output using templates."""
-    try:
-        # Get the response mapping module
-        response_mapping_obj = s3.Object(api_template_bucket, s3_templates["response_mapping"])
-        response_mapping_code = response_mapping_obj.get()['Body'].read().decode('utf-8')
-        
-        # Create a module from the code
-        spec = importlib.util.spec_from_loader('response_mapping', loader=None)
-        response_mapping_module = importlib.util.module_from_spec(spec)
-        exec(response_mapping_code, response_mapping_module.__dict__)
-        
-        # Call the translate_event_to_request function with the result and event
-        response_mapping = response_mapping_module.translate_event_to_request({
-            "response_body": result,
-            "event": event
-        })
-        
-        # Get the response template
-        response_template_obj = s3.Object(api_template_bucket, s3_templates["response_template"])
-        response_template = response_template_obj.get()['Body'].read().decode('utf-8')
-        
-        # Render the template
-        env = Environment(loader=FileSystemLoader('/'))
-        template = env.from_string(response_template)
-        rendered_template = template.render(variables=response_mapping)
-        
-        # Parse the rendered template
-        response_output = json.loads(rendered_template)
-        
-        return response_output
-    except Exception as e:
-        logger.error(f"Error creating response output: {str(e)}")
-        raise
+    request_mapping_obj = s3.Object(bucket_name, s3_templates["request_mapping"])
+    code = request_mapping_obj.get()["Body"].read().decode("utf-8")
+    spec = importlib.util.spec_from_loader("rm", loader=None)
+    mod = importlib.util.module_from_spec(spec)
+    exec(code, mod.__dict__)
+    mapping = mod.translate_event_to_request(event)
+    tmpl_obj = s3.Object(bucket_name, s3_templates["request_template"])
+    tmpl = tmpl_obj.get()["Body"].read().decode("utf-8")
+    env = Environment(
+        loader=FileSystemLoader("/"),
+        autoescape=True
+    )
+    rendered = env.from_string(tmpl).render(variables=mapping)
+    return json.loads(rendered), mapping
 
-def get_content_from_asset(asset_details, content_source):
-    """Get content from asset based on content source."""
-    content_uri = None
-    
-    # Map content_source to asset field
-    source_field_mapping = {
+def create_response_output(s3_templates, bucket_name: str, result: dict, event: dict, mapping: dict):
+
+    resp_map_obj = s3.Object(bucket_name, s3_templates["response_mapping"])
+    code = resp_map_obj.get()["Body"].read().decode("utf-8")
+    spec = importlib.util.spec_from_loader("rm2", loader=None)
+    mod = importlib.util.module_from_spec(spec)
+    exec(code, mod.__dict__)
+    resp_mapping = mod.translate_event_to_request({"response_body": result, "event": event})
+    tmpl_obj = s3.Object(bucket_name, s3_templates["response_template"])
+    tmpl = tmpl_obj.get()["Body"].read().decode("utf-8")
+    env = Environment(
+        loader=FileSystemLoader("/"),
+        autoescape=True
+    )
+    rendered = env.from_string(tmpl).render(variables=resp_mapping)
+    return json.loads(rendered)
+
+def get_content_from_asset(asset_details: dict, content_source: str):
+    source_map = {
         "transcript": "TranscriptionS3Uri",
-        "proxy": "ProxyS3Uri",
-        "metadata": "MetadataS3Uri",
+        "proxy":      "ProxyS3Uri",
+        "metadata":   "MetadataS3Uri",
     }
-    
-    # Try to get the content URI based on content_source
-    if content_source in source_field_mapping:
-        field = source_field_mapping[content_source]
-        if field in asset_details:
-            content_uri = asset_details[field]
-    
-    # If content_source is custom or the specified field doesn't exist,
-    # try to find content in common fields
-    if not content_uri:
-        for field in ["TranscriptionS3Uri", "TextS3Uri", "ContentS3Uri", "ProxyS3Uri", "MetadataS3Uri"]:
-            if field in asset_details:
-                content_uri = asset_details[field]
+    uri = asset_details.get(source_map.get(content_source, ""), None)
+    if not uri:
+        for fld in ["TranscriptionS3Uri","TextS3Uri","ContentS3Uri","ProxyS3Uri","MetadataS3Uri"]:
+            if fld in asset_details:
+                uri = asset_details[fld]
                 break
-    
-    if not content_uri:
-        raise ValueError(f"No content found for source '{content_source}'")
-    
-    # Get the content from S3
-    content = get_file_content(content_uri)
-    
-    return content, content_uri
+    if not uri:
+        raise ValueError(f"No content for source '{content_source}'")
+    return get_file_content(uri), uri
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-)
+
+
+@lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME","default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     try:
-        logger.info("Received event", extra={"event": event})
-        api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
+        logger.info("Event received", extra={"event": event})
+        bucket = os.environ.get("API_TEMPLATE_BUCKET","medialake-assets")
+        s3_templates = build_s3_templates_path("bedrock","content_processor","post")
 
-        # Build the S3 template paths
-        s3_templates = build_s3_templates_path(
-            service_name="bedrock",
-            resource="content_processor",
-            method="post"
-        )
-
-        # Create the request body using the template
+        # build request & mapping
         try:
-            request_params, mapping = create_request_body(s3_templates, api_template_bucket, event)
+            params, mapping = create_request_body(s3_templates, bucket, event)
         except Exception as e:
-            logger.error(f"Error creating request body: {str(e)}")
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": f"Error creating request body: {str(e)}"})
-            }
+            logger.error(f"Request body error: {e}")
+            return {"statusCode":500, "body":json.dumps({"error":str(e)})}
 
-        # Extract parameters
-        asset_id = request_params.get("asset_id")
-        file_s3_uri = request_params.get("file_s3_uri")
-        content_source = mapping.get("content_source", "transcript")
-
-        # Determine the prompt
-        custom_prompt = mapping.get("custom_prompt")
-        prompt_name = mapping.get("prompt_name")
-        if custom_prompt:
-            processing_instructions = custom_prompt
-        elif prompt_name and prompt_name in DEFAULT_PROMPTS:
-            processing_instructions = DEFAULT_PROMPTS[prompt_name]
-        else:
-            processing_instructions = os.environ.get("PROMPT", DEFAULT_PROMPTS["summary_100"])
-
-        # Determine the model ID
-        bedrock_model_id = mapping.get("model_id") or os.environ.get("MODEL_ID")
-        if not bedrock_model_id:
-            raise KeyError("Model ID not provided and environment variable MODEL_ID is not set")
-
-        # Get file content
-        if file_s3_uri:
-            # Use the provided file URI directly
-            content = get_file_content(file_s3_uri)
-            source_s3_uri = file_s3_uri
-        else:
-            # Fetch asset details
-            asset_details = get_asset_details(asset_id)
-            
-            # Get content based on content_source
-            try:
-                content, source_s3_uri = get_content_from_asset(asset_details, content_source)
-            except ValueError as e:
-                error_response = {
-                    "statusCode": 404,
-                    "body": {"message": str(e)},
-                    "status": "FAILED"
-                }
-                return create_response_output(s3_templates, api_template_bucket, error_response, event, mapping)
-
-        # Build Bedrock request based on model
-        if "anthropic" in bedrock_model_id.lower():
-            # Anthropic Claude models
-            messages = [{
-                "role": "user",
-                "content": [{"text": processing_instructions + "\n\ncontent: " + content}]
-            }]
-            
-            body = json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 2000,
-                "messages": messages,
-                "system": "You are an expert in processing and analyzing content",
-                "temperature": 1,
-                "top_p": 0.999
-            })
-        else:
-            # Generic format for other models (can be expanded for specific models)
-            body = json.dumps({
-                "prompt": processing_instructions + "\n\ncontent: " + content,
-                "max_tokens": 2000,
-                "temperature": 1,
-                "top_p": 0.999
-            })
-
-        # Invoke Bedrock model
-        logger.info(f'Invoking model: {bedrock_model_id}')
-        response = bedrock_runtime_client.invoke_model(body=body, modelId=bedrock_model_id)
+        asset_id      = params.get("asset_id")
+        file_uri      = params.get("file_s3_uri")
         
-        # Parse response based on model
-        if "anthropic" in bedrock_model_id.lower():
-            assistant_response = json.loads(response.get('body').read())
-            result_text = assistant_response['content'][0]['text']
-        else:
-            # Generic response parsing (can be expanded for specific models)
-            response_body = json.loads(response.get('body').read())
-            result_text = response_body.get('completion', response_body.get('generated_text', ''))
+        content_src   = os.environ.get("CONTENT_SOURCE")
+        custom_prompt = mapping.get("custom_prompt")
+        prompt_name   = os.environ.get("PROMPT_NAME")
 
-        # Store result directly in DynamoDB in the TranscriptSummary field
+        # choose instructions
+        if custom_prompt:
+            instr = custom_prompt
+        elif prompt_name in DEFAULT_PROMPTS:
+            instr = DEFAULT_PROMPTS[prompt_name]
+        else:
+            instr = os.environ.get("PROMPT",DEFAULT_PROMPTS["summary_100"])
+
+        # choose model
+        model_id =  os.environ.get("MODEL_ID")
+        if not model_id:
+            raise KeyError("Model ID missing")
+
+        # ── fetch content ────────────────────────────────────────────────
+        assets = event.get("payload", {}).get("assets", [])
+        if not assets:
+            raise ValueError("No assets found in event.payload.assets")
+
+        asset_detail = assets[0]
+
+        if content_src == "transcript":
+            transcript_uri = (
+                asset_detail.get("TranscriptionS3Uri")
+                or asset_detail.get("TextS3Uri")
+                or asset_detail.get("ContentS3Uri")
+            )
+            text = get_file_content(transcript_uri)
+            fetched_uri = transcript_uri
+            body_json = build_bedrock_body(model_id, instr, text)
+
+        elif content_src == "proxy":
+            rep = next(r for r in asset_detail["DerivedRepresentations"] if r["Purpose"]=="proxy")
+            loc = rep["StorageInfo"]["PrimaryLocation"]
+            raw = get_s3_bytes(loc["Bucket"], loc["ObjectKey"]["FullPath"])
+            b64  = base64.b64encode(raw).decode("utf-8")
+            mime = mimetypes.guess_type(loc["ObjectKey"]["FullPath"])[0] or "application/octet-stream"
+
+            # record where it came from
+            fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
+
+            body_json = build_bedrock_body(model_id, instr, {"b64": b64, "mime": mime})
+
+        elif file_uri:
+            text = get_file_content(file_uri)
+            fetched_uri = file_uri
+            body_json = build_bedrock_body(model_id, instr, text)
+
+        else:
+            raise ValueError(f"Unsupported content source '{content_src}'")
+
+        # ── now invoke ──────────────────────────────────────────────────────────────
+        logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
+
+      
+        try:
+            resp = bedrock_runtime_client.invoke_model(
+                modelId=model_id,
+                body=body_json,
+                contentType="application/json"
+            )
+        except ClientError as e:
+            # dump again at error
+            logger.error(f"InvokeModel failed for model {model_id}. Payload was: {body_json}")
+            raise
+
+        # parse response
+        data = json.loads(resp["body"].read())
+        if "anthropic" in model_id.lower():
+            result = data["content"][0]["text"]
+        elif "images" in data:
+            result = data["images"][0]
+        else:
+            result = data.get("completion", data.get("generated_text",""))
+
+        # ── persist ───────────────────────────────────────────────────────────
+        if mapping.get("dynamo_key"):
+            dynamo_key = mapping["dynamo_key"]
+        elif prompt_name:
+            dynamo_key = f"{prompt_name}Result"
+        else:
+            dynamo_key = "customPromptResult"
+
+        update_expr      = "SET #k = :t"
+        expr_attr_names  = {"#k": dynamo_key}
+        expr_attr_values = {":t": result}
+
         table.update_item(
             Key={"InventoryID": asset_id},
-            UpdateExpression="SET TranscriptSummary = :val",
-            ExpressionAttributeValues={":val": result_text}
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_attr_names,
+            ExpressionAttributeValues=expr_attr_values
         )
 
-        # Prepare result
-        result = {
-            "result": result_text,
-            "status": "SUCCEEDED"
-        }
-        
-        # Create response
-        try:
-            final_response = create_response_output(s3_templates, api_template_bucket, result, event, mapping)
-            return final_response
-        except Exception as e:
-            logger.error(f"Error processing response: {str(e)}")
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": f"Error processing response: {str(e)}"})
-            }
+        # respond
+        final = create_response_output(
+            s3_templates,
+            bucket,
+            data,        # <-- raw JSON from Bedrock invoke_model
+            event,
+            mapping
+        )
+
+        updated_item = table.get_item(Key={"InventoryID": asset_id}).get("Item", {})
+        final["updatedAsset"] = _strip_decimals(updated_item)
+
+        return final
 
     except Exception as e:
-        error_message = f"Error processing content with Bedrock: {str(e)}"
-        logger.exception(error_message)
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": error_message})
-        }
+        logger.exception("Processing failed")
+        return {"statusCode":500, "body":json.dumps({"error":str(e)})}

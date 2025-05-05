@@ -1,9 +1,8 @@
 {
   "statusCode": {{ variables.statusCode }},
   "body": {
-    "result": "{{ variables.result }}",
-    "status": "{{ variables.status }}",
-    "inventory_id": "{{ variables.inventory_id }}"
+    "result": {{ variables.result | tojson }},
+    "status": "{{ variables.status }}"
   },
   "externalJobId": "{{ variables.externalJobId }}",
   "externalJobStatus": "{{ variables.externalJobStatus }}",

@@ -4,46 +4,43 @@ def translate_event_to_request(event):
     """
     Extract input parameters for Bedrock content processing.
 
-    Expected event structure:
-    {
-        "payload": {
-            "body": {  # may be JSON string or dict
-                "inventory_id": "...",  # required if file_s3_uri not provided
-                "file_s3_uri": "...",   # required if inventory_id not provided
-                "model_id": "...",      # optional, will use env var if not provided
-                "prompt_name": "...",   # optional
-                "custom_prompt": "...", # optional
-                "content_source": "..." # optional, default: transcript
-            }
-        }
-    }
+    Supports two shapes:
+      1) event["payload"]["body"]
+      2) event["payload"]["data"]["body"]
     """
     payload = event.get("payload")
-    if not payload:
+    if payload is None:
         raise KeyError("Missing 'payload' in event")
 
-    body = payload.get("body")
-    if isinstance(body, str):
-        payload_body = json.loads(body)
+    # support both payload.body and payload.data.body
+    if "body" in payload:
+        raw_body = payload["body"]
+    elif isinstance(payload.get("data"), dict) and "body" in payload["data"]:
+        raw_body = payload["data"]["body"]
     else:
-        payload_body = body or {}
+        raise KeyError("Missing 'body' in payload; found neither payload.body nor payload.data.body")
 
-    inventory_id = payload_body.get("inventory_id")
-    file_s3_uri = payload_body.get("file_s3_uri")
-    
+    # if the body is still a JSON string, parse it
+    if isinstance(raw_body, str):
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse body as JSON: {e}")
+    else:
+        body = raw_body or {}
+
+    # pull out the two required identifiers
+    inventory_id = body.get("inventory_id")
+    file_s3_uri  = body.get("file_s3_uri")
+
     if not inventory_id and not file_s3_uri:
         raise KeyError("Either 'inventory_id' or 'file_s3_uri' must be provided in payload body")
 
-    model_id = payload_body.get("model_id")
-    prompt_name = payload_body.get("prompt_name")
-    custom_prompt = payload_body.get("custom_prompt")
-    content_source = payload_body.get("content_source", "transcript")
-
     return {
-        "asset_id": inventory_id,
-        "file_s3_uri": file_s3_uri,
-        "model_id": model_id,
-        "prompt_name": prompt_name,
-        "custom_prompt": custom_prompt,
-        "content_source": content_source,
+        "asset_id":       inventory_id,
+        "file_s3_uri":    file_s3_uri,
+        "model_id":       body.get("model_id"),
+        "prompt_name":    body.get("prompt_name"),
+        "custom_prompt":  body.get("custom_prompt"),
+        "content_source": body.get("content_source", "transcript"),
     }

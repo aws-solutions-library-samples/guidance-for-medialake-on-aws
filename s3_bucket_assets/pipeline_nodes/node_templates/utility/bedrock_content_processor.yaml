@@ -15,6 +15,7 @@ node:
             - effect: Allow
               actions:
                 - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
               resources:
                 - "*"
             - effect: Allow
@@ -30,7 +31,7 @@ node:
                 - dynamodb:GetItem
               resources:
                 - ${MEDIALAKE_ASSET_TABLE}
-           
+
 actions:
   process_content:
     summary: Process Content with Bedrock
@@ -43,7 +44,32 @@ actions:
         required: true
         schema:
           type: select
-          options: ["anthropic.claude-3-sonnet-20240229-v1:0", "anthropic.claude-3-haiku-20240307-v1:0", "anthropic.claude-instant-v1", "amazon.titan-text-express-v1"]
+          options: [
+            "amazon.nova-canvas-v1:0",
+            "amazon.nova-lite-v1:0",
+            "amazon.nova-premier-v1:0",
+            "amazon.nova-pro-v1:0",
+            "amazon.nova-reel-v1:0",
+            "amazon.nova-reel-v1:1",
+            "amazon.titan-image-generator-v2:0",
+            "amazon.titan-image-generator-v1",
+            "amazon.titan-embed-image-v1",
+            "anthropic.claude-3-haiku-20240307-v1:0",
+            "anthropic.claude-3-opus-20240229-v1:0",
+            "anthropic.claude-3-sonnet-20240229-v1:0",
+            "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "anthropic.claude-3-7-sonnet-20250219-v1:0",
+            "meta.llama3-2-1b-instruct-v1:0",
+            "meta.llama3-2-11b-instruct-v1:0",
+            "meta.llama3-2-90b-instruct-v1:0",
+            "meta.llama4-maverick-17b-instruct-v1:0",
+            "meta.llama4-scout-17b-instruct-v1:0",
+            "mistral.pixtral-large-2502-v1:0",
+            "stability.sd3-5-large-v1:0",
+            "stability.stable-image-core-v1:1",
+            "stability.stable-image-ultra-v1:1"
+          ]
       - in: body
         name: prompt_name
         label: Default Prompt
@@ -51,21 +77,21 @@ actions:
         schema:
           type: select
           options: ["summary_100", "describe_image", "extract_key_points", "analyze_sentiment"]
-      - in: body
-        name: custom_prompt
-        label: Override Prompt
-        required: false
-        schema:
-          type: string
+      # - in: body
+      #   name: custom_prompt
+      #   label: Override Prompt
+      #   required: false
+      #   schema:
+      #     type: string
       - in: body
         name: content_source
         label: Content Source
         required: true
         schema:
           type: select
-          options: ["transcript", "proxy", "metadata", "custom"]
+          options: ["transcript", "proxy"]
     connections:
       incoming:
-        type: [metadata]
+        type: [any]
       outgoing:
-        type: [metadata]
+        type: [any]

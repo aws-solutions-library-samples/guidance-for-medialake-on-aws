@@ -1,51 +1,44 @@
 def translate_event_to_request(response_body_and_event):
     """
-    Transform the Bedrock content processing response.
-    
-    Args:
-        response_body_and_event: Dict containing the processing response and the original event
-        
-    Returns:
-        Dict with the transformed response
+    Transform the Bedrock content processing response into the external API shape.
     """
     response_body = response_body_and_event["response_body"]
-    event = response_body_and_event["event"]
-    
-    # Extract asset ID from the event
-    payload = event.get("payload", {})
-    if isinstance(payload.get("body"), str):
-        import json
-        payload_body = json.loads(payload["body"])
-    else:
-        payload_body = payload.get("body", {})
-    
-    inventory_id = payload_body.get("inventory_id", "")
-    
-    # Extract result information
-    result = response_body.get("result", "")
-    status = response_body.get("status", "FAILED")
-    
-    # Map status to external job status
+    event         = response_body_and_event["event"]
+
+    # 1) Extract inventory_id from the first asset
+    assets       = event.get("payload", {}).get("assets", [])
+    inventory_id = ""
+    if isinstance(assets, list) and assets:
+        inventory_id = assets[0].get("InventoryID", "")
+
+    # 2) Extract assistant text from output.message.content[0].text
+    result_text = ""
+    output      = response_body.get("output", {})
+    message     = output.get("message", {})
+    content_arr = message.get("content", [])
+    if content_arr and isinstance(content_arr[0], dict):
+        result_text = content_arr[0].get("text", "")
+
+    # 3) Determine success by stopReason
+    stop_reason = response_body.get("stopReason", "")
+    status      = "SUCCEEDED" if stop_reason == "end_turn" else "FAILED"
+
+    # 4) Map to external status labels
     status_mapping = {
         "SUCCEEDED": "Completed",
         "IN_PROGRESS": "inProgress",
-        "FAILED": "Started"  # Even if failed, we use "Started" as per requirements
+        "FAILED": "Started"
     }
-    
-    mapped_status = status_mapping.get(status, "Started")
-    
-    # Determine job result
-    job_result = "Success" if status == "SUCCEEDED" else "Failed"
-    
-    # Create the response
-    result = {
+    external_status = status_mapping.get(status, "Started")
+    external_result = "Success" if status == "SUCCEEDED" else "Failed"
+
+    # 5) Build and return the response payload
+    return {
         "statusCode": 200 if status == "SUCCEEDED" else 500,
-        "result": result,
-        "status": status,
-        "inventory_id": inventory_id,
-        "externalJobId": f"bedrock-{inventory_id}",
-        "externalJobStatus": mapped_status,
-        "externalJobResult": job_result
+        "result":     result_text,
+        "status":     status,
+        "inventory_id":       inventory_id,
+        "externalJobId":      f"bedrock-{inventory_id}",
+        "externalJobStatus":  external_status,
+        "externalJobResult":  external_result
     }
-    
-    return result
