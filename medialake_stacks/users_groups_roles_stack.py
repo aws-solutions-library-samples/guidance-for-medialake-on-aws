@@ -34,8 +34,8 @@ class UsersGroupsRolesStackProps:
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     x_origin_verify_secret: secretsmanager.Secret
-    # authorizer_lambda: lambda_.Function
-
+    auth_table_name: str
+    avp_policy_store_id: str
 
 class UsersGroupsRolesStack(cdk.NestedStack):
     """
@@ -65,7 +65,11 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                 entry="lambdas/auth/custom_authorizer",
                 memory_size=256,
                 timeout_minutes=1,
-                # environment_variables=common_env_vars,
+                environment_variables={
+                    "AUTH_TABLE_NAME": props.auth_table_name,
+                    "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
+                    "DEBUG_MODE": "true",
+                },
             ),
         )
         

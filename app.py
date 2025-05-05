@@ -88,7 +88,6 @@ authorization_stack = AuthorizationStack(
     "MediaLakeAuthorizationStack",
     props=AuthorizationStackProps(
         cognito_user_pool=api_gateway_core_stack.user_pool,
-        # custom_authorizer_lambda=auth_lambda_stack.custom_authorizer_lambda,
     ),
     env=env
 )
@@ -119,7 +118,6 @@ class MediaLakeStack(cdk.Stack):
             props=AuthorizationApiProps(
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 api_resource=props.api_gateway_core_stack.rest_api,
-                # cognito_authorizer=props.api_gateway_core_stack.authorizer,
                 cognito_user_pool=props.api_gateway_core_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
             ),
@@ -153,7 +151,8 @@ class MediaLakeStack(cdk.Stack):
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-            # authorizer_lambda=authorization_stack.authorizer_lambda,
+            auth_table_name=authorization_stack._auth_table.table_name,
+            avp_policy_store_id=authorization_stack._policy_store.attr_policy_store_id,
             ),
         )
 

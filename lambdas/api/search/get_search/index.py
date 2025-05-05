@@ -184,9 +184,6 @@ def build_semantic_query(params: SearchParams) -> Dict:
     if not api_key:
         raise SearchException("Search provider API key not configured or provider not enabled")
 
-    # Get the endpoint from the configuration
-    endpoint = get_endpoint()
-
     # Initialize the Twelve Labs client
     twelve_labs_client = TwelveLabs(api_key=api_key)
 

@@ -38,7 +38,6 @@ from config import config
 class AuthorizationStackProps:
     """Configuration for Authorization Stack."""
     cognito_user_pool: cognito.UserPool
-    # custom_authorizer_lambda: lambda_.Function
 
 
 class AuthorizationStack(Stack):
