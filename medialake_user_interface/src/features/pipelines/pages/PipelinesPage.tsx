@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Box, Button, Snackbar, Alert, ButtonGroup, Popper, Grow, Paper, ClickAwayListener, MenuList, MenuItem } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-import { FileUpload as FileUploadIcon } from '@mui/icons-material';
+import { Box, Button, Snackbar, Alert, ButtonGroup, Popper, Grow, Paper, ClickAwayListener, MenuList, MenuItem, useTheme, alpha, IconButton } from '@mui/material';
+import { Add as AddIcon, FileUpload as FileUploadIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +38,7 @@ const PIPELINES_QUERY_KEYS = {
 const PipelinesPage: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const theme = useTheme();
     
     // Add Pipeline Button Menu state
     const addPipelineButtonRef = useRef<HTMLDivElement>(null);
@@ -78,6 +78,7 @@ const PipelinesPage: React.FC = () => {
     const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
     const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
     const [isDeletingInProgress, setIsDeletingInProgress] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         severity: 'info' as 'info' | 'success' | 'error' | 'warning',
@@ -120,8 +121,17 @@ const PipelinesPage: React.FC = () => {
         deletePipeline,
         isDeleting,
         toggleActive,
-        togglingPipelines
+        togglingPipelines,
+        refetch
     } = usePipelineManager();
+    
+    // Handle refresh
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        refetch().finally(() => {
+            setIsRefreshing(false);
+        });
+    };
 
     // Handle edit pipeline
     const handleEdit = (id: string) => {
@@ -332,6 +342,65 @@ const PipelinesPage: React.FC = () => {
                 description={t('pipelines.description')}
                 action={
                     <>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3.5 }}>
+                            <IconButton
+                                onClick={handleRefresh}
+                                disabled={isLoading || isRefreshing}
+                                sx={{
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                                    }
+                                }}
+                                title={t('common.refresh')}
+                            >
+                                <RefreshIcon 
+                                    sx={{
+                                        animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                                        '@keyframes spin': {
+                                            '0%': {
+                                                transform: 'rotate(0deg)',
+                                            },
+                                            '100%': {
+                                                transform: 'rotate(360deg)',
+                                            },
+                                        },
+                                    }}
+                                />
+                            </IconButton>
+                            <ButtonGroup
+                                variant="contained"
+                                ref={addPipelineButtonRef}
+                                aria-label="Pipeline actions"
+                            >
+                                <Button
+                                    startIcon={<AddIcon />}
+                                    onClick={() => navigate('/settings/pipelines/new')}
+                                    sx={{
+                                        borderRadius: '8px 0 0 8px',
+                                        textTransform: 'none',
+                                        px: 3,
+                                        height: 40
+                                    }}
+                                >
+                                    {t('pipelines.actions.create')}
+                                </Button>
+                                <Button
+                                    size="small"
+                                    sx={{
+                                        borderRadius: '0 8px 8px 0',
+                                        height: 40
+                                    }}
+                                    aria-controls={addPipelineMenuOpen ? 'add-pipeline-menu' : undefined}
+                                    aria-expanded={addPipelineMenuOpen ? 'true' : undefined}
+                                    aria-label="select pipeline action"
+                                    aria-haspopup="menu"
+                                    onClick={handleAddPipelineMenuToggle}
+                                >
+                                    <ArrowDropDownIcon />
+                                </Button>
+                            </ButtonGroup>
+                        </Box>
                         <input
                             type="file"
                             accept="application/json"
@@ -356,6 +425,14 @@ const PipelinesPage: React.FC = () => {
                                                 // If active is not defined in the imported flow, default to true
                                                 // Process the imported flow to ensure all edges have the required data field
                                                 const processedFlow = { ...flow };
+                                                
+                                                // Check if nodes and edges are under a configuration property
+                                                if (processedFlow.configuration && processedFlow.configuration.nodes && processedFlow.configuration.edges) {
+                                                    console.log('[PipelinesPage] Found nodes and edges under configuration property');
+                                                    // Move nodes and edges to the top level
+                                                    processedFlow.nodes = processedFlow.configuration.nodes;
+                                                    processedFlow.edges = processedFlow.configuration.edges;
+                                                }
                                                 
                                                 // If the flow has edges, ensure each edge has a data field
                                                 if (processedFlow.edges && Array.isArray(processedFlow.edges)) {
@@ -412,38 +489,6 @@ const PipelinesPage: React.FC = () => {
                                 }
                             }}
                         />
-                        <ButtonGroup
-                            variant="contained"
-                            ref={addPipelineButtonRef}
-                            aria-label="Pipeline actions"
-                        >
-                            <Button
-                                startIcon={<AddIcon />}
-                                onClick={() => navigate('/settings/pipelines/new')}
-                                sx={{
-                                    borderRadius: '8px 0 0 8px',
-                                    textTransform: 'none',
-                                    px: 3,
-                                    height: 40
-                                }}
-                            >
-                                {t('pipelines.actions.create')}
-                            </Button>
-                            <Button
-                                size="small"
-                                sx={{
-                                    borderRadius: '0 8px 8px 0',
-                                    height: 40
-                                }}
-                                aria-controls={addPipelineMenuOpen ? 'add-pipeline-menu' : undefined}
-                                aria-expanded={addPipelineMenuOpen ? 'true' : undefined}
-                                aria-label="select pipeline action"
-                                aria-haspopup="menu"
-                                onClick={handleAddPipelineMenuToggle}
-                            >
-                                <ArrowDropDownIcon />
-                            </Button>
-                        </ButtonGroup>
                         
                         <Popper
                             sx={{ zIndex: 1200 }}

@@ -292,28 +292,50 @@ def create_pipeline() -> Dict[str, Any]:
         pipeline_name = pipeline.name
         logger.info(f"Processing pipeline: {pipeline_name} - {pipeline.description}")
         
-        # Check if a pipeline with this name already exists
-        existing_pipeline = get_pipeline_by_name(pipeline_name)
-        if existing_pipeline:
-            error_body = {
-                "error": "Pipeline name already exists",
-                "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name.",
-            }
-            logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
-            return {
-                "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-                "body": json.dumps(error_body),
-            }
+        # Check if this is an update operation by looking for pipeline_id in the request
+        pipeline_id = request_data.get("pipeline_id")
         
-        # Create pipeline record with initial status and execution ARN
-        pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
-        
-        # Add pipeline_id to the request data
-        request_data["pipeline_id"] = pipeline_id
+        if pipeline_id:
+            # This is an update operation, check if the pipeline exists
+            existing_pipeline = get_pipeline_by_id(pipeline_id)
+            if not existing_pipeline:
+                error_body = {
+                    "error": "Pipeline not found",
+                    "details": f"No pipeline with ID '{pipeline_id}' exists."
+                }
+                logger.info(f"Rejecting pipeline update - ID does not exist: {pipeline_id}")
+                return {
+                    "statusCode": 404,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps(error_body),
+                }
+            logger.info(f"Updating existing pipeline with ID: {pipeline_id}")
+        else:
+            # This is a new pipeline creation, check if the name already exists
+            existing_pipeline = get_pipeline_by_name(pipeline_name)
+            if existing_pipeline:
+                error_body = {
+                    "error": "Pipeline name already exists",
+                    "details": f"A pipeline with the name '{pipeline_name}' already exists. Please use a different name or provide the pipeline_id to update it.",
+                }
+                logger.info(f"Rejecting pipeline creation - name already exists: {pipeline_name}")
+                return {
+                    "statusCode": 400,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps(error_body),
+                }
+            
+            # For new pipelines, create a pipeline record with initial status
+            pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
+            
+            # Add pipeline_id to the request data
+            request_data["pipeline_id"] = pipeline_id
         
         # Start the Step Function execution
         sfn_client = boto3.client("stepfunctions")

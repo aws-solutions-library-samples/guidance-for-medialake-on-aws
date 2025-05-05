@@ -10,26 +10,18 @@ node:
       aws_eventbridge:
         aws_eventbridge_rule: pipeline_execution_completed
         event_pattern:
-          source: ["medialake.pipeline"]
-          detail-type: ["Pipeline Execution Completed"]
           detail:
-            outputs:
-              input:
-                DigitalSourceAsset:
-                  Type: ["Video"]
-                  MainRepresentation:
-                    Format: ["${Video Type}"]
+            metadata:
+              pipelineName: ["Default Video Pipeline"]
+              pipelineStatus: ["Completed"]
+
 actions:
   trigger:
     summary: Trigger after video processing is completed
     description: This step will trigger after video processing is completed
     operationId: triggerVideoProcessingCompleted
     parameters:
-      - in: body
-        name: Video Type
-        required: false
-        schema:
-          type: string
+
       - in: body
         name: Prefix
         required: false

@@ -104,6 +104,7 @@ class SearchConstruct(Construct):
                     "s3:PutObject",
                     "s3:GetObjectVersion",
                     "s3:GetBucketLocation",
+                    "s3:ListBucket",
                     "kms:Decrypt",
                     "kms:GenerateDataKey",
                 ],

@@ -1,1 +1,2 @@
+aws-xray-sdk
 aws-lambda-powertools

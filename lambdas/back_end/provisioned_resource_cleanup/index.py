@@ -193,7 +193,7 @@ def clean_up_pipeline(item, table):
                 
                 logger.info(f"Cleaning up resource of type {resource_type}: {resource_identifier}")
                 
-                if resource_type == "sqs":
+                if resource_type == "sqs" or resource_type == "sqs_queue":
                     delete_sqs_queue(resource_identifier)
                 elif resource_type == "eventbridge_rule":
                     # Handle the new format where resource_identifier is an ARN string
@@ -223,14 +223,16 @@ def clean_up_pipeline(item, table):
                         )
                     else:
                         logger.warning(f"Unrecognized EventBridge rule format: {resource_identifier}")
-                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role"]:
+                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role", "iam_role", "lambda_role", "sfn_role", "events_role"]:
                     delete_iam_role(resource_identifier)
                 elif resource_type == "step_function":
                     delete_step_function(resource_identifier)
-                elif resource_type == "lambda":
+                elif resource_type == "lambda" or resource_type == "trigger_lambda":
                     delete_lambda_function(resource_identifier)
                 elif resource_type == "event_source_mapping":
                     delete_event_source_mapping(resource_identifier)
+                elif resource_type == "eventbridge_pipe" or resource_type == "pipe":
+                    delete_eventbridge_pipe(resource_identifier)
                 else:
                     logger.warning(f"Unknown resource type: {resource_type}")
             except Exception as e:
@@ -310,6 +312,27 @@ def delete_event_bus_and_rules(event_bus_name):
 def delete_step_function(state_machine_arn):
     try:
         sfn = boto3.client("stepfunctions")
+        
+        # Check if there are any running executions
+        try:
+            # List executions
+            paginator = sfn.get_paginator('list_executions')
+            for page in paginator.paginate(stateMachineArn=state_machine_arn):
+                for execution in page['executions']:
+                    if execution['status'] in ['RUNNING', 'PENDING']:
+                        # Stop running executions
+                        try:
+                            logger.info(f"Stopping execution {execution['executionArn']}")
+                            sfn.stop_execution(
+                                executionArn=execution['executionArn'],
+                                cause="Cleanup during stack deletion"
+                            )
+                        except Exception as stop_error:
+                            logger.warning(f"Failed to stop execution {execution['executionArn']}: {str(stop_error)}")
+        except Exception as list_error:
+            logger.warning(f"Error listing executions for {state_machine_arn}: {str(list_error)}")
+        
+        # Delete the state machine
         sfn.delete_state_machine(stateMachineArn=state_machine_arn)
         logger.info(f"Deleted Step Function {state_machine_arn}")
     except ClientError as e:
@@ -326,6 +349,27 @@ def delete_event_source_mapping(uuid):
         try:
             lambda_client.delete_event_source_mapping(UUID=uuid)
             logger.info(f"Deleted event source mapping {uuid}")
+            
+            # Wait for the mapping to be fully deleted
+            wait_attempts = 5
+            for wait_attempt in range(wait_attempts):
+                try:
+                    # Check if the mapping still exists
+                    lambda_client.get_event_source_mapping(UUID=uuid)
+                    # If we get here, the mapping still exists, wait and try again
+                    if wait_attempt < wait_attempts - 1:
+                        time.sleep(2)
+                    else:
+                        logger.warning(f"Event source mapping {uuid} still exists after waiting")
+                except ClientError as wait_error:
+                    if wait_error.response["Error"]["Code"] == "ResourceNotFoundException":
+                        # Mapping is gone, we can return
+                        logger.info(f"Confirmed deletion of event source mapping {uuid}")
+                        return
+                    else:
+                        # Some other error occurred
+                        raise
+            
             return
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
@@ -465,13 +509,32 @@ def lambda_handler(event, context):
             pipeline_table_name = os.environ["PIPELINE_TABLE"]
 
             # Clean up pipeline resources
+            logger.info("Starting cleanup of pipeline resources")
             clean_up_table_resources(pipeline_table_name, clean_up_pipeline)
 
             # Clean up connector resources
+            logger.info("Starting cleanup of connector resources")
             clean_up_table_resources(connector_table_name, clean_up_connector)
 
             # Clean up CloudWatch log groups
+            logger.info("Starting cleanup of CloudWatch log groups")
             delete_cloudwatch_log_groups(LOG_GROUPS_TO_CLEAN)
+
+            # Additional cleanup for any orphaned resources
+            try:
+                # Check for orphaned EventBridge pipes
+                logger.info("Checking for orphaned EventBridge pipes")
+                pipes_paginator = pipes.get_paginator('list_pipes')
+                for page in pipes_paginator.paginate():
+                    for pipe in page.get('Pipes', []):
+                        if 'medialake' in pipe['Name'].lower():
+                            try:
+                                logger.info(f"Cleaning up orphaned EventBridge pipe: {pipe['Name']}")
+                                delete_eventbridge_pipe(pipe['Arn'])
+                            except Exception as e:
+                                logger.error(f"Error cleaning up orphaned pipe {pipe['Name']}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error during orphaned resource cleanup: {str(e)}")
 
             logger.info("Cleanup completed successfully")
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})

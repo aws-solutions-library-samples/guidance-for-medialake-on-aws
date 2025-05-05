@@ -57,13 +57,17 @@ export interface PipelineNode {
     };
     data: {
         icon?: {
+            key?: any;
+            ref?: any;
             props: {
                 size: string | number;
             };
+            _owner?: any;
         };
         inputTypes: string[];
-        outputTypes: string[];
-        id?: string;
+        outputTypes: string[] | Array<{ name: string; description: string }>;
+        nodeId: string;
+        id?: string; // Keep for backward compatibility
         label: string;
         type: string;
         description?: string;
@@ -71,7 +75,15 @@ export interface PipelineNode {
         cause?: string;
         width?: string;
         height?: string;
-        configuration?: any;
+        configuration?: {
+            method: string;
+            parameters: Record<string, any>;
+            path?: string;
+            operationId?: string;
+            requestMapping?: any;
+            responseMapping?: any;
+            integrationId?: string; // Add integrationId property
+        };
     };
     width: string;
     height: string;
@@ -85,6 +97,7 @@ export interface PipelineNode {
 
 export interface PipelineEdge {
     source: string;
+    sourceHandle?: string;
     id: string;
     type: string;
     data: {
@@ -96,6 +109,7 @@ export interface PipelineEdge {
         };
     };
     target: string;
+    targetHandle?: string;
 }
 
 export interface PipelineSettings {
@@ -127,6 +141,7 @@ export interface UpdatePipelineDto {
     description?: string;
     configuration?: PipelineConfiguration;
     active?: boolean; // New optional field
+    updateDeployed?: boolean; // Flag to indicate updating a deployed pipeline
 }
 
 export interface SearchMetadata {

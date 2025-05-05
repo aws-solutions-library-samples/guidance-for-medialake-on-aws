@@ -1,0 +1,73 @@
+spec: v1.0.0
+node:
+  id: check_media_convert_status
+  title: Check MediaConvert Status
+  description: Checks MediaConvert Job Status
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/CheckMediaConvertStatusLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - mediaconvert:ListJobs
+                - mediaconvert:GetJob
+              resources:
+                - ${MEDIACONVERT_QUEUE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:GetJob
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:jobs/*
+            - effect: Allow
+              actions:
+                - mediaconvert:ListJobs
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:queues/*
+            - effect: Allow
+              actions:
+                - mediaconvert:DescribeEndpoints
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:endpoints/*
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+
+actions:
+  extract:
+    summary: Check MediaConvert Status
+    description: Checks MediaConvert Job Status
+    operationId: checkMediaConvertStatus
+    parameters:
+      - in: body
+        name: MediaConvert Queue Arn
+        required: true
+        default: ${MEDIACONVERT_QUEUE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: MediaConvert Role Arn
+        required: true
+        default: ${MEDIACONVERT_ROLE_ARN}
+        schema:
+          type: string
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

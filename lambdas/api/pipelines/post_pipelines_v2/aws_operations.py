@@ -116,7 +116,9 @@ def create_step_function(
         definition: State machine definition
 
     Returns:
-        Response from the create_state_machine API call
+        Dictionary containing:
+        - response: Response from the create_state_machine API call
+        - role_arn: ARN of the IAM role created for the state machine
     """
     logger.info(f"Creating Step Functions state machine for pipeline: {pipeline_name}")
     sfn_client = boto3.client("stepfunctions")
@@ -153,7 +155,10 @@ def create_step_function(
         logger.info(
             f"Created state machine for pipeline '{pipeline_name}' with name '{sanitized_state_machine_name}': {response}"
         )
-        return response
+        return {
+            "response": response,
+            "role_arn": role_arn
+        }
     except Exception as e:
         logger.exception(
             f"Failed to create/update state machine for pipeline '{pipeline_name}': {e}"

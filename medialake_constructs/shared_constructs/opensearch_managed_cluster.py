@@ -21,9 +21,8 @@ from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from constructs import Construct
 
 from config import config
-from medialake_constructs.shared_constructs.layer_base import (
-    LambdaLayer,
-    LambdaLayerConfig,
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PowertoolsLayer, PowertoolsLayerConfig
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 

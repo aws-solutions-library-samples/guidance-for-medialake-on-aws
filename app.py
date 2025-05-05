@@ -28,10 +28,7 @@ from medialake_stacks.pipeline_stack import (
     PipelineStack,
     PipelineStackProps,
 )
-from medialake_stacks.pipeline_nodes_stack import (
-    PipelineNodesStack,
-    PipelineNodesStackProps,
-)
+
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
@@ -127,11 +124,7 @@ class MediaLakeStack(cdk.Stack):
             iac_bucket=props.base_infrastructure.iac_assets_bucket,
             ),
         )
-        pipeline_nodes_stack = PipelineNodesStack(self, "MediaLakePipelineNodes", props=PipelineNodesStackProps(
-            media_assets_bucket=props.base_infrastructure.media_assets_bucket,
-            asset_table=props.base_infrastructure.asset_table,
-            ),
-        )
+
         asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
             asset_table=props.base_infrastructure.asset_table,
             ingest_event_bus=props.base_infrastructure.ingest_event_bus,
@@ -172,8 +165,8 @@ class MediaLakeStack(cdk.Stack):
             collection_arn=props.base_infrastructure.collection_arn,
             access_log_bucket=props.base_infrastructure.access_log_bucket,
             pipeline_table=props.base_infrastructure.pipeline_table,
-            image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
-            image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+            # image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+            # image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
             pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
             node_table=nodes_stack.pipelines_nodes_table,
             asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
@@ -190,22 +183,22 @@ class MediaLakeStack(cdk.Stack):
         
         pipeline_stack = PipelineStack(self, "MediaLakePipeline", props=PipelineStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
-            trigger_node_function_arn=pipeline_nodes_stack.trigger_node_function_arn,
-            image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
-            image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
-            video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
-            audio_metadata_extractor_function_arn=pipeline_nodes_stack.audio_metadata_extractor_function_arn,
-            video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
-            audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
-            check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
+            # trigger_node_function_arn=pipeline_nodes_stack.trigger_node_function_arn,
+            # image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
+            # image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
+            # video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
+            # audio_metadata_extractor_function_arn=pipeline_nodes_stack.audio_metadata_extractor_function_arn,
+            # video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
+            # audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
+            # check_media_convert_status_function_arn=pipeline_nodes_stack.check_media_convert_status_function_arn,
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             asset_table=props.base_infrastructure.asset_table,
             connector_table=api_gateway_stack.connector_table,
             node_table=nodes_stack.pipelines_nodes_table,
             pipeline_table=props.base_infrastructure.pipeline_table,
-            image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
-            image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+            # image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+            # image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
             external_payload_bucket=props.base_infrastructure.external_payload_bucket,
             pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
             open_search_endpoint=props.base_infrastructure.collection_endpoint,
@@ -215,6 +208,8 @@ class MediaLakeStack(cdk.Stack):
             media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
             collection_endpoint=props.base_infrastructure.collection_endpoint,
+            mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
+            mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
         

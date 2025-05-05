@@ -14,7 +14,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useGetUnconfiguredNodeMethods } from '@/shared/nodes/api/nodesController';
 import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
 import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
-import { createJobStatusNodeData } from './jobStatusNodeUtils';
+// import { createJobStatusNodeData } from './jobStatusNodeUtils';
 
 interface NodeSection {
     title: string;
@@ -288,14 +288,14 @@ const SidebarContent: React.FC = () => {
     };
 
     // Handler for dragging the custom job status node
-    const onDragStartJobStatus = (event: React.DragEvent) => {
-        const nodeData = createJobStatusNodeData();
-        event.dataTransfer.setData('application/reactflow', JSON.stringify({
-            ...nodeData,
-            customNodeType: 'jobStatusNode' // This helps identify it as a special node type
-        }));
-        event.dataTransfer.effectAllowed = 'move';
-    };
+    // const onDragStartJobStatus = (event: React.DragEvent) => {
+    //     const nodeData = createJobStatusNodeData();
+    //     event.dataTransfer.setData('application/reactflow', JSON.stringify({
+    //         ...nodeData,
+    //         customNodeType: 'jobStatusNode' // This helps identify it as a special node type
+    //     }));
+    //     event.dataTransfer.effectAllowed = 'move';
+    // };
 
     const sections = useMemo(() => {
         if (!nodesResponse?.data) return [];
@@ -476,10 +476,9 @@ const SidebarContent: React.FC = () => {
                         <AccordionDetails sx={{ p: 2 }}>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                 {/* If this is the Utilities section, add our custom Job Status node */}
-                                {section.types[0] === 'UTILITY' && (
+                                {/* {section.types[0] === 'UTILITY' && (
                                     <Paper
                                         elevation={2}
-                                        onDragStart={onDragStartJobStatus}
                                         draggable
                                         sx={{
                                             p: 2,
@@ -501,7 +500,7 @@ const SidebarContent: React.FC = () => {
                                             Checks the status of a job and routes based on completion status
                                         </Typography>
                                     </Paper>
-                                )}
+                                )} */}
 
                                 {/* Render existing nodes */}
                                 {section.nodes.map(({ node, methodName, method }) => (

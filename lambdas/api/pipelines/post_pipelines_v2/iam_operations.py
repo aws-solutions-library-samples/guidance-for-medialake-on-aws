@@ -328,21 +328,36 @@ def standardize_policy_document(policy_document: Dict[str, Any]) -> Dict[str, An
 
 
 def process_policy_template(template_str: str) -> str:
-    """Process a policy template string by replacing environment variables."""
+    """Process a policy template string by replacing environment variables and CloudFormation parameters."""
     # Find all ${VAR} patterns in the template
     var_pattern = r"\${([^}]+)}"
     matches = re.finditer(var_pattern, template_str)
 
-    # Replace each match with the corresponding environment variable value
+    # Replace each match with the corresponding environment variable value or CloudFormation parameter
     result = template_str
     for match in matches:
         var_name = match.group(1)
-        var_value = os.environ.get(var_name, "")
-        if not var_value and var_name not in [
-            "EXTERNAL_PAYLOAD_BUCKET"
-        ]:  # Allow some vars to be empty
-            raise ValueError(f"Required environment variable {var_name} not set")
-        result = result.replace(f"${{{var_name}}}", var_value)
+        
+        # Handle CloudFormation parameters
+        if var_name == "AWS::Region":
+            # Get the current AWS region
+            region = boto3.session.Session().region_name
+            result = result.replace(f"${{{var_name}}}", region)
+            logger.info(f"Replaced CloudFormation parameter ${{{var_name}}} with region: {region}")
+        elif var_name == "AWS::AccountId":
+            # Get the current AWS account ID
+            sts_client = boto3.client('sts')
+            account_id = sts_client.get_caller_identity()["Account"]
+            result = result.replace(f"${{{var_name}}}", account_id)
+            logger.info(f"Replaced CloudFormation parameter ${{{var_name}}} with account ID: {account_id}")
+        else:
+            # Handle regular environment variables
+            var_value = os.environ.get(var_name, "")
+            if not var_value and var_name not in [
+                "EXTERNAL_PAYLOAD_BUCKET"
+            ]:  # Allow some vars to be empty
+                raise ValueError(f"Required environment variable {var_name} not set")
+            result = result.replace(f"${{{var_name}}}", var_value)
 
     return result
 
@@ -377,6 +392,13 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
                 "Resource": [
                     f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}",
+                ],
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["dynamodb:GetItem"],
+                "Resource": [
+                    MEDIALAKE_ASSET_TABLE,
                 ],
             },
             {

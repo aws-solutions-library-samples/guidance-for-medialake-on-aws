@@ -394,6 +394,8 @@ class BaseInfrastructureStack(Stack):
                 projection_type=dynamodb.ProjectionType.ALL,
             )
 
+            
+
             self._asset_table.add_global_secondary_index(
                 index_name="FileHashIndex",
                 partition_key=dynamodb.Attribute(
