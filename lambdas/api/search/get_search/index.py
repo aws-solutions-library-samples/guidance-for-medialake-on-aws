@@ -281,6 +281,24 @@ def build_search_query(params: SearchParams) -> Dict:
                     }
                 ],
                 "should": [
+                    # Exact prefix match on the file name with highest boost
+                    {
+                        "prefix": {
+                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                                "value": clean_query,
+                                "boost": 4.0
+                            }
+                        }
+                    },
+                    # Enhanced phrase prefix matching
+                    {
+                        "match_phrase_prefix": {
+                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
+                                "query": clean_query,
+                                "boost": 3.0
+                            }
+                        }
+                    },
                     {
                         "multi_match": {
                             "query": clean_query,
@@ -290,14 +308,6 @@ def build_search_query(params: SearchParams) -> Dict:
                             "prefix_length": 1,
                             "minimum_should_match": "20%",
                             "boost": 2
-                        }
-                    },
-                    {
-                        "match_phrase_prefix": {
-                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
-                                "query": clean_query,
-                                "boost": 1.5
-                            }
                         }
                     },
                     {

@@ -43,20 +43,35 @@ def lambda_handler(
     Lambda handler to list all permission sets from DynamoDB
     """
     try:
+        # Log the entire event structure for debugging
+        logger.info("Received event", extra={"event": json.dumps(event)})
+        
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
+        logger.info("Request context", extra={"request_context": json.dumps(request_context)})
         
-        # Get the user ID from the Cognito claims
+        authorizer = request_context.get("authorizer", {})
+        logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
+        
+        claims = authorizer.get("claims", {})
+        logger.info("Claims", extra={"claims": json.dumps(claims)})
+        
+        # Get the user ID from the Cognito claims or directly from the authorizer context
         user_id = claims.get("sub")
         
+        # If not found in claims, try to get it directly from the authorizer context
         if not user_id:
-            logger.error("Missing user_id in Cognito claims")
+            user_id = authorizer.get("userId")
+            logger.info("Using userId from authorizer context", extra={"user_id": user_id})
+        else:
+            logger.info("Using sub from claims", extra={"user_id": user_id})
+        
+        if not user_id:
+            logger.error("Missing user_id in both Cognito claims and authorizer context")
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user")
+            return _create_error_response(400, "Unable to identify user - missing from both claims and authorizer context")
 
         # Get the auth table name from environment variable
         auth_table_name = os.getenv("AUTH_TABLE_NAME")

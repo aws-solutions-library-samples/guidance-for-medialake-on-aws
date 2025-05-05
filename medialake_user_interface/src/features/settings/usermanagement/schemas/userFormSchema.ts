@@ -6,6 +6,7 @@ export const userFormSchema = z.object({
     email: z.string().trim().email('Invalid email format'),
     email_verified: z.boolean().default(false),
     roles: z.array(z.string()).min(1, 'At least one role is required'),
+    groups: z.array(z.string()).default([]),
     enabled: z.boolean().default(true),
 });
 
@@ -17,5 +18,6 @@ export const createUserFormDefaults: UserFormData = {
     email: '',
     email_verified: false,
     roles: [],
+    groups: [],
     enabled: true,
 };

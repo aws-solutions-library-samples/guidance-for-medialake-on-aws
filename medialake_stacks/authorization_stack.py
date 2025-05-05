@@ -137,6 +137,7 @@ class AuthorizationStack(Stack):
         common_env_vars = {
             "AUTH_TABLE_NAME": self._auth_table.table_name,
             "AVP_POLICY_STORE_ID": self._policy_store.attr_policy_store_id,
+            "DEBUG_MODE": "true",
         }
 
         # 3. Use the Custom API Gateway Lambda Authorizer from props
@@ -153,6 +154,9 @@ class AuthorizationStack(Stack):
                 environment_variables=common_env_vars,
             ),
         )
+        
+        self._auth_table.table.grant_read_data(self._custom_authorizer_lambda.function)
+        
     
         # 4. Create the DynamoDB Stream Lambda for policy synchronization
         self._policy_sync_lambda = Lambda(

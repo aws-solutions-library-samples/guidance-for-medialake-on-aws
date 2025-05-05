@@ -36,7 +36,7 @@ from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
 from medialake_stacks.api_gateway_deployment_stack import ApiGatewayDeploymentStack, ApiGatewayDeploymentStackProps
-
+from medialake_constructs.api_gateway.api_gateway_authorization import AuthorizationApi, AuthorizationApiProps
 # from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
 
 # Initialize global logger configuration
@@ -113,6 +113,17 @@ class MediaLakeStack(cdk.Stack):
             )
         )
         
+        api_gateway_authorization_stack = AuthorizationApi(
+            self,
+            "MediaLakeApiGatewayAuthorization",
+            props=AuthorizationApiProps(
+                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                api_resource=props.api_gateway_core_stack.rest_api,
+                # cognito_authorizer=props.api_gateway_core_stack.authorizer,
+                cognito_user_pool=props.api_gateway_core_stack.user_pool,
+                auth_table=props.authorization_stack.auth_table,
+            ),
+        )
         settings_stack = SettingsStack(self, "MediaLakeSettings", props=SettingsStackProps())
         nodes_stack = NodesStack(self, "MediaLakeNodes", props=NodesStackProps(
             iac_bucket=props.base_infrastructure.iac_assets_bucket,

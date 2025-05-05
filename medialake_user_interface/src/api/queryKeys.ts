@@ -63,6 +63,31 @@ export const QUERY_KEYS = {
         details: () => [...QUERY_KEYS.ROLES.all, 'detail'] as const,
         detail: (id: string) => [...QUERY_KEYS.ROLES.details(), id] as const,
     },
+    PERMISSION_SETS: {
+        all: ['permission-sets'] as const,
+        lists: () => [...QUERY_KEYS.PERMISSION_SETS.all, 'list'] as const,
+        list: (filters: string) => [...QUERY_KEYS.PERMISSION_SETS.lists(), { filters }] as const,
+        details: () => [...QUERY_KEYS.PERMISSION_SETS.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.PERMISSION_SETS.details(), id] as const,
+    },
+    GROUPS: {
+        all: ['groups'] as const,
+        lists: () => [...QUERY_KEYS.GROUPS.all, 'list'] as const,
+        list: (filters: string) => [...QUERY_KEYS.GROUPS.lists(), { filters }] as const,
+        details: () => [...QUERY_KEYS.GROUPS.all, 'detail'] as const,
+        detail: (id: string) => [...QUERY_KEYS.GROUPS.details(), id] as const,
+        members: (id: string) => [...QUERY_KEYS.GROUPS.detail(id), 'members'] as const,
+    },
+    ASSIGNMENTS: {
+        user: {
+            all: (userId: string) => ['assignments', 'user', userId] as const,
+            list: (userId: string) => [...QUERY_KEYS.ASSIGNMENTS.user.all(userId), 'list'] as const,
+        },
+        group: {
+            all: (groupId: string) => ['assignments', 'group', groupId] as const,
+            list: (groupId: string) => [...QUERY_KEYS.ASSIGNMENTS.group.all(groupId), 'list'] as const,
+        },
+    },
     ENVIRONMENTS: {
         all: ['environments'] as const,
         lists: () => [...QUERY_KEYS.ENVIRONMENTS.all, 'list'] as const,

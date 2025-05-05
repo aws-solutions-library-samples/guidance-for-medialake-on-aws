@@ -20,6 +20,7 @@ interface UserFormProps {
     onSave: (user: CreateUserRequest) => Promise<any>;
     user?: User;
     availableRoles: string[];
+    availableGroups?: { id: string; name: string }[];
 }
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -28,8 +29,12 @@ export const UserForm: React.FC<UserFormProps> = ({
     onSave,
     user,
     availableRoles,
+    availableGroups = [],
 }) => {
     const { t } = useTranslation();
+    
+    // Debug logs
+    console.log('UserForm props:', { user, availableGroups });
     
     const form = useFormWithValidation<UserFormData>({
         defaultValues: user
@@ -39,6 +44,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                 email: user.email || '',
                 email_verified: user.email_verified === 'true',
                 roles: user.roles || [],
+                groups: user.groups || [],
                 enabled: user.enabled ?? true,
             }
             : createUserFormDefaults,
@@ -56,6 +62,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                     email: user.email || '',
                     email_verified: user.email_verified === 'true',
                     roles: user.roles || [],
+                    groups: user.groups || [],
                     enabled: user.enabled ?? true,
                   }
                 : createUserFormDefaults;
@@ -74,6 +81,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                 given_name: data.given_name,
                 family_name: data.family_name,
                 roles: data.roles,
+                groups: data.groups,
                 enabled: data.enabled,
             };
 
@@ -138,6 +146,21 @@ export const UserForm: React.FC<UserFormProps> = ({
                             }))}
                             multiple
                             required
+                            translationPrefix="users.form"
+                        />
+                        <FormSelect
+                            name="groups"
+                            control={form.control}
+                            label={t('users.form.fields.groups.label', 'Groups')}
+                            tooltip={t('users.form.fields.groups.tooltip', 'Select groups for this user')}
+                            options={availableGroups.map(group => {
+                                console.log('Mapping group in FormSelect:', group);
+                                return {
+                                    label: group.name,
+                                    value: group.id,
+                                };
+                            })}
+                            multiple
                             translationPrefix="users.form"
                         />
                         <FormSwitch

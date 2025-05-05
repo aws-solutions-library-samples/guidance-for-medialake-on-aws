@@ -39,13 +39,19 @@ class AuthLambdaConstruct(Construct):
         super().__init__(scope, id, **kwargs)
 
         # Common environment variables for Lambda functions
-        common_env_vars = {
-            "AUTH_TABLE_NAME": props.auth_table_name,
-            "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
-        }
+        # common_env_vars = {
+        #     "AUTH_TABLE_NAME": props.auth_table_name,
+        #     "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
+        # }
 
         # Create the Custom API Gateway Lambda Authorizer
-
+        # self._custom_authorizer_lambda = Lambda(
+        #     self,
+        #     "CustomAuthorizerLambda",
+        #     function_name="CustomAuthorizerLambda",
+        #     handler="index.handler",
+        #     runtime=lambda_.Runtime.PYTHON_3_12,
+        # )
 
         # Grant IsAuthorized permission for AVP
         # self._custom_authorizer_lambda.function.add_to_role_policy(

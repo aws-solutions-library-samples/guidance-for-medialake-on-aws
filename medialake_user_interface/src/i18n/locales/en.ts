@@ -417,6 +417,7 @@ export default {
             deactivate: 'Deactivate'
         },
         columns: {
+            permissionSets: 'Permission Sets',
             username: 'Username',
             firstName: 'First Name',
             lastName: 'Last Name',
@@ -840,6 +841,23 @@ export default {
                     title: 'Environments'
                 }
             }
+        }
+    },
+    groups: {
+        actions: {
+            addGroup: 'Add Group',
+            editGroup: 'Edit Group',
+            deleteGroup: 'Delete Group',
+            createGroup: 'Create Group',
+            manageGroups: 'Manage Groups'
+        }
+    },
+    permissionSets: {
+        noAssignments: 'No permission sets',
+        actions: {
+            addPermissionSet: 'Add Permission Set',
+            editPermissionSet: 'Edit Permission Set',
+            deletePermissionSet: 'Delete Permission Set'
         }
     }
 }

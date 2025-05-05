@@ -21,6 +21,7 @@ import RoleManagement from '@/pages/settings/RoleManagement';
 import IntegrationsPage from '@/pages/settings/IntegrationsPage';
 import EnvironmentsPage from '@/pages/settings/EnvironmentsPage';
 import SystemSettingsPage from '@/pages/settings/SystemSettingsPage';
+import PermissionSetsPage from '@/pages/settings/PermissionSetsPage';
 
 const S3ExplorerWrapper = () => {
     const { connectorId } = useParams<{ connectorId: string }>();
@@ -99,8 +100,16 @@ export const router = createBrowserRouter([
                 element: <UserManagement />
             },
             {
+                path: 'settings/users-groups',
+                element: <UserManagement />
+            },
+            {
                 path: 'settings/roles',
                 element: <RoleManagement />
+            },
+            {
+                path: 'settings/permission-sets',
+                element: <PermissionSetsPage />
             },
             {
                 path: 'settings/integrations',

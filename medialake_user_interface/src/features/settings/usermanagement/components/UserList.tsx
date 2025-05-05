@@ -7,6 +7,8 @@ import {
     IconButton,
     useTheme,
     alpha,
+    Menu,
+    MenuItem,
 } from '@mui/material';
 import {
     useReactTable,
@@ -25,7 +27,14 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import { User } from '@/api/types/api.types';
+import { useGetGroups } from '@/api/hooks/useGroups';
+import { useGetPermissionSets } from '@/api/hooks/usePermissionSets';
+import { useAddGroupMembers, useRemoveGroupMember } from '@/api/hooks/useGroups';
+import { useAssignPsToUser, useRemoveUserAssignment } from '@/api/hooks/useAssignments';
+import { useListUserAssignments } from '@/api/hooks/useAssignments';
 import { useTranslation } from 'react-i18next';
 import { UserFilterPopover } from './UserFilterPopover';
 import { ResizableTable, ColumnVisibilityMenu, TableCellContent } from '@/components/common/table';
@@ -44,6 +53,243 @@ interface UserListProps {
     onFilterChange?: (columnId: string, value: string) => void;
     onSortChange?: (columnId: string, desc: boolean) => void;
 }
+
+// Helper component for managing group chips
+const GroupChips: React.FC<{
+    user: User,
+    theme: any
+}> = ({ user, theme }) => {
+    const { t } = useTranslation();
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const { data: groups } = useGetGroups();
+    const addGroupMembersMutation = useAddGroupMembers();
+    const removeGroupMemberMutation = useRemoveGroupMember();
+
+    const handleAddClick = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleAddToGroup = async (groupId: string) => {
+        try {
+            await addGroupMembersMutation.mutateAsync({
+                groupId,
+                request: { userIds: [user.username] }
+            });
+            handleClose();
+        } catch (error) {
+            console.error('Error adding user to group:', error);
+        }
+    };
+
+    const handleRemoveFromGroup = async (groupId: string) => {
+        try {
+            await removeGroupMemberMutation.mutateAsync({
+                groupId,
+                userId: user.username
+            });
+        } catch (error) {
+            console.error('Error removing user from group:', error);
+        }
+    };
+
+    // Filter out groups the user is not a member of
+    const availableGroups = groups?.filter(group =>
+        !user.groups?.includes(group.name)
+    ) || [];
+
+    return (
+        <Box sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            alignItems: 'center'
+        }}>
+            {user.groups && user.groups.length > 0 ? (
+                user.groups.map(groupName => (
+                    <Chip
+                        key={groupName}
+                        label={groupName}
+                        size="small"
+                        onDelete={() => {
+                            const group = groups?.find(g => g.name === groupName);
+                            if (group) {
+                                handleRemoveFromGroup(group.id);
+                            }
+                        }}
+                        deleteIcon={<CloseIcon fontSize="small" />}
+                        sx={{
+                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                            color: theme.palette.primary.main,
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            height: '24px',
+                            '& .MuiChip-label': {
+                                px: 1.5,
+                            },
+                        }}
+                    />
+                ))
+            ) : (
+                <Typography variant="body2" color="text.secondary">
+                    {t('common.noGroups')}
+                </Typography>
+            )}
+            
+            <IconButton
+                size="small"
+                onClick={handleAddClick}
+                sx={{
+                    width: 24,
+                    height: 24,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                }}
+            >
+                <AddIcon fontSize="small" />
+            </IconButton>
+            
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+            >
+                {availableGroups.length > 0 ? (
+                    availableGroups.map(group => (
+                        <MenuItem
+                            key={group.id}
+                            onClick={() => handleAddToGroup(group.id)}
+                        >
+                            {group.name}
+                        </MenuItem>
+                    ))
+                ) : (
+                    <MenuItem disabled>{t('groups.noAvailableGroups')}</MenuItem>
+                )}
+            </Menu>
+        </Box>
+    );
+};
+
+// Helper component for managing permission set chips
+const PermissionSetChips: React.FC<{
+    user: User,
+    theme: any
+}> = ({ user, theme }) => {
+    const { t } = useTranslation();
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const { data: permissionSets } = useGetPermissionSets();
+    const { data: userAssignments } = useListUserAssignments(user.username);
+    const assignPsToUserMutation = useAssignPsToUser();
+    const removeUserAssignmentMutation = useRemoveUserAssignment();
+
+    const handleAddClick = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleAssignPermissionSet = async (permissionSetId: string) => {
+        try {
+            await assignPsToUserMutation.mutateAsync({
+                userId: user.username,
+                request: { permissionSetIds: [permissionSetId] }
+            });
+            handleClose();
+        } catch (error) {
+            console.error('Error assigning permission set to user:', error);
+        }
+    };
+
+    const handleRemovePermissionSet = async (permissionSetId: string) => {
+        try {
+            await removeUserAssignmentMutation.mutateAsync({
+                userId: user.username,
+                permissionSetId
+            });
+        } catch (error) {
+            console.error('Error removing permission set from user:', error);
+        }
+    };
+
+    // Get assigned permission set IDs
+    const assignedPermissionSetIds = userAssignments?.assignments?.map(a => a.permissionSetId) || [];
+    
+    // Filter out already assigned permission sets
+    const availablePermissionSets = permissionSets?.filter(
+        ps => !assignedPermissionSetIds.includes(ps.id)
+    ) || [];
+
+    return (
+        <Box sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            alignItems: 'center'
+        }}>
+            {userAssignments?.assignments && userAssignments.assignments.length > 0 ? (
+                userAssignments.assignments.map(assignment => (
+                    <Chip
+                        key={assignment.permissionSetId}
+                        label={assignment.permissionSetName}
+                        size="small"
+                        onDelete={() => handleRemovePermissionSet(assignment.permissionSetId)}
+                        deleteIcon={<CloseIcon fontSize="small" />}
+                        sx={{
+                            backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                            color: theme.palette.secondary.main,
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            height: '24px',
+                            '& .MuiChip-label': {
+                                px: 1.5,
+                            },
+                        }}
+                    />
+                ))
+            ) : (
+                <Typography variant="body2" color="text.secondary">
+                    {t('permissionSets.noAssignments')}
+                </Typography>
+            )}
+            
+            <IconButton
+                size="small"
+                onClick={handleAddClick}
+                sx={{
+                    width: 24,
+                    height: 24,
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                }}
+            >
+                <AddIcon fontSize="small" />
+            </IconButton>
+            
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+            >
+                {availablePermissionSets.length > 0 ? (
+                    availablePermissionSets.map(ps => (
+                        <MenuItem
+                            key={ps.id}
+                            onClick={() => handleAssignPermissionSet(ps.id)}
+                        >
+                            {ps.name}
+                        </MenuItem>
+                    ))
+                ) : (
+                    <MenuItem disabled>{t('permissionSets.noAvailablePermissionSets')}</MenuItem>
+                )}
+            </Menu>
+        </Box>
+    );
+};
 
 const containsFilter: FilterFn<any> = (row, columnId, filterValue) => {
     const cellValue = row.getValue(columnId);
@@ -242,43 +488,25 @@ const UserList: React.FC<UserListProps> = ({
             {
                 header: t('common.columns.groups'),
                 accessorKey: 'groups',
-                minSize: 120,
-                size: 160,
+                minSize: 200,
+                size: 250,
                 enableResizing: true,
                 enableSorting: true,
                 enableFiltering: true,
-                cell: ({ getValue }) => {
-                    const roles = getValue() as string[];
-                    const primaryRole = roles && roles.length > 0 ? roles[0] : null;
-                    
-                    return (
-                        <Box sx={{
-                            display: 'flex',
-                            gap: 1,
-                        }}>
-                            {primaryRole ? (
-                                <Chip
-                                    key={primaryRole}
-                                    label={primaryRole}
-                                    size="small"
-                                    sx={{
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main,
-                                        fontWeight: 600,
-                                        borderRadius: '6px',
-                                        height: '24px',
-                                        '& .MuiChip-label': {
-                                            px: 1.5,
-                                        },
-                                    }}
-                                />
-                            ) : (
-                                <TableCellContent variant="secondary">
-                                    {t('common.noGroups')}
-                                </TableCellContent>
-                            )}
-                        </Box>
-                    );
+                cell: ({ row }) => {
+                    return <GroupChips user={row.original} theme={theme} />;
+                },
+            },
+            {
+                header: t('common.columns.permissionSets'),
+                id: 'permissionSets',
+                minSize: 200,
+                size: 250,
+                enableResizing: true,
+                enableSorting: false,
+                enableFiltering: false,
+                cell: ({ row }) => {
+                    return <PermissionSetChips user={row.original} theme={theme} />;
                 },
             },
             {

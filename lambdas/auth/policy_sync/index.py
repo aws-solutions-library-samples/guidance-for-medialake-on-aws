@@ -113,6 +113,12 @@ def generate_policy_id(item: Dict[str, Any]) -> str:
         resource_id = sk[len(PREFIX_PERMISSION):]
         return f"perm-{principal_id.replace('#', '-')}-{resource_id.replace('#', '-')}"
     
+    # For permission set assignments
+    if sk.startswith("ASSIGNMENT#PS#"):
+        principal_id = pk
+        permission_set_id = sk[len("ASSIGNMENT#PS#"):]
+        return f"assign-{principal_id.replace('#', '-')}-ps-{permission_set_id}"
+    
     # Fallback to a UUID if we can't determine a consistent ID
     return f"policy-{str(uuid.uuid4())}"
 
@@ -181,7 +187,7 @@ def generate_cedar_policy(item: Dict[str, Any]) -> Optional[str]:
     pk = item.get('PK', '')
     sk = item.get('SK', '')
     
-    # Handle permission assignments (e.g., USER#123 -> PERMISSION#RESOURCE#456)
+    # Handle direct permission assignments (e.g., USER#123 -> PERMISSION#RESOURCE#456)
     if sk.startswith(PREFIX_PERMISSION):
         principal_id = pk
         resource_id = sk[len(PREFIX_PERMISSION):]
@@ -220,13 +226,58 @@ def generate_cedar_policy(item: Dict[str, Any]) -> Optional[str]:
 );"""
         return policy
     
+    # Handle permission set assignments (e.g., USER#123 -> ASSIGNMENT#PS#456 or GROUP#123 -> ASSIGNMENT#PS#456)
+    elif sk.startswith("ASSIGNMENT#PS#"):
+        principal_id = pk
+        permission_set_id = sk[len("ASSIGNMENT#PS#"):]
+        
+        principal_type, principal_entity_id = get_principal_entity(principal_id)
+        
+        # For permission set assignments, we create a template-linked policy
+        # that links the principal to the permission set's template policy
+        logger.info(f"Creating template-linked policy for {principal_type} {principal_entity_id} to PS {permission_set_id}")
+        
+        # We don't generate a Cedar policy string here because we'll use the template-linked policy API
+        # Return a special marker to indicate this is a template-linked policy
+        return f"TEMPLATE_LINKED:{permission_set_id}:{principal_type}:{principal_entity_id}"
+    
     # Handle permission sets (definitions)
     elif pk.startswith(PREFIX_PERMISSION_SET) and sk == PREFIX_METADATA:
-        # Permission sets are more complex and might require additional logic
-        # For now, we'll just log that we received a permission set
-        logger.info(f"Received permission set: {pk}")
-        # In a real implementation, we might generate template policies or policy schemas
-        return None
+        permission_set_id = pk[len(PREFIX_PERMISSION_SET):]
+        name = item.get('name', 'Unnamed Permission Set')
+        description = item.get('description', '')
+        permissions = item.get('permissions', {})
+        
+        # Skip if no permissions defined
+        if not permissions:
+            logger.warning(f"No permissions defined for permission set {permission_set_id}")
+            return None
+        
+        # Generate a static policy for this permission set
+        # This will be used as a template for assignments
+        actions = []
+        for perm_key, enabled in permissions.items():
+            if perm_key != 'deny' and enabled:
+                cedar_action = map_action(perm_key)
+                actions.append(f"MediaLake::Action::\"{cedar_action}\"")
+        
+        # Skip if no actions
+        if not actions:
+            logger.warning(f"No actions enabled for permission set {permission_set_id}")
+            return None
+        
+        # Build the policy
+        actions_str = ", ".join(actions)
+        policy_effect = "forbid" if permissions.get('deny', False) else "permit"
+        
+        policy = f"""{policy_effect} (
+    principal,
+    action in [{actions_str}],
+    resource
+);"""
+        
+        logger.info(f"Generated template policy for permission set {permission_set_id}")
+        return policy
     
     # Not a policy-related item
     return None
@@ -237,46 +288,116 @@ def create_or_update_policy(policy_id: str, policy_string: str) -> bool:
     
     Args:
         policy_id: Policy ID
-        policy_string: Cedar policy string
+        policy_string: Cedar policy string or template-linked policy marker
         
     Returns:
         True if successful, False otherwise
     """
     try:
-        # Check if the policy already exists
-        try:
-            verified_permissions.get_policy(
-                policyStoreId=AVP_POLICY_STORE_ID,
-                policyId=policy_id
-            )
+        # Check if this is a template-linked policy
+        if policy_string.startswith("TEMPLATE_LINKED:"):
+            # Parse the template-linked policy marker
+            parts = policy_string.split(":")
+            if len(parts) != 4:
+                logger.error(f"Invalid template-linked policy marker: {policy_string}")
+                return False
             
-            # Policy exists, update it
-            logger.info(f"Updating policy {policy_id}")
-            verified_permissions.update_policy(
-                policyStoreId=AVP_POLICY_STORE_ID,
-                policyId=policy_id,
-                definition={
-                    'static': {
-                        'statement': policy_string
-                    }
-                }
-            )
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                # Policy doesn't exist, create it
-                logger.info(f"Creating new policy {policy_id}")
-                verified_permissions.create_policy(
+            _, permission_set_id, principal_type, principal_entity_id = parts
+            
+            # Check if the template policy exists
+            template_policy_id = f"ps-{permission_set_id}"
+            try:
+                # Try to get the template policy
+                verified_permissions.get_policy(
                     policyStoreId=AVP_POLICY_STORE_ID,
+                    policyId=template_policy_id
+                )
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                    logger.error(f"Template policy {template_policy_id} not found for permission set {permission_set_id}")
+                    return False
+                else:
+                    raise e
+            
+            # Create or update the template-linked policy
+            try:
+                # Check if the policy already exists
+                verified_permissions.get_policy(
+                    policyStoreId=AVP_POLICY_STORE_ID,
+                    policyId=policy_id
+                )
+                
+                # Policy exists, update it
+                logger.info(f"Updating template-linked policy {policy_id}")
+                verified_permissions.update_policy(
+                    policyStoreId=AVP_POLICY_STORE_ID,
+                    policyId=policy_id,
+                    definition={
+                        'templateLinked': {
+                            'policyTemplateId': template_policy_id,
+                            'principal': {
+                                'entityType': f"MediaLake::{principal_type}",
+                                'entityId': principal_entity_id
+                            }
+                        }
+                    }
+                )
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                    # Policy doesn't exist, create it
+                    logger.info(f"Creating new template-linked policy {policy_id}")
+                    verified_permissions.create_policy(
+                        policyStoreId=AVP_POLICY_STORE_ID,
+                        definition={
+                            'templateLinked': {
+                                'policyTemplateId': template_policy_id,
+                                'principal': {
+                                    'entityType': f"MediaLake::{principal_type}",
+                                    'entityId': principal_entity_id
+                                }
+                            }
+                        },
+                        policyId=policy_id
+                    )
+                else:
+                    # Some other error
+                    raise e
+        else:
+            # Regular static policy
+            try:
+                # Check if the policy already exists
+                verified_permissions.get_policy(
+                    policyStoreId=AVP_POLICY_STORE_ID,
+                    policyId=policy_id
+                )
+                
+                # Policy exists, update it
+                logger.info(f"Updating static policy {policy_id}")
+                verified_permissions.update_policy(
+                    policyStoreId=AVP_POLICY_STORE_ID,
+                    policyId=policy_id,
                     definition={
                         'static': {
                             'statement': policy_string
                         }
-                    },
-                    policyId=policy_id
+                    }
                 )
-            else:
-                # Some other error
-                raise e
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                    # Policy doesn't exist, create it
+                    logger.info(f"Creating new static policy {policy_id}")
+                    verified_permissions.create_policy(
+                        policyStoreId=AVP_POLICY_STORE_ID,
+                        definition={
+                            'static': {
+                                'statement': policy_string
+                            }
+                        },
+                        policyId=policy_id
+                    )
+                else:
+                    # Some other error
+                    raise e
         
         return True
     except Exception as e:
