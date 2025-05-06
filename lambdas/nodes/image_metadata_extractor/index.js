@@ -211,12 +211,11 @@ exports.lambda_handler = async (event) => {
 
   for (const asset of assets) {
     // ── 1) pull the ID ────────────────────────────────────────────────
-    const digitalSourceAssetId =
-      asset.DigitalSourceAsset?.ID ?? asset.DigitalSourceAssetID;
+    const inventoryId = asset.InventoryID;
   
-    if (!digitalSourceAssetId) {
+    if (!inventoryId) {
       console.warn(
-        'Skipping asset without DigitalSourceAssetID:',
+        'Skipping asset without InventoryID:',
         JSON.stringify(asset),
       );
       continue;
@@ -248,7 +247,7 @@ exports.lambda_handler = async (event) => {
       // ── 4) update the item in DynamoDB ──────────────────────────────
       await dynamoDB.updateItem({
         TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { DigitalSourceAssetID: { S: digitalSourceAssetId } },
+        Key: { InventoryID: { S:inventoryId } },
         UpdateExpression: 'SET Metadata = :m',
         ExpressionAttributeValues: { ':m': { M: marshalled } },
         ReturnValues: 'UPDATED_NEW',
@@ -257,15 +256,15 @@ exports.lambda_handler = async (event) => {
       // ── 5) read back the full updated item (optional) ───────────────
       const getResp      = await dynamoDB.getItem({
         TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { DigitalSourceAssetID: { S: digitalSourceAssetId } },
+        Key: { InventoryID:         { S: inventoryId    } },
       }).promise();
       const updatedAsset = AWS.DynamoDB.Converter.unmarshall(getResp.Item);
   
-      console.log(`Updated metadata for ${digitalSourceAssetId}`);
-      results.push({ digitalSourceAssetId, status: 'OK', updatedAsset });
+      console.log(`Updated metadata for ${inventoryId}`);
+      results.push({ inventoryId, status: 'OK', updatedAsset });
     } catch (err) {
-      console.error(`Error processing ${digitalSourceAssetId}:`, err);
-      results.push({ digitalSourceAssetId, status: 'ERROR', message: err.message });
+      console.error(`Error processing ${inventoryId}:`, err);
+      results.push({ inventoryId, status: 'ERROR', message: err.message });
     }
   }
   
