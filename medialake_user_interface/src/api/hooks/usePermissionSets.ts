@@ -1,44 +1,61 @@
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
 import { QUERY_KEYS } from '../queryKeys';
-import { 
-  PermissionSet, 
-  CreatePermissionSetRequest, 
-  UpdatePermissionSetRequest, 
-  PermissionSetListResponse, 
-  PermissionSetResponse 
+import {
+  PermissionSet,
+  CreatePermissionSetRequest,
+  UpdatePermissionSetRequest,
+  PermissionSetListResponse,
+  PermissionSetResponse
 } from '../types/permissionSet.types';
 
 export const useGetPermissionSets = () => {
+  // Add a unique identifier to track each hook instance
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
+  console.log(`useGetPermissionSets hook instance created: ${hookId}`);
+  
   return useQuery<PermissionSet[], Error>({
     queryKey: QUERY_KEYS.PERMISSION_SETS.all,
     queryFn: async () => {
-      console.log('Fetching permission sets...');
-      const { data } = await apiClient.get<any>(API_ENDPOINTS.PERMISSION_SETS.BASE);
-      console.log('Permission sets API response:', data);
+      try {
+        console.log(`Fetching permission sets... [${new Date().toISOString()}] from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.PERMISSION_SETS.BASE);
+        console.log(`Permission sets API response [${new Date().toISOString()}] for hook instance: ${hookId}`);
       
-      // Handle string body format (older API format)
-      if (typeof data.body === 'string') {
-        const parsedBody = JSON.parse(data.body) as PermissionSetListResponse;
-        console.log('Parsed permission sets from string:', parsedBody.data.permissionSets);
-        return parsedBody.data.permissionSets;
+        // Handle string body format (older API format)
+        if (typeof data.body === 'string') {
+          const parsedBody = JSON.parse(data.body) as PermissionSetListResponse;
+          console.log('Parsed permission sets from string:', parsedBody.data.permissionSets);
+          return parsedBody.data.permissionSets;
+        }
+        
+        // Handle nested body.data.permissionSets format
+        if (data.body && data.body.data && Array.isArray(data.body.data.permissionSets)) {
+          console.log('Permission sets from data.body:', data.body.data.permissionSets);
+          return data.body.data.permissionSets;
+        }
+        
+        // Handle direct response format {status, message, data: {permissionSets: []}}
+        if (data.status && data.data && Array.isArray(data.data.permissionSets)) {
+          console.log('Permission sets from direct response:', data.data.permissionSets);
+          return data.data.permissionSets;
+        }
+        
+        console.error('Unexpected API response structure:', data);
+        return [];
+      } catch (error: any) {
+        // Handle 403 errors gracefully
+        if (error?.response?.status === 403) {
+          console.log(`Permission sets API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log('User likely does not have permission to access permission sets');
+          // Return empty array instead of throwing an error
+          return [];
+        }
+        // Re-throw other errors
+        throw error;
       }
-      
-      // Handle nested body.data.permissionSets format
-      if (data.body && data.body.data && Array.isArray(data.body.data.permissionSets)) {
-        console.log('Permission sets from data.body:', data.body.data.permissionSets);
-        return data.body.data.permissionSets;
-      }
-      
-      // Handle direct response format {status, message, data: {permissionSets: []}}
-      if (data.status && data.data && Array.isArray(data.data.permissionSets)) {
-        console.log('Permission sets from direct response:', data.data.permissionSets);
-        return data.data.permissionSets;
-      }
-      
-      console.error('Unexpected API response structure:', data);
-      return [];
     }
   });
 };

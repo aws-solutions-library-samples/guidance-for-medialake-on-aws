@@ -57,11 +57,11 @@ interface UserListProps {
 // Helper component for managing group chips
 const GroupChips: React.FC<{
     user: User,
-    theme: any
-}> = ({ user, theme }) => {
+    theme: any,
+    groups: any[] | undefined
+}> = ({ user, theme, groups }) => {
     const { t } = useTranslation();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const { data: groups } = useGetGroups();
     const addGroupMembersMutation = useAddGroupMembers();
     const removeGroupMemberMutation = useRemoveGroupMember();
 
@@ -176,12 +176,12 @@ const GroupChips: React.FC<{
 // Helper component for managing permission set chips
 const PermissionSetChips: React.FC<{
     user: User,
-    theme: any
-}> = ({ user, theme }) => {
+    theme: any,
+    permissionSets: any[] | undefined,
+    userAssignments: any | undefined
+}> = ({ user, theme, permissionSets, userAssignments }) => {
     const { t } = useTranslation();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const { data: permissionSets } = useGetPermissionSets();
-    const { data: userAssignments } = useListUserAssignments(user.username);
     const assignPsToUserMutation = useAssignPsToUser();
     const removeUserAssignmentMutation = useRemoveUserAssignment();
 
@@ -323,6 +323,10 @@ const UserList: React.FC<UserListProps> = ({
     const theme = useTheme();
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    
+    // Fetch groups and permission sets at the parent level
+    const { data: groups } = useGetGroups();
+    const { data: permissionSets } = useGetPermissionSets();
 
     // Sync external state with internal state
     React.useEffect(() => {
@@ -494,7 +498,7 @@ const UserList: React.FC<UserListProps> = ({
                 enableSorting: true,
                 enableFiltering: true,
                 cell: ({ row }) => {
-                    return <GroupChips user={row.original} theme={theme} />;
+                    return <GroupChips user={row.original} theme={theme} groups={groups} />;
                 },
             },
             {
@@ -506,7 +510,14 @@ const UserList: React.FC<UserListProps> = ({
                 enableSorting: false,
                 enableFiltering: false,
                 cell: ({ row }) => {
-                    return <PermissionSetChips user={row.original} theme={theme} />;
+                    // Get user assignments for this specific user
+                    const { data: userAssignments } = useListUserAssignments(row.original.username);
+                    return <PermissionSetChips
+                        user={row.original}
+                        theme={theme}
+                        permissionSets={permissionSets}
+                        userAssignments={userAssignments}
+                    />;
                 },
             },
             {

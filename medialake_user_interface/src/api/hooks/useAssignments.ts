@@ -1,3 +1,4 @@
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
@@ -11,36 +12,51 @@ import {
 
 // User Assignment Hooks
 export const useListUserAssignments = (userId: string) => {
+  // Add a unique identifier to track each hook instance
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
+  
   return useQuery<UserAssignmentListResponse['data'], Error>({
     queryKey: QUERY_KEYS.ASSIGNMENTS.user.list(userId),
     queryFn: async () => {
-      console.log(`Fetching assignments for user: ${userId}`);
-      const { data } = await apiClient.get<any>(
-        API_ENDPOINTS.ASSIGNMENTS.USER.BASE(userId)
-      );
-      console.log('User assignments API response:', data);
-      
-      // Handle string body format
-      if (typeof data.body === 'string') {
-        const parsedBody = JSON.parse(data.body) as UserAssignmentListResponse;
-        console.log('Parsed user assignments from string:', parsedBody.data);
-        return parsedBody.data;
+      try {
+        console.log(`Fetching assignments for user: ${userId} from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(
+          API_ENDPOINTS.ASSIGNMENTS.USER.BASE(userId)
+        );
+        console.log(`User assignments API response for hook instance: ${hookId}`, data);
+        
+        // Handle string body format
+        if (typeof data.body === 'string') {
+          const parsedBody = JSON.parse(data.body) as UserAssignmentListResponse;
+          console.log('Parsed user assignments from string:', parsedBody.data);
+          return parsedBody.data;
+        }
+        
+        // Handle nested body.data format
+        if (data.body && data.body.data) {
+          console.log('User assignments from data.body:', data.body.data);
+          return data.body.data;
+        }
+        
+        // Handle direct response format {status, message, data: {...}}
+        if (data.status && data.data) {
+          console.log('User assignments from direct response:', data.data);
+          return data.data;
+        }
+        
+        console.error('Unexpected API response structure:', data);
+        return { assignments: [] }; // Return empty assignments instead of throwing
+      } catch (error: any) {
+        // Handle 403 errors gracefully
+        if (error?.response?.status === 403) {
+          console.log(`User assignments API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log('User likely does not have permission to access assignments');
+          // Return empty assignments instead of throwing an error
+          return { assignments: [] };
+        }
+        // Re-throw other errors
+        throw error;
       }
-      
-      // Handle nested body.data format
-      if (data.body && data.body.data) {
-        console.log('User assignments from data.body:', data.body.data);
-        return data.body.data;
-      }
-      
-      // Handle direct response format {status, message, data: {...}}
-      if (data.status && data.data) {
-        console.log('User assignments from direct response:', data.data);
-        return data.data;
-      }
-      
-      console.error('Unexpected API response structure:', data);
-      throw new Error('Failed to fetch user assignments');
     },
     enabled: !!userId
   });
@@ -82,36 +98,51 @@ export const useRemoveUserAssignment = () => {
 
 // Group Assignment Hooks
 export const useListGroupAssignments = (groupId: string) => {
+  // Add a unique identifier to track each hook instance
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
+  
   return useQuery<GroupAssignmentListResponse['data'], Error>({
     queryKey: QUERY_KEYS.ASSIGNMENTS.group.list(groupId),
     queryFn: async () => {
-      console.log(`Fetching assignments for group: ${groupId}`);
-      const { data } = await apiClient.get<any>(
-        API_ENDPOINTS.ASSIGNMENTS.GROUP.BASE(groupId)
-      );
-      console.log('Group assignments API response:', data);
-      
-      // Handle string body format
-      if (typeof data.body === 'string') {
-        const parsedBody = JSON.parse(data.body) as GroupAssignmentListResponse;
-        console.log('Parsed group assignments from string:', parsedBody.data);
-        return parsedBody.data;
+      try {
+        console.log(`Fetching assignments for group: ${groupId} from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(
+          API_ENDPOINTS.ASSIGNMENTS.GROUP.BASE(groupId)
+        );
+        console.log(`Group assignments API response for hook instance: ${hookId}`, data);
+        
+        // Handle string body format
+        if (typeof data.body === 'string') {
+          const parsedBody = JSON.parse(data.body) as GroupAssignmentListResponse;
+          console.log('Parsed group assignments from string:', parsedBody.data);
+          return parsedBody.data;
+        }
+        
+        // Handle nested body.data format
+        if (data.body && data.body.data) {
+          console.log('Group assignments from data.body:', data.body.data);
+          return data.body.data;
+        }
+        
+        // Handle direct response format {status, message, data: {...}}
+        if (data.status && data.data) {
+          console.log('Group assignments from direct response:', data.data);
+          return data.data;
+        }
+        
+        console.error('Unexpected API response structure:', data);
+        return { assignments: [] }; // Return empty assignments instead of throwing
+      } catch (error: any) {
+        // Handle 403 errors gracefully
+        if (error?.response?.status === 403) {
+          console.log(`Group assignments API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log('User likely does not have permission to access group assignments');
+          // Return empty assignments instead of throwing an error
+          return { assignments: [] };
+        }
+        // Re-throw other errors
+        throw error;
       }
-      
-      // Handle nested body.data format
-      if (data.body && data.body.data) {
-        console.log('Group assignments from data.body:', data.body.data);
-        return data.body.data;
-      }
-      
-      // Handle direct response format {status, message, data: {...}}
-      if (data.status && data.data) {
-        console.log('Group assignments from direct response:', data.data);
-        return data.data;
-      }
-      
-      console.error('Unexpected API response structure:', data);
-      throw new Error('Failed to fetch group assignments');
     },
     enabled: !!groupId
   });

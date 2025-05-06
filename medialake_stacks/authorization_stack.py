@@ -175,7 +175,7 @@ class AuthorizationStack(Stack):
             self,
             "AuthTableSeederLambda",
             config=LambdaConfig(
-                name="auth_table_seeder",
+                name="auth-table-seeder",
                 entry="lambdas/auth/auth_seeder",
                 memory_size=256,
                 timeout_minutes=2,

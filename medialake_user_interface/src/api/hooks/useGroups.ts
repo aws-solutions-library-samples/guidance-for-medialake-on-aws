@@ -1,46 +1,63 @@
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
 import { QUERY_KEYS } from '../queryKeys';
-import { 
-  Group, 
-  CreateGroupRequest, 
-  UpdateGroupRequest, 
-  GroupListResponse, 
+import {
+  Group,
+  CreateGroupRequest,
+  UpdateGroupRequest,
+  GroupListResponse,
   GroupResponse,
   AddGroupMembersRequest,
   GroupMembersResponse
 } from '../types/group.types';
 
 export const useGetGroups = () => {
+  // Add a unique identifier to track each hook instance
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
+  console.log(`useGetGroups hook instance created: ${hookId}`);
+  
   return useQuery<Group[], Error>({
     queryKey: QUERY_KEYS.GROUPS.all,
     queryFn: async () => {
-      console.log('Fetching groups...');
-      const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE);
-      console.log('Groups API response:', data);
+      try {
+        console.log(`Fetching groups... [${new Date().toISOString()}] from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE);
+        console.log(`Groups API response [${new Date().toISOString()}] for hook instance: ${hookId}`);
       
-      // Handle string body format (older API format)
-      if (typeof data.body === 'string') {
-        const parsedBody = JSON.parse(data.body) as GroupListResponse;
-        console.log('Parsed groups from string:', parsedBody.data.groups);
-        return parsedBody.data.groups;
+        // Handle string body format (older API format)
+        if (typeof data.body === 'string') {
+          const parsedBody = JSON.parse(data.body) as GroupListResponse;
+          console.log('Parsed groups from string:', parsedBody.data.groups);
+          return parsedBody.data.groups;
+        }
+        
+        // Handle nested body.data.groups format
+        if (data.body && data.body.data && Array.isArray(data.body.data.groups)) {
+          console.log('Groups from data.body:', data.body.data.groups);
+          return data.body.data.groups;
+        }
+        
+        // Handle direct response format {status, message, data: {groups: []}}
+        if (data.status && data.data && Array.isArray(data.data.groups)) {
+          console.log('Groups from direct response:', data.data.groups);
+          return data.data.groups;
+        }
+        
+        console.error('Unexpected API response structure:', data);
+        return [];
+      } catch (error: any) {
+        // Handle 403 errors gracefully
+        if (error?.response?.status === 403) {
+          console.log(`Groups API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log('User likely does not have permission to access groups');
+          // Return empty array instead of throwing an error
+          return [];
+        }
+        // Re-throw other errors
+        throw error;
       }
-      
-      // Handle nested body.data.groups format
-      if (data.body && data.body.data && Array.isArray(data.body.data.groups)) {
-        console.log('Groups from data.body:', data.body.data.groups);
-        return data.body.data.groups;
-      }
-      
-      // Handle direct response format {status, message, data: {groups: []}}
-      if (data.status && data.data && Array.isArray(data.data.groups)) {
-        console.log('Groups from direct response:', data.data.groups);
-        return data.data.groups;
-      }
-      
-      console.error('Unexpected API response structure:', data);
-      return [];
     }
   });
 };

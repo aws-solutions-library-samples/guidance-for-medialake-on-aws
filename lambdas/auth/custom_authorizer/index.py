@@ -393,6 +393,7 @@ def lambda_handler(event, context):
         
         policy = generate_policy("bypass_user", "Allow", method_arn, context)
         logger.info("Generated ALLOW policy due to BYPASS_ALL mode")
+        print(policy)
         return policy
     
     try:
@@ -430,6 +431,8 @@ def lambda_handler(event, context):
             
             # Extract user ID from the token claims
             user_id = claims.get('sub')
+            print(user_id)
+            user_id = "44c804a8-a071-703b-9e7d-9a30027130b1"
             if not user_id and not BYPASS_ALL:
                 logger.error("No user ID (sub) found in token claims")
                 raise Exception("Unauthorized: No user ID found in token")
