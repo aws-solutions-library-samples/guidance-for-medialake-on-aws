@@ -55,6 +55,9 @@ export interface AssetResultsViewProps<T> {
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Selection functionality
+  isAssetSelected?: (assetId: string) => boolean;
+  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
   // Functions to extract data from asset objects
@@ -101,6 +104,8 @@ function AssetResultsView<T>({
   editedName,
   isAssetFavorited,
   onFavoriteToggle,
+  isAssetSelected,
+  onSelectToggle,
   error,
   isLoading,
   getAssetId,
@@ -279,6 +284,8 @@ function AssetResultsView<T>({
           editedName={editedName}
           isAssetFavorited={isAssetFavorited}
           onFavoriteToggle={onFavoriteToggle}
+          isAssetSelected={isAssetSelected}
+          onSelectToggle={onSelectToggle}
           getAssetId={getAssetId}
           getAssetName={getAssetName}
           getAssetType={getAssetType}
@@ -305,6 +312,10 @@ function AssetResultsView<T>({
           getAssetName={getAssetName}
           getAssetType={getAssetType}
           getAssetThumbnail={getAssetThumbnail}
+          isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
+          onSelectToggle={onSelectToggle}
+          isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
+          onFavoriteToggle={onFavoriteToggle}
         />
       )}
 

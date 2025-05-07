@@ -47,6 +47,9 @@ interface ModularUnifiedResultsViewProps {
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  // Selection functionality
+  selectedAssets?: string[];
+  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -85,6 +88,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   editedName,
   isAssetFavorited,
   onFavoriteToggle,
+  selectedAssets,
+  onSelectToggle,
   onGroupByTypeChange,
   onPageSizeChange,
   error,
@@ -109,6 +114,11 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
         return '';
     }
   };
+
+  // Function to check if an asset is selected
+  const isAssetSelected = selectedAssets && selectedAssets.length > 0
+    ? (assetId: string) => selectedAssets.includes(assetId)
+    : undefined;
 
   return (
     <AssetResultsView
@@ -146,6 +156,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       editedName={editedName}
       isAssetFavorited={isAssetFavorited}
       onFavoriteToggle={onFavoriteToggle}
+      isAssetSelected={isAssetSelected}
+      onSelectToggle={onSelectToggle}
       error={error}
       isLoading={isLoading}
       getAssetId={(asset) => asset.InventoryID}

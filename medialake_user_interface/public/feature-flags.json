@@ -6,5 +6,9 @@
   "file-upload-enabled": {
     "value": false,
     "variant": "on"
+  },
+  "bulk-downloads": {
+    "value": false,
+    "variant": "on"
   }
 }

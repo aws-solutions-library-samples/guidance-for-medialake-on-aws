@@ -25,10 +25,11 @@ import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
-
-type AssetItem = ImageItem | VideoItem | AudioItem;
+import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
+
+type AssetItem = ImageItem | VideoItem | AudioItem;
 
 interface LocationState {
     query?: string;
@@ -58,6 +59,13 @@ interface Filters {
 
 const DEFAULT_PAGE_SIZE = 50;
 
+interface SelectedAsset {
+    id: string;
+    name: string;
+    type: string;
+    inventoryID: string;
+}
+
 const SearchPage: React.FC = () => {
     const location = useLocation();
     const { query, isSemantic } = (location.state as LocationState) || {};
@@ -72,7 +80,7 @@ const SearchPage: React.FC = () => {
     );
 
     const {
-        data: searchResults,
+        data,
         isLoading,
         isFetching,
         error
@@ -81,6 +89,11 @@ const SearchPage: React.FC = () => {
         pageSize: pageSize,
         isSemantic: currentSemantic
     });
+
+    // Access the nested data structure correctly
+    const searchData = data?.data;
+    const searchResults = searchData?.results || [];
+    const searchMetadata = searchData?.searchMetadata;
 
     const [filters, setFilters] = useState<Filters>({
         mediaTypes: {
@@ -118,6 +131,42 @@ const SearchPage: React.FC = () => {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [editingAssetId, setEditingAssetId] = useState<string>();
     const [editedName, setEditedName] = useState<string>();
+    
+    // Add state for selected assets
+    const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
+    
+    // Handle selection toggle
+    const handleSelectToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+        console.log('SearchPage handleSelectToggle called with asset:', asset.InventoryID);
+        
+        const assetId = asset.InventoryID;
+        const selectedAsset: SelectedAsset = {
+            id: assetId,
+            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+            type: asset.DigitalSourceAsset.Type,
+            inventoryID: assetId
+        };
+        
+        setSelectedAssets(prev => {
+            // Check if this asset is already selected
+            const isSelected = prev.some(item => item.id === assetId);
+            const newSelectedAssets = isSelected
+                ? prev.filter(item => item.id !== assetId)
+                : [...prev, selectedAsset];
+                
+            // Update URL parameter to indicate selection state
+            if (newSelectedAssets.length > 0) {
+                searchParams.set('selected', 'true');
+            } else {
+                searchParams.delete('selected');
+                // Clear from localStorage when empty
+                localStorage.removeItem('selectedAssets');
+            }
+            setSearchParams(searchParams);
+            
+            return newSelectedAssets;
+        });
+    }, [searchParams, setSearchParams]);
 
     const {
         handleDeleteClick,
@@ -287,7 +336,7 @@ const SearchPage: React.FC = () => {
         ));
     };
 
-    const filteredResults = searchResults?.data?.results?.filter(item => {
+    const filteredResults = searchResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
@@ -334,6 +383,35 @@ const SearchPage: React.FC = () => {
             });
         }
     }, [query, isSemantic, searchParams, setSearchParams]);
+
+    useEffect(() => {
+        // Load selections from localStorage on component mount
+        const savedSelections = localStorage.getItem('selectedAssets');
+        if (savedSelections) {
+            try {
+                const parsedSelections = JSON.parse(savedSelections) as SelectedAsset[];
+                if (Array.isArray(parsedSelections) && parsedSelections.length > 0) {
+                    setSelectedAssets(parsedSelections);
+                    
+                    // Update URL parameter
+                    searchParams.set('selected', 'true');
+                    setSearchParams(searchParams);
+                }
+            } catch (e) {
+                console.error("Error parsing saved selections:", e);
+            }
+        }
+    }, []);
+
+    // Add an effect to save selections to localStorage whenever they change
+    useEffect(() => {
+        // Save selections to localStorage whenever they change
+        if (selectedAssets.length > 0) {
+            localStorage.setItem('selectedAssets', JSON.stringify(selectedAssets));
+        } else {
+            localStorage.removeItem('selectedAssets');
+        }
+    }, [selectedAssets]);
 
     const handleFilterChange = (section: keyof Filters, filter: string) => {
         setFilters(prev => {
@@ -389,6 +467,24 @@ const SearchPage: React.FC = () => {
         });
     };
 
+    // Add a new handler function to remove a single asset from selection
+    const handleRemoveAsset = useCallback((assetId: string) => {
+        console.log('Removing single asset from selection:', assetId);
+        setSelectedAssets(prev => {
+            const newSelectedAssets = prev.filter(item => item.id !== assetId);
+            
+            // Update URL parameter
+            if (newSelectedAssets.length > 0) {
+                searchParams.set('selected', 'true');
+            } else {
+                searchParams.delete('selected');
+            }
+            setSearchParams(searchParams);
+            
+            return newSelectedAssets;
+        });
+    }, [searchParams, setSearchParams]);
+
     return (
         <RightSidebarProvider>
             <>
@@ -423,7 +519,7 @@ const SearchPage: React.FC = () => {
                         minHeight: 0,
                         marginBottom: 4
                     }}>
-                        {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
+                        {searchMetadata?.totalResults === 0 && currentQuery && (
                             <Box
                                 sx={{
                                     display: 'flex',
@@ -467,11 +563,11 @@ const SearchPage: React.FC = () => {
                             </Box>
                         )}
 
-                        {(filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error) || error ? (
+                        {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
                             <ModularUnifiedResultsView
                                 results={error ? [] : filteredResults}
                                 searchMetadata={{
-                                    totalResults: error ? 0 : (searchResults?.data?.searchMetadata?.totalResults || 0),
+                                    totalResults: error ? 0 : (searchMetadata?.totalResults || 0),
                                     page: currentPage,
                                     pageSize: pageSize,
                                 }}
@@ -506,6 +602,8 @@ const SearchPage: React.FC = () => {
                                 editedName={editedName}
                                 isAssetFavorited={isAssetFavorited}
                                 onFavoriteToggle={handleFavoriteToggle}
+                                selectedAssets={selectedAssets.map(item => item.id)}
+                                onSelectToggle={handleSelectToggle}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -516,13 +614,30 @@ const SearchPage: React.FC = () => {
                     </Box>
 
                     <RightSidebar>
-                        <SearchFilters
-                            filters={filters}
-                            expandedSections={expandedSections}
-                            onFilterChange={handleFilterChange}
-                            onSectionToggle={handleSectionToggle}
-                            groupByType={groupByType}
-                            onGroupByTypeChange={setGroupByType}
+                        <FilterAndBatchOperations
+                            selectedAssets={selectedAssets}
+                            onBatchDelete={() => {
+                                console.log('Batch delete:', selectedAssets);
+                                setSelectedAssets([]);
+                            }}
+                            onBatchDownload={() => {
+                                console.log('Batch download:', selectedAssets);
+                            }}
+                            onBatchShare={() => {
+                                console.log('Batch share:', selectedAssets);
+                            }}
+                            onClearSelection={() => setSelectedAssets([])}
+                            onRemoveItem={handleRemoveAsset}
+                            filterComponent={
+                                <SearchFilters
+                                    filters={filters}
+                                    expandedSections={expandedSections}
+                                    onFilterChange={handleFilterChange}
+                                    onSectionToggle={handleSectionToggle}
+                                    groupByType={groupByType}
+                                    onGroupByTypeChange={setGroupByType}
+                                />
+                            }
                         />
                     </RightSidebar>
                 </Box>

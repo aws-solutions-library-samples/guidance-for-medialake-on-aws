@@ -23,6 +23,11 @@ interface AssetTableViewProps<T> {
   getAssetName: (asset: T) => string;
   getAssetType: (asset: T) => string;
   getAssetThumbnail: (asset: T) => string;
+  // Selection and favorite handlers
+  isSelected?: (asset: T) => boolean;
+  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  isFavorite?: (asset: T) => boolean;
+  onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
 }
 
 function AssetTableView<T>({
@@ -43,6 +48,10 @@ function AssetTableView<T>({
   getAssetName,
   getAssetType,
   getAssetThumbnail,
+  isSelected,
+  onSelectToggle,
+  isFavorite,
+  onFavoriteToggle,
 }: AssetTableViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -94,7 +103,11 @@ function AssetTableView<T>({
                 editingId={editingAssetId}
                 editedName={editedName}
                 onEditNameChange={onEditNameChange}
-                onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
+                onEditNameComplete={onEditNameComplete}
+                isSelected={isSelected}
+                onSelectToggle={onSelectToggle}
+                isFavorite={isFavorite}
+                onFavoriteToggle={onFavoriteToggle}
               />
             </Box>
           ))}
@@ -120,7 +133,11 @@ function AssetTableView<T>({
       editingId={editingAssetId}
       editedName={editedName}
       onEditNameChange={onEditNameChange}
-      onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
+      onEditNameComplete={onEditNameComplete}
+      isSelected={isSelected}
+      onSelectToggle={onSelectToggle}
+      isFavorite={isFavorite}
+      onFavoriteToggle={onFavoriteToggle}
     />
   );
 }
