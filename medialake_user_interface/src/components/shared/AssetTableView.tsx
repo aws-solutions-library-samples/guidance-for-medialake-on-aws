@@ -1,29 +1,25 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
 import { type SortingState } from '@tanstack/react-table';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { AssetTable } from './AssetTable';
 
 interface AssetTableViewProps<T> {
   results: T[];
-  columns: AssetTableColumn<T>[];
+  columns: any[];
   sorting: SortingState;
   onSortChange: (sorting: SortingState) => void;
   groupByType: boolean;
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onMenuClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean) => void;
+  onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onEditNameComplete?: (asset: T, save: boolean) => void;
   editingAssetId?: string;
   editedName?: string;
-  // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
   getAssetType: (asset: T) => string;
   getAssetThumbnail: (asset: T) => string;
-  // Selection and favorite handlers
   isSelected?: (asset: T) => boolean;
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   isFavorite?: (asset: T) => boolean;
@@ -69,76 +65,73 @@ function AssetTableView<T>({
     }, {} as Record<string, T[]>);
   }, [results, groupByType, getAssetType]);
 
-  if (groupByType) {
+  if (!groupByType) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {Object.entries(groupedResults)
-          .filter(([type, assets]) => assets.length > 0)
-          .map(([type, assets]) => (
-            <Box key={type}>
-              <Typography variant="h6" sx={{ 
-                mb: 2, 
-                px: 1, 
-                background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                color: 'transparent',
-                fontWeight: 600
-              }}>
-                {type}
-              </Typography>
-              <AssetTable
-                data={assets}
-                columns={columns}
-                sorting={sorting}
-                onSortingChange={onSortChange}
-                onDeleteClick={onDeleteClick}
-                onMenuClick={onMenuClick}
-                onEditClick={onEditClick}
-                onAssetClick={onAssetClick}
-                getThumbnailUrl={getAssetThumbnail}
-                getName={getAssetName}
-                getId={getAssetId}
-                getAssetType={getAssetType}
-                editingId={editingAssetId}
-                editedName={editedName}
-                onEditNameChange={onEditNameChange}
-                onEditNameComplete={onEditNameComplete}
-                isSelected={isSelected}
-                onSelectToggle={onSelectToggle}
-                isFavorite={isFavorite}
-                onFavoriteToggle={onFavoriteToggle}
-              />
-            </Box>
-          ))}
-      </Box>
+      <AssetTable
+        data={results}
+        columns={columns}
+        sorting={sorting}
+        onSortingChange={onSortChange}
+        onDeleteClick={onDeleteClick}
+        onMenuClick={onMenuClick}
+        onEditClick={onEditClick}
+        onAssetClick={onAssetClick}
+        getThumbnailUrl={getAssetThumbnail}
+        getName={getAssetName}
+        getId={getAssetId}
+        getAssetType={getAssetType}
+        editingId={editingAssetId}
+        editedName={editedName}
+        onEditNameChange={onEditNameChange}
+        onEditNameComplete={onEditNameComplete}
+        isSelected={isSelected}
+        onSelectToggle={onSelectToggle}
+        isFavorite={isFavorite}
+        onFavoriteToggle={onFavoriteToggle}
+      />
     );
   }
 
-  // Non-grouped table view
   return (
-    <AssetTable
-      data={results}
-      columns={columns}
-      sorting={sorting}
-      onSortingChange={onSortChange}
-      onDeleteClick={onDeleteClick}
-      onMenuClick={onMenuClick}
-      onEditClick={onEditClick}
-      onAssetClick={onAssetClick}
-      getThumbnailUrl={getAssetThumbnail}
-      getName={getAssetName}
-      getId={getAssetId}
-      getAssetType={getAssetType}
-      editingId={editingAssetId}
-      editedName={editedName}
-      onEditNameChange={onEditNameChange}
-      onEditNameComplete={onEditNameComplete}
-      isSelected={isSelected}
-      onSelectToggle={onSelectToggle}
-      isFavorite={isFavorite}
-      onFavoriteToggle={onFavoriteToggle}
-    />
+    <React.Fragment>
+      {Object.entries(groupedResults)
+        .filter(([type]) => ['Image', 'Video', 'Audio'].includes(type) && groupedResults[type].length > 0)
+        .map(([type, assets]) => (
+          <div key={type} style={{ marginBottom: '2rem' }}>
+            <h3 style={{ 
+              marginBottom: '1rem', 
+              background: 'linear-gradient(45deg, #1976d2, #9c27b0)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontWeight: 600
+            }}>
+              {type}
+            </h3>
+            <AssetTable
+              data={assets}
+              columns={columns}
+              sorting={sorting}
+              onSortingChange={onSortChange}
+              onDeleteClick={onDeleteClick}
+              onMenuClick={onMenuClick}
+              onEditClick={onEditClick}
+              onAssetClick={onAssetClick}
+              getThumbnailUrl={getAssetThumbnail}
+              getName={getAssetName}
+              getId={getAssetId}
+              getAssetType={getAssetType}
+              editingId={editingAssetId}
+              editedName={editedName}
+              onEditNameChange={onEditNameChange}
+              onEditNameComplete={onEditNameComplete}
+              isSelected={isSelected}
+              onSelectToggle={onSelectToggle}
+              isFavorite={isFavorite}
+              onFavoriteToggle={onFavoriteToggle}
+            />
+          </div>
+        ))}
+    </React.Fragment>
   );
 }
 

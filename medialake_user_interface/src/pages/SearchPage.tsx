@@ -17,10 +17,9 @@ import {
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
-import ModularUnifiedResultsView from '../components/search/ModularUnifiedResultsView';
+import MasterResultsView from '../components/search/MasterResultsView';
 import { useSearch } from '../api/hooks/useSearch';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
-import { useGetFavorites, useAddFavorite, useRemoveFavorite } from '../api/hooks/useFavorites';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -28,8 +27,15 @@ import { SearchError } from '@/api/hooks/useSearch';
 import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
+import { useViewPreferences } from '@/hooks/useViewPreferences';
+import { useAssetSelection } from '@/hooks/useAssetSelection';
+import { useAssetFavorites } from '@/hooks/useAssetFavorites';
 
-type AssetItem = ImageItem | VideoItem | AudioItem;
+type AssetItem = (ImageItem | VideoItem | AudioItem) & {
+    DigitalSourceAsset: {
+        Type: string;
+    };
+};
 
 interface LocationState {
     query?: string;
@@ -109,64 +115,38 @@ const SearchPage: React.FC = () => {
         }
     });
 
-    const [viewMode, setViewMode] = useState<'card' | 'table'>(
-        location.state?.preserveSearch ? location.state.viewMode : 'card'
-    );
-    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>(
-        location.state?.preserveSearch ? location.state.cardSize : 'medium'
-    );
-    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(
-        location.state?.preserveSearch ? location.state.aspectRatio : 'square'
-    );
-    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>(
-        location.state?.preserveSearch ? location.state.thumbnailScale : 'fit'
-    );
-    const [showMetadata, setShowMetadata] = useState(
-        location.state?.preserveSearch ? location.state.showMetadata : true
-    );
-    const [groupByType, setGroupByType] = useState(
-        location.state?.preserveSearch ? location.state.groupByType : false
-    );
-
-    const [sorting, setSorting] = useState<SortingState>([]);
+    // Use custom hooks for view preferences, asset selection, and favorites
+    const viewPreferences = useViewPreferences({
+        initialViewMode: location.state?.preserveSearch ? location.state.viewMode : 'card',
+        initialCardSize: location.state?.preserveSearch ? location.state.cardSize : 'medium',
+        initialAspectRatio: location.state?.preserveSearch ? location.state.aspectRatio : 'square',
+        initialThumbnailScale: location.state?.preserveSearch ? location.state.thumbnailScale : 'fit',
+        initialShowMetadata: location.state?.preserveSearch ? location.state.showMetadata : true,
+        initialGroupByType: location.state?.preserveSearch ? location.state.groupByType : false,
+    });
     const [editingAssetId, setEditingAssetId] = useState<string>();
     const [editedName, setEditedName] = useState<string>();
     
-    // Add state for selected assets
-    const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
+    // Asset accessors for hooks
+    const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+    const getAssetName = useCallback((asset: AssetItem) =>
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name, []);
+    const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+    const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || '', []);
     
-    // Handle selection toggle
-    const handleSelectToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-        console.log('SearchPage handleSelectToggle called with asset:', asset.InventoryID);
-        
-        const assetId = asset.InventoryID;
-        const selectedAsset: SelectedAsset = {
-            id: assetId,
-            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-            type: asset.DigitalSourceAsset.Type,
-            inventoryID: assetId
-        };
-        
-        setSelectedAssets(prev => {
-            // Check if this asset is already selected
-            const isSelected = prev.some(item => item.id === assetId);
-            const newSelectedAssets = isSelected
-                ? prev.filter(item => item.id !== assetId)
-                : [...prev, selectedAsset];
-                
-            // Update URL parameter to indicate selection state
-            if (newSelectedAssets.length > 0) {
-                searchParams.set('selected', 'true');
-            } else {
-                searchParams.delete('selected');
-                // Clear from localStorage when empty
-                localStorage.removeItem('selectedAssets');
-            }
-            setSearchParams(searchParams);
-            
-            return newSelectedAssets;
-        });
-    }, [searchParams, setSearchParams]);
+    // Use custom hooks for asset selection and favorites
+    const assetSelection = useAssetSelection({
+        getAssetId,
+        getAssetName,
+        getAssetType,
+    });
+    
+    const assetFavorites = useAssetFavorites({
+        getAssetId,
+        getAssetName,
+        getAssetType,
+        getAssetThumbnail,
+    });
 
     const {
         handleDeleteClick,
@@ -185,42 +165,6 @@ const SearchPage: React.FC = () => {
         selectedAsset,
     } = useAssetOperations<AssetItem>();
 
-    // Favorites functionality
-    const { data: favorites } = useGetFavorites("ASSET");
-    const { mutate: addFavorite } = useAddFavorite();
-    const { mutate: removeFavorite } = useRemoveFavorite();
-
-    const isAssetFavorited = useCallback((assetId: string) => {
-        if (!favorites) return false;
-        return favorites.some(favorite => favorite.itemId === assetId);
-    }, [favorites]);
-
-    const handleFavoriteToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation();
-        const assetId = asset.InventoryID;
-        
-        console.log('Toggling favorite for asset:', assetId);
-        console.log('Current favorites state:', favorites);
-        
-        if (isAssetFavorited(assetId)) {
-            console.log('Removing favorite for asset:', assetId);
-            removeFavorite({ itemType: "ASSET", itemId: assetId });
-        } else {
-            console.log('Adding favorite for asset:', assetId);
-            const favoriteData = {
-                itemId: assetId,
-                itemType: "ASSET" as const, // Use const assertion to fix type error
-                metadata: {
-                    name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-                    assetType: asset.DigitalSourceAsset.Type, // Note: using assetType to match what Favorites.tsx expects
-                    thumbnailUrl: asset.thumbnailUrl || ""
-                }
-            };
-            console.log('Favorite data being sent:', favoriteData);
-            addFavorite(favoriteData);
-        }
-    }, [isAssetFavorited, addFavorite, removeFavorite, favorites]);
-
     const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
         // Special case for audio to use singular form
@@ -234,6 +178,7 @@ const SearchPage: React.FC = () => {
         });
     }, [navigate, currentQuery]);
 
+    // Update local state from useAssetOperations
     useEffect(() => {
         setEditingAssetId(currentEditingAssetId || undefined);
         setEditedName(currentEditedName);
@@ -249,13 +194,6 @@ const SearchPage: React.FC = () => {
         }
         return `${Math.round(size * 100) / 100} ${sizes[i]}`;
     };
-
-    const [cardFields, setCardFields] = useState([
-        { id: 'name', label: 'Object Name', visible: true },
-        { id: 'type', label: 'Type', visible: true },
-        { id: 'format', label: 'Format', visible: true },
-        { id: 'createdAt', label: 'Date Created', visible: true },
-    ]);
 
     const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
         {
@@ -320,16 +258,6 @@ const SearchPage: React.FC = () => {
         }
     ]);
 
-    const handleViewModeChange = (_: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
-        if (newMode) setViewMode(newMode);
-    };
-
-    const handleCardFieldToggle = (fieldId: string) => {
-        setCardFields(prev => prev.map(field =>
-            field.id === fieldId ? { ...field, visible: !field.visible } : field
-        ));
-    };
-
     const handleColumnToggle = (columnId: string) => {
         setColumns(prev => prev.map(column =>
             column.id === columnId ? { ...column, visible: !column.visible } : column
@@ -384,34 +312,7 @@ const SearchPage: React.FC = () => {
         }
     }, [query, isSemantic, searchParams, setSearchParams]);
 
-    useEffect(() => {
-        // Load selections from localStorage on component mount
-        const savedSelections = localStorage.getItem('selectedAssets');
-        if (savedSelections) {
-            try {
-                const parsedSelections = JSON.parse(savedSelections) as SelectedAsset[];
-                if (Array.isArray(parsedSelections) && parsedSelections.length > 0) {
-                    setSelectedAssets(parsedSelections);
-                    
-                    // Update URL parameter
-                    searchParams.set('selected', 'true');
-                    setSearchParams(searchParams);
-                }
-            } catch (e) {
-                console.error("Error parsing saved selections:", e);
-            }
-        }
-    }, []);
-
-    // Add an effect to save selections to localStorage whenever they change
-    useEffect(() => {
-        // Save selections to localStorage whenever they change
-        if (selectedAssets.length > 0) {
-            localStorage.setItem('selectedAssets', JSON.stringify(selectedAssets));
-        } else {
-            localStorage.removeItem('selectedAssets');
-        }
-    }, [selectedAssets]);
+    // No need for these effects as they're now handled in the useAssetSelection hook
 
     const handleFilterChange = (section: keyof Filters, filter: string) => {
         setFilters(prev => {
@@ -467,23 +368,7 @@ const SearchPage: React.FC = () => {
         });
     };
 
-    // Add a new handler function to remove a single asset from selection
-    const handleRemoveAsset = useCallback((assetId: string) => {
-        console.log('Removing single asset from selection:', assetId);
-        setSelectedAssets(prev => {
-            const newSelectedAssets = prev.filter(item => item.id !== assetId);
-            
-            // Update URL parameter
-            if (newSelectedAssets.length > 0) {
-                searchParams.set('selected', 'true');
-            } else {
-                searchParams.delete('selected');
-            }
-            setSearchParams(searchParams);
-            
-            return newSelectedAssets;
-        });
-    }, [searchParams, setSearchParams]);
+    // No need for this handler as it's now handled in the useAssetSelection hook
 
     return (
         <RightSidebarProvider>
@@ -564,7 +449,7 @@ const SearchPage: React.FC = () => {
                         )}
 
                         {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
-                            <ModularUnifiedResultsView
+                            <MasterResultsView
                                 results={error ? [] : filteredResults}
                                 searchMetadata={{
                                     totalResults: error ? 0 : (searchMetadata?.totalResults || 0),
@@ -574,22 +459,22 @@ const SearchPage: React.FC = () => {
                                 onPageChange={(newPage) => handleSearch({ page: newPage })}
                                 onPageSizeChange={handlePageSizeChange}
                                 searchTerm={currentQuery}
-                                groupByType={groupByType}
-                                onGroupByTypeChange={setGroupByType}
-                                viewMode={viewMode}
-                                onViewModeChange={handleViewModeChange}
-                                cardSize={cardSize}
-                                onCardSizeChange={setCardSize}
-                                aspectRatio={aspectRatio}
-                                onAspectRatioChange={setAspectRatio}
-                                thumbnailScale={thumbnailScale}
-                                onThumbnailScaleChange={setThumbnailScale}
-                                showMetadata={showMetadata}
-                                onShowMetadataChange={setShowMetadata}
-                                sorting={sorting}
-                                onSortChange={setSorting}
-                                cardFields={cardFields}
-                                onCardFieldToggle={handleCardFieldToggle}
+                                groupByType={viewPreferences.groupByType}
+                                onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                                viewMode={viewPreferences.viewMode}
+                                onViewModeChange={viewPreferences.handleViewModeChange}
+                                cardSize={viewPreferences.cardSize}
+                                onCardSizeChange={viewPreferences.handleCardSizeChange}
+                                aspectRatio={viewPreferences.aspectRatio}
+                                onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                                thumbnailScale={viewPreferences.thumbnailScale}
+                                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                                showMetadata={viewPreferences.showMetadata}
+                                onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                                sorting={viewPreferences.sorting}
+                                onSortChange={viewPreferences.handleSortChange}
+                                cardFields={viewPreferences.cardFields}
+                                onCardFieldToggle={viewPreferences.handleCardFieldToggle}
                                 columns={columns}
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
@@ -600,10 +485,10 @@ const SearchPage: React.FC = () => {
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
-                                isAssetFavorited={isAssetFavorited}
-                                onFavoriteToggle={handleFavoriteToggle}
-                                selectedAssets={selectedAssets.map(item => item.id)}
-                                onSelectToggle={handleSelectToggle}
+                                isAssetFavorited={assetFavorites.isAssetFavorited}
+                                onFavoriteToggle={assetFavorites.handleFavoriteToggle}
+                                selectedAssets={assetSelection.selectedAssetIds}
+                                onSelectToggle={assetSelection.handleSelectToggle}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -615,27 +500,20 @@ const SearchPage: React.FC = () => {
 
                     <RightSidebar>
                         <FilterAndBatchOperations
-                            selectedAssets={selectedAssets}
-                            onBatchDelete={() => {
-                                console.log('Batch delete:', selectedAssets);
-                                setSelectedAssets([]);
-                            }}
-                            onBatchDownload={() => {
-                                console.log('Batch download:', selectedAssets);
-                            }}
-                            onBatchShare={() => {
-                                console.log('Batch share:', selectedAssets);
-                            }}
-                            onClearSelection={() => setSelectedAssets([])}
-                            onRemoveItem={handleRemoveAsset}
+                            selectedAssets={assetSelection.selectedAssets}
+                            onBatchDelete={assetSelection.handleBatchDelete}
+                            onBatchDownload={assetSelection.handleBatchDownload}
+                            onBatchShare={assetSelection.handleBatchShare}
+                            onClearSelection={assetSelection.handleClearSelection}
+                            onRemoveItem={assetSelection.handleRemoveAsset}
                             filterComponent={
                                 <SearchFilters
                                     filters={filters}
                                     expandedSections={expandedSections}
                                     onFilterChange={handleFilterChange}
                                     onSectionToggle={handleSectionToggle}
-                                    groupByType={groupByType}
-                                    onGroupByTypeChange={setGroupByType}
+                                    groupByType={viewPreferences.groupByType}
+                                    onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                                 />
                             }
                         />
