@@ -92,17 +92,31 @@ const SearchPage: React.FC = () => {
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
 
-    // Initialize facet filters from location state or URL params
+    // Initialize facet filters from URL params first, then fall back to location state
     const initialFacetFilters: FacetFilters = {
-        type,
-        extension,
-        LargerThan,
-        asset_size_lte,
-        asset_size_gte,
-        ingested_date_lte,
-        ingested_date_gte,
-        filename
+        // Get values from URL params first, then fall back to location state
+        type: searchParams.get('type') || type,
+        extension: searchParams.get('extension') || extension,
+        LargerThan: searchParams.has('LargerThan')
+            ? parseInt(searchParams.get('LargerThan') || '0', 10)
+            : LargerThan,
+        asset_size_lte: searchParams.has('asset_size_lte')
+            ? parseInt(searchParams.get('asset_size_lte') || '0', 10)
+            : asset_size_lte,
+        asset_size_gte: searchParams.has('asset_size_gte')
+            ? parseInt(searchParams.get('asset_size_gte') || '0', 10)
+            : asset_size_gte,
+        ingested_date_lte: searchParams.get('ingested_date_lte') || ingested_date_lte,
+        ingested_date_gte: searchParams.get('ingested_date_gte') || ingested_date_gte,
+        filename: searchParams.get('filename') || filename
     };
+    
+    // Remove undefined values
+    Object.keys(initialFacetFilters).forEach(key => {
+        if (initialFacetFilters[key as keyof FacetFilters] === undefined) {
+            delete initialFacetFilters[key as keyof FacetFilters];
+        }
+    });
     
     const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
     

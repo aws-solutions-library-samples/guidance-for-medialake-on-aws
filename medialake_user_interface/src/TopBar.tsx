@@ -70,12 +70,26 @@ function TopBar() {
         
         // Trigger search with the new filters
         const searchQuery = getSearchQuery();
-        navigate('/search', {
-            state: {
-                query: searchQuery,
-                isSemantic: isSemanticSearch,
-                ...newFilters
-            }
+        
+        // Create URLSearchParams object for the query parameters
+        const queryParams = new URLSearchParams();
+        queryParams.append('q', searchQuery);
+        queryParams.append('semantic', isSemanticSearch.toString());
+        
+        // Add facet parameters to the URL
+        if (newFilters.type) queryParams.append('type', newFilters.type);
+        if (newFilters.extension) queryParams.append('extension', newFilters.extension);
+        if (newFilters.LargerThan) queryParams.append('LargerThan', newFilters.LargerThan.toString());
+        if (newFilters.asset_size_lte) queryParams.append('asset_size_lte', newFilters.asset_size_lte.toString());
+        if (newFilters.asset_size_gte) queryParams.append('asset_size_gte', newFilters.asset_size_gte.toString());
+        if (newFilters.ingested_date_lte) queryParams.append('ingested_date_lte', newFilters.ingested_date_lte);
+        if (newFilters.ingested_date_gte) queryParams.append('ingested_date_gte', newFilters.ingested_date_gte);
+        if (newFilters.filename) queryParams.append('filename', newFilters.filename);
+        
+        // Navigate to search page with query parameters
+        navigate({
+            pathname: '/search',
+            search: queryParams.toString()
         });
     };
     

@@ -21,10 +21,8 @@ interface UseFacetSearchResult {
  */
 export const useFacetSearch = ({ initialFilters = {} }: UseFacetSearchProps = {}): UseFacetSearchResult => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [filters, setFiltersInternal] = useState<FacetFilters>(initialFilters);
-
-  // Initialize filters from URL params on mount
-  useEffect(() => {
+  const [filters, setFiltersInternal] = useState<FacetFilters>(() => {
+    // Initialize with URL params first, then fall back to initialFilters
     const filtersFromUrl: FacetFilters = {};
     
     // Extract facet parameters from URL
@@ -57,11 +55,16 @@ export const useFacetSearch = ({ initialFilters = {} }: UseFacetSearchProps = {}
       filtersFromUrl.ingested_date_gte = searchParams.get('ingested_date_gte') || undefined;
     }
     
-    // Only update state if we have filters from URL
-    if (Object.keys(filtersFromUrl).length > 0) {
-      setFiltersInternal(filtersFromUrl);
+    // If we have URL params, use those; otherwise use initialFilters
+    return Object.keys(filtersFromUrl).length > 0 ? filtersFromUrl : initialFilters;
+  });
+
+  // Sync filters with URL params when initialFilters change
+  useEffect(() => {
+    if (Object.keys(initialFilters).length > 0) {
+      setFilters(initialFilters);
     }
-  }, []);
+  }, [JSON.stringify(initialFilters)]);
 
   // Update URL when filters change
   const setFilters = useCallback((newFilters: FacetFilters) => {
