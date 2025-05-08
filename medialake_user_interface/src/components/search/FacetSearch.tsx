@@ -93,10 +93,11 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
     setAnchorEl(null);
   };
 
-  const handleApply = () => {
-    // Convert size inputs to bytes for API
-    let updatedFilters = { ...filters };
+  // Helper function to apply filters with conversions
+  const applyFiltersWithConversions = (newFilters = filters) => {
+    let updatedFilters = { ...newFilters };
     
+    // Convert size inputs to bytes for API
     if (minSizeValue !== '') {
       updatedFilters.asset_size_gte = Number(minSizeValue) * minSizeUnit;
     }
@@ -115,6 +116,10 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
     }
     
     onApplyFilters(updatedFilters);
+  };
+
+  const handleApply = () => {
+    applyFiltersWithConversions();
     handleClose();
   };
 
@@ -125,24 +130,34 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
     setStartDate(null);
     setEndDate(null);
     onApplyFilters({});
-    handleClose();
+    // Don't close the popover automatically on clear
+    // This allows users to see that filters were cleared and select new ones
   };
 
   const handleTypeChange = (type: string) => {
-    setFilters(prev => ({
-      ...prev,
-      type: prev.type === type ? undefined : type
-    }));
+    const newFilters = {
+      ...filters,
+      type: filters.type === type ? undefined : type
+    };
+    setFilters(newFilters);
+    
+    // Auto-apply the filter
+    onApplyFilters(newFilters);
   };
 
   const handleExtensionChange = (extension: string) => {
-    setFilters(prev => ({
-      ...prev,
-      extension: prev.extension === extension ? undefined : extension
-    }));
+    const newFilters = {
+      ...filters,
+      extension: filters.extension === extension ? undefined : extension
+    };
+    setFilters(newFilters);
+    
+    // Auto-apply the filter
+    onApplyFilters(newFilters);
   };
 
   const handleFilenameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // For text input, don't auto-apply on every keystroke
     setFilters(prev => ({
       ...prev,
       filename: event.target.value || undefined
@@ -357,14 +372,22 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                       type="number"
                       size="small"
                       value={minSizeValue}
-                      onChange={(e) => setMinSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => {
+                        const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                        setMinSizeValue(newValue);
+                        // Don't auto-apply on every keystroke for number inputs
+                      }}
+                      onBlur={() => applyFiltersWithConversions()} // Apply on blur
                       inputProps={{ min: 0 }}
                       sx={{ flex: 1 }}
                     />
                     <FormControl size="small" sx={{ width: 70 }}>
                       <Select
                         value={minSizeUnit}
-                        onChange={(e) => setMinSizeUnit(Number(e.target.value))}
+                        onChange={(e) => {
+                          setMinSizeUnit(Number(e.target.value));
+                          applyFiltersWithConversions(); // Apply when unit changes
+                        }}
                       >
                         {FILE_SIZE_UNITS.map((unit) => (
                           <MenuItem key={unit.value} value={unit.value}>
@@ -385,14 +408,22 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                       type="number"
                       size="small"
                       value={maxSizeValue}
-                      onChange={(e) => setMaxSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => {
+                        const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                        setMaxSizeValue(newValue);
+                        // Don't auto-apply on every keystroke for number inputs
+                      }}
+                      onBlur={() => applyFiltersWithConversions()} // Apply on blur
                       inputProps={{ min: 0 }}
                       sx={{ flex: 1 }}
                     />
                     <FormControl size="small" sx={{ width: 70 }}>
                       <Select
                         value={maxSizeUnit}
-                        onChange={(e) => setMaxSizeUnit(Number(e.target.value))}
+                        onChange={(e) => {
+                          setMaxSizeUnit(Number(e.target.value));
+                          applyFiltersWithConversions(); // Apply when unit changes
+                        }}
                       >
                         {FILE_SIZE_UNITS.map((unit) => (
                           <MenuItem key={unit.value} value={unit.value}>
@@ -416,7 +447,11 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                     </Typography>
                     <DatePicker
                       value={startDate}
-                      onChange={(newValue) => setStartDate(newValue)}
+                      onChange={(newValue) => {
+                        setStartDate(newValue);
+                        // Apply after a short delay to ensure state is updated
+                        setTimeout(() => applyFiltersWithConversions(), 0);
+                      }}
                       slotProps={{ textField: { size: 'small', fullWidth: true } }}
                     />
                   </Grid>
@@ -427,7 +462,11 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                     </Typography>
                     <DatePicker
                       value={endDate}
-                      onChange={(newValue) => setEndDate(newValue)}
+                      onChange={(newValue) => {
+                        setEndDate(newValue);
+                        // Apply after a short delay to ensure state is updated
+                        setTimeout(() => applyFiltersWithConversions(), 0);
+                      }}
                       slotProps={{ textField: { size: 'small', fullWidth: true } }}
                     />
                   </Grid>
@@ -447,6 +486,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                   placeholder={t('search.filters.filenameSearch', 'Search by filename')}
                   value={filters.filename || ''}
                   onChange={handleFilenameChange}
+                  onBlur={() => applyFiltersWithConversions()} // Apply on blur
                 />
               </Box>
             )}
