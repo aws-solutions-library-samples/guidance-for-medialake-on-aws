@@ -29,6 +29,8 @@ import { SearchError } from '@/api/hooks/useSearch';
 type AssetItem = ImageItem | VideoItem | AudioItem;
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
+import { useFacetSearch } from '../hooks/useFacetSearch';
+import { FacetFilters } from '../components/search/FacetSearch';
 
 interface LocationState {
     query?: string;
@@ -40,6 +42,14 @@ interface LocationState {
     thumbnailScale?: 'fit' | 'fill';
     showMetadata?: boolean;
     groupByType?: boolean;
+    type?: string;
+    extension?: string;
+    LargerThan?: number;
+    asset_size_lte?: number;
+    asset_size_gte?: number;
+    ingested_date_lte?: string;
+    ingested_date_gte?: string;
+    filename?: string;
 }
 
 interface Filters {
@@ -60,7 +70,18 @@ const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
-    const { query, isSemantic } = (location.state as LocationState) || {};
+    const {
+        query,
+        isSemantic,
+        type,
+        extension,
+        LargerThan,
+        asset_size_lte,
+        asset_size_gte,
+        ingested_date_lte,
+        ingested_date_gte,
+        filename
+    } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
@@ -71,6 +92,20 @@ const SearchPage: React.FC = () => {
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
 
+    // Initialize facet filters from location state or URL params
+    const initialFacetFilters: FacetFilters = {
+        type,
+        extension,
+        LargerThan,
+        asset_size_lte,
+        asset_size_gte,
+        ingested_date_lte,
+        ingested_date_gte,
+        filename
+    };
+    
+    const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
+    
     const {
         data: searchResults,
         isLoading,
@@ -79,8 +114,22 @@ const SearchPage: React.FC = () => {
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: pageSize,
-        isSemantic: currentSemantic
+        isSemantic: currentSemantic,
+        ...facetFilters // Include facet filters in the search
     });
+    
+    // Store search results in sessionStorage for access by other components
+    useEffect(() => {
+        if (searchResults) {
+            try {
+                sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+                // Trigger storage event for other components to detect the change
+                window.dispatchEvent(new Event('storage'));
+            } catch (e) {
+                console.error('Error storing search results in session storage', e);
+            }
+        }
+    }, [searchResults]);
 
     const [filters, setFilters] = useState<Filters>({
         mediaTypes: {

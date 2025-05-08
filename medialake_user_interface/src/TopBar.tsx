@@ -6,23 +6,15 @@ import {
     Stack,
     Chip,
     IconButton,
-    Menu,
-    MenuItem,
     FormControlLabel,
     Switch,
-    Divider,
     Typography,
-    Popover,
     Paper
 } from '@mui/material';
 import { Button } from '@/components/common';
-import { 
+import {
     Search as SearchIcon,
-    FilterList as FilterListIcon,
-    DateRange as DateRangeIcon,
-    Category as CategoryIcon,
-    Storage as StorageIcon,
-    CloudUpload as CloudUploadIcon 
+    CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
@@ -33,6 +25,8 @@ import { useDirection } from './contexts/DirectionContext';
 import { drawerWidth, collapsedDrawerWidth } from './constants';
 import { S3UploaderModal } from './features/upload';
 import { useFeatureFlag } from './contexts/FeatureFlagsContext';
+import FacetSearch from './components/search/FacetSearch';
+import { useFacetSearch } from './hooks/useFacetSearch';
 
 interface SearchTag {
     key: string;
@@ -49,8 +43,9 @@ function TopBar() {
     const isRTL = direction === 'rtl';
     const [searchInput, setSearchInput] = useState('');
     const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
-    const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
     const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+    const { filters, setFilters } = useFacetSearch();
+    const [searchResults, setSearchResults] = useState<any>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
 
@@ -68,13 +63,43 @@ function TopBar() {
         [navigate, isSemanticSearch]
     );
 
-    const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
-        setFilterAnchorEl(event.currentTarget);
+    const handleApplyFilters = (newFilters: any) => {
+        setFilters(newFilters);
+        
+        // Trigger search with the new filters
+        const searchQuery = getSearchQuery();
+        navigate('/search', {
+            state: {
+                query: searchQuery,
+                isSemantic: isSemanticSearch,
+                ...newFilters
+            }
+        });
     };
-
-    const handleFilterClose = () => {
-        setFilterAnchorEl(null);
-    };
+    
+    // Update search results when navigating to search page
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const storedResults = sessionStorage.getItem('searchResults');
+            if (storedResults) {
+                try {
+                    setSearchResults(JSON.parse(storedResults));
+                } catch (e) {
+                    console.error('Error parsing search results from session storage', e);
+                }
+            }
+        };
+        
+        // Initial check
+        handleStorageChange();
+        
+        // Listen for storage changes
+        window.addEventListener('storage', handleStorageChange);
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
 
     const handleOpenUploadModal = () => {
         setIsUploadModalOpen(true);
@@ -245,56 +270,15 @@ function TopBar() {
                             },
                         }}
                     />
-                    <IconButton
-                        size="small"
-                        onClick={handleFilterClick}
-                        sx={{
-                            [isRTL ? 'mr' : 'ml']: 1,
-                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                        }}
-                    >
-                        <FilterListIcon />
-                    </IconButton>
-                </Box>
-
-                {/* Filter Menu */}
-                <Menu
-                    anchorEl={filterAnchorEl}
-                    open={Boolean(filterAnchorEl)}
-                    onClose={handleFilterClose}
-                    PaperProps={{
-                        sx: {
-                            mt: 1,
-                            width: 280,
-                            maxHeight: 400,
-                        }
-                    }}
-                >
-                    <MenuItem>
-                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
-                            <DateRangeIcon />
-                            <Typography>{t('search.filters.dateRange', 'Date Range')}</Typography>
-                        </Stack>
-                    </MenuItem>
-                    <MenuItem>
-                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
-                            <CategoryIcon />
-                            <Typography>{t('search.filters.contentType', 'Content Type')}</Typography>
-                        </Stack>
-                    </MenuItem>
-                    <MenuItem>
-                        <Stack direction={isRTL ? "row-reverse" : "row"} spacing={2} alignItems="center" width="100%">
-                            <StorageIcon />
-                            <Typography>{t('search.filters.storageLocation', 'Storage Location')}</Typography>
-                        </Stack>
-                    </MenuItem>
-                    <Divider />
-                    <Box sx={{ p: 1 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
-                            {t('search.filters.comingSoon', 'More filters coming soon...')}
-                        </Typography>
+                    {/* Facet Search Component */}
+                    <Box sx={{ [isRTL ? 'mr' : 'ml']: 1 }}>
+                        <FacetSearch
+                            onApplyFilters={handleApplyFilters}
+                            activeFilters={filters}
+                            facetCounts={searchResults?.data?.searchMetadata?.facets}
+                        />
                     </Box>
-                </Menu>
+                </Box>
 
                 {/* Search Button */}
                 <Button

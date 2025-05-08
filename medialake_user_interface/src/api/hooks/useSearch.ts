@@ -10,6 +10,15 @@ interface SearchParams {
     page?: number;
     pageSize?: number;
     isSemantic?: boolean;
+    // New facet parameters
+    type?: string;
+    extension?: string;
+    LargerThan?: number;
+    asset_size_lte?: number;
+    asset_size_gte?: number;
+    ingested_date_lte?: string;
+    ingested_date_gte?: string;
+    filename?: string;
 }
 
 interface SearchResponseData {
@@ -42,12 +51,41 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const isSemantic = params?.isSemantic ?? false;
     const { showError } = useErrorModal();
 
+    // Extract facet parameters from params
+    const facetParams = params ? {
+        type: params.type,
+        extension: params.extension,
+        LargerThan: params.LargerThan,
+        asset_size_lte: params.asset_size_lte,
+        asset_size_gte: params.asset_size_gte,
+        ingested_date_lte: params.ingested_date_lte,
+        ingested_date_gte: params.ingested_date_gte,
+        filename: params.filename
+    } : undefined;
+
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, facetParams),
         queryFn: async ({ signal }) => {
             try {
+                // Build query parameters
+                const queryParams = new URLSearchParams();
+                queryParams.append('q', query);
+                queryParams.append('page', page.toString());
+                queryParams.append('pageSize', pageSize.toString());
+                queryParams.append('semantic', isSemantic.toString());
+                
+                // Add facet parameters if they exist
+                if (params?.type) queryParams.append('type', params.type);
+                if (params?.extension) queryParams.append('extension', params.extension);
+                if (params?.LargerThan) queryParams.append('LargerThan', params.LargerThan.toString());
+                if (params?.asset_size_lte) queryParams.append('asset_size_lte', params.asset_size_lte.toString());
+                if (params?.asset_size_gte) queryParams.append('asset_size_gte', params.asset_size_gte.toString());
+                if (params?.ingested_date_lte) queryParams.append('ingested_date_lte', params.ingested_date_lte);
+                if (params?.ingested_date_gte) queryParams.append('ingested_date_gte', params.ingested_date_gte);
+                if (params?.filename) queryParams.append('filename', params.filename);
+                
                 const response = await apiClient.get<SearchResponseType>(
-                    `${API_ENDPOINTS.SEARCH}?q=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}&semantic=${isSemantic}`,
+                    `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,
                     { signal }
                 );
 
