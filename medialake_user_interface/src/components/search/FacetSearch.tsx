@@ -1,33 +1,37 @@
 import React, { useState } from 'react';
+import { FacetFilters } from '../../types/facetSearch';
 import {
   Box,
   Popover,
   Typography,
   Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Tabs,
+  Tab,
   FormGroup,
   FormControlLabel,
   Checkbox,
   TextField,
   MenuItem,
   Select,
-  InputLabel,
   FormControl,
   Button,
   Chip,
   Stack,
   IconButton,
-  useTheme
+  useTheme,
+  Paper,
+  Grid
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import {
-  ExpandMore as ExpandMoreIcon,
   FilterList as FilterListIcon,
-  Clear as ClearIcon
+  ImageOutlined as ImageIcon,
+  InsertDriveFileOutlined as FileIcon,
+  AspectRatioOutlined as SizeIcon,
+  DateRangeOutlined as DateIcon,
+  TextFieldsOutlined as TextIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 
@@ -48,28 +52,21 @@ export interface FacetSearchProps {
     ingestion_date?: { buckets: Array<{ key: string; doc_count: number }> };
   };
   activeFilters?: FacetFilters;
+  searchBoxWidth?: number;
 }
 
-export interface FacetFilters {
-  type?: string;
-  extension?: string;
-  LargerThan?: number;
-  asset_size_lte?: number;
-  asset_size_gte?: number;
-  ingested_date_lte?: string;
-  ingested_date_gte?: string;
-  filename?: string;
-}
 
 const FacetSearch: React.FC<FacetSearchProps> = ({
   onApplyFilters,
   facetCounts,
-  activeFilters = {}
+  activeFilters = {},
+  searchBoxWidth
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const [filters, setFilters] = useState<FacetFilters>(activeFilters);
+  const [currentTab, setCurrentTab] = useState(0);
   
   // State for file size inputs
   const [minSizeValue, setMinSizeValue] = useState<number | ''>('');
@@ -216,225 +213,257 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
         onClose={handleClose}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'right',
+          horizontal: 'left',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'right',
+          horizontal: 'left',
         }}
         PaperProps={{
           sx: {
-            width: 320,
-            maxHeight: 500,
-            overflow: 'auto',
+            width: searchBoxWidth || 600,
+            maxHeight: 400,
+            overflow: 'hidden',
             mt: 1,
-            p: 2
           }
         }}
       >
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">{t('search.filters.title', 'Filters')}</Typography>
-          <Button 
-            size="small" 
-            onClick={handleClearFilters}
-            disabled={!activeFilterCount}
-          >
-            {t('search.filters.clearAll', 'Clear All')}
-          </Button>
-        </Box>
-
-        {/* Media Type Filter */}
-        <Accordion defaultExpanded>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>{t('search.filters.mediaType', 'Media Type')}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <FormGroup>
-              {availableTypes.map((type) => (
-                <FormControlLabel
-                  key={type.key}
-                  control={
-                    <Checkbox
-                      checked={filters.type === type.key}
-                      onChange={() => handleTypeChange(type.key)}
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Typography variant="body2">
-                      {type.key} {type.doc_count > 0 && `(${type.doc_count})`}
-                    </Typography>
-                  }
-                />
-              ))}
-            </FormGroup>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* File Extension Filter */}
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>{t('search.filters.fileExtension', 'File Extension')}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <FormGroup>
-              {availableExtensions.length > 0 ? (
-                availableExtensions.map((ext) => (
-                  <FormControlLabel
-                    key={ext.key}
-                    control={
-                      <Checkbox
-                        checked={filters.extension === ext.key}
-                        onChange={() => handleExtensionChange(ext.key)}
-                        size="small"
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">
-                        {ext.key} ({ext.doc_count})
-                      </Typography>
-                    }
-                  />
-                ))
-              ) : (
-                Object.entries(extensionsByType).map(([type, extensions]) => (
-                  <Box key={type} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>{type}</Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                      {extensions.map(ext => (
-                        <Chip
-                          key={ext}
-                          label={ext}
-                          size="small"
-                          onClick={() => handleExtensionChange(ext)}
-                          color={filters.extension === ext ? "primary" : "default"}
-                          sx={{ mb: 1 }}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                ))
-              )}
-            </FormGroup>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* File Size Filter */}
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>{t('search.filters.fileSize', 'File Size')}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                {t('search.filters.minSize', 'Minimum Size')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  type="number"
-                  size="small"
-                  value={minSizeValue}
-                  onChange={(e) => setMinSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
-                  inputProps={{ min: 0 }}
-                  sx={{ flex: 1 }}
-                />
-                <FormControl size="small" sx={{ width: 80 }}>
-                  <Select
-                    value={minSizeUnit}
-                    onChange={(e) => setMinSizeUnit(Number(e.target.value))}
-                  >
-                    {FILE_SIZE_UNITS.map((unit) => (
-                      <MenuItem key={unit.value} value={unit.value}>
-                        {unit.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </Box>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                {t('search.filters.maxSize', 'Maximum Size')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  type="number"
-                  size="small"
-                  value={maxSizeValue}
-                  onChange={(e) => setMaxSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
-                  inputProps={{ min: 0 }}
-                  sx={{ flex: 1 }}
-                />
-                <FormControl size="small" sx={{ width: 80 }}>
-                  <Select
-                    value={maxSizeUnit}
-                    onChange={(e) => setMaxSizeUnit(Number(e.target.value))}
-                  >
-                    {FILE_SIZE_UNITS.map((unit) => (
-                      <MenuItem key={unit.value} value={unit.value}>
-                        {unit.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </Box>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* Date Range Filter */}
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>{t('search.filters.dateRange', 'Date Range')}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  {t('search.filters.fromDate', 'From Date')}
-                </Typography>
-                <DatePicker
-                  value={startDate}
-                  onChange={(newValue) => setStartDate(newValue)}
-                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                />
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  {t('search.filters.toDate', 'To Date')}
-                </Typography>
-                <DatePicker
-                  value={endDate}
-                  onChange={(newValue) => setEndDate(newValue)}
-                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                />
-              </Box>
-            </LocalizationProvider>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* Filename Search */}
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography>{t('search.filters.filename', 'Filename')}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <TextField
-              fullWidth
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Header with title and clear button */}
+          <Box sx={{
+            px: 2,
+            py: 1,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: 1,
+            borderColor: 'divider'
+          }}>
+            <Typography variant="subtitle1">{t('search.filters.title', 'Filters')}</Typography>
+            <Button
               size="small"
-              placeholder={t('search.filters.filenameSearch', 'Search by filename')}
-              value={filters.filename || ''}
-              onChange={handleFilenameChange}
-            />
-          </AccordionDetails>
-        </Accordion>
-
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="contained" onClick={handleApply}>
-            {t('search.filters.apply', 'Apply Filters')}
-          </Button>
+              onClick={handleClearFilters}
+              disabled={!activeFilterCount}
+            >
+              {t('search.filters.clearAll', 'Clear All')}
+            </Button>
+          </Box>
+          
+          {/* Horizontal tabs */}
+          <Tabs
+            value={currentTab}
+            onChange={(_, newValue) => setCurrentTab(newValue)}
+            variant="fullWidth"
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              minHeight: 48,
+              '& .MuiTab-root': {
+                minHeight: 48,
+                py: 0.5
+              }
+            }}
+          >
+            <Tab icon={<ImageIcon fontSize="small" />} label="Media Type" iconPosition="start" />
+            <Tab icon={<FileIcon fontSize="small" />} label="Extension" iconPosition="start" />
+            <Tab icon={<SizeIcon fontSize="small" />} label="Size" iconPosition="start" />
+            <Tab icon={<DateIcon fontSize="small" />} label="Date" iconPosition="start" />
+            <Tab icon={<TextIcon fontSize="small" />} label="Filename" iconPosition="start" />
+          </Tabs>
+          
+          {/* Tab content area */}
+          <Box sx={{ p: 2, overflow: 'auto', flexGrow: 1 }}>
+            {/* Media Type Tab */}
+            {currentTab === 0 && (
+              <Grid container spacing={1}>
+                {availableTypes.map((type) => (
+                  <Grid item xs={6} key={type.key}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={filters.type === type.key}
+                          onChange={() => handleTypeChange(type.key)}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2">
+                          {type.key} {type.doc_count > 0 && `(${type.doc_count})`}
+                        </Typography>
+                      }
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+            
+            {/* File Extension Tab */}
+            {currentTab === 1 && (
+              <Box>
+                {availableExtensions.length > 0 ? (
+                  <Grid container spacing={1}>
+                    {availableExtensions.map((ext) => (
+                      <Grid item xs={4} key={ext.key}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={filters.extension === ext.key}
+                              onChange={() => handleExtensionChange(ext.key)}
+                              size="small"
+                            />
+                          }
+                          label={
+                            <Typography variant="body2" noWrap>
+                              {ext.key} ({ext.doc_count})
+                            </Typography>
+                          }
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Box>
+                    {Object.entries(extensionsByType).map(([type, extensions]) => (
+                      <Box key={type} sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{type}</Typography>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                          {extensions.map(ext => (
+                            <Chip
+                              key={ext}
+                              label={ext}
+                              size="small"
+                              onClick={() => handleExtensionChange(ext)}
+                              color={filters.extension === ext ? "primary" : "default"}
+                              sx={{ mb: 0.5, mr: 0.5 }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+            
+            {/* File Size Tab */}
+            {currentTab === 2 && (
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                    {t('search.filters.minSize', 'Minimum Size')}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={minSizeValue}
+                      onChange={(e) => setMinSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      inputProps={{ min: 0 }}
+                      sx={{ flex: 1 }}
+                    />
+                    <FormControl size="small" sx={{ width: 70 }}>
+                      <Select
+                        value={minSizeUnit}
+                        onChange={(e) => setMinSizeUnit(Number(e.target.value))}
+                      >
+                        {FILE_SIZE_UNITS.map((unit) => (
+                          <MenuItem key={unit.value} value={unit.value}>
+                            {unit.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                    {t('search.filters.maxSize', 'Maximum Size')}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={maxSizeValue}
+                      onChange={(e) => setMaxSizeValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      inputProps={{ min: 0 }}
+                      sx={{ flex: 1 }}
+                    />
+                    <FormControl size="small" sx={{ width: 70 }}>
+                      <Select
+                        value={maxSizeUnit}
+                        onChange={(e) => setMaxSizeUnit(Number(e.target.value))}
+                      >
+                        {FILE_SIZE_UNITS.map((unit) => (
+                          <MenuItem key={unit.value} value={unit.value}>
+                            {unit.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Grid>
+              </Grid>
+            )}
+            
+            {/* Date Range Tab */}
+            {currentTab === 3 && (
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      {t('search.filters.fromDate', 'From Date')}
+                    </Typography>
+                    <DatePicker
+                      value={startDate}
+                      onChange={(newValue) => setStartDate(newValue)}
+                      slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      {t('search.filters.toDate', 'To Date')}
+                    </Typography>
+                    <DatePicker
+                      value={endDate}
+                      onChange={(newValue) => setEndDate(newValue)}
+                      slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                    />
+                  </Grid>
+                </Grid>
+              </LocalizationProvider>
+            )}
+            
+            {/* Filename Tab */}
+            {currentTab === 4 && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                  {t('search.filters.filenameSearch', 'Search by filename')}
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder={t('search.filters.filenameSearch', 'Search by filename')}
+                  value={filters.filename || ''}
+                  onChange={handleFilenameChange}
+                />
+              </Box>
+            )}
+          </Box>
+          
+          {/* Footer with apply button */}
+          <Box sx={{
+            p: 1.5,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            borderTop: 1,
+            borderColor: 'divider'
+          }}>
+            <Button variant="contained" onClick={handleApply} size="small">
+              {t('search.filters.apply', 'Apply Filters')}
+            </Button>
+          </Box>
         </Box>
       </Popover>
     </>

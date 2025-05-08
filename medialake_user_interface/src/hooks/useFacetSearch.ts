@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FacetFilters } from '../components/search/FacetSearch';
+import { FacetFilters } from '../types/facetSearch';
 
 interface UseFacetSearchProps {
   initialFilters?: FacetFilters;
@@ -97,11 +97,15 @@ export const useFacetSearch = ({ initialFilters = {} }: UseFacetSearchProps = {}
 
   // Update a single filter
   const updateFilter = useCallback(<K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => {
-    setFilters(prev => ({
-      ...prev,
+    // Create a new filters object with the updated value
+    const updatedFilters = {
+      ...filters,
       [key]: value
-    }));
-  }, [setFilters]);
+    };
+    
+    // Call setFilters with the new object directly
+    setFilters(updatedFilters);
+  }, [filters, setFilters]);
 
   // Clear all filters
   const clearFilters = useCallback(() => {

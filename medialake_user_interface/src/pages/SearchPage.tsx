@@ -30,7 +30,7 @@ type AssetItem = ImageItem | VideoItem | AudioItem;
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import { useFacetSearch } from '../hooks/useFacetSearch';
-import { FacetFilters } from '../components/search/FacetSearch';
+import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
     query?: string;

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     Box,
     useTheme as useMuiTheme,
@@ -46,6 +46,8 @@ function TopBar() {
     const [isSemanticSearch, setIsSemanticSearch] = useState(false);
     const { filters, setFilters } = useFacetSearch();
     const [searchResults, setSearchResults] = useState<any>(null);
+    const [searchBoxWidth, setSearchBoxWidth] = useState<number>(0);
+    const searchBoxRef = useRef<HTMLDivElement>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
 
@@ -77,7 +79,26 @@ function TopBar() {
         });
     };
     
-    // Update search results when navigating to search page
+    // Measure search box width
+    useEffect(() => {
+        const updateWidth = () => {
+            if (searchBoxRef.current) {
+                setSearchBoxWidth(searchBoxRef.current.offsetWidth);
+            }
+        };
+        
+        // Initial measurement
+        updateWidth();
+        
+        // Re-measure on window resize
+        window.addEventListener('resize', updateWidth);
+        
+        return () => {
+            window.removeEventListener('resize', updateWidth);
+        };
+    }, []);
+    
+    // Handle search results from session storage
     useEffect(() => {
         const handleStorageChange = () => {
             const storedResults = sessionStorage.getItem('searchResults');
@@ -238,15 +259,18 @@ function TopBar() {
                 ))}
 
                 {/* Search Input with Filter Icon */}
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                    borderRadius: '8px',
-                    padding: '4px 12px',
-                    flex: 1,
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
-                }}>
+                <Box
+                    ref={searchBoxRef}
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                        borderRadius: '8px',
+                        padding: '4px 12px',
+                        flex: 1,
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                    }}
+                >
                     <SearchIcon sx={{
                         color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
                         [isRTL ? 'ml' : 'mr']: 1
@@ -276,6 +300,7 @@ function TopBar() {
                             onApplyFilters={handleApplyFilters}
                             activeFilters={filters}
                             facetCounts={searchResults?.data?.searchMetadata?.facets}
+                            searchBoxWidth={searchBoxWidth}
                         />
                     </Box>
                 </Box>
