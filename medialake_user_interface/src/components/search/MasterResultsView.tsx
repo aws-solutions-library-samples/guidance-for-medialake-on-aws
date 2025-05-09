@@ -1,41 +1,58 @@
 import React from 'react';
-import { useFeatureFlag } from '@/utils/featureFlags';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
 import AssetResultsView from '../shared/AssetResultsView';
 
-type AssetItem = ImageItem | VideoItem | AudioItem;
+type AssetItem = (ImageItem | VideoItem | AudioItem) & {
+  DigitalSourceAsset: {
+    Type: string;
+  };
+};
 
-interface ModularUnifiedResultsViewProps {
+interface MasterResultsViewProps {
+  // Results data
   results: AssetItem[];
   searchMetadata: {
     totalResults: number;
     page: number;
     pageSize: number;
   };
-  onPageChange: (page: number) => void;
   searchTerm: string;
-  groupByType: boolean;
+  error?: { status: string; message: string } | null;
+  isLoading?: boolean;
+  
+  // View preferences
   viewMode: 'card' | 'table';
-  onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
   cardSize: 'small' | 'medium' | 'large';
-  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
   aspectRatio: 'vertical' | 'square' | 'horizontal';
-  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
   thumbnailScale: 'fit' | 'fill';
-  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
   showMetadata: boolean;
-  onShowMetadataChange: (show: boolean) => void;
+  groupByType: boolean;
   sorting: SortingState;
-  onSortChange: (sorting: SortingState) => void;
   cardFields: { id: string; label: string; visible: boolean; }[];
-  onCardFieldToggle: (fieldId: string) => void;
   columns: AssetTableColumn<AssetItem>[];
+  
+  // Event handlers for view preferences
+  onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
+  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
+  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
+  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+  onShowMetadataChange: (show: boolean) => void;
+  onGroupByTypeChange: (checked: boolean) => void;
+  onSortChange: (sorting: SortingState) => void;
+  onCardFieldToggle: (fieldId: string) => void;
   onColumnToggle: (columnId: string) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (newPageSize: number) => void;
+  
+  // Asset state
+  selectedAssets?: string[];
+  editingAssetId?: string;
+  editedName?: string;
+  
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
   onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
@@ -43,62 +60,63 @@ interface ModularUnifiedResultsViewProps {
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: AssetItem, save: boolean) => void;
-  editingAssetId?: string;
-  editedName?: string;
-  // Favorite functionality
-  isAssetFavorited?: (assetId: string) => boolean;
-  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-  // Selection functionality
-  selectedAssets?: string[];
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-  onGroupByTypeChange: (checked: boolean) => void;
-  onPageSizeChange: (newPageSize: number) => void;
-  error?: { status: string; message: string } | null;
-  isLoading?: boolean;
+  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  
+  // Asset state accessors
+  isAssetFavorited?: (assetId: string) => boolean;
 }
 
-const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
+const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   results,
   searchMetadata,
-  onPageChange,
   searchTerm,
-  groupByType,
+  error,
+  isLoading,
+  
+  // View preferences
   viewMode,
-  onViewModeChange,
   cardSize,
-  onCardSizeChange,
   aspectRatio,
-  onAspectRatioChange,
   thumbnailScale,
-  onThumbnailScaleChange,
   showMetadata,
-  onShowMetadataChange,
+  groupByType,
   sorting,
-  onSortChange,
   cardFields,
-  onCardFieldToggle,
   columns,
+  
+  // Event handlers for view preferences
+  onViewModeChange,
+  onCardSizeChange,
+  onAspectRatioChange,
+  onThumbnailScaleChange,
+  onShowMetadataChange,
+  onGroupByTypeChange,
+  onSortChange,
+  onCardFieldToggle,
   onColumnToggle,
+  onPageChange,
+  onPageSizeChange,
+  
+  // Asset state
+  selectedAssets,
+  editingAssetId,
+  editedName,
+  
+  // Asset action handlers
   onAssetClick,
   onDeleteClick,
   onMenuClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
-  editingAssetId,
-  editedName,
-  isAssetFavorited,
-  onFavoriteToggle,
-  selectedAssets,
   onSelectToggle,
-  onGroupByTypeChange,
-  onPageSizeChange,
-  error,
-  isLoading,
-}) => {
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  onFavoriteToggle,
   
+  // Asset state accessors
+  isAssetFavorited,
+}) => {
+  // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case 'name':
@@ -119,8 +137,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
     }
   };
 
-  // Function to check if an asset is selected - only if multi-select feature is enabled
-  const isAssetSelected = (multiSelectFeature.value && selectedAssets && selectedAssets.length > 0)
+  // Function to check if an asset is selected
+  const isAssetSelected = selectedAssets && selectedAssets.length > 0
     ? (assetId: string) => selectedAssets.includes(assetId)
     : undefined;
 
@@ -174,4 +192,4 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   );
 };
 
-export default ModularUnifiedResultsView;
+export default MasterResultsView;

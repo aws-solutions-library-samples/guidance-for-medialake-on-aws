@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 
 // Default width values
 export const DEFAULT_WIDTH = 375;
-export const COLLAPSED_WIDTH = 8;
+export const COLLAPSED_WIDTH = 24;
 
 interface RightSidebarContextType {
     isExpanded: boolean;
@@ -11,6 +12,8 @@ interface RightSidebarContextType {
     closeSidebar: () => void;
     width: number;
     setWidth: (width: number) => void;
+    hasSelectedItems: boolean;
+    setHasSelectedItems: (hasItems: boolean) => void;
 }
 
 const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
@@ -21,9 +24,19 @@ interface RightSidebarProviderProps {
 
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [hasSelectedItems, setHasSelectedItems] = useState(false);
+    
+    // Check if multi-select feature is enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
     const openSidebar = () => setIsExpanded(true);
-    const closeSidebar = () => setIsExpanded(false);
+    const closeSidebar = () => {
+        // Don't close if there are selected items and multi-select is enabled
+        if (!hasSelectedItems || !multiSelectFeature.value) {
+            setIsExpanded(false);
+        }
+    };
+    
     const [width, setWidth] = useState(DEFAULT_WIDTH);
 
     // Load saved width on mount
@@ -37,8 +50,24 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
         }
     }, []);
 
+    // Keep sidebar open when items are selected (only if multi-select is enabled)
+    useEffect(() => {
+        if (hasSelectedItems && multiSelectFeature.value) {
+            openSidebar();
+        }
+    }, [hasSelectedItems, multiSelectFeature.value]);
+
     return (
-        <RightSidebarContext.Provider value={{ isExpanded, setIsExpanded, openSidebar, closeSidebar, width, setWidth }}>
+        <RightSidebarContext.Provider value={{ 
+            isExpanded, 
+            setIsExpanded, 
+            openSidebar, 
+            closeSidebar, 
+            width, 
+            setWidth, 
+            hasSelectedItems, 
+            setHasSelectedItems 
+        }}>
             {children}
         </RightSidebarContext.Provider>
     );
