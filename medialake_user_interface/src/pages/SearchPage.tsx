@@ -13,13 +13,20 @@ import {
     DialogContent,
     DialogContentText,
     DialogActions,
-    Button
+    Button,
+    FormControl,
+    InputLabel,
+    Select,
+    Chip,
+    OutlinedInput,
+    SelectChangeEvent
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
 import MasterResultsView from '../components/search/MasterResultsView';
 import { useSearch } from '../api/hooks/useSearch';
+import { useSearchFields, type FieldInfo } from '../api/hooks/useSearchFields';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
@@ -85,6 +92,9 @@ const SearchPage: React.FC = () => {
     const [pageSize, setPageSize] = useState<number>(
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
+    
+    // State for selected fields
+    const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
     const {
         data,
@@ -94,8 +104,39 @@ const SearchPage: React.FC = () => {
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: pageSize,
-        isSemantic: currentSemantic
+        isSemantic: currentSemantic,
+        fields: selectedFields
     });
+    
+    // Fetch search fields
+    const {
+        data: fieldsData,
+        isLoading: isFieldsLoading,
+        error: fieldsError
+    } = useSearchFields();
+    
+    // Extract fields data
+    const defaultFields = fieldsData?.data?.defaultFields || [];
+    const availableFields = fieldsData?.data?.availableFields || [];
+    
+    
+    // Initialize selected fields with default fields when data is loaded
+    useEffect(() => {
+        if (defaultFields.length > 0 && selectedFields.length === 0) {
+            setSelectedFields(defaultFields.map(field => field.name));
+        }
+    }, [defaultFields, selectedFields.length]);
+    
+    // Handle field selection change
+    const handleFieldsChange = (event: SelectChangeEvent<typeof selectedFields>) => {
+        const {
+            target: { value },
+        } = event;
+        setSelectedFields(
+            // On autofill we get a stringified value.
+            typeof value === 'string' ? value.split(',') : value,
+        );
+    };
 
     // Access the nested data structure correctly
     const searchData = data?.data;
@@ -512,14 +553,61 @@ const SearchPage: React.FC = () => {
                             onClearSelection={assetSelection.handleClearSelection}
                             onRemoveItem={assetSelection.handleRemoveAsset}
                             filterComponent={
-                                <SearchFilters
-                                    filters={filters}
-                                    expandedSections={expandedSections}
-                                    onFilterChange={handleFilterChange}
-                                    onSectionToggle={handleSectionToggle}
-                                    groupByType={viewPreferences.groupByType}
-                                    onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
-                                />
+                                <>
+                                    <FormControl sx={{ m: 1, width: '100%', mt: 3 }}>
+                                        <InputLabel id="search-fields-label">Search Fields</InputLabel>
+                                        <Select
+                                            labelId="search-fields-label"
+                                            id="search-fields"
+                                            multiple
+                                            value={selectedFields}
+                                            onChange={handleFieldsChange}
+                                            input={<OutlinedInput id="select-multiple-fields" label="Search Fields" />}
+                                            renderValue={(selected) => (
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                    {selected.map((value) => {
+                                                        const field = availableFields.find(f => f.name === value);
+                                                        return (
+                                                            <Chip
+                                                                key={value}
+                                                                label={field?.displayName || value}
+                                                                size="small"
+                                                            />
+                                                        );
+                                                    })}
+                                                </Box>
+                                            )}
+                                            MenuProps={{
+                                                PaperProps: {
+                                                    style: {
+                                                        maxHeight: 224,
+                                                        width: 250,
+                                                    },
+                                                },
+                                            }}
+                                        >
+                                            {availableFields.map((field) => (
+                                                <MenuItem
+                                                    key={field.name}
+                                                    value={field.name}
+                                                    sx={{
+                                                        fontWeight: selectedFields.indexOf(field.name) > -1 ? 'bold' : 'normal',
+                                                    }}
+                                                >
+                                                    {field.displayName}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <SearchFilters
+                                        filters={filters}
+                                        expandedSections={expandedSections}
+                                        onFilterChange={handleFilterChange}
+                                        onSectionToggle={handleSectionToggle}
+                                        groupByType={viewPreferences.groupByType}
+                                        onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                                    />
+                                </>
                             }
                         />
                     </RightSidebar>

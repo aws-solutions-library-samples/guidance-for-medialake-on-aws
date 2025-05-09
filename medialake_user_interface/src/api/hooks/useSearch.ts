@@ -10,6 +10,7 @@ interface SearchParams {
     page?: number;
     pageSize?: number;
     isSemantic?: boolean;
+    fields?: string[];
 }
 
 interface SearchResponseData {
@@ -40,16 +41,22 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const page = params?.page || 1;
     const pageSize = params?.pageSize || 20;
     const isSemantic = params?.isSemantic ?? false;
+    const fields = params?.fields || [];
     const { showError } = useErrorModal();
 
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields),
         queryFn: async ({ signal }) => {
             try {
-                const response = await apiClient.get<SearchResponseType>(
-                    `${API_ENDPOINTS.SEARCH}?q=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}&semantic=${isSemantic}`,
-                    { signal }
-                );
+                // Build the URL with query parameters
+                let url = `${API_ENDPOINTS.SEARCH}?q=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}&semantic=${isSemantic}`;
+                
+                // Add fields parameter if fields are specified
+                if (fields.length > 0) {
+                    url += `&fields=${fields.join(',')}`;
+                }
+                
+                const response = await apiClient.get<SearchResponseType>(url, { signal });
 
                 // Check if the response status is not a success (2xx)
                 if (response.data?.status && !response.data.status.startsWith('2')) {
