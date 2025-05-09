@@ -97,18 +97,33 @@ function TopBar() {
     useEffect(() => {
         const updateWidth = () => {
             if (searchBoxRef.current) {
-                setSearchBoxWidth(searchBoxRef.current.offsetWidth);
+                // Get the full width of the search box
+                const width = searchBoxRef.current.offsetWidth;
+                setSearchBoxWidth(width);
+                
+                // Log for debugging
+                console.log('Search box width measured:', width);
             }
         };
         
-        // Initial measurement
-        updateWidth();
+        // Initial measurement after a short delay to ensure rendering is complete
+        setTimeout(updateWidth, 100);
         
         // Re-measure on window resize
         window.addEventListener('resize', updateWidth);
         
+        // Re-measure when the component is fully rendered
+        const observer = new ResizeObserver(() => {
+            updateWidth();
+        });
+        
+        if (searchBoxRef.current) {
+            observer.observe(searchBoxRef.current);
+        }
+        
         return () => {
             window.removeEventListener('resize', updateWidth);
+            observer.disconnect();
         };
     }, []);
     
@@ -309,7 +324,7 @@ function TopBar() {
                         }}
                     />
                     {/* Facet Search Component */}
-                    <Box sx={{ [isRTL ? 'mr' : 'ml']: 1 }}>
+                    <Box sx={{ [isRTL ? 'mr' : 'ml']: 1, display: 'flex', alignItems: 'center' }}>
                         <FacetSearch
                             onApplyFilters={handleApplyFilters}
                             activeFilters={filters}

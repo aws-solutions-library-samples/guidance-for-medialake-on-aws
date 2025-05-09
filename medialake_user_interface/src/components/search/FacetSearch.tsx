@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FacetFilters } from '../../types/facetSearch';
 import {
   Box,
@@ -186,8 +186,11 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
   // Get available extensions from facet counts if available
   const availableExtensions = facetCounts?.file_extensions?.buckets || [];
 
+  // Create a ref for the root element to use as the anchor for the popover
+  const rootRef = useRef<HTMLDivElement>(null);
+  
   return (
-    <>
+    <Box ref={rootRef} sx={{ position: 'relative' }}>
       <IconButton
         aria-describedby={id}
         onClick={handleClick}
@@ -224,7 +227,8 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
       <Popover
         id={id}
         open={open}
-        anchorEl={anchorEl}
+        // Use the parent search box ref instead of the button
+        anchorEl={rootRef.current?.parentElement?.parentElement || anchorEl}
         onClose={handleClose}
         anchorOrigin={{
           vertical: 'bottom',
@@ -506,7 +510,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
           </Box>
         </Box>
       </Popover>
-    </>
+    </Box>
   );
 };
 
