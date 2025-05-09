@@ -92,6 +92,7 @@ class LoggingConfig(BaseModel):
 
 
 class OpenSearchClusterSettings(BaseModel):
+    use_dedicated_master_nodes: bool = True
     master_node_count: int = 2
     master_node_instance_type: str = "r7g.medium.search"
     data_node_count: int = 3
@@ -132,12 +133,13 @@ class OpenSearchClusterSettings(BaseModel):
     @root_validator(pre=True)
     @classmethod
     def validate_master_node_count(cls, values):
+        use_dedicated_masters = values.get("use_dedicated_master_nodes", True)
         multi_az = values.get("multi_az_with_standby_enabled", False)
         master_count = values.get("master_node_count", 2)
 
-        if multi_az and master_count < 3:
+        if use_dedicated_masters and multi_az and master_count < 3:
             raise ValueError(
-                "When multi_az_with_standby_enabled is True, you must choose at least three dedicated master nodes"
+                "When multi_az_with_standby_enabled is True and using dedicated master nodes, you must choose at least three dedicated master nodes"
             )
         return values
 
@@ -147,6 +149,15 @@ class OpenSearchClusterSettings(BaseModel):
             warnings.warn(
                 f"availability_zone_count ({self.availability_zone_count}) may be greater than the "
                 "number of available AZs in the region. This might cause deployment issues."
+            )
+        return self
+        
+    @model_validator(mode="after")
+    def check_collapsed_node_config(self):
+        if not self.use_dedicated_master_nodes and self.data_node_count < 2:
+            raise ValueError(
+                "When not using dedicated master nodes (collapsed configuration), "
+                "you must have at least 2 data nodes for high availability"
             )
         return self
 
