@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { formatDate } from '@/utils/dateFormat';
 import {
     Box,
@@ -115,6 +116,9 @@ const SearchPage: React.FC = () => {
         }
     });
 
+    // Check if multi-select feature is enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+    
     // Use custom hooks for view preferences, asset selection, and favorites
     const viewPreferences = useViewPreferences({
         initialViewMode: location.state?.preserveSearch ? location.state.viewMode : 'card',
@@ -487,8 +491,9 @@ const SearchPage: React.FC = () => {
                                 editedName={editedName}
                                 isAssetFavorited={assetFavorites.isAssetFavorited}
                                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                                selectedAssets={assetSelection.selectedAssetIds}
-                                onSelectToggle={assetSelection.handleSelectToggle}
+                                // Only pass selection props if multi-select feature is enabled
+                                selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
+                                onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { Box, Typography, IconButton, TextField, Button, CircularProgress, Checkbox } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -78,6 +79,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+    
+    // Check if features are enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+    const favoritesFeature = useFeatureFlag('user-favorites-enabled', false);
 
     // Update when menuOpen prop changes
     useEffect(() => {
@@ -267,81 +272,85 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     }}
                     onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
                 >
-                    {/* Checkbox for bulk selection */}
-                    <Box
-                        sx={(theme) => ({
-                            bgcolor: isSelected 
-                                ? alpha(theme.palette.primary.main, 0.25) // More visible background color when selected
-                                : alpha(theme.palette.background.paper, 0.7),
-                            borderRadius: '50%',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            padding: '4px',
-                            border: isSelected 
-                                ? `2px solid ${theme.palette.primary.main}` // Thicker border when selected
-                                : 'none',
-                            boxShadow: isSelected 
-                                ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.5)}` // Add glow effect
-                                : 'none',
-                            '&:hover': {
+                    {/* Checkbox for bulk selection - only show if feature flag is enabled */}
+                    {multiSelectFeature.value && (
+                        <Box
+                            sx={(theme) => ({
                                 bgcolor: isSelected
-                                    ? alpha(theme.palette.primary.main, 0.35)
-                                    : alpha(theme.palette.background.default, 0.9),
-                            },
-                            transition: 'all 0.2s ease-in-out',
-                            transform: isSelected ? 'scale(1.15)' : 'scale(1)', // Slightly larger when selected
-                        })}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onSelectToggle) {
-                                onSelectToggle(id, e);
-                            }
-                        }}
-                    >
-                        <Checkbox
-                            size="small"
-                            checked={isSelected}
-                            disableRipple
-                            sx={{
-                                padding: 0,
-                                color: isSelected ? 'primary.main' : 'text.secondary', 
-                                '&.Mui-checked': {
-                                    color: 'primary.main',
+                                    ? alpha(theme.palette.primary.main, 0.25) // More visible background color when selected
+                                    : alpha(theme.palette.background.paper, 0.7),
+                                borderRadius: '50%',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                padding: '4px',
+                                border: isSelected
+                                    ? `2px solid ${theme.palette.primary.main}` // Thicker border when selected
+                                    : 'none',
+                                boxShadow: isSelected
+                                    ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.5)}` // Add glow effect
+                                    : 'none',
+                                '&:hover': {
+                                    bgcolor: isSelected
+                                        ? alpha(theme.palette.primary.main, 0.35)
+                                        : alpha(theme.palette.background.default, 0.9),
                                 },
-                                '& .MuiSvgIcon-root': {
-                                    fontSize: '1.2rem',
-                                    // Apply a more visible checkmark when selected
-                                    fontWeight: isSelected ? 'bold' : 'normal',
-                                    filter: isSelected ? 'drop-shadow(0px 0px 1px rgba(0,0,0,0.5))' : 'none',
+                                transition: 'all 0.2s ease-in-out',
+                                transform: isSelected ? 'scale(1.15)' : 'scale(1)', // Slightly larger when selected
+                            })}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectToggle) {
+                                    onSelectToggle(id, e);
                                 }
                             }}
-                        />
-                    </Box>
+                        >
+                            <Checkbox
+                                size="small"
+                                checked={isSelected}
+                                disableRipple
+                                sx={{
+                                    padding: 0,
+                                    color: isSelected ? 'primary.main' : 'text.secondary',
+                                    '&.Mui-checked': {
+                                        color: 'primary.main',
+                                    },
+                                    '& .MuiSvgIcon-root': {
+                                        fontSize: '1.2rem',
+                                        // Apply a more visible checkmark when selected
+                                        fontWeight: isSelected ? 'bold' : 'normal',
+                                        filter: isSelected ? 'drop-shadow(0px 0px 1px rgba(0,0,0,0.5))' : 'none',
+                                    }
+                                }}
+                            />
+                        </Box>
+                    )}
                     
-                    {/* Favorite button */}
-                    <IconButton
-                        size="small"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onFavoriteToggle) {
-                                onFavoriteToggle(e);
-                            }
-                        }}
-                        sx={(theme) => ({
-                            bgcolor: alpha(theme.palette.background.paper, 0.7),
-                            padding: '4px',
-                            '&:hover': {
-                                bgcolor: alpha(theme.palette.background.default, 0.9),
-                            }
-                        })}
-                    >
-                        {isFavorite ? (
-                            <FavoriteIcon fontSize="small" color="error" />
-                        ) : (
-                            <FavoriteBorderIcon fontSize="small" />
-                        )}
-                    </IconButton>
+                    {/* Favorite button - only show if feature flag is enabled */}
+                    {favoritesFeature.value && (
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onFavoriteToggle) {
+                                    onFavoriteToggle(e);
+                                }
+                            }}
+                            sx={(theme) => ({
+                                bgcolor: alpha(theme.palette.background.paper, 0.7),
+                                padding: '4px',
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.background.default, 0.9),
+                                }
+                            })}
+                        >
+                            {isFavorite ? (
+                                <FavoriteIcon fontSize="small" color="error" />
+                            ) : (
+                                <FavoriteBorderIcon fontSize="small" />
+                            )}
+                        </IconButton>
+                    )}
                 </Box>
 
                 {/* Position buttons at the top right of the card, visible on hover or when menu is open */}

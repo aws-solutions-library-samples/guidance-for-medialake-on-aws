@@ -7,7 +7,7 @@
     "value": false,
     "variant": "on"
   },
-  "bulk-downloads": {
+  "search-multi-select-enabled": {
     "value": false,
     "variant": "on"
   }

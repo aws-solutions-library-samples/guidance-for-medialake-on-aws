@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 
 // Default width values
 export const DEFAULT_WIDTH = 375;
@@ -24,11 +25,14 @@ interface RightSidebarProviderProps {
 export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [hasSelectedItems, setHasSelectedItems] = useState(false);
+    
+    // Check if multi-select feature is enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
     const openSidebar = () => setIsExpanded(true);
     const closeSidebar = () => {
-        // Don't close if there are selected items
-        if (!hasSelectedItems) {
+        // Don't close if there are selected items and multi-select is enabled
+        if (!hasSelectedItems || !multiSelectFeature.value) {
             setIsExpanded(false);
         }
     };
@@ -46,12 +50,12 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
         }
     }, []);
 
-    // Keep sidebar open when items are selected
+    // Keep sidebar open when items are selected (only if multi-select is enabled)
     useEffect(() => {
-        if (hasSelectedItems) {
+        if (hasSelectedItems && multiSelectFeature.value) {
             openSidebar();
         }
-    }, [hasSelectedItems]);
+    }, [hasSelectedItems, multiSelectFeature.value]);
 
     return (
         <RightSidebarContext.Provider value={{ 

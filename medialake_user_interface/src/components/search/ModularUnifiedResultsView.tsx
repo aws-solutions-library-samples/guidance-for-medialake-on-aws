@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -95,6 +96,9 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   error,
   isLoading,
 }) => {
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case 'name':
@@ -115,8 +119,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
     }
   };
 
-  // Function to check if an asset is selected
-  const isAssetSelected = selectedAssets && selectedAssets.length > 0
+  // Function to check if an asset is selected - only if multi-select feature is enabled
+  const isAssetSelected = (multiSelectFeature.value && selectedAssets && selectedAssets.length > 0)
     ? (assetId: string) => selectedAssets.includes(assetId)
     : undefined;
 

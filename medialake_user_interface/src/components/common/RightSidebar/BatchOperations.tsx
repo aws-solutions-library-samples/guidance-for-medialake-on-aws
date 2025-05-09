@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { 
   Box, 
   Typography, 
@@ -37,6 +38,14 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onRemoveItem
 }) => {
   const { openSidebar, setHasSelectedItems } = useRightSidebar();
+  
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  
+  // If feature flag is disabled, don't render the component
+  if (!multiSelectFeature.value) {
+    return null;
+  }
 
   // Open sidebar when items are selected
   React.useEffect(() => {
