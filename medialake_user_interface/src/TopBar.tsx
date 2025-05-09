@@ -14,7 +14,9 @@ import {
 import { Button } from '@/components/common';
 import {
     Search as SearchIcon,
-    CloudUpload as CloudUploadIcon
+    CloudUpload as CloudUploadIcon,
+    Translate as TranslateIcon,
+    Language as LanguageIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
@@ -227,8 +229,15 @@ function TopBar() {
         });
     };
 
-    const handleSemanticSearchToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setIsSemanticSearch(event.target.checked);
+    // Updated to handle both switch and icon button clicks
+    const handleSemanticSearchToggle = (event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
+        if ('checked' in (event.target as HTMLInputElement)) {
+            // Handle Switch component event
+            setIsSemanticSearch((event.target as HTMLInputElement).checked);
+        } else {
+            // Handle IconButton click - toggle the current state
+            setIsSemanticSearch(prevState => !prevState);
+        }
     };
 
     const handleUploadComplete = (files: any[]) => {
@@ -287,22 +296,26 @@ function TopBar() {
                     />
                 ))}
 
-                {/* Search Input with Filter Icon */}
+                {/* Google-style Search Input with Filter Icon */}
                 <Box
                     ref={searchBoxRef}
                     sx={{
                         display: 'flex',
                         alignItems: 'center',
                         backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                        borderRadius: '8px',
-                        padding: '4px 12px',
+                        borderRadius: '24px', // More rounded like Google search
+                        padding: '8px 16px',
                         flex: 1,
+                        maxWidth: '800px', // Wider search box
+                        width: '100%',
                         flexDirection: isRTL ? 'row-reverse' : 'row',
+                        boxShadow: theme === 'dark' ? '0 2px 5px rgba(0,0,0,0.2)' : 'none',
                     }}
                 >
                     <SearchIcon sx={{
                         color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                        [isRTL ? 'ml' : 'mr']: 1
+                        [isRTL ? 'ml' : 'mr']: 1.5,
+                        fontSize: '20px'
                     }} />
                     <InputBase
                         placeholder={t('common.search')}
@@ -312,10 +325,10 @@ function TopBar() {
                         fullWidth
                         sx={{
                             textAlign: isRTL ? 'right' : 'left',
-                            fontSize: '14px',
+                            fontSize: '16px',
                             color: theme === 'dark' ? 'white' : muiTheme.palette.text.primary,
                             '& input': {
-                                padding: '4px 0',
+                                padding: '6px 0',
                                 '&::placeholder': {
                                     color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'inherit',
                                     opacity: 1,
@@ -323,8 +336,32 @@ function TopBar() {
                             },
                         }}
                     />
+                    
+                    {/* Semantic Search Toggle as Icon Button */}
+                    <IconButton
+                        size="small"
+                        onClick={(e) => handleSemanticSearchToggle(e)}
+                        sx={{
+                            color: isSemanticSearch
+                                ? muiTheme.palette.primary.main
+                                : theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                            '&:hover': {
+                                backgroundColor: 'transparent',
+                                color: isSemanticSearch
+                                    ? muiTheme.palette.primary.dark
+                                    : theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                            },
+                            mr: 1
+                        }}
+                        title={isSemanticSearch
+                            ? t('search.semantic.disable', 'Disable semantic search')
+                            : t('search.semantic.enable', 'Enable semantic search')}
+                    >
+                        <TranslateIcon />
+                    </IconButton>
+                    
                     {/* Facet Search Component */}
-                    <Box sx={{ [isRTL ? 'mr' : 'ml']: 1, display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <FacetSearch
                             onApplyFilters={handleApplyFilters}
                             activeFilters={filters}
@@ -334,44 +371,19 @@ function TopBar() {
                     </Box>
                 </Box>
 
-                {/* Search Button */}
+                {/* Search Button - Now outside the search box */}
                 <Button
                     variant="contained"
                     onClick={handleSearchSubmit}
-                    sx={{ minWidth: '80px' }}
+                    sx={{
+                        minWidth: '80px',
+                        ml: 2,
+                        borderRadius: '20px', // Rounded button to match search box
+                        height: '40px'  // Match height with search box
+                    }}
                 >
                     {t('common.search')}
                 </Button>
-
-                {/* Semantic Search Toggle */}
-                <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    ml: 2,
-                }}>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                size="small"
-                                checked={isSemanticSearch}
-                                onChange={handleSemanticSearchToggle}
-                                sx={{ ml: 1 }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                                {t('search.semantic', 'Semantic Search')}
-                            </Typography>
-                        }
-                        sx={{
-                            margin: 0,
-                            '& .MuiTypography-root': {
-                                fontSize: '14px',
-                                color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                            }
-                        }}
-                    />
-                </Box>
             </Box>
 
             {/* Upload Modal - Only rendered if file upload is enabled */}
