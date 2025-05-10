@@ -95,6 +95,8 @@ interface AssetMarkersProps {
     asset: any;
     assetType: string;
     searchTerm?: string; // Add searchTerm prop
+    clipsMarkersCreated: boolean;
+    setClipsMarkersCreated: (created: boolean) => void;
 }
 
 interface AssetCollaborationProps {
@@ -254,7 +256,16 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef, asset, assetType, searchTerm }) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({ 
+    markers, 
+    setMarkers, 
+    videoViewerRef, 
+    asset, 
+    assetType, 
+    searchTerm,
+    clipsMarkersCreated,
+    setClipsMarkersCreated
+}) => {
     // Store all marker references in a Map
     const markerRefsMap = useRef(new Map<string, PeriodMarker>());
     // State to track editable marker names
@@ -395,6 +406,12 @@ const timecodeToSeconds = (timecode: string): number => {
 
 useEffect(() => {
     if (!videoViewerRef?.current || !asset?.clips || !Array.isArray(asset.clips)) return;
+    
+    // Skip if markers have already been created from clips
+    if (clipsMarkersCreated) {
+        console.log('Clips markers already created, skipping');
+        return;
+    }
 
     const timer = setTimeout(() => {
         try {
@@ -485,13 +502,17 @@ useEffect(() => {
                 }]);
             });
 
+            // Mark that we've created markers from clips
+            setClipsMarkersCreated(true);
+            console.log('Clips markers created and flag set');
+
         } catch (error) {
             console.error('Error adding clip markers:', error);
         }
     }, 1000);
 
     return () => clearTimeout(timer);
-}, [videoViewerRef, asset]);
+}, [videoViewerRef, asset, clipsMarkersCreated, setClipsMarkersCreated]);
 
     
     return ( 
@@ -835,6 +856,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
     const [markers, setMarkers] = useState<MarkerInfo[]>([]);
+    const [clipsMarkersCreated, setClipsMarkersCreated] = useState(false);
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
@@ -931,6 +953,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                         asset={asset}
                         assetType={assetType}
                         searchTerm={searchTerm}
+                        clipsMarkersCreated={clipsMarkersCreated}
+                        setClipsMarkersCreated={setClipsMarkersCreated}
                     />
                 )}
                     </Box>
