@@ -59,6 +59,7 @@ import { subscribe } from 'diagnostics_channel';
 
 interface MarkerInfo {
     id: string;
+    name?: string;
     timeObservation: {
         start: number;
         end: number;
@@ -66,6 +67,7 @@ interface MarkerInfo {
     style: {
         color: string;
     };
+    score?: number; // Optional score property for markers created from clips
 }
 
 interface AssetSidebarProps {
@@ -73,9 +75,10 @@ interface AssetSidebarProps {
     comments?: any[];
     onAddComment?: (comment: string) => void;
     videoViewerRef?: RefObject<VideoViewerRef>;
-    assetId?: string; 
-    asset?: any;       
-    assetType?: string; 
+    assetId?: string;
+    asset?: any;
+    assetType?: string;
+    searchTerm?: string; // Add searchTerm prop
 }
 
 
@@ -85,12 +88,13 @@ interface AssetVersionProps {
 }
 
 interface AssetMarkersProps {
-    onMarkerAdd?: () => void; 
+    onMarkerAdd?: () => void;
     videoViewerRef?: RefObject<VideoViewerRef>; // Add this
     markers?: MarkerInfo[];
     setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;
     asset: any;
     assetType: string;
+    searchTerm?: string; // Add searchTerm prop
 }
 
 interface AssetCollaborationProps {
@@ -250,9 +254,11 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef,asset,assetType }) => {
+const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoViewerRef, asset, assetType, searchTerm }) => {
     // Store all marker references in a Map
     const markerRefsMap = useRef(new Map<string, PeriodMarker>());
+    // State to track editable marker names
+    const [markerNames, setMarkerNames] = useState<Record<string, string>>({});
     // Set up subscriptions for all markers
     useEffect(() => {
         const subscriptions: any[] = [];
@@ -350,8 +356,17 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({ markers, setMarkers, videoV
             
             lane.addMarker(periodMarker);
 
+            const defaultName = `Marker ${newId}`;
+            
+            // Add default name for the new marker
+            setMarkerNames(prev => ({
+                ...prev,
+                [newId]: defaultName
+            }));
+
             setMarkers(prev => [...prev, {
                 id: newId,
+                name: defaultName,
                 timeObservation: {
                     start: currentTime,
                     end: currentTime + 5
@@ -407,12 +422,15 @@ useEffect(() => {
                     }
                 });
 
+                // Extract score from clip if available
+                const clipScore = clip.score !== undefined ? clip.score : null;
+                
                 const newId = (markers.length + index + 1).toString();
                 
                 const periodMarker = new PeriodMarker({
-                    timeObservation: { 
-                        start: startSeconds, 
-                        end: endSeconds 
+                    timeObservation: {
+                        start: startSeconds,
+                        end: endSeconds
                     },
                     editable: true,
                     id: newId,
@@ -426,8 +444,8 @@ useEffect(() => {
                 
                 const subscription = periodMarker.onChange$.subscribe({
                     next: (event) => {
-                        setMarkers(prevMarkers => 
-                            prevMarkers.map(marker => 
+                        setMarkers(prevMarkers =>
+                            prevMarkers.map(marker =>
                                 marker.id === newId
                                     ? {
                                         ...marker,
@@ -444,15 +462,26 @@ useEffect(() => {
                 
                 lane.addMarker(periodMarker);
 
+                // Use searchTerm for marker names if available, otherwise use default
+                const defaultName = searchTerm ? `${searchTerm} Clip ${index + 1}` : `Marker ${newId}`;
+                
+                // Add default name for clip markers
+                setMarkerNames(prev => ({
+                    ...prev,
+                    [newId]: defaultName
+                }));
+
                 setMarkers(prev => [...prev, {
                     id: newId,
+                    name: defaultName,
                     timeObservation: {
                         start: startSeconds,
                         end: endSeconds
                     },
                     style: {
                         color: periodMarker.style.color
-                    }
+                    },
+                    score: clipScore !== null ? clipScore : undefined // Add score only if it exists
                 }]);
             });
 
@@ -488,15 +517,46 @@ useEffect(() => {
                         border: `1px solid ${alpha(marker.style.color, 0.2)}`,
                     }}
                 >
-                    <Typography variant="body2">
-                        <b>Marker {marker.id}</b>
-                    </Typography>
+                    <TextField
+                        variant="standard"
+                        fullWidth
+                        value={marker.id in markerNames ? markerNames[marker.id] : (marker.name || `Marker ${marker.id}`)}
+                        onChange={(e) => {
+                            const newName = e.target.value;
+                            
+                            // Update the UI state
+                            setMarkerNames(prev => ({
+                                ...prev,
+                                [marker.id]: newName
+                            }));
+                            
+                            // Update the marker state
+                            setMarkers(prevMarkers =>
+                                prevMarkers.map(m =>
+                                    m.id === marker.id
+                                        ? { ...m, name: newName }
+                                        : m
+                                )
+                            );
+                        }}
+                        sx={{
+                            mb: 1,
+                            '& .MuiInput-root': {
+                                fontWeight: 'bold',
+                            }
+                        }}
+                    />
                     <Typography variant="body2">
                         <b>IN:</b> {videoViewerRef?.current?.formatToTimecode(marker.timeObservation.start)}
                     </Typography>
                     <Typography variant="body2">
                         <b>OUT:</b> {videoViewerRef?.current?.formatToTimecode(marker.timeObservation.end)}
                     </Typography>
+                    {marker.score !== undefined && (
+                        <Typography variant="body2">
+                            <b>Score:</b> {marker.score.toFixed(1)}
+                        </Typography>
+                    )}
                 </Box>
             ))}
         </Box>
@@ -770,7 +830,8 @@ const AssetActivity: React.FC<AssetActivityProps> = () => {
         </Box>
     );
 };
-export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, versions = [], comments = [], onAddComment, assetId,asset,assetType}) => {
+export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
+    const { videoViewerRef, versions = [], comments = [], onAddComment, assetId, asset, assetType, searchTerm } = props;
     const [currentTab, setCurrentTab] = useState(0);
     const theme = useTheme();
     const [markers, setMarkers] = useState<MarkerInfo[]>([]);
@@ -863,13 +924,13 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = ({ videoViewerRef, vers
                         sx={{ height: '100%', overflow: 'auto' }}
                     >
                                         {currentTab === 0 && (
-                    <AssetMarkers 
-                        videoViewerRef= {videoViewerRef}
-                        markers = {markers}
-                        setMarkers = {setMarkers}
+                    <AssetMarkers
+                        videoViewerRef={videoViewerRef}
+                        markers={markers}
+                        setMarkers={setMarkers}
                         asset={asset}
                         assetType={assetType}
-                        
+                        searchTerm={searchTerm}
                     />
                 )}
                     </Box>
