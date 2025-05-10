@@ -41,6 +41,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PreviewIcon from '@mui/icons-material/Preview';
 import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import { RefObject } from 'react';
 import { VideoViewer, VideoViewerRef, Marker } from '../common/VideoViewer';
 import {randomHexColor} from '../common/utils';
@@ -256,16 +257,17 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
 
 
 // Markers content component
-const AssetMarkers: React.FC<AssetMarkersProps> = ({ 
-    markers, 
-    setMarkers, 
-    videoViewerRef, 
-    asset, 
-    assetType, 
+const AssetMarkers: React.FC<AssetMarkersProps> = ({
+    markers,
+    setMarkers,
+    videoViewerRef,
+    asset,
+    assetType,
     searchTerm,
     clipsMarkersCreated,
     setClipsMarkersCreated
 }) => {
+    const theme = useTheme();
     // Store all marker references in a Map
     const markerRefsMap = useRef(new Map<string, PeriodMarker>());
     // State to track editable marker names
@@ -311,6 +313,40 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             subscriptions.forEach(sub => sub.unsubscribe());
         };
     }, [videoViewerRef, setMarkers]);
+
+    const deleteMarker = (markerId: string) => {
+        if (!videoViewerRef?.current) return;
+        
+        try {
+            const lane = videoViewerRef.current.getMarkerLane();
+            if (!lane) {
+                console.warn('Marker lane is not available');
+                return;
+            }
+            
+            // Get the marker reference
+            const markerRef = markerRefsMap.current.get(markerId);
+            if (markerRef) {
+                // Remove from timeline
+                lane.removeMarker(markerId);
+                
+                // Remove from markerRefsMap
+                markerRefsMap.current.delete(markerId);
+                
+                // Remove from markers state
+                setMarkers(prevMarkers => prevMarkers.filter(marker => marker.id !== markerId));
+                
+                // Remove from markerNames if needed
+                setMarkerNames(prev => {
+                    const newNames = { ...prev };
+                    delete newNames[markerId];
+                    return newNames;
+                });
+            }
+        } catch (error) {
+            console.error('Error deleting marker:', error);
+        }
+    };
 
     const addMarker = () => {
         if (!videoViewerRef?.current) return;
@@ -533,40 +569,60 @@ useEffect(() => {
                     sx={{
                         mt: 2,
                         p: 2,
+                        pb: 1.5,
                         bgcolor: alpha(marker.style.color, 0.1),
                         borderRadius: 1,
                         border: `1px solid ${alpha(marker.style.color, 0.2)}`,
+                        position: 'relative',
                     }}
                 >
-                    <TextField
-                        variant="standard"
-                        fullWidth
-                        value={marker.id in markerNames ? markerNames[marker.id] : (marker.name || `Marker ${marker.id}`)}
-                        onChange={(e) => {
-                            const newName = e.target.value;
-                            
-                            // Update the UI state
-                            setMarkerNames(prev => ({
-                                ...prev,
-                                [marker.id]: newName
-                            }));
-                            
-                            // Update the marker state
-                            setMarkers(prevMarkers =>
-                                prevMarkers.map(m =>
-                                    m.id === marker.id
-                                        ? { ...m, name: newName }
-                                        : m
-                                )
-                            );
-                        }}
-                        sx={{
-                            mb: 1,
-                            '& .MuiInput-root': {
-                                fontWeight: 'bold',
-                            }
-                        }}
-                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <TextField
+                            variant="standard"
+                            value={marker.id in markerNames ? markerNames[marker.id] : (marker.name || `Marker ${marker.id}`)}
+                            onChange={(e) => {
+                                const newName = e.target.value;
+                                
+                                // Update the UI state
+                                setMarkerNames(prev => ({
+                                    ...prev,
+                                    [marker.id]: newName
+                                }));
+                                
+                                // Update the marker state
+                                setMarkers(prevMarkers =>
+                                    prevMarkers.map(m =>
+                                        m.id === marker.id
+                                            ? { ...m, name: newName }
+                                            : m
+                                    )
+                                );
+                            }}
+                            sx={{
+                                width: 'calc(100% - 40px)',
+                                '& .MuiInput-root': {
+                                    fontWeight: 'bold',
+                                }
+                            }}
+                        />
+                        <Tooltip title="Delete marker">
+                            <IconButton
+                                size="small"
+                                onClick={() => deleteMarker(marker.id)}
+                                sx={{
+                                    ml: 1,
+                                    padding: '6px',
+                                    color: 'text.secondary',
+                                    '&:hover': {
+                                        color: 'error.main',
+                                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                                    }
+                                }}
+                            >
+                                <CloseIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                     <Typography variant="body2">
                         <b>IN:</b> {videoViewerRef?.current?.formatToTimecode(marker.timeObservation.start)}
                     </Typography>
