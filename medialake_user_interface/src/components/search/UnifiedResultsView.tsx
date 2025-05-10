@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, Grid, Typography, Paper, Alert, AlertTitle } from '@mui/material';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
@@ -13,6 +13,8 @@ import UnifiedAssetResults from './UnifiedAssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
 import ErrorDisplay from '../shared/ErrorDisplay';
+import RightSidebar from '../common/RightSidebar/RightSidebar';
+import FilterAndBatchOperations from '../common/RightSidebar/FilterAndBatchOperations';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
@@ -59,6 +61,12 @@ interface UnifiedResultsViewProps {
     onPageSizeChange: (newPageSize: number) => void;
     error?: { status: string; message: string } | null;
     isLoading?: boolean;
+    // Selection and favorite handlers
+    selectedAssets?: string[];
+    onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    favoriteAssets?: string[];
+    onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    filterComponent?: React.ReactNode;
 }
 
 const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
@@ -95,10 +103,109 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
     onPageSizeChange,
     error,
     isLoading,
+    selectedAssets: initialSelectedAssets = [],
+    onSelectToggle: externalOnSelectToggle,
+    favoriteAssets = [],
+    onFavoriteToggle,
+    filterComponent,
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const locationState = location.state as { filters?: unknown; isSemantic?: boolean } | null;
+    
+    // Internal state for selected assets
+    const [internalSelectedAssets, setInternalSelectedAssets] = useState<string[]>(initialSelectedAssets);
+    
+    // Use either external or internal state for selected assets
+    const selectedAssets = externalOnSelectToggle ? initialSelectedAssets : internalSelectedAssets;
+    
+    // Handle selection toggle
+    const handleSelectToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement> | React.ChangeEvent<HTMLInputElement>) => {
+        console.log('handleSelectToggle called with asset:', asset.InventoryID);
+        console.log('Current selectedAssets:', selectedAssets);
+        console.log('Is asset currently selected:', selectedAssets.includes(asset.InventoryID));
+        console.log('Event type:', event.type);
+        
+        if (externalOnSelectToggle) {
+            // Use external handler if provided
+            console.log('Using external handler');
+            externalOnSelectToggle(asset, event as React.MouseEvent<HTMLElement>);
+            
+            // Log after external handler (will show on next render cycle)
+            setTimeout(() => {
+                console.log('After external handler, selectedAssets:', 
+                    Array.isArray(initialSelectedAssets) ? initialSelectedAssets : 'Not an array');
+            }, 0);
+        } else {
+            // Otherwise use internal state
+            console.log('Using internal state');
+            setInternalSelectedAssets(prev => {
+                const assetId = asset.InventoryID;
+                if (prev.includes(assetId)) {
+                    console.log('Removing asset from selection:', assetId);
+                    return prev.filter(id => id !== assetId);
+                } else {
+                    console.log('Adding asset to selection:', assetId);
+                    return [...prev, assetId];
+                }
+            });
+            
+            // Log the updated state (will show on next render cycle)
+            setTimeout(() => {
+                console.log('After internal state update, selectedAssets:', selectedAssets);
+            }, 0);
+        }
+    }, [externalOnSelectToggle, selectedAssets, initialSelectedAssets]);
+    
+    // Handle clearing all selections
+    const handleClearSelection = useCallback(() => {
+        if (externalOnSelectToggle) {
+            // If using external state, we need to clear each item individually
+            selectedAssets.forEach(assetId => {
+                const asset = results.find(a => a.InventoryID === assetId);
+                if (asset) {
+                    externalOnSelectToggle(asset, {} as React.MouseEvent<HTMLElement>);
+                }
+            });
+        } else {
+            // Clear internal state
+            setInternalSelectedAssets([]);
+        }
+    }, [externalOnSelectToggle, selectedAssets, results]);
+    
+    // Handle batch operations
+    const handleBatchDelete = useCallback(() => {
+        console.log('Batch delete:', selectedAssets);
+        // Implement batch delete functionality
+        // After deletion, clear selection
+        handleClearSelection();
+    }, [selectedAssets, handleClearSelection]);
+    
+    const handleBatchDownload = useCallback(() => {
+        console.log('Batch download:', selectedAssets);
+        // Implement batch download functionality
+    }, [selectedAssets]);
+    
+    const handleBatchShare = useCallback(() => {
+        console.log('Batch share:', selectedAssets);
+        // Implement batch share functionality
+    }, [selectedAssets]);
+    
+    // Create selected assets objects for the batch operations component
+    const selectedAssetsObjects = React.useMemo(() => {
+        return selectedAssets.map(assetId => {
+            const asset = results.find(a => a.InventoryID === assetId);
+            return asset ? {
+                id: asset.InventoryID,
+                name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+                type: asset.DigitalSourceAsset.Type
+            } : null;
+        }).filter(Boolean) as Array<{
+            id: string;
+            name: string;
+            type: string;
+        }>;
+    }, [selectedAssets, results]);
 
     const handleAssetClick = (asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -276,8 +383,10 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                     aspectRatio={aspectRatio}
                                     thumbnailScale={thumbnailScale}
                                     showMetadata={showMetadata}
-                                    isFavorite={false} // Default to false since we don't have favorite info here
-                                    onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in UnifiedResultsView')}
+                                    isSelected={selectedAssets.includes(asset.InventoryID)}
+                                    onSelectToggle={(id, e) => handleSelectToggle(asset, e)}
+                                    isFavorite={favoriteAssets.includes(asset.InventoryID)}
+                                    onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
                                 />
                             </Grid>
                         ))}
@@ -323,8 +432,10 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                             aspectRatio={aspectRatio}
                                             thumbnailScale={thumbnailScale}
                                             showMetadata={showMetadata}
-                                            isFavorite={false} // Default to false since we don't have favorite info here
-                                            onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in UnifiedResultsView')}
+                                            isSelected={selectedAssets.includes(asset.InventoryID)}
+                                            onSelectToggle={(id, e) => handleSelectToggle(asset, e)}
+                                            isFavorite={favoriteAssets.includes(asset.InventoryID)}
+                                            onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
                                         />
                                     </Grid>
                                 ))}
@@ -363,6 +474,10 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                                     editedName={editedName}
                                     onEditNameChange={onEditNameChange}
                                     onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
+                                    isSelected={(asset) => selectedAssets.includes(asset.InventoryID)}
+                                    onSelectToggle={(asset, e) => handleSelectToggle(asset, e)}
+                                    isFavorite={(asset) => favoriteAssets.includes(asset.InventoryID)}
+                                    onFavoriteToggle={onFavoriteToggle}
                                 />
                             </Box>
                         ))}
@@ -389,12 +504,29 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 editedName={editedName}
                 onEditNameChange={onEditNameChange}
                 onEditNameComplete={(asset) => onEditNameComplete(asset, true)}
+                isSelected={(asset) => selectedAssets.includes(asset.InventoryID)}
+                onSelectToggle={(asset, e) => handleSelectToggle(asset, e)}
+                isFavorite={(asset) => favoriteAssets.includes(asset.InventoryID)}
+                onFavoriteToggle={onFavoriteToggle}
             />
         );
     };
 
     return (
-        <Box sx={{ mt: -2 }}>
+        <React.Fragment>
+            {/* Right Sidebar with Filter and Batch Operations */}
+            <RightSidebar>
+                <FilterAndBatchOperations
+                    selectedAssets={selectedAssetsObjects}
+                    onBatchDelete={handleBatchDelete}
+                    onBatchDownload={handleBatchDownload}
+                    onBatchShare={handleBatchShare}
+                    onClearSelection={handleClearSelection}
+                    filterComponent={filterComponent}
+                />
+            </RightSidebar>
+            
+            <Box sx={{ mt: -2 }}>
             <Box sx={{ mb: 2 }}>
                 <Typography
                     variant="h4"
@@ -473,7 +605,8 @@ const UnifiedResultsView: React.FC<UnifiedResultsViewProps> = ({
                 onPageChange={(_, page) => onPageChange(page)}
                 onPageSizeChange={onPageSizeChange}
             />
-        </Box>
+            </Box>
+        </React.Fragment>
     );
 };
 

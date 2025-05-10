@@ -21,6 +21,9 @@ interface AssetGridViewProps<T> {
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Selection functionality
+  isAssetSelected?: (assetId: string) => boolean;
+  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -48,6 +51,8 @@ function AssetGridView<T>({
   editedName,
   isAssetFavorited,
   onFavoriteToggle,
+  isAssetSelected,
+  onSelectToggle,
   getAssetId,
   getAssetName,
   getAssetType,
@@ -109,6 +114,8 @@ function AssetGridView<T>({
               showMetadata={showMetadata}
               isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
               onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
+              isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
+              onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
             />
           </Grid>
         ))}
@@ -156,6 +163,8 @@ function AssetGridView<T>({
                   showMetadata={showMetadata}
                   isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
                   onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
+                  isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
+                  onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
                 />
               </Grid>
             ))}
