@@ -16,12 +16,10 @@ docker run --rm \
     set -e
     # Update packages and install required dependencies using yum
     yum update -y && yum install -y cairo-devel pango-devel gdk-pixbuf2-devel libffi-devel pkg-config python3-pip
-    yum install -y gcc libjpeg-devel zlib-devel
     # Upgrade pip (optional, but often helpful)
     python3 -m pip install --upgrade pip
     # Install cairosvg and its dependencies into the python folder
     python3 -m pip install cairosvg -t /asset-output/python
-    python3 -m pip install pillow==11.0.0 -t /asset-output/python
     # Copy native libraries required by CairoSVG and its dependencies
     cp -v /usr/lib64/libcairo.so* /asset-output/lib/ || echo \"Cairo libraries not found in /usr/lib64\"
     cp -v /usr/lib64/libpango-1.0.so* /asset-output/lib/ || echo \"Pango libraries not found in /usr/lib64\"
