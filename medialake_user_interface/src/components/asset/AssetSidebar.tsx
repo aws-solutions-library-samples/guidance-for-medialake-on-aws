@@ -634,7 +634,7 @@ useEffect(() => {
                     </Typography>
                     {marker.score !== undefined && (
                         <Typography variant="body2">
-                            <b>Score:</b> {marker.score.toFixed(1)}
+                            <b>Score:</b> {Number(marker.score).toFixed(10).replace(/\.?0+$/, '')}
                         </Typography>
                     )}
                 </Box>
