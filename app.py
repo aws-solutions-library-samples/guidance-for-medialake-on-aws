@@ -18,6 +18,7 @@ from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
+from medialake_stacks.pre_deploy_cleanup_stack import PreDeployCleanUpStack, PreDeployCleanUpStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 # from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack - Development paused, commented out for now
 from medialake_stacks.integrations_environment_stack import IntegrationsEnvironmentStack, IntegrationsEnvironmentStackProps
@@ -62,11 +63,16 @@ else:
 #     lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
 
 
+pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
 
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
+cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
 
+# Create the PreDeployCleanUp stack first
 
+# Create the BaseInfrastructureStack and make it depend on the PreDeployCleanUp stack
 base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
+base_infrastructure.add_dependency(pre_deploy_cleanup_stack)
 
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
