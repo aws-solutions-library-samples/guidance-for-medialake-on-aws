@@ -359,12 +359,13 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             }
 
             const currentTime = videoViewerRef.current.getCurrentTime();
-            const newId = (markers.length + 1).toString();
+            // Generate a unique ID based on timestamp to ensure uniqueness
+            const newId = `marker_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
             const periodMarker = new PeriodMarker({
-                timeObservation: { 
-                    start: currentTime, 
-                    end: currentTime + 5 
+                timeObservation: {
+                    start: currentTime,
+                    end: currentTime + 5
                 },
                 editable: true,
                 id: newId,
@@ -385,8 +386,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                         event
                     });
                     
-                    setMarkers(prevMarkers => 
-                        prevMarkers.map(marker => 
+                    setMarkers(prevMarkers =>
+                        prevMarkers.map(marker =>
                             marker.id === newId
                                 ? {
                                     ...marker,
@@ -403,7 +404,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             
             lane.addMarker(periodMarker);
 
-            const defaultName = `Marker ${newId}`;
+            // Use the same default name format, allowing duplicates
+            const defaultName = `Marker ${markers.length + 1}`;
             
             // Add default name for the new marker
             setMarkerNames(prev => ({
@@ -478,7 +480,8 @@ useEffect(() => {
                 // Extract score from clip if available
                 const clipScore = clip.score !== undefined ? clip.score : null;
                 
-                const newId = (markers.length + index + 1).toString();
+                // Generate a unique ID based on timestamp to ensure uniqueness
+                const newId = `clip_${Date.now()}_${index}_${Math.floor(Math.random() * 1000)}`;
                 
                 const periodMarker = new PeriodMarker({
                     timeObservation: {
@@ -631,7 +634,7 @@ useEffect(() => {
                     </Typography>
                     {marker.score !== undefined && (
                         <Typography variant="body2">
-                            <b>Score:</b> {marker.score.toFixed(1)}
+                            <b>Score:</b> {Number(marker.score).toFixed(10).replace(/\.?0+$/, '')}
                         </Typography>
                     )}
                 </Box>
