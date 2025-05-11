@@ -180,7 +180,11 @@ export function ResizableTable<T>({
     const styles = useTableStyles(theme, mode, Boolean(onRowClick), rows.length);
 
     const handleRowClick = useCallback((row: Row<T>, event: React.MouseEvent<HTMLElement>) => {
-        if (!(event.target as HTMLElement).closest('.action-buttons')) {
+        // Prevent row click when clicking on action buttons or checkboxes
+        if (!(event.target as HTMLElement).closest('.action-buttons') &&
+            !(event.target as HTMLElement).closest('.MuiCheckbox-root') &&
+            !(event.target as HTMLElement).closest('input[type="checkbox"]') &&
+            !(event.target as HTMLElement).closest('.checkbox-cell')) {
             onRowClick?.(row);
         }
     }, [onRowClick]);

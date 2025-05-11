@@ -30,7 +30,7 @@ const defaultCardFields: CardFieldConfig[] = [
     { id: 'name', label: 'Object Name', visible: true },
     { id: 'format', label: 'Format', visible: true },
     { id: 'createDate', label: 'Date Created', visible: true },
-    { id: 'fileSize', label: 'File Size', visible: false },
+    { id: 'fileSize', label: 'File Size', visible: true },
 ];
 
 const defaultColumns: AssetTableColumn<VideoItem>[] = [

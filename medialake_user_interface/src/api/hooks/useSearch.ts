@@ -53,7 +53,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
                 
                 // Add fields parameter if fields are specified
                 if (fields.length > 0) {
-                    url += `&fields=${fields.join(',')}`;
+                    url += `&fields=${encodeURIComponent(fields.join(','))}`;
                 }
                 
                 const response = await apiClient.get<SearchResponseType>(url, { signal });

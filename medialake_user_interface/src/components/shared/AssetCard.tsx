@@ -3,7 +3,7 @@ import { useFeatureFlag } from '@/utils/featureFlags';
 import { Box, Typography, IconButton, TextField, Button, CircularProgress, Checkbox } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import DeleteIcon from '@mui/icons-material/Delete';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
@@ -26,7 +26,7 @@ export interface AssetCardProps {
     renderField: (fieldId: string) => string | React.ReactNode;
     onAssetClick: () => void;
     onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
-    onMenuClick: (event: React.MouseEvent<HTMLElement>) => void;
+    onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
     placeholderImage?: string;
     onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -43,6 +43,7 @@ export interface AssetCardProps {
     onFavoriteToggle?: (event: React.MouseEvent<HTMLElement>) => void; // Callback when favorite is toggled
     isSelected?: boolean; // Whether the asset is selected for bulk operations
     onSelectToggle?: (id: string, event: React.MouseEvent<HTMLElement>) => void; // Callback when selection is toggled
+    selectedSearchFields?: string[]; // Selected search fields
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -55,7 +56,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     renderField,
     onAssetClick,
     onDeleteClick,
-    onMenuClick,
+    onDownloadClick,
     onEditClick,
     placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
     onImageError,
@@ -73,6 +74,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onFavoriteToggle,
     isSelected = false,
     onSelectToggle,
+    selectedSearchFields,
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -119,10 +121,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
         onDeleteClick(event);
     };
 
-    const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    const handleDownloadClick = (event: React.MouseEvent<HTMLElement>) => {
         event.stopPropagation();
-        setIsMenuClicked(true); // Set menu as clicked
-        onMenuClick(event);
+        // Directly trigger download functionality
+        onDownloadClick(event);
     };
 
     // Handle clicks outside to detect when menu should be considered closed
@@ -173,6 +175,93 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
     // Determine if buttons should be visible
     const shouldShowButtons = isHovering || isMenuClicked;
+
+    // Create a mapping between API field IDs and card field IDs based on the new API response structure
+    const fieldMapping: Record<string, string> = {
+        // Root level fields (new API structure)
+        'id': 'id',
+        'assetType': 'type',
+        'format': 'format',
+        'createdAt': 'createdAt',
+        'objectName': 'name',
+        'fileSize': 'size',
+        'fullPath': 'fullPath',
+        'bucket': 'bucket',
+        'FileHash': 'hash',
+        
+        // Legacy nested fields (for backward compatibility)
+        'DigitalSourceAsset.Type': 'type',
+        'DigitalSourceAsset.MainRepresentation.Format': 'format',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'createdAt',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'createdAt',
+        'DigitalSourceAsset.CreateDate': 'createdAt',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath': 'fullPath',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
+        'Metadata.Consolidated': 'metadata',
+        'InventoryID': 'id'
+    };
+
+    // Log the selected search fields for debugging
+    console.log('Selected search fields:', selectedSearchFields);
+    console.log('Card fields:', fields);
+
+    // Create a reverse mapping for easier lookup
+    // Since multiple API fields can map to the same card field, we need to store arrays
+    const reverseFieldMapping: Record<string, string[]> = {};
+    Object.entries(fieldMapping).forEach(([apiId, cardId]) => {
+        if (!reverseFieldMapping[cardId]) {
+            reverseFieldMapping[cardId] = [];
+        }
+        reverseFieldMapping[cardId].push(apiId);
+    });
+
+    // Filter fields based on visibility and selected search fields
+    const visibleFields = fields.filter(field => {
+        // First check if the field is marked as visible in cardFields
+        if (!field.visible) return false;
+        
+        // If no selectedSearchFields are provided, show all visible fields
+        if (!selectedSearchFields || selectedSearchFields.length === 0) return true;
+        
+        // Special case for name field - check if any selected field contains 'Name' or matches 'objectName'
+        if (field.id === 'name') {
+            const hasNameField = selectedSearchFields.some(field =>
+                field.includes('Name') || field === 'objectName'
+            );
+            console.log(`Name field check: ${hasNameField}`);
+            return hasNameField;
+        }
+        
+        // Special case for date field - check if any selected field contains 'CreateDate' or matches 'createdAt'
+        if (field.id === 'createdAt') {
+            const hasDateField = selectedSearchFields.some(field =>
+                field.includes('CreateDate') || field === 'createdAt'
+            );
+            console.log(`Date field check: ${hasDateField}`);
+            return hasDateField;
+        }
+        
+        // Special case for file size field - check if any selected field contains 'FileSize', 'Size', or matches 'fileSize'
+        if (field.id === 'size') {
+            const hasSizeField = selectedSearchFields.some(field =>
+                field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+            );
+            console.log(`Size field check: ${hasSizeField}`);
+            return hasSizeField;
+        }
+        
+        // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
+        const apiFieldIds = reverseFieldMapping[field.id] || [];
+        const isFieldSelected = apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
+        
+        // Log the field mapping for debugging
+        console.log(`Field ${field.id} -> API fields [${apiFieldIds.join(', ')}]: ${isFieldSelected ? 'selected' : 'not selected'}`);
+        
+        return isFieldSelected;
+    });
 
     return (
         <Box
@@ -383,7 +472,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     </IconButton>
                     <IconButton
                         size="small"
-                        onClick={handleMenuClick}
+                        onClick={handleDownloadClick}
                         sx={(theme) => ({
                             bgcolor: alpha(theme.palette.background.paper, 0.7),
                             padding: '4px',
@@ -392,7 +481,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             }
                         })}
                     >
-                        <MoreVertIcon fontSize="small" />
+                        <DownloadIcon fontSize="small" />
                     </IconButton>
                 </Box>
 
@@ -400,115 +489,202 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 {showMetadata && (
                     <Box sx={{ p: 2 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {fields.map((field) =>
-                                field.visible && (
-                                    <Box key={field.id}>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {field.label}:
-                                        </Typography>
-                                        {field.id === 'name' && onEditClick ? (
-                                            isEditing ? (
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                    <TextField
-                                                        inputRef={inputRef}
-                                                        value={editedName}
-                                                        disabled={isRenaming}
-                                                        onChange={handleInputChange}
-                                                        onKeyPress={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                onEditNameComplete?.(true);
-                                                            } else if (e.key === 'Escape') {
-                                                                onEditNameComplete?.(false);
-                                                            }
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        autoFocus
-                                                        size="small"
-                                                        fullWidth
-                                                        multiline
-                                                        sx={{ 
+                            {visibleFields.map((field) => (
+                                <Box
+                                    key={field.id}
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '100px 1fr',
+                                        alignItems: 'center',
+                                        width: '100%'
+                                    }}
+                                >
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                            flexShrink: 0,
+                                            paddingRight: 1
+                                        }}
+                                    >
+                                        {field.label}:
+                                    </Typography>
+                                    {field.id === 'name' && onEditClick ? (
+                                        isEditing ? (
+                                            <Box sx={{
+                                                gridColumn: '1 / span 2',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: 1,
+                                                width: '100%',
+                                                mt: 1
+                                            }}>
+                                                <TextField
+                                                    inputRef={inputRef}
+                                                    value={editedName}
+                                                    disabled={isRenaming}
+                                                    onChange={handleInputChange}
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            onEditNameComplete?.(true);
+                                                        } else if (e.key === 'Escape') {
+                                                            onEditNameComplete?.(false);
+                                                        }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                    size="small"
+                                                    fullWidth
+                                                    multiline
+                                                    rows={2}
+                                                    sx={{
+                                                        width: '100%',
+                                                        '& .MuiInputBase-root': {
                                                             width: '100%',
-                                                            '& .MuiInputBase-root': {
-                                                                width: '100%',
-                                                                minHeight: '2.5em',
-                                                                height: 'auto',
-                                                            },
-                                                            '& .MuiInputBase-input': {
-                                                                whiteSpace: 'normal',
-                                                                wordBreak: 'break-word',
-                                                                overflow: 'visible',
-                                                                textOverflow: 'clip',
-                                                                width: '100%',
-                                                                minHeight: '1.5em',
-                                                                height: 'auto',
-                                                                lineHeight: '1.5',
-                                                            }
-                                                        }}
-                                                        InputProps={{
-                                                            endAdornment: isRenaming && (
-                                                              <CircularProgress size={16} />
-                                                            )
-                                                          }}
-                                                    />
-                                                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
-                                                        <Button
-                                                            size="small"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onEditNameComplete?.(true);
-                                                            }}
-                                                            variant="contained"
-                                                            disabled={isRenaming}
-                                                        >
-                                                            Save
-                                                        </Button>
-                                                        <Button
-                                                            size="small"
-                                                            disabled={isRenaming}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onEditNameComplete?.(false);
-                                                            }}
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                    </Box>
-                                                </Box>
-                                            ) : (
-                                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                                                    <Typography
-                                                        sx={{
-                                                            wordBreak: 'break-word',
+                                                        },
+                                                        '& .MuiInputBase-input': {
                                                             whiteSpace: 'normal',
-                                                            overflow: 'visible',
-                                                            textOverflow: 'clip',
-                                                            width: '100%',
-                                                            userSelect: 'text', // Allow text selection
-                                                        }}
-                                                        display="inline"
-                                                        variant="body2"
-                                                    >
-                                                        {renderField(field.id)}
-                                                    </Typography>
-                                                    <IconButton
+                                                            wordBreak: 'break-word',
+                                                        }
+                                                    }}
+                                                    InputProps={{
+                                                        endAdornment: isRenaming && (
+                                                            <CircularProgress size={16} />
+                                                        )
+                                                    }}
+                                                />
+                                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                                    <Button
                                                         size="small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onEditClick(e);
+                                                            onEditNameComplete?.(true);
+                                                        }}
+                                                        variant="contained"
+                                                        disabled={isRenaming}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        size="small"
+                                                        disabled={isRenaming}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEditNameComplete?.(false);
                                                         }}
                                                     >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
+                                                        Cancel
+                                                    </Button>
                                                 </Box>
-                                            )
+                                            </Box>
                                         ) : (
-                                            <Typography variant="body2" sx={{ userSelect: 'text' }}>
+                                            <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                width: '100%',
+                                                justifyContent: 'space-between'
+                                            }}>
+                                                <Typography
+                                                    sx={{
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'normal',
+                                                        wordBreak: 'break-word',
+                                                        flexGrow: 1,
+                                                        userSelect: 'text', // Allow text selection
+                                                        maxHeight: '2.4em', // Limit to exactly 2 lines
+                                                        lineHeight: '1.2em',
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                        position: 'relative',
+                                                        '&:after': {
+                                                            content: '"..."',
+                                                            position: 'absolute',
+                                                            bottom: 0,
+                                                            right: 0,
+                                                            paddingLeft: '4px',
+                                                            backgroundColor: 'inherit',
+                                                            boxShadow: '-8px 0 8px rgba(255,255,255,0.8)',
+                                                            display: 'none'
+                                                        },
+                                                        '&.truncated:after': {
+                                                            display: 'inline'
+                                                        },
+                                                        '&:hover': {
+                                                            maxHeight: 'none', // Remove height limit on hover
+                                                            WebkitLineClamp: 'unset',
+                                                            '&:after': {
+                                                                display: 'none'
+                                                            }
+                                                        }
+                                                    }}
+                                                    className={String(renderField(field.id)).length > 60 ? 'truncated' : ''}
+                                                    display="inline"
+                                                    variant="body2"
+                                                    title={String(renderField(field.id))}
+                                                >
+                                                    {renderField(field.id)}
+                                                </Typography>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditClick(e);
+                                                    }}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        )
+                                    ) : (
+                                        <Box sx={{ width: '100%' }}>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{
+                                                    userSelect: 'text',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'normal',
+                                                    wordBreak: 'break-word',
+                                                    width: '100%',
+                                                    maxHeight: '2.4em', // Limit to exactly 2 lines
+                                                    lineHeight: '1.2em',
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 2,
+                                                    WebkitBoxOrient: 'vertical',
+                                                    position: 'relative',
+                                                    '&:after': {
+                                                        content: '"..."',
+                                                        position: 'absolute',
+                                                        bottom: 0,
+                                                        right: 0,
+                                                        paddingLeft: '4px',
+                                                        backgroundColor: 'inherit',
+                                                        boxShadow: '-8px 0 8px rgba(255,255,255,0.8)',
+                                                        display: 'none'
+                                                    },
+                                                    '&.truncated:after': {
+                                                        display: 'inline'
+                                                    },
+                                                    '&:hover': {
+                                                        maxHeight: 'none', // Remove height limit on hover
+                                                        WebkitLineClamp: 'unset',
+                                                        '&:after': {
+                                                            display: 'none'
+                                                        }
+                                                    }
+                                                }}
+                                                className={String(renderField(field.id)).length > 60 ? 'truncated' : ''}
+                                                title={String(renderField(field.id))}
+                                            >
                                                 {renderField(field.id)}
                                             </Typography>
-                                        )}
-                                    </Box>
-                                )
-                            )}
+                                        </Box>
+                                    )}
+                                </Box>
+                            ))}
                         </Box>
                     </Box>
                 )}

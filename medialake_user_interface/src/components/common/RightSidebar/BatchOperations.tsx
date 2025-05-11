@@ -41,11 +41,6 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  
-  // If feature flag is disabled, don't render the component
-  if (!multiSelectFeature.value) {
-    return null;
-  }
 
   // Open sidebar when items are selected
   React.useEffect(() => {
@@ -69,10 +64,6 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     }, {} as Record<string, typeof selectedAssets>);
   }, [selectedAssets]);
 
-  if (selectedAssets.length === 0) {
-    return null;
-  }
-
   // Handle removing a single item
   const handleRemoveItem = (assetId: string) => {
     if (onRemoveItem) {
@@ -83,6 +74,11 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       onClearSelection();
     }
   };
+
+  // Don't render anything if feature flag is disabled or no assets are selected
+  if (!multiSelectFeature.value || selectedAssets.length === 0) {
+    return null;
+  }
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

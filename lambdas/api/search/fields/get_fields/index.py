@@ -45,13 +45,11 @@ class FieldInfo(BaseModelWithConfig):
     type: str
     isDefault: bool = False
 
-
 class FieldsResponse(BaseModelWithConfig):
     """Model for fields response"""
     status: str
     message: str
     data: Dict[str, Any]
-
 
 def get_search_fields() -> Dict[str, Any]:
     """
@@ -110,13 +108,6 @@ def get_search_fields() -> Dict[str, Any]:
             description="Storage bucket where the asset is stored",
             type="string",
             isDefault=True
-        ),
-        FieldInfo(
-            name="Metadata.Consolidated",
-            displayName="Metadata",
-            description="Consolidated metadata for the asset",
-            type="object",
-            isDefault=False
         ),
     ]
     

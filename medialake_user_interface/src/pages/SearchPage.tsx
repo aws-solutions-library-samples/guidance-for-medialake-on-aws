@@ -6,8 +6,6 @@ import {
     Typography,
     LinearProgress,
     Paper,
-    Menu,
-    MenuItem,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -34,7 +32,6 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
 import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
-import { alpha } from '@mui/material/styles';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import { useAssetSelection } from '@/hooks/useAssetSelection';
 import { useAssetFavorites } from '@/hooks/useAssetFavorites';
@@ -132,10 +129,15 @@ const SearchPage: React.FC = () => {
         const {
             target: { value },
         } = event;
-        setSelectedFields(
-            // On autofill we get a stringified value.
-            typeof value === 'string' ? value.split(',') : value,
-        );
+        const newSelectedFields = typeof value === 'string' ? value.split(',') : value;
+        setSelectedFields(newSelectedFields);
+        
+        // Reset to first page when changing fields
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('page', '1');
+            return newParams;
+        });
     };
 
     // Access the nested data structure correctly
@@ -195,18 +197,16 @@ const SearchPage: React.FC = () => {
 
     const {
         handleDeleteClick,
-        handleMenuOpen,
         handleStartEditing,
         handleNameChange,
         handleNameEditComplete,
-        handleMenuClose,
         handleAction,
         handleDeleteConfirm,
         handleDeleteCancel,
+        handleDownloadClick,
         editingAssetId: currentEditingAssetId,
         editedName: currentEditedName,
         isDeleteModalOpen,
-        menuAnchorEl,
         selectedAsset,
     } = useAssetOperations<AssetItem>();
 
@@ -504,6 +504,9 @@ const SearchPage: React.FC = () => {
                                 onPageChange={(newPage) => handleSearch({ page: newPage })}
                                 onPageSizeChange={handlePageSizeChange}
                                 searchTerm={currentQuery}
+                                selectedFields={selectedFields}
+                                availableFields={availableFields}
+                                onFieldsChange={handleFieldsChange}
                                 groupByType={viewPreferences.groupByType}
                                 onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                                 viewMode={viewPreferences.viewMode}
@@ -524,7 +527,7 @@ const SearchPage: React.FC = () => {
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
                                 onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleMenuOpen}
+                                onMenuClick={handleDownloadClick}
                                 onEditClick={handleStartEditing}
                                 onEditNameChange={handleNameChange}
                                 onEditNameComplete={handleNameEditComplete}
@@ -554,51 +557,6 @@ const SearchPage: React.FC = () => {
                             onRemoveItem={assetSelection.handleRemoveAsset}
                             filterComponent={
                                 <>
-                                    <FormControl sx={{ m: 1, width: '100%', mt: 3 }}>
-                                        <InputLabel id="search-fields-label">Search Fields</InputLabel>
-                                        <Select
-                                            labelId="search-fields-label"
-                                            id="search-fields"
-                                            multiple
-                                            value={selectedFields}
-                                            onChange={handleFieldsChange}
-                                            input={<OutlinedInput id="select-multiple-fields" label="Search Fields" />}
-                                            renderValue={(selected) => (
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                                    {selected.map((value) => {
-                                                        const field = availableFields.find(f => f.name === value);
-                                                        return (
-                                                            <Chip
-                                                                key={value}
-                                                                label={field?.displayName || value}
-                                                                size="small"
-                                                            />
-                                                        );
-                                                    })}
-                                                </Box>
-                                            )}
-                                            MenuProps={{
-                                                PaperProps: {
-                                                    style: {
-                                                        maxHeight: 224,
-                                                        width: 250,
-                                                    },
-                                                },
-                                            }}
-                                        >
-                                            {availableFields.map((field) => (
-                                                <MenuItem
-                                                    key={field.name}
-                                                    value={field.name}
-                                                    sx={{
-                                                        fontWeight: selectedFields.indexOf(field.name) > -1 ? 'bold' : 'normal',
-                                                    }}
-                                                >
-                                                    {field.displayName}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
                                     <SearchFilters
                                         filters={filters}
                                         expandedSections={expandedSections}
@@ -613,48 +571,7 @@ const SearchPage: React.FC = () => {
                     </RightSidebar>
                 </Box>
 
-                {/* Asset Menu */}
-                <Menu
-                    anchorEl={menuAnchorEl}
-                    open={Boolean(menuAnchorEl)}
-                    onClose={handleMenuClose}
-                    MenuListProps={{
-                        'aria-labelledby': selectedAsset ? `asset-menu-button-${selectedAsset.InventoryID}` : undefined
-                    }}
-                    anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            borderRadius: '8px',
-                            minWidth: 200,
-                            mt: 1,
-                            border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            backgroundColor: theme => theme.palette.background.paper,
-                            overflow: 'visible',
-                            position: 'fixed',
-                            zIndex: 1400,
-                        },
-                    }}
-                    slotProps={{
-                        paper: {
-                            sx: {
-                                overflow: 'visible',
-                                position: 'fixed',
-                            }
-                        }
-                    }}
-                >
-                    <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
-                    <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
-                    <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
-                </Menu>
+                {/* Menu removed - download functionality now directly triggered by the download button */}
 
                 {/* Delete Confirmation Dialog */}
                 <Dialog

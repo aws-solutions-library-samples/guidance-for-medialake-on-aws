@@ -24,6 +24,17 @@ interface MasterResultsViewProps {
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
   
+  // Search fields
+  selectedFields: string[];
+  availableFields: Array<{
+    name: string;
+    displayName: string;
+    description: string;
+    type: string;
+    isDefault: boolean;
+  }>;
+  onFieldsChange: (event: any) => void;
+  
   // View preferences
   viewMode: 'card' | 'table';
   cardSize: 'small' | 'medium' | 'large';
@@ -73,6 +84,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   searchTerm,
   error,
   isLoading,
+  
+  // Search fields
+  selectedFields,
+  availableFields,
+  onFieldsChange,
   
   // View preferences
   viewMode,
@@ -148,6 +164,9 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
+      selectedFields={selectedFields}
+      availableFields={availableFields}
+      onFieldsChange={onFieldsChange}
       searchTerm={searchTerm}
       title="Results"
       groupByType={groupByType}
@@ -170,7 +189,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onColumnToggle={onColumnToggle}
       onAssetClick={onAssetClick}
       onDeleteClick={onDeleteClick}
-      onMenuClick={onMenuClick}
+      onDownloadClick={onMenuClick}
       onEditClick={onEditClick}
       onEditNameChange={onEditNameChange}
       onEditNameComplete={onEditNameComplete}

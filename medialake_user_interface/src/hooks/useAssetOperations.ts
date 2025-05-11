@@ -23,6 +23,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     handleRenameConfirm: (newName: string) => Promise<void>;
     handleDeleteCancel: () => void;
     handleRenameCancel: () => void;
+    handleDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
     isLoading: {
         rename: boolean;
         delete: boolean;
@@ -103,6 +104,40 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
                     setDownloadingAssetId(null);
                 }
                 break;
+        }
+    };
+
+    const handleDownloadClick = async (asset: T, event: React.MouseEvent<HTMLElement>) => {
+        // Make sure to stop propagation to prevent the card click
+        event.stopPropagation();
+        event.preventDefault();
+        
+        try {
+            // Set the downloading asset ID to show loading state
+            setDownloadingAssetId(asset.InventoryID);
+            
+            // Always generate a presigned URL
+            // Determine the purpose based on asset type (use 'original' as default)
+            const purpose = 'original';
+            
+            const fileName = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+            const result = await generatePresignedUrl.mutateAsync({
+                inventoryId: asset.InventoryID,
+                expirationTime: 60, // 1 minute in seconds
+                purpose: purpose // Pass the purpose to get the correct representation
+            });
+            
+            const link = document.createElement('a');
+            link.href = result.presigned_url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Error downloading file:', error);
+        } finally {
+            // Reset the downloading asset ID
+            setDownloadingAssetId(null);
         }
     };
 
@@ -200,6 +235,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         handleRenameConfirm,
         handleDeleteCancel,
         handleRenameCancel,
+        handleDownloadClick,
         isLoading: {
             rename: renameAsset.isPending,
             delete: deleteAsset.isPending,

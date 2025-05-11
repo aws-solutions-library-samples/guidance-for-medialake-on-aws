@@ -1,6 +1,7 @@
 import React from 'react';
 import { type SortingState } from '@tanstack/react-table';
 import { AssetTable } from './AssetTable';
+import { useFeatureFlag } from '@/utils/featureFlags';
 
 interface AssetTableViewProps<T> {
   results: T[];
@@ -10,7 +11,7 @@ interface AssetTableViewProps<T> {
   groupByType: boolean;
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onMenuClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (asset: T, save: boolean) => void;
@@ -24,6 +25,7 @@ interface AssetTableViewProps<T> {
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   isFavorite?: (asset: T) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  selectedSearchFields?: string[]; // Add selectedSearchFields prop
 }
 
 function AssetTableView<T>({
@@ -34,7 +36,7 @@ function AssetTableView<T>({
   groupByType,
   onAssetClick,
   onDeleteClick,
-  onMenuClick,
+  onDownloadClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -48,7 +50,11 @@ function AssetTableView<T>({
   onSelectToggle,
   isFavorite,
   onFavoriteToggle,
+  selectedSearchFields,
 }: AssetTableViewProps<T>) {
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  const favoritesFeature = useFeatureFlag('user-favorites-enabled', false);
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -73,7 +79,7 @@ function AssetTableView<T>({
         sorting={sorting}
         onSortingChange={onSortChange}
         onDeleteClick={onDeleteClick}
-        onMenuClick={onMenuClick}
+        onDownloadClick={onDownloadClick}
         onEditClick={onEditClick}
         onAssetClick={onAssetClick}
         getThumbnailUrl={getAssetThumbnail}
@@ -84,10 +90,11 @@ function AssetTableView<T>({
         editedName={editedName}
         onEditNameChange={onEditNameChange}
         onEditNameComplete={onEditNameComplete}
-        isSelected={isSelected}
-        onSelectToggle={onSelectToggle}
-        isFavorite={isFavorite}
-        onFavoriteToggle={onFavoriteToggle}
+        isSelected={multiSelectFeature.value ? isSelected : undefined}
+        onSelectToggle={multiSelectFeature.value ? onSelectToggle : undefined}
+        isFavorite={favoritesFeature.value ? isFavorite : undefined}
+        onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
+        selectedSearchFields={selectedSearchFields}
       />
     );
   }
@@ -107,13 +114,13 @@ function AssetTableView<T>({
             }}>
               {type}
             </h3>
-            <AssetTable
+            <AssetTable<T>
               data={assets}
               columns={columns}
               sorting={sorting}
               onSortingChange={onSortChange}
               onDeleteClick={onDeleteClick}
-              onMenuClick={onMenuClick}
+              onDownloadClick={onDownloadClick}
               onEditClick={onEditClick}
               onAssetClick={onAssetClick}
               getThumbnailUrl={getAssetThumbnail}
@@ -124,10 +131,11 @@ function AssetTableView<T>({
               editedName={editedName}
               onEditNameChange={onEditNameChange}
               onEditNameComplete={onEditNameComplete}
-              isSelected={isSelected}
-              onSelectToggle={onSelectToggle}
-              isFavorite={isFavorite}
-              onFavoriteToggle={onFavoriteToggle}
+              isSelected={multiSelectFeature.value ? isSelected : undefined}
+              onSelectToggle={multiSelectFeature.value ? onSelectToggle : undefined}
+              isFavorite={favoritesFeature.value ? isFavorite : undefined}
+              onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
+              selectedSearchFields={selectedSearchFields}
             />
           </div>
         ))}

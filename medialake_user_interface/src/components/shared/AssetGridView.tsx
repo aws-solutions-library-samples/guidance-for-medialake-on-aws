@@ -12,7 +12,7 @@ interface AssetGridViewProps<T> {
   cardFields: AssetField[];
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onMenuClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean) => void;
@@ -31,6 +31,8 @@ interface AssetGridViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
+  // Search fields
+  selectedSearchFields?: string[];
 }
 
 function AssetGridView<T>({
@@ -43,7 +45,7 @@ function AssetGridView<T>({
   cardFields,
   onAssetClick,
   onDeleteClick,
-  onMenuClick,
+  onDownloadClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -59,6 +61,7 @@ function AssetGridView<T>({
   getAssetThumbnail,
   getAssetProxy,
   renderCardField,
+  selectedSearchFields,
 }: AssetGridViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -102,7 +105,7 @@ function AssetGridView<T>({
               renderField={(fieldId) => renderCardField(fieldId, asset)}
               onAssetClick={() => onAssetClick(asset)}
               onDeleteClick={(e) => onDeleteClick(asset, e)}
-              onMenuClick={(e) => onMenuClick(asset, e)}
+              onDownloadClick={(e) => onDownloadClick(asset, e)}
               onEditClick={(e) => onEditClick(asset, e)}
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
@@ -116,6 +119,7 @@ function AssetGridView<T>({
               onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
               isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
               onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
+              selectedSearchFields={selectedSearchFields}
             />
           </Grid>
         ))}
@@ -151,7 +155,7 @@ function AssetGridView<T>({
                   renderField={(fieldId) => renderCardField(fieldId, asset)}
                   onAssetClick={() => onAssetClick(asset)}
                   onDeleteClick={(e) => onDeleteClick(asset, e)}
-                  onMenuClick={(e) => onMenuClick(asset, e)}
+                  onDownloadClick={(e) => onDownloadClick(asset, e)}
                   onEditClick={(e) => onEditClick(asset, e)}
                   isEditing={editingAssetId === getAssetId(asset)}
                   editedName={editedName}
@@ -165,6 +169,7 @@ function AssetGridView<T>({
                   onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
                   isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
                   onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
+                  selectedSearchFields={selectedSearchFields}
                 />
               </Grid>
             ))}
