@@ -16,7 +16,9 @@ import {
     Search as SearchIcon,
     CloudUpload as CloudUploadIcon,
     Translate as TranslateIcon,
-    Language as LanguageIcon
+    FilterList as FilterListIcon,
+    Chat as ChatIcon,
+    Notifications as NotificationsIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
@@ -27,7 +29,7 @@ import { useDirection } from './contexts/DirectionContext';
 import { drawerWidth, collapsedDrawerWidth } from './constants';
 import { S3UploaderModal } from './features/upload';
 import { useFeatureFlag } from './contexts/FeatureFlagsContext';
-import FacetSearch from './components/search/FacetSearch';
+import FilterModal from './components/search/FilterModal';
 import { useFacetSearch } from './hooks/useFacetSearch';
 
 interface SearchTag {
@@ -51,7 +53,10 @@ function TopBar() {
     const [searchBoxWidth, setSearchBoxWidth] = useState<number>(0);
     const searchBoxRef = useRef<HTMLDivElement>(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
+    const isChatEnabled = useFeatureFlag('chat-enabled', true);
+    const isNotificationEnabled = useFeatureFlag('notification-enabled', true);
 
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
@@ -160,6 +165,14 @@ function TopBar() {
     const handleCloseUploadModal = () => {
         setIsUploadModalOpen(false);
     };
+    
+    const handleOpenFilterModal = () => {
+        setIsFilterModalOpen(true);
+    };
+    
+    const handleCloseFilterModal = () => {
+        setIsFilterModalOpen(false);
+    };
 
     const createTagFromInput = (input: string): boolean => {
         if (input.includes(':')) {
@@ -247,37 +260,23 @@ function TopBar() {
     };
 
     return (
-        <Box sx={{ 
+        <Box sx={{
             display: 'flex',
             alignItems: 'center',
             width: '100%',
             bgcolor: 'transparent',
+            justifyContent: 'space-between', // Add space between search area and icons
+            paddingRight: 0, // Ensure no padding on the right side
         }}>
+            {/* Search area container - centered in available space */}
             <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
-                width: '100%',
-                bgcolor: 'transparent',
+                justifyContent: 'center', // Center the search box
+                width: '100%', // Take full width to enable centering
+                position: 'relative',
+                mr: 2, // Add margin to the right to make space for the icons
             }}>
-                {/* Upload Button - Only shown if file upload is enabled */}
-                {isFileUploadEnabled && (
-                    <IconButton
-                        size="small"
-                        onClick={handleOpenUploadModal}
-                        sx={{
-                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            '&:hover': {
-                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                            }
-                        }}
-                    >
-                        <CloudUploadIcon />
-                    </IconButton>
-                )}
 
                 {/* Tags */}
                 {searchTags.map((tag, index) => (
@@ -297,21 +296,27 @@ function TopBar() {
                 ))}
 
                 {/* Google-style Search Input with Filter Icon */}
-                <Box
-                    ref={searchBoxRef}
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                        borderRadius: '24px', // More rounded like Google search
-                        padding: '8px 16px',
-                        flex: 1,
-                        maxWidth: '800px', // Wider search box
-                        width: '100%',
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
-                        boxShadow: theme === 'dark' ? '0 2px 5px rgba(0,0,0,0.2)' : 'none',
-                    }}
-                >
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    maxWidth: '600px',
+                    mx: 'auto', // Center horizontally
+                }}>
+                    <Box
+                        ref={searchBoxRef}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '24px', // More rounded like Google search
+                            padding: '8px 16px',
+                            width: '100%',
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            boxShadow: theme === 'dark' ? '0 2px 5px rgba(0,0,0,0.2)' : 'none',
+                        }}
+                    >
                     <SearchIcon sx={{
                         color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
                         [isRTL ? 'ml' : 'mr']: 1.5,
@@ -360,30 +365,128 @@ function TopBar() {
                         <TranslateIcon />
                     </IconButton>
                     
-                    {/* Facet Search Component */}
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FacetSearch
-                            onApplyFilters={handleApplyFilters}
-                            activeFilters={filters}
-                            facetCounts={searchResults?.data?.searchMetadata?.facets}
-                            searchBoxWidth={searchBoxWidth}
-                        />
+                    {/* Filter Button */}
+                    <IconButton
+                        size="small"
+                        onClick={handleOpenFilterModal}
+                        sx={{
+                            color: Object.keys(filters).length > 0
+                                ? muiTheme.palette.primary.main
+                                : theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                            position: 'relative',
+                            '&:hover': {
+                                backgroundColor: 'transparent',
+                                color: Object.keys(filters).length > 0
+                                    ? muiTheme.palette.primary.dark
+                                    : theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                            },
+                            mr: 1
+                        }}
+                        title={t('search.filters.title', 'Filter Results')}
+                    >
+                        <FilterListIcon />
+                        {Object.keys(filters).length > 0 && (
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    top: -2,
+                                    right: -2,
+                                    backgroundColor: muiTheme.palette.primary.main,
+                                    color: muiTheme.palette.primary.contrastText,
+                                    borderRadius: '50%',
+                                    width: 16,
+                                    height: 16,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold',
+                                }}
+                            >
+                                {Object.keys(filters).length}
+                            </Box>
+                        )}
+                    </IconButton>
+                    
                     </Box>
+                    
+                    {/* Search Button - Now outside but adjacent to the search box */}
+                    <Button
+                        variant="contained"
+                        onClick={handleSearchSubmit}
+                        sx={{
+                            minWidth: '80px',
+                            [isRTL ? 'mr' : 'ml']: 2,
+                            borderRadius: '20px', // Rounded button to match search box
+                            height: '40px',  // Standard height for buttons
+                        }}
+                    >
+                        {t('common.search')}
+                    </Button>
                 </Box>
+            </Box>
 
-                {/* Search Button - Now outside the search box */}
-                <Button
-                    variant="contained"
-                    onClick={handleSearchSubmit}
-                    sx={{
-                        minWidth: '80px',
-                        ml: 2,
-                        borderRadius: '20px', // Rounded button to match search box
-                        height: '40px'  // Match height with search box
-                    }}
-                >
-                    {t('common.search')}
-                </Button>
+            {/* Right-aligned icons - Moved outside the search container */}
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2, // Increased spacing between icons
+                // Removed ml: 2 to position icons at the absolute far right edge
+            }}>
+                {/* Upload Button - Only shown if file upload is enabled */}
+                {isFileUploadEnabled && (
+                    <IconButton
+                        size="small"
+                        onClick={handleOpenUploadModal}
+                        sx={{
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            '&:hover': {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                            }
+                        }}
+                    >
+                        <CloudUploadIcon />
+                    </IconButton>
+                )}
+                
+                {/* Notifications Icon Button - Only shown if notifications are enabled */}
+                {isNotificationEnabled && (
+                    <IconButton
+                        size="small"
+                        sx={{
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            '&:hover': {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                            }
+                        }}
+                    >
+                        <NotificationsIcon />
+                    </IconButton>
+                )}
+                
+                {/* Chat Icon Button - Only shown if chat is enabled */}
+                {isChatEnabled && (
+                    <IconButton
+                        size="small"
+                        sx={{
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            '&:hover': {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                            }
+                        }}
+                    >
+                        <ChatIcon />
+                    </IconButton>
+                )}
             </Box>
 
             {/* Upload Modal - Only rendered if file upload is enabled */}
@@ -396,6 +499,15 @@ function TopBar() {
                     description={t('upload.description', 'Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.')}
                 />
             )}
+            
+            {/* Filter Modal */}
+            <FilterModal
+                open={isFilterModalOpen}
+                onClose={handleCloseFilterModal}
+                onApplyFilters={handleApplyFilters}
+                activeFilters={filters}
+                facetCounts={searchResults?.data?.searchMetadata?.facets}
+            />
         </Box>
     );
 }

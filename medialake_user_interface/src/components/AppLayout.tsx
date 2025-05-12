@@ -39,12 +39,15 @@ const AppLayout: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        transition: theme => theme.transitions.create(['padding'], {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.leavingScreen,
+                        }),
                     }}>
                         <Box sx={{
                             width: '100%',
-                            maxWidth: '800px',
-                            mx: 'auto',
-                            px: 2,
+                            paddingLeft: 2,
+                            paddingRight: 0, // Remove right padding to allow icons to reach the edge
                         }}>
                             <TopBar />
                         </Box>
