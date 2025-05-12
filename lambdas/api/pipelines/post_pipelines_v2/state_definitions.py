@@ -20,17 +20,19 @@ class StateDefinitionFactory:
     node types and configurations.
     """
     
-    def __init__(self, pipeline: Any, lambda_arns: Dict[str, str]):
+    def __init__(self, pipeline: Any, lambda_arns: Dict[str, str], first_lambda_node_id: Optional[str] = None):
         """
         Initialize the StateDefinitionFactory.
         
         Args:
             pipeline: Pipeline definition object
             lambda_arns: Dictionary mapping node IDs to Lambda ARNs
+            first_lambda_node_id: ID of the first Lambda node in the execution path
         """
         self.pipeline = pipeline
         self.lambda_arns = lambda_arns
         self.node_id_to_lambda_key = {}
+        self.first_lambda_node_id = first_lambda_node_id
         
     def _get_previous_nodes(self, node_id: str) -> list:
         """
@@ -76,8 +78,8 @@ class StateDefinitionFactory:
         # We need to check for both externalPayloadLocation and externalTaskResults
         # Since we can't use intrinsic functions directly in ItemsPath, we'll use a simple approach
         # that works with Step Functions' limitations
-        logger.info(f"Using $.payload.externalTaskResults as default ItemsPath for Map node {node.id}")
-        return "$.payload.externalTaskResults"
+        logger.info(f"Using $.payload.data as default ItemsPath for Map node {node.id}")
+        return "$.payload.data"
         
     def create_state_definitions(self, nodes: list, node_id_to_state_name: Dict[str, str],
                                 map_processor_chains: Dict[str, List[str]]) -> Dict[str, Any]:
@@ -167,18 +169,49 @@ class StateDefinitionFactory:
                         "Result": {"message": f"No Lambda function for {node.data.id}"},
                     }
                 else:
-                    states[state_name] = {
+                    # Create the base Task state
+                    task_state = {
                         "Type": "Task",
                         "Resource": lambda_arn,
                         "Retry": [
                             {
+                                "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                                "IntervalSeconds": 1,
+                                "MaxAttempts": 5,
+                                "BackoffRate": 2.0
+                            },
+                            {
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
                                 "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
-                                "BackoffRate": 2.0,
+                                "BackoffRate": 2.0
                             }
                         ],
                     }
+                    
+                    # Add execution context properties to the first Lambda in the step function
+                    if self.first_lambda_node_id and node.id == self.first_lambda_node_id:
+                        # Check if Parameters already exists
+                        if "Parameters" in task_state:
+                            # Add execution context properties to existing Parameters
+                            task_state["Parameters"].update({
+                               
+                                "executionName.$": "$$.Execution.Name",
+                                "stateMachineArn.$": "$$.StateMachine.Id"
+                            })
+                        else:
+                            # Create new Parameters with execution context properties
+                            # Also include the original event as input
+                            task_state["Parameters"] = {
+                   
+                                "executionName.$": "$$.Execution.Name",
+                                "stateMachineArn.$": "$$.StateMachine.Id",
+                                # Pass the original event as input
+                                "payload.$": "$"
+                            }
+                        logger.info(f"Added execution context properties to first Lambda task state: {state_name}")
+                    
+                    states[state_name] = task_state
                     logger.info(f"Created task state for {state_name}")
                     
         return states
@@ -260,7 +293,7 @@ class StateDefinitionFactory:
             
             # Ensure we have at least one choice in the Choices array
             if not choices:
-                choices = [{"variable": "$.metadata.externalTaskStatus", "value": "ready"}]
+                choices = [{"variable": "$.metadata.externalJobStatus", "value": "Completed"}]
             
             # For Choice states, we'll set placeholder Next values that will be updated later
             # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
@@ -268,8 +301,8 @@ class StateDefinitionFactory:
                 "Type": "Choice",
                 "Choices": [
                     {
-                        "Variable": choice.get("variable", "$.metadata.externalTaskStatus"),
-                        "StringEquals": choice.get("value", "ready"),
+                        "Variable": choice.get("variable", "$.metadata.externalJobStatus"),
+                        "StringEquals": choice.get("value", "Completed"),
                         "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
                     }
                     for choice in choices
@@ -325,6 +358,12 @@ class StateDefinitionFactory:
                         "Type": "Task",
                         "Resource": processor_lambda_arn,
                         "Retry": [
+                            {
+                                "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                                "IntervalSeconds": 1,
+                                "MaxAttempts": 5,
+                                "BackoffRate": 2.0
+                            },
                             {
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
@@ -402,7 +441,7 @@ class StateDefinitionFactory:
                     "Type": "Choice",
                     "Choices": [
                         {
-                            "Variable": "$.payload.externalTaskResults",
+                            "Variable": "$.payload.data",
                             "IsPresent": True,
                             "Next": f"{node.id}_Map"
                         }
@@ -424,12 +463,27 @@ class StateDefinitionFactory:
                 # Store them as metadata in the state definition
                 map_state = {
                     "Type": "Map",
-                    "ItemsPath": "$.payload.externalTaskResults",
+                    "ItemsPath": "$.payload.data",
                     "Iterator": iterator,
+                    "ResultPath": None,
                     "End": True,
                     "Parameters": {
                         "item.$": "$$.Map.Item.Value"
-                    }
+                    },
+                    "Retry": [
+                        {
+                            "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                            "IntervalSeconds": 1,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        },
+                        {
+                            "ErrorEquals": ["States.ALL"],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        }
+                    ]
                 }
                 
                 # Only add MaxConcurrency if it's not zero
@@ -463,11 +517,26 @@ class StateDefinitionFactory:
                     "Type": "Map",
                     "ItemsPath": items_path,
                     "Iterator": iterator,
+                    "ResultPath": None,
                     "End": True,
                     # Add Parameters with InputPath to handle potential path mismatches
                     "Parameters": {
                         "item.$": "$$.Map.Item.Value"
-                    }
+                    },
+                    "Retry": [
+                        {
+                            "ErrorEquals": ["Lambda.TooManyRequestsException"],
+                            "IntervalSeconds": 1,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        },
+                        {
+                            "ErrorEquals": ["States.ALL"],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2.0
+                        }
+                    ]
                 }
                 
                 # Only add MaxConcurrency if it's not zero

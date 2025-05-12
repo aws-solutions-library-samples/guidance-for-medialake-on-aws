@@ -51,8 +51,9 @@ const IconSwitch = styled(Switch)<IconSwitchProps>(({ theme, onIcon, offIcon, on
   },
   '& .MuiSwitch-thumb': {
     backgroundColor: offColor || '#001e3c',
-    width: 32,
+    width:  32,
     height: 32,
+    borderRadius: '25%', 
     '&::before': {
       content: "''",
       position: 'absolute',
@@ -73,6 +74,9 @@ const IconSwitch = styled(Switch)<IconSwitchProps>(({ theme, onIcon, offIcon, on
   },
   '& .MuiSwitch-switchBase.Mui-checked .MuiSwitch-thumb': {
     backgroundColor: onColor || '#001e3c',
+    width: 32,          
+    height: 32,
+    borderRadius: '25%',
     ...theme.applyStyles('dark', {
       backgroundColor: onColor || '#003892',
     }),

@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_iam as iam,
     RemovalPolicy,
     CustomResource,
+    aws_lambda as lambda_,
 )
 
 from constructs import Construct
@@ -16,6 +17,15 @@ from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployme
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PowertoolsLayer, PowertoolsLayerConfig,
+    PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
+    PyamlLayer, ShortuuidLayer
+)
+from medialake_constructs.shared_constructs.mediaconvert import (
+    MediaConvert,
+    MediaConvertProps,
+)
 import aws_cdk as cdk
 
 from config import config
@@ -50,15 +60,77 @@ class NodesStack(cdk.NestedStack):
             retain_on_delete=False,
         )
 
+        # Create Lambda Layers
+        self.powertools_layer = PowertoolsLayer(self, "PowertoolsLayer", PowertoolsLayerConfig())
+        self.ffmpeg_layer = FFmpegLayer(self, "FFmpegLayer")
+        self.pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
+        self.shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
+        self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
+        self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
+        self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+        
+        
+        
         # Node Lambda Deployments
+
+        self.check_media_convert_status_lambda_deployment = LambdaDeployment(
+            self,
+            "CheckMediaConvertStatusLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "check_media_convert_status"],
+        )
+
+
+        self.image_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "ImageProxyLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "image_proxy"],
+        )
+        
+        self.image_thumbnail_lambda_deployment = LambdaDeployment(
+            self,
+            "ImageThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "image_thumbnail"],
+        )
+
+        self.video_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoProxyAndThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_proxy_and_thumbnail"],
+        )
+
+        self.audio_proxy_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioProxyLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_proxy"],
+        )
+        
+        self.audio_thumbnail_lambda_deployment = LambdaDeployment(
+            self,
+            "AudioThumbnailLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "audio_thumbnail"],
+        )
 
         self.image_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "ImageMetadataExtractorLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
+            runtime="nodejs18.x",
             code_path=["lambdas", "nodes", "image_metadata_extractor"],
         )
+        
         self.video_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "VideoMetadataExtractorLambdaDeployment",
@@ -73,29 +145,6 @@ class NodesStack(cdk.NestedStack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "audio_metadata_extractor"],
-        )
-
-        self.audio_transcription_transcribe_role = iam.Role(
-            self,
-            "AudioTranscriptionTranscribeRole",
-            assumed_by=iam.ServicePrincipal("transcribe.amazonaws.com"),
-            inline_policies={
-                "s3": iam.PolicyDocument(
-                    statements=[
-                        iam.PolicyStatement(
-                            actions=[
-                                "s3:PutObject",
-                                "s3:ListBucket",
-                                "s3:GetObject",
-                                "s3:DeleteObject",
-                            ],
-                            resources=[
-                                "*" # TODO: need to adjust that
-                            ],
-                        )
-                    ]
-                )
-            }
         )
 
         self.audio_transcription_transcribe_lambda_deployment = LambdaDeployment(
@@ -114,12 +163,12 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "audio_transcription_transcribe_status"],   
         )
 
-        self.audio_transcription_transcribe_summary_lambda_deployment = LambdaDeployment(
+        self.bedrock_content_processor_lambda_deployment = LambdaDeployment(
             self,
-            "AudioTranscriptionTrSumLambdaDeployment",
+            "BedrockContentProcessorLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "audio_transcription_transcribe_summary"],   
+            code_path=["lambdas", "nodes", "bedrock_content_processor"],
         )
 
         self.api_lambda_deployment = LambdaDeployment(
@@ -154,7 +203,21 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "debug_input"],
         )
 
-
+        self.publish_event_lambda_deployment = LambdaDeployment(
+            self,
+            "PublishEventLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "publish_event"],
+        )
+      
+        self.pipeline_trigger_lambda_deployment = LambdaDeployment(
+            self,
+            "PipelineTriggerLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "pipelines", "pipeline_trigger"],
+        )
         
         # Add FFmpeg layer to the audio splitter Lambda
         self.audio_splitter_lambda_deployment = LambdaDeployment(
@@ -242,13 +305,24 @@ class NodesStack(cdk.NestedStack):
             "NodesProcessor",
             LambdaConfig(
                 name=f"{config.resource_prefix}-nodes-processor",
-                entry="lambdas/nodes/pipeline_nodes_deployment",
+                entry="lambdas/back_end/pipeline_nodes_deployment",
                 memory_size=256,
                 timeout_minutes=15,
                 environment_variables={
                     "NODES_TABLE": self._pipelines_nodes_table.table_name,
                     "NODES_BUCKET": self._pipelines_nodes_bucket.bucket_name,
                     "SERVICE_NAME": "pipeline-nodes-deployer",
+                    # Layer ARNs for automatic layer attachment
+                    "POWERTOOLS_LAYER_ARN":  self.powertools_layer.layer.layer_version_arn,
+                    "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
+                    "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
+                    # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,
+                    # "OPENSEARCH_LAYER_ARN": self.opensearch_layer.layer.layer_version_arn,
+                    "SHORTUUID_LAYER_ARN": self.shortuuid_layer.layer.layer_version_arn,
+                    "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
+                    "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
+                    "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn
+                    
                 },
             ),
         )
@@ -279,6 +353,69 @@ class NodesStack(cdk.NestedStack):
         )
 
         self.resource.node.add_dependency(bucket_deployment)
+        
+        # Create MediaConvert role and queue
+        self.mediaconvert_role = self.create_mediaconvert_role()
+        
+        self.proxy_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeProxyMediaConvertQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for proxy MediaConvert jobs",
+                name="MediaLakeProxyQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+    def create_mediaconvert_role(self):
+        mediaconvert_role = iam.Role(
+            self,
+            "MediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_MediaConvert_Role",
+            description="IAM role for MediaConvert",
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
+        return mediaconvert_role
 
     @property
     def pipelines_nodes_table(self) -> dynamodb.TableV2:
@@ -287,3 +424,11 @@ class NodesStack(cdk.NestedStack):
     @property
     def pipelines_nodes_templates_bucket(self) -> S3Bucket:
         return self._pipelines_nodes_bucket.bucket
+        
+    @property
+    def mediaconvert_role_arn(self) -> str:
+        return self.mediaconvert_role.role_arn
+        
+    @property
+    def mediaconvert_queue_arn(self) -> str:
+        return self.proxy_queue.queue_arn

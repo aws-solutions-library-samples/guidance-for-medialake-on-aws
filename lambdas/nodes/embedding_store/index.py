@@ -1,314 +1,317 @@
 import json
 import os
 import time
-import boto3
-from urllib.parse import urlparse
 from datetime import datetime
+from urllib.parse import urlparse
+from typing import Any, Dict, List, Optional
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth, exceptions
+from opensearchpy import (
+    OpenSearch,
+    RequestsHttpConnection,
+    AWSV4SignerAuth,
+    exceptions,
+)
 
 from lambda_middleware import lambda_middleware
 from nodes_utils import seconds_to_smpte
 
-# Initialize Powertools
+# ── Powertools ───────────────────────────────────────────────────────────────
 logger = Logger()
 tracer = Tracer()
 
-# OpenSearch configuration
-OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
-INDEX_NAME = os.environ.get("INDEX_NAME", "media")
-CONTENT_TYPE = os.environ.get("CONTENT_TYPE", "video").lower()
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+# ── Environment ──────────────────────────────────────────────────────────────
+OPENSEARCH_ENDPOINT = os.getenv("OPENSEARCH_ENDPOINT", "")
+INDEX_NAME          = os.getenv("INDEX_NAME", "media")
+CONTENT_TYPE        = os.getenv("CONTENT_TYPE", "video").lower()
+AWS_REGION          = os.getenv("AWS_REGION", "us-east-1")
 
-# Initialize AWS session and clients
-session = boto3.Session()
-credentials = session.get_credentials()
-auth = AWSV4SignerAuth(credentials, AWS_REGION, 'es')  # 'es' for managed OpenSearch service
+# ── OpenSearch client ────────────────────────────────────────────────────────
+_session     = boto3.Session()
+_credentials = _session.get_credentials()
+_auth        = AWSV4SignerAuth(_credentials, AWS_REGION, "es")  # OpenSearch service
+
 
 def get_opensearch_client():
-    """Initialize and return an OpenSearch client"""
     if not OPENSEARCH_ENDPOINT:
-        logger.warning("OPENSEARCH_ENDPOINT environment variable not set")
+        logger.warning("OPENSEARCH_ENDPOINT not set – skipping OpenSearch calls.")
         return None
 
     parsed = urlparse(OPENSEARCH_ENDPOINT)
-    host = parsed.netloc if parsed.scheme else OPENSEARCH_ENDPOINT
+    host   = parsed.netloc if parsed.scheme else OPENSEARCH_ENDPOINT
 
-    client = OpenSearch(
-        hosts=[{'host': host, 'port': 443}],
-        http_auth=auth,
+    return OpenSearch(
+        hosts=[{"host": host, "port": 443}],
+        http_auth=_auth,
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
         timeout=60,
         http_compress=True,
         retry_on_timeout=True,
-        max_retries=3
+        max_retries=3,
     )
-    return client
 
-@lambda_middleware(
-    event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
-)
+# ── Helper extraction functions ──────────────────────────────────────────────
+def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Return payload.data.item if present (new Twelve Labs shape).
+    """
+    if isinstance(container.get("data"), dict):
+        itm = container["data"].get("item")
+        if isinstance(itm, dict):
+            return itm
+    return None
+
+
+def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # 👈 NEW
+    """
+    Return payload.map.item when present (audio segmentation metadata).
+    """
+    m = container.get("map")
+    if isinstance(m, dict) and isinstance(m.get("item"), dict):
+        return m["item"]
+    return None
+
+
+def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
+    """
+    Locate the first asset ID, in order of priority:
+
+    1. payload.data.item.asset_id          (new shape – PRIMARY)
+    2. payload.map.item.asset_id           (audio map – SECONDARY)  # 👈 NEW
+    3. payload.assets[ ].DigitalSourceAsset.ID
+    4. payload.DigitalSourceAsset.ID
+    """
+    itm = _item(container)
+    if itm and itm.get("asset_id"):
+        return itm["asset_id"]
+
+    m_itm = _map_item(container)                                     # 👈 NEW
+    if m_itm and m_itm.get("asset_id"):                              # 👈 NEW
+        return m_itm["asset_id"]                                     # 👈 NEW
+
+    for asset in container.get("assets", []):
+        dsa_id = asset.get("DigitalSourceAsset", {}).get("ID")
+        if dsa_id:
+            return dsa_id
+
+    return container.get("DigitalSourceAsset", {}).get("ID")
+
+
+def extract_scope(container: Dict[str, Any]) -> Optional[str]:
+    """
+    1. payload.data.item.embedding_scope   (new shape – PRIMARY)
+    2. payload.embedding_scope
+    3. payload.externalTaskResults[*].embedding_scope
+    """
+    itm = _item(container)
+    if itm and itm.get("embedding_scope"):
+        return itm["embedding_scope"]
+
+    if container.get("embedding_scope"):
+        return container["embedding_scope"]
+
+    for res in container.get("externalTaskResults", []):
+        if "embedding_scope" in res:
+            return res["embedding_scope"]
+
+    return None
+
+
+def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
+    """
+    1. payload.data.item.float             (new shape – PRIMARY)
+    2. payload.data.float
+    3. payload.float
+    4. payload.externalTaskResults[*].float
+    """
+    itm = _item(container)
+    if itm and isinstance(itm.get("float"), list) and itm["float"]:
+        return itm["float"]
+
+    if (
+        isinstance(container.get("data"), dict)
+        and isinstance(container["data"].get("float"), list)
+        and container["data"]["float"]
+    ):
+        return container["data"]["float"]
+
+    if isinstance(container.get("float"), list) and container["float"]:
+        return container["float"]
+
+    for res in container.get("externalTaskResults", []):
+        if isinstance(res.get("float"), list) and res["float"]:
+            return res["float"]
+
+    return None
+
+# ── Small helpers for early exits ────────────────────────────────────────────
+def _bad_request(msg: str):
+    logger.warning(msg)
+    return {"statusCode": 400, "body": json.dumps({"error": msg})}
+
+
+def _ok_no_op(vector: Optional[List], asset_id: Optional[str]):
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {
+                "message": "Embedding processed (OpenSearch not available)",
+                "asset_id": asset_id,
+                "vector_length": len(vector or []),
+            }
+        ),
+    }
+
+# ── Lambda entrypoint ────────────────────────────────────────────────────────
+@lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
         logger.info("Received event", extra={"event": event})
-        item = event.get("item", {})
-        if not item:
-            item = event.get("payload", {})
-            if not item:
-                logger.warning("No embedding item found in event")
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "No embedding item found in event"})
-                }
-        
-        asset_id = item.get("assetId")
-        if asset_id is None:
-            # Attempt to get asset_id from metadata.pipelineAssets
-            metadata = item.get("metadata", {})
-            pipeline_assets = metadata.get("pipelineAssets", [])
-            if pipeline_assets and isinstance(pipeline_assets, list):
-                asset_id = pipeline_assets[0].get("assetId")
-            # If still not found, try payload.externalTaskResults
-            if asset_id is None:
-                external_results = item.get("externalTaskResults", [])
-                if external_results and isinstance(external_results, list):
-                    asset_id = external_results[0].get("assetId")
-        
-        scope = item.get("embedding_scope")
-        if scope is None:
-            # Attempt to get embedding_scope from externalTaskResults if available
-            external_results = item.get("externalTaskResults", [])
-            if isinstance(external_results, list):
-                for result in external_results:
-                    scope = result.get("embedding_scope")
-                    if scope is not None:
-                        break
-        
-        embedding_vector = item.get("float")
-        if not embedding_vector or not isinstance(embedding_vector, list):
-            external_results = item.get("externalTaskResults", [])
-            if isinstance(external_results, list):
-                for result in external_results:
-                    embedding_vector = result.get("float")
-                    if embedding_vector and isinstance(embedding_vector, list):
-                        break
-        
+
+        # 1️⃣ Unpack the envelope ------------------------------------------------
+        payload: Dict[str, Any] = event.get("payload") or {}
+        if not payload:
+            return _bad_request("Event missing 'payload'")
+
+        # 2️⃣ Extract critical fields ------------------------------------------
+        asset_id         = extract_asset_id(payload)
+        if not asset_id:
+            return _bad_request("Unable to determine asset_id – aborting")
+
+        embedding_vector = extract_embedding_vector(payload)
+        if not embedding_vector:
+            return _bad_request("No embedding vector found in event")
+
+        scope            = extract_scope(payload)
+
+        # 3️⃣ OpenSearch client (skip if unavailable) ---------------------------
         client = get_opensearch_client()
         if not client:
-            logger.info("OpenSearch client not available, skipping index creation and document storage")
+            return _ok_no_op(embedding_vector, asset_id)
+
+        # 4️⃣ Base document definition ------------------------------------------
+        document: Dict[str, Any] = {
+            "type":            CONTENT_TYPE,
+            "embedding":       embedding_vector,
+            "embedding_scope": scope,
+            "timestamp":       datetime.utcnow().isoformat(),
+        }
+
+        # ── Clip / audio scopes – create a new document ────────────────────────
+        if scope in {"clip", "audio"}:
+            # --------------------------------------------------------------
+            # Where to grab segment timing?
+            #  • clip  -> payload.data.item
+            #  • audio -> payload.map.item  (preferred) OR payload.data.item
+            # --------------------------------------------------------------
+            itm: Dict[str, Any] = {}
+
+            if scope == "clip":
+                itm = _item(payload) or {}
+                start_sec        = itm.get("start_offset_sec", 0)
+                end_sec          = itm.get("end_offset_sec",   0)
+                embedding_option = itm.get("embedding_option")
+            else:  # audio
+                itm = _map_item(payload) or _item(payload) or {}        # 👈 NEW
+                start_sec = itm.get("start_time", 0)                    # 👈 NEW
+                end_sec   = itm.get("end_time",   0)                    # 👈 NEW
+                embedding_option = None  # audio: not stored
+
+            document |= {
+                "DigitalSourceAsset": {"ID": asset_id},
+                "start_timecode":     seconds_to_smpte(start_sec),
+                "end_timecode":       seconds_to_smpte(end_sec),
+            }
+
+            if embedding_option is not None:
+                document["embedding_option"] = embedding_option
+
+            res = client.index(index=INDEX_NAME, body=document)
             return {
                 "statusCode": 200,
-                "body": json.dumps({
-                    "message": "Embedding processed (OpenSearch not available)",
-                    "asset_id": asset_id,
-                    "vector_length": len(embedding_vector)
-                })
+                "body": json.dumps(
+                    {
+                        "message":     "Embedding stored successfully",
+                        "index":       INDEX_NAME,
+                        "document_id": res.get("_id", "unknown"),
+                        "asset_id":    asset_id,
+                    }
+                ),
             }
-        
-        # Build the document to be stored/updated.
-        document = {
-            "type": CONTENT_TYPE,
-            "embedding": embedding_vector,
-            "embedding_scope": scope,
-            "timestamp": datetime.utcnow().isoformat()
+
+        # ── Non‑clip / non‑audio scopes – update existing document ────────────
+        search_query = {
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
+                        {"exists": {"field": "InventoryID"}},
+                        {"exists": {"field": "DerivedRepresentations.ID"}},
+                    ]
+                }
+            }
         }
 
-        if scope == "clip" or scope == "audio":
-            end_offset_sec = 0
-            start_offset_sec = 0
-           
-            if scope == "clip":
-                start_offset_sec = item["start_offset_sec"]
-                end_offset_sec = item["end_offset_sec"]
-            if scope == "audio":
-                start_offset_sec = item["start_time"]
-                end_offset_sec = item["end_time"]
-            document["embedding_scope"] = "clip"
-            # For clips, store the original asset_id and add timecodes.
-            document["DigitalSourceAsset"] = {"ID": asset_id}
-            document["start_timecode"] = seconds_to_smpte(start_offset_sec)
-            document["end_timecode"] = seconds_to_smpte(end_offset_sec)
-
-            # Index the document without a forced refresh.
-            response = client.index(index=INDEX_NAME, body=document)
-            document_id = response.get("_id", "unknown")
-            logger.info(f"Successfully created new document for clip: {response}")
-
-        else:
-            # Search for an existing document by DigitalSourceAsset.ID
-            search_query = {
-                "query": {
-                    "bool": {
-                        "must": [
-                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
-                            {"exists": {"field": "InventoryID"}},
-                            {"exists": {"field": "DerivedRepresentations.ID"}}
-                        ]
-                    }
-                }
-            }
-
-            start_time = time.time()
+        start_time      = time.time()
+        search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
+        while (
+            search_response["hits"]["total"]["value"] == 0
+            and time.time() - start_time < 120
+        ):
+            logger.info(f"Doc {asset_id} not found – refreshing index & retrying …")
+            client.indices.refresh(index=INDEX_NAME)
+            time.sleep(5)
             search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            # Retry search for up to 2 minutes if the document is not found.
-            while search_response["hits"]["total"]["value"] == 0 and (time.time() - start_time) < 120:
-                logger.info("Document not found, refreshing index and retrying search...")
-                client.indices.refresh(index=INDEX_NAME)
-                time.sleep(5)
-                search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            
-            if search_response["hits"]["total"]["value"] == 0:
-                error_msg = (f"No existing document found with DigitalSourceAsset.ID={asset_id} "
-                             f"in index {INDEX_NAME} after retrying for 2 minutes")
-                logger.error(error_msg)
-                return {
-                    "statusCode": 404,
-                    "body": json.dumps({"error": error_msg})
-                }
-            
-            # Extract the document ID.
-            existing_doc_id = search_response["hits"]["hits"][0]["_id"]
-            logger.info(f"Found existing document with ID: {existing_doc_id} for asset_id: {asset_id}")
-            
-            # Retrieve current document for sequence number and primary term.
-            existing_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-            current_seq_no = existing_doc.get("_seq_no")
-            current_primary_term = existing_doc.get("_primary_term")
-            
-            # Include DigitalSourceAsset in the document.
-            document["DigitalSourceAsset"] = {"ID": asset_id}
-            
-            # Log the document before update
-            logger.info("Document before update: %s", json.dumps(document))
-            
-            # Retry loop for update with conflict error handling
-            max_update_retries = 50
-            update_attempt = 0
-            while update_attempt < max_update_retries:
-                try:
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    logger.info(f"Successfully updated document with optimistic concurrency: {response}")
-                    break  # Exit the loop if the update succeeded
-                except exceptions.ConflictError as ce:
-                    update_attempt += 1
-                    logger.error(f"Conflict detected on attempt {update_attempt}: {ce}")
-                    # Get the latest sequence number and primary term before retrying
-                    updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    time.sleep(1)  # Short delay before retrying
 
-            if update_attempt == max_update_retries:
-                error_msg = "Failed to update document due to conflict errors after 50 attempts"
-                logger.error(error_msg)
-                return {
-                    "statusCode": 409,
-                    "body": json.dumps({"error": error_msg})
-                }
-            
-            # Validation loop: ensure the updated document has the "embedding_scope" field.
-            max_validation_attempts = 50
-            validation_attempt = 0
-            while validation_attempt < max_validation_attempts:
-                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                source = updated_doc.get("_source", {})
-                if "embedding_scope" in source:
-                    logger.info("Validation succeeded: 'embedding_scope' field found in updated document.")
-                    break
-                else:
-                    logger.warning("Validation failed: 'embedding_scope' field not found. Re-updating document.")
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    validation_attempt += 1
-                    time.sleep(5)  # Pause briefly before checking again
+        if search_response["hits"]["total"]["value"] == 0:
+            return _bad_request(
+                f"No document found with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
+            )
 
-            if validation_attempt == max_validation_attempts:
-                error_msg = "Failed to validate the update after multiple attempts. 'embedding_scope' field missing."
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            
-            # **** New DerivedRepresentations Count Validation Loop ****
-            # This loop will repeatedly retrieve the document and count the number of items in DerivedRepresentations.
-            # If the count is not exactly 2, it will re-update the document and try again.
-            max_dr_validation_attempts = 50
-            dr_validation_attempt = 0
-            while dr_validation_attempt < max_dr_validation_attempts:
-                updated_doc = client.get(index=INDEX_NAME, id=existing_doc_id)
-                source = updated_doc.get("_source", {})
-                dr = source.get("DerivedRepresentations", [])
-                actual_count = len(dr) if isinstance(dr, list) else 0
-                if isinstance(dr, list) and actual_count == 2:
-                    logger.info("Validation succeeded: 'DerivedRepresentations' count is 2.")
-                    break
-                else:
-                    logger.warning(
-                        f"Validation failed: 'DerivedRepresentations' count is not 2 (actual count: {actual_count}). Retrying update..."
-                    )
-                    current_seq_no = updated_doc.get("_seq_no")
-                    current_primary_term = updated_doc.get("_primary_term")
-                    response = client.update(
-                        index=INDEX_NAME,
-                        id=existing_doc_id,
-                        body={"doc": document},
-                        if_seq_no=current_seq_no,
-                        if_primary_term=current_primary_term
-                    )
-                    dr_validation_attempt += 1
-                    time.sleep(5)
-            if dr_validation_attempt == max_dr_validation_attempts:
-                error_msg = "Failed to validate 'DerivedRepresentations' count after multiple attempts."
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            # **** End of DerivedRepresentations Validation Loop ****
-            
-            # Log the final updated document after validation
-            logger.info("Document after update validation: %s", json.dumps(updated_doc))
-            document_id = existing_doc_id
-        
+        existing_id       = search_response["hits"]["hits"][0]["_id"]
+        meta              = client.get(index=INDEX_NAME, id=existing_id)
+        seq_no, p_term    = meta["_seq_no"], meta["_primary_term"]
+        document["DigitalSourceAsset"] = {"ID": asset_id}
+
+        for attempt in range(50):
+            try:
+                res = client.update(
+                    index=INDEX_NAME,
+                    id=existing_id,
+                    body={"doc": document},
+                    if_seq_no=seq_no,
+                    if_primary_term=p_term,
+                )
+                logger.info("Update succeeded", extra={"response": res})
+                break
+            except exceptions.ConflictError:
+                logger.warning("Version conflict – retrying")
+                meta   = client.get(index=INDEX_NAME, id=existing_id)
+                seq_no = meta["_seq_no"]
+                p_term = meta["_primary_term"]
+                time.sleep(1)
+        else:
+            return _bad_request("Failed to update document after 50 retries")
+
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "message": "Embedding stored successfully",
-                "index": INDEX_NAME,
-                "document_id": document_id,
-                "asset_id": asset_id if scope != "clip" else "Generated by OpenSearch"
-            })
+            "body": json.dumps(
+                {
+                    "message":     "Embedding stored successfully",
+                    "index":       INDEX_NAME,
+                    "document_id": existing_id,
+                    "asset_id":    asset_id,
+                }
+            ),
         }
-        
-    except Exception as e:
-        error_message = f"Error storing embedding: {str(e)}"
-        
-        # Check if this is an audio clip with duration less than 10 seconds causing the specific error
-        if (scope == "audio" and
-            "RequestError(400, 'x_content_parse_exception', '[1:72] [bool] failed to parse field [must]')" in str(e) and
-            'start_time' in item and 'end_time' in item):
-            
-            duration = item['end_time'] - item['start_time']
-            if duration < 10:
-                error_message = f"Audio clip duration is less than 10 seconds ({duration:.2f}s). No embeddings were found."
-                logger.error(error_message)
-        
-        logger.exception(error_message)
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": error_message})
-        }
+
+    # ── Un‑handled errors raise a RuntimeError (as requested) ────────────────
+    except Exception as exc:
+        logger.exception("Error storing embedding")
+        raise RuntimeError("Error storing embedding") from exc

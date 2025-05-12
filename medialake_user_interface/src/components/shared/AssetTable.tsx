@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Box, Typography, IconButton, TextField, Button, TableContainer } from '@mui/material';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { Box, Typography, IconButton, TextField, Button, TableContainer, Checkbox } from '@mui/material';
 import {
     useReactTable,
     getCoreRowModel,
@@ -14,7 +14,9 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ResizableTable } from '../common/table';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DownloadIcon from '@mui/icons-material/Download';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { AssetAudio } from '../asset';
 
@@ -24,7 +26,7 @@ export interface AssetTableProps<T> {
     sorting: SortingState;
     onSortingChange: (sorting: SortingState) => void;
     onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-    onMenuClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+    onDownloadClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     onAssetClick: (item: T) => void;
     getThumbnailUrl: (item: T) => string;
@@ -38,6 +40,11 @@ export interface AssetTableProps<T> {
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     activeFilters?: Array<{ columnId: string; value: string }>;
     onRemoveFilter?: (columnId: string) => void;
+    isSelected?: (item: T) => boolean;
+    onSelectToggle?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+    isFavorite?: (item: T) => boolean;
+    onFavoriteToggle?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+    selectedSearchFields?: string[]; // Add selectedSearchFields prop
 }
 
 export function AssetTable<T>({
@@ -46,7 +53,7 @@ export function AssetTable<T>({
     sorting,
     onSortingChange,
     onDeleteClick,
-    onMenuClick,
+    onDownloadClick,
     onEditClick,
     onAssetClick,
     getThumbnailUrl,
@@ -60,14 +67,209 @@ export function AssetTable<T>({
     onFilterClick,
     activeFilters = [],
     onRemoveFilter,
+    isSelected = () => false,
+    onSelectToggle,
+    isFavorite = () => false,
+    onFavoriteToggle,
+    selectedSearchFields,
 }: AssetTableProps<T>): React.ReactElement {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    
+    // Create a mapping between API field IDs and column IDs
+    const fieldMapping: Record<string, string> = {
+        // Root level fields (new API structure)
+        'id': 'id',
+        'assetType': 'type',
+        'format': 'format',
+        'createdAt': 'date',
+        'objectName': 'name',
+        'fileSize': 'size',
+        'fullPath': 'fullPath',
+        'bucket': 'bucket',
+        'FileHash': 'hash',
+        
+        // Legacy nested fields (for backward compatibility)
+        'DigitalSourceAsset.Type': 'type',
+        'DigitalSourceAsset.MainRepresentation.Format': 'format',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'date',
+        'DigitalSourceAsset.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath': 'fullPath',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
+        'Metadata.Consolidated': 'metadata',
+        'InventoryID': 'id'
+    };
+    
+    // Create a reverse mapping for easier lookup
+    const reverseFieldMapping: Record<string, string[]> = {};
+    Object.entries(fieldMapping).forEach(([apiId, colId]) => {
+        if (!reverseFieldMapping[colId]) {
+            reverseFieldMapping[colId] = [];
+        }
+        reverseFieldMapping[colId].push(apiId);
+    });
+    
+    // Log props for debugging - keep this for now to help debugging
+    console.log('AssetTable props:', {
+        dataLength: data.length,
+        isSelectedProvided: !!isSelected,
+        onSelectToggleProvided: !!onSelectToggle,
+        isFavoriteProvided: !!isFavorite,
+        onFavoriteToggleProvided: !!onFavoriteToggle,
+        selectedSearchFields
+    });
+    
+    // Add state to track if all rows are selected
+    const [allSelected, setAllSelected] = useState(false);
+    const [someSelected, setSomeSelected] = useState(false);
+    
+    // Function to handle selecting/deselecting all rows
+    const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        console.log('handleSelectAll called with checked:', e.target.checked);
+        if (onSelectToggle) {
+            const visibleRows = data;
+            visibleRows.forEach(row => {
+                if (e.target.checked !== isSelected(row)) {
+                    onSelectToggle(row, e as any);
+                }
+            });
+        } else {
+            console.log('onSelectToggle is not defined');
+        }
+    }, [data, onSelectToggle, isSelected]);
+    
+    // Update allSelected and someSelected states when data or isSelected changes
+    useEffect(() => {
+        if (data.length === 0) {
+            setAllSelected(false);
+            setSomeSelected(false);
+            return;
+        }
+        
+        const selectedCount = data.filter(row => isSelected(row)).length;
+        setAllSelected(selectedCount === data.length);
+        setSomeSelected(selectedCount > 0 && selectedCount < data.length);
+    }, [data, isSelected]);
 
     const tableColumns = React.useMemo(() => {
-        const visibleColumns = columns.filter(col => col.visible);
-        return [
+        // Filter columns based on selectedSearchFields
+        let visibleColumns = columns.filter(col => col.visible);
+        
+        if (selectedSearchFields && selectedSearchFields.length > 0) {
+            visibleColumns = visibleColumns.filter(col => {
+                // Special case for name field
+                if (col.id === 'name') {
+                    const hasNameField = selectedSearchFields.some(field =>
+                        field.includes('Name') || field === 'objectName'
+                    );
+                    console.log(`Name column check: ${hasNameField}`);
+                    return hasNameField;
+                }
+                
+                // Special case for date field
+                if (col.id === 'date') {
+                    const hasDateField = selectedSearchFields.some(field =>
+                        field.includes('CreateDate') || field === 'createdAt'
+                    );
+                    console.log(`Date column check: ${hasDateField}`);
+                    return hasDateField;
+                }
+                
+                // Special case for size field
+                if (col.id === 'size') {
+                    const hasSizeField = selectedSearchFields.some(field =>
+                        field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+                    );
+                    console.log(`Size column check: ${hasSizeField}`);
+                    return hasSizeField;
+                }
+                
+                // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
+                const apiFieldIds = reverseFieldMapping[col.id] || [];
+                const isFieldSelected = apiFieldIds.some(apiFieldId =>
+                    selectedSearchFields.includes(apiFieldId)
+                );
+                
+                console.log(`Column ${col.id} -> API fields [${apiFieldIds.join(', ')}]: ${isFieldSelected ? 'selected' : 'not selected'}`);
+                
+                return isFieldSelected;
+            });
+        }
+        
+        const tableColumns = [];
+        
+        // Only include the selection checkbox column if onSelectToggle is provided
+        if (onSelectToggle) {
+            tableColumns.push(
+                // Selection checkbox column
+                // Custom header component for the select column
+                columnHelper.display({
+                    id: 'select',
+                    // Use a custom header component
+                    header: () => (
+                        <Box sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Checkbox
+                                size="small"
+                                checked={allSelected}
+                                indeterminate={someSelected}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectAll(e);
+                                }}
+                                sx={{
+                                    padding: 0,
+                                    '& .MuiSvgIcon-root': {
+                                        fontSize: '1.2rem'
+                                    },
+                                    '&.Mui-checked': {
+                                        color: 'primary.main'
+                                    },
+                                    '&.MuiCheckbox-indeterminate': {
+                                        color: 'primary.main'
+                                    }
+                                }}
+                            />
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                Select All
+                            </Typography>
+                        </Box>
+                    ),
+                    enableSorting: false,
+                    size: 100,
+                    cell: info => (
+                        <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }} className="checkbox-cell">
+                            <Checkbox
+                                size="small"
+                                checked={isSelected(info.row.original)}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    console.log('Checkbox onChange in row cell');
+                                    onSelectToggle(info.row.original, e as any);
+                                }}
+                                sx={{
+                                    padding: 0,
+                                    '& .MuiSvgIcon-root': {
+                                        fontSize: '1.2rem'
+                                    },
+                                    '&.Mui-checked': {
+                                        color: 'primary.main'
+                                    }
+                                }}
+                            />
+                        </Box>
+                    )
+                })
+            );
+        }
+        
+        // Add the rest of the columns
+        tableColumns.push(
+            
             columnHelper.accessor(row => getThumbnailUrl(row), {
                 id: 'preview',
                 header: 'Preview',
@@ -226,9 +428,27 @@ export function AssetTable<T>({
             columnHelper.display({
                 id: 'actions',
                 header: 'Actions',
-                size: 100,
+                size: 150,
                 cell: info => (
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', p: 1 }}>
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onFavoriteToggle) {
+                                    onFavoriteToggle(info.row.original, e);
+                                }
+                            }}
+                            sx={{
+                                padding: '4px',
+                            }}
+                        >
+                            {isFavorite(info.row.original) ? (
+                                <FavoriteIcon fontSize="small" color="error" />
+                            ) : (
+                                <FavoriteBorderIcon fontSize="small" />
+                            )}
+                        </IconButton>
                         <IconButton
                             size="small"
                             onClick={(e) => onDeleteClick(info.row.original, e)}
@@ -237,21 +457,22 @@ export function AssetTable<T>({
                         </IconButton>
                         <IconButton
                             size="small"
-                            onClick={(e) => onMenuClick(info.row.original, e)}
-                            id={`asset-menu-button-${getId(info.row.original)}`}
-                            aria-haspopup="true"
+                            onClick={(e) => onDownloadClick(info.row.original, e)}
+                            id={`asset-download-button-${getId(info.row.original)}`}
                             sx={{
                                 position: 'relative',
                                 zIndex: 1
                             }}
                         >
-                            <MoreVertIcon fontSize="small" />
+                            <DownloadIcon fontSize="small" />
                         </IconButton>
                     </Box>
                 )
             })
-        ];
-    }, [columns, editingId, editedName]);
+        );
+        
+        return tableColumns;
+    }, [columns, editingId, editedName, onSelectToggle, isSelected, allSelected, someSelected, handleSelectAll, onFavoriteToggle, isFavorite, columnHelper, selectedSearchFields, reverseFieldMapping]);
 
     const table = useReactTable({
         data,

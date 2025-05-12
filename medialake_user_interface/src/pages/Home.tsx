@@ -257,7 +257,7 @@ const Home: React.FC = () => {
                                             }}
                                             onAssetClick={() => handleAssetClick(favorite.itemId, favorite.metadata?.assetType || 'Unknown')}
                                             onDeleteClick={() => {}} // Not used in this context
-                                            onMenuClick={() => {}} // Not used in this context
+                                            onDownloadClick={() => {}} // Not used in this context
                                             isFavorite={true}
                                             onFavoriteToggle={(e) => handleFavoriteToggle(favorite.itemId, favorite.itemType, e)}
                                             cardSize="medium"

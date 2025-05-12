@@ -10,6 +10,8 @@ node:
       lambda:
         handler: utility/AudioSplitterLambdaDeployment
         runtime: python3.12
+        layers:
+          - FFmpeg
         iam_policy:
           statements:
             - effect: Allow

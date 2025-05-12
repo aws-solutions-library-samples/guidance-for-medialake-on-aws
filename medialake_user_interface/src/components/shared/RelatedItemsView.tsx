@@ -105,7 +105,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                             renderField={(fieldId) => renderField(fieldId, item)}
                             onAssetClick={() => onItemClick?.(item)}
                             onDeleteClick={() => {}} // Not needed for related items
-                            onMenuClick={() => {}} // Not needed for related items
+                            onDownloadClick={() => {}} // Not needed for related items
                             cardSize="medium"
                             aspectRatio="square"
                             thumbnailScale="fill"

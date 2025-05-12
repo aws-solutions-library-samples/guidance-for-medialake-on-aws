@@ -1,50 +1,46 @@
-import json
-
-
-def translate_event_to_request(event):
+# embed_tasks_request_mapping.py
+def _digital_asset_type(event: dict) -> str:
     """
-    Translate the Lambda event into variables for the API request.
-    This version extracts the URL (pre-signed URL) from the event payload and
-    determines the media type (video, image, or audio) from the event payload.
-    
-    Expected structure:
-    {
-      "metadata": {...},
-      "payload": {
-        "presignedUrl": "...",
-        "mediaType": "Image|Video|Audio",
-        ...
-      }
-    }
+    Return payload.assets[0].DigitalSourceAsset.Type (lower-cased) or ''.
     """
     try:
-        # Extract payload from event
-        if "payload" not in event:
-            raise KeyError("Missing 'payload' in event")
-        
-        payload = event["payload"]
-        
-        # Extract presignedUrl from payload
-        if "presignedUrl" not in payload:
-            raise KeyError("Missing 'presignedUrl' in payload")
-        
-        url = payload["presignedUrl"]
-        
-        # Extract mediaType from payload and convert to lowercase
-        media_type = payload.get("mediaType", "")
-        if media_type:
-            media_type = media_type.lower()
-        else:
-            # Default to video if mediaType is not provided
-            media_type = "video"
-        
-        # Set the appropriate URL variable based on the media type
-        if media_type == "image":
-            return {"image_url": url}
-        elif media_type == "audio":
-            return {"audio_url": url}
-        else:
-            # Default to video for any other media type or if not specified
-            return {"video_url": url}
-    except KeyError as e:
-        raise KeyError(f"Missing expected key in event: {e}")
+        return (
+            event["payload"]["assets"][0]
+                 ["DigitalSourceAsset"]["Type"]
+                 .lower()
+        )
+    except (KeyError, IndexError, TypeError):
+        return ""
+
+
+def translate_event_to_request(event: dict) -> dict:
+    """
+    Build variables for Twelve Labs **/v1.3/embed/tasks** (video embeddings).
+
+    Accepted shape (abbreviated):
+
+        {
+          "payload": {
+            "data":   { "presignedUrl": "…" },
+            "assets": [
+              { "DigitalSourceAsset": { "Type": "Video" } }
+            ]
+          }
+        }
+    """
+    data = (event.get("payload") or {}).get("data", {})
+    url  = data.get("presignedUrl")
+    if not url:
+        raise KeyError("presignedUrl missing in payload.data")
+
+    mtype = _digital_asset_type(event)
+    if not mtype:
+        raise KeyError("DigitalSourceAsset.Type missing – cannot determine media kind")
+
+    if mtype != "video":
+        raise ValueError(
+            f"/v1.3/embed/tasks accepts Video only; received “{mtype}”. "
+            "Route Image/Audio assets to /v1.3/embed instead."
+        )
+
+    return {"video_url": url}

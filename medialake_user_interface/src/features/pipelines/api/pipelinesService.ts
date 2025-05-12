@@ -78,6 +78,21 @@ export class PipelinesService {
     }
 
     static async updatePipeline(id: string, data: UpdatePipelineDto): Promise<Pipeline> {
+        // For deployed pipelines, use the pipelinesv2 endpoint with pipeline_id
+        if (data.updateDeployed) {
+            // Create a new request object with the pipeline_id
+            const updateData = {
+                ...data,
+                pipeline_id: id
+            };
+            // Remove the updateDeployed flag as it's not needed by the backend
+            delete updateData.updateDeployed;
+            
+            const response = await apiClient.post<any>(PIPELINES_API.endpoints.CREATE_PIPELINE, updateData);
+            return response.data;
+        }
+        
+        // For non-deployed pipelines, use the existing update endpoint
         const response = await apiClient.put<Pipeline>(PIPELINES_API.endpoints.UPDATE_PIPELINE(id), data);
         return response.data;
     }

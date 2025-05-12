@@ -1,0 +1,16 @@
+{
+  "statusCode": 200,
+  "body": {
+    "message": "{{ variables.message }}",
+    "inventory_id": "{{ variables.inventory_id }}",
+    "transcription": {
+      "engine": "{{ variables.transcription.engine }}",
+      "id": "{{ variables.transcription.id }}",
+      "status": "{{ variables.transcription.status }}",
+      "job_name": "{{ variables.transcription.job_name }}"
+    }
+  },
+  "externalJobId": "{{ variables.externalJobId }}",
+  "externalJobStatus": "{{ variables.externalJobStatus }}",
+  "externalJobResult": "{{ variables.externalJobResult }}"
+}

@@ -1,13 +1,14 @@
-const AWS     = require('aws-sdk');
-const s3      = new AWS.S3();
-const dynamo  = new AWS.DynamoDB();
-const exifr   = require('exifr');
-const xml2js  = require('xml2js');
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
+const dynamoDB = new AWS.DynamoDB();
+const exifr = require('exifr');
+const xml2js = require('xml2js');
+const { lambdaMiddleware } = require('./lambda_middleware');
 
 const MEDIALAKE_ASSET_TABLE  = process.env.MEDIALAKE_ASSET_TABLE;
 const UNSUPPORTED_EXTENSIONS = ['.webp'];
 
-// ——— Helpers for clipping long byte arrays & strings ———
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function sliceArray(arr, limit) {
   const size   = Math.min(arr.length, limit);
@@ -35,12 +36,10 @@ function clipString(str, limit = 300) {
   return out;
 }
 
-// ——— Case‑prettify & float→decimal helpers ———
-
-function prettyCase(string) {
-  return string
+function prettyCase(key) {
+  return key
     .match(/([A-Z]+(?=[A-Z][a-z]))|([A-Z][a-z]+)|([0-9]+)|([a-z]+)|([A-Z]+)/g)
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .map(s => s[0].toUpperCase() + s.slice(1))
     .join(' ');
 }
 
@@ -55,8 +54,6 @@ const convertFloatsToDecimals = obj => {
   }
   return res;
 };
-
-// ——— Date normalization ———
 
 function normalizeDateString(str) {
   const m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
@@ -76,36 +73,30 @@ function normalizeDateTimeString(str) {
   return str;
 }
 
-// ——— Metadata sanitization ———
-
 function sanitizeMetadata(obj) {
   if (obj == null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(sanitizeMetadata);
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
+  return Object.entries(obj).reduce((out, [k, v]) => {
     if (typeof v === 'string') {
-      if (/^0000-00-00/.test(v)) continue;  // drop placeholders
-      let s = normalizeDateString(v);
-      s     = normalizeDateTimeString(s);
-      if (!isNaN(Date.parse(s))) {
-        out[k] = s
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-          .replace(/[\\"']/g, '\\$&');
+      if (!/^0000-00-00/.test(v)) {
+        let s = normalizeDateString(v);
+        s     = normalizeDateTimeString(s);
+        if (!isNaN(Date.parse(s))) {
+          out[k] = s
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+            .replace(/[\\"']/g, '\\$&');
+        }
       }
-      // otherwise skip non-date strings
     } else if (v instanceof Uint8Array) {
       out[k] = clipBytes(v);
     } else {
       const nested = sanitizeMetadata(v);
       if (nested !== undefined) out[k] = nested;
     }
-  }
-  return out;
+    return out;
+  }, {});
 }
 
-// ——— Base64‑blob detection & removal ———
-
-// Very long strings (>100 chars) of A–Z a–z 0–9 + /, optional = padding
 function isLikelyBase64(str) {
   return (
     typeof str === 'string' &&
@@ -114,28 +105,21 @@ function isLikelyBase64(str) {
   );
 }
 
-// Recursively remove any key whose value is base64‑blob or array of such blobs
 function removeBase64Fields(obj) {
   if (Array.isArray(obj)) {
-    // filter out base64 string items
-    let filtered = [];
+    const filtered = [];
     for (const item of obj) {
-      if (isLikelyBase64(item)) {
-        continue;
-      } else if (item && typeof item === 'object') {
-        removeBase64Fields(item);
-        filtered.push(item);
-      } else {
-        filtered.push(item);
-      }
+      if (isLikelyBase64(item)) continue;
+      if (item && typeof item === 'object') removeBase64Fields(item);
+      filtered.push(item);
     }
     obj.length = 0;
     obj.push(...filtered);
   } else if (obj && typeof obj === 'object') {
     for (const [key, val] of Object.entries(obj)) {
-      if (isLikelyBase64(val)) {
-        delete obj[key];
-      } else if (Array.isArray(val) && val.every(el => isLikelyBase64(el))) {
+      if (isLikelyBase64(val) ||
+          (Array.isArray(val) && val.every(el => isLikelyBase64(el)))
+      ) {
         delete obj[key];
       } else {
         removeBase64Fields(val);
@@ -144,19 +128,14 @@ function removeBase64Fields(obj) {
   }
 }
 
-// ——— Force every leaf into { value: ... } ———
-
 function forceAllObjects(x) {
   if (x == null || typeof x !== 'object') return { value: x };
   if (Array.isArray(x)) return x.map(forceAllObjects);
-  const out = {};
-  for (const [k, v] of Object.entries(x)) {
+  return Object.entries(x).reduce((out, [k, v]) => {
     out[k] = forceAllObjects(v);
-  }
-  return out;
+    return out;
+  }, {});
 }
-
-// ——— EXIF & SVG extraction pipelines ———
 
 async function extractOrganizedMetadata(buffer) {
   const options = {
@@ -172,38 +151,39 @@ async function extractOrganizedMetadata(buffer) {
 function organizeMetadata(raw) {
   const out  = {};
   const seen = new Set();
-  for (const [segment, data] of Object.entries(raw)) {
-    if (segment === 'errors') continue;
+  for (const [seg, data] of Object.entries(raw)) {
+    if (seg === 'errors') continue;
     if (data && typeof data === 'object') {
-      out[segment] = {};
+      out[seg] = {};
       for (const [k, v] of Object.entries(data)) {
         if (!seen.has(k)) {
-          let val = v instanceof Uint8Array
+          const val = v instanceof Uint8Array
                     ? clipBytes(v)
                     : typeof v === 'string'
                       ? clipString(v)
                       : v;
-          out[segment][prettyCase(k)] = val;
+          out[seg][prettyCase(k)] = val;
           seen.add(k);
         }
       }
     } else {
-      out[segment] = data;
+      out[seg] = data;
     }
   }
   return out;
 }
 
 async function extractSvgMetadata(buffer) {
-  const xml = buffer.toString('utf8');
   try {
     const doc = await new xml2js.Parser({ explicitArray: false })
-                               .parseStringPromise(xml);
+                               .parseStringPromise(buffer);
     return doc.svg?.metadata || null;
   } catch {
     return null;
   }
 }
+
+// ─── EXIF & SVG pipeline ───────────────────────────────────────────────────────
 
 async function processImageFile(bucket, key) {
   const ext = key.slice(key.lastIndexOf('.')).toLowerCase();
@@ -218,62 +198,93 @@ async function processImageFile(bucket, key) {
   return extractOrganizedMetadata(Body);
 }
 
-// ——— Lambda handler ———
-
+// ─── Lambda handler for latest event shape ───────────────────────────────────
 exports.lambda_handler = async (event) => {
   console.log('Received event:', JSON.stringify(event));
 
-  const inventoryId = event.input?.InventoryID;
-  if (!inventoryId) {
-    throw new Error('Missing InventoryID');
+  const assets = event.payload?.assets;
+  if (!Array.isArray(assets) || assets.length === 0) {
+    throw new Error('Event.payload.assets must be a non-empty array');
   }
 
-  const loc = event.input?.DigitalSourceAsset
-             ?.MainRepresentation
-             ?.StorageInfo
-             ?.PrimaryLocation;
-  if (!loc?.Bucket || !loc.ObjectKey?.FullPath) {
-    throw new Error('Missing StorageInfo.PrimaryLocation');
-  }
+  const results = [];
 
-  try {
-    const rawMeta = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
-    let cleaned   = sanitizeMetadata(rawMeta);
-
-    // remove any deep‑nested base64 blobs
-    removeBase64Fields(cleaned);
-
-    const forced     = forceAllObjects(cleaned);
-    const newMeta    = { CustomMetadata: forced };
-    const converted  = convertFloatsToDecimals(newMeta);
-    const marshalled = AWS.DynamoDB.Converter.marshall(converted);
-
-    const updateParams = {
-      TableName: MEDIALAKE_ASSET_TABLE,
-      Key: { InventoryID: { S: inventoryId } },
-      UpdateExpression: 'SET Metadata = :m',
-      ExpressionAttributeValues: { ':m': { M: marshalled } }
-    };
-
-    try {
-      await dynamo.updateItem(updateParams).promise();
-    } catch (updateErr) {
-      if (
-        updateErr.code === 'ValidationException' &&
-        /Item size has exceeded/.test(updateErr.message)
-      ) {
-        console.error(
-          'Payload too large – dumping updateParams:',
-          JSON.stringify(updateParams, null, 2)
-        );
-      }
-      throw updateErr;
+  for (const asset of assets) {
+    // ── 1) pull the ID ────────────────────────────────────────────────
+    const inventoryId = asset.InventoryID;
+  
+    if (!inventoryId) {
+      console.warn(
+        'Skipping asset without InventoryID:',
+        JSON.stringify(asset),
+      );
+      continue;
     }
-
-    return { statusCode: 200, body: JSON.stringify({ inventoryId }) };
-
-  } catch (err) {
-    console.error('Processing failed for', inventoryId, err);
-    // throw err;
+  
+    // ── 2) locate the object in S3 ────────────────────────────────────
+    const loc =
+      asset.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation;
+  
+    if (!loc?.Bucket || !loc.ObjectKey?.FullPath) {
+      console.error(
+        'Skipping asset with missing S3 location:',
+        JSON.stringify(asset),
+      );
+      continue;
+    }
+  
+    try {
+      // ── 3) extract & clean metadata ────────────────────────────────
+      const rawMeta     = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
+      let   cleaned     = sanitizeMetadata(rawMeta);
+      removeBase64Fields(cleaned);
+  
+      const forced      = forceAllObjects(cleaned);
+      const newMeta     = { CustomMetadata: forced };
+      const converted   = convertFloatsToDecimals(newMeta);
+      const marshalled  = AWS.DynamoDB.Converter.marshall(converted);
+  
+      // ── 4) update the item in DynamoDB ──────────────────────────────
+      await dynamoDB.updateItem({
+        TableName: MEDIALAKE_ASSET_TABLE,
+        Key: { InventoryID: { S:inventoryId } },
+        UpdateExpression: 'SET Metadata = :m',
+        ExpressionAttributeValues: { ':m': { M: marshalled } },
+        ReturnValues: 'UPDATED_NEW',
+      }).promise();
+  
+      // ── 5) read back the full updated item (optional) ───────────────
+      const getResp      = await dynamoDB.getItem({
+        TableName: MEDIALAKE_ASSET_TABLE,
+        Key: { InventoryID:         { S: inventoryId    } },
+      }).promise();
+      const updatedAsset = AWS.DynamoDB.Converter.unmarshall(getResp.Item);
+  
+      console.log(`Updated metadata for ${inventoryId}`);
+      results.push({ inventoryId, status: 'OK', updatedAsset });
+    } catch (err) {
+      console.error(`Error processing ${inventoryId}:`, err);
+      results.push({ inventoryId, status: 'ERROR', message: err.message });
+    }
   }
+  
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ results }),
+  };
 };
+
+// ── Wrap with middleware ───────────────────────────────────────────────────────
+
+const baseHandler = exports.lambda_handler;
+exports.lambda_handler = lambdaMiddleware({
+  eventBusName:         process.env.EVENT_BUS_NAME      || 'default-event-bus',
+  metricsNamespace:     process.env.METRICS_NAMESPACE   || 'MediaLake',
+  cleanupS3:            true,
+  largePayloadBucket:   process.env.EXTERNAL_PAYLOAD_BUCKET,
+  externalPayloadBucket:process.env.EXTERNAL_PAYLOAD_BUCKET,
+  maxRetries:           3,
+  standardizePayloads:  true,
+  maxResponseSize:      240 * 1024, // 240 KB
+})(baseHandler);

@@ -1,0 +1,4 @@
+pillow==11.0.0
+cairosvg
+aws-xray-sdk
+aws-lambda-powertools

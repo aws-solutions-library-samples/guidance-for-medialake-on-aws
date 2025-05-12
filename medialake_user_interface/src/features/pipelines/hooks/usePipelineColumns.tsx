@@ -64,20 +64,20 @@ export const usePipelineColumns = ({
                     );
                 },
             }),
-            columnHelper.accessor('system', {
-                header: 'System',
-                size: 100,
-                enableSorting: true,
-                cell: info => (
-                    <TableCellContent variant="secondary">
-                        <Chip
-                            label={info.getValue() ? 'Yes' : 'No'}
-                            size="small"
-                            color={info.getValue() ? 'success' : 'default'}
-                        />
-                    </TableCellContent>
-                ),
-            }),
+            // columnHelper.accessor('system', {
+            //     header: 'System',
+            //     size: 100,
+            //     enableSorting: true,
+            //     cell: info => (
+            //         <TableCellContent variant="secondary">
+            //             <Chip
+            //                 label={info.getValue() ? 'Yes' : 'No'}
+            //                 size="small"
+            //                 color={info.getValue() ? 'success' : 'default'}
+            //             />
+            //         </TableCellContent>
+            //     ),
+            // }),
             columnHelper.accessor('deploymentStatus', {
                 header: 'Status',
                 size: 150, // Increased size to accommodate the switch
@@ -120,7 +120,7 @@ export const usePipelineColumns = ({
                                                 disabled={pipeline.system}
                                                 onIcon={<CheckCircleIcon />}
                                                 offIcon={<CancelIcon />}
-                                                onColor="#2e7d32"
+                                                onColor="#2b6cb0"
                                                 offColor="#757575"
                                                 trackOnColor="#b2ebf2"
                                                 trackOffColor="#cfd8dc"
@@ -128,7 +128,7 @@ export const usePipelineColumns = ({
                                         }
                                         // label={pipeline.active !== false ? "Active" : "Inactive"}
                                         label=""
-                                        sx={{ mt: 1, ml: 0 }}
+                                        sx={{ mt: 0, ml: 0 }}
                                     />
                                 )}
                             </Box>

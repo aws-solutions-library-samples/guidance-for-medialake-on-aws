@@ -207,11 +207,11 @@ class StateMachineValidator:
             
         # Validate ItemsPath
         if "ItemsPath" not in state:
-            logger.warning(f"Map state {state_name} has no ItemsPath, adding default $.payload.externalTaskResults")
-            state["ItemsPath"] = "$.payload.externalTaskResults"
+            logger.warning(f"Map state {state_name} has no ItemsPath, adding default $.payload.data")
+            state["ItemsPath"] = "$.payload.data"
         elif not state["ItemsPath"].startswith("$"):
-            logger.warning(f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.externalTaskResults")
-            state["ItemsPath"] = "$.payload.externalTaskResults"
+            logger.warning(f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.data")
+            state["ItemsPath"] = "$.payload.data"
             
         # Ensure Parameters exists for fallback mechanism
         if "Parameters" not in state:

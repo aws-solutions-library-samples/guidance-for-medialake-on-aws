@@ -175,18 +175,18 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
           />
         </Box>
 
-        {/* Failed output */}
+        {/* Fail output */}
         <Box sx={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', mr: '-6px' }}>
           <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
-            Failed
+            Fail
           </Typography>
           <Handle
             type="source"
             position={Position.Right}
-            id="failed"
+            id="fail"
             isConnectable={isConnectable}
             style={{
-              background: '#F44336', // Red for failed
+              background: '#F44336', // Red for fail
               width: '10px',
               height: '10px',
               border: '2px solid #fff',

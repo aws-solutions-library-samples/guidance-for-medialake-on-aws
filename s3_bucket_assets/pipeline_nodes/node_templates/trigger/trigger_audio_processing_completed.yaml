@@ -10,26 +10,17 @@ node:
       aws_eventbridge:
         aws_eventbridge_rule: pipeline_execution_completed
         event_pattern:
-          source: ["medialake.pipeline"]
-          detail-type: ["Pipeline Execution Completed"]
           detail:
-            outputs:
-              input:
-                DigitalSourceAsset:
-                  Type: ["Audio"]
-                  MainRepresentation:
-                    Format: ["${Audio Type}"]
+            metadata:
+              pipelineName: ["Default Audio Pipeline"]
+              pipelineStatus: ["Completed"]
+
 actions:
   trigger:
     summary: Trigger after audio processing is completed
     description: This step will trigger after audio processing is completed
     operationId: triggerAudioProcessingCompleted
     parameters:
-      - in: body
-        name: Audio Type
-        required: false
-        schema:
-          type: string
       - in: body
         name: Prefix
         required: false

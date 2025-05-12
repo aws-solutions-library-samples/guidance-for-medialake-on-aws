@@ -1,0 +1,31 @@
+{# transcribe_status_get_response.jinja #}
+{
+  "statusCode": {{ variables.statusCode }},
+  "body": {
+    "status": "{{ variables.status }}",
+    "inventory_id": "{{ variables.inventory_id }}",
+    "transcription": {
+      "job_name": "{{ variables.transcription.job_name }}"
+      {% if variables.status == "COMPLETED" %}
+      ,
+      "transcript": "{{ variables.transcription.transcript }}",
+      "detected_language": "{{ variables.transcription.detected_language }}",
+      "object": {
+        "bucket": "{{ variables.transcription.object.bucket }}",
+        "key": "{{ variables.transcription.object.key }}"
+      }
+      {% endif %}
+    }
+    {% if variables.error is defined %}
+    ,
+    "error": "{{ variables.error }}"
+    {% endif %}
+  },
+  "externalTaskStatus": "{{ variables.externalTaskStatus }}",
+  "externalJobId": "{{ variables.externalJobId }}",
+  "externalJobStatus": "{{ variables.externalJobStatus }}"
+  {% if variables.externalJobResult %}
+  ,
+  "externalJobResult": "{{ variables.externalJobResult }}"
+  {% endif %}
+}

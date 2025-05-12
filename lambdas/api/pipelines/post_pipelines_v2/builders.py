@@ -3,7 +3,6 @@ State machine builder for Step Functions.
 """
 
 from typing import Dict, Any, List, Set, Optional
-import os
 from aws_lambda_powertools import Logger
 
 from graph_utils import GraphAnalyzer
@@ -36,6 +35,7 @@ class StateMachineBuilder:
         self.lambda_arns = lambda_arns
         self.resource_prefix = resource_prefix
         self.graph_analyzer = GraphAnalyzer(pipeline)
+        # Initialize without first_lambda_node_id, will set it later
         self.state_factory = StateDefinitionFactory(pipeline, lambda_arns)
         self.validator = StateMachineValidator()
         
@@ -62,7 +62,14 @@ class StateMachineBuilder:
         root_node_id = self.graph_analyzer.get_root_node()
         
         # Step 3: Find special edge types
-        choice_true_targets, choice_false_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
+        choice_true_targets, choice_false_targets, choice_fail_targets, map_processor_chains = self.graph_analyzer.find_special_edges()
+        
+        # Step 3.5: Find first and last Lambda nodes
+        first_lambda_node_id, last_lambda_node_id = self.graph_analyzer.find_first_and_last_lambdas()
+        logger.info(f"Identified first lambda node for execution context properties: {first_lambda_node_id}")
+        
+        # Update the state factory with the first Lambda node ID
+        self.state_factory.first_lambda_node_id = first_lambda_node_id
         
         # Step 4: Create state definitions for each node
         self.states = self.state_factory.create_state_definitions(
@@ -84,7 +91,8 @@ class StateMachineBuilder:
         state_connector.connect_states(
             self.pipeline.configuration.edges,
             choice_true_targets,
-            choice_false_targets
+            choice_false_targets,
+            choice_fail_targets
         )
         
         # Step 7: Find execution path
@@ -164,19 +172,24 @@ class StateMachineBuilder:
             if root_node_id in self.graph_analyzer.graph and self.graph_analyzer.graph[root_node_id]:
                 # Get the first target from the graph
                 next_node_id = self.graph_analyzer.graph[root_node_id][0]
-                start_at = self.node_id_to_state_name.get(next_node_id)
-                logger.info(
-                    f"Using node {next_node_id} as start state instead of trigger node"
-                )
-                return start_at
+                next_state_name = self.node_id_to_state_name.get(next_node_id)
+                
+                logger.info(f"Using {next_state_name} as start state")
+                return next_state_name
             else:
                 logger.warning(
                     f"Trigger root node {root_node_id} has no outgoing edges, using first available state"
                 )
                 # Use the first available state as start state
-                return next(iter(self.states)) if self.states else None
+                first_state = next(iter(self.states)) if self.states else None
+                return first_state
         else:
-            # Use the root node's state name as the start state
+            # For non-trigger root nodes, use the root node's state name
             start_at = self.node_id_to_state_name.get(root_node_id)
-            logger.info(f"Using root node {root_node_id} state name as start state: {start_at}")
-            return start_at
+            if start_at:
+                logger.info(f"Using {start_at} as start state")
+                return start_at
+            else:
+                logger.warning(f"Could not find state name for root node {root_node_id}, using first available state")
+                first_state = next(iter(self.states)) if self.states else None
+                return first_state

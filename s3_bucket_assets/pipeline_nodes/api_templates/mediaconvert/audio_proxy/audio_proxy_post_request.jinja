@@ -1,0 +1,47 @@
+{
+  "Role": "{{ variables.mediaconvert_role_arn }}",
+  "Queue": "{{ variables.mediaconvert_queue_arn }}",
+  "Settings": {
+    "Inputs": [
+      {
+        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}",
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            "DefaultSelection": "DEFAULT"
+          }
+        }
+      }
+    ],
+    "OutputGroups": [
+      {
+        "Name": "Audio Conversion",
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}"
+          }
+        },
+        "Outputs": [
+          {
+            "NameModifier": "_proxy",
+            "AudioDescriptions": [
+              {
+                "CodecSettings": {
+                  "Codec": "MP3",
+                  "Mp3Settings": {
+                    "Bitrate": 128000,
+                    "SampleRate": 44100,
+                    "RateControlMode": "CBR"
+                  }
+                }
+              }
+            ],
+            "ContainerSettings": {
+              "Container": "RAW"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

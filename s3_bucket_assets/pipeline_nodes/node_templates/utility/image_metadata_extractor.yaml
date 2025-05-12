@@ -8,8 +8,42 @@ node:
   integration:
     config:
       lambda:
-        handler: utility/image_metadata_extractor.zip
-        runtime: python3.12
+        handler: utility/ImageMetadataExtractorLambdaDeployment
+        runtime: nodejs18.x
+
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - '*'
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - '*'
+                
 actions:
   extract:
     summary: Extract image metadata

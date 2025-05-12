@@ -147,13 +147,19 @@ export function TableHeader<T>({
                     sx={{ flex: 1, cursor: canSort ? 'pointer' : 'default' }}
                     onClick={canSort ? handleSortClick : undefined}
                 >
-                    <TableCellContent
-                        variant="primary"
-                        wordBreak="normal"
-                        aria-label={`${header.column.columnDef.header as string} column`}
-                    >
-                        {header.column.columnDef.header as string}
-                    </TableCellContent>
+                    {typeof header.column.columnDef.header === 'function' ? (
+                        // If header is a function, call it with the header context
+                        header.column.columnDef.header(header.getContext())
+                    ) : (
+                        // Otherwise render it as a string
+                        <TableCellContent
+                            variant="primary"
+                            wordBreak="normal"
+                            aria-label={`${header.column.columnDef.header as string} column`}
+                        >
+                            {header.column.columnDef.header as string}
+                        </TableCellContent>
+                    )}
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                         {canSort && (
                             <Box

@@ -1,180 +1,58 @@
-import boto3
+import boto3, io, os, json, decimal
 from PIL import Image, ExifTags
-import io
-import os
 import cairosvg
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from lambda_middleware import lambda_middleware
 
-logger = Logger()
-tracer = Tracer()
+logger  = Logger()
+tracer  = Tracer()
 
+s3      = boto3.client("s3")
+dynamo  = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+# ── helpers ────────────────────────────────────────────────────────────────
 def get_image_rotation(image):
     try:
-        exif = image._getexif()
-        if not exif:
-            return 0
-        orientation_key = next(
-            (k for k, v in ExifTags.TAGS.items() if v == "Orientation"),
-            None
-        )
-        orientation = exif.get(orientation_key, 1)
-        return {1: 0, 3: 180, 6: 270, 8: 90}.get(orientation, 0)
+        exif = image._getexif() or {}
+        key  = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
+        return {1: 0, 3: 180, 6: 270, 8: 90}.get(exif.get(key, 1), 0)
     except Exception as e:
         logger.warning(f"Error getting image rotation: {e}")
         return 0
 
-def create_thumbnail(img, width, height, crop=False):
-    rotation = get_image_rotation(img)
-    if rotation:
-        img = img.rotate(rotation, expand=True)
+def create_thumbnail(img, w, h, crop=False):
+    rot = get_image_rotation(img)
+    if rot:
+        img = img.rotate(rot, expand=True)
+
     if crop:
-        target_ratio = width / height
-        img_ratio = img.width / img.height
-        if img_ratio > target_ratio:
-            new_w = int(height * img_ratio)
-            img = img.resize((new_w, height))
-            left = (new_w - width) // 2
-            img = img.crop((left, 0, left + width, height))
-        else:
-            new_h = int(width / img_ratio)
-            img = img.resize((width, new_h))
-            top = (new_h - height) // 2
-            img = img.crop((0, top, width, top + height))
+        tgt_ratio, img_ratio = w / h, img.width / img.height
+        if img_ratio > tgt_ratio:           # crop width
+            new_w = int(h * img_ratio)
+            img   = img.resize((new_w, h))
+            left  = (new_w - w) // 2
+            img   = img.crop((left, 0, left + w, h))
+        else:                                # crop height
+            new_h = int(w / img_ratio)
+            img   = img.resize((w, new_h))
+            top   = (new_h - h) // 2
+            img   = img.crop((0, top, w, top + h))
     else:
-        img.thumbnail((width, height))
+        img.thumbnail((w, h))
+
     return img
 
 def create_proxy(img):
-    rotation = get_image_rotation(img)
-    return img.rotate(rotation, expand=True) if rotation else img
+    rot = get_image_rotation(img)
+    return img.rotate(rot, expand=True) if rot else img
 
 def clean_asset_id(input_string: str) -> str:
     parts = input_string.split(":")
-    uuid = parts[-1] if parts[-1] != "master" else parts[-2]
+    uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"
 
-@logger.inject_lambda_context
-@tracer.capture_lambda_handler
-def lambda_handler(event, context: LambdaContext):
-    # DynamoDB table and S3 client
-    table = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
-    s3 = boto3.client("s3")
-
-    # extract parameters
-    inv = event.get("input", {}).get("InventoryID") or _raise("Missing InventoryID")
-    key = (
-        event.get("input", {})
-             .get("DigitalSourceAsset", {})
-             .get("MainRepresentation", {})
-             .get("StorageInfo", {})
-             .get("PrimaryLocation", {})
-             .get("ObjectKey", {})
-             .get("FullPath")
-    ) or _raise("Missing key parameter")
-    bucket = (
-        event.get("input", {})
-             .get("DigitalSourceAsset", {})
-             .get("MainRepresentation", {})
-             .get("StorageInfo", {})
-             .get("PrimaryLocation", {})
-             .get("Bucket")
-    ) or _raise("Missing bucket parameter")
-    out_bucket = event.get("output_bucket") or _raise("Missing output_bucket parameter")
-    mode = event.get("mode", "proxy")
-
-    # fetch image bytes
-    body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-
-    # open image (convert SVG→PNG if needed)
-    if key.lower().endswith(".svg"):
-        png_bytes = cairosvg.svg2png(bytestring=body)
-        img = Image.open(io.BytesIO(png_bytes))
-    else:
-        img = Image.open(io.BytesIO(body))
-
-    # process image
-    if mode == "thumbnail":
-        w = event.get("width")
-        h = event.get("height")
-        if w is None and h is None:
-            _raise("Both width and height cannot be None for thumbnail")
-        w, h = _resolve_dims(w, h, img.width, img.height)
-        proc = create_thumbnail(img, w, h, crop=bool(event.get("crop", False)))
-        ext, fmt = "png", "PNG"
-    elif mode == "proxy":
-        proc = create_proxy(img)
-        w, h = proc.size
-        ext, fmt = "png", "PNG"
-    else:
-        _raise(f"Invalid mode parameter: {mode}")
-
-    # save & upload
-    new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
-    buf = io.BytesIO()
-
-    # ** CONVERSION FIX: ensure PNG‑compatible mode **
-    if proc.mode not in ("RGB", "RGBA"):
-        proc = proc.convert("RGB")
-
-    proc.save(buf, format=fmt)
-    data = buf.getvalue()
-    s3.put_object(
-        Bucket=out_bucket,
-        Key=new_key,
-        Body=data,
-        ContentType=f"image/{ext}"
-    )
-
-    # update DynamoDB with new representation
-    try:
-        table.update_item(
-            Key={"InventoryID": clean_asset_id(inv)},
-            UpdateExpression=(
-                "SET DerivedRepresentations = list_append("
-                "if_not_exists(DerivedRepresentations, :empty), :r)"
-            ),
-            ExpressionAttributeValues={
-                ":r": [{
-                    "ID": f"{clean_asset_id(inv)}:{mode}",
-                    "Type": "Image",
-                    "Format": fmt,
-                    "Purpose": mode,
-                    "StorageInfo": {
-                        "PrimaryLocation": {
-                            "StorageType": "s3",
-                            "Provider": "aws",
-                            "Bucket": out_bucket,
-                            "ObjectKey": {"FullPath": new_key},
-                            "Status": "active",
-                            "FileInfo": {"Size": len(data)}
-                        }
-                    },
-                    **(
-                        {"ImageSpec": {"Resolution": {"Width": w, "Height": h}}}
-                        if mode == "thumbnail"
-                        else {}
-                    )
-                }],
-                ":empty": []
-            }
-        )
-    except Exception:
-        logger.exception("Error updating DynamoDB")
-        raise
-
-    return {
-        "statusCode": 200,
-        "body": {
-            "bucket": out_bucket,
-            "key": new_key,
-            "mode": mode,
-            "format": fmt
-        }
-    }
-
-def _raise(msg: str):
-    raise ValueError(msg)
+def _raise(msg): raise ValueError(msg)
 
 def _resolve_dims(w, h, iw, ih):
     if w is None:
@@ -182,3 +60,148 @@ def _resolve_dims(w, h, iw, ih):
     elif h is None:
         h = int(w * (ih / iw))
     return int(w), int(h)
+
+def _extract_from_event(event: dict):
+    payload = event.get("payload", {})
+    assets  = payload.get("assets") or _raise("Missing payload.assets")
+    asset   = assets[0]  # single-asset assumption
+
+    detail      = asset
+    mode        = payload.get("mode", "proxy")
+    width       = payload.get("width")
+    height      = payload.get("height")
+    crop        = bool(payload.get("crop", False))
+
+    return detail, mode, width, height, crop
+
+def _strip_decimals(obj):
+    """
+    Recursively convert Decimals → int/float so json.dumps works.
+    """
+    if isinstance(obj, list):
+        return [_strip_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, decimal.Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
+
+
+@lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"))
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event, context: LambdaContext):
+    detail, mode, width, height, crop = _extract_from_event(event)
+
+    dsa      = detail["DigitalSourceAsset"]
+    location = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+
+    bucket   = location.get("Bucket") \
+               or _raise("PrimaryLocation.Bucket missing")
+    key      = location.get("ObjectKey", {}).get("FullPath") \
+               or _raise("PrimaryLocation.ObjectKey.FullPath missing")
+    inv_id   = detail.get("InventoryID") or _raise("InventoryID missing")
+
+    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") \
+                 or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
+
+    # ── fetch source ───────────────────────────────────────────────────────
+    body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+    if key.lower().endswith(".svg"):
+        body = cairosvg.svg2png(bytestring=body)
+    img = Image.open(io.BytesIO(body))
+
+    # ── process image ──────────────────────────────────────────────────────
+    if mode == "thumbnail":
+        if width is None and height is None:
+            _raise("Both width and height cannot be None for thumbnail")
+        width, height = _resolve_dims(width, height, img.width, img.height)
+        proc = create_thumbnail(img, width, height, crop=crop)
+    elif mode == "proxy":
+        proc = create_proxy(img)
+        width, height = proc.size
+    else:
+        _raise(f"Invalid mode: {mode}")
+
+    # always output PNG
+    ext, fmt = "png", "PNG"
+    if proc.mode not in ("RGB", "RGBA"):
+        proc = proc.convert("RGB")
+    buf = io.BytesIO()
+    proc.save(buf, format=fmt)
+    data = buf.getvalue()
+
+    new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
+
+    # ── fetch existing reps & split out to_delete ──────────────────────────
+    resp      = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
+    existing  = resp.get("Item", {}).get("DerivedRepresentations", [])
+    to_delete = [r for r in existing if r.get("Purpose") == mode]
+    cur_reps  = [r for r in existing if r.get("Purpose") != mode]
+
+    # ── upload new image ───────────────────────────────────────────────────
+    s3.put_object(
+        Bucket=out_bucket,
+        Key=new_key,
+        Body=data,
+        ContentType=f"image/{ext}"
+    )
+
+    # ── delete old S3 objects for this mode ───────────────────────────────
+    for old in to_delete:
+        old_bucket = old["StorageInfo"]["PrimaryLocation"]["Bucket"]
+        old_key    = old["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+        try:
+            s3.delete_object(Bucket=old_bucket, Key=old_key)
+            logger.info("Deleted old representation",
+                        extra={"mode": mode, "bucket": old_bucket, "key": old_key})
+        except Exception as err:
+            logger.warning("Failed to delete old representation",
+                           extra={"error": str(err), "bucket": old_bucket, "key": old_key})
+
+    # ── update DynamoDB ────────────────────────────────────────────────────
+    new_rep = {
+        "ID": f"{clean_asset_id(inv_id)}:{mode}",
+        "Type": "Image",
+        "Format": fmt,
+        "Purpose": mode,
+        "StorageInfo": {
+            "PrimaryLocation": {
+                "StorageType": "s3",
+                "Provider": "aws",
+                "Bucket": out_bucket,
+                "ObjectKey": {"FullPath": new_key},
+                "Status": "active",
+                "FileInfo": {"Size": len(data)},
+            }
+        },
+        **({"ImageSpec": {"Resolution": {"Width": width, "Height": height}}}
+           if mode == "thumbnail" else {})
+    }
+
+    try:
+        dynamo.update_item(
+            Key={"InventoryID": clean_asset_id(inv_id)},
+            UpdateExpression="SET DerivedRepresentations = :dr",
+            ExpressionAttributeValues={":dr": cur_reps + [new_rep]},
+        )
+        # ── immediately fetch the updated record ───────────────────────────
+        get_resp     = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
+        updated_item = get_resp.get("Item", {})
+    except Exception:
+        logger.exception("Error updating DynamoDB")
+        raise
+
+    # ── clean Decimals so json.dumps will not choke ───────────────────────
+    safe_item = _strip_decimals(updated_item)
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "bucket":       out_bucket,
+            "key":          new_key,
+            "mode":         mode,
+            "format":       fmt,
+            "updatedAsset": safe_item,
+        }),
+    }

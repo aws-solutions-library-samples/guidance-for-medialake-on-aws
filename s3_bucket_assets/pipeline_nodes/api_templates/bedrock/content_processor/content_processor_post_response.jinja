@@ -1,0 +1,10 @@
+{
+  "statusCode": {{ variables.statusCode }},
+  "body": {
+    "result": {{ variables.result | tojson }},
+    "status": "{{ variables.status }}"
+  },
+  "externalJobId": "{{ variables.externalJobId }}",
+  "externalJobStatus": "{{ variables.externalJobStatus }}",
+  "externalJobResult": "{{ variables.externalJobResult }}"
+}

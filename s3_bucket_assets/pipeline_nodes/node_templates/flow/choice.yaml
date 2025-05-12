@@ -24,3 +24,5 @@ actions:
             description: Path taken when condition evaluates to true
           - name: In Progress
             description: Path taken when condition evaluates to false
+          - name: Fail
+            description: Path taken when condition evaluates to false

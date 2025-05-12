@@ -279,7 +279,6 @@ def load_and_execute_custom_code(api_template_bucket: str, s3templates: dict, ap
 
 @lambda_middleware(
     event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"),
-    large_payload_bucket=os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
 )
 @tracer.capture_lambda_handler
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

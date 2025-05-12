@@ -14,12 +14,11 @@ from dataclasses import dataclass
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.api_gateway_core_stack import ApiGatewayCoreStack, ApiGatewayCoreStackProps
 from medialake_stacks.users_groups_roles_stack import UsersGroupsRolesStack, UsersGroupsRolesStackProps
-from medialake_stacks.authorization_stack import AuthorizationStack, AuthorizationStackProps
-from medialake_stacks.auth_lambda_stack import AuthLambdaStack, AuthLambdaStackProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
+from medialake_stacks.pre_deploy_cleanup_stack import PreDeployCleanUpStack, PreDeployCleanUpStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 # from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack - Development paused, commented out for now
 from medialake_stacks.integrations_environment_stack import IntegrationsEnvironmentStack, IntegrationsEnvironmentStackProps
@@ -27,10 +26,7 @@ from medialake_stacks.pipeline_stack import (
     PipelineStack,
     PipelineStackProps,
 )
-from medialake_stacks.pipeline_nodes_stack import (
-    PipelineNodesStack,
-    PipelineNodesStackProps,
-)
+
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
@@ -67,11 +63,16 @@ else:
 #     lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
 
 
+pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
 
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
+cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
 
+# Create the PreDeployCleanUp stack first
 
+# Create the BaseInfrastructureStack and make it depend on the PreDeployCleanUp stack
 base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
+base_infrastructure.add_dependency(pre_deploy_cleanup_stack)
 
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
@@ -83,11 +84,10 @@ waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
         
-@dataclass
+@dataclass 
 class MediaLakeStackProps:
     api_gateway_core_stack: ApiGatewayCoreStack
     base_infrastructure: BaseInfrastructureStack
-    authorization_stack: AuthorizationStack
 
 class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
@@ -98,11 +98,7 @@ class MediaLakeStack(cdk.Stack):
             iac_bucket=props.base_infrastructure.iac_assets_bucket,
             ),
         )
-        pipeline_nodes_stack = PipelineNodesStack(self, "MediaLakePipelineNodes", props=PipelineNodesStackProps(
-            media_assets_bucket=props.base_infrastructure.media_assets_bucket,
-            asset_table=props.base_infrastructure.asset_table,
-            ),
-        )
+
         asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
             asset_table=props.base_infrastructure.asset_table,
             ingest_event_bus=props.base_infrastructure.ingest_event_bus,
@@ -118,23 +114,10 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         
-        # Create the Auth Lambda Stack
-        auth_lambda_stack = AuthLambdaStack(
-            self,
-            "MediaLakeAuthLambdaStack",
-            props=AuthLambdaStackProps(
-                auth_table_name=props.authorization_stack.auth_table.table_name,
-                avp_policy_store_id=props.authorization_stack.policy_store.attr_policy_store_id,
-                avp_policy_store_arn=f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{props.authorization_stack.policy_store.attr_policy_store_id}",
-            )
-        )
-        
         users_groups_roles_stack = UsersGroupsRolesStack(self, "MediaLakeUsersGroupsRolesStack", props=UsersGroupsRolesStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-            custom_authorizer_lambda=auth_lambda_stack.custom_authorizer_lambda,
-            auth_table=props.authorization_stack.auth_table,
             ),
         )
 
@@ -154,8 +137,8 @@ class MediaLakeStack(cdk.Stack):
             collection_arn=props.base_infrastructure.collection_arn,
             access_log_bucket=props.base_infrastructure.access_log_bucket,
             pipeline_table=props.base_infrastructure.pipeline_table,
-            image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
-            image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+            # image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+            # image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
             pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
             node_table=nodes_stack.pipelines_nodes_table,
             asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
@@ -172,22 +155,22 @@ class MediaLakeStack(cdk.Stack):
         
         pipeline_stack = PipelineStack(self, "MediaLakePipeline", props=PipelineStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
-            trigger_node_function_arn=pipeline_nodes_stack.trigger_node_function_arn,
-            image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
-            image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
-            video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
-            audio_metadata_extractor_function_arn=pipeline_nodes_stack.audio_metadata_extractor_function_arn,
-            video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
-            audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
-            check_mediaconvert_status_function_arn=pipeline_nodes_stack.check_mediaconvert_status_function_arn,
+            # trigger_node_function_arn=pipeline_nodes_stack.trigger_node_function_arn,
+            # image_metadata_extractor_function_arn=pipeline_nodes_stack.image_metadata_extractor_function_arn,
+            # image_proxy_function_arn=pipeline_nodes_stack.image_proxy_function_arn,
+            # video_metadata_extractor_function_arn=pipeline_nodes_stack.video_metadata_extractor_function_arn,
+            # audio_metadata_extractor_function_arn=pipeline_nodes_stack.audio_metadata_extractor_function_arn,
+            # video_proxy_thumbnail_function_arn=pipeline_nodes_stack.video_proxy_thumbnail_function_arn,
+            # audio_proxy_thumbnail_function_arn=pipeline_nodes_stack.audio_proxy_thumbnail_function_arn,
+            # check_media_convert_status_function_arn=pipeline_nodes_stack.check_media_convert_status_function_arn,
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             cognito_app_client=props.api_gateway_core_stack.user_pool_client,
             asset_table=props.base_infrastructure.asset_table,
             connector_table=api_gateway_stack.connector_table,
             node_table=nodes_stack.pipelines_nodes_table,
             pipeline_table=props.base_infrastructure.pipeline_table,
-            image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
-            image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
+            # image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
+            # image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
             external_payload_bucket=props.base_infrastructure.external_payload_bucket,
             pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
             open_search_endpoint=props.base_infrastructure.collection_endpoint,
@@ -197,6 +180,8 @@ class MediaLakeStack(cdk.Stack):
             media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
             collection_endpoint=props.base_infrastructure.collection_endpoint,
+            mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
+            mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
         
@@ -220,7 +205,6 @@ class MediaLakeStack(cdk.Stack):
 medialake_stack = MediaLakeStack(app, "MediaLakeStack",props=MediaLakeStackProps(
     api_gateway_core_stack=api_gateway_core_stack,
     base_infrastructure=base_infrastructure,
-    authorization_stack=authorization_stack,
     ), env=env)
 medialake_stack.add_dependency(api_gateway_core_stack)
 

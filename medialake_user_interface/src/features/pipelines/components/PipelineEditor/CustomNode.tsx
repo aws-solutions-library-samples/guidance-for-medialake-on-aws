@@ -255,7 +255,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                                     id={`input-${typeof inputType === 'string' ? inputType : (inputType as InputType).name}`}
                                     isConnectable={isConnectable}
                                     style={{
-                                        background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#555',
+                                        background: typeof inputType === 'string'
+                                            ? '#555'
+                                            : (inputType as InputType).name === 'Completed'
+                                                ? '#4CAF50'
+                                                : (inputType as InputType).name === 'In Progress'
+                                                    ? '#2196F3'
+                                                    : (inputType as InputType).name === 'Fail'
+                                                        ? '#F44336'
+                                                        : '#555',
                                         width: '12px',
                                         height: '12px',
                                         border: '2px solid #fff',
@@ -349,7 +357,13 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                                 id={output.name}
                                 isConnectable={isConnectable}
                                 style={{
-                                    background: index === 0 ? '#4CAF50' : index === 1 ? '#2196F3' : '#555',
+                                    background: output.name === 'Completed'
+                                        ? '#4CAF50'
+                                        : output.name === 'In Progress'
+                                            ? '#2196F3'
+                                            : output.name === 'Fail'
+                                                ? '#F44336'
+                                                : '#555',
                                     width: '12px',
                                     height: '12px',
                                     border: '2px solid #fff',

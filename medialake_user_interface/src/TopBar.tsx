@@ -20,6 +20,7 @@ import {
     Chat as ChatIcon,
     Notifications as NotificationsIcon
 } from '@mui/icons-material';
+import { useChat } from './contexts/ChatContext';
 import { useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +58,7 @@ function TopBar() {
     const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
     const isChatEnabled = useFeatureFlag('chat-enabled', true);
     const isNotificationEnabled = useFeatureFlag('notification-enabled', true);
+    const { toggleChat, isOpen: isChatOpen } = useChat();
 
     const getSearchQuery = useCallback(() => {
         const tagPart = searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
@@ -474,13 +476,23 @@ function TopBar() {
                 {isChatEnabled && (
                     <IconButton
                         size="small"
+                        onClick={toggleChat}
                         sx={{
-                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            color: isChatOpen
+                                ? muiTheme.palette.primary.main
+                                : theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            backgroundColor: isChatOpen
+                                ? alpha(muiTheme.palette.primary.main, 0.1)
+                                : theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                             borderRadius: '8px',
                             padding: '8px',
+                            transition: theme => theme.transitions.create(['color', 'background-color'], {
+                                duration: theme.transitions.duration.short,
+                            }),
                             '&:hover': {
-                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                                backgroundColor: isChatOpen
+                                    ? alpha(muiTheme.palette.primary.main, 0.2)
+                                    : theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
                             }
                         }}
                     >

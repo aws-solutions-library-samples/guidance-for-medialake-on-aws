@@ -25,6 +25,18 @@ export interface AssetResultsViewProps<T> {
   onPageSizeChange: (newPageSize: number) => void;
   searchTerm?: string;
   title?: string;
+  
+  // Search fields
+  selectedFields?: string[];
+  availableFields?: Array<{
+    name: string;
+    displayName: string;
+    description: string;
+    type: string;
+    isDefault: boolean;
+  }>;
+  onFieldsChange?: (event: any) => void;
+  
   groupByType: boolean;
   onGroupByTypeChange: (checked: boolean) => void;
   viewMode: 'card' | 'table';
@@ -46,7 +58,7 @@ export interface AssetResultsViewProps<T> {
   // Asset action handlers
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onMenuClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean) => void;
@@ -55,6 +67,9 @@ export interface AssetResultsViewProps<T> {
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Selection functionality
+  isAssetSelected?: (assetId: string) => boolean;
+  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
   // Functions to extract data from asset objects
@@ -73,6 +88,10 @@ function AssetResultsView<T>({
   onPageSizeChange,
   searchTerm,
   title = 'Results',
+  // Search fields
+  selectedFields,
+  availableFields,
+  onFieldsChange,
   groupByType,
   onGroupByTypeChange,
   viewMode,
@@ -93,7 +112,7 @@ function AssetResultsView<T>({
   onColumnToggle,
   onAssetClick,
   onDeleteClick,
-  onMenuClick,
+  onDownloadClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -101,6 +120,8 @@ function AssetResultsView<T>({
   editedName,
   isAssetFavorited,
   onFavoriteToggle,
+  isAssetSelected,
+  onSelectToggle,
   error,
   isLoading,
   getAssetId,
@@ -148,14 +169,17 @@ function AssetResultsView<T>({
             const desc = currentSort?.id === columnId ? !currentSort.desc : false;
             onSortChange([{ id: columnId, desc }]);
           }}
-          fields={viewMode === 'card' 
-            ? cardFields 
+          fields={viewMode === 'card'
+            ? cardFields
             : columns.map(col => ({
               id: col.id,
               label: col.label,
               visible: col.visible
             }))}
           onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
+          selectedFields={selectedFields}
+          availableFields={availableFields}
+          onFieldsChange={onFieldsChange}
           groupByType={groupByType}
           onGroupByTypeChange={onGroupByTypeChange}
           cardSize={cardSize}
@@ -240,14 +264,17 @@ function AssetResultsView<T>({
           const desc = currentSort?.id === columnId ? !currentSort.desc : false;
           onSortChange([{ id: columnId, desc }]);
         }}
-        fields={viewMode === 'card' 
-          ? cardFields 
+        fields={viewMode === 'card'
+          ? cardFields
           : columns.map(col => ({
             id: col.id,
             label: col.label,
             visible: col.visible
           }))}
         onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
+        selectedFields={selectedFields}
+        availableFields={availableFields}
+        onFieldsChange={onFieldsChange}
         groupByType={groupByType}
         onGroupByTypeChange={onGroupByTypeChange}
         cardSize={cardSize}
@@ -271,7 +298,7 @@ function AssetResultsView<T>({
           cardFields={cardFields.filter(f => f.visible)}
           onAssetClick={onAssetClick}
           onDeleteClick={onDeleteClick}
-          onMenuClick={onMenuClick}
+          onDownloadClick={onDownloadClick}
           onEditClick={onEditClick}
           onEditNameChange={onEditNameChange}
           onEditNameComplete={onEditNameComplete}
@@ -279,12 +306,15 @@ function AssetResultsView<T>({
           editedName={editedName}
           isAssetFavorited={isAssetFavorited}
           onFavoriteToggle={onFavoriteToggle}
+          isAssetSelected={isAssetSelected}
+          onSelectToggle={onSelectToggle}
           getAssetId={getAssetId}
           getAssetName={getAssetName}
           getAssetType={getAssetType}
           getAssetThumbnail={getAssetThumbnail}
           getAssetProxy={getAssetProxy}
           renderCardField={renderCardField}
+          selectedSearchFields={selectedFields}
         />
       ) : (
         <AssetTableView
@@ -295,7 +325,7 @@ function AssetResultsView<T>({
           groupByType={groupByType}
           onAssetClick={onAssetClick}
           onDeleteClick={onDeleteClick}
-          onMenuClick={onMenuClick}
+          onDownloadClick={onDownloadClick}
           onEditClick={onEditClick}
           onEditNameChange={onEditNameChange}
           onEditNameComplete={onEditNameComplete}
@@ -305,6 +335,11 @@ function AssetResultsView<T>({
           getAssetName={getAssetName}
           getAssetType={getAssetType}
           getAssetThumbnail={getAssetThumbnail}
+          isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
+          onSelectToggle={onSelectToggle}
+          isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
+          onFavoriteToggle={onFavoriteToggle}
+          selectedSearchFields={selectedFields}
         />
       )}
 

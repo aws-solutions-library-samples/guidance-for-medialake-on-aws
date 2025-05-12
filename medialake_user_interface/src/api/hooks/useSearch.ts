@@ -19,6 +19,7 @@ interface SearchParams {
     ingested_date_lte?: string;
     ingested_date_gte?: string;
     filename?: string;
+    fields?: string[];
 }
 
 interface SearchResponseData {
@@ -49,6 +50,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const page = params?.page || 1;
     const pageSize = params?.pageSize || 20;
     const isSemantic = params?.isSemantic ?? false;
+    const fields = params?.fields || [];
     const { showError } = useErrorModal();
 
     // Extract facet parameters from params
@@ -64,7 +66,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     } : undefined;
 
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, facetParams),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, facetParams, fields),
         queryFn: async ({ signal }) => {
             try {
                 // Build query parameters

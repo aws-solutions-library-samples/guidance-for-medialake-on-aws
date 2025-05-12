@@ -1,50 +1,58 @@
-import json
+"""
+Build the variables dict for the Twelve Labs /v1.3/embed POST.
 
-
-def translate_event_to_request(event):
-    """
-    Translate the Lambda event into variables for the API request.
-    This version extracts the URL (pre-signed URL) from the event payload and
-    determines the media type (video, image, or audio) from the event payload.
-    
-    Expected structure:
-    {
-      "metadata": {...},
-      "payload": {
-        "presignedUrl": "...",
-        "mediaType": "Image|Video|Audio",
-        ...
-      }
+Accepted event shape
+────────────────────
+event = {
+    "payload": {
+        "data":   { "presignedUrl": "…" },
+        "assets": [
+            { "DigitalSourceAsset": { "Type": "Image" | "Audio" } }
+        ]
     }
+}
+
+Anything else is considered invalid and triggers a hard failure.
+"""
+
+def _digital_asset_type(event: dict) -> str:
+    """
+    Return payload.assets[0].DigitalSourceAsset.Type, lower-cased.
+
+    Raises KeyError if the path is missing so the caller can fail loudly.
     """
     try:
-        # Extract payload from event
-        if "payload" not in event:
-            raise KeyError("Missing 'payload' in event")
-        
-        payload = event["payload"]
-        
-        # Extract presignedUrl from payload
-        if "presignedUrl" not in payload:
-            raise KeyError("Missing 'presignedUrl' in payload")
-        
-        url = payload["presignedUrl"]
-        
-        # Extract mediaType from payload and convert to lowercase
-        media_type = payload.get("mediaType", "")
-        if media_type:
-            media_type = media_type.lower()
-        else:
-            # Default to video if mediaType is not provided
-            media_type = "video"
-        
-        # Set the appropriate URL variable based on the media type
-        if media_type == "image":
-            return {"image_url": url}
-        elif media_type == "audio":
-            return {"audio_url": url}
-        else:
-            # Default to video for any other media type or if not specified
-            return {"video_url": url}
-    except KeyError as e:
-        raise KeyError(f"Missing expected key in event: {e}")
+        return (
+            event["payload"]["assets"][0]
+                 ["DigitalSourceAsset"]["Type"]
+                 .lower()
+        )
+    except (KeyError, IndexError, TypeError) as exc:
+        raise KeyError(
+            "DigitalSourceAsset.Type missing in payload.assets[0]"
+        ) from exc
+
+
+def translate_event_to_request(event: dict) -> dict:
+    # ── presigned URL ────────────────────────────────────────────────────────
+    url = (
+        event.get("payload", {})
+             .get("data", {})
+             .get("presignedUrl")
+    )
+    if not url:
+        raise KeyError("presignedUrl missing in event.payload.data")
+
+    # ── media kind ──────────────────────────────────────────────────────────
+    mtype = _digital_asset_type(event)
+
+    # ── map → variables for the Jinja request template ──────────────────────
+    if mtype == "image":
+        return {"image_url": url}
+    if mtype == "audio":
+        return {"audio_url": url}
+
+    raise ValueError(
+        f"Unsupported DigitalSourceAsset.Type “{mtype}” for /v1.3/embed "
+        "(only image & audio embeddings are supported)."
+    )
