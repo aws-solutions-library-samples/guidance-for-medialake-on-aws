@@ -20,7 +20,6 @@ from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterf
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
 from medialake_stacks.pre_deploy_cleanup_stack import PreDeployCleanUpStack, PreDeployCleanUpStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
-# from medialake_stacks.lambda_warmer_stack import LambdaWarmerStack - Development paused, commented out for now
 from medialake_stacks.integrations_environment_stack import IntegrationsEnvironmentStack, IntegrationsEnvironmentStackProps
 from medialake_stacks.pipeline_stack import (
     PipelineStack,
@@ -30,10 +29,6 @@ from medialake_stacks.pipeline_stack import (
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.cloudfront_waf_stack import CloudFrontWafStack
-from medialake_constructs.api_gateway.api_gateway_deployment_construct import (
-    ApiGatewayDeploymentConstruct,
-ApiGatewayDeploymentProps,
-)
 from medialake_stacks.api_gateway_deployment_stack import ApiGatewayDeploymentStack, ApiGatewayDeploymentStackProps
 
 # from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
@@ -56,19 +51,12 @@ if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
 else:
     env = cdk.Environment(account=app.account, region=app.region)
 
-
-## Create Lambda warmer stack if enabled ( ### Development paused, currently not used ###
-# lambda_warmer = None
-# if config.lambda_tail_warming:
-#     lambda_warmer = LambdaWarmerStack(app, "MediaLakeLambdaWarmer", env=env)
-
-
+# Create the PreDeployCleanUp stack first
 pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
 
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
 cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
 
-# Create the PreDeployCleanUp stack first
 
 # Create the BaseInfrastructureStack and make it depend on the PreDeployCleanUp stack
 base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
@@ -201,12 +189,12 @@ class MediaLakeStack(cdk.Stack):
     def connector_table(self):
         return self._api_gateway_stack.connector_table
 
-
 medialake_stack = MediaLakeStack(app, "MediaLakeStack",props=MediaLakeStackProps(
     api_gateway_core_stack=api_gateway_core_stack,
     base_infrastructure=base_infrastructure,
     ), env=env)
 medialake_stack.add_dependency(api_gateway_core_stack)
+medialake_stack.add_dependency(cloudfront_waf_stack)
 
 # Get API resources for dependencies
 api_resources = medialake_stack._api_gateway_stack.api_resources
@@ -241,18 +229,6 @@ user_interface_stack.add_dependency(medialake_stack)
 if config.resource_application_tag:
     cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
-# cdk.CfnOutput(
-#     user_interface_stack,
-#     "UserInterfaceUrl",
-#     value=user_interface_stack.user_interface_url,
-#     description="URL for the MediaLake User Interface",
-# )
-
-medialake_stack.add_dependency(cloudfront_waf_stack)
-
-
-
-
 cleanup_stack = CleanupStack(
     app,
     "MediaLakeCleanupStack",
@@ -270,26 +246,5 @@ cleanup_stack.add_dependency(api_gateway_core_stack)
 
 app.synth()
 
-
 # AWS Solutions checks
 # cdk.Aspects.of(app).add(AwsSolutionsChecks())
-
-# cleanup_stack.add_dependency(monitoring_stack)
-
-# Create the monitoring stack
-# monitoring_stack = MonitoringStack(
-#     app,
-#     "MediaLakeMonitoringStack",
-#     config_path="config.json",
-#     env=env,
-# )
-
-# if lambda_warmer:
-#     cleanup_stack.add_dependency(lambda_warmer)
-
-# cdk.CfnOutput(
-#     monitoring_stack,
-#     "MonitoringDashboardUrl",
-#     value=f"https://{app.region}.console.aws.amazon.com/cloudwatch/home?region={app.region}#dashboards:name={monitoring_stack.dashboard.dashboard_name}",
-#     description="URL for the MediaLake Monitoring Dashboard",
-# )

@@ -221,44 +221,52 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const asset = assetData?.data?.asset;
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
-    const descKeywordsColor = '#F6AD55';  // Orange
     
     // Extract metadata from API response
     const metadata = asset?.Metadata?.EmbeddedMetadata || {};
     const generalMetadata = metadata?.General || {};
     const imageMetadata = metadata?.Image?.[0] || {};
     
-    // Primary fields
-    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
-    const fileType = asset?.DigitalSourceAsset?.Type || 'Image';
-    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
-    const s3Bucket = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket || 'Unknown';
-    const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name || 'Unknown';
-    const s3Uri = s3Bucket && asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath
-        ? `s3://${s3Bucket}/${asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath}`
-        : 'Unknown';
+    // Create a helper function to render a field only if it exists in the API response
+    const renderField = (label: string, value: any, formatter?: (val: any) => string) => {
+        if (value === undefined || value === null) return null;
+        
+        return (
+            <Box sx={{ display: 'flex', mb: 1 }}>
+                <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>{label}:</Typography>
+                <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                    {formatter ? formatter(value) : value}
+                </Typography>
+            </Box>
+        );
+    };
+    
+    // File Information fields
+    const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size;
+    const fileType = asset?.DigitalSourceAsset?.Type;
+    const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.Format;
+    const s3Bucket = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
+    const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
+    const objectFullPath = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
+    const s3Uri = s3Bucket && objectFullPath ? `s3://${s3Bucket}/${objectFullPath}` : undefined;
     
     // Technical details
-    const width = imageMetadata?.Width || generalMetadata?.ImageWidth || 'Unknown';
-    const height = imageMetadata?.Height || generalMetadata?.ImageHeight || 'Unknown';
-    const dimensions = `${width}x${height}`;
-    const colorDepth = imageMetadata?.BitDepth || imageMetadata?.Bitdepth || '8';
-    const colorSpace = imageMetadata?.ColorSpace || imageMetadata?.Colorspace || 'Unknown';
-    const compression = imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm || 'Unknown';
-    const createdDate = asset?.DigitalSourceAsset?.CreateDate 
-        ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString() 
-        : 'Unknown';
-    
-    // Extract keywords/tags
-    const description = generalMetadata?.Description || 'High resolution image';
-    const keywords = generalMetadata?.Keywords || metadata?.Keywords || ['image'];
+    const width = imageMetadata?.Width || generalMetadata?.ImageWidth;
+    const height = imageMetadata?.Height || generalMetadata?.ImageHeight;
+    const dimensions = width && height ? `${width}x${height}` : undefined;
+    const colorDepth = imageMetadata?.BitDepth || imageMetadata?.Bitdepth;
+    const colorSpace = imageMetadata?.ColorSpace || imageMetadata?.Colorspace;
+    const compression = imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm;
+    const createdDate = asset?.DigitalSourceAsset?.CreateDate
+        ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
+        : undefined;
     
     return (
         <Box>
             {/* File Information Section */}
             <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: fileInfoColor,
                         fontSize: '0.875rem',
                         fontWeight: 600,
@@ -267,58 +275,25 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 >
                     File Information
                 </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
+                <Box sx={{
+                    width: '100%',
+                    height: '1px',
                     bgcolor: fileInfoColor,
                     mb: 2
                 }} />
                 
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{fileType}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {formatFileSize(fileSize)}
-                    </Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {fileFormat}
-                    </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 Bucket:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {s3Bucket}
-                    </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Object Name:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {objectName}
-                    </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>S3 URI:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                        {s3Uri}
-                    </Typography>
-                </Box>
+                {renderField('Type', fileType)}
+                {renderField('Size', fileSize, formatFileSize)}
+                {renderField('Format', fileFormat)}
+                {renderField('S3 Bucket', s3Bucket)}
+                {renderField('Object Name', objectName)}
+                {renderField('S3 URI', s3Uri)}
             </Box>
             
             {/* Technical Details Section */}
             <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: techDetailsColor,
                         fontSize: '0.875rem',
                         fontWeight: 600,
@@ -327,83 +302,18 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 >
                     Technical Details
                 </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
+                <Box sx={{
+                    width: '100%',
+                    height: '1px',
                     bgcolor: techDetailsColor,
                     mb: 2
                 }} />
                 
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Dimensions:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{dimensions}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Depth:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorDepth} bit</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Color Space:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{colorSpace}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Compression:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{compression}</Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', mb: 1 }}>
-                    <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
-                    <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
-                        {createdDate}
-                    </Typography>
-                </Box>
-            </Box>
-            
-            {/* Description & Keywords Section */}
-            <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
-                        color: descKeywordsColor,
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        mb: 0.5
-                    }}
-                >
-                    Description & Keywords
-                </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
-                    bgcolor: descKeywordsColor,
-                    mb: 2
-                }} />
-                
-                <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
-                    {description}
-                </Typography>
-                
-                <Box sx={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    gap: 0.75
-                }}>
-                    {(Array.isArray(keywords) ? keywords : [keywords]).map((keyword, index) => (
-                        <Chip
-                            key={index}
-                            label={keyword}
-                            size="small"
-                            sx={{
-                                bgcolor: '#1E2732',
-                                color: '#fff',
-                                borderRadius: '16px',
-                                fontSize: '0.75rem'
-                            }}
-                        />
-                    ))}
-                </Box>
+                {renderField('Dimensions', dimensions)}
+                {renderField('Color Depth', colorDepth, (val) => `${val} bit`)}
+                {renderField('Color Space', colorSpace)}
+                {renderField('Compression', compression)}
+                {renderField('Created Date', createdDate)}
             </Box>
         </Box>
     );
