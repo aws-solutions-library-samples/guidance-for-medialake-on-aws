@@ -16,10 +16,10 @@ import { Button } from '@/components/common';
 import {
     Search as SearchIcon,
     CloudUpload as CloudUploadIcon,
-    Translate as TranslateIcon,
     FilterList as FilterListIcon,
     Chat as ChatIcon,
-    Notifications as NotificationsIcon
+    Notifications as NotificationsIcon,
+    Psychology as PsychologyIcon
 } from '@mui/icons-material';
 import { useChat } from './contexts/ChatContext';
 import { useNavigate } from 'react-router-dom';
@@ -345,29 +345,6 @@ function TopBar() {
                         }}
                     />
                     
-                    {/* Semantic Search Toggle as Icon Button */}
-                    <IconButton
-                        size="small"
-                        onClick={(e) => handleSemanticSearchToggle(e)}
-                        sx={{
-                            color: isSemanticSearch
-                                ? muiTheme.palette.primary.main
-                                : theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
-                            '&:hover': {
-                                backgroundColor: 'transparent',
-                                color: isSemanticSearch
-                                    ? muiTheme.palette.primary.dark
-                                    : theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-                            },
-                            mr: 1
-                        }}
-                        title={isSemanticSearch
-                            ? t('search.semantic.disable', 'Disable semantic search')
-                            : t('search.semantic.enable', 'Enable semantic search')}
-                    >
-                        <TranslateIcon />
-                    </IconButton>
-                    
                     {/* Filter Button */}
                     <IconButton
                         size="small"
@@ -426,6 +403,55 @@ function TopBar() {
                     >
                         {t('common.search')}
                     </Button>
+                    
+                    {/* Semantic Search Toggle Button */}
+                    <IconButton
+                        size="medium"
+                        onClick={(e) => handleSemanticSearchToggle(e)}
+                        sx={{
+                            color: isSemanticSearch
+                                ? muiTheme.palette.primary.main  // Primary color when on
+                                : theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', // Neutral color when off
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '20px',
+                            padding: '10px',
+                            [isRTL ? 'mr' : 'ml']: 2,
+                            height: '40px',
+                            width: '40px',
+                            transition: theme => theme.transitions.create(['color', 'transform', 'background-color'], {
+                                duration: theme.transitions.duration.short,
+                            }),
+                            '&:hover': {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                                color: isSemanticSearch
+                                    ? muiTheme.palette.primary.dark
+                                    : theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                                transform: 'scale(1.05)',
+                            },
+                            '&:focus': {
+                                outline: `2px solid ${isSemanticSearch ? muiTheme.palette.primary.main : 'rgba(0,0,0,0.2)'}`,
+                                outlineOffset: '2px',
+                            },
+                            boxShadow: isSemanticSearch ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.4)}` : 'none',
+                        }}
+                        title={isSemanticSearch
+                            ? t('search.semantic.disable', 'Disable semantic search')
+                            : t('search.semantic.enable', 'Enable semantic search')}
+                        aria-pressed={isSemanticSearch}
+                        aria-label={isSemanticSearch
+                            ? t('search.semantic.disable', 'Disable semantic search')
+                            : t('search.semantic.enable', 'Enable semantic search')}
+                    >
+                        <PsychologyIcon
+                            sx={{
+                                fontSize: '24px',
+                                transform: isSemanticSearch ? 'rotate(10deg)' : 'none',
+                                transition: theme => theme.transitions.create(['transform'], {
+                                    duration: theme.transitions.duration.short,
+                                }),
+                            }}
+                        />
+                    </IconButton>
                 </Box>
             </Box>
 
