@@ -1,10 +1,10 @@
 {
   "user-favorites-enabled": {
-    "value": false,
+    "value": true,
     "variant": "on"
   },
   "file-upload-enabled": {
-    "value": false,
+    "value": true,
     "variant": "on"
   },
   "search-multi-select-enabled": {

@@ -114,15 +114,7 @@ export function AssetTable<T>({
         reverseFieldMapping[colId].push(apiId);
     });
     
-    // Log props for debugging - keep this for now to help debugging
-    console.log('AssetTable props:', {
-        dataLength: data.length,
-        isSelectedProvided: !!isSelected,
-        onSelectToggleProvided: !!onSelectToggle,
-        isFavoriteProvided: !!isFavorite,
-        onFavoriteToggleProvided: !!onFavoriteToggle,
-        selectedSearchFields
-    });
+    // Component initialization
     
     // Add state to track if all rows are selected
     const [allSelected, setAllSelected] = useState(false);
@@ -130,7 +122,6 @@ export function AssetTable<T>({
     
     // Function to handle selecting/deselecting all rows
     const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        console.log('handleSelectAll called with checked:', e.target.checked);
         if (onSelectToggle) {
             const visibleRows = data;
             visibleRows.forEach(row => {
@@ -138,8 +129,6 @@ export function AssetTable<T>({
                     onSelectToggle(row, e as any);
                 }
             });
-        } else {
-            console.log('onSelectToggle is not defined');
         }
     }, [data, onSelectToggle, isSelected]);
     
@@ -164,40 +153,30 @@ export function AssetTable<T>({
             visibleColumns = visibleColumns.filter(col => {
                 // Special case for name field
                 if (col.id === 'name') {
-                    const hasNameField = selectedSearchFields.some(field =>
+                    return selectedSearchFields.some(field =>
                         field.includes('Name') || field === 'objectName'
                     );
-                    console.log(`Name column check: ${hasNameField}`);
-                    return hasNameField;
                 }
                 
                 // Special case for date field
                 if (col.id === 'date') {
-                    const hasDateField = selectedSearchFields.some(field =>
+                    return selectedSearchFields.some(field =>
                         field.includes('CreateDate') || field === 'createdAt'
                     );
-                    console.log(`Date column check: ${hasDateField}`);
-                    return hasDateField;
                 }
                 
                 // Special case for size field
                 if (col.id === 'size') {
-                    const hasSizeField = selectedSearchFields.some(field =>
+                    return selectedSearchFields.some(field =>
                         field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
                     );
-                    console.log(`Size column check: ${hasSizeField}`);
-                    return hasSizeField;
                 }
                 
                 // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
                 const apiFieldIds = reverseFieldMapping[col.id] || [];
-                const isFieldSelected = apiFieldIds.some(apiFieldId =>
+                return apiFieldIds.some(apiFieldId =>
                     selectedSearchFields.includes(apiFieldId)
                 );
-                
-                console.log(`Column ${col.id} -> API fields [${apiFieldIds.join(', ')}]: ${isFieldSelected ? 'selected' : 'not selected'}`);
-                
-                return isFieldSelected;
             });
         }
         
@@ -248,7 +227,6 @@ export function AssetTable<T>({
                                 checked={isSelected(info.row.original)}
                                 onChange={(e) => {
                                     e.stopPropagation();
-                                    console.log('Checkbox onChange in row cell');
                                     onSelectToggle(info.row.original, e as any);
                                 }}
                                 sx={{

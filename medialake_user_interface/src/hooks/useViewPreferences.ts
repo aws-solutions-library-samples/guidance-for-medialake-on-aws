@@ -35,6 +35,7 @@ export function useViewPreferences<T>({
     { id: 'name', label: 'Object Name', visible: true },
     { id: 'type', label: 'Type', visible: true },
     { id: 'format', label: 'Format', visible: true },
+    { id: 'size', label: 'File Size', visible: true },
     { id: 'createdAt', label: 'Date Created', visible: true },
   ]);
 

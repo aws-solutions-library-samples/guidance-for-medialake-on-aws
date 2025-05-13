@@ -66,7 +66,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     } : undefined;
 
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, facetParams, fields),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
         queryFn: async ({ signal }) => {
             try {
                 // Build query parameters
@@ -85,6 +85,14 @@ export const useSearch = (query: string, params?: SearchParams) => {
                 if (params?.ingested_date_lte) queryParams.append('ingested_date_lte', params.ingested_date_lte);
                 if (params?.ingested_date_gte) queryParams.append('ingested_date_gte', params.ingested_date_gte);
                 if (params?.filename) queryParams.append('filename', params.filename);
+                
+                // Add fields to the query parameters
+                if (params?.fields && params.fields.length > 0) {
+                    // Use the short field names directly
+                    params.fields.forEach(field => {
+                        queryParams.append('fields', field);
+                    });
+                }
                 
                 const response = await apiClient.get<SearchResponseType>(
                     `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,

@@ -7,7 +7,7 @@ import { useTheme, alpha } from '@mui/material/styles';
 const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { addMessage, isOpen } = useChat();
+  const { addMessage, updateLastMessage, isOpen } = useChat();
   const theme = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
 

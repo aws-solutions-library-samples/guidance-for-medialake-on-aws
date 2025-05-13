@@ -155,6 +155,11 @@ const SearchPage: React.FC = () => {
         ...facetFilters // Include facet filters in the search
     });
     
+    // Access the nested data structure correctly
+    const searchData = data?.data;
+    const searchResults = searchData?.results || [];
+    const searchMetadata = searchData?.searchMetadata;
+    
     // Store search results in sessionStorage for access by other components
     useEffect(() => {
         if (searchResults) {
@@ -193,20 +198,24 @@ const SearchPage: React.FC = () => {
             target: { value },
         } = event;
         const newSelectedFields = typeof value === 'string' ? value.split(',') : value;
+        
+        // Check if fields were added or removed
+        const fieldsAdded = newSelectedFields.some(field => !selectedFields.includes(field));
+        
+        // Update the selected fields state
         setSelectedFields(newSelectedFields);
         
-        // Reset to first page when changing fields
-        setSearchParams(prev => {
-            const newParams = new URLSearchParams(prev);
-            newParams.set('page', '1');
-            return newParams;
-        });
+        // Only make a new API request if fields were added
+        if (fieldsAdded) {
+            // Reset to first page when adding fields
+            setSearchParams(prev => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('page', '1');
+                return newParams;
+            });
+        }
+        // If fields were only removed, don't make a new API request
     };
-
-    // Access the nested data structure correctly
-    const searchData = data?.data;
-    const searchResults = searchData?.results || [];
-    const searchMetadata = searchData?.searchMetadata;
 
     const [filters, setFilters] = useState<Filters>({
         mediaTypes: {

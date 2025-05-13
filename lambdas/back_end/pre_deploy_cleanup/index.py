@@ -5,7 +5,7 @@ import cfnresponse
 import concurrent.futures
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
-from lambda_middleware import lambda_handler_decorator
+from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
 from typing import List, Dict, Any
 
 # Initialize logger and tracer
@@ -245,9 +245,18 @@ def delete_resources_in_parallel() -> Dict[str, List[str]]:
 
 
 @lambda_handler_decorator
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event):
     """Lambda handler function."""
     logger.info(f"Received event: {event}")
+    
+    # Access the context object from the decorator
+    import inspect
+    frame = inspect.currentframe()
+    ctx = None
+    try:
+        ctx = frame.f_back.f_locals.get('ctx')
+    finally:
+        del frame  # Avoid reference cycles
     
     request_type = event["RequestType"]
     response_data = {}
@@ -269,16 +278,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             response_data["total_deleted"] = total_deleted
             
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+            cfnresponse.send(event, ctx, cfnresponse.SUCCESS, response_data)
         elif request_type == "Update":
             # Skip resource deletion on update
             logger.info("Skipping resource deletion on update")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+            cfnresponse.send(event, ctx, cfnresponse.SUCCESS, response_data)
         else:
             logger.error(f"Unknown request type: {request_type}")
-            cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+            cfnresponse.send(event, ctx, cfnresponse.FAILED, response_data)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}", exc_info=True)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)})
+        cfnresponse.send(event, ctx, cfnresponse.FAILED, {"Error": str(e)})
     
     return response_data
