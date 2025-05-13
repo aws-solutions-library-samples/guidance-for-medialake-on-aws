@@ -83,8 +83,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const cardRef = useRef<HTMLDivElement>(null);
     
     // Check if features are enabled
-    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-    const favoritesFeature = useFeatureFlag('user-favorites-enabled', false);
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
+    const favoritesFeature = useFeatureFlag('user-favorites-enabled', true);
 
     // Update when menuOpen prop changes
     useEffect(() => {
@@ -330,7 +330,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     />
                 )}
 
-                {/* Position checkbox and favorite buttons at the top left of the card - only visible on hover */}
+                {/* Position checkbox and favorite buttons at the top left of the card */}
                 <Box
                     sx={{
                         position: 'absolute',
@@ -339,11 +339,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         display: 'flex',
                         gap: 1,
                         zIndex: 1000, // Keep high z-index to ensure it's above other elements
-                        opacity: shouldShowButtons ? 1 : 0, // Only visible when hovering
+                        opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0, // Visible when hovering, selected, or favorited
                         transition: 'opacity 0.2s ease-in-out',
-                        pointerEvents: shouldShowButtons ? 'auto' : 'none', // Ensure buttons are clickable only when visible
+                        pointerEvents: shouldShowButtons || isSelected || isFavorite ? 'auto' : 'none', // Ensure buttons are clickable when visible
                         '&:hover': {
-                            opacity: shouldShowButtons ? 1 : 0,
+                            opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0,
                         }
                     }}
                     onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
@@ -351,29 +351,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     {/* Checkbox for bulk selection - only show if feature flag is enabled */}
                     {multiSelectFeature.value && (
                         <Box
-                            sx={(theme) => ({
-                                bgcolor: isSelected
-                                    ? alpha(theme.palette.primary.main, 0.25) // More visible background color when selected
-                                    : alpha(theme.palette.background.paper, 0.7),
-                                borderRadius: '50%',
+                            sx={{
                                 display: 'flex',
                                 justifyContent: 'center',
                                 alignItems: 'center',
-                                padding: '4px',
-                                border: isSelected
-                                    ? `2px solid ${theme.palette.primary.main}` // Thicker border when selected
-                                    : 'none',
-                                boxShadow: isSelected
-                                    ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.5)}` // Add glow effect
-                                    : 'none',
-                                '&:hover': {
-                                    bgcolor: isSelected
-                                        ? alpha(theme.palette.primary.main, 0.35)
-                                        : alpha(theme.palette.background.default, 0.9),
-                                },
                                 transition: 'all 0.2s ease-in-out',
                                 transform: isSelected ? 'scale(1.15)' : 'scale(1)', // Slightly larger when selected
-                            })}
+                            }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (onSelectToggle) {
@@ -412,13 +396,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                     onFavoriteToggle(e);
                                 }
                             }}
-                            sx={(theme) => ({
-                                bgcolor: alpha(theme.palette.background.paper, 0.7),
+                            sx={{
                                 padding: '4px',
-                                '&:hover': {
-                                    bgcolor: alpha(theme.palette.background.default, 0.9),
-                                }
-                            })}
+                            }}
                         >
                             {isFavorite ? (
                                 <FavoriteIcon fontSize="small" color="error" />
