@@ -20,4 +20,10 @@ export interface FacetFilters {
   ingested_date_lte?: string;
   ingested_date_gte?: string;
   filename?: string;
+  
+  /**
+   * Selected date range option
+   * Can be one of: '24h', '7d', '14d', '30d'
+   */
+  date_range_option?: string;
 }
