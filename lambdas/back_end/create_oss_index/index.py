@@ -283,6 +283,7 @@ def handler(event, context):
                             }
                         },
                         "EmbeddedMetadata": { "type": "object", "dynamic": True }
+                        }
                     }
                 }
             }
