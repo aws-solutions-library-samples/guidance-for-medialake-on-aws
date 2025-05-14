@@ -14,19 +14,28 @@ s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
 # Supported special keywords for search
 KEYWORDS = {
     'type': r'type:(\w+)',
-    'format': r'format:(\w+)',
-    'size': r'size:([<>]=?\d+(?:\.\d+)?(?:B|KB|MB|GB|TB))',
-    'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
-    'metadata': r'metadata:(\w+:\w+)',
-    'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)',
-    'extension': r'extension:([a-zA-Z0-9]+)',
-    'filename': r'filename:([a-zA-Z0-9._\-]+)'
+    'asset_size_gte': r'asset_size_gte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
+    'asset_size_lte': r'asset_size_lte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
+    'extension': r'extension:([a-zA-Z0-9._\-*/]+)',
+    'ingested_date_gte': r'ingested_date_gte:([<>]=?\d{4}-\d{2}-\d{2})',
+    'ingested_date_lte': r'ingested_date_lte:([<>]=?\d{4}-\d{2}-\d{2})'
 }
 
+#KEYWORDS = {
+#    'content_type': r'type:(\w+)',
+#    'format': r'format:(\w+)',
+#    'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
+#    'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
+#    'metadata': r'metadata:(\w+:\w+)',
+#	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
+#}
+
+
+
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
-    """Convert size string (e.g., '1GB', '500MB', '1024B') to bytes"""
+    """Convert size string (e.g., '1GB', '500MB') to bytes"""
     try:
-        pattern = r'([<>]=?)(\d+(?:\.\d+)?)(B|KB|MB|GB|TB)'
+        pattern = r'([<>]=?)(\d+(?:\.\d+)?)(KB|MB|GB|TB)'
         match = re.match(pattern, size_str)
         if not match:
             return None
@@ -35,7 +44,6 @@ def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
         value = float(value)
         
         multipliers = {
-            'B': 1,
             'KB': 1024,
             'MB': 1024 ** 2,
             'GB': 1024 ** 3,
@@ -82,28 +90,6 @@ def parse_metadata_value(metadata_str: str) -> Optional[Dict]:
         logger.warning(f"Error parsing metadata value: {str(e)}")
         return None
 
-def parse_extension_value(extension_str: str) -> Optional[str]:
-    """Parse file extension (e.g., 'jpg', 'mp4')"""
-    try:
-        # Simple validation to ensure it's a valid extension
-        if re.match(r'^[a-zA-Z0-9]+$', extension_str):
-            return extension_str.lower()
-        return None
-    except Exception as e:
-        logger.warning(f"Error parsing extension value: {str(e)}")
-        return None
-
-def parse_filename_value(filename_str: str) -> Optional[str]:
-    """Parse filename search term"""
-    try:
-        # Basic validation for filename
-        if re.match(r'^[a-zA-Z0-9._\-]+$', filename_str):
-            return filename_str
-        return None
-    except Exception as e:
-        logger.warning(f"Error parsing filename value: {str(e)}")
-        return None
-
 def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
     """
     Parse search query to extract filters and clean search term
@@ -121,16 +107,18 @@ def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
             value = match.group(1)
             
             # Process value based on keyword type
-            if keyword == 'size':
+            if keyword == 'asset_size_gte':
                 parsed_value = parse_size_value(value)
-            elif keyword == 'date':
+            elif keyword == 'asset_size_lte':
+                parsed_value = parse_size_value(value)
+            elif keyword == 'ingested_date_gte':
                 parsed_value = parse_date_value(value)
-            elif keyword == 'metadata':
-                parsed_value = parse_metadata_value(value)
+            elif keyword == 'ingested_date_lte':
+                parsed_value = parse_date_value(value)
             elif keyword == 'extension':
-                parsed_value = parse_extension_value(value)
-            elif keyword == 'filename':
-                parsed_value = parse_filename_value(value)
+                parsed_value = parse_metadata_value(value)
+            elif keyword == 'type':
+                parsed_value = parse_metadata_value(value)
             else:
                 parsed_value = value
                 
