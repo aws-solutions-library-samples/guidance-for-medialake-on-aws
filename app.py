@@ -52,15 +52,15 @@ else:
     env = cdk.Environment(account=app.account, region=app.region)
 
 # Create the PreDeployCleanUp stack first
-pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
+# pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
 
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
-cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
+# cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
 
 
 # Create the BaseInfrastructureStack and make it depend on the PreDeployCleanUp stack
 base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
-base_infrastructure.add_dependency(pre_deploy_cleanup_stack)
+# base_infrastructure.add_dependency(pre_deploy_cleanup_stack)
 
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
