@@ -79,6 +79,16 @@ class SearchParams(BaseModelWithConfig):
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
     semantic: bool = Field(default=False)
+    
+    # New facet parameters
+    type: Optional[str] = None
+    extension: Optional[str] = None
+    LargerThan: Optional[int] = None
+    asset_size_lte: Optional[int] = None
+    asset_size_gte: Optional[int] = None
+    ingested_date_lte: Optional[str] = None
+    ingested_date_gte: Optional[str] = None
+    filename: Optional[str] = None
 
     @property
     def from_(self) -> int:
@@ -261,7 +271,9 @@ def build_search_query(params: SearchParams) -> Dict:
         "Metadata.Embedded.S3.ContentType"
     ]
 
+    # Handle multi-keyword search by splitting the query into terms
     if clean_query:
+        terms = clean_query.split()
         query = {
             "bool": {
                 "must": [
@@ -287,9 +299,9 @@ def build_search_query(params: SearchParams) -> Dict:
                             "fields": name_fields,
                             "type": "best_fields",
                             "fuzziness": "AUTO",
-                            "prefix_length": 1,
-                            "minimum_should_match": "20%",
-                            "boost": 2
+                            "prefix_length": 12,
+                            "minimum_should_match": "80%",
+                            "boost": 4
                         }
                     },
                     {
@@ -330,6 +342,19 @@ def build_search_query(params: SearchParams) -> Dict:
                 "filter": []
             }
         }
+        
+        # Add individual term matches for multi-keyword search with OR logic
+        if len(terms) > 1:
+            for term in terms:
+                query["bool"]["should"].append({
+                    "multi_match": {
+                        "query": term,
+                        "fields": name_fields + type_fields,
+                        "type": "best_fields",
+                        "fuzziness": "AUTO",
+                        "boost": 0.5
+                    }
+                })
     else:
         query = {
             "bool": {
@@ -361,6 +386,7 @@ def build_search_query(params: SearchParams) -> Dict:
             }
         }
 
+    # Process parsed filters from the query string
     if parsed_filters:
         if 'type' in parsed_filters:
             query["bool"]["filter"].append({
@@ -409,7 +435,97 @@ def build_search_query(params: SearchParams) -> Dict:
                         f"Metadata.Consolidated.{metadata_filter['key']}.keyword": metadata_filter['value']
                     }
                 })
+        if 'extension' in parsed_filters:
+            for extension in parsed_filters['extension']:
+                query["bool"]["filter"].append({
+                    "term": {
+                        "DigitalSourceAsset.MainRepresentation.Format.keyword": extension
+                    }
+                })
+        if 'filename' in parsed_filters:
+            for filename in parsed_filters['filename']:
+                query["bool"]["filter"].append({
+                    "wildcard": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                            "value": f"*{filename}*"
+                        }
+                    }
+                })
 
+    # Process explicit facet parameters from the API request
+    if params.type:
+        query["bool"]["filter"].append({
+            "term": {"DigitalSourceAsset.Type.keyword": params.type}
+        })
+    
+    if params.extension:
+        query["bool"]["filter"].append({
+            "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": params.extension}
+        })
+    
+    if params.LargerThan:
+        query["bool"]["filter"].append({
+            "range": {
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
+                    "gt": params.LargerThan
+                }
+            }
+        })
+    
+    if params.asset_size_lte:
+        query["bool"]["filter"].append({
+            "range": {
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
+                    "lte": params.asset_size_lte
+                }
+            }
+        })
+    
+    if params.asset_size_gte:
+        query["bool"]["filter"].append({
+            "range": {
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
+                    "gte": params.asset_size_gte
+                }
+            }
+        })
+    
+    if params.ingested_date_lte:
+        try:
+            date_value = datetime.strptime(params.ingested_date_lte, '%Y-%m-%d').isoformat()
+            query["bool"]["filter"].append({
+                "range": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
+                        "lte": date_value
+                    }
+                }
+            })
+        except ValueError:
+            logger.warning(f"Invalid date format for ingested_date_lte: {params.ingested_date_lte}")
+    
+    if params.ingested_date_gte:
+        try:
+            date_value = datetime.strptime(params.ingested_date_gte, '%Y-%m-%d').isoformat()
+            query["bool"]["filter"].append({
+                "range": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
+                        "gte": date_value
+                    }
+                }
+            })
+        except ValueError:
+            logger.warning(f"Invalid date format for ingested_date_gte: {params.ingested_date_gte}")
+    
+    if params.filename:
+        query["bool"]["filter"].append({
+            "wildcard": {
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                    "value": f"*{params.filename}*"
+                }
+            }
+        })
+
+    # Process generic filters
     if params.filters:
         for filter_item in params.filters:
             if filter_item.get("operator") == "term":
@@ -421,6 +537,7 @@ def build_search_query(params: SearchParams) -> Dict:
                     {"range": {filter_item["field"]: filter_item["value"]}}
                 )
 
+    # Build the complete OpenSearch query with aggregations for facets
     return {
         "query": query,
         "min_score": params.min_score,
@@ -430,13 +547,38 @@ def build_search_query(params: SearchParams) -> Dict:
             "file_types": {
                 "terms": {
                     "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
-                    "size": 20
+                    "size": 50
                 }
             },
             "asset_types": {
                 "terms": {
                     "field": "DigitalSourceAsset.Type.keyword",
                     "size": 20
+                }
+            },
+            "file_extensions": {
+                "terms": {
+                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+                    "size": 50
+                }
+            },
+            "file_size_ranges": {
+                "range": {
+                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+                    "ranges": [
+                        { "to": 1024 * 100 },                  # < 100KB
+                        { "from": 1024 * 100, "to": 1024 * 1024 },      # 100KB - 1MB
+                        { "from": 1024 * 1024, "to": 10 * 1024 * 1024 },  # 1MB - 10MB
+                        { "from": 10 * 1024 * 1024, "to": 100 * 1024 * 1024 },  # 10MB - 100MB
+                        { "from": 100 * 1024 * 1024 }          # > 100MB
+                    ]
+                }
+            },
+            "ingestion_date": {
+                "date_histogram": {
+                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
+                    "calendar_interval": "month",
+                    "format": "yyyy-MM-dd"
                 }
             }
         },
@@ -447,6 +589,8 @@ def build_search_query(params: SearchParams) -> Dict:
                 "DigitalSourceAsset.MainRepresentation.Format",
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
                 "DigitalSourceAsset.CreateDate",
                 "DerivedRepresentations.Purpose",
                 "DerivedRepresentations.StorageInfo.PrimaryLocation",

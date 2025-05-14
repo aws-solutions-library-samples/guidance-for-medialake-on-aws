@@ -103,7 +103,11 @@ export default {
         }
     },
     search: {
-        semantic: 'Semantic Search',
+        semantic: {
+            label: 'Semantic',
+            enable: 'Enable semantic search',
+            disable: 'Disable semantic search'
+        },
         filters: {
             dateRange: 'Date Range',
             contentType: 'Content Type',

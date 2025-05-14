@@ -10,6 +10,15 @@ interface SearchParams {
     page?: number;
     pageSize?: number;
     isSemantic?: boolean;
+    // New facet parameters
+    type?: string;
+    extension?: string;
+    LargerThan?: number;
+    asset_size_lte?: number;
+    asset_size_gte?: number;
+    ingested_date_lte?: string;
+    ingested_date_gte?: string;
+    filename?: string;
     fields?: string[];
 }
 
@@ -44,19 +53,51 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const fields = params?.fields || [];
     const { showError } = useErrorModal();
 
+    // Extract facet parameters from params
+    const facetParams = params ? {
+        type: params.type,
+        extension: params.extension,
+        LargerThan: params.LargerThan,
+        asset_size_lte: params.asset_size_lte,
+        asset_size_gte: params.asset_size_gte,
+        ingested_date_lte: params.ingested_date_lte,
+        ingested_date_gte: params.ingested_date_gte,
+        filename: params.filename
+    } : undefined;
+
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
         queryFn: async ({ signal }) => {
             try {
-                // Build the URL with query parameters
-                let url = `${API_ENDPOINTS.SEARCH}?q=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}&semantic=${isSemantic}`;
+                // Build query parameters
+                const queryParams = new URLSearchParams();
+                queryParams.append('q', query);
+                queryParams.append('page', page.toString());
+                queryParams.append('pageSize', pageSize.toString());
+                queryParams.append('semantic', isSemantic.toString());
                 
-                // Add fields parameter if fields are specified
-                if (fields.length > 0) {
-                    url += `&fields=${encodeURIComponent(fields.join(','))}`;
+                // Add facet parameters if they exist
+                if (params?.type) queryParams.append('type', params.type);
+                if (params?.extension) queryParams.append('extension', params.extension);
+                if (params?.LargerThan) queryParams.append('LargerThan', params.LargerThan.toString());
+                if (params?.asset_size_lte) queryParams.append('asset_size_lte', params.asset_size_lte.toString());
+                if (params?.asset_size_gte) queryParams.append('asset_size_gte', params.asset_size_gte.toString());
+                if (params?.ingested_date_lte) queryParams.append('ingested_date_lte', params.ingested_date_lte);
+                if (params?.ingested_date_gte) queryParams.append('ingested_date_gte', params.ingested_date_gte);
+                if (params?.filename) queryParams.append('filename', params.filename);
+                
+                // Add fields to the query parameters
+                if (params?.fields && params.fields.length > 0) {
+                    // Use the short field names directly
+                    params.fields.forEach(field => {
+                        queryParams.append('fields', field);
+                    });
                 }
                 
-                const response = await apiClient.get<SearchResponseType>(url, { signal });
+                const response = await apiClient.get<SearchResponseType>(
+                    `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,
+                    { signal }
+                );
 
                 // Check if the response status is not a success (2xx)
                 if (response.data?.status && !response.data.status.startsWith('2')) {

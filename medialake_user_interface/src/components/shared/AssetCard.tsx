@@ -204,9 +204,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         'InventoryID': 'id'
     };
 
-    // Log the selected search fields for debugging
-    console.log('Selected search fields:', selectedSearchFields);
-    console.log('Card fields:', fields);
+    // Create a reverse mapping for easier lookup
 
     // Create a reverse mapping for easier lookup
     // Since multiple API fields can map to the same card field, we need to store arrays
@@ -228,39 +226,28 @@ const AssetCard: React.FC<AssetCardProps> = ({
         
         // Special case for name field - check if any selected field contains 'Name' or matches 'objectName'
         if (field.id === 'name') {
-            const hasNameField = selectedSearchFields.some(field =>
+            return selectedSearchFields.some(field =>
                 field.includes('Name') || field === 'objectName'
             );
-            console.log(`Name field check: ${hasNameField}`);
-            return hasNameField;
         }
         
         // Special case for date field - check if any selected field contains 'CreateDate' or matches 'createdAt'
         if (field.id === 'createdAt') {
-            const hasDateField = selectedSearchFields.some(field =>
+            return selectedSearchFields.some(field =>
                 field.includes('CreateDate') || field === 'createdAt'
             );
-            console.log(`Date field check: ${hasDateField}`);
-            return hasDateField;
         }
         
         // Special case for file size field - check if any selected field contains 'FileSize', 'Size', or matches 'fileSize'
         if (field.id === 'size') {
-            const hasSizeField = selectedSearchFields.some(field =>
+            return selectedSearchFields.some(field =>
                 field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
             );
-            console.log(`Size field check: ${hasSizeField}`);
-            return hasSizeField;
         }
         
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[field.id] || [];
-        const isFieldSelected = apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
-        
-        // Log the field mapping for debugging
-        console.log(`Field ${field.id} -> API fields [${apiFieldIds.join(', ')}]: ${isFieldSelected ? 'selected' : 'not selected'}`);
-        
-        return isFieldSelected;
+        return apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
     });
 
     return (

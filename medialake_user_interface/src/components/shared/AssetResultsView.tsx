@@ -287,61 +287,114 @@ function AssetResultsView<T>({
         onShowMetadataChange={onShowMetadataChange}
       />
 
-      {viewMode === 'card' ? (
-        <AssetGridView
-          results={results}
-          groupByType={groupByType}
-          cardSize={cardSize}
-          aspectRatio={aspectRatio}
-          thumbnailScale={thumbnailScale}
-          showMetadata={showMetadata}
-          cardFields={cardFields.filter(f => f.visible)}
-          onAssetClick={onAssetClick}
-          onDeleteClick={onDeleteClick}
-          onDownloadClick={onDownloadClick}
-          onEditClick={onEditClick}
-          onEditNameChange={onEditNameChange}
-          onEditNameComplete={onEditNameComplete}
-          editingAssetId={editingAssetId}
-          editedName={editedName}
-          isAssetFavorited={isAssetFavorited}
-          onFavoriteToggle={onFavoriteToggle}
-          isAssetSelected={isAssetSelected}
-          onSelectToggle={onSelectToggle}
-          getAssetId={getAssetId}
-          getAssetName={getAssetName}
-          getAssetType={getAssetType}
-          getAssetThumbnail={getAssetThumbnail}
-          getAssetProxy={getAssetProxy}
-          renderCardField={renderCardField}
-          selectedSearchFields={selectedFields}
-        />
-      ) : (
-        <AssetTableView
-          results={results}
-          columns={columns}
-          sorting={sorting}
-          onSortChange={onSortChange}
-          groupByType={groupByType}
-          onAssetClick={onAssetClick}
-          onDeleteClick={onDeleteClick}
-          onDownloadClick={onDownloadClick}
-          onEditClick={onEditClick}
-          onEditNameChange={onEditNameChange}
-          onEditNameComplete={onEditNameComplete}
-          editingAssetId={editingAssetId}
-          editedName={editedName}
-          getAssetId={getAssetId}
-          getAssetName={getAssetName}
-          getAssetType={getAssetType}
-          getAssetThumbnail={getAssetThumbnail}
-          isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
-          onSelectToggle={onSelectToggle}
-          isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
-          onFavoriteToggle={onFavoriteToggle}
-          selectedSearchFields={selectedFields}
-        />
-      )}
+      {/* Sort the results based on the current sorting state */}
+      {(() => {
+        // Sort the results if sorting is specified
+        const sortedResults = [...results];
+        if (sorting.length > 0) {
+          const { id: sortField, desc } = sorting[0];
+          sortedResults.sort((a, b) => {
+            let valueA, valueB;
+            
+            // Get values based on field ID
+            switch (sortField) {
+              case 'name':
+                valueA = getAssetName(a);
+                valueB = getAssetName(b);
+                break;
+              case 'type':
+                valueA = getAssetType(a);
+                valueB = getAssetType(b);
+                break;
+              case 'size':
+                // Assuming there's a way to get size from the asset
+                const sizeFieldA = a as any;
+                const sizeFieldB = b as any;
+                valueA = sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                valueB = sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                break;
+              case 'date':
+                // Assuming there's a way to get date from the asset
+                const dateFieldA = a as any;
+                const dateFieldB = b as any;
+                valueA = dateFieldA?.DigitalSourceAsset?.CreateDate ? new Date(dateFieldA.DigitalSourceAsset.CreateDate).getTime() : 0;
+                valueB = dateFieldB?.DigitalSourceAsset?.CreateDate ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime() : 0;
+                break;
+              default:
+                valueA = (a as any)[sortField];
+                valueB = (b as any)[sortField];
+            }
+            
+            // Compare values
+            if (valueA === valueB) return 0;
+            
+            // Handle string comparison
+            if (typeof valueA === 'string' && typeof valueB === 'string') {
+              return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
+            }
+            
+            // Handle number comparison
+            return desc ? valueB - valueA : valueA - valueB;
+          });
+        }
+        
+        // Return the appropriate view based on viewMode
+        return viewMode === 'card' ? (
+          <AssetGridView
+            results={sortedResults}
+            groupByType={groupByType}
+            cardSize={cardSize}
+            aspectRatio={aspectRatio}
+            thumbnailScale={thumbnailScale}
+            showMetadata={showMetadata}
+            cardFields={cardFields.filter(f => f.visible)}
+            onAssetClick={onAssetClick}
+            onDeleteClick={onDeleteClick}
+            onDownloadClick={onDownloadClick}
+            onEditClick={onEditClick}
+            onEditNameChange={onEditNameChange}
+            onEditNameComplete={onEditNameComplete}
+            editingAssetId={editingAssetId}
+            editedName={editedName}
+            isAssetFavorited={isAssetFavorited}
+            onFavoriteToggle={onFavoriteToggle}
+            isAssetSelected={isAssetSelected}
+            onSelectToggle={onSelectToggle}
+            getAssetId={getAssetId}
+            getAssetName={getAssetName}
+            getAssetType={getAssetType}
+            getAssetThumbnail={getAssetThumbnail}
+            getAssetProxy={getAssetProxy}
+            renderCardField={renderCardField}
+            selectedSearchFields={selectedFields}
+          />
+        ) : (
+          <AssetTableView
+            results={sortedResults}
+            columns={columns}
+            sorting={sorting}
+            onSortChange={onSortChange}
+            groupByType={groupByType}
+            onAssetClick={onAssetClick}
+            onDeleteClick={onDeleteClick}
+            onDownloadClick={onDownloadClick}
+            onEditClick={onEditClick}
+            onEditNameChange={onEditNameChange}
+            onEditNameComplete={onEditNameComplete}
+            editingAssetId={editingAssetId}
+            editedName={editedName}
+            getAssetId={getAssetId}
+            getAssetName={getAssetName}
+            getAssetType={getAssetType}
+            getAssetThumbnail={getAssetThumbnail}
+            isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
+            onSelectToggle={onSelectToggle}
+            isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
+            onFavoriteToggle={onFavoriteToggle}
+            selectedSearchFields={selectedFields}
+          />
+        );
+      })()}
 
       <AssetPagination
         page={searchMetadata.page}

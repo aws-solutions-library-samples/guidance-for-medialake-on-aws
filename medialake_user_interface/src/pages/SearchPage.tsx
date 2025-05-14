@@ -41,6 +41,8 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
         Type: string;
     };
 };
+import { useFacetSearch } from '../hooks/useFacetSearch';
+import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
     query?: string;
@@ -52,6 +54,14 @@ interface LocationState {
     thumbnailScale?: 'fit' | 'fill';
     showMetadata?: boolean;
     groupByType?: boolean;
+    type?: string;
+    extension?: string;
+    LargerThan?: number;
+    asset_size_lte?: number;
+    asset_size_gte?: number;
+    ingested_date_lte?: string;
+    ingested_date_gte?: string;
+    filename?: string;
 }
 
 interface Filters {
@@ -79,7 +89,18 @@ interface SelectedAsset {
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
-    const { query, isSemantic } = (location.state as LocationState) || {};
+    const {
+        query,
+        isSemantic,
+        type,
+        extension,
+        LargerThan,
+        asset_size_lte,
+        asset_size_gte,
+        ingested_date_lte,
+        ingested_date_gte,
+        filename
+    } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
@@ -89,7 +110,35 @@ const SearchPage: React.FC = () => {
     const [pageSize, setPageSize] = useState<number>(
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
+
+    // Initialize facet filters from URL params first, then fall back to location state
+    const initialFacetFilters: FacetFilters = {
+        // Get values from URL params first, then fall back to location state
+        type: searchParams.get('type') || type,
+        extension: searchParams.get('extension') || extension,
+        LargerThan: searchParams.has('LargerThan')
+            ? parseInt(searchParams.get('LargerThan') || '0', 10)
+            : LargerThan,
+        asset_size_lte: searchParams.has('asset_size_lte')
+            ? parseInt(searchParams.get('asset_size_lte') || '0', 10)
+            : asset_size_lte,
+        asset_size_gte: searchParams.has('asset_size_gte')
+            ? parseInt(searchParams.get('asset_size_gte') || '0', 10)
+            : asset_size_gte,
+        ingested_date_lte: searchParams.get('ingested_date_lte') || ingested_date_lte,
+        ingested_date_gte: searchParams.get('ingested_date_gte') || ingested_date_gte,
+        filename: searchParams.get('filename') || filename
+    };
     
+    // Remove undefined values
+    Object.keys(initialFacetFilters).forEach(key => {
+        if (initialFacetFilters[key as keyof FacetFilters] === undefined) {
+            delete initialFacetFilters[key as keyof FacetFilters];
+        }
+    });
+    
+    const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
+        
     // State for selected fields
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
@@ -102,8 +151,27 @@ const SearchPage: React.FC = () => {
         page: currentPage,
         pageSize: pageSize,
         isSemantic: currentSemantic,
-        fields: selectedFields
+        fields: selectedFields,
+        ...facetFilters // Include facet filters in the search
     });
+    
+    // Access the nested data structure correctly
+    const searchData = data?.data;
+    const searchResults = searchData?.results || [];
+    const searchMetadata = searchData?.searchMetadata;
+    
+    // Store search results in sessionStorage for access by other components
+    useEffect(() => {
+        if (searchResults) {
+            try {
+                sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+                // Trigger storage event for other components to detect the change
+                window.dispatchEvent(new Event('storage'));
+            } catch (e) {
+                console.error('Error storing search results in session storage', e);
+            }
+        }
+    }, [searchResults]);
     
     // Fetch search fields
     const {
@@ -130,20 +198,24 @@ const SearchPage: React.FC = () => {
             target: { value },
         } = event;
         const newSelectedFields = typeof value === 'string' ? value.split(',') : value;
+        
+        // Check if fields were added or removed
+        const fieldsAdded = newSelectedFields.some(field => !selectedFields.includes(field));
+        
+        // Update the selected fields state
         setSelectedFields(newSelectedFields);
         
-        // Reset to first page when changing fields
-        setSearchParams(prev => {
-            const newParams = new URLSearchParams(prev);
-            newParams.set('page', '1');
-            return newParams;
-        });
+        // Only make a new API request if fields were added
+        if (fieldsAdded) {
+            // Reset to first page when adding fields
+            setSearchParams(prev => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('page', '1');
+                return newParams;
+            });
+        }
+        // If fields were only removed, don't make a new API request
     };
-
-    // Access the nested data structure correctly
-    const searchData = data?.data;
-    const searchResults = searchData?.results || [];
-    const searchMetadata = searchData?.searchMetadata;
 
     const [filters, setFilters] = useState<Filters>({
         mediaTypes: {
