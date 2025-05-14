@@ -597,7 +597,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   </Typography>
                   <DateTimePicker
                     value={startDate}
-                    clearable={true}
                     onChange={(newValue) => {
                       setStartDate(newValue);
                       // Update date range option based on selected date
@@ -641,7 +640,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   </Typography>
                   <DateTimePicker
                     value={endDate}
-                    clearable={true}
                     onChange={(newValue) => {
                       setEndDate(newValue);
                       // Update date range option based on selected date
