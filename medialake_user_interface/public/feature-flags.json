@@ -1,10 +1,22 @@
 {
   "user-favorites-enabled": {
     "value": false,
-    "variant": "on"
+    "variant": "off"
   },
   "file-upload-enabled": {
     "value": false,
-    "variant": "on"
+    "variant": "off"
+  },
+  "search-multi-select-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "chat-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "notification-enabled": {
+    "value": false,
+    "variant": "off"
   }
 }

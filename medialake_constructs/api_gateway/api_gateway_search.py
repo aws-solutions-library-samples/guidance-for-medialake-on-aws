@@ -150,3 +150,58 @@ class SearchConstruct(Construct):
         
         # Add CORS support
         add_cors_options_method(search_resource)
+        
+        # Create fields resource under search
+        fields_resource = search_resource.add_resource("fields")
+        
+        # Create Lambda for search fields endpoint
+        search_fields_lambda = Lambda(
+            self,
+            "SearchFieldsLambda",
+            config=LambdaConfig(
+                name="search-fields-get",
+                entry="lambdas/api/search/fields/get_fields",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": (
+                        props.x_origin_verify_secret.secret_arn
+                    ),
+                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                },
+            ),
+        )
+        
+        # Add permissions to access Secrets Manager
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=["*"],
+            )
+        )
+        
+        # Add permissions to access the system settings table
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"],
+            )
+        )
+        
+        # Add the GET method to the fields resource
+        fields_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(search_fields_lambda.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        
+        # Add CORS support to fields resource
+        add_cors_options_method(fields_resource)

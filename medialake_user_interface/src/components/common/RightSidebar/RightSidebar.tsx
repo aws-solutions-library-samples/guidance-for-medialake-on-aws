@@ -13,7 +13,7 @@ const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-    const { isExpanded, setIsExpanded, width, setWidth } = useRightSidebar();
+    const { isExpanded, setIsExpanded, width, setWidth, setHasSelectedItems } = useRightSidebar();
     const location = useLocation();
     const [isResizing, setIsResizing] = useState(false);
     const resizeHandleRef = useRef<HTMLDivElement | null>(null);
@@ -25,12 +25,19 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
         }
     }, [width]);
 
-    // Auto-close on search page
+    // Check if items are selected based on URL
     useEffect(() => {
-        if (location.pathname === '/search') {
+        const searchParams = new URLSearchParams(location.search);
+        const hasSelectedItems = searchParams.has('selected');
+        setHasSelectedItems(hasSelectedItems);
+        
+        // Only auto-close if no items are selected
+        if (location.pathname === '/search' && !hasSelectedItems) {
             setIsExpanded(false);
+        } else if (hasSelectedItems) {
+            setIsExpanded(true);
         }
-    }, [location.pathname, setIsExpanded]);
+    }, [location.pathname, location.search, setIsExpanded, setHasSelectedItems]);
 
     // Handle resize start
     const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -139,7 +146,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                         height: '100%',
                         overflowY: 'auto',
                         visibility: isExpanded ? 'visible' : 'hidden',
-                        py: 2
                     }}>
                         {children}
                     </Box>

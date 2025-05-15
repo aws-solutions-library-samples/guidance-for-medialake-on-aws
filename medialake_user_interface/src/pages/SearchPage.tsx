@@ -1,34 +1,48 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { formatDate } from '@/utils/dateFormat';
 import {
     Box,
     Typography,
     LinearProgress,
     Paper,
-    Menu,
-    MenuItem,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogContentText,
     DialogActions,
-    Button
+    Button,
+    FormControl,
+    InputLabel,
+    Select,
+    Chip,
+    OutlinedInput,
+    SelectChangeEvent
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
 import SearchFilters from '../components/search/SearchFilters';
-import ModularUnifiedResultsView from '../components/search/ModularUnifiedResultsView';
+import MasterResultsView from '../components/search/MasterResultsView';
 import { useSearch } from '../api/hooks/useSearch';
+import { useSearchFields, type FieldInfo } from '../api/hooks/useSearchFields';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
-import { useGetFavorites, useAddFavorite, useRemoveFavorite } from '../api/hooks/useFavorites';
 import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
-
-type AssetItem = ImageItem | VideoItem | AudioItem;
+import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
-import { alpha } from '@mui/material/styles';
+import { useViewPreferences } from '@/hooks/useViewPreferences';
+import { useAssetSelection } from '@/hooks/useAssetSelection';
+import { useAssetFavorites } from '@/hooks/useAssetFavorites';
+
+type AssetItem = (ImageItem | VideoItem | AudioItem) & {
+    DigitalSourceAsset: {
+        Type: string;
+    };
+};
+import { useFacetSearch } from '../hooks/useFacetSearch';
+import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
     query?: string;
@@ -40,6 +54,14 @@ interface LocationState {
     thumbnailScale?: 'fit' | 'fill';
     showMetadata?: boolean;
     groupByType?: boolean;
+    type?: string;
+    extension?: string;
+    LargerThan?: number;
+    asset_size_lte?: number;
+    asset_size_gte?: number;
+    ingested_date_lte?: string;
+    ingested_date_gte?: string;
+    filename?: string;
 }
 
 interface Filters {
@@ -58,9 +80,27 @@ interface Filters {
 
 const DEFAULT_PAGE_SIZE = 50;
 
+interface SelectedAsset {
+    id: string;
+    name: string;
+    type: string;
+    inventoryID: string;
+}
+
 const SearchPage: React.FC = () => {
     const location = useLocation();
-    const { query, isSemantic } = (location.state as LocationState) || {};
+    const {
+        query,
+        isSemantic,
+        type,
+        extension,
+        LargerThan,
+        asset_size_lte,
+        asset_size_gte,
+        ingested_date_lte,
+        ingested_date_gte,
+        filename
+    } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
@@ -71,16 +111,111 @@ const SearchPage: React.FC = () => {
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
 
+    // Initialize facet filters from URL params first, then fall back to location state
+    const initialFacetFilters: FacetFilters = {
+        // Get values from URL params first, then fall back to location state
+        type: searchParams.get('type') || type,
+        extension: searchParams.get('extension') || extension,
+        LargerThan: searchParams.has('LargerThan')
+            ? parseInt(searchParams.get('LargerThan') || '0', 10)
+            : LargerThan,
+        asset_size_lte: searchParams.has('asset_size_lte')
+            ? parseInt(searchParams.get('asset_size_lte') || '0', 10)
+            : asset_size_lte,
+        asset_size_gte: searchParams.has('asset_size_gte')
+            ? parseInt(searchParams.get('asset_size_gte') || '0', 10)
+            : asset_size_gte,
+        ingested_date_lte: searchParams.get('ingested_date_lte') || ingested_date_lte,
+        ingested_date_gte: searchParams.get('ingested_date_gte') || ingested_date_gte,
+        filename: searchParams.get('filename') || filename
+    };
+    
+    // Remove undefined values
+    Object.keys(initialFacetFilters).forEach(key => {
+        if (initialFacetFilters[key as keyof FacetFilters] === undefined) {
+            delete initialFacetFilters[key as keyof FacetFilters];
+        }
+    });
+    
+    const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
+        
+    // State for selected fields
+    const [selectedFields, setSelectedFields] = useState<string[]>([]);
+
     const {
-        data: searchResults,
+        data,
         isLoading,
         isFetching,
         error
     } = useSearch(currentQuery, {
         page: currentPage,
         pageSize: pageSize,
-        isSemantic: currentSemantic
+        isSemantic: currentSemantic,
+        fields: selectedFields,
+        ...facetFilters // Include facet filters in the search
     });
+    
+    // Access the nested data structure correctly
+    const searchData = data?.data;
+    const searchResults = searchData?.results || [];
+    const searchMetadata = searchData?.searchMetadata;
+    
+    // Store search results in sessionStorage for access by other components
+    useEffect(() => {
+        if (searchResults) {
+            try {
+                sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+                // Trigger storage event for other components to detect the change
+                window.dispatchEvent(new Event('storage'));
+            } catch (e) {
+                console.error('Error storing search results in session storage', e);
+            }
+        }
+    }, [searchResults]);
+    
+    // Fetch search fields
+    const {
+        data: fieldsData,
+        isLoading: isFieldsLoading,
+        error: fieldsError
+    } = useSearchFields();
+    
+    // Extract fields data
+    const defaultFields = fieldsData?.data?.defaultFields || [];
+    const availableFields = fieldsData?.data?.availableFields || [];
+    
+    
+    // Initialize selected fields with default fields when data is loaded
+    useEffect(() => {
+        if (defaultFields.length > 0 && selectedFields.length === 0) {
+            setSelectedFields(defaultFields.map(field => field.name));
+        }
+    }, [defaultFields, selectedFields.length]);
+    
+    // Handle field selection change
+    const handleFieldsChange = (event: SelectChangeEvent<typeof selectedFields>) => {
+        const {
+            target: { value },
+        } = event;
+        const newSelectedFields = typeof value === 'string' ? value.split(',') : value;
+        
+        // Check if fields were added or removed
+        const fieldsAdded = newSelectedFields.some(field => !selectedFields.includes(field));
+        
+        // Update the selected fields state
+        setSelectedFields(newSelectedFields);
+        
+        // Only make a new API request if fields were added
+        if (fieldsAdded) {
+            // Reset to first page when adding fields
+            setSearchParams(prev => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('page', '1');
+                return newParams;
+            });
+        }
+        // If fields were only removed, don't make a new API request
+    };
 
     const [filters, setFilters] = useState<Filters>({
         mediaTypes: {
@@ -96,81 +231,56 @@ const SearchPage: React.FC = () => {
         }
     });
 
-    const [viewMode, setViewMode] = useState<'card' | 'table'>(
-        location.state?.preserveSearch ? location.state.viewMode : 'card'
-    );
-    const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>(
-        location.state?.preserveSearch ? location.state.cardSize : 'medium'
-    );
-    const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(
-        location.state?.preserveSearch ? location.state.aspectRatio : 'square'
-    );
-    const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>(
-        location.state?.preserveSearch ? location.state.thumbnailScale : 'fit'
-    );
-    const [showMetadata, setShowMetadata] = useState(
-        location.state?.preserveSearch ? location.state.showMetadata : true
-    );
-    const [groupByType, setGroupByType] = useState(
-        location.state?.preserveSearch ? location.state.groupByType : false
-    );
-
-    const [sorting, setSorting] = useState<SortingState>([]);
+    // Check if multi-select feature is enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+    
+    // Use custom hooks for view preferences, asset selection, and favorites
+    const viewPreferences = useViewPreferences({
+        initialViewMode: location.state?.preserveSearch ? location.state.viewMode : 'card',
+        initialCardSize: location.state?.preserveSearch ? location.state.cardSize : 'medium',
+        initialAspectRatio: location.state?.preserveSearch ? location.state.aspectRatio : 'square',
+        initialThumbnailScale: location.state?.preserveSearch ? location.state.thumbnailScale : 'fit',
+        initialShowMetadata: location.state?.preserveSearch ? location.state.showMetadata : true,
+        initialGroupByType: location.state?.preserveSearch ? location.state.groupByType : false,
+    });
     const [editingAssetId, setEditingAssetId] = useState<string>();
     const [editedName, setEditedName] = useState<string>();
+    
+    // Asset accessors for hooks
+    const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+    const getAssetName = useCallback((asset: AssetItem) =>
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name, []);
+    const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+    const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || '', []);
+    
+    // Use custom hooks for asset selection and favorites
+    const assetSelection = useAssetSelection({
+        getAssetId,
+        getAssetName,
+        getAssetType,
+    });
+    
+    const assetFavorites = useAssetFavorites({
+        getAssetId,
+        getAssetName,
+        getAssetType,
+        getAssetThumbnail,
+    });
 
     const {
         handleDeleteClick,
-        handleMenuOpen,
         handleStartEditing,
         handleNameChange,
         handleNameEditComplete,
-        handleMenuClose,
         handleAction,
         handleDeleteConfirm,
         handleDeleteCancel,
+        handleDownloadClick,
         editingAssetId: currentEditingAssetId,
         editedName: currentEditedName,
         isDeleteModalOpen,
-        menuAnchorEl,
         selectedAsset,
     } = useAssetOperations<AssetItem>();
-
-    // Favorites functionality
-    const { data: favorites } = useGetFavorites("ASSET");
-    const { mutate: addFavorite } = useAddFavorite();
-    const { mutate: removeFavorite } = useRemoveFavorite();
-
-    const isAssetFavorited = useCallback((assetId: string) => {
-        if (!favorites) return false;
-        return favorites.some(favorite => favorite.itemId === assetId);
-    }, [favorites]);
-
-    const handleFavoriteToggle = useCallback((asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation();
-        const assetId = asset.InventoryID;
-        
-        console.log('Toggling favorite for asset:', assetId);
-        console.log('Current favorites state:', favorites);
-        
-        if (isAssetFavorited(assetId)) {
-            console.log('Removing favorite for asset:', assetId);
-            removeFavorite({ itemType: "ASSET", itemId: assetId });
-        } else {
-            console.log('Adding favorite for asset:', assetId);
-            const favoriteData = {
-                itemId: assetId,
-                itemType: "ASSET" as const, // Use const assertion to fix type error
-                metadata: {
-                    name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-                    assetType: asset.DigitalSourceAsset.Type, // Note: using assetType to match what Favorites.tsx expects
-                    thumbnailUrl: asset.thumbnailUrl || ""
-                }
-            };
-            console.log('Favorite data being sent:', favoriteData);
-            addFavorite(favoriteData);
-        }
-    }, [isAssetFavorited, addFavorite, removeFavorite, favorites]);
 
     const handleAssetClick = useCallback((asset: AssetItem) => {
         const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -185,6 +295,7 @@ const SearchPage: React.FC = () => {
         });
     }, [navigate, currentQuery]);
 
+    // Update local state from useAssetOperations
     useEffect(() => {
         setEditingAssetId(currentEditingAssetId || undefined);
         setEditedName(currentEditedName);
@@ -200,13 +311,6 @@ const SearchPage: React.FC = () => {
         }
         return `${Math.round(size * 100) / 100} ${sizes[i]}`;
     };
-
-    const [cardFields, setCardFields] = useState([
-        { id: 'name', label: 'Object Name', visible: true },
-        { id: 'type', label: 'Type', visible: true },
-        { id: 'format', label: 'Format', visible: true },
-        { id: 'createdAt', label: 'Date Created', visible: true },
-    ]);
 
     const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
         {
@@ -271,23 +375,13 @@ const SearchPage: React.FC = () => {
         }
     ]);
 
-    const handleViewModeChange = (_: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
-        if (newMode) setViewMode(newMode);
-    };
-
-    const handleCardFieldToggle = (fieldId: string) => {
-        setCardFields(prev => prev.map(field =>
-            field.id === fieldId ? { ...field, visible: !field.visible } : field
-        ));
-    };
-
     const handleColumnToggle = (columnId: string) => {
         setColumns(prev => prev.map(column =>
             column.id === columnId ? { ...column, visible: !column.visible } : column
         ));
     };
 
-    const filteredResults = searchResults?.data?.results?.filter(item => {
+    const filteredResults = searchResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
@@ -334,6 +428,8 @@ const SearchPage: React.FC = () => {
             });
         }
     }, [query, isSemantic, searchParams, setSearchParams]);
+
+    // No need for these effects as they're now handled in the useAssetSelection hook
 
     const handleFilterChange = (section: keyof Filters, filter: string) => {
         setFilters(prev => {
@@ -389,6 +485,8 @@ const SearchPage: React.FC = () => {
         });
     };
 
+    // No need for this handler as it's now handled in the useAssetSelection hook
+
     return (
         <RightSidebarProvider>
             <>
@@ -423,7 +521,7 @@ const SearchPage: React.FC = () => {
                         minHeight: 0,
                         marginBottom: 4
                     }}>
-                        {searchResults?.data?.searchMetadata?.totalResults === 0 && currentQuery && (
+                        {searchMetadata?.totalResults === 0 && currentQuery && (
                             <Box
                                 sx={{
                                     display: 'flex',
@@ -467,45 +565,51 @@ const SearchPage: React.FC = () => {
                             </Box>
                         )}
 
-                        {(filteredResults.length > 0 && searchResults?.data?.searchMetadata && !error) || error ? (
-                            <ModularUnifiedResultsView
+                        {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
+                            <MasterResultsView
                                 results={error ? [] : filteredResults}
                                 searchMetadata={{
-                                    totalResults: error ? 0 : (searchResults?.data?.searchMetadata?.totalResults || 0),
+                                    totalResults: error ? 0 : (searchMetadata?.totalResults || 0),
                                     page: currentPage,
                                     pageSize: pageSize,
                                 }}
                                 onPageChange={(newPage) => handleSearch({ page: newPage })}
                                 onPageSizeChange={handlePageSizeChange}
                                 searchTerm={currentQuery}
-                                groupByType={groupByType}
-                                onGroupByTypeChange={setGroupByType}
-                                viewMode={viewMode}
-                                onViewModeChange={handleViewModeChange}
-                                cardSize={cardSize}
-                                onCardSizeChange={setCardSize}
-                                aspectRatio={aspectRatio}
-                                onAspectRatioChange={setAspectRatio}
-                                thumbnailScale={thumbnailScale}
-                                onThumbnailScaleChange={setThumbnailScale}
-                                showMetadata={showMetadata}
-                                onShowMetadataChange={setShowMetadata}
-                                sorting={sorting}
-                                onSortChange={setSorting}
-                                cardFields={cardFields}
-                                onCardFieldToggle={handleCardFieldToggle}
+                                selectedFields={selectedFields}
+                                availableFields={availableFields}
+                                onFieldsChange={handleFieldsChange}
+                                groupByType={viewPreferences.groupByType}
+                                onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                                viewMode={viewPreferences.viewMode}
+                                onViewModeChange={viewPreferences.handleViewModeChange}
+                                cardSize={viewPreferences.cardSize}
+                                onCardSizeChange={viewPreferences.handleCardSizeChange}
+                                aspectRatio={viewPreferences.aspectRatio}
+                                onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                                thumbnailScale={viewPreferences.thumbnailScale}
+                                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                                showMetadata={viewPreferences.showMetadata}
+                                onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                                sorting={viewPreferences.sorting}
+                                onSortChange={viewPreferences.handleSortChange}
+                                cardFields={viewPreferences.cardFields}
+                                onCardFieldToggle={viewPreferences.handleCardFieldToggle}
                                 columns={columns}
                                 onColumnToggle={handleColumnToggle}
                                 onAssetClick={handleAssetClick}
                                 onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleMenuOpen}
+                                onMenuClick={handleDownloadClick}
                                 onEditClick={handleStartEditing}
                                 onEditNameChange={handleNameChange}
                                 onEditNameComplete={handleNameEditComplete}
                                 editingAssetId={editingAssetId}
                                 editedName={editedName}
-                                isAssetFavorited={isAssetFavorited}
-                                onFavoriteToggle={handleFavoriteToggle}
+                                isAssetFavorited={assetFavorites.isAssetFavorited}
+                                onFavoriteToggle={assetFavorites.handleFavoriteToggle}
+                                // Only pass selection props if multi-select feature is enabled
+                                selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
+                                onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -516,59 +620,30 @@ const SearchPage: React.FC = () => {
                     </Box>
 
                     <RightSidebar>
-                        <SearchFilters
-                            filters={filters}
-                            expandedSections={expandedSections}
-                            onFilterChange={handleFilterChange}
-                            onSectionToggle={handleSectionToggle}
-                            groupByType={groupByType}
-                            onGroupByTypeChange={setGroupByType}
+                        <FilterAndBatchOperations
+                            selectedAssets={assetSelection.selectedAssets}
+                            onBatchDelete={assetSelection.handleBatchDelete}
+                            onBatchDownload={assetSelection.handleBatchDownload}
+                            onBatchShare={assetSelection.handleBatchShare}
+                            onClearSelection={assetSelection.handleClearSelection}
+                            onRemoveItem={assetSelection.handleRemoveAsset}
+                            filterComponent={
+                                <>
+                                    <SearchFilters
+                                        filters={filters}
+                                        expandedSections={expandedSections}
+                                        onFilterChange={handleFilterChange}
+                                        onSectionToggle={handleSectionToggle}
+                                        groupByType={viewPreferences.groupByType}
+                                        onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                                    />
+                                </>
+                            }
                         />
                     </RightSidebar>
                 </Box>
 
-                {/* Asset Menu */}
-                <Menu
-                    anchorEl={menuAnchorEl}
-                    open={Boolean(menuAnchorEl)}
-                    onClose={handleMenuClose}
-                    MenuListProps={{
-                        'aria-labelledby': selectedAsset ? `asset-menu-button-${selectedAsset.InventoryID}` : undefined
-                    }}
-                    anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            borderRadius: '8px',
-                            minWidth: 200,
-                            mt: 1,
-                            border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            backgroundColor: theme => theme.palette.background.paper,
-                            overflow: 'visible',
-                            position: 'fixed',
-                            zIndex: 1400,
-                        },
-                    }}
-                    slotProps={{
-                        paper: {
-                            sx: {
-                                overflow: 'visible',
-                                position: 'fixed',
-                            }
-                        }
-                    }}
-                >
-                    <MenuItem onClick={() => handleAction('rename')}>Rename</MenuItem>
-                    <MenuItem onClick={() => handleAction('share')}>Share</MenuItem>
-                    <MenuItem onClick={() => handleAction('download')}>Download</MenuItem>
-                </Menu>
+                {/* Menu removed - download functionality now directly triggered by the download button */}
 
                 {/* Delete Confirmation Dialog */}
                 <Dialog

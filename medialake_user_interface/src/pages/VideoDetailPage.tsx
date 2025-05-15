@@ -686,10 +686,9 @@ const RelatedItemsTab: React.FC<{
 
 const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     asset,
-    assetType
-}
-
-) => {
+    assetType,
+    searchTerm
+}) => {
     const videoViewerRef = useRef<VideoViewerRef>(null);
     console.log("Parent videoViewerRef:", videoViewerRef); // Debug log
     const { id } = useParams<{ id: string }>();
@@ -721,8 +720,11 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         }
     }, [id]); // Include id in dependencies to ensure scroll reset when navigating between detail pages
 
+    // Use the searchTerm prop or fallback to URL parameters
     const searchParams = new URLSearchParams(location.search);
-    const searchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
+    const urlSearchTerm = searchParams.get('q') || searchParams.get('searchTerm') || '';
+    // Use the prop value if available, otherwise use the URL value
+    const effectiveSearchTerm = searchTerm || urlSearchTerm;
 
     const versions = useMemo(() => {
         if (!assetData?.data?.asset) return [];
@@ -821,7 +823,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
             title: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
             type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video",
             path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${assetData.data.asset.InventoryID}`,
-            searchTerm: searchTerm,
+            searchTerm: effectiveSearchTerm,
             metadata: {
                 duration: '00:15',
                 fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
@@ -851,9 +853,9 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
             navigate(-1);
         } else {
             // Fallback to search page with search term if available
-            navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`);
+            navigate(`/search${effectiveSearchTerm ? `?q=${encodeURIComponent(effectiveSearchTerm)}` : ''}`);
         }
-    }, [navigate, location.state, searchTerm]);
+    }, [navigate, location.state, effectiveSearchTerm]);
 
     // Track scroll position to hide/show header
     useEffect(() => {
@@ -899,7 +901,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         return (
             <Box sx={{ p: 3 }}>
                 <BreadcrumbNavigation
-                    searchTerm={searchTerm}
+                    searchTerm={effectiveSearchTerm}
                     currentResult={48}
                     totalResults={156}
                     onBack={handleBack}
@@ -944,7 +946,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
             }}>
                 <Box sx={{ py: 0, mb: 0 }}>
                     <BreadcrumbNavigation
-                        searchTerm={searchTerm}
+                        searchTerm={effectiveSearchTerm}
                         currentResult={48}
                         totalResults={156}
                         onBack={handleBack}
@@ -1072,8 +1074,9 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                 onAddComment={handleAddComment}
                 videoViewerRef={videoViewerRef}
                 assetId={assetData?.data?.asset?.InventoryID}
-                asset={asset} 
-                assetType={assetType} 
+                asset={asset}
+                assetType={assetType}
+                searchTerm={effectiveSearchTerm}
             />
         </Box>
     );
@@ -1082,6 +1085,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
 interface VideoDetailContentProps {
     asset: any;
     assetType: string;
+    searchTerm?: string;
 }
 
 const VideoDetailPage: React.FC = () => {
@@ -1093,9 +1097,10 @@ const VideoDetailPage: React.FC = () => {
     return (
         <RecentlyViewedProvider>
             <RightSidebarProvider>
-                <VideoDetailContent 
+                <VideoDetailContent
                     asset={asset}
                     assetType={assetType}
+                    searchTerm={searchTerm}
                 />
             </RightSidebarProvider>
         </RecentlyViewedProvider>

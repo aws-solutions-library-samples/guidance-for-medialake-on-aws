@@ -141,9 +141,7 @@ def handler(event, context):
         headers = {
             "content-type": "application/json",
             "accept": "application/json",
-        }
-
-      
+        }      
 
         payload = {
             "settings": {
@@ -156,20 +154,135 @@ def handler(event, context):
                 "properties": {
                 "type":             {"type": "keyword"},
                 "document_id":      {"type": "keyword"},
-                "asset_id":         {"type": "keyword"},
-                "start_timecode":   {"type": "keyword"},
-                "end_timecode":     {"type": "keyword"},
-                "embedding_scope":  {"type": "keyword"},
-                "embedding": {
-                    "type":      "knn_vector",
-                    "dimension": VECTOR_DIMENSION,
-                    "method": {
-                    "name":       "hnsw",
-                    "space_type": "cosinesimil",
-                    "engine":     "nmslib"
+                "InventoryID":      {"type": "keyword"},
+                "FileHash":         {"type": "keyword"},
+                "StoragePath":      {"type": "keyword"},    
+                "DerivedRepresentations": {
+                "type": "nested", 
+                "properties": {
+                    "Format":    { "type": "keyword"  },
+                    "ID":        { "type": "keyword"  },
+                    "Purpose":   { "type": "keyword"  },
+                    "Type":      { "type": "keyword"  },
+                    "ImageSpec": {
+                        "type": "object",
+                        "properties": {
+                            "Resolution": {
+                                "properties": {
+                                    "Height": { "type": "integer" },
+                                    "Width": { "type": "integer" }
+                                }
+                            }
+                        }
+                    },
+                    "StorageInfo": {
+                        "type": "object",
+                        "properties": {
+                            "PrimaryLocation": {
+                                "properties": {
+                                    "Bucket": { "type": "keyword" },
+                                    "Status": { "type": "keyword" },
+                                    "Provider": { "type": "keyword" },
+                                    "StorageType": { "type": "keyword" },
+                                    "FileInfo": {
+                                        "properties": {
+                                            "Size": { "type": "long" }
+                                        }
+                                    },
+                                    "ObjectKey": {
+                                        "properties": {
+                                            "FullPath": { "type": "keyword" },
+                                            "Name": { "type": "keyword" },
+                                            "Path": { "type": "keyword" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                },
+                "DigitalSourceAsset": {
+                    "type": "object",
+                    "properties": {
+                        "CreateDate": { "type": "date" },
+                        "ID": { "type": "keyword" },
+                        "IngestedAt": { "type": "date" },
+                        "lastModifiedDate": { "type": "date" },
+                        "originalIngestDate": { "type": "date" },
+                        "Type": { "type": "keyword" },
+                        "MainRepresentation": {
+                            "type": "object",
+                            "properties": {
+                                "Format": { "type": "keyword" },
+                                "ID": { "type": "keyword" },
+                                "Purpose": { "type": "keyword" },
+                                "Type": { "type": "keyword" },
+                                "StorageInfo": {
+                                    "type": "object",
+                                    "properties": {
+                                        "PrimaryLocation": {
+                                            "properties": {
+                                                "Bucket": { "type": "keyword" },
+                                                "Status": { "type": "keyword" },
+                                                "StorageType": { "type": "keyword" },
+                                                "FileInfo": {
+                                                    "properties": {
+                                                        "CreateDate": { "type": "date" },
+                                                        "Size": { "type": "long" },
+                                                        "Hash": {
+                                                            "properties": {
+                                                                "Algorithm": { "type": "keyword" },
+                                                                "MD5Hash": { "type": "keyword" },
+                                                                "Value": { "type": "keyword" }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "ObjectKey": {
+                                                    "properties": {
+                                                        "FullPath": { "type": "keyword" },
+                                                        "Name": { "type": "keyword" },
+                                                        "Path": { "type": "keyword" }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
-                "EmbeddedMetadata": {"type": "object", "dynamic": True}
+                "Metadata": {
+                    "type": "object",
+                    "dynamic": True,
+                    "properties": {
+                        "CustomMetadata": {
+                            "type": "object",
+                            "dynamic": True
+                        }
+                    }
+                },
+                "DigitalAsset": {
+                    "type": "nested",
+                    "properties": {
+                        "asset_id":         { "type": "keyword" },
+                        "start_timecode":   { "type": "keyword" },
+                        "end_timecode":     { "type": "keyword" },
+                        "embedding_scope":  { "type": "keyword" },
+                        "embedding": {
+                            "type":      "knn_vector",
+                            "dimension": VECTOR_DIMENSION,
+                            "method": {
+                                "name":       "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine":     "nmslib"
+                            }
+                        },
+                        "EmbeddedMetadata": { "type": "object", "dynamic": True }
+                        }
+                    }
                 }
             }
         }

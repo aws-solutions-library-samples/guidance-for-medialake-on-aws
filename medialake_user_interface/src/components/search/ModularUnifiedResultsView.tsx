@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFeatureFlag } from '@/utils/featureFlags';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -47,6 +48,9 @@ interface ModularUnifiedResultsViewProps {
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  // Selection functionality
+  selectedAssets?: string[];
+  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -85,11 +89,16 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   editedName,
   isAssetFavorited,
   onFavoriteToggle,
+  selectedAssets,
+  onSelectToggle,
   onGroupByTypeChange,
   onPageSizeChange,
   error,
   isLoading,
 }) => {
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case 'name':
@@ -109,6 +118,11 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
         return '';
     }
   };
+
+  // Function to check if an asset is selected - only if multi-select feature is enabled
+  const isAssetSelected = (multiSelectFeature.value && selectedAssets && selectedAssets.length > 0)
+    ? (assetId: string) => selectedAssets.includes(assetId)
+    : undefined;
 
   return (
     <AssetResultsView
@@ -138,7 +152,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onColumnToggle={onColumnToggle}
       onAssetClick={onAssetClick}
       onDeleteClick={onDeleteClick}
-      onMenuClick={onMenuClick}
+      onDownloadClick={onMenuClick}
       onEditClick={onEditClick}
       onEditNameChange={onEditNameChange}
       onEditNameComplete={onEditNameComplete}
@@ -146,6 +160,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       editedName={editedName}
       isAssetFavorited={isAssetFavorited}
       onFavoriteToggle={onFavoriteToggle}
+      isAssetSelected={isAssetSelected}
+      onSelectToggle={onSelectToggle}
       error={error}
       isLoading={isLoading}
       getAssetId={(asset) => asset.InventoryID}
