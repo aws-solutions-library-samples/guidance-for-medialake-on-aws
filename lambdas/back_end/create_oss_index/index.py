@@ -152,18 +152,18 @@ def handler(event, context):
             },
             "mappings": {
                 "properties": {
-                "type":             {"type": "keyword"},
-                "document_id":      {"type": "keyword"},
-                "InventoryID":      {"type": "keyword"},
-                "FileHash":         {"type": "keyword"},
-                "StoragePath":      {"type": "keyword"},    
+                "type":             {"type": "text"},
+                "document_id":      {"type": "text"},
+                "InventoryID":      {"type": "text"},
+                "FileHash":         {"type": "text"},
+                "StoragePath":      {"type": "text"},    
                 "DerivedRepresentations": {
                 "type": "nested", 
                 "properties": {
-                    "Format":    { "type": "keyword"  },
-                    "ID":        { "type": "keyword"  },
-                    "Purpose":   { "type": "keyword"  },
-                    "Type":      { "type": "keyword"  },
+                    "Format":    { "type": "text"  },
+                    "ID":        { "type": "text"  },
+                    "Purpose":   { "type": "text"  },
+                    "Type":      { "type": "text"  },
                     "ImageSpec": {
                         "type": "object",
                         "properties": {
@@ -180,10 +180,10 @@ def handler(event, context):
                         "properties": {
                             "PrimaryLocation": {
                                 "properties": {
-                                    "Bucket": { "type": "keyword" },
-                                    "Status": { "type": "keyword" },
-                                    "Provider": { "type": "keyword" },
-                                    "StorageType": { "type": "keyword" },
+                                    "Bucket": { "type": "text" },
+                                    "Status": { "type": "text" },
+                                    "Provider": { "type": "text" },
+                                    "StorageType": { "type": "text" },
                                     "FileInfo": {
                                         "properties": {
                                             "Size": { "type": "long" }
@@ -191,9 +191,9 @@ def handler(event, context):
                                     },
                                     "ObjectKey": {
                                         "properties": {
-                                            "FullPath": { "type": "keyword" },
-                                            "Name": { "type": "keyword" },
-                                            "Path": { "type": "keyword" }
+                                            "FullPath": { "type": "text" },
+                                            "Name": { "type": "text" },
+                                            "Path": { "type": "text" }
                                         }
                                     }
                                 }
@@ -206,26 +206,26 @@ def handler(event, context):
                     "type": "object",
                     "properties": {
                         "CreateDate": { "type": "date" },
-                        "ID": { "type": "keyword" },
+                        "ID": { "type": "text" },
                         "IngestedAt": { "type": "date" },
                         "lastModifiedDate": { "type": "date" },
                         "originalIngestDate": { "type": "date" },
-                        "Type": { "type": "keyword" },
+                        "Type": { "type": "text" },
                         "MainRepresentation": {
                             "type": "object",
                             "properties": {
-                                "Format": { "type": "keyword" },
-                                "ID": { "type": "keyword" },
-                                "Purpose": { "type": "keyword" },
-                                "Type": { "type": "keyword" },
+                                "Format": { "type": "text" },
+                                "ID": { "type": "text" },
+                                "Purpose": { "type": "text" },
+                                "Type": { "type": "text" },
                                 "StorageInfo": {
                                     "type": "object",
                                     "properties": {
                                         "PrimaryLocation": {
                                             "properties": {
-                                                "Bucket": { "type": "keyword" },
-                                                "Status": { "type": "keyword" },
-                                                "StorageType": { "type": "keyword" },
+                                                "Bucket": { "type": "text" },
+                                                "Status": { "type": "text" },
+                                                "StorageType": { "type": "text" },
                                                 "FileInfo": {
                                                     "properties": {
                                                         "CreateDate": { "type": "date" },
@@ -241,9 +241,9 @@ def handler(event, context):
                                                 },
                                                 "ObjectKey": {
                                                     "properties": {
-                                                        "FullPath": { "type": "keyword" },
-                                                        "Name": { "type": "keyword" },
-                                                        "Path": { "type": "keyword" }
+                                                        "FullPath": { "type": "text" },
+                                                        "Name": { "type": "text" },
+                                                        "Path": { "type": "text" }
                                                     }
                                                 }
                                             }
