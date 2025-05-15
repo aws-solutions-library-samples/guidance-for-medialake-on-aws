@@ -146,7 +146,7 @@ def handler(event, context):
         payload = {
             "settings": {
                 "index": {
-                    "knn": True,
+                    "knn": true,
                     "mapping.total_fields.limit": 6000
                 }
             },
@@ -256,11 +256,11 @@ def handler(event, context):
                 },
                 "Metadata": {
                     "type": "object",
-                    "dynamic": True,
+                    "dynamic": true,
                     "properties": {
                         "CustomMetadata": {
                             "type": "object",
-                            "dynamic": True
+                            "dynamic": true
                         }
                     }
                 },
@@ -280,7 +280,7 @@ def handler(event, context):
                                 "engine":     "nmslib"
                             }
                         },
-                        "EmbeddedMetadata": { "type": "object", "dynamic": True }
+                        "EmbeddedMetadata": { "type": "object", "dynamic": true }
                         }
                     }
                 }
