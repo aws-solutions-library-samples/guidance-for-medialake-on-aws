@@ -42,7 +42,7 @@
         }
     },
     "opensearch_cluster_settings": {
-        "use_dedicated_master_nodes": true,
+        "use_dedicated_master_nodes": false,
         "master_node_count": 3,
         "master_node_instance_type": "m6g.large.search",
         "data_node_count": 3,
