@@ -151,11 +151,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       case 'modifiedAt':
         return formatDate(asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate);
       case 'fullPath':
-        // Construct a path from available data since FullPath doesn't exist in the data model
-        const objectName = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
-        // Check if we can access any bucket information
-        const bucketInfo = (asset as any).DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
-        return bucketInfo ? `${bucketInfo}/${objectName}` : objectName;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
       default:
         console.log('Unknown field ID:', fieldId);
         return '';
