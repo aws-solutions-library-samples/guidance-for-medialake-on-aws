@@ -141,9 +141,7 @@ def handler(event, context):
         headers = {
             "content-type": "application/json",
             "accept": "application/json",
-        }
-
-      
+        }      
 
         payload = {
             "settings": {

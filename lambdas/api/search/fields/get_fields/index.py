@@ -79,36 +79,36 @@ def get_search_fields() -> Dict[str, Any]:
             displayName="File Size",
             description="Size of the file in bytes",
             type="number",
-            isDefault=False
+            isDefault=True
         ),
         FieldInfo(
             name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-            displayName="Ingestion Date",
-            description="Date when the asset was ingested",
+            displayName="Created date",
+            description="Date when the asset was created",
             type="date",
             isDefault=True
         ),
         FieldInfo(
             name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
-            displayName="Filename",
+            displayName="File name",
             description="Name of the file",
             type="string",
             isDefault=True
         ),
         FieldInfo(
             name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-            displayName="Full Path",
+            displayName="Full path",
             description="Full path to the file",
             type="string",
             isDefault=False
         ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
-            displayName="Storage Location",
-            description="Storage bucket where the asset is stored",
-            type="string",
-            isDefault=True
-        ),
+        # FieldInfo(
+        #     name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
+        #     displayName="Storage location",
+        #     description="Storage bucket where the asset is stored",
+        #     type="string",
+        #     isDefault=True
+        # ),
     ]
     
     # Extract default fields

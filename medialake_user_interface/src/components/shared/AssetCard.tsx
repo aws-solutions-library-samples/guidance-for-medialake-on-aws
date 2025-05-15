@@ -245,6 +245,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
             );
         }
         
+        // Special case for fullPath field - check if any selected field contains 'FullPath' or 'Path'
+        if (field.id === 'fullPath') {
+            return selectedSearchFields.some(field =>
+                field.includes('FullPath') || field.includes('Path') || field === 'fullPath'
+            );
+        }
+        
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[field.id] || [];
         return apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
