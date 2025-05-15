@@ -188,6 +188,9 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
             "assetIds": asset_ids,
             "options": options,
             "timestamp": int(time.time()),
+            # Add empty arrays for Map states
+            "smallFiles": [],
+            "largeFiles": [],
         }
         
         # Start execution

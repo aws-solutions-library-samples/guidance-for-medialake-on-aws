@@ -32,6 +32,7 @@ from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="bulk-download-merge-zips")
@@ -40,8 +41,9 @@ metrics = Metrics(namespace="BulkDownloadService", service="bulk-download-merge-
 
 # Initialize AWS clients
 dynamodb = boto3.resource("dynamodb")
-s3 = boto3.client("s3")
-s3_resource = boto3.resource("s3")
+# Configure S3 client with Signature Version 4 for KMS encryption support
+s3 = boto3.client("s3", config=Config(signature_version='s3v4'))
+s3_resource = boto3.resource("s3", config=Config(signature_version='s3v4'))
 
 # Get environment variables
 BULK_DOWNLOAD_TABLE = os.environ["BULK_DOWNLOAD_TABLE"]
@@ -55,6 +57,8 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 MAX_PRESIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60  # 7 days in seconds
 MAX_RETRIES = 3  # Maximum number of retries for S3 operations
 FINAL_ZIP_PREFIX = "temp/zip/final"
+MERGE_BATCH_SIZE = int(os.environ.get("MERGE_BATCH_SIZE", "100"))  # Number of zip files to merge at once
+MAX_ZIP_ENTRIES = 65000  # Slightly below the 65,535 limit for safety
 
 
 @tracer.capture_method
@@ -207,6 +211,84 @@ def merge_zip_files(
             },
         )
         return False
+
+
+@tracer.capture_method
+def merge_in_batches(zip_files: List[str], temp_dir: str, job_id: str) -> Tuple[bool, List[str]]:
+    """
+    Merge zip files in batches to avoid memory issues and zip file entry limits.
+    
+    Args:
+        zip_files: List of zip file paths
+        temp_dir: Temporary directory for intermediate files
+        job_id: Job ID for naming
+        
+    Returns:
+        Tuple of (success, list of intermediate zip file paths)
+    """
+    if not zip_files:
+        return True, []
+        
+    # If we have a small number of files, return them directly
+    if len(zip_files) <= MERGE_BATCH_SIZE:
+        return True, zip_files
+        
+    intermediate_zips = []
+    
+    # Process in batches
+    for i in range(0, len(zip_files), MERGE_BATCH_SIZE):
+        batch = zip_files[i:i + MERGE_BATCH_SIZE]
+        batch_zip_name = f"intermediate_batch_{i//MERGE_BATCH_SIZE}_{job_id}.zip"
+        batch_zip_path = os.path.join(temp_dir, batch_zip_name)
+        
+        logger.info(
+            f"Merging batch {i//MERGE_BATCH_SIZE + 1}/{(len(zip_files) + MERGE_BATCH_SIZE - 1)//MERGE_BATCH_SIZE}",
+            extra={
+                "jobId": job_id,
+                "batchSize": len(batch),
+                "outputPath": batch_zip_path,
+            }
+        )
+        
+        # Create a new zip file for this batch
+        with zipfile.ZipFile(batch_zip_path, 'w', zipfile.ZIP_DEFLATED) as output_zip:
+            # Track files already added to avoid duplicates
+            added_files = set()
+            entry_count = 0
+            
+            # Process each zip file in the batch
+            for zip_path in batch:
+                try:
+                    with zipfile.ZipFile(zip_path, 'r') as input_zip:
+                        # Get list of files in this zip
+                        for file_info in input_zip.infolist():
+                            # Skip directories and duplicates
+                            if file_info.filename.endswith('/') or file_info.filename in added_files:
+                                continue
+                                
+                            # Check if we're approaching the zip entry limit
+                            if entry_count >= MAX_ZIP_ENTRIES:
+                                logger.warning(
+                                    f"Reached maximum zip entries ({MAX_ZIP_ENTRIES}), creating new batch",
+                                    extra={"jobId": job_id}
+                                )
+                                break
+                                
+                            # Read file from input zip and write to output zip
+                            file_data = input_zip.read(file_info.filename)
+                            output_zip.writestr(file_info, file_data)
+                            added_files.add(file_info.filename)
+                            entry_count += 1
+                except Exception as e:
+                    logger.error(
+                        f"Error processing zip file {zip_path}: {str(e)}",
+                        extra={"zipPath": zip_path}
+                    )
+                    # Continue with next zip file
+        
+        intermediate_zips.append(batch_zip_path)
+    
+    return True, intermediate_zips
 
 
 @tracer.capture_method
@@ -450,19 +532,75 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             final_zip_name = f"bulk_download_{job_id}_{timestamp}.zip"
             final_zip_path = os.path.join(temp_dir, final_zip_name)
             
-            # Merge zip files
-            if merge_zip_files(small_zip_files, large_zip_files, final_zip_path, job_id):
-                # Upload merged zip to S3
-                s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
-                
-                # Generate presigned URL
-                download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
-                
-                # Update job as completed
-                update_job_completed(job_id, [download_url])
-                
-                # Clean up temporary files
-                cleanup_temp_files(job_id, small_zip_files, large_zip_files)
+            # Process all zip files in batches to handle large numbers of files
+            logger.info(
+                "Processing zip files in batches",
+                extra={
+                    "jobId": job_id,
+                    "smallZipCount": len(small_zip_files),
+                    "largeZipCount": len(large_zip_files),
+                    "batchSize": MERGE_BATCH_SIZE,
+                }
+            )
+            
+            # First, download any large zip files from S3 to local storage
+            local_large_zip_files = []
+            for s3_path in large_zip_files:
+                local_path = os.path.join(temp_dir, os.path.basename(s3_path))
+                if download_s3_zip(s3_path, local_path):
+                    local_large_zip_files.append(local_path)
+            
+            # Combine all zip files
+            all_zip_files = small_zip_files + local_large_zip_files
+            
+            # Merge in batches if needed
+            success, intermediate_zips = merge_in_batches(all_zip_files, temp_dir, job_id)
+            
+            if success and intermediate_zips:
+                # If we have multiple intermediate zips, merge them into a final zip
+                if len(intermediate_zips) > 1:
+                    logger.info(
+                        f"Merging {len(intermediate_zips)} intermediate zip files into final zip",
+                        extra={"jobId": job_id}
+                    )
+                    if merge_zip_files(intermediate_zips, [], final_zip_path, job_id):
+                        # Upload merged zip to S3
+                        s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
+                        
+                        # Generate presigned URL
+                        download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
+                        
+                        # Update job as completed
+                        update_job_completed(job_id, [download_url])
+                        
+                        # Clean up temporary files
+                        cleanup_temp_files(job_id, small_zip_files, large_zip_files)
+                        
+                        # Also clean up intermediate zips
+                        for zip_path in intermediate_zips:
+                            try:
+                                if os.path.exists(zip_path):
+                                    os.remove(zip_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to remove intermediate zip file: {str(e)}",
+                                    extra={"zipPath": zip_path}
+                                )
+                else:
+                    # Only one intermediate zip, use it as the final zip
+                    final_zip_path = intermediate_zips[0]
+                    
+                    # Upload merged zip to S3
+                    s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
+                    
+                    # Generate presigned URL
+                    download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
+                    
+                    # Update job as completed
+                    update_job_completed(job_id, [download_url])
+                    
+                    # Clean up temporary files
+                    cleanup_temp_files(job_id, small_zip_files, large_zip_files)
                 
                 # Add metrics
                 metrics.add_metric(name="JobsCompleted", unit=MetricUnit.Count, value=1)

@@ -18,6 +18,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_iam as iam,
     aws_ec2 as ec2,
+    aws_efs as efs,
     AssetHashType,
     Stack,
     RemovalPolicy,
@@ -128,6 +129,8 @@ class LambdaConfig:
         log_removal_policy (Optional[RemovalPolicy]): Removal policy for the CloudWatch log group (default: DESTROY)
         python_bundling (Optional[BundlingOptions]): Bundling options for Python functions
         nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
+        filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
+        filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
     """
 
     name: Optional[str] = None
@@ -147,6 +150,8 @@ class LambdaConfig:
     python_bundling: Optional[BundlingOptions] = None
     nodejs_bundling: Optional[NodeJSBundlingOptions] = None
     reserved_concurrent_executions: Optional[int] = None
+    filesystem_access_point: Optional[efs.IAccessPoint] = None
+    filesystem_mount_path: Optional[str] = None
 
 
 class Lambda(Construct):
@@ -329,6 +334,14 @@ class Lambda(Construct):
                     "Security groups can only be added when a VPC is configured"
                 )
             common_lambda_props["security_groups"] = config.security_groups
+            
+        # Add filesystem if provided
+        if config.filesystem_access_point and config.filesystem_mount_path:
+            logger.debug(f"Adding filesystem with access point and mount path {config.filesystem_mount_path}")
+            common_lambda_props["filesystem"] = lambda_.FileSystem.from_efs_access_point(
+                config.filesystem_access_point,
+                config.filesystem_mount_path
+            )
 
         # Create the Lambda function based on runtime
         logger.info(

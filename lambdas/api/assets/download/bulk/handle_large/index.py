@@ -53,7 +53,9 @@ asset_table = dynamodb.Table(ASSET_TABLE)
 MAX_FILES_PER_ZIP = 10  # Maximum number of large files per zip
 MAX_RETRIES = 3  # Maximum number of retries for S3 operations
 PROGRESS_UPDATE_FREQUENCY = 2  # Update progress every N files
-CHUNK_SIZE = 8 * 1024 * 1024  # 8MB chunks for streaming
+# Get chunk size from environment variable or use default
+CHUNK_SIZE_MB = int(os.environ.get("CHUNK_SIZE_MB", "100"))
+CHUNK_SIZE = CHUNK_SIZE_MB * 1024 * 1024  # Convert MB to bytes for streaming
 
 
 @tracer.capture_method
@@ -264,6 +266,207 @@ def stream_s3_object_to_zip(
 
 
 @tracer.capture_method
+def process_file_chunk(
+    job_id: str,
+    asset_id: str,
+    chunk_index: int,
+    total_chunks: int,
+    chunk_size: int,
+    file_size: int,
+    options: Dict[str, Any],
+    temp_dir: str
+) -> Dict[str, Any]:
+    """
+    Process a single chunk of a large file.
+    
+    Args:
+        job_id: ID of the job
+        asset_id: ID of the asset
+        chunk_index: Index of the chunk to process
+        total_chunks: Total number of chunks
+        chunk_size: Size of each chunk in bytes
+        file_size: Total file size in bytes
+        options: Download options
+        temp_dir: Temporary directory for processing
+        
+    Returns:
+        Updated job details with path to created zip file
+    """
+    try:
+        logger.info(
+            f"Processing chunk {chunk_index + 1}/{total_chunks} for asset {asset_id}",
+            extra={
+                "jobId": job_id,
+                "assetId": asset_id,
+                "chunkIndex": chunk_index,
+                "totalChunks": total_chunks,
+            }
+        )
+        
+        # Get asset details
+        asset = get_asset_details(asset_id)
+        
+        # Determine file path based on quality option
+        quality = options.get("quality", "original")  # original or proxy
+        file_path = None
+        bucket = None
+        
+        if quality == "proxy":
+            # Look for proxy representation
+            for rep in asset.get("DerivedRepresentations", []):
+                if rep.get("Purpose") == "proxy":
+                    storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                    bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
+                    file_path = storage_info.get("ObjectKey", {}).get("FullPath")
+                    break
+            
+            # If no proxy found, use original
+            if not file_path:
+                logger.warning(
+                    "No proxy representation found, using original",
+                    extra={"assetId": asset_id}
+                )
+                main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
+                storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
+                file_path = storage_info.get("ObjectKey", {}).get("FullPath")
+        else:
+            # Use original representation
+            main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
+            storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
+            file_path = storage_info.get("ObjectKey", {}).get("FullPath")
+        
+        if not file_path:
+            raise ValueError(f"Could not determine file path for asset {asset_id}")
+        
+        # Get file name from path
+        file_name = os.path.basename(file_path)
+        
+        # Calculate chunk range
+        start_byte = chunk_index * chunk_size
+        end_byte = min(start_byte + chunk_size, file_size) - 1
+        
+        # Create a unique zip file name for this chunk
+        chunk_zip_name = f"chunk_{job_id}_{asset_id}_{chunk_index}_{total_chunks}.zip"
+        chunk_zip_path = os.path.join(temp_dir, chunk_zip_name)
+        
+        # Create a zip file for this chunk
+        with zipfile.ZipFile(chunk_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Create a ZipInfo object to store file info
+            zip_info = zipfile.ZipInfo(file_name)
+            zip_info.compress_type = zipfile.ZIP_DEFLATED
+            zip_info.date_time = time.localtime(time.time())[:6]
+            
+            # Stream the chunk directly from S3 to the zip file
+            with zipf.open(zip_info, 'w') as dest_file:
+                # Get the S3 object
+                s3_object = s3_resource.Object(bucket, file_path)
+                
+                # Get the chunk with range request
+                range_str = f'bytes={start_byte}-{end_byte}'
+                response = s3_object.get(Range=range_str)
+                data = response['Body'].read()
+                dest_file.write(data)
+        
+        # Upload the chunk zip to S3
+        s3_key = f"temp/zip/{job_id}/chunks/{chunk_zip_name}"
+        s3.upload_file(chunk_zip_path, MEDIA_ASSETS_BUCKET, s3_key)
+        
+        # Clean up the local zip file
+        try:
+            if os.path.exists(chunk_zip_path):
+                os.remove(chunk_zip_path)
+        except Exception as e:
+            logger.warning(
+                f"Failed to remove temporary chunk zip file: {str(e)}",
+                extra={"zipPath": chunk_zip_path}
+            )
+        
+        # Return the S3 path
+        chunk_zip_s3_path = f"s3://{MEDIA_ASSETS_BUCKET}/{s3_key}"
+        
+        # Update progress in DynamoDB
+        try:
+            bulk_download_table.update_item(
+                Key={"jobId": job_id},
+                UpdateExpression="SET #chunkStatus.#assetId.#chunkIndex = :status, #updatedAt = :updatedAt",
+                ExpressionAttributeNames={
+                    "#chunkStatus": "chunkStatus",
+                    "#assetId": asset_id,
+                    "#chunkIndex": str(chunk_index),
+                    "#updatedAt": "updatedAt",
+                },
+                ExpressionAttributeValues={
+                    ":status": "COMPLETED",
+                    ":updatedAt": datetime.utcnow().isoformat(),
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to update chunk status: {str(e)}",
+                extra={
+                    "jobId": job_id,
+                    "assetId": asset_id,
+                    "chunkIndex": chunk_index,
+                }
+            )
+        
+        # Add metrics
+        metrics.add_metric(name="ChunksProcessed", unit=MetricUnit.Count, value=1)
+        
+        return {
+            "jobId": job_id,
+            "assetId": asset_id,
+            "chunkIndex": chunk_index,
+            "totalChunks": total_chunks,
+            "chunkZipPath": chunk_zip_s3_path,
+        }
+    
+    except Exception as e:
+        logger.error(
+            f"Error processing chunk: {str(e)}",
+            exc_info=True,
+            extra={
+                "jobId": job_id,
+                "assetId": asset_id,
+                "chunkIndex": chunk_index,
+            },
+        )
+        
+        # Update chunk status to FAILED
+        try:
+            bulk_download_table.update_item(
+                Key={"jobId": job_id},
+                UpdateExpression="SET #chunkStatus.#assetId.#chunkIndex = :status, #error = :error, #updatedAt = :updatedAt",
+                ExpressionAttributeNames={
+                    "#chunkStatus": "chunkStatus",
+                    "#assetId": asset_id,
+                    "#chunkIndex": str(chunk_index),
+                    "#error": "error",
+                    "#updatedAt": "updatedAt",
+                },
+                ExpressionAttributeValues={
+                    ":status": "FAILED",
+                    ":error": f"Failed to process chunk: {str(e)}",
+                    ":updatedAt": datetime.utcnow().isoformat(),
+                },
+            )
+        except Exception as update_error:
+            logger.error(
+                f"Failed to update chunk status after error: {str(update_error)}",
+                extra={
+                    "jobId": job_id,
+                    "assetId": asset_id,
+                    "chunkIndex": chunk_index,
+                },
+            )
+        
+        # Re-raise the exception to be handled by Step Functions
+        raise
+
+
+@tracer.capture_method
 def create_zip_with_large_files(
     asset_batch: List[Dict[str, Any]], 
     quality: str,
@@ -375,10 +578,32 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         Updated job details with paths to created zip files
     """
     # Create temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
+    base_dir = os.environ.get("EFS_MOUNT_PATH", "/tmp")
+    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
         job_id = event.get("jobId")
         if not job_id:
             raise ValueError("Missing jobId in event")
+            
+        # Check if this is a chunk processing request
+        asset_id = event.get("assetId")
+        chunk_index = event.get("chunkIndex")
+        total_chunks = event.get("totalChunks")
+        chunk_size = event.get("chunkSize")
+        file_size = event.get("fileSize")
+        
+        # If this is a chunk processing request, handle it differently
+        if asset_id and chunk_index is not None and total_chunks and chunk_size and file_size:
+            # Convert numeric values to integers to avoid Decimal issues
+            return process_file_chunk(
+                job_id,
+                asset_id,
+                int(chunk_index),
+                int(total_chunks),
+                int(chunk_size),
+                int(file_size),
+                event.get("options", {}),
+                temp_dir
+            )
         
         try:
             logger.info("Processing large files job", extra={"jobId": job_id})

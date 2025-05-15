@@ -51,6 +51,13 @@ class AssetsProps:
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     media_assets_bucket: Optional[s3.Bucket] = None
+    
+    # Bulk download parameters
+    small_file_threshold_mb: int = 1024  # Max size for a file to be considered "small"
+    chunk_size_mb: int = 100  # Size of each chunk for large file processing
+    max_small_file_concurrency: int = 1000  # Max Lambdas for processing small files
+    max_large_chunk_concurrency: int = 100  # Max Lambdas processing large file chunks
+    merge_batch_size: int = 100  # Number of zip files merged at once in intermediate stage
 
 
 class AssetsConstruct(Construct):
@@ -73,8 +80,8 @@ class AssetsConstruct(Construct):
 
         region = Stack.of(self).region
         # Create assets resource and add {id} parameter
-        assets_resource = props.api_resource.root.add_resource("assets")
-        asset_resource = assets_resource.add_resource("{id}")
+        self._assets_resource = props.api_resource.root.add_resource("assets")
+        asset_resource = self._assets_resource.add_resource("{id}")
 
         search_layer = SearchLayer(self, "SearchLayer")
 
@@ -115,7 +122,7 @@ class AssetsConstruct(Construct):
             )
         )
 
-        assets_resource.add_method(
+        self._assets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_assets_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
@@ -295,7 +302,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add POST /assets/generate-presigned-url endpoint
-        presigned_url_resource = assets_resource.add_resource("generate-presigned-url")
+        presigned_url_resource = self._assets_resource.add_resource("generate-presigned-url")
         generate_presigned_url_lambda = Lambda(
             self,
             "GeneratePresignedUrlLambda",
@@ -365,7 +372,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add POST /assets/generate-presigned-url endpoint
-        upload_resource = assets_resource.add_resource("upload")
+        upload_resource = self._assets_resource.add_resource("upload")
         upload_lambda = Lambda(
             self,
             "UploadLambda",
@@ -691,7 +698,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add CORS support to all API resources
-        add_cors_options_method(assets_resource)
+        add_cors_options_method(self._assets_resource)
         add_cors_options_method(asset_resource)
         add_cors_options_method(presigned_url_resource)
         add_cors_options_method(rename_resource)
@@ -772,7 +779,8 @@ class AssetsConstruct(Construct):
         self._create_bulk_download_lambda_functions(props)
         
         # Create Step Functions state machine
-        self._create_bulk_download_step_functions_workflow()
+        # Pass the asset table name to the step functions workflow
+        self._create_bulk_download_step_functions_workflow(props.asset_table.table_name)
         
         # Create API Gateway endpoints
         self._create_bulk_download_api_endpoints(props)
@@ -792,7 +800,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadKickoffLambda",
             config=LambdaConfig(
                 name=f"{config.resource_prefix}_assets_bulk_download_kickoff_{config.environment}",
-                entry="lambdas/api/download/bulk/kickoff",
+                entry="lambdas/api/assets/download/bulk/kickoff",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -806,12 +814,13 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadAssessScaleLambda",
             config=LambdaConfig(
                 name=f"{config.resource_prefix}_assets_bulk_download_assess_scale_{config.environment}",
-                entry="lambdas/api/download/bulk/assess_scale",
+                entry="lambdas/api/assets/download/bulk/assess_scale",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
                     "SMALL_FILE_THRESHOLD": "100",  # MB
                     "LARGE_JOB_THRESHOLD": "1000",  # MB
+                    "SINGLE_FILE_CHECK": "true",  # Enable single file check
                 },
                 timeout_minutes=1,
                 memory_size=512,
@@ -819,36 +828,27 @@ class AssetsConstruct(Construct):
         )
         
         # Create a custom Lambda function with EFS filesystem
-        self._handle_small_lambda_function = lambda_.Function(
+        self._handle_small_lambda = Lambda(
             self,
-            "AssetsBulkDownloadHandleSmallFunction",
-            function_name=f"{config.resource_prefix}_assets_bulk_download_handle_small_{config.environment}",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.lambda_handler",
-            code=lambda_.Code.from_asset("lambdas/api/download/bulk/handle_small"),
-            environment={
-                **common_env_vars,
-                "ASSET_TABLE": props.asset_table.table_name,
-                "RESOURCE_PREFIX": config.resource_prefix,
-                "ENVIRONMENT": config.environment,
-                "METRICS_NAMESPACE": config.resource_prefix,
-            },
-            vpc=props.vpc,
-            security_groups=[props.security_group],
-            timeout=Duration.minutes(15),
-            memory_size=1024,
-            filesystem=lambda_.FileSystem.from_efs_access_point(
-                self._efs_access_point,
-                "/mnt/bulk-downloads"
+            "AssetsBulkDownloadHandleSmallLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_handle_small_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/handle_small",
+                environment_variables={
+                    **common_env_vars,
+                    "ASSET_TABLE": props.asset_table.table_name,
+                    "RESOURCE_PREFIX": config.resource_prefix,
+                    "ENVIRONMENT": config.environment,
+                    "METRICS_NAMESPACE": config.resource_prefix,
+                },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=15,
+                memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
             ),
         )
-        
-        # Create a wrapper for compatibility with our Lambda class
-        class LambdaWrapper:
-            def __init__(self, function):
-                self.function = function
-                
-        self._handle_small_lambda = LambdaWrapper(self._handle_small_lambda_function)
         
         # Handle Large Files Lambda
         self._handle_large_lambda = Lambda(
@@ -856,42 +856,41 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadHandleLargeLambda",
             config=LambdaConfig(
                 name=f"{config.resource_prefix}_assets_bulk_download_handle_large_{config.environment}",
-                entry="lambdas/api/download/bulk/handle_large",
+                entry="lambdas/api/assets/download/bulk/handle_large",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
                 },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
                 timeout_minutes=15,
                 memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
             ),
         )
         
         # Create a custom Lambda function with EFS filesystem
-        self._merge_zips_lambda_function = lambda_.Function(
+        self._merge_zips_lambda = Lambda(
             self,
-            "AssetsBulkDownloadMergeZipsFunction",
-            function_name=f"{config.resource_prefix}_assets_bulk_download_merge_zips_{config.environment}",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.lambda_handler",
-            code=lambda_.Code.from_asset("lambdas/api/download/bulk/merge_zips"),
-            environment={
-                **common_env_vars,
-                "RESOURCE_PREFIX": config.resource_prefix,
-                "ENVIRONMENT": config.environment,
-                "METRICS_NAMESPACE": config.resource_prefix,
-            },
-            vpc=props.vpc,
-            security_groups=[props.security_group],
-            timeout=Duration.minutes(15),
-            memory_size=1024,
-            filesystem=lambda_.FileSystem.from_efs_access_point(
-                self._efs_access_point,
-                "/mnt/bulk-downloads"
+            "AssetsBulkDownloadMergeZipsLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_merge_zips_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/merge_zips",
+                environment_variables={
+                    **common_env_vars,
+                    "RESOURCE_PREFIX": config.resource_prefix,
+                    "ENVIRONMENT": config.environment,
+                    "METRICS_NAMESPACE": config.resource_prefix,
+                },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=15,
+                memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
             ),
         )
-        
-        # Create a wrapper for compatibility with our Lambda class
-        self._merge_zips_lambda = LambdaWrapper(self._merge_zips_lambda_function)
         
         # Status Lambda
         self._status_lambda = Lambda(
@@ -899,7 +898,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadStatusLambda",
             config=LambdaConfig(
                 name=f"{config.resource_prefix}_assets_bulk_download_status_{config.environment}",
-                entry="lambdas/api/download/bulk/status",
+                entry="lambdas/api/assets/download/bulk/status",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -913,7 +912,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadMarkDownloadedLambda",
             config=LambdaConfig(
                 name=f"{config.resource_prefix}_assets_bulk_download_mark_downloaded_{config.environment}",
-                entry="lambdas/api/download/bulk/mark_downloaded",
+                entry="lambdas/api/assets/download/bulk/mark_downloaded",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -962,6 +961,41 @@ class AssetsConstruct(Construct):
             )
         
         # S3 permissions for handler and merge lambdas
+        # Add EC2 permissions for VPC access to Lambda functions
+        for lambda_function in [
+            self._handle_small_lambda,
+            self._handle_large_lambda,
+            self._merge_zips_lambda,
+        ]:
+            lambda_function.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "ec2:CreateNetworkInterface",
+                        "ec2:DescribeNetworkInterfaces",
+                        "ec2:DeleteNetworkInterface",
+                    ],
+                    resources=["*"],
+                )
+            )
+        
+        # Add S3 GetObject permission for all resources to handle_small_lambda and handle_large_lambda
+        for lambda_function in [
+            self._handle_small_lambda,
+            self._handle_large_lambda,
+        ]:
+            lambda_function.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "s3:GetObject",
+                        "s3:HeadObject",
+                    ],
+                    resources=["*"],
+                )
+            )
+
+        # KMS permissions are now consolidated below
+            
+        # Add S3 permissions for handler and merge lambdas
         for lambda_function in [
             self._handle_small_lambda,
             self._handle_large_lambda,
@@ -980,10 +1014,28 @@ class AssetsConstruct(Construct):
                     ],
                 )
             )
+        # Add comprehensive KMS permissions for all Lambda functions that interact with S3
+        for lambda_function in [
+            self._handle_small_lambda,
+            self._handle_large_lambda,
+            self._merge_zips_lambda,
+        ]:
+            lambda_function.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "kms:GenerateDataKey",
+                        "kms:Decrypt",
+                        "kms:Encrypt",
+                        "kms:ReEncrypt*",
+                        "kms:DescribeKey"
+                    ],
+                    resources=["*"],
+                )
+            )
         
         # Step Functions permissions will be added after Step Function creation
     
-    def _create_bulk_download_step_functions_workflow(self):
+    def _create_bulk_download_step_functions_workflow(self, asset_table_name=None):
         """Create Step Functions state machine for orchestrating the bulk download process."""
         # Define task states
         assess_scale_task = tasks.LambdaInvoke(
@@ -993,24 +1045,102 @@ class AssetsConstruct(Construct):
             output_path="$.Payload",
         )
         
-        handle_small_task = tasks.LambdaInvoke(
+        # Define Map state for small files with concurrency control
+        small_files_map = sfn.Map(
             self,
-            "AssetsHandleSmallTask",
-            lambda_function=self._handle_small_lambda.function,
-            output_path="$.Payload",
+            "ProcessSmallFilesMap",
+            max_concurrency=self.node.try_get_context("max_small_file_concurrency") or 1000,
+            items_path="$.smallFiles",
+            result_path="$.smallZipFiles",
+        ).iterator(
+            tasks.LambdaInvoke(
+                self,
+                "ProcessSmallFileTask",
+                lambda_function=self._handle_small_lambda.function,
+                output_path="$.Payload",
+            )
         )
         
-        handle_large_task = tasks.LambdaInvoke(
+        # Define Map state for large file chunks with concurrency control
+        large_files_map = sfn.Map(
             self,
-            "AssetsHandleLargeTask",
-            lambda_function=self._handle_large_lambda.function,
-            output_path="$.Payload",
+            "ProcessLargeFilesMap",
+            max_concurrency=self.node.try_get_context("max_large_chunk_concurrency") or 100,
+            items_path="$.largeFiles",
+            result_path="$.largeZipFiles",
+        ).iterator(
+            tasks.LambdaInvoke(
+                self,
+                "ProcessLargeFileTask",
+                lambda_function=self._handle_large_lambda.function,
+                output_path="$.Payload",
+            )
         )
         
         merge_zips_task = tasks.LambdaInvoke(
             self,
             "AssetsMergeZipsTask",
             lambda_function=self._merge_zips_lambda.function,
+            output_path="$.Payload",
+        )
+        
+        # Create a new Lambda for handling single file downloads
+        self._single_file_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadSingleFileLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_single_file_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/single_file",
+                environment_variables={
+                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+                    "ASSET_TABLE": asset_table_name,
+                },
+                timeout_minutes=1,
+                memory_size=512,
+            ),
+        )
+        
+        # Add necessary permissions to the single file Lambda
+        self._single_file_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                ],
+                resources=[self._bulk_download_table.table_arn],
+            )
+        )
+
+       
+        self._single_file_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["kms:Decrypt"],
+                resources=["*"],  # Use a wildcard for now since we don't have the exact ARN
+            )
+        )
+        
+        self._single_file_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=["*"],  # Use a wildcard for now since we don't have the exact ARN
+            )
+        )
+        
+        self._single_file_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:HeadObject",
+                ],
+                resources=["*"],
+            )
+        )
+        
+        # Create a task for the single file Lambda
+        single_file_task = tasks.LambdaInvoke(
+            self,
+            "AssetsSingleFileTask",
+            lambda_function=self._single_file_lambda.function,
             output_path="$.Payload",
         )
         
@@ -1021,17 +1151,54 @@ class AssetsConstruct(Construct):
         success_state = sfn.Succeed(self, "AssetsDownloadJobSucceeded")
         fail_state = sfn.Fail(self, "AssetsDownloadJobFailed", cause="Job processing failed")
         
-        # Build the workflow
-        workflow = assess_scale_task.next(
-            job_size_choice
-            .when(sfn.Condition.string_equals("$.jobType", "SMALL"), handle_small_task)
-            .when(sfn.Condition.string_equals("$.jobType", "LARGE"), handle_large_task)
-            .otherwise(fail_state)
+        # Define a pass state to combine results
+        combine_results = sfn.Pass(
+            self,
+            "CombineResults",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "smallZipFiles.$": "$.smallZipFiles",
+                "largeZipFiles.$": "$.largeZipFiles",
+                "options.$": "$.options"
+            }
         )
         
-        # Connect both handler paths to merge zips task
-        handle_small_task.next(merge_zips_task)
-        handle_large_task.next(merge_zips_task)
+        # For SMALL and LARGE job types, we need to process both small and large files
+        # Create a parallel state to process both small and large files
+        parallel_processing = sfn.Parallel(
+            self,
+            "ProcessFilesInParallel"
+        ).branch(
+            # Process small files if there are any
+            sfn.Choice(self, "CheckSmallFiles")
+            .when(
+                sfn.Condition.is_present("$.smallFiles[0]"),
+                small_files_map
+            )
+            .otherwise(
+                sfn.Pass(self, "NoSmallFiles", result_path="$.smallZipFiles", result=sfn.Result.from_array([]))
+            )
+        ).branch(
+            # Process large files if there are any
+            sfn.Choice(self, "CheckLargeFiles")
+            .when(
+                sfn.Condition.is_present("$.largeFiles[0]"),
+                large_files_map
+            )
+            .otherwise(
+                sfn.Pass(self, "NoLargeFiles", result_path="$.largeZipFiles", result=sfn.Result.from_array([]))
+            )
+        ).next(combine_results).next(merge_zips_task)
+        
+        # Build the main workflow
+        workflow = assess_scale_task.next(
+            job_size_choice
+            .when(sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"), single_file_task.next(success_state))
+            .otherwise(parallel_processing)
+        )
+        
+        # Note: single_file_task already connected to success_state in the workflow definition
         
         # Complete the workflow
         merge_zips_task.next(success_state)
@@ -1059,39 +1226,42 @@ class AssetsConstruct(Construct):
     
     def _create_bulk_download_api_endpoints(self, props: AssetsProps):
         """Create API Gateway endpoints for bulk download operations."""
-        # Create download resource
-        # Use a different path to avoid conflicts with existing resources
-        download_resource = props.api_resource.root.add_resource("assets-download")
+        # Create download resource under assets
+        download_resource = self._assets_resource.add_resource("download")
         bulk_resource = download_resource.add_resource("bulk")
         job_resource = bulk_resource.add_resource("{jobId}")
         
-        # POST /download/bulk - Start a new bulk download job
+        # POST /assets/download/bulk - Start a new bulk download job
         bulk_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._kickoff_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.NONE,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer
         )
         
-        # GET /download/bulk/{jobId} - Get job status
+        # GET /assets/download/bulk/{jobId} - Get job status
         job_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.NONE,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer
         )
         
-        # PUT /download/bulk/{jobId} - Mark job as downloaded
+        # PUT /assets/download/bulk/{jobId} - Mark job as downloaded
         job_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._mark_downloaded_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.NONE,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer
         )
         
-        # GET /download/bulk/user - List user's bulk download jobs
+        # GET /assets/download/bulk/user - List user's bulk download jobs
         user_resource = bulk_resource.add_resource("user")
         user_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.NONE,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer
         )
         
         # Add CORS support to bulk download API resources
