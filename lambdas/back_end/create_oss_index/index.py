@@ -156,7 +156,19 @@ def handler(event, context):
                 "document_id":      {"type": "text"},
                 "InventoryID":      {"type": "text"},
                 "FileHash":         {"type": "text"},
-                "StoragePath":      {"type": "text"},    
+                "StoragePath":      {"type": "text"}, 
+                "start_timecode":   {"type": "keyword"},
+                "end_timecode":     {"type": "keyword"},
+                "embedding_scope":  {"type": "keyword"},
+                "embedding": {
+                    "type":      "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                    "name":       "hnsw",
+                    "space_type": "cosinesimil",
+                    "engine":     "nmslib"
+                    }
+                },   
                 "DerivedRepresentations": {
                 "type": "nested", 
                 "properties": {
@@ -273,7 +285,7 @@ def handler(event, context):
                         "embedding_scope":  { "type": "keyword" },
                         "embedding": {
                             "type":      "knn_vector",
-                            "dimension": VECTOR_DIMENSION,
+                            "dimension": 1024,
                             "method": {
                                 "name":       "hnsw",
                                 "space_type": "cosinesimil",
