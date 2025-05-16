@@ -13,7 +13,41 @@ export default {
         title: 'Assets',
         connectors: 'Connectors',
         selectConnector: 'Select a connector'
-      },
+    },
+    connectors: {
+        apiMessages: {
+            creating: {
+                loading: 'Creating connector...',
+                success: 'Connector Created',
+                successMessage: 'New connector has been successfully created.',
+                error: 'Connector Creation Failed'
+            },
+            updating: {
+                loading: 'Updating connector...',
+                success: 'Connector Updated',
+                successMessage: 'Connector has been successfully updated.',
+                error: 'Connector Update Failed'
+            },
+            deleting: {
+                loading: 'Deleting connector...',
+                success: 'Connector Deleted',
+                successMessage: 'Connector has been successfully deleted.',
+                error: 'Connector Deletion Failed'
+            },
+            enabling: {
+                loading: 'Enabling connector...',
+                success: 'Connector Enabled',
+                successMessage: 'Connector has been successfully enabled.',
+                error: 'Connector Enable Failed'
+            },
+            disabling: {
+                loading: 'Disabling connector...',
+                success: 'Connector Disabled',
+                successMessage: 'Connector has been successfully disabled.',
+                error: 'Connector Disable Failed'
+            }
+        }
+    },
     assets: {
         "favorite": "Favorite",
         "unfavorite": "Unfavorite",

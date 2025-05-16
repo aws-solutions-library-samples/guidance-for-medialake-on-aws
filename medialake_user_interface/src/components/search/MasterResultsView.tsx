@@ -134,6 +134,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
+    console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
+    
     switch (fieldId) {
       case 'name':
         return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
@@ -148,7 +150,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case 'modifiedAt':
         return formatDate(asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate);
+      case 'fullPath':
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
       default:
+        console.log('Unknown field ID:', fieldId);
         return '';
     }
   };

@@ -14,6 +14,7 @@ interface DigitalSourceAsset {
             PrimaryLocation: {
                 ObjectKey: {
                     Name: string;
+                    FullPath: string;
                 };
                 FileInfo: {
                     Size: number;
@@ -37,7 +38,10 @@ export interface ImageItem extends AssetBase {
             Format: string;
             StorageInfo: {
                 PrimaryLocation: {
-                    ObjectKey: { Name: string; };
+                    ObjectKey: { 
+                        Name: string;
+                        FullPath: string;
+                    };
                     FileInfo: { Size: number; };
                 };
             };
@@ -51,9 +55,11 @@ export interface VideoItem extends AssetBase {
         MainRepresentation: {
             Format: string;
             StorageInfo: {
-
                 PrimaryLocation: {
-                    ObjectKey: { Name: string; };
+                    ObjectKey: { 
+                        Name: string;
+                        FullPath: string;
+                    };
                     FileInfo: { Size: number; };
                 };
             };
@@ -72,9 +78,11 @@ export interface AudioItem extends AssetBase {
         MainRepresentation: {
             Format: string;
             StorageInfo: {
-
                 PrimaryLocation: {
-                    ObjectKey: { Name: string; };
+                    ObjectKey: { 
+                        Name: string;
+                        FullPath: string;
+                    };
                     FileInfo: { Size: number; };
                 };
             };
