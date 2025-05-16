@@ -218,7 +218,7 @@ def handler(event, context):
                     "type": "object",
                     "properties": {
                         "CreateDate": { "type": "date" },
-                        "ID": { "type": "text" },
+                        "ID": { "type": "keyword" },
                         "IngestedAt": { "type": "date" },
                         "lastModifiedDate": { "type": "date" },
                         "originalIngestDate": { "type": "date" },
