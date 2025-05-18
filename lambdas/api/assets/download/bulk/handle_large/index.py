@@ -605,14 +605,24 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 temp_dir
             )
         
+        # Check if this is a specific asset request (from Map state)
+        if asset_id:
+            logger.info(f"Processing specific asset: {asset_id}", extra={"jobId": job_id})
+        
         try:
             logger.info("Processing large files job", extra={"jobId": job_id})
             
             # Get job details
             job = get_job_details(job_id)
             
-            # Get asset IDs from job
-            asset_ids = job.get("foundAssets", [])
+            # Get asset IDs from job or use the specific asset ID
+            if asset_id:
+                # If a specific asset ID is provided, only process that asset
+                asset_ids = [asset_id]
+            else:
+                # Otherwise, process all assets in the job
+                asset_ids = job.get("foundAssets", [])
+                
             if not asset_ids:
                 logger.warning("No assets found for job", extra={"jobId": job_id})
                 return {
