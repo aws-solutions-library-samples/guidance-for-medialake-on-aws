@@ -33,6 +33,17 @@ import { type SortingState } from '@tanstack/react-table';
 import { type AssetField, type SortOption, type CardSize, type AspectRatio, type AssetViewControlsProps as BaseAssetViewControlsProps } from '../../types/shared/assetComponents';
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
+    // Search fields
+    selectedFields?: string[];
+    availableFields?: Array<{
+        name: string;
+        displayName: string;
+        description: string;
+        type: string;
+        isDefault: boolean;
+    }>;
+    onFieldsChange?: (event: any) => void;
+    
     groupByType: boolean;
     onGroupByTypeChange: (checked: boolean) => void;
     cardSize: CardSize;
@@ -54,6 +65,10 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     onSortChange,
     fields,
     onFieldToggle,
+    // Search fields
+    selectedFields,
+    availableFields,
+    onFieldsChange,
     groupByType,
     onGroupByTypeChange,
     cardSize,
@@ -72,6 +87,79 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
     const handleAppearanceClose = () => setAppearanceAnchor(null);
+    
+    // Create a mapping between API field IDs and column IDs
+    const fieldMapping: Record<string, string> = {
+        // Root level fields (new API structure)
+        'id': 'id',
+        'assetType': 'type',
+        'format': 'format',
+        'createdAt': 'date',
+        'objectName': 'name',
+        'fileSize': 'size',
+        'fullPath': 'fullPath',
+        'bucket': 'bucket',
+        'FileHash': 'hash',
+        
+        // Legacy nested fields (for backward compatibility)
+        'DigitalSourceAsset.Type': 'type',
+        'DigitalSourceAsset.MainRepresentation.Format': 'format',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'date',
+        'DigitalSourceAsset.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath': 'fullPath',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
+        'Metadata.Consolidated': 'metadata',
+        'InventoryID': 'id'
+    };
+    
+    // Create a reverse mapping for easier lookup
+    const reverseFieldMapping: Record<string, string[]> = {};
+    Object.entries(fieldMapping).forEach(([apiId, colId]) => {
+        if (!reverseFieldMapping[colId]) {
+            reverseFieldMapping[colId] = [];
+        }
+        reverseFieldMapping[colId].push(apiId);
+    });
+    
+    // Filter sort options based on selected fields
+    const filteredSortOptions = React.useMemo(() => {
+        if (!selectedFields || selectedFields.length === 0) {
+            return sortOptions;
+        }
+        
+        return sortOptions.filter(option => {
+            // Special case for name field
+            if (option.id === 'name') {
+                return selectedFields.some(field =>
+                    field.includes('Name') || field === 'objectName'
+                );
+            }
+            
+            // Special case for date field
+            if (option.id === 'date') {
+                return selectedFields.some(field =>
+                    field.includes('CreateDate') || field === 'createdAt'
+                );
+            }
+            
+            // Special case for size field
+            if (option.id === 'size') {
+                return selectedFields.some(field =>
+                    field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+                );
+            }
+            
+            // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
+            const apiFieldIds = reverseFieldMapping[option.id] || [];
+            return apiFieldIds.some(apiFieldId =>
+                selectedFields.includes(apiFieldId)
+            );
+        });
+    }, [sortOptions, selectedFields, reverseFieldMapping]);
 
     return (
         <Box sx={{
@@ -158,7 +246,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         Sort By
                     </Typography>
-                    {sortOptions.map((option) => (
+                    {filteredSortOptions.map((option) => (
                         <MenuItem
                             key={option.id}
                             onClick={() => {
@@ -200,29 +288,68 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                 }}
             >
                 <Box sx={{ p: 2, minWidth: 200 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                        {viewMode === 'card' ? 'Show Fields' : 'Show Columns'}
-                    </Typography>
-                    <FormGroup>
-                        {fields.map((field) => (
-                            <FormControlLabel
-                                key={field.id}
-                                control={
-                                    <Checkbox
-                                        checked={field.visible}
-                                        onChange={() => onFieldToggle(field.id)}
-                                        size="small"
+                    {/* Display fields for search if available */}
+                    {availableFields && selectedFields && onFieldsChange ? (
+                        <>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                Search Fields
+                            </Typography>
+                            <FormGroup>
+                                {availableFields.map((field) => (
+                                    <FormControlLabel
+                                        key={field.name}
+                                        control={
+                                            <Checkbox
+                                                checked={selectedFields.includes(field.name)}
+                                                onChange={(e) => {
+                                                    const newSelectedFields = e.target.checked
+                                                        ? [...selectedFields, field.name]
+                                                        : selectedFields.filter(name => name !== field.name);
+                                                    
+                                                    onFieldsChange({
+                                                        target: { value: newSelectedFields }
+                                                    });
+                                                }}
+                                                size="small"
+                                            />
+                                        }
+                                        label={field.displayName}
+                                        sx={{
+                                            '& .MuiFormControlLabel-label': {
+                                                fontSize: '0.875rem'
+                                            }
+                                        }}
                                     />
-                                }
-                                label={field.label}
-                                sx={{
-                                    '& .MuiFormControlLabel-label': {
-                                        fontSize: '0.875rem'
-                                    }
-                                }}
-                            />
-                        ))}
-                    </FormGroup>
+                                ))}
+                            </FormGroup>
+                        </>
+                    ) : (
+                        <>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                {viewMode === 'card' ? 'Show Fields' : 'Show Columns'}
+                            </Typography>
+                            <FormGroup>
+                                {fields.map((field) => (
+                                    <FormControlLabel
+                                        key={field.id}
+                                        control={
+                                            <Checkbox
+                                                checked={field.visible}
+                                                onChange={() => onFieldToggle(field.id)}
+                                                size="small"
+                                            />
+                                        }
+                                        label={field.label}
+                                        sx={{
+                                            '& .MuiFormControlLabel-label': {
+                                                fontSize: '0.875rem'
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </FormGroup>
+                        </>
+                    )}
                 </Box>
             </Menu>
 

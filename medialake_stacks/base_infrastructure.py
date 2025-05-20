@@ -192,9 +192,16 @@ class BaseInfrastructureStack(Stack):
             )
 
         # Create OpenSearch managed cluster
+        # Calculate the effective availability zone count based on data node count
+        opensearch_settings = config.opensearch_cluster_settings
+        effective_az_count = min(
+            opensearch_settings.availability_zone_count,
+            opensearch_settings.data_node_count
+        )
+        
         if config.vpc.use_existing_vpc:
             selected_subnet_ids = config.vpc.existing_vpc.subnet_ids["private"][
-                : config.opensearch_cluster_settings.availability_zone_count
+                : effective_az_count
             ]
         else:
             private_subnets = self._vpc.get_subnet_ids(
@@ -203,7 +210,7 @@ class BaseInfrastructureStack(Stack):
             selected_subnet_ids = [
                 subnet["subnet_id"]
                 for subnet in private_subnets[
-                    : config.opensearch_cluster_settings.availability_zone_count
+                    : effective_az_count
                 ]
             ]
 

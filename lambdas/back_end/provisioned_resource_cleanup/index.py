@@ -223,7 +223,7 @@ def clean_up_pipeline(item, table):
                         )
                     else:
                         logger.warning(f"Unrecognized EventBridge rule format: {resource_identifier}")
-                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role", "iam_role", "lambda_role", "sfn_role", "events_role"]:
+                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role", "iam_role", "lambda_role", "sfn_role", "events_role", "service_role"]:
                     delete_iam_role(resource_identifier)
                 elif resource_type == "step_function":
                     delete_step_function(resource_identifier)

@@ -206,7 +206,7 @@ function AssetResults<T extends AssetBase>({
                 renderField={(fieldId) => renderCardField(fieldId, asset)}
                 onAssetClick={() => handleAssetClick(asset)}
                 onDeleteClick={(e) => handleDeleteClick(asset, e)}
-                onMenuClick={(e) => handleMenuOpen(asset, e)}
+                onDownloadClick={(e) => handleMenuOpen(asset, e)}
                 onEditClick={(e) => handleStartEditing(asset, e)}
                 onImageError={handleAssetError}
                 isEditing={editingAssetId === asset.InventoryID}
@@ -291,13 +291,13 @@ function AssetResults<T extends AssetBase>({
                         )}
                     </Box>
                 ) : (
-                    <AssetTable
+                    <AssetTable<T>
                         data={displayedAssets}
                         columns={columns}
                         sorting={sorting}
                         onSortingChange={setSorting}
                         onDeleteClick={handleDeleteClick}
-                        onMenuClick={handleMenuOpen}
+                        onDownloadClick={handleMenuOpen}
                         onEditClick={handleStartEditing}
                         onAssetClick={handleAssetClick}
                         getThumbnailUrl={(asset) => asset.thumbnailUrl || placeholderImage}

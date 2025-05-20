@@ -141,9 +141,7 @@ def handler(event, context):
         headers = {
             "content-type": "application/json",
             "accept": "application/json",
-        }
-
-      
+        }      
 
         payload = {
             "settings": {
@@ -154,22 +152,149 @@ def handler(event, context):
             },
             "mappings": {
                 "properties": {
-                "type":             {"type": "keyword"},
-                "document_id":      {"type": "keyword"},
-                "asset_id":         {"type": "keyword"},
+                "type":             {"type": "text"},
+                "document_id":      {"type": "text"},
+                "InventoryID":      {"type": "text"},
+                "FileHash":         {"type": "text"},
+                "StoragePath":      {"type": "text"}, 
                 "start_timecode":   {"type": "keyword"},
                 "end_timecode":     {"type": "keyword"},
                 "embedding_scope":  {"type": "keyword"},
                 "embedding": {
                     "type":      "knn_vector",
-                    "dimension": VECTOR_DIMENSION,
+                    "dimension": 1024,
                     "method": {
                     "name":       "hnsw",
                     "space_type": "cosinesimil",
                     "engine":     "nmslib"
                     }
+                },   
+                "DerivedRepresentations": {
+                "type": "nested", 
+                "properties": {
+                    "Format":    { "type": "text"  },
+                    "ID":        { "type": "text"  },
+                    "Purpose":   { "type": "text"  },
+                    "Type":      { "type": "text"  },
+                    "ImageSpec": {
+                        "type": "object",
+                        "properties": {
+                            "Resolution": {
+                                "properties": {
+                                    "Height": { "type": "integer" },
+                                    "Width": { "type": "integer" }
+                                }
+                            }
+                        }
+                    },
+                    "StorageInfo": {
+                        "type": "object",
+                        "properties": {
+                            "PrimaryLocation": {
+                                "properties": {
+                                    "Bucket": { "type": "text" },
+                                    "Status": { "type": "text" },
+                                    "Provider": { "type": "text" },
+                                    "StorageType": { "type": "text" },
+                                    "FileInfo": {
+                                        "properties": {
+                                            "Size": { "type": "long" }
+                                        }
+                                    },
+                                    "ObjectKey": {
+                                        "properties": {
+                                            "FullPath": { "type": "text" },
+                                            "Name": { "type": "text" },
+                                            "Path": { "type": "text" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 },
-                "EmbeddedMetadata": {"type": "object", "dynamic": True}
+                "DigitalSourceAsset": {
+                    "type": "object",
+                    "properties": {
+                        "CreateDate": { "type": "date" },
+                        "ID": { "type": "keyword" },
+                        "IngestedAt": { "type": "date" },
+                        "lastModifiedDate": { "type": "date" },
+                        "originalIngestDate": { "type": "date" },
+                        "Type": { "type": "text" },
+                        "MainRepresentation": {
+                            "type": "object",
+                            "properties": {
+                                "Format": { "type": "text" },
+                                "ID": { "type": "text" },
+                                "Purpose": { "type": "text" },
+                                "Type": { "type": "text" },
+                                "StorageInfo": {
+                                    "type": "object",
+                                    "properties": {
+                                        "PrimaryLocation": {
+                                            "properties": {
+                                                "Bucket": { "type": "text" },
+                                                "Status": { "type": "text" },
+                                                "StorageType": { "type": "text" },
+                                                "FileInfo": {
+                                                    "properties": {
+                                                        "CreateDate": { "type": "date" },
+                                                        "Size": { "type": "long" },
+                                                        "Hash": {
+                                                            "properties": {
+                                                                "Algorithm": { "type": "keyword" },
+                                                                "MD5Hash": { "type": "keyword" },
+                                                                "Value": { "type": "keyword" }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "ObjectKey": {
+                                                    "properties": {
+                                                        "FullPath": { "type": "text" },
+                                                        "Name": { "type": "text" },
+                                                        "Path": { "type": "text" }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "Metadata": {
+                    "type": "object",
+                    "dynamic": True,
+                    "properties": {
+                        "CustomMetadata": {
+                            "type": "object",
+                            "dynamic": True
+                        }
+                    }
+                },
+                "DigitalAsset": {
+                    "type": "nested",
+                    "properties": {
+                        "asset_id":         { "type": "keyword" },
+                        "start_timecode":   { "type": "keyword" },
+                        "end_timecode":     { "type": "keyword" },
+                        "embedding_scope":  { "type": "keyword" },
+                        "embedding": {
+                            "type":      "knn_vector",
+                            "dimension": 1024,
+                            "method": {
+                                "name":       "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine":     "nmslib"
+                            }
+                        },
+                        "EmbeddedMetadata": { "type": "object", "dynamic": True }
+                        }
+                    }
                 }
             }
         }

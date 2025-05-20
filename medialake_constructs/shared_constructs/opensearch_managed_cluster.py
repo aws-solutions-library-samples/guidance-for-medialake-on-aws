@@ -33,6 +33,7 @@ class OpenSearchClusterProps:
     domain_name: str
 
     engine_version: str = "OpenSearch_2.15"
+    use_dedicated_master_nodes: bool = config.opensearch_cluster_settings.use_dedicated_master_nodes
     master_node_instance_type: str = (
         config.opensearch_cluster_settings.master_node_instance_type
     )
@@ -227,12 +228,13 @@ class OpenSearchCluster(Construct):
                 cluster_config=opensearch.CfnDomain.ClusterConfigProperty(
                     instance_type=props.data_node_instance_type,
                     instance_count=props.data_node_count,
-                    dedicated_master_enabled=True,
-                    dedicated_master_type=props.master_node_instance_type,
-                    dedicated_master_count=props.master_node_count,
+                    dedicated_master_enabled=props.use_dedicated_master_nodes,
+                    dedicated_master_type=props.master_node_instance_type if props.use_dedicated_master_nodes else None,
+                    dedicated_master_count=props.master_node_count if props.use_dedicated_master_nodes else None,
                     zone_awareness_enabled=True,
                     zone_awareness_config=opensearch.CfnDomain.ZoneAwarenessConfigProperty(
-                        availability_zone_count=props.availability_zone_count
+                        # Ensure availability_zone_count doesn't exceed the number of data nodes
+                        availability_zone_count=min(props.availability_zone_count, props.data_node_count)
                     ),
                     multi_az_with_standby_enabled=props.multi_az_with_standby_enabled,
                 ),

@@ -23,6 +23,26 @@ node:
               resources:
                 - "*"
             
+      service_roles:
+        - name: transcribe_service_role
+          service: transcribe.amazonaws.com
+          policies:
+            - name: s3
+              statements:
+                - effect: Allow
+                  actions:
+                    - s3:PutObject
+                    - s3:ListBucket
+                    - s3:GetObject
+                    - s3:DeleteObject
+                  resources:
+                    - "*"  # This could be more specific in production
+                - effect: Allow
+                  actions:
+                    - kms:Decrypt
+                  resources:
+                    - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            
 actions:
   transcribe:
     summary: Transcribe Audio using Amazon Transcribe

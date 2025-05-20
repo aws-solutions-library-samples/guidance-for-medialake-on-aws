@@ -42,15 +42,16 @@
         }
     },
     "opensearch_cluster_settings": {
+        "use_dedicated_master_nodes": false,
         "master_node_count": 3,
-        "master_node_instance_type": "r7g.medium.search",
-        "data_node_count": 2,
-        "data_node_instance_type": "r7g.medium.search",
+        "master_node_instance_type": "m6g.large.search",
+        "data_node_count": 3,
+        "data_node_instance_type": "m6g.large.search",
         "data_node_volume_size": 10,
         "data_node_volume_type": "gp3",
         "data_node_volume_iops": 3000,
         "multi_az_with_standby_enabled": false,
-        "availability_zone_count": 2,
+        "availability_zone_count": 3,
         "off_peak_window_start": "20:00",
         "off_peak_window_enabled": true,
         "snapshot_options": {

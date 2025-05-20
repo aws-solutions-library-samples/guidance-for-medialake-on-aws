@@ -34,8 +34,9 @@ export const QUERY_KEYS = {
     SEARCH: {
         all: ['search'] as const,
         lists: () => [...QUERY_KEYS.SEARCH.all, 'list'] as const,
-        list: (query: string, page: number, pageSize: number, isSemantic: boolean) =>
-            [...QUERY_KEYS.SEARCH.lists(), { query, page, pageSize, isSemantic }] as const,
+        list: (query: string, page: number, pageSize: number, isSemantic: boolean, fields?: string[], facetParams?: Record<string, any>) =>
+            [...QUERY_KEYS.SEARCH.lists(), { query, page, pageSize, isSemantic, fields, facetParams }] as const,
+        fields: () => [...QUERY_KEYS.SEARCH.all, 'fields'] as const,
     },
     ASSETS: {
         all: ['assets'] as const,

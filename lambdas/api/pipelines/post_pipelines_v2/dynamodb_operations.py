@@ -370,7 +370,8 @@ def update_pipeline_status(
     eventbridge_role_arns: Optional[Dict[str, str]] = None,
     trigger_lambda_arns: Optional[Dict[str, str]] = None,
     sqs_queue_arns: Optional[Dict[str, str]] = None,
-    event_source_mapping_uuids: Optional[Dict[str, str]] = None
+    event_source_mapping_uuids: Optional[Dict[str, str]] = None,
+    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None
 ) -> None:
     """
     Update the deployment status and optionally resources of a pipeline.
@@ -388,6 +389,7 @@ def update_pipeline_status(
         trigger_lambda_arns: Optional dictionary mapping node IDs to trigger Lambda ARNs
         sqs_queue_arns: Optional dictionary mapping node IDs to SQS queue ARNs
         event_source_mapping_uuids: Optional dictionary mapping node IDs to event source mapping UUIDs
+        service_role_arns: Optional dictionary mapping node IDs to dictionaries of service role names and ARNs
     """
     logger.info(f"Updating pipeline {pipeline_id} status to {deployment_status}")
     dynamodb = boto3.resource("dynamodb")
@@ -424,6 +426,13 @@ def update_pipeline_status(
                     dependent_resources.append(["iam_role", role_arn])
                     logger.info(f"Added Lambda IAM role {role_arn} to dependent resources")
         
+        # Add service roles if available
+        if service_role_arns:
+            for node_id, roles in service_role_arns.items():
+                for role_name, role_arn in roles.items():
+                    dependent_resources.append(["service_role", role_arn])
+                    logger.info(f"Added service role {role_name} ({role_arn}) to dependent resources")
+        
         update_expr += ", #res = :res"
         expr_values[":res"] = dependent_resources
         expr_names["#res"] = "dependentResources"
@@ -456,7 +465,24 @@ def update_pipeline_status(
         expr_values[":arn"] = state_machine_arn
         expr_names["#arn"] = "stateMachineArn"
     
-    if eventbridge_rule_arns and not lambda_arns:
+    # Handle service roles separately if lambda_arns is not provided
+    elif service_role_arns:
+        # Need to get existing dependentResources first
+        pipeline = get_pipeline_by_id(pipeline_id)
+        if pipeline and "dependentResources" in pipeline:
+            dependent_resources = pipeline["dependentResources"]
+        
+        # Add service roles
+        for node_id, roles in service_role_arns.items():
+            for role_name, role_arn in roles.items():
+                dependent_resources.append(["service_role", role_arn])
+                logger.info(f"Added service role {role_name} ({role_arn}) to dependent resources")
+        
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
+    
+    if eventbridge_rule_arns and not lambda_arns and not service_role_arns:
         # Need to get existing dependentResources first if lambda_arns not provided
         pipeline = get_pipeline_by_id(pipeline_id)
         if pipeline and "dependentResources" in pipeline:
@@ -524,7 +550,8 @@ def store_pipeline_info(
     eventbridge_role_arns: Optional[Dict[str, str]] = None,
     trigger_lambda_arns: Optional[Dict[str, str]] = None,
     sqs_queue_arns: Optional[Dict[str, str]] = None,
-    event_source_mapping_uuids: Optional[Dict[str, str]] = None
+    event_source_mapping_uuids: Optional[Dict[str, str]] = None,
+    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None
 ) -> str:
     """
     Store or update pipeline information in DynamoDB.
@@ -536,6 +563,13 @@ def store_pipeline_info(
         eventbridge_rule_arns: Optional dictionary mapping node IDs to EventBridge rule ARNs
         pipeline_id: Optional ID of an existing pipeline record
         active: Whether the pipeline is active
+        sfn_role_arn: Optional ARN of the Step Functions IAM role
+        lambda_role_arns: Optional dictionary mapping node IDs to Lambda IAM role ARNs
+        eventbridge_role_arns: Optional dictionary mapping node IDs to EventBridge IAM role ARNs
+        trigger_lambda_arns: Optional dictionary mapping node IDs to trigger Lambda ARNs
+        sqs_queue_arns: Optional dictionary mapping node IDs to SQS queue ARNs
+        event_source_mapping_uuids: Optional dictionary mapping node IDs to event source mapping UUIDs
+        service_role_arns: Optional dictionary mapping node IDs to dictionaries of service role names and ARNs
         
     Returns:
         ID of the created or updated pipeline
@@ -587,7 +621,8 @@ def store_pipeline_info(
             eventbridge_role_arns=eventbridge_role_arns,
             trigger_lambda_arns=trigger_lambda_arns,
             sqs_queue_arns=sqs_queue_arns,
-            event_source_mapping_uuids=event_source_mapping_uuids
+            event_source_mapping_uuids=event_source_mapping_uuids,
+            service_role_arns=service_role_arns
         )
         return pipeline_id
     else:
@@ -607,7 +642,8 @@ def store_pipeline_info(
                 eventbridge_role_arns=eventbridge_role_arns,
                 trigger_lambda_arns=trigger_lambda_arns,
                 sqs_queue_arns=sqs_queue_arns,
-                event_source_mapping_uuids=event_source_mapping_uuids
+                event_source_mapping_uuids=event_source_mapping_uuids,
+                service_role_arns=service_role_arns
             )
             return pipeline_id
         else:
@@ -624,6 +660,7 @@ def store_pipeline_info(
                 eventbridge_role_arns=eventbridge_role_arns,
                 trigger_lambda_arns=trigger_lambda_arns,
                 sqs_queue_arns=sqs_queue_arns,
-                event_source_mapping_uuids=event_source_mapping_uuids
+                event_source_mapping_uuids=event_source_mapping_uuids,
+                service_role_arns=service_role_arns
             )
             return pipeline_id

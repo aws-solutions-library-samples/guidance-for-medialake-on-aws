@@ -1,8 +1,9 @@
+{# transcribe_status_get_response.jinja #}
 {
   "statusCode": {{ variables.statusCode }},
   "body": {
     "status": "{{ variables.status }}",
-    "asset_id": "{{ variables.asset_id }}",
+    "inventory_id": "{{ variables.inventory_id }}",
     "transcription": {
       "job_name": "{{ variables.transcription.job_name }}"
       {% if variables.status == "COMPLETED" %}
@@ -22,6 +23,9 @@
   },
   "externalTaskStatus": "{{ variables.externalTaskStatus }}",
   "externalJobId": "{{ variables.externalJobId }}",
-  "externalJobStatus": "{{ variables.externalJobStatus }}",
+  "externalJobStatus": "{{ variables.externalJobStatus }}"
+  {% if variables.externalJobResult %}
+  ,
   "externalJobResult": "{{ variables.externalJobResult }}"
+  {% endif %}
 }

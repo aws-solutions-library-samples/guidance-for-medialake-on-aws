@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Box, IconButton, TextField, Button } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
     useReactTable,
     getCoreRowModel,
@@ -30,6 +31,7 @@ interface AssetTableProps<T> {
     onSortingChange?: (sorting: SortingState) => void;
     columnFilters?: ColumnFiltersState;
     onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
+    selectedSearchFields?: string[]; // Add selectedSearchFields prop
 }
 
 export function AssetTable<T>({
@@ -42,6 +44,7 @@ export function AssetTable<T>({
     onSortingChange,
     columnFilters = [],
     onColumnFiltersChange,
+    selectedSearchFields,
 }: AssetTableProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [columnVisibility, setColumnVisibility] = useState({});
@@ -50,6 +53,93 @@ export function AssetTable<T>({
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editedName, setEditedName] = useState('');
+    
+    // Create a mapping between API field IDs and column IDs
+    const fieldMapping: Record<string, string> = {
+        // Root level fields (new API structure)
+        'id': 'id',
+        'assetType': 'type',
+        'format': 'format',
+        'createdAt': 'date',
+        'objectName': 'name',
+        'fileSize': 'size',
+        'fullPath': 'fullPath',
+        'bucket': 'bucket',
+        'FileHash': 'hash',
+        
+        // Legacy nested fields (for backward compatibility)
+        'DigitalSourceAsset.Type': 'type',
+        'DigitalSourceAsset.MainRepresentation.Format': 'format',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'date',
+        'DigitalSourceAsset.CreateDate': 'date',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath': 'fullPath',
+        'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
+        'Metadata.Consolidated': 'metadata',
+        'InventoryID': 'id'
+    };
+    
+    // Create a reverse mapping for easier lookup
+    const reverseFieldMapping: Record<string, string[]> = {};
+    Object.entries(fieldMapping).forEach(([apiId, colId]) => {
+        if (!reverseFieldMapping[colId]) {
+            reverseFieldMapping[colId] = [];
+        }
+        reverseFieldMapping[colId].push(apiId);
+    });
+    
+    // Calculate column visibility based on selectedSearchFields
+    React.useEffect(() => {
+        if (selectedSearchFields && selectedSearchFields.length > 0) {
+            const newColumnVisibility: Record<string, boolean> = {};
+            
+            userColumns.forEach(column => {
+                const colId = column.id;
+                
+                // Special case for name field
+                if (colId === 'name') {
+                    const hasNameField = selectedSearchFields.some(field =>
+                        field.includes('Name') || field === 'objectName'
+                    );
+                    newColumnVisibility[colId] = hasNameField;
+                }
+                // Special case for date field
+                else if (colId === 'date') {
+                    const hasDateField = selectedSearchFields.some(field =>
+                        field.includes('CreateDate') || field === 'createdAt'
+                    );
+                    newColumnVisibility[colId] = hasDateField;
+                }
+                // Special case for size field
+                else if (colId === 'size') {
+                    const hasSizeField = selectedSearchFields.some(field =>
+                        field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+                    );
+                    newColumnVisibility[colId] = hasSizeField;
+                }
+                // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
+                else {
+                    const apiFieldIds = reverseFieldMapping[colId] || [];
+                    const isFieldSelected = apiFieldIds.some(apiFieldId =>
+                        selectedSearchFields.includes(apiFieldId)
+                    );
+                    newColumnVisibility[colId] = isFieldSelected;
+                }
+            });
+            
+            setColumnVisibility(newColumnVisibility);
+        } else {
+            // If no selectedSearchFields, show all columns
+            const allVisible: Record<string, boolean> = {};
+            userColumns.forEach(column => {
+                allVisible[column.id] = true;
+            });
+            setColumnVisibility(allVisible);
+        }
+    }, [selectedSearchFields, userColumns]);
 
     const columns = React.useMemo(() => {
         return userColumns.map(col => {

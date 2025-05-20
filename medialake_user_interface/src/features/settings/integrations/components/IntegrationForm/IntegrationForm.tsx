@@ -82,8 +82,15 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
         });
     }, [rawNodes]);
     
-    // Memoize form values to prevent infinite render loops
-    const formValues = React.useMemo(() => form.getValues(), [form.formState.isDirty, form.formState.dirtyFields]);
+    // Memoize form values to prevent infinite render loops but still update when needed
+    const formValues = React.useMemo(() => form.getValues(), [
+        // Only update when these specific form values change
+        form.watch('nodeId'),
+        form.watch('description'),
+        form.watch('auth.type'),
+        form.watch('auth.credentials.apiKey'),
+        form.watch('auth.credentials.iamRole')
+    ]);
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
         // Close the form immediately when the user clicks the button
