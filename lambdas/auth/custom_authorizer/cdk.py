@@ -66,6 +66,9 @@ class ApiAuthStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "POLICY_STORE_ID": "REPLACE_WITH_YOUR_POLICY_STORE_ID",  # Replace with actual policy store ID
+                "NAMESPACE": "MediaLake",  # Replace with your namespace
+                "TOKEN_TYPE": "bearerToken",  # Token type for AVP (bearerToken, cognitoJwt, etc.)
                 "POWERTOOLS_SERVICE_NAME": "custom-authorizer",
                 "POWERTOOLS_METRICS_NAMESPACE": "CustomAuthorizer",
                 "LOG_LEVEL": "INFO",
@@ -78,6 +81,17 @@ class ApiAuthStack(Stack):
         # Grant permissions to the authorizer lambda
         authorizer_lambda.add_to_role_policy(
             iam.PolicyStatement(actions=["apigateway:GET"], resources=["*"])
+        )
+        
+        # Grant permissions to use Amazon Verified Permissions
+        authorizer_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "verifiedpermissions:IsAuthorizedWithToken",
+                    "verifiedpermissions:IsAuthorized"
+                ],
+                resources=["*"]
+            )
         )
 
         # Create API Gateway
@@ -102,6 +116,11 @@ class ApiAuthStack(Stack):
             "CustomAuthorizer",
             handler=authorizer_lambda,
             results_cache_ttl=Duration.minutes(5),
+            identity_sources=[
+                "method.request.header.Authorization",  # Authorization header
+                "context.httpMethod",                   # HTTP method
+                "context.path"                          # Request path
+            ]
         )
 
         # Create Usage Plan

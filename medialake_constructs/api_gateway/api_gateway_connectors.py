@@ -310,6 +310,8 @@ class ConnectorsConstruct(Construct):
                     "iam:ListAttachedRolePolicies",
                     "iam:ListRolePolicies",
                     "iam:GetRolePolicy",
+                    "iam:ListInstanceProfilesForRole",
+                    "iam:GetRole"
                 ],
                 resources=[f"arn:aws:iam::{account_id}:role/*"],
             )

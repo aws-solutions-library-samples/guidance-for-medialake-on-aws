@@ -1,7 +1,7 @@
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from constructs import Construct
-from typing import Optional
+from typing import Optional, List
 from aws_cdk import (
     aws_cognito as cognito,
     RemovalPolicy,
@@ -16,6 +16,13 @@ from aws_cdk.aws_cognito_identitypool_alpha import (
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from config import config
+
+
+@dataclass
+class CognitoGroupConfig:
+    name: str
+    description: str
+    precedence: int
 
 
 @dataclass
@@ -164,6 +171,40 @@ class CognitoConstruct(Construct):
                 domain_prefix=domain_prefix.lower()
             ),
         )
+
+        # Create default user groups
+        self._user_groups = []
+        
+        # Define default groups with precedence (lower values have higher precedence)
+        default_groups = [
+            CognitoGroupConfig(
+                name="administrators",
+                description="Full administrative access to all MediaLake features",
+                precedence=10
+            ),
+            CognitoGroupConfig(
+                name="editors",
+                description="Can upload, edit and manage media assets",
+                precedence=20
+            ),
+            CognitoGroupConfig(
+                name="read-only",
+                description="Read-only access to media assets",
+                precedence=30
+            )
+        ]
+        
+        # Create the groups
+        for group_config in default_groups:
+            group = cognito.CfnUserPoolGroup(
+                self,
+                f"UserGroup-{group_config.name}",
+                user_pool_id=self._user_pool.user_pool_id,
+                group_name=group_config.name,
+                description=group_config.description,
+                precedence=group_config.precedence
+            )
+            self._user_groups.append(group)
 
         # Create base client props
         client_props = {

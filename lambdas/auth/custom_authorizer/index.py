@@ -11,7 +11,7 @@ import json
 import boto3
 import base64
 import re
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Union
 from jose import jwt, JWTError
 from aws_lambda_powertools import Logger
 from botocore.exceptions import ClientError
@@ -20,14 +20,29 @@ logger = Logger()
 
 # Initialize clients
 dynamodb = boto3.resource('dynamodb')
-verified_permissions = boto3.client('verifiedpermissions')
 cognito_idp = boto3.client('cognito-idp')
 
 # Get environment variables
 AUTH_TABLE_NAME = os.environ.get('AUTH_TABLE_NAME')
-AVP_POLICY_STORE_ID = os.environ.get('AVP_POLICY_STORE_ID')
+POLICY_STORE_ID = os.environ.get('POLICY_STORE_ID')
+NAMESPACE = os.environ.get('NAMESPACE')
+TOKEN_TYPE = os.environ.get('TOKEN_TYPE')
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
 BYPASS_ALL = os.environ.get('BYPASS_ALL', 'false').lower() == 'true'
+
+# Define resource and action types using namespace
+RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MediaLake::Application"
+RESOURCE_ID = NAMESPACE if NAMESPACE else "MediaLake"
+ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MediaLake::Action"
+
+# Initialize Verified Permissions client with optional endpoint
+if os.environ.get('ENDPOINT'):
+    verified_permissions = boto3.client(
+        'verifiedpermissions',
+        endpoint_url=f"https://{os.environ.get('ENDPOINT')}ford.{os.environ.get('AWS_REGION')}.amazonaws.com"
+    )
+else:
+    verified_permissions = boto3.client('verifiedpermissions')
 
 if DEBUG_MODE:
     logger.warning("DEBUG_MODE is enabled - all requests with valid JWT will be allowed")
@@ -57,11 +72,13 @@ def extract_token_from_header(auth_header: str) -> Optional[str]:
         return None
     
     # Check for Bearer token format
-    match = re.match(r'Bearer\s+(.+)', auth_header)
-    if match:
-        return match.group(1)
+    # Per RFC 6750 section 2.1, "Authorization" header should contain:
+    # "Bearer" 1*SP b64token
+    # However, match behavior of COGNITO_USER_POOLS authorizer allowing "Bearer" to be optional
+    if auth_header.lower().startswith('bearer '):
+        return auth_header.split(' ')[1]
     
-    return None
+    return auth_header
 
 def decode_and_verify_token(token: str) -> Dict[str, Any]:
     """
@@ -83,16 +100,27 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
         # 3. Verify the token hasn't expired
         # 4. Verify the audience (client_id) and issuer
         
-        # For now, we'll just decode without verification to extract the claims
-        # In production, use the jose.jwt.decode with the proper keys and verification
-        header = jwt.get_unverified_header(token)
-        claims = jwt.get_unverified_claims(token)
+        # Parse the token using base64 decoding similar to the JS implementation
+        try:
+            # Try using jose library first
+            header = jwt.get_unverified_header(token)
+            claims = jwt.get_unverified_claims(token)
+        except JWTError:
+            # Fallback to manual parsing like in JS
+            token_parts = token.split('.')
+            if len(token_parts) >= 2:
+                # Add padding if needed
+                payload = token_parts[1]
+                payload += '=' * ((4 - len(payload) % 4) % 4)
+                decoded_bytes = base64.b64decode(payload)
+                claims = json.loads(decoded_bytes.decode('utf-8'))
+            else:
+                raise Exception("Invalid token format")
         
-        logger.debug(f"Token header: {json.dumps(header)}")
         logger.debug(f"Token claims: {json.dumps(claims)}")
         
         return claims
-    except JWTError as e:
+    except Exception as e:
         logger.error(f"Error decoding token: {str(e)}")
         raise Exception(f"Invalid token: {str(e)}")
 
@@ -196,93 +224,118 @@ def extract_resource_id(resource_path: str, path_parameters: Dict[str, str]) -> 
     # If no specific resource ID, return the resource type
     return resource_type
 
-def check_authorization_with_avp(
-    user_id: str,
-    groups: List[str],
-    action: str,
-    resource_type: str,
-    resource_id: str
-) -> Tuple[bool, Dict[str, Any]]:
+def get_context_map(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Check authorization using Amazon Verified Permissions.
+    Transform path parameters and query string parameters into the format expected by AVP.
     
     Args:
-        user_id: User ID
-        groups: List of group IDs the user belongs to
-        action: Action to check
-        resource_type: Resource type
-        resource_id: Resource ID
+        event: API Gateway event
+        
+    Returns:
+        Context map for AVP or None if no parameters exist
+    """
+    path_parameters = event.get('pathParameters', {}) or {}
+    query_string_parameters = event.get('queryStringParameters', {}) or {}
+    
+    # If no parameters, return None
+    if not path_parameters and not query_string_parameters:
+        return None
+    
+    # Transform path parameters into smithy format
+    path_params_obj = {}
+    if path_parameters:
+        path_params_obj = {
+            "pathParameters": {
+                "record": {
+                    param_key: {
+                        "string": param_value
+                    }
+                    for param_key, param_value in path_parameters.items()
+                }
+            }
+        }
+    
+    # Transform query string parameters into smithy format
+    query_params_obj = {}
+    if query_string_parameters:
+        query_params_obj = {
+            "queryStringParameters": {
+                "record": {
+                    param_key: {
+                        "string": param_value
+                    }
+                    for param_key, param_value in query_string_parameters.items()
+                }
+            }
+        }
+    
+    # Combine both parameter types
+    return {
+        "contextMap": {
+            **query_params_obj,
+            **path_params_obj
+        }
+    }
+
+def check_authorization_with_avp(
+    token: str,
+    action_id: str,
+    event: Dict[str, Any]
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Check authorization using Amazon Verified Permissions with token.
+    
+    Args:
+        token: Bearer token
+        action_id: Action ID to check
+        event: API Gateway event
         
     Returns:
         Tuple of (is_authorized, decision_details)
     """
     if DEBUG_MODE:
-        logger.warning(f"DEBUG_MODE enabled: Bypassing AVP authorization check for user {user_id}, action {action}, resource {resource_type}/{resource_id}")
+        logger.warning(f"DEBUG_MODE enabled: Bypassing AVP authorization check for action {action_id}")
         return True, {"reason": "DEBUG_MODE enabled, authorization check bypassed"}
         
-    if not AVP_POLICY_STORE_ID:
-        logger.warning("AVP_POLICY_STORE_ID not set, skipping authorization check")
-        return True, {"reason": "AVP_POLICY_STORE_ID not set"}
+    if not POLICY_STORE_ID:
+        logger.warning("POLICY_STORE_ID not set, skipping authorization check")
+        return True, {"reason": "POLICY_STORE_ID not set"}
     
     try:
-        # Construct the principal entity
-        principal = {
-            "entityType": f"MediaLake::User",
-            "entityId": user_id
+        # Get context map from event
+        context = get_context_map(event)
+        
+        # Prepare input for isAuthorizedWithToken
+        input_params = {
+            "policyStoreId": POLICY_STORE_ID,
+            "action": {
+                "actionType": ACTION_TYPE,
+                "actionId": action_id
+            },
+            "resource": {
+                "entityType": RESOURCE_TYPE,
+                "entityId": RESOURCE_ID
+            }
         }
         
-        # Construct the action entity
-        action_entity = {
-            "entityType": "MediaLake::Action",
-            "entityId": action
-        }
+        # Add token parameter based on TOKEN_TYPE
+        if TOKEN_TYPE:
+            input_params[TOKEN_TYPE] = token
+        else:
+            # Default to bearer token if TOKEN_TYPE not specified
+            input_params["bearerToken"] = token
+            
+        # Add context if available
+        if context:
+            input_params["context"] = context
         
-        # Construct the resource entity
-        resource_entity = {
-            "entityType": f"MediaLake::{resource_type.capitalize()}",
-            "entityId": resource_id
-        }
+        logger.info(f"AVP IsAuthorizedWithToken request: {json.dumps(input_params)}")
         
-        # Construct the entities structure with group memberships
-        entities = {
-            "entityList": [
-                # Include the user's groups as entities
-                *[{
-                    "identifier": {
-                        "entityType": "MediaLake::Group",
-                        "entityId": group_id
-                    },
-                    "parents": [
-                        {
-                            "entityType": "MediaLake::User",
-                            "entityId": user_id
-                        }
-                    ]
-                } for group_id in groups]
-            ]
-        }
-        
-        logger.info(f"User ID: {user_id}")
-        logger.info(f"User Groups: {groups}")
-        logger.info(f"Action: {action}")
-        logger.info(f"Resource Type: {resource_type}")
-        logger.info(f"Resource ID: {resource_id}")
-        logger.info(f"AVP Policy Store ID: {AVP_POLICY_STORE_ID}")
-        
-        logger.info(f"AVP IsAuthorized request: principal={json.dumps(principal)}, action={json.dumps(action_entity)}, resource={json.dumps(resource_entity)}")
-        logger.info(f"Entities: {json.dumps(entities)}")
-        
-        # Call AVP IsAuthorized API
-        response = verified_permissions.is_authorized(
-            policyStoreId=AVP_POLICY_STORE_ID,
-            principal=principal,
-            action=action_entity,
-            resource=resource_entity,
-            entities=entities
-        )
+        # Call AVP IsAuthorizedWithToken API
+        response = verified_permissions.is_authorized_with_token(**input_params)
         
         decision = response.get('decision', 'DENY')
-        is_authorized = decision == 'ALLOW'
+        is_authorized = decision.upper() == 'ALLOW'
         
         logger.info(f"AVP authorization decision: {decision}")
         
@@ -341,17 +394,17 @@ def generate_policy(
     return policy
 
 @logger.inject_lambda_context
-def lambda_handler(event, context):
+def handler(event, context):
     """
     Lambda handler for the Custom API Gateway Authorizer.
     
     This implementation:
     1. If BYPASS_ALL is enabled, automatically authorizes all requests
     2. Otherwise:
-       a. Extracts user information from the JWT token in the Authorization header
-       b. Queries the authorization DynamoDB table for the user's group memberships
-       c. Maps the HTTP method and resource path to Cedar action and resource entities
-       d. Calls AVP for authorization decision
+       a. Extracts bearer token from the Authorization header
+       b. Parses the token
+       c. Constructs the action ID from HTTP method and resource path
+       d. Calls AVP for authorization decision using isAuthorizedWithToken
        e. Returns an IAM policy document allowing or denying access based on the decision
     
     Args:
@@ -363,7 +416,6 @@ def lambda_handler(event, context):
     """
     logger.info("========== CUSTOM AUTHORIZER INVOKED ==========")
     logger.info(f"Event: {json.dumps(event)}")
-    logger.info(f"Context: {context}")
     logger.info(f"Environment: DEBUG_MODE={DEBUG_MODE}, BYPASS_ALL={BYPASS_ALL}")
     logger.info("===============================================")
     
@@ -383,121 +435,96 @@ def lambda_handler(event, context):
         logger.info(f"Auto-authorizing request: {http_method} {resource_path}")
         
         # Generate an Allow policy with minimal context
-        context = {
+        context_data = {
             "userId": "bypass_user",
-            "groups": "[]",
             "bypassMode": "true",
             "resourcePath": resource_path,
             "httpMethod": http_method
         }
         
-        policy = generate_policy("bypass_user", "Allow", method_arn, context)
+        policy = generate_policy("bypass_user", "Allow", method_arn, context_data)
         logger.info("Generated ALLOW policy due to BYPASS_ALL mode")
-        print(policy)
         return policy
     
     try:
-        # Extract the token from either the Authorization header or authorizationToken field
-        auth_header = event.get('headers', {}).get('Authorization')
+        # Extract the bearer token from the Authorization header
+        auth_header = event.get('headers', {}).get('Authorization') or event.get('headers', {}).get('authorization')
         auth_token = event.get('authorizationToken')
         
         logger.info(f"Auth header: {auth_header}")
-        logger.info(f"Auth token: {auth_token}")
         
+        bearer_token = None
         if auth_header:
-            token = extract_token_from_header(auth_header)
+            bearer_token = extract_token_from_header(auth_header)
         elif auth_token:
-            token = extract_token_from_header(auth_token)
-        else:
-            if BYPASS_ALL:
-                logger.warning("No authorization token found, but BYPASS_ALL is enabled - proceeding with authorization")
-                token = "bypass_token"
-            else:
-                logger.error("No Authorization header or authorizationToken found")
-                raise Exception("Unauthorized: No Authorization token found")
+            bearer_token = extract_token_from_header(auth_token)
         
-        if not token and not BYPASS_ALL:
-            logger.error("No token extracted from authorization sources")
-            raise Exception("Unauthorized: No token found in authorization sources")
+        if not bearer_token:
+            logger.error("No bearer token found in authorization sources")
+            raise Exception("Unauthorized: No bearer token found")
         
-        # Decode and verify the token (unless using bypass token)
-        if token == "bypass_token" and BYPASS_ALL:
-            claims = {"sub": "bypass_user"}
-            user_id = "bypass_user"
-            logger.warning("Using bypass user ID due to BYPASS_ALL mode")
-        else:
-            # Decode and verify the token
-            claims = decode_and_verify_token(token)
+        # Parse the token to get claims
+        try:
+            parsed_token = decode_and_verify_token(bearer_token)
             
-            # Extract user ID from the token claims
-            user_id = claims.get('sub')
-            print(user_id)
-            user_id = "44c804a8-a071-703b-9e7d-9a30027130b1"
-            if not user_id and not BYPASS_ALL:
-                logger.error("No user ID (sub) found in token claims")
-                raise Exception("Unauthorized: No user ID found in token")
-            elif not user_id and BYPASS_ALL:
-                user_id = "bypass_user"
-                logger.warning("No user ID found in token, using bypass user due to BYPASS_ALL mode")
-        
-        # Get the user's group memberships
-        groups = get_user_groups(user_id)
-        
-        # Extract method ARN components
-        arn_parts = method_arn.split(':')
-        api_gateway_arn_parts = arn_parts[5].split('/') if len(arn_parts) > 5 else []
-        
-        # Extract HTTP method and resource path
-        http_method = event.get('httpMethod') or (api_gateway_arn_parts[2] if len(api_gateway_arn_parts) > 2 else 'GET')
-        resource_path = event.get('path') or ('/'.join(api_gateway_arn_parts[3:]) if len(api_gateway_arn_parts) > 3 else '/')
-        
-        logger.info(f"HTTP Method: {http_method}")
-        logger.info(f"Resource Path: {resource_path}")
-        
-        # Extract path parameters
-        path_parameters = event.get('pathParameters', {}) or {}
-        logger.info(f"Path Parameters: {json.dumps(path_parameters)}")
-        
-        # Map HTTP method and resource path to Cedar action and resource entities
-        action = map_http_method_to_action(http_method, resource_path)
-        resource_type = resource_path.strip('/').split('/')[0] if resource_path else "unknown"
-        resource_id = extract_resource_id(resource_path, path_parameters)
-        
-        logger.info(f"Mapped Cedar Action: {action}")
-        logger.info(f"Resource Type: {resource_type}")
-        logger.info(f"Resource ID: {resource_id}")
-        
-        # If BYPASS_ALL is enabled, always authorize
-        if BYPASS_ALL:
-            is_authorized = True
-            decision_details = {"reason": "BYPASS_ALL mode enabled - all requests are authorized"}
-            logger.warning("⚠️ BYPASS_ALL mode enabled - automatically authorizing request ⚠️")
-        else:
-            # Check authorization with AVP (will be bypassed if DEBUG_MODE is enabled)
-            is_authorized, decision_details = check_authorization_with_avp(
-                user_id, groups, action, resource_type, resource_id
+            # Extract HTTP method and resource path
+            http_method = event.get('requestContext', {}).get('httpMethod', 'GET').lower()
+            resource_path = event.get('requestContext', {}).get('resourcePath', '/')
+            
+            # Construct action ID as in the JS code
+            action_id = f"{http_method} {resource_path}"
+            
+            logger.info(f"Action ID: {action_id}")
+            
+            # Check authorization with AVP
+            is_authorized, auth_response = check_authorization_with_avp(
+                bearer_token, action_id, event
             )
-        
-        # Generate the appropriate policy based on the authorization decision
-        effect = "Allow" if is_authorized else "Deny"
-        
-        # Log the authorization decision
-        logger.info(f"Authorization decision: {effect}, reason: {json.dumps(decision_details)}")
-        
-        # Include relevant context in the response
-        context = {
-            "userId": user_id,
-            "groups": json.dumps(groups),
-            "action": action,
-            "resourceType": resource_type,
-            "resourceId": resource_id
-        }
-        
-        # Generate and return the policy
-        policy = generate_policy(user_id, effect, method_arn, context)
-        logger.info(f"Generated policy with effect: {effect}")
-        return policy
-        
+            
+            # Extract principal ID from token or response
+            principal_id = f"{parsed_token.get('iss', '').split('/')[3] if '/' in parsed_token.get('iss', '') else ''}|{parsed_token.get('sub', '')}"
+            
+            if auth_response.get('principal'):
+                principal_entity = auth_response.get('principal')
+                principal_id = f"{principal_entity.get('entityType')}::\"{principal_entity.get('entityId')}\""
+            
+            # Generate policy based on authorization decision
+            effect = "Allow" if is_authorized else "Deny"
+            
+            return {
+                "principalId": principal_id,
+                "policyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": "execute-api:Invoke",
+                            "Effect": effect,
+                            "Resource": method_arn
+                        }
+                    ]
+                },
+                "context": {
+                    "actionId": action_id,
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing token: {str(e)}")
+            return {
+                "principalId": "",
+                "policyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": "execute-api:Invoke",
+                            "Effect": "Deny",
+                            "Resource": method_arn
+                        }
+                    ]
+                },
+                "context": {}
+            }
+            
     except Exception as e:
         logger.error(f"Authorization error: {str(e)}")
         
@@ -509,6 +536,22 @@ def lambda_handler(event, context):
                 "error": str(e)
             })
         else:
-            return generate_policy("user", "Deny", method_arn, {
-                "error": str(e)
-            })
+            return {
+                "principalId": "",
+                "policyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": "execute-api:Invoke",
+                            "Effect": "Deny",
+                            "Resource": method_arn
+                        }
+                    ]
+                },
+                "context": {
+                    "error": str(e)
+                }
+            }
+
+# For backward compatibility
+lambda_handler = handler
