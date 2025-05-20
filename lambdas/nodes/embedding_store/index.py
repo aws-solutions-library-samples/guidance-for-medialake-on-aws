@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import sys
 from datetime import datetime
 from urllib.parse import urlparse
 from typing import Any, Dict, List, Optional
@@ -15,7 +16,14 @@ from opensearchpy import (
     exceptions,
 )
 
+# Add common_libraries to path for importing shared modules
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'common_libraries'))
 from lambda_middleware import lambda_middleware
+from lambda_error_handler import (
+    check_response_status,
+    ResponseError,
+    with_error_handling
+)
 from nodes_utils import seconds_to_smpte
 
 # ── Powertools ───────────────────────────────────────────────────────────────
@@ -166,24 +174,20 @@ def _ok_no_op(vector: Optional[List], asset_id: Optional[str]):
         ),
     }
 
+# Using the new error handler module instead of the local function
 def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
     """
     Check OpenSearch response for errors and raise if status is not 200/201
+    
+    This is a wrapper around check_response_status for backward compatibility
     """
-    status = response.get('status', 200)  # OpenSearch usually returns 200/201 for success
-    if status not in (200, 201):
-        error_msg = response.get('error', {}).get('reason', 'Unknown error')
-        logger.error(f"OpenSearch {operation} failed", extra={
-            "status": status,
-            "error": error_msg,
-            "response": response
-        })
-        raise RuntimeError(f"OpenSearch {operation} failed: {error_msg} (status: {status})")
+    check_response_status(response, "OpenSearch", operation, [200, 201])
 
 # ── Lambda entrypoint ────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
+@with_error_handling
 def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
         logger.info("Received event", extra={"event": event})
@@ -471,6 +475,9 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             ),
         }
 
+    except ResponseError:
+        # ResponseError is already logged and formatted by the with_error_handling decorator
+        raise
     except Exception as exc:
         logger.exception("Error storing embedding")
         raise RuntimeError("Error storing embedding") from exc
