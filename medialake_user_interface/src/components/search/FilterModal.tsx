@@ -235,7 +235,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
     
     // Apply extension filters - now supports multiple extensions
     if (selectedExtensions.length > 0) {
-      updatedFilters.extension = selectedExtensions.join(',');
+      // Convert extensions to uppercase before sending to API
+      updatedFilters.extension = selectedExtensions.map(ext => ext.toUpperCase()).join(',');
     }
     
     // Convert size inputs to bytes for API
@@ -252,7 +253,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       updatedFilters.date_range_option = dateRangeOption;
     }
     
-    // Apply date range filters - ensure all timestamps are in ISO 8601 format
+    // Apply date range filters - ensure all timestamps are in ISO 8601 format with explicit UTC timezone (Z suffix)
     if (dateRangeOption === '24h') {
       const now = new Date();
       const yesterday = subDays(now, 1);
