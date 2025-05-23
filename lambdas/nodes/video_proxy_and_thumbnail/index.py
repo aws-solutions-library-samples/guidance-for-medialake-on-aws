@@ -49,7 +49,7 @@ def get_mediaconvert_endpoint() -> str:
     if override:
         return override
 
-    mc = boto3.client("mediaconvert", region_name="us-east-1")
+    mc = boto3.client("mediaconvert")
     for attempt in range(60):
         try:
             return mc.describe_endpoints()["Endpoints"][0]["Url"]
