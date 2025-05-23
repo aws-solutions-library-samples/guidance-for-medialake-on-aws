@@ -14,7 +14,7 @@ tracer = Tracer()
 
 # ────── AWS clients ──────
 s3_client = boto3.client("s3")
-mc        = boto3.client("mediaconvert", region_name="us-east-1")
+mc        = boto3.client("mediaconvert")
 
 # ────── Fix helper ──────
 def _strip_decimals(obj):
