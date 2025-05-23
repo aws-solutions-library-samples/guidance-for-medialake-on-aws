@@ -69,14 +69,18 @@ def create_index_with_retry(
                     response.json()["error"]["root_cause"][0]["type"]
                     == "resource_already_exists_exception"
                 ):
-                    logger.info(
-                        "Index already exists",
+                    error_message = f"Index '{index_name}' already exists - cannot proceed with creation"
+                    logger.error(
+                        "Index already exists - failing lambda execution",
                         extra={
                             "index_name": index_name,
-                            "status_code": response.status_code
+                            "status_code": response.status_code,
+                            "full_response": response.text,
+                            "error_details": response.json(),
+                            "operation": "create_index"
                         }
                     )
-                    return True
+                    raise Exception(error_message)
                 
                 logger.error(
                     "Failed to create OpenSearch index",
