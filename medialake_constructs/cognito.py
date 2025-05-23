@@ -129,6 +129,20 @@ class CognitoConstruct(Construct):
                     temporary_password_validity_days=7,
                 )
             ),
+            "custom_attributes": [
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="permission_sets",
+                    attribute_data_type="String",
+                    mutable=True,
+                    required=False,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="avp_entity_id",
+                    attribute_data_type="String",
+                    mutable=True,
+                    required=False,
+                )
+            ],
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn
             ),
@@ -159,12 +173,11 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
-        # Using stack name, region, account, and environment ensures uniqueness across different deployments
+        # Using stack name, region, account, and environment to create a unique domain prefix
         unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         self._domain_prefix = domain_prefix
         
-        print(f"Domain prefix: {domain_prefix}")
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
@@ -175,12 +188,11 @@ class CognitoConstruct(Construct):
         # Create default user groups
         self._user_groups = []
         
-        # Define default groups with precedence (lower values have higher precedence)
         default_groups = [
             CognitoGroupConfig(
                 name="administrators",
                 description="Full administrative access to all MediaLake features",
-                precedence=10
+                precedence=1
             ),
             CognitoGroupConfig(
                 name="editors",
@@ -190,24 +202,24 @@ class CognitoConstruct(Construct):
             CognitoGroupConfig(
                 name="read-only",
                 description="Read-only access to media assets",
-                precedence=30
+                precedence=40
             )
         ]
         
         # Create the groups
-        for group_config in default_groups:
+        for group in default_groups:
             group = cognito.CfnUserPoolGroup(
                 self,
-                f"UserGroup-{group_config.name}",
+                f"UserGroup-{group.name}",
                 user_pool_id=self._user_pool.user_pool_id,
-                group_name=group_config.name,
-                description=group_config.description,
-                precedence=group_config.precedence
+                group_name=group.name,
+                description=group.description,
+                precedence=group.precedence
             )
             self._user_groups.append(group)
 
         # Create base client props
-        client_props = {
+        user_pool_client_props = {
             "generate_secret": self.props.generate_secret,
             "auth_flows": cognito.AuthFlow(
                 admin_user_password=self.props.admin_user_password,
@@ -256,7 +268,7 @@ class CognitoConstruct(Construct):
 
         # Update client props with configured providers
         if supported_providers:
-            client_props.update(
+            user_pool_client_props.update(
                 {
                     "supported_identity_providers": supported_providers,
                     "o_auth": cognito.OAuthSettings(
@@ -283,7 +295,7 @@ class CognitoConstruct(Construct):
 
         # Create the client
         self._user_pool_client = self._user_pool.add_client(
-            "MediaLakeUserPoolClient", **client_props
+            "MediaLakeUserPoolClient", **user_pool_client_props
         )
 
         # Add dependencies for SAML providers if any
