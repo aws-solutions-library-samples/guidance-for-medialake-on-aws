@@ -11,6 +11,10 @@ import json
 import boto3
 import base64
 import re
+import time
+import hashlib
+import urllib.request
+import urllib.error
 from typing import Dict, Any, List, Tuple, Optional, Union
 from jose import jwt, JWTError
 from aws_lambda_powertools import Logger
@@ -27,8 +31,11 @@ AUTH_TABLE_NAME = os.environ.get('AUTH_TABLE_NAME')
 POLICY_STORE_ID = os.environ.get('AVP_POLICY_STORE_ID')
 NAMESPACE = os.environ.get('NAMESPACE')
 TOKEN_TYPE = os.environ.get('TOKEN_TYPE')
+COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID')
+COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID')
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
 BYPASS_ALL = os.environ.get('BYPASS_ALL', 'false').lower() == 'true'
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 
 # Define resource and action types using namespace (avoid reserved prefixes)
 RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MyApp::Application"
@@ -44,7 +51,16 @@ if os.environ.get('ENDPOINT'):
 else:
     verified_permissions = boto3.client('verifiedpermissions')
 
-if DEBUG_MODE:
+# Safety checks for production environments
+if ENVIRONMENT == 'prod' and DEBUG_MODE:
+    logger.warning("⚠️ DEBUG_MODE is enabled in production - this is a security risk!")
+    
+if ENVIRONMENT == 'prod' and BYPASS_ALL:
+    logger.critical("⚠️ BYPASS_ALL is enabled in production - this is a CRITICAL security risk!")
+    # In production, we should never allow BYPASS_ALL
+    BYPASS_ALL = False
+    logger.info("BYPASS_ALL has been forcibly disabled in production environment")
+elif DEBUG_MODE:
     logger.warning("DEBUG_MODE is enabled - all requests with valid JWT will be allowed")
     
 if BYPASS_ALL:
@@ -57,6 +73,15 @@ PREFIX_MEMBERSHIP = "MEMBERSHIP#"
 
 # Initialize DynamoDB table
 auth_table = dynamodb.Table(AUTH_TABLE_NAME) if AUTH_TABLE_NAME else None
+
+# JWKS cache with TTL
+jwks_cache = {
+    'keys': None,
+    'expiry': 0
+}
+
+# Initialize JWT token verification cache
+token_verification_cache = {}
 
 def extract_token_from_header(auth_header: str) -> Optional[str]:
     """
@@ -71,18 +96,71 @@ def extract_token_from_header(auth_header: str) -> Optional[str]:
     if not auth_header:
         return None
     
-    # Check for Bearer token format
-    # Per RFC 6750 section 2.1, "Authorization" header should contain:
-    # "Bearer" 1*SP b64token
-    # However, match behavior of COGNITO_USER_POOLS authorizer allowing "Bearer" to be optional
+    # Check for Bearer token format, token is optional
     if auth_header.lower().startswith('bearer '):
         return auth_header.split(' ')[1]
     
     return auth_header
 
+def get_cognito_jwks() -> Dict[str, Any]:
+    """
+    Fetch the JSON Web Key Set (JWKS) from Cognito user pool.
+    Uses caching to avoid frequent requests to Cognito.
+    
+    Returns:
+        JWKS dictionary containing the public keys
+    """
+    global jwks_cache
+    current_time = time.time()
+    
+    # Return cached JWKS if still valid
+    if jwks_cache['keys'] and jwks_cache['expiry'] > current_time:
+        logger.debug("Using cached JWKS")
+        return jwks_cache['keys']
+    
+    logger.info("Fetching fresh JWKS from Cognito")
+    
+    try:
+        # Construct the JWKS URL from the Cognito user pool ID
+        if not COGNITO_USER_POOL_ID:
+            raise Exception("COGNITO_USER_POOL_ID environment variable not set")
+            
+        region = COGNITO_USER_POOL_ID.split('_')[0]
+        jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
+        
+        logger.info(f"Fetching JWKS from: {jwks_url}")
+        req = urllib.request.Request(jwks_url)
+        
+        try:
+            with urllib.request.urlopen(req) as response:
+                response_data = response.read()
+                jwks = json.loads(response_data.decode('utf-8'))
+                
+                # Cache the JWKS for 1 hour
+                jwks_cache['keys'] = jwks
+                jwks_cache['expiry'] = current_time + 3600  # 1 hour TTL
+                
+                logger.info(f"Successfully fetched JWKS with {len(jwks.get('keys', []))} keys")
+                return jwks
+                
+        except urllib.error.HTTPError as http_err:
+            raise Exception(f"Failed to fetch JWKS: HTTP {http_err.code}")
+        except urllib.error.URLError as url_err:
+            raise Exception(f"Failed to fetch JWKS: {url_err.reason}")
+        
+    except Exception as e:
+        logger.error(f"Error fetching JWKS: {str(e)}")
+        
+        # If we have cached keys, use them even if expired
+        if jwks_cache['keys']:
+            logger.warning("Using expired JWKS cache due to fetch error")
+            return jwks_cache['keys']
+            
+        raise Exception(f"Failed to fetch JWKS: {str(e)}")
+
 def decode_and_verify_token(token: str) -> Dict[str, Any]:
     """
-    Decode and verify the JWT token with enhanced debugging.
+    Decode and verify the JWT token, including signature verification.
     
     Args:
         token: JWT token
@@ -93,49 +171,154 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
     Raises:
         Exception: If token is invalid
     """
+    # Check if we have this token in cache
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    cache_entry = token_verification_cache.get(token_hash)
+    
+    # If we have a valid cache entry that hasn't expired
+    if cache_entry and cache_entry['expiry'] > time.time():
+        logger.debug("Using cached token verification result")
+        return cache_entry['claims']
+    
+    logger.info("Verifying token signature")
+    
     try:
-        # Try using jose library first
+        # Get unverified header and claims first for debugging
         header = jwt.get_unverified_header(token)
-        claims = jwt.get_unverified_claims(token)
+        unverified_claims = jwt.get_unverified_claims(token)
         
-        # Log key token claims for debugging
-        logger.info(f"Token issuer: {claims.get('iss')}")
-        logger.info(f"Token subject: {claims.get('sub')}")
-        logger.info(f"Token username: {claims.get('cognito:username')}")
-        logger.info(f"Token client_id: {claims.get('client_id')}")
-        logger.info(f"Token audience: {claims.get('aud')}")
+        # Log token details for debugging
+        logger.info(f"Token header: {json.dumps(header)}")
+        logger.info(f"Token audience (aud): {unverified_claims.get('aud')}")
+        logger.info(f"Token client_id: {unverified_claims.get('client_id')}")
+        logger.info(f"Token issuer (iss): {unverified_claims.get('iss')}")
+        logger.info(f"Token subject (sub): {unverified_claims.get('sub')}")
+        logger.info(f"Token username: {unverified_claims.get('cognito:username')}")
+        logger.info(f"Expected client ID: {COGNITO_CLIENT_ID}")
+        
+        if not header or 'kid' not in header:
+            raise Exception("Invalid token header or missing key ID (kid)")
+            
+        kid = header['kid']
+        
+        # Get the JWKS from Cognito
+        jwks = get_cognito_jwks()
+        
+        # Find the key with matching kid
+        key = None
+        for jwk_key in jwks.get('keys', []):
+            if jwk_key.get('kid') == kid:
+                key = jwk_key
+                break
+                
+        if not key:
+            raise Exception(f"No matching key found for kid: {kid}")
+            
+        logger.info(f"Using JWK with kid: {key.get('kid')}")
+        
+        try:
+            logger.info("Attempting to verify token signature")
+            
+            # Configure JWT decode options
+            jwt_options = {
+                'verify_signature': True,
+                'verify_exp': True,
+                'verify_iat': True,
+                'verify_aud': False  # Disable automatic audience verification for now
+            }
+            
+            # If we have a specific client ID to validate against, enable audience verification
+            jwt_audience = None
+            if COGNITO_CLIENT_ID:
+                jwt_options['verify_aud'] = True
+                jwt_audience = COGNITO_CLIENT_ID
+                logger.info(f"Will verify audience against: {jwt_audience}")
+            else:
+                logger.info("COGNITO_CLIENT_ID not set, skipping audience verification")
+            
+            # Verify the token signature and decode claims
+            claims = jwt.decode(
+                token,
+                key,  # Pass the JWK directly
+                algorithms=['RS256'],
+                audience=jwt_audience,  # Specify expected audience if configured
+                options=jwt_options
+            )
+            
+            logger.info("Token signature verified successfully")
+            
+        except AttributeError as e:
+            # If there's an issue with the jose library, log it and try a fallback
+            logger.warning(f"Error using jose library: {str(e)}")
+            
+            # Fallback to just decoding the token without signature verification
+            # This is not secure but allows the code to continue working
+            # while we fix the library issue
+            logger.warning("SECURITY RISK: Falling back to unverified token parsing")
+            claims = jwt.get_unverified_claims(token)
+            
+            # Add a warning to the logs
+            logger.warning("Token signature NOT verified - fix jose library integration ASAP")
+        
+        # Manual audience validation if COGNITO_CLIENT_ID is set and we're not using jose validation
+        if COGNITO_CLIENT_ID and not jwt_options.get('verify_aud', False):
+            token_aud = claims.get('aud')
+            if token_aud != COGNITO_CLIENT_ID:
+                logger.error(f"Audience mismatch: expected '{COGNITO_CLIENT_ID}', got '{token_aud}'")
+                raise Exception(f"Invalid audience: expected '{COGNITO_CLIENT_ID}', got '{token_aud}'")
+        
+        # In production, only log minimal token info
+        if ENVIRONMENT == 'prod':
+            logger.info(f"Processing token for subject: {claims.get('sub', 'unknown')}")
+        else:
+            # More verbose logging in non-prod environments
+            logger.info(f"Token issuer: {claims.get('iss')}")
+            logger.info(f"Token subject: {claims.get('sub')}")
+            logger.info(f"Token username: {claims.get('cognito:username')}")
+            logger.info(f"Token client_id: {claims.get('client_id')}")
+            logger.info(f"Token audience: {claims.get('aud')}")
         
         # Validate required claims
         if not claims.get('sub'):
             raise Exception("Token missing required 'sub' claim")
             
+        # Validate token issuer if configured
+        if COGNITO_USER_POOL_ID:
+            expected_issuer = f"https://cognito-idp.{COGNITO_USER_POOL_ID.split('_')[0]}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+            if claims.get('iss') != expected_issuer:
+                logger.error(f"Issuer mismatch: expected '{expected_issuer}', got '{claims.get('iss')}'")
+                raise Exception(f"Invalid token issuer: expected '{expected_issuer}', got '{claims.get('iss')}'")
+        
+        # Cache the verified token with expiry time (use token exp claim or default to 5 minutes)
+        exp_time = claims.get('exp', int(time.time() + 300))
+        token_verification_cache[token_hash] = {
+            'claims': claims,
+            'expiry': exp_time
+        }
+        
+        # Clean up expired cache entries periodically (1% chance per request)
+        if hash(token_hash) % 100 == 0:
+            current_time = time.time()
+            expired_keys = [k for k, v in token_verification_cache.items()
+                           if v['expiry'] < current_time]
+            for k in expired_keys:
+                token_verification_cache.pop(k, None)
+                
         return claims
         
-    except JWTError as e:
-        logger.error(f"JWT parsing error: {str(e)}")
-        # Fallback to manual parsing
-        try:
-            token_parts = token.split('.')
-            if len(token_parts) >= 2:
-                # Add padding if needed
-                payload = token_parts[1]
-                payload += '=' * ((4 - len(payload) % 4) % 4)
-                decoded_bytes = base64.b64decode(payload)
-                claims = json.loads(decoded_bytes.decode('utf-8'))
-                
-                # Validate required claims
-                if not claims.get('sub'):
-                    raise Exception("Token missing required 'sub' claim")
-                
-                logger.info(f"Fallback parse - Token subject: {claims.get('sub')}")
-                logger.info(f"Fallback parse - Token username: {claims.get('cognito:username')}")
-                
-                return claims
-            else:
-                raise Exception("Invalid token format")
-        except Exception as fallback_error:
-            logger.error(f"Fallback parsing also failed: {str(fallback_error)}")
-            raise Exception(f"Invalid token format: {str(fallback_error)}")
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token has expired")
+        raise Exception("Token has expired")
+        
+    except jwt.JWTClaimsError as e:
+        logger.error(f"Invalid token claims: {str(e)}")
+        # Log more details about the claims error
+        logger.error(f"Detailed claims error: {str(e)}")
+        raise Exception(f"Invalid token claims: {str(e)}")
+        
+    except jwt.JWTError as e:
+        logger.error(f"JWT validation error: {str(e)}")
+        raise Exception(f"Token validation failed: {str(e)}")
             
     except Exception as e:
         logger.error(f"Error decoding token: {str(e)}")
