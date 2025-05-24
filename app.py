@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-This module serves as the entry point for the MediaLake CDK application.
-"""
+"""Entry point for the MediaLake CDK application."""
 import os
 import aws_cdk as cdk
 from cdk_logger import CDKLogger, get_logger
@@ -16,12 +14,10 @@ from medialake_stacks.api_gateway_core_stack import ApiGatewayCoreStack, ApiGate
 from medialake_stacks.users_groups_roles_stack import UsersGroupsRolesStack, UsersGroupsRolesStackProps
 from medialake_stacks.authorization_stack import AuthorizationStack, AuthorizationStackProps
 from medialake_stacks.auth_lambda_stack import AuthLambdaStack, AuthLambdaStackProps
-from medialake_constructs.auth_lambda_construct import AuthLambdaConstruct, AuthLambdaConstructProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.user_interface_stack import UserInterfaceStack, UserInterfaceStackProps
 from medialake_stacks.clean_up_stack import CleanupStack, CleanupStackProps
-from medialake_stacks.pre_deploy_cleanup_stack import PreDeployCleanUpStack, PreDeployCleanUpStackProps
 from medialake_stacks.base_infrastructure import BaseInfrastructureStack
 from medialake_stacks.integrations_environment_stack import IntegrationsEnvironmentStack, IntegrationsEnvironmentStackProps
 from medialake_stacks.pipeline_stack import (
@@ -54,16 +50,10 @@ if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
 else:
     env = cdk.Environment(account=app.account, region=app.region)
 
-# Create the PreDeployCleanUp stack first
-# pre_deploy_cleanup_stack = PreDeployCleanUpStack(app, "MediaLakePreDeployCleanUp", env=env)
-
 cloudfront_waf_stack = CloudFrontWafStack(app, "MediaLakeCloudFrontWAF", env=env_us_east_1)
-# cloudfront_waf_stack.add_dependency(pre_deploy_cleanup_stack)
 
-
-# Create the BaseInfrastructureStack and make it depend on the PreDeployCleanUp stack
+# Create the BaseInfrastructureStack
 base_infrastructure = BaseInfrastructureStack(app, "MediaLakeBaseInfrastructure", env=env)
-# base_infrastructure.add_dependency(pre_deploy_cleanup_stack)
 
 
 api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", props=ApiGatewayCoreStackProps(
@@ -74,8 +64,6 @@ api_gateway_core_stack = ApiGatewayCoreStack(app, "MediaLakeApiGatewayCore", pro
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
-
-# Create the Auth Lambda Stack
 
 # Create the Authorization Stack
 authorization_stack = AuthorizationStack(

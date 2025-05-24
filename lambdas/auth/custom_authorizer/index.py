@@ -30,10 +30,10 @@ TOKEN_TYPE = os.environ.get('TOKEN_TYPE')
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
 BYPASS_ALL = os.environ.get('BYPASS_ALL', 'false').lower() == 'true'
 
-# Define resource and action types using namespace
-RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MediaLake::Application"
-RESOURCE_ID = NAMESPACE if NAMESPACE else "MediaLake"
-ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MediaLake::Action"
+# Define resource and action types using namespace (avoid reserved prefixes)
+RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MyApp::Application"
+RESOURCE_ID = NAMESPACE if NAMESPACE else "MyApp"
+ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MyApp::Action"
 
 # Initialize Verified Permissions client with optional endpoint
 if os.environ.get('ENDPOINT'):
@@ -82,7 +82,7 @@ def extract_token_from_header(auth_header: str) -> Optional[str]:
 
 def decode_and_verify_token(token: str) -> Dict[str, Any]:
     """
-    Decode and verify the JWT token.
+    Decode and verify the JWT token with enhanced debugging.
     
     Args:
         token: JWT token
@@ -94,19 +94,27 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
         Exception: If token is invalid
     """
     try:
-        # For a complete implementation, you would:
-        # 1. Fetch the Cognito User Pool public keys
-        # 2. Verify the token signature using those keys
-        # 3. Verify the token hasn't expired
-        # 4. Verify the audience (client_id) and issuer
+        # Try using jose library first
+        header = jwt.get_unverified_header(token)
+        claims = jwt.get_unverified_claims(token)
         
-        # Parse the token using base64 decoding similar to the JS implementation
+        # Log key token claims for debugging
+        logger.info(f"Token issuer: {claims.get('iss')}")
+        logger.info(f"Token subject: {claims.get('sub')}")
+        logger.info(f"Token username: {claims.get('cognito:username')}")
+        logger.info(f"Token client_id: {claims.get('client_id')}")
+        logger.info(f"Token audience: {claims.get('aud')}")
+        
+        # Validate required claims
+        if not claims.get('sub'):
+            raise Exception("Token missing required 'sub' claim")
+            
+        return claims
+        
+    except JWTError as e:
+        logger.error(f"JWT parsing error: {str(e)}")
+        # Fallback to manual parsing
         try:
-            # Try using jose library first
-            header = jwt.get_unverified_header(token)
-            claims = jwt.get_unverified_claims(token)
-        except JWTError:
-            # Fallback to manual parsing like in JS
             token_parts = token.split('.')
             if len(token_parts) >= 2:
                 # Add padding if needed
@@ -114,15 +122,58 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
                 payload += '=' * ((4 - len(payload) % 4) % 4)
                 decoded_bytes = base64.b64decode(payload)
                 claims = json.loads(decoded_bytes.decode('utf-8'))
+                
+                # Validate required claims
+                if not claims.get('sub'):
+                    raise Exception("Token missing required 'sub' claim")
+                
+                logger.info(f"Fallback parse - Token subject: {claims.get('sub')}")
+                logger.info(f"Fallback parse - Token username: {claims.get('cognito:username')}")
+                
+                return claims
             else:
                 raise Exception("Invalid token format")
-        
-        logger.debug(f"Token claims: {json.dumps(claims)}")
-        
-        return claims
+        except Exception as fallback_error:
+            logger.error(f"Fallback parsing also failed: {str(fallback_error)}")
+            raise Exception(f"Invalid token format: {str(fallback_error)}")
+            
     except Exception as e:
         logger.error(f"Error decoding token: {str(e)}")
         raise Exception(f"Invalid token: {str(e)}")
+
+def extract_principal_id(parsed_token: Dict[str, Any], auth_response: Dict[str, Any]) -> str:
+    """
+    Extract principal ID from token claims or AVP response.
+    
+    Args:
+        parsed_token: Decoded JWT token claims
+        auth_response: AVP authorization response
+        
+    Returns:
+        Principal ID for the user
+    """
+    # First, try to get principal from AVP response
+    if auth_response.get('principal'):
+        principal_entity = auth_response.get('principal')
+        entity_type = principal_entity.get('entityType', 'User')
+        entity_id = principal_entity.get('entityId', '')
+        if entity_id:
+            logger.info(f"Using principal from AVP response: {entity_type}::{entity_id}")
+            return f"{entity_type}::{entity_id}"
+    
+    # Fall back to extracting from token claims
+    user_id = parsed_token.get('sub')
+    if not user_id:
+        logger.error("No 'sub' claim found in token")
+        raise Exception("Invalid token: missing subject")
+    
+    # For Cognito tokens, use the sub claim directly
+    username = parsed_token.get('cognito:username', user_id)
+    
+    logger.info(f"Extracted user ID: {user_id}, username: {username}")
+    
+    # Return in format expected by your system
+    return f"User::{user_id}"
 
 def get_user_groups(user_id: str) -> List[str]:
     """
@@ -319,11 +370,11 @@ def check_authorization_with_avp(
         }
         
         # Add token parameter based on TOKEN_TYPE
-        if TOKEN_TYPE:
+        if TOKEN_TYPE and TOKEN_TYPE in ['identityToken', 'accessToken']:
             input_params[TOKEN_TYPE] = token
         else:
-            # Default to bearer token if TOKEN_TYPE not specified
-            input_params["bearerToken"] = token
+            # Default to identityToken for Cognito JWT tokens
+            input_params["identityToken"] = token
             
         # Add context if available
         if context:
@@ -481,12 +532,10 @@ def handler(event, context):
                 bearer_token, action_id, event
             )
             
-            # Extract principal ID from token or response
-            principal_id = f"{parsed_token.get('iss', '').split('/')[3] if '/' in parsed_token.get('iss', '') else ''}|{parsed_token.get('sub', '')}"
+            # Extract principal ID using the fixed function
+            principal_id = extract_principal_id(parsed_token, auth_response)
             
-            if auth_response.get('principal'):
-                principal_entity = auth_response.get('principal')
-                principal_id = f"{principal_entity.get('entityType')}::\"{principal_entity.get('entityId')}\""
+            logger.info(f"Using principal ID: {principal_id}")
             
             # Generate policy based on authorization decision
             effect = "Allow" if is_authorized else "Deny"
@@ -505,13 +554,16 @@ def handler(event, context):
                 },
                 "context": {
                     "actionId": action_id,
+                    "userId": principal_id,
+                    "username": parsed_token.get('cognito:username', ''),
+                    "sub": parsed_token.get('sub', ''),
                 }
             }
             
         except Exception as e:
             logger.error(f"Error processing token: {str(e)}")
             return {
-                "principalId": "",
+                "principalId": "denied_user",
                 "policyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
@@ -522,7 +574,9 @@ def handler(event, context):
                         }
                     ]
                 },
-                "context": {}
+                "context": {
+                    "error": str(e)
+                }
             }
             
     except Exception as e:
@@ -537,7 +591,7 @@ def handler(event, context):
             })
         else:
             return {
-                "principalId": "",
+                "principalId": "error_user",
                 "policyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [

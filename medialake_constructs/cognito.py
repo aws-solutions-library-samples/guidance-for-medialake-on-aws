@@ -1,7 +1,6 @@
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from constructs import Construct
-from typing import Optional, List
 from aws_cdk import (
     aws_cognito as cognito,
     RemovalPolicy,
@@ -40,9 +39,9 @@ class CognitoProps:
 
 class CognitoConstruct(Construct):
     def __init__(
-        self, 
-        scope: Construct, 
-        construct_id: str, 
+        self,
+        scope: Construct,
+        construct_id: str,
         props: CognitoProps,
         **kwargs,
     ) -> None:
@@ -55,7 +54,7 @@ class CognitoConstruct(Construct):
 
         # Use provided props or create default props
         self.props = props or CognitoProps()
-        
+
         # Store the placeholder for CloudFront domain that we'll update later
         self._cloudfront_domain = None
 
@@ -69,7 +68,7 @@ class CognitoConstruct(Construct):
             ),
         )
 
-        # Create User Pool using L1 construct for more control
+        # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
             "admin_create_user_config": cognito.CfnUserPool.AdminCreateUserConfigProperty(
                 allow_admin_create_user_only=not self.props.self_sign_up_enabled,
@@ -129,20 +128,6 @@ class CognitoConstruct(Construct):
                     temporary_password_validity_days=7,
                 )
             ),
-            "custom_attributes": [
-                cognito.CfnUserPool.SchemaAttributeProperty(
-                    name="permission_sets",
-                    attribute_data_type="String",
-                    mutable=True,
-                    required=False,
-                ),
-                cognito.CfnUserPool.SchemaAttributeProperty(
-                    name="avp_entity_id",
-                    attribute_data_type="String",
-                    mutable=True,
-                    required=False,
-                )
-            ],
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn
             ),
@@ -156,13 +141,51 @@ class CognitoConstruct(Construct):
                     mutable=True,
                     required=False,
                     string_attribute_constraints=cognito.CfnUserPool.StringAttributeConstraintsProperty(
-                        min_length="1",
-                        max_length="2048"
-                    )
-                )
+                        min_length="1", max_length="2048"
+                    ),
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="email",
+                    attribute_data_type="String",
+                    required=True,
+                    mutable=True,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="given_name",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="family_name",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                ),
+                # Custom attributes
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="permission_sets",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="avp_entity_id",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="organization_id",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
             ],
         }
-
         # Create the user pool with all properties
         cfn_user_pool = cognito.CfnUserPool(
             self, "MediaLakeUserPool", **user_pool_props
@@ -174,10 +197,14 @@ class CognitoConstruct(Construct):
         )
 
         # Using stack name, region, account, and environment to create a unique domain prefix
-        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
-        domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+        unique_id = hashlib.md5(
+            f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()
+        ).hexdigest()[:16]
+        domain_prefix = (
+            f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+        )
         self._domain_prefix = domain_prefix
-        
+
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
@@ -187,25 +214,25 @@ class CognitoConstruct(Construct):
 
         # Create default user groups
         self._user_groups = []
-        
+
         default_groups = [
             CognitoGroupConfig(
                 name="administrators",
                 description="Full administrative access to all MediaLake features",
-                precedence=1
+                precedence=1,
             ),
             CognitoGroupConfig(
                 name="editors",
                 description="Can upload, edit and manage media assets",
-                precedence=20
+                precedence=20,
             ),
             CognitoGroupConfig(
                 name="read-only",
                 description="Read-only access to media assets",
-                precedence=40
-            )
+                precedence=40,
+            ),
         ]
-        
+
         # Create the groups
         for group in default_groups:
             group = cognito.CfnUserPoolGroup(
@@ -214,7 +241,7 @@ class CognitoConstruct(Construct):
                 user_pool_id=self._user_pool.user_pool_id,
                 group_name=group.name,
                 description=group.description,
-                precedence=group.precedence
+                precedence=group.precedence,
             )
             self._user_groups.append(group)
 
@@ -251,7 +278,7 @@ class CognitoConstruct(Construct):
                         "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
                         "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
                         "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
                     },
                     idp_identifiers=[provider.identity_provider_name],
                 )
@@ -285,8 +312,8 @@ class CognitoConstruct(Construct):
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse",
                         ],
                         logout_urls=[
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",  
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",  
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/sign-in",
                         ],
                     ),
@@ -334,7 +361,7 @@ class CognitoConstruct(Construct):
     @property
     def user_pool_id(self) -> str:
         return self._user_pool.user_pool_id
-    
+
     @property
     def user_pool_arn(self) -> str:
         return self._user_pool.user_pool_arn
@@ -346,24 +373,24 @@ class CognitoConstruct(Construct):
     @property
     def identity_pool(self) -> str:
         return self._identity_pool.identity_pool_id
-    
+
     @property
     def cognito_domain_prefix(self) -> str:
         return self._domain_prefix
-        
+
     def update_callback_urls(self, cloudfront_domain: str) -> None:
         """
         Updates the callback URLs for the Cognito User Pool Client with the CloudFront domain.
         This should be called after the CloudFront distribution is created.
-        
+
         Args:
             cloudfront_domain: The CloudFront distribution domain name
         """
         if not cloudfront_domain:
             return
-            
+
         self._cloudfront_domain = cloudfront_domain
-        
+
         # Use AWS SDK to update the user pool client
         custom_resource = cr.AwsCustomResource(
             self,
@@ -392,13 +419,16 @@ class CognitoConstruct(Construct):
                     "AllowedOAuthFlows": ["code", "implicit"],
                     "AllowedOAuthScopes": ["email", "openid", "profile"],
                     "AllowedOAuthFlowsUserPoolClient": True,
-                    "SupportedIdentityProviders": ["COGNITO"] + [
-                        provider.identity_provider_name 
-                        for provider in config.authZ.identity_providers 
+                    "SupportedIdentityProviders": ["COGNITO"]
+                    + [
+                        provider.identity_provider_name
+                        for provider in config.authZ.identity_providers
                         if provider.identity_provider_method == "saml"
                     ],
                 },
-                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-cognito-callback-urls-update"),
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-cognito-callback-urls-update"
+                ),
             ),
             policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
                 resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
