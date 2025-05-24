@@ -2,51 +2,49 @@
 Custom API Gateway Lambda Authorizer for Media Lake.
 
 This Lambda function acts as the primary enforcement point for the authorization system.
-It reads permissions from the DynamoDB authorization table and calls Amazon Verified Permissions (AVP)
-for evaluation before allowing requests to proceed to backend Lambdas.
+It validates JWT tokens and calls Amazon Verified Permissions (AVP) for evaluation 
+before allowing requests to proceed to backend Lambdas.
 """
 
 import os
 import json
-import boto3
-import base64
-import re
 import time
 import hashlib
 import urllib.request
 import urllib.error
-from typing import Dict, Any, List, Tuple, Optional, Union
+from typing import Dict, Any, Tuple, Optional
 from jose import jwt, JWTError
-from aws_lambda_powertools import Logger
-from botocore.exceptions import ClientError
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
+# Initialize observability tools with proper namespace
 logger = Logger()
-
-# Initialize clients
-dynamodb = boto3.resource('dynamodb')
-cognito_idp = boto3.client('cognito-idp')
+metrics = Metrics(namespace="MediaLake/Authorization")
+tracer = Tracer()
 
 # Get environment variables
-AUTH_TABLE_NAME = os.environ.get('AUTH_TABLE_NAME')
 POLICY_STORE_ID = os.environ.get('AVP_POLICY_STORE_ID')
 NAMESPACE = os.environ.get('NAMESPACE')
-TOKEN_TYPE = os.environ.get('TOKEN_TYPE')
+TOKEN_TYPE = os.environ.get('TOKEN_TYPE', 'identityToken')
 COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID')
 COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID')
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
-BYPASS_ALL = os.environ.get('BYPASS_ALL', 'false').lower() == 'true'
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 
-# Define resource and action types using namespace (avoid reserved prefixes)
-RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MyApp::Application"
-RESOURCE_ID = NAMESPACE if NAMESPACE else "MyApp"
-ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MyApp::Action"
+# Define resource and action types using namespace
+RESOURCE_TYPE = f"{NAMESPACE}::Application" if NAMESPACE else "MediaLake::Application"
+RESOURCE_ID = NAMESPACE if NAMESPACE else "MediaLake"
+ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MediaLake::Action"
+
+# Initialize AWS clients outside handler for reuse
+import boto3
 
 # Initialize Verified Permissions client with optional endpoint
 if os.environ.get('ENDPOINT'):
     verified_permissions = boto3.client(
         'verifiedpermissions',
-        endpoint_url=f"https://{os.environ.get('ENDPOINT')}ford.{os.environ.get('AWS_REGION')}.amazonaws.com"
+        endpoint_url=f"https://{os.environ.get('ENDPOINT')}.{os.environ.get('AWS_REGION', 'us-east-1')}.amazonaws.com"
     )
 else:
     verified_permissions = boto3.client('verifiedpermissions')
@@ -55,34 +53,19 @@ else:
 if ENVIRONMENT == 'prod' and DEBUG_MODE:
     logger.warning("⚠️ DEBUG_MODE is enabled in production - this is a security risk!")
     
-if ENVIRONMENT == 'prod' and BYPASS_ALL:
-    logger.critical("⚠️ BYPASS_ALL is enabled in production - this is a CRITICAL security risk!")
-    # In production, we should never allow BYPASS_ALL
-    BYPASS_ALL = False
-    logger.info("BYPASS_ALL has been forcibly disabled in production environment")
-elif DEBUG_MODE:
+if DEBUG_MODE:
     logger.warning("DEBUG_MODE is enabled - all requests with valid JWT will be allowed")
-    
-if BYPASS_ALL:
-    logger.warning("⚠️ BYPASS_ALL is enabled - ALL requests will be authorized without any checks ⚠️")
 
-# Constants for DynamoDB keys
-PREFIX_USER = "USER#"
-PREFIX_GROUP = "GROUP#"
-PREFIX_MEMBERSHIP = "MEMBERSHIP#"
-
-# Initialize DynamoDB table
-auth_table = dynamodb.Table(AUTH_TABLE_NAME) if AUTH_TABLE_NAME else None
-
-# JWKS cache with TTL
+# JWKS cache with TTL - optimized for Lambda reuse
 jwks_cache = {
     'keys': None,
     'expiry': 0
 }
 
-# Initialize JWT token verification cache
+# JWT token verification cache - optimized for Lambda reuse
 token_verification_cache = {}
 
+@tracer.capture_method
 def extract_token_from_header(auth_header: str) -> Optional[str]:
     """
     Extract the JWT token from the Authorization header.
@@ -96,12 +79,13 @@ def extract_token_from_header(auth_header: str) -> Optional[str]:
     if not auth_header:
         return None
     
-    # Check for Bearer token format, token is optional
+    # Check for Bearer token format
     if auth_header.lower().startswith('bearer '):
         return auth_header.split(' ')[1]
     
     return auth_header
 
+@tracer.capture_method
 def get_cognito_jwks() -> Dict[str, Any]:
     """
     Fetch the JSON Web Key Set (JWKS) from Cognito user pool.
@@ -115,10 +99,14 @@ def get_cognito_jwks() -> Dict[str, Any]:
     
     # Return cached JWKS if still valid
     if jwks_cache['keys'] and jwks_cache['expiry'] > current_time:
+        metrics.add_metric(name="fetch.jwks.cache_hit", unit=MetricUnit.Count, value=1)
         logger.debug("Using cached JWKS")
         return jwks_cache['keys']
     
+    metrics.add_metric(name="fetch.jwks.cache_miss", unit=MetricUnit.Count, value=1)
     logger.info("Fetching fresh JWKS from Cognito")
+    
+    start_time = time.time()
     
     try:
         # Construct the JWKS URL from the Cognito user pool ID
@@ -132,7 +120,7 @@ def get_cognito_jwks() -> Dict[str, Any]:
         req = urllib.request.Request(jwks_url)
         
         try:
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 response_data = response.read()
                 jwks = json.loads(response_data.decode('utf-8'))
                 
@@ -140,30 +128,41 @@ def get_cognito_jwks() -> Dict[str, Any]:
                 jwks_cache['keys'] = jwks
                 jwks_cache['expiry'] = current_time + 3600  # 1 hour TTL
                 
-                logger.info(f"Successfully fetched JWKS with {len(jwks.get('keys', []))} keys")
+                # Record successful fetch metrics
+                fetch_time = (time.time() - start_time) * 1000
+                metrics.add_metric(name="fetch.jwks.latency", unit=MetricUnit.Milliseconds, value=fetch_time)
+                metrics.add_metric(name="fetch.jwks.success", unit=MetricUnit.Count, value=1)
+                
+                logger.info(f"Successfully fetched JWKS with {len(jwks.get('keys', []))} keys in {fetch_time:.2f}ms")
                 return jwks
                 
         except urllib.error.HTTPError as http_err:
+            metrics.add_metric(name="fetch.jwks.error", unit=MetricUnit.Count, value=1)
             raise Exception(f"Failed to fetch JWKS: HTTP {http_err.code}")
         except urllib.error.URLError as url_err:
+            metrics.add_metric(name="fetch.jwks.error", unit=MetricUnit.Count, value=1)
             raise Exception(f"Failed to fetch JWKS: {url_err.reason}")
         
     except Exception as e:
         logger.error(f"Error fetching JWKS: {str(e)}")
+        metrics.add_metric(name="fetch.jwks.error", unit=MetricUnit.Count, value=1)
         
         # If we have cached keys, use them even if expired
         if jwks_cache['keys']:
             logger.warning("Using expired JWKS cache due to fetch error")
+            metrics.add_metric(name="fetch.jwks.expired_cache_used", unit=MetricUnit.Count, value=1)
             return jwks_cache['keys']
             
         raise Exception(f"Failed to fetch JWKS: {str(e)}")
 
-def decode_and_verify_token(token: str) -> Dict[str, Any]:
+@tracer.capture_method
+def decode_and_verify_token(token: str, correlation_id: str) -> Dict[str, Any]:
     """
     Decode and verify the JWT token, including signature verification.
     
     Args:
         token: JWT token
+        correlation_id: Request correlation ID for tracing
         
     Returns:
         Decoded token claims
@@ -171,32 +170,36 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
     Raises:
         Exception: If token is invalid
     """
+    start_time = time.time()
+    
     # Check if we have this token in cache
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     cache_entry = token_verification_cache.get(token_hash)
     
     # If we have a valid cache entry that hasn't expired
     if cache_entry and cache_entry['expiry'] > time.time():
-        logger.debug("Using cached token verification result")
+        metrics.add_metric(name="validate.token.cache_hit", unit=MetricUnit.Count, value=1)
+        logger.debug("Using cached token verification result", extra={"correlation_id": correlation_id})
         return cache_entry['claims']
     
-    logger.info("Verifying token signature")
+    metrics.add_metric(name="validate.token.cache_miss", unit=MetricUnit.Count, value=1)
+    logger.info("Verifying token signature", extra={"correlation_id": correlation_id})
     
     try:
         # Get unverified header and claims first for debugging
         header = jwt.get_unverified_header(token)
         unverified_claims = jwt.get_unverified_claims(token)
         
-        # Log token details for debugging
-        logger.info(f"Token header: {json.dumps(header)}")
-        logger.info(f"Token audience (aud): {unverified_claims.get('aud')}")
-        logger.info(f"Token client_id: {unverified_claims.get('client_id')}")
-        logger.info(f"Token issuer (iss): {unverified_claims.get('iss')}")
-        logger.info(f"Token subject (sub): {unverified_claims.get('sub')}")
-        logger.info(f"Token username: {unverified_claims.get('cognito:username')}")
-        logger.info(f"Expected client ID: {COGNITO_CLIENT_ID}")
+        # Log token details for debugging (production-safe)
+        if ENVIRONMENT != 'prod':
+            logger.info(f"Token header: {json.dumps(header)}", extra={"correlation_id": correlation_id})
+            logger.info(f"Token audience (aud): {unverified_claims.get('aud')}", extra={"correlation_id": correlation_id})
+            logger.info(f"Token client_id: {unverified_claims.get('client_id')}", extra={"correlation_id": correlation_id})
+            logger.info(f"Token issuer (iss): {unverified_claims.get('iss')}", extra={"correlation_id": correlation_id})
+            logger.info(f"Expected client ID: {COGNITO_CLIENT_ID}", extra={"correlation_id": correlation_id})
         
         if not header or 'kid' not in header:
+            metrics.add_metric(name="validate.token.invalid_header", unit=MetricUnit.Count, value=1)
             raise Exception("Invalid token header or missing key ID (kid)")
             
         kid = header['kid']
@@ -212,84 +215,54 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
                 break
                 
         if not key:
+            metrics.add_metric(name="validate.token.key_not_found", unit=MetricUnit.Count, value=1)
             raise Exception(f"No matching key found for kid: {kid}")
             
-        logger.info(f"Using JWK with kid: {key.get('kid')}")
+        logger.info(f"Using JWK with kid: {key.get('kid')}", extra={"correlation_id": correlation_id})
         
-        try:
-            logger.info("Attempting to verify token signature")
-            
-            # Configure JWT decode options
-            jwt_options = {
-                'verify_signature': True,
-                'verify_exp': True,
-                'verify_iat': True,
-                'verify_aud': False  # Disable automatic audience verification for now
-            }
-            
-            # If we have a specific client ID to validate against, enable audience verification
-            jwt_audience = None
-            if COGNITO_CLIENT_ID:
-                jwt_options['verify_aud'] = True
-                jwt_audience = COGNITO_CLIENT_ID
-                logger.info(f"Will verify audience against: {jwt_audience}")
-            else:
-                logger.info("COGNITO_CLIENT_ID not set, skipping audience verification")
-            
-            # Verify the token signature and decode claims
-            claims = jwt.decode(
-                token,
-                key,  # Pass the JWK directly
-                algorithms=['RS256'],
-                audience=jwt_audience,  # Specify expected audience if configured
-                options=jwt_options
-            )
-            
-            logger.info("Token signature verified successfully")
-            
-        except AttributeError as e:
-            # If there's an issue with the jose library, log it and try a fallback
-            logger.warning(f"Error using jose library: {str(e)}")
-            
-            # Fallback to just decoding the token without signature verification
-            # This is not secure but allows the code to continue working
-            # while we fix the library issue
-            logger.warning("SECURITY RISK: Falling back to unverified token parsing")
-            claims = jwt.get_unverified_claims(token)
-            
-            # Add a warning to the logs
-            logger.warning("Token signature NOT verified - fix jose library integration ASAP")
+        # Configure JWT decode options
+        jwt_options = {
+            'verify_signature': True,
+            'verify_exp': True,
+            'verify_iat': True,
+            'verify_aud': False  # We'll handle audience validation manually
+        }
         
-        # Manual audience validation if COGNITO_CLIENT_ID is set and we're not using jose validation
-        if COGNITO_CLIENT_ID and not jwt_options.get('verify_aud', False):
-            token_aud = claims.get('aud')
-            if token_aud != COGNITO_CLIENT_ID:
-                logger.error(f"Audience mismatch: expected '{COGNITO_CLIENT_ID}', got '{token_aud}'")
-                raise Exception(f"Invalid audience: expected '{COGNITO_CLIENT_ID}', got '{token_aud}'")
-        
-        # In production, only log minimal token info
-        if ENVIRONMENT == 'prod':
-            logger.info(f"Processing token for subject: {claims.get('sub', 'unknown')}")
+        # If we have a specific client ID to validate against, enable audience verification
+        jwt_audience = None
+        if COGNITO_CLIENT_ID:
+            jwt_options['verify_aud'] = True
+            jwt_audience = COGNITO_CLIENT_ID
+            logger.debug(f"Will verify audience against: {jwt_audience}", extra={"correlation_id": correlation_id})
         else:
-            # More verbose logging in non-prod environments
-            logger.info(f"Token issuer: {claims.get('iss')}")
-            logger.info(f"Token subject: {claims.get('sub')}")
-            logger.info(f"Token username: {claims.get('cognito:username')}")
-            logger.info(f"Token client_id: {claims.get('client_id')}")
-            logger.info(f"Token audience: {claims.get('aud')}")
+            logger.info("COGNITO_CLIENT_ID not set, skipping audience verification", extra={"correlation_id": correlation_id})
+        
+        # Verify the token signature and decode claims
+        claims = jwt.decode(
+            token,
+            key,  # Pass the JWK directly
+            algorithms=['RS256'],
+            audience=jwt_audience,  # Specify expected audience if configured
+            options=jwt_options
+        )
+        
+        logger.info("Token signature verified successfully", extra={"correlation_id": correlation_id})
+        metrics.add_metric(name="validate.token.signature_verified", unit=MetricUnit.Count, value=1)
         
         # Validate required claims
         if not claims.get('sub'):
+            metrics.add_metric(name="validate.token.missing_sub", unit=MetricUnit.Count, value=1)
             raise Exception("Token missing required 'sub' claim")
             
         # Validate token issuer if configured
         if COGNITO_USER_POOL_ID:
             expected_issuer = f"https://cognito-idp.{COGNITO_USER_POOL_ID.split('_')[0]}.amazonaws.com/{COGNITO_USER_POOL_ID}"
             if claims.get('iss') != expected_issuer:
-                logger.error(f"Issuer mismatch: expected '{expected_issuer}', got '{claims.get('iss')}'")
+                metrics.add_metric(name="validate.token.invalid_issuer", unit=MetricUnit.Count, value=1)
+                logger.error(f"Issuer mismatch: expected '{expected_issuer}', got '{claims.get('iss')}'", extra={"correlation_id": correlation_id})
                 raise Exception(f"Invalid token issuer: expected '{expected_issuer}', got '{claims.get('iss')}'")
         
-        # Cache the verified token with expiry time (use token exp claim or default to 5 minutes)
+        # Cache the verified token with expiry time
         exp_time = claims.get('exp', int(time.time() + 300))
         token_verification_cache[token_hash] = {
             'claims': claims,
@@ -304,26 +277,34 @@ def decode_and_verify_token(token: str) -> Dict[str, Any]:
             for k in expired_keys:
                 token_verification_cache.pop(k, None)
                 
+        # Record validation time
+        validation_time = (time.time() - start_time) * 1000
+        metrics.add_metric(name="validate.token.latency", unit=MetricUnit.Milliseconds, value=validation_time)
+        metrics.add_metric(name="validate.token.success", unit=MetricUnit.Count, value=1)
+        
         return claims
         
     except jwt.ExpiredSignatureError:
-        logger.warning("Token has expired")
+        metrics.add_metric(name="validate.token.expired", unit=MetricUnit.Count, value=1)
+        logger.warning("Token has expired", extra={"correlation_id": correlation_id})
         raise Exception("Token has expired")
         
     except jwt.JWTClaimsError as e:
-        logger.error(f"Invalid token claims: {str(e)}")
-        # Log more details about the claims error
-        logger.error(f"Detailed claims error: {str(e)}")
+        metrics.add_metric(name="validate.token.invalid_claims", unit=MetricUnit.Count, value=1)
+        logger.error(f"Invalid token claims: {str(e)}", extra={"correlation_id": correlation_id})
         raise Exception(f"Invalid token claims: {str(e)}")
         
     except jwt.JWTError as e:
-        logger.error(f"JWT validation error: {str(e)}")
+        metrics.add_metric(name="validate.token.jwt_error", unit=MetricUnit.Count, value=1)
+        logger.error(f"JWT validation error: {str(e)}", extra={"correlation_id": correlation_id})
         raise Exception(f"Token validation failed: {str(e)}")
             
     except Exception as e:
-        logger.error(f"Error decoding token: {str(e)}")
+        metrics.add_metric(name="validate.token.error", unit=MetricUnit.Count, value=1)
+        logger.error(f"Error decoding token: {str(e)}", extra={"correlation_id": correlation_id})
         raise Exception(f"Invalid token: {str(e)}")
 
+@tracer.capture_method
 def extract_principal_id(parsed_token: Dict[str, Any], auth_response: Dict[str, Any]) -> str:
     """
     Extract principal ID from token claims or AVP response.
@@ -342,122 +323,26 @@ def extract_principal_id(parsed_token: Dict[str, Any], auth_response: Dict[str, 
         entity_id = principal_entity.get('entityId', '')
         if entity_id:
             logger.info(f"Using principal from AVP response: {entity_type}::{entity_id}")
+            metrics.add_metric(name="extract.principal.from_avp", unit=MetricUnit.Count, value=1)
             return f"{entity_type}::{entity_id}"
     
     # Fall back to extracting from token claims
     user_id = parsed_token.get('sub')
     if not user_id:
         logger.error("No 'sub' claim found in token")
+        metrics.add_metric(name="extract.principal.missing_sub", unit=MetricUnit.Count, value=1)
         raise Exception("Invalid token: missing subject")
     
     # For Cognito tokens, use the sub claim directly
     username = parsed_token.get('cognito:username', user_id)
     
     logger.info(f"Extracted user ID: {user_id}, username: {username}")
+    metrics.add_metric(name="extract.principal.from_token", unit=MetricUnit.Count, value=1)
     
     # Return in format expected by your system
     return f"User::{user_id}"
 
-def get_user_groups(user_id: str) -> List[str]:
-    """
-    Get the user's group memberships from DynamoDB.
-    
-    Args:
-        user_id: User ID
-        
-    Returns:
-        List of group IDs the user belongs to
-    """
-    if not auth_table:
-        logger.warning("AUTH_TABLE_NAME not set, skipping group lookup")
-        return []
-    
-    try:
-        # Query the auth table for the user's group memberships
-        response = auth_table.query(
-            KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
-            ExpressionAttributeValues={
-                ":pk": f"{PREFIX_USER}{user_id}",
-                ":sk_prefix": PREFIX_MEMBERSHIP
-            }
-        )
-        
-        # Extract group IDs from the membership records
-        groups = []
-        for item in response.get('Items', []):
-            # SK format is MEMBERSHIP#GROUP#groupId
-            sk = item.get('SK', '')
-            if sk.startswith(f"{PREFIX_MEMBERSHIP}{PREFIX_GROUP}"):
-                group_id = sk[len(f"{PREFIX_MEMBERSHIP}{PREFIX_GROUP}"):]
-                groups.append(group_id)
-        
-        logger.info(f"Found {len(groups)} group memberships for user {user_id}")
-        return groups
-    except Exception as e:
-        logger.error(f"Error fetching user groups: {str(e)}")
-        return []
-
-def map_http_method_to_action(http_method: str, resource_path: str) -> str:
-    """
-    Map HTTP method and resource path to a Cedar action entity.
-    
-    Args:
-        http_method: HTTP method (GET, POST, PUT, DELETE, etc.)
-        resource_path: API resource path
-        
-    Returns:
-        Cedar action entity ID
-    """
-    # Extract the resource type from the path
-    # Example: /assets/{id} -> assets
-    path_parts = resource_path.strip('/').split('/')
-    resource_type = path_parts[0] if path_parts else "unknown"
-    
-    logger.info(f"Mapping HTTP method to action: method={http_method}, path={resource_path}, resource_type={resource_type}")
-    
-    # Map HTTP methods to actions
-    action = None
-    if http_method == 'GET':
-        action = f"view{resource_type.capitalize()}"
-    elif http_method == 'POST':
-        action = f"create{resource_type.capitalize()}"
-    elif http_method == 'PUT' or http_method == 'PATCH':
-        action = f"edit{resource_type.capitalize()}"
-    elif http_method == 'DELETE':
-        action = f"delete{resource_type.capitalize()}"
-    else:
-        action = f"access{resource_type.capitalize()}"
-    
-    logger.info(f"Mapped to Cedar action: {action}")
-    return action
-
-def extract_resource_id(resource_path: str, path_parameters: Dict[str, str]) -> str:
-    """
-    Extract the resource ID from the path parameters or resource path.
-    
-    Args:
-        resource_path: API resource path
-        path_parameters: Path parameters from the request
-        
-    Returns:
-        Resource ID or resource type if no ID is present
-    """
-    # Extract the resource type from the path
-    path_parts = resource_path.strip('/').split('/')
-    resource_type = path_parts[0] if path_parts else "unknown"
-    
-    # Check if there's an ID in the path parameters
-    for param_name, param_value in path_parameters.items():
-        if param_name.lower().endswith('id'):
-            return param_value
-    
-    # If no ID in path parameters, check if there's an ID in the path
-    if len(path_parts) > 1:
-        return path_parts[1]
-    
-    # If no specific resource ID, return the resource type
-    return resource_type
-
+@tracer.capture_method
 def get_context_map(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Transform path parameters and query string parameters into the format expected by AVP.
@@ -488,6 +373,7 @@ def get_context_map(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 }
             }
         }
+        metrics.add_metric(name="context.path_parameters", unit=MetricUnit.Count, value=len(path_parameters))
     
     # Transform query string parameters into smithy format
     query_params_obj = {}
@@ -502,6 +388,7 @@ def get_context_map(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 }
             }
         }
+        metrics.add_metric(name="context.query_parameters", unit=MetricUnit.Count, value=len(query_string_parameters))
     
     # Combine both parameter types
     return {
@@ -511,10 +398,12 @@ def get_context_map(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         }
     }
 
+@tracer.capture_method
 def check_authorization_with_avp(
     token: str,
     action_id: str,
-    event: Dict[str, Any]
+    event: Dict[str, Any],
+    correlation_id: str
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Check authorization using Amazon Verified Permissions with token.
@@ -523,16 +412,21 @@ def check_authorization_with_avp(
         token: Bearer token
         action_id: Action ID to check
         event: API Gateway event
+        correlation_id: Request correlation ID for tracing
         
     Returns:
         Tuple of (is_authorized, decision_details)
     """
+    start_time = time.time()
+    
     if DEBUG_MODE:
-        logger.warning(f"DEBUG_MODE enabled: Bypassing AVP authorization check for action {action_id}")
+        logger.warning(f"DEBUG_MODE enabled: Bypassing AVP authorization check for action {action_id}", extra={"correlation_id": correlation_id})
+        metrics.add_metric(name="authorize.request.debug_bypass", unit=MetricUnit.Count, value=1)
         return True, {"reason": "DEBUG_MODE enabled, authorization check bypassed"}
         
     if not POLICY_STORE_ID:
-        logger.warning("POLICY_STORE_ID not set, skipping authorization check")
+        logger.warning("POLICY_STORE_ID not set, skipping authorization check", extra={"correlation_id": correlation_id})
+        metrics.add_metric(name="authorize.request.missing_policy_store", unit=MetricUnit.Count, value=1)
         return True, {"reason": "POLICY_STORE_ID not set"}
     
     try:
@@ -553,7 +447,7 @@ def check_authorization_with_avp(
         }
         
         # Add token parameter based on TOKEN_TYPE
-        if TOKEN_TYPE and TOKEN_TYPE in ['identityToken', 'accessToken']:
+        if TOKEN_TYPE in ['identityToken', 'accessToken']:
             input_params[TOKEN_TYPE] = token
         else:
             # Default to identityToken for Cognito JWT tokens
@@ -563,32 +457,56 @@ def check_authorization_with_avp(
         if context:
             input_params["context"] = context
         
-        logger.info(f"AVP IsAuthorizedWithToken request: {json.dumps(input_params)}")
+        # Redact token for logging in production
+        log_params = input_params.copy()
+        if ENVIRONMENT == 'prod':
+            if TOKEN_TYPE in log_params:
+                log_params[TOKEN_TYPE] = "***REDACTED***"
+            if "identityToken" in log_params:
+                log_params["identityToken"] = "***REDACTED***"
+            
+        logger.info(f"AVP IsAuthorizedWithToken request: {json.dumps(log_params)}", extra={"correlation_id": correlation_id})
         
         # Call AVP IsAuthorizedWithToken API
+        avp_start_time = time.time()
         response = verified_permissions.is_authorized_with_token(**input_params)
+        avp_duration = (time.time() - avp_start_time) * 1000
+        
+        metrics.add_metric(name="authorize.avp.latency", unit=MetricUnit.Milliseconds, value=avp_duration)
         
         decision = response.get('decision', 'DENY')
         is_authorized = decision.upper() == 'ALLOW'
         
-        logger.info(f"AVP authorization decision: {decision}")
+        logger.info(f"AVP authorization decision: {decision}", extra={"correlation_id": correlation_id})
         
-        # Log more details about the decision
-        if not is_authorized:
+        # Record metrics based on decision
+        if is_authorized:
+            metrics.add_metric(name="authorize.request.allow", unit=MetricUnit.Count, value=1)
+        else:
+            metrics.add_metric(name="authorize.request.deny", unit=MetricUnit.Count, value=1)
+            
             errors = response.get('errors', [])
             if errors:
-                logger.error(f"AVP authorization errors: {json.dumps(errors)}")
+                logger.error(f"AVP authorization errors: {json.dumps(errors)}", extra={"correlation_id": correlation_id})
+                metrics.add_metric(name="authorize.request.errors", unit=MetricUnit.Count, value=len(errors))
             
             # Log the decision details
             decision_details = response.get('decisionDetails', {})
-            logger.info(f"Decision details: {json.dumps(decision_details)}")
+            logger.info(f"Decision details: {json.dumps(decision_details)}", extra={"correlation_id": correlation_id})
+        
+        # Record total authorization time
+        total_duration = (time.time() - start_time) * 1000
+        metrics.add_metric(name="authorize.request.latency", unit=MetricUnit.Milliseconds, value=total_duration)
         
         return is_authorized, response
+        
     except Exception as e:
-        logger.error(f"Error checking authorization with AVP: {str(e)}")
+        logger.error(f"Error checking authorization with AVP: {str(e)}", extra={"correlation_id": correlation_id})
+        metrics.add_metric(name="authorize.request.error", unit=MetricUnit.Count, value=1)
         # Default to deny on error
         return False, {"error": str(e)}
 
+@tracer.capture_method
 def generate_policy(
     principal_id: str,
     effect: str,
@@ -625,21 +543,25 @@ def generate_policy(
     if context:
         policy["context"] = context
     
+    # Record policy generation metrics
+    metrics.add_metric(name=f"generate.policy.{effect.lower()}", unit=MetricUnit.Count, value=1)
+    logger.info(f"Generated {effect} policy for principal {principal_id}")
+    
     return policy
 
 @logger.inject_lambda_context
-def handler(event, context):
+@tracer.capture_lambda_handler
+@metrics.log_metrics
+def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     Lambda handler for the Custom API Gateway Authorizer.
     
     This implementation:
-    1. If BYPASS_ALL is enabled, automatically authorizes all requests
-    2. Otherwise:
-       a. Extracts bearer token from the Authorization header
-       b. Parses the token
-       c. Constructs the action ID from HTTP method and resource path
-       d. Calls AVP for authorization decision using isAuthorizedWithToken
-       e. Returns an IAM policy document allowing or denying access based on the decision
+    1. Extracts bearer token from the Authorization header
+    2. Validates and verifies the JWT token including signature
+    3. Constructs the action ID from HTTP method and resource path
+    4. Calls AVP for authorization decision using isAuthorizedWithToken
+    5. Returns an IAM policy document allowing or denying access based on the decision
     
     Args:
         event: API Gateway authorizer event
@@ -648,82 +570,75 @@ def handler(event, context):
     Returns:
         IAM policy document
     """
-    logger.info("========== CUSTOM AUTHORIZER INVOKED ==========")
-    logger.info(f"Event: {json.dumps(event)}")
-    logger.info(f"Environment: DEBUG_MODE={DEBUG_MODE}, BYPASS_ALL={BYPASS_ALL}")
-    logger.info("===============================================")
+    start_time = time.time()
+    correlation_id = context.aws_request_id
+    
+    logger.info("========== CUSTOM AUTHORIZER INVOKED ==========", extra={"correlation_id": correlation_id})
+    
+    # In production, don't log the full event as it may contain sensitive information
+    if ENVIRONMENT == 'prod':
+        logger.info("Event received (details redacted in production)", extra={"correlation_id": correlation_id})
+    else:
+        logger.info(f"Event: {json.dumps(event)}", extra={"correlation_id": correlation_id})
+        
+    logger.info(f"Environment: DEBUG_MODE={DEBUG_MODE}, ENVIRONMENT={ENVIRONMENT}", extra={"correlation_id": correlation_id})
+    logger.info("===============================================", extra={"correlation_id": correlation_id})
     
     # Extract method ARN for policy generation
     method_arn = event.get('methodArn', '*')
     
-    # If BYPASS_ALL is enabled, automatically authorize all requests
-    if BYPASS_ALL:
-        logger.warning("⚠️ BYPASS_ALL mode active - Automatically authorizing ALL requests ⚠️")
-        
-        # Extract HTTP method and resource path for logging purposes only
-        arn_parts = method_arn.split(':')
-        api_gateway_arn_parts = arn_parts[5].split('/') if len(arn_parts) > 5 else []
-        http_method = event.get('httpMethod') or (api_gateway_arn_parts[2] if len(api_gateway_arn_parts) > 2 else 'GET')
-        resource_path = event.get('path') or ('/'.join(api_gateway_arn_parts[3:]) if len(api_gateway_arn_parts) > 3 else '/')
-        
-        logger.info(f"Auto-authorizing request: {http_method} {resource_path}")
-        
-        # Generate an Allow policy with minimal context
-        context_data = {
-            "userId": "bypass_user",
-            "bypassMode": "true",
-            "resourcePath": resource_path,
-            "httpMethod": http_method
-        }
-        
-        policy = generate_policy("bypass_user", "Allow", method_arn, context_data)
-        logger.info("Generated ALLOW policy due to BYPASS_ALL mode")
-        return policy
+    # Record request metrics
+    metrics.add_metric(name="request.total", unit=MetricUnit.Count, value=1)
     
     try:
         # Extract the bearer token from the Authorization header
         auth_header = event.get('headers', {}).get('Authorization') or event.get('headers', {}).get('authorization')
         auth_token = event.get('authorizationToken')
         
-        logger.info(f"Auth header: {auth_header}")
+        # In production, don't log the auth header as it contains sensitive information
+        if ENVIRONMENT != 'prod':
+            logger.info(f"Auth header present: {auth_header is not None}", extra={"correlation_id": correlation_id})
         
         bearer_token = None
         if auth_header:
             bearer_token = extract_token_from_header(auth_header)
+            metrics.add_metric(name="extract.token.from_header", unit=MetricUnit.Count, value=1)
         elif auth_token:
             bearer_token = extract_token_from_header(auth_token)
+            metrics.add_metric(name="extract.token.from_token", unit=MetricUnit.Count, value=1)
         
         if not bearer_token:
-            logger.error("No bearer token found in authorization sources")
+            logger.error("No bearer token found in authorization sources", extra={"correlation_id": correlation_id})
+            metrics.add_metric(name="request.missing_token", unit=MetricUnit.Count, value=1)
             raise Exception("Unauthorized: No bearer token found")
         
-        # Parse the token to get claims
+        # Parse and verify the token
         try:
-            parsed_token = decode_and_verify_token(bearer_token)
+            parsed_token = decode_and_verify_token(bearer_token, correlation_id)
             
             # Extract HTTP method and resource path
             http_method = event.get('requestContext', {}).get('httpMethod', 'GET').lower()
             resource_path = event.get('requestContext', {}).get('resourcePath', '/')
             
-            # Construct action ID as in the JS code
+            # Construct action ID
             action_id = f"{http_method} {resource_path}"
             
-            logger.info(f"Action ID: {action_id}")
+            logger.info(f"Action ID: {action_id}", extra={"correlation_id": correlation_id})
             
             # Check authorization with AVP
             is_authorized, auth_response = check_authorization_with_avp(
-                bearer_token, action_id, event
+                bearer_token, action_id, event, correlation_id
             )
             
-            # Extract principal ID using the fixed function
+            # Extract principal ID
             principal_id = extract_principal_id(parsed_token, auth_response)
             
-            logger.info(f"Using principal ID: {principal_id}")
+            logger.info(f"Using principal ID: {principal_id}", extra={"correlation_id": correlation_id})
             
             # Generate policy based on authorization decision
             effect = "Allow" if is_authorized else "Deny"
             
-            return {
+            policy = {
                 "principalId": principal_id,
                 "policyDocument": {
                     "Version": "2012-10-17",
@@ -740,12 +655,22 @@ def handler(event, context):
                     "userId": principal_id,
                     "username": parsed_token.get('cognito:username', ''),
                     "sub": parsed_token.get('sub', ''),
+                    "requestId": correlation_id
                 }
             }
             
+            # Record execution time and result
+            execution_time = (time.time() - start_time) * 1000
+            metrics.add_metric(name="request.latency", unit=MetricUnit.Milliseconds, value=execution_time)
+            metrics.add_metric(name=f"request.result_{effect.lower()}", unit=MetricUnit.Count, value=1)
+            
+            return policy
+            
         except Exception as e:
-            logger.error(f"Error processing token: {str(e)}")
-            return {
+            logger.error(f"Error processing token: {str(e)}", extra={"correlation_id": correlation_id})
+            metrics.add_metric(name="request.token_error", unit=MetricUnit.Count, value=1)
+            
+            policy = {
                 "principalId": "denied_user",
                 "policyDocument": {
                     "Version": "2012-10-17",
@@ -758,37 +683,46 @@ def handler(event, context):
                     ]
                 },
                 "context": {
-                    "error": str(e)
+                    "error": str(e),
+                    "requestId": correlation_id
                 }
             }
             
+            # Record execution time
+            execution_time = (time.time() - start_time) * 1000
+            metrics.add_metric(name="request.latency", unit=MetricUnit.Milliseconds, value=execution_time)
+            metrics.add_metric(name="request.result_deny", unit=MetricUnit.Count, value=1)
+            
+            return policy
+            
     except Exception as e:
-        logger.error(f"Authorization error: {str(e)}")
+        logger.error(f"Authorization error: {str(e)}", extra={"correlation_id": correlation_id})
+        metrics.add_metric(name="request.error", unit=MetricUnit.Count, value=1)
         
-        # On error, deny access unless BYPASS_ALL is enabled
-        if BYPASS_ALL:
-            logger.warning(f"⚠️ Error occurred but BYPASS_ALL is enabled - authorizing anyway: {str(e)} ⚠️")
-            return generate_policy("bypass_user", "Allow", method_arn, {
-                "bypassMode": "true",
-                "error": str(e)
-            })
-        else:
-            return {
-                "principalId": "error_user",
-                "policyDocument": {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Action": "execute-api:Invoke",
-                            "Effect": "Deny",
-                            "Resource": method_arn
-                        }
-                    ]
-                },
-                "context": {
-                    "error": str(e)
-                }
+        policy = {
+            "principalId": "error_user",
+            "policyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": "execute-api:Invoke",
+                        "Effect": "Deny",
+                        "Resource": method_arn
+                    }
+                ]
+            },
+            "context": {
+                "error": str(e),
+                "requestId": correlation_id
             }
+        }
+        
+        # Record execution time
+        execution_time = (time.time() - start_time) * 1000
+        metrics.add_metric(name="request.latency", unit=MetricUnit.Milliseconds, value=execution_time)
+        metrics.add_metric(name="request.result_deny", unit=MetricUnit.Count, value=1)
+        
+        return policy
 
 # For backward compatibility
 lambda_handler = handler
