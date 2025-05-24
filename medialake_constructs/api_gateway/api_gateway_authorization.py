@@ -23,6 +23,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
 )
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer, ensure_shared_authorizer_permissions
 
 
 @dataclass
@@ -47,38 +48,27 @@ class AuthorizationApi(Construct):
     ) -> None:
         super().__init__(scope, constructor_id)
 
-
-        common_env_vars = {
-            "AUTH_TABLE_NAME": "mlake-demo-authorization-dev",
-            "DEBUG_MODE": "true",  # Add a debug mode flag to bypass AVP authorization
-        }
-        
-        self._authorization_authorizer_lambda = Lambda(
-            self,
-            "AuthorizationAuthorizerLambda",
-            config=LambdaConfig(
-                name="authorization_authorizer",
-                entry="lambdas/auth/custom_authorizer",
-                memory_size=256,
-                timeout_minutes=1,
-                environment_variables=common_env_vars,
-            ),
-        )
-                
-        self._api_authorizer = apigateway.RequestAuthorizer(
-            self,
-            "CustomApiAuthorizer",
-            handler=self._authorization_authorizer_lambda.function,
-            identity_sources=["method.request.header.Authorization"],
-            results_cache_ttl=Duration.minutes(5),
-        )
-
+        # Use the shared custom authorizer instead of creating a new one
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        
+        self._api_authorizer = create_shared_custom_authorizer(
+            self,
+            "AuthorizationCustomApiAuthorizer",
+            api_gateway_id=api_id
+        )
+
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
                 
         api = apigateway.RestApi.from_rest_api_attributes(self, "AuthorizationImportedApi",
             rest_api_id=api_id,
             root_resource_id=root_resource_id
+        )
+        
+        # Ensure the shared authorizer has permissions for this API Gateway
+        ensure_shared_authorizer_permissions(
+            self,
+            "Authorization",
+            api
         )
         
         # Create the base authorization resource if it doesn't exist

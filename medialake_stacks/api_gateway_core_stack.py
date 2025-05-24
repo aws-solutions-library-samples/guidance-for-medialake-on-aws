@@ -86,8 +86,9 @@ class ApiGatewayCoreStack(Stack):
         return self._api_gateway.x_origin_verify_secret
 
     @property
-    def user_pool(self):
+    def user_pool(self) -> cognito.IUserPool:
         return self._cognito_construct.user_pool
+    
 
     @property
     def user_pool_arn(self):
@@ -98,8 +99,12 @@ class ApiGatewayCoreStack(Stack):
         return self._cognito_construct.identity_pool
     
     @property
-    def user_pool_client(self):
+    def user_pool_client(self) -> cognito.UserPoolClient:
         return self._cognito_construct.user_pool_client
+
+    @property
+    def user_pool_client_id(self):
+        return self._cognito_construct.user_pool_client_id
     
     @property
     def user_pool_id(self):

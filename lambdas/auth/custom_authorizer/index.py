@@ -24,7 +24,7 @@ cognito_idp = boto3.client('cognito-idp')
 
 # Get environment variables
 AUTH_TABLE_NAME = os.environ.get('AUTH_TABLE_NAME')
-POLICY_STORE_ID = os.environ.get('POLICY_STORE_ID')
+POLICY_STORE_ID = os.environ.get('AVP_POLICY_STORE_ID')
 NAMESPACE = os.environ.get('NAMESPACE')
 TOKEN_TYPE = os.environ.get('TOKEN_TYPE')
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'

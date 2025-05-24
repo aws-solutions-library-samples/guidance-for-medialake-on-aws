@@ -216,6 +216,49 @@ class UserInterfaceStack(Stack):
         # Add dependency
         create_user_handler.node.add_dependency(self._ui)
 
+        # Add the initial user to the administrators group
+        add_to_admin_group_handler = cr.AwsCustomResource(
+            self,
+            "AddToAdminGroupHandler",
+            on_create=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="adminAddUserToGroup",
+                parameters={
+                    "UserPoolId": props.cognito_user_pool_id,
+                    "Username": config.initial_user.email,
+                    "GroupName": "administrators",
+                },
+                physical_resource_id=cr.PhysicalResourceId.of("AddToAdminGroupHandler"),
+                ignore_error_codes_matching="UserNotFoundException|ResourceNotFoundException",
+            ),
+            on_delete=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="adminRemoveUserFromGroup",
+                parameters={
+                    "UserPoolId": props.cognito_user_pool_id,
+                    "Username": config.initial_user.email,
+                    "GroupName": "administrators",
+                },
+                physical_resource_id=cr.PhysicalResourceId.of("RemoveFromAdminGroupHandler"),
+                ignore_error_codes_matching="UserNotFoundException|ResourceNotFoundException",
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=[
+                            "cognito-idp:AdminAddUserToGroup",
+                            "cognito-idp:AdminRemoveUserFromGroup",
+                            "cognito-idp:AdminListGroupsForUser",
+                        ],
+                        resources=[props.cognito_user_pool_arn],
+                    )
+                ]
+            ),
+        )
+
+        # Ensure the user is created before adding to group
+        add_to_admin_group_handler.node.add_dependency(create_user_handler)
+
 
     @property
     def user_interface_url(self) -> str:

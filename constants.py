@@ -74,8 +74,8 @@ class Lambda:
     LONG_RUNNING_TIMEOUT_SECONDS = 900  # 15 minutes
     
     # Runtime versions
-    PYTHON_RUNTIME = "python3.9"
-    NODE_RUNTIME = "nodejs16.x"
+    PYTHON_RUNTIME = "python3.12"
+    NODE_RUNTIME = "nodejs20.x"
     
     # Layer names
     COMMON_LAYER_NAME = "media-lake-common-layer"

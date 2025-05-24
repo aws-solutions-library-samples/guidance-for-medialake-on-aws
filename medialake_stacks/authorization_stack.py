@@ -10,7 +10,6 @@ This stack defines the AWS resources for the new authorization system, including
 
 from aws_cdk import (
     Stack,
-    NestedStack,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_event_sources,
@@ -18,9 +17,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_verifiedpermissions as avp,
     RemovalPolicy,
-    Duration,
     CustomResource,
-    aws_apigateway as apigateway,
 )
 import aws_cdk as cdk
 import datetime
@@ -30,6 +27,10 @@ from dataclasses import dataclass
 
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.auth.shared_authorizer_construct import (
+    SharedAuthorizerConstruct,
+    SharedAuthorizerConstructProps,
+)
 
 from config import config
 
@@ -38,6 +39,7 @@ from config import config
 class AuthorizationStackProps:
     """Configuration for Authorization Stack."""
     cognito_user_pool: cognito.UserPool
+    user_pool_client: str
 
 
 class AuthorizationStack(Stack):
@@ -131,7 +133,33 @@ class AuthorizationStack(Stack):
             ),
         )
 
+        # Create a default "permit all" policy in the AVP Policy Store
+        self._default_policy = avp.CfnPolicy(
+            self,
+            "DefaultPermitAllPolicy",
+            policy_store_id=self._policy_store.attr_policy_store_id,
+            definition=avp.CfnPolicy.PolicyDefinitionProperty(
+                static=avp.CfnPolicy.StaticPolicyDefinitionProperty(
+                    statement="permit(principal, action, resource);",
+                    description="Default policy that permits all actions"
+                )
+            )
+        )
 
+        # Create the shared custom authorizer
+        self._shared_authorizer = SharedAuthorizerConstruct(
+            self,
+            "SharedAuthorizer",
+            props=SharedAuthorizerConstructProps(
+                auth_table_name=self._auth_table.table_name,
+                avp_policy_store_id=self._policy_store.attr_policy_store_id,
+                avp_policy_store_arn=f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{self._policy_store.attr_policy_store_id}",
+                cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
+            ),
+        )
+
+        # Grant table read access to the shared authorizer
+        self._auth_table.table.grant_read_data(self._shared_authorizer.authorizer_lambda)
 
         # Common environment variables for Lambda functions
         common_env_vars = {
@@ -246,7 +274,7 @@ class AuthorizationStack(Stack):
             configuration=avp.CfnIdentitySource.IdentitySourceConfigurationProperty(
                 cognito_user_pool_configuration=avp.CfnIdentitySource.CognitoUserPoolConfigurationProperty(
                     user_pool_arn=props.cognito_user_pool.user_pool_arn,
-                    client_ids=[props.cognito_user_pool.user_pool_client_id]
+                    client_ids=[props.user_pool_client]
                 )
             ),
             principal_entity_type="MediaLake::User"
@@ -355,10 +383,10 @@ def handler(event, context):
         )
 
         # Add the Pre-Token-Generation trigger to the Cognito user pool
-        props.cognito_user_pool.add_trigger(
-            trigger_type=cognito.UserPoolTriggerType.PRE_TOKEN_GENERATION,
-            trigger_handler=pre_token_generation_trigger,
-        )
+        # props.cognito_user_pool.add_trigger(
+        #     trigger_type=cognito.UserPoolTriggerType.PRE_TOKEN_GENERATION,
+        #     trigger_handler=pre_token_generation_trigger,
+        # )
 
         # Create a Lambda function for the Pre-Signup trigger
         pre_signup_lambda = lambda_.Function(
@@ -485,3 +513,8 @@ def handler(event, context):
     def authorizer_lambda(self):
         """Return the custom authorizer Lambda function"""
         return self._custom_authorizer_lambda.function
+
+    @property
+    def shared_authorizer_lambda(self):
+        """Return the shared authorizer Lambda function"""
+        return self._shared_authorizer.authorizer_lambda

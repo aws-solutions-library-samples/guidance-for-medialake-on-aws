@@ -26,6 +26,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from config import config
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer, ensure_shared_authorizer_permissions
 
 
 @dataclass
@@ -57,28 +58,18 @@ class UsersGroupsRolesStack(cdk.NestedStack):
             root_resource_id=root_resource_id
         )
         
-        self._users_groups_roles_authorizer_lambda = Lambda(
+        # Use the shared custom authorizer
+        self._api_authorizer = create_shared_custom_authorizer(
             self,
-            "UsersGroupsRolesAuthorizerLambda",
-            config=LambdaConfig(
-                name="users_api_authorizer",
-                entry="lambdas/auth/custom_authorizer",
-                memory_size=256,
-                timeout_minutes=1,
-                environment_variables={
-                    "AUTH_TABLE_NAME": props.auth_table_name,
-                    "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
-                    "DEBUG_MODE": "true",
-                },
-            ),
+            "UsersGroupsRolesCustomApiAuthorizer",
+            api_gateway_id=api_id
         )
         
-        self._api_authorizer = apigateway.RequestAuthorizer(
+        # Ensure the shared authorizer has permissions for this API Gateway
+        ensure_shared_authorizer_permissions(
             self,
-            "CustomApiAuthorizer",
-            handler=self._users_groups_roles_authorizer_lambda.function,
-            identity_sources=["method.request.header.Authorization"],
-            results_cache_ttl=cdk.Duration.minutes(5),
+            "UsersGroupsRoles",
+            api
         )
                 
         # Create the DynamoDB tables for User/Sharing Features

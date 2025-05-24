@@ -17,23 +17,13 @@ from aws_cdk import (
     aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_cognito as cognito,
-    aws_dynamodb as dynamodb,
     Stack,
-    aws_lambda_python_alpha as lambda_python_alpha,
-    aws_lambda as _lambda,
-    aws_events as events,
-    aws_s3 as s3,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
-)
-
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
 )
 
 from .api_gateway_utils import add_cors_options_method

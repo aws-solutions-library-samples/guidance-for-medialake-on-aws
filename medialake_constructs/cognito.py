@@ -367,7 +367,12 @@ class CognitoConstruct(Construct):
         return self._user_pool.user_pool_arn
 
     @property
-    def user_pool_client(self) -> str:
+    def user_pool_client(self) -> cognito.UserPoolClient:
+        """Return the user pool client"""
+        return self._user_pool_client
+
+    @property
+    def user_pool_client_id(self) -> str:
         return self._user_pool_client.user_pool_client_id
 
     @property
@@ -391,8 +396,7 @@ class CognitoConstruct(Construct):
 
         self._cloudfront_domain = cloudfront_domain
 
-        # Use AWS SDK to update the user pool client
-        custom_resource = cr.AwsCustomResource(
+        _ = cr.AwsCustomResource(
             self,
             "UpdateUserPoolClientCallbacks",
             on_update=cr.AwsSdkCall(
