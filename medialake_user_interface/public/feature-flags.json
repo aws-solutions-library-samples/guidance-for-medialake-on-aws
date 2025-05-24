@@ -8,7 +8,7 @@
     "variant": "off"
   },
   "search-multi-select-enabled": {
-    "value": false,
+    "value": true,
     "variant": "off"
   },
   "chat-enabled": {

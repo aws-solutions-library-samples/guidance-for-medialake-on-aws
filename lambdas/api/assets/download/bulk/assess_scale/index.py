@@ -39,7 +39,7 @@ BULK_DOWNLOAD_TABLE = os.environ["BULK_DOWNLOAD_TABLE"]
 ASSET_TABLE = os.environ["ASSET_TABLE"]
 SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
 SMALL_FILE_THRESHOLD = SMALL_FILE_THRESHOLD_MB  # For backward compatibility
-LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "10"))  # MB
+LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "1000"))  # MB
 SINGLE_FILE_CHECK = os.environ.get("SINGLE_FILE_CHECK", "false").lower() == "true"
 
 # Initialize DynamoDB tables
