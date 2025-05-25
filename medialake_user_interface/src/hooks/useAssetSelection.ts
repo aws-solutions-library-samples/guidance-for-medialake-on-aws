@@ -1,5 +1,30 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useBulkDownload, useBulkDownloadStatus } from '@/api/hooks/useAssets';
+
+/**
+ * Hook for managing asset selection and bulk operations.
+ *
+ * To use with notifications for bulk downloads:
+ *
+ * ```typescript
+ * import { useNotifications } from '@/components/NotificationCenter';
+ * import { useProcessNotifications } from '@/hooks/useProcessNotifications';
+ * import { useBulkDownloadStatus } from '@/api/hooks/useAssets';
+ *
+ * const { bulkDownloadJobId, handleBatchDownload } = useAssetSelection({...});
+ * const { add: addNotification, dismiss: dismissNotification } = useNotifications();
+ * const { data: downloadStatus } = useBulkDownloadStatus(bulkDownloadJobId || '', !!bulkDownloadJobId);
+ *
+ * useProcessNotifications({
+ *   processId: bulkDownloadJobId,
+ *   processType: 'bulk-download',
+ *   status: downloadStatus?.data,
+ *   addNotification,
+ *   dismissNotification,
+ * });
+ * ```
+ */
 
 interface SelectedAsset {
   id: string;
@@ -19,6 +44,10 @@ export function useAssetSelection<T>({
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
+  const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(null);
+  
+  // Bulk download hooks
+  const bulkDownloadMutation = useBulkDownload();
 
   // Load selections from localStorage on component mount
   useEffect(() => {
@@ -120,10 +149,35 @@ export function useAssetSelection<T>({
     handleClearSelection();
   }, [selectedAssets, handleClearSelection]);
 
-  const handleBatchDownload = useCallback(() => {
-    console.log('Batch download:', selectedAssets);
-    // Implement batch download functionality
-  }, [selectedAssets]);
+  const handleBatchDownload = useCallback(async () => {
+    if (selectedAssets.length === 0) {
+      console.warn('No assets selected for download');
+      return;
+    }
+
+    try {
+      console.log('Starting batch download for:', selectedAssets);
+      
+      // Extract asset IDs from selected assets
+      const assetIds = selectedAssets.map(asset => asset.id);
+      
+      // Initiate bulk download
+      const response = await bulkDownloadMutation.mutateAsync({
+        assetIds,
+        options: {
+          format: 'zip',
+          includeMetadata: false
+        }
+      });
+
+      if (response.data?.jobId) {
+        setBulkDownloadJobId(response.data.jobId);
+        console.log('Bulk download job started:', response.data.jobId);
+      }
+    } catch (error) {
+      console.error('Failed to start bulk download:', error);
+    }
+  }, [selectedAssets, bulkDownloadMutation]);
 
   const handleBatchShare = useCallback(() => {
     console.log('Batch share:', selectedAssets);
@@ -140,5 +194,8 @@ export function useAssetSelection<T>({
     handleBatchDelete,
     handleBatchDownload,
     handleBatchShare,
+    // Bulk download state
+    bulkDownloadJobId,
+    isDownloadInProgress: !!bulkDownloadJobId,
   };
 }

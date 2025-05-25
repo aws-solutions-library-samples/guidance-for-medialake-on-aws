@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
         GET: (id: string) => `/assets/${id}`,
         DELETE: (id: string) => `/assets/${id}`,
         RENAME: (id: string) => `/assets/${id}/rename`,
+        BULK_DOWNLOAD: '/assets/download/bulk',
     },
     USERS: '/settings/users',
     USER: '/users/user',

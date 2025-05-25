@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/api/queryKeys';
 import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
 import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
 
@@ -202,6 +203,43 @@ export interface RelatedVersionsResponse {
     };
 }
 
+// Bulk download types
+interface BulkDownloadRequest {
+    assetIds: string[];
+    options?: {
+        includeMetadata?: boolean;
+        format?: 'zip';
+    };
+}
+
+interface BulkDownloadResponse {
+    status: string;
+    message: string;
+    data: {
+        jobId: string;
+        status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+        downloadUrl?: string;
+        estimatedSize?: number;
+        createdAt: string;
+    };
+}
+
+interface BulkDownloadStatusResponse {
+    status: string;
+    message: string;
+    data: {
+        jobId: string;
+        status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+        downloadUrl?: string;
+        progress?: number;
+        estimatedSize?: number;
+        actualSize?: number;
+        createdAt: string;
+        completedAt?: string;
+        error?: string;
+    };
+}
+
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
     const { showError } = useErrorModal();
@@ -369,5 +407,62 @@ export const useTranscription = (inventoryId: string) => {
     });
 };
 
+// Hook to initiate bulk download
+export const useBulkDownload = () => {
+    const { showError } = useErrorModal();
+
+    return useMutation({
+        mutationFn: async (request: BulkDownloadRequest) => {
+            try {
+                const response = await apiClient.post<BulkDownloadResponse>(
+                    API_ENDPOINTS.ASSETS.BULK_DOWNLOAD,
+                    request
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Error initiating bulk download:', error);
+                showError('Failed to initiate bulk download');
+                throw error;
+            }
+        },
+        onError: (error) => {
+            logger.error('Error in bulk download mutation:', error);
+            showError('Failed to initiate bulk download');
+        },
+    });
+};
+
+// Hook to check bulk download status
+export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) => {
+    const { showError } = useErrorModal();
+
+    return useQuery({
+        queryKey: ['bulkDownloadStatus', jobId],
+        queryFn: async () => {
+            try {
+                const response = await apiClient.get<BulkDownloadStatusResponse>(
+                    `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Error fetching bulk download status:', error);
+                showError('Failed to fetch download status');
+                throw error;
+            }
+        },
+        enabled: !!jobId && enabled,
+        refetchInterval: 2000, // Poll every 2 seconds
+        retry: 1,
+    });
+};
+
 // Export types for use in components
-export type { Asset, AssetResponse, DeleteAssetResponse, TranscriptionResponse };
+export type { 
+    Asset, 
+    AssetResponse, 
+    DeleteAssetResponse, 
+    TranscriptionResponse,
+    BulkDownloadRequest,
+    BulkDownloadResponse,
+    BulkDownloadStatusResponse
+};

@@ -33,6 +33,7 @@ import { S3UploaderModal } from './features/upload';
 import { useFeatureFlag } from './contexts/FeatureFlagsContext';
 import FilterModal from './components/search/FilterModal';
 import { useFacetSearch } from './hooks/useFacetSearch';
+import { NotificationCenter } from './components/NotificationCenter';
 
 interface SearchTag {
     key: string;
@@ -402,6 +403,9 @@ function TopBar() {
                     >
                         {t('common.search')}
                     </Button>
+                    
+                    {/* Notification Center */}
+                    <NotificationCenter />
                     
                     {/* Semantic Search Text Button */}
                     <Button
