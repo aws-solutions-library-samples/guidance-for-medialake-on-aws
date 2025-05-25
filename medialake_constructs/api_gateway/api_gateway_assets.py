@@ -19,6 +19,8 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_efs as efs,
     aws_lambda as lambda_,
+    aws_lambda_event_sources as lambda_event_sources,
+    aws_sqs as sqs,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     RemovalPolicy,
@@ -790,6 +792,14 @@ class AssetsConstruct(Construct):
         # Create the ZipmergeLayer for fast ZIP merging
         zipmerge_layer = ZipmergeLayer(self, "ZipmergeLayer")
         
+        # Create SQS queue for multipart upload parts
+        self._multipart_upload_queue = sqs.Queue(
+            self,
+            "MultipartUploadQueue",
+            visibility_timeout=Duration.seconds(900),  # 15 minutes
+            retention_period=Duration.days(14),  # Maximum retention period
+        )
+        
         # Common environment variables for all Lambda functions
         common_env_vars = {
             "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
@@ -840,7 +850,74 @@ class AssetsConstruct(Construct):
             ),
         )
         
-        # Create Lambda for finalizing zip file
+        # Create Lambda for initializing multipart upload
+        self._init_multipart_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadInitMultipartLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_init_multipart_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/init_multipart",
+                environment_variables={
+                    **common_env_vars,
+                },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=5,
+                memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
+            ),
+        )
+        
+        # Create Lambda for uploading parts
+        self._upload_part_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadUploadPartLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_upload_part_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/upload_part",
+                environment_variables={
+                    **common_env_vars,
+                    "SQS_QUEUE_URL": self._multipart_upload_queue.queue_url,
+                },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=15,
+                memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
+            ),
+        )
+        
+        # Add SQS event source to the upload part Lambda
+        self._upload_part_lambda.function.add_event_source(
+            lambda_event_sources.SqsEventSource(
+                self._multipart_upload_queue,
+                batch_size=10,
+                max_batching_window=Duration.seconds(30),
+            )
+        )
+        
+        # Create Lambda for completing multipart upload
+        self._complete_multipart_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadCompleteMultipartLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_complete_multipart_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/complete_multipart",
+                environment_variables={
+                    **common_env_vars,
+                },
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                timeout_minutes=15,
+                memory_size=1024,
+                filesystem_access_point=self._efs_access_point,
+                filesystem_mount_path="/mnt/bulk-downloads",
+            ),
+        )
+        
+        # Create Lambda for finalizing zip file (keep for backward compatibility)
         self._finalize_zip_lambda = Lambda(
             self,
             "AssetsBulkDownloadFinalizeZipLambda",
@@ -852,10 +929,25 @@ class AssetsConstruct(Construct):
                 },
                 vpc=props.vpc,
                 security_groups=[props.security_group],
-                timeout_minutes=5,
+                timeout_minutes=15,
                 memory_size=1024,
                 filesystem_access_point=self._efs_access_point,
                 filesystem_mount_path="/mnt/bulk-downloads",
+            ),
+        )
+        
+        # Create Lambda for getting parts manifest
+        self._get_parts_manifest_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadGetPartsManifestLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_get_parts_manifest_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/get_parts_manifest",
+                environment_variables={
+                    **common_env_vars,
+                },
+                timeout_minutes=1,
+                memory_size=512,
             ),
         )
         
@@ -1027,6 +1119,10 @@ class AssetsConstruct(Construct):
             self._init_zip_lambda,
             self._append_to_zip_lambda,
             self._finalize_zip_lambda,
+            self._init_multipart_lambda,
+            self._upload_part_lambda,
+            self._complete_multipart_lambda,
+            self._get_parts_manifest_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1064,6 +1160,9 @@ class AssetsConstruct(Construct):
             self._init_zip_lambda,
             self._append_to_zip_lambda,
             self._finalize_zip_lambda,
+            self._init_multipart_lambda,
+            self._upload_part_lambda,
+            self._complete_multipart_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1102,12 +1201,17 @@ class AssetsConstruct(Construct):
             self._final_merge_lambda,
             self._append_to_zip_lambda,
             self._finalize_zip_lambda,
+            self._init_multipart_lambda,
+            self._upload_part_lambda,
+            self._complete_multipart_lambda,
+            self._get_parts_manifest_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
                     actions=[
                         "s3:GetObject",
                         "s3:PutObject",
+                        "s3:DeleteObject",
                         "s3:ListBucket",
                     ],
                     resources=[
@@ -1124,6 +1228,10 @@ class AssetsConstruct(Construct):
             self._final_merge_lambda,
             self._append_to_zip_lambda,
             self._finalize_zip_lambda,
+            self._init_multipart_lambda,
+            self._upload_part_lambda,
+            self._complete_multipart_lambda,
+            self._get_parts_manifest_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1139,6 +1247,21 @@ class AssetsConstruct(Construct):
             )
         
         # Step Functions permissions will be added after Step Function creation
+        
+        # Add SQS permissions for the upload part Lambda
+        self._multipart_upload_queue.grant_send_messages(self._init_multipart_lambda.function)
+        self._multipart_upload_queue.grant_consume_messages(self._upload_part_lambda.function)
+        
+        # Add Step Functions permissions for the upload part Lambda
+        self._upload_part_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:SendTaskSuccess",
+                    "states:SendTaskFailure",
+                ],
+                resources=["*"],  # Will be restricted after state machine creation
+            )
+        )
     
     def _create_bulk_download_step_functions_workflow(self, asset_table_name=None, props=None):
         """Create Step Functions state machine for orchestrating the bulk download process."""
@@ -1162,6 +1285,37 @@ class AssetsConstruct(Construct):
             result_path="$.zipInfo",
         )
         
+        # Add a debug state to log the structure of the Lambda response
+        debug_state = sfn.Pass(
+            self,
+            "DebugZipInfo",
+            parameters={
+                "zipInfo.$": "$.zipInfo",
+                "debug": "Debugging zipInfo structure"
+            },
+            result_path="$.debug"
+        )
+        
+        # Add a Pass state to extract zipPath from init_zip_task result and preserve context
+        extract_zip_path = sfn.Pass(
+            self,
+            "ExtractZipPath",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "zipPath.$": "$.zipInfo.Payload.zipPath",
+                "smallFiles.$": "$.smallFiles",
+                "largeFiles.$": "$.largeFiles",
+                "jobType.$": "$.jobType",
+                "totalSize.$": "$.totalSize",
+                "smallFilesCount.$": "$.smallFilesCount",
+                "largeFilesCount.$": "$.largeFilesCount",
+                "foundAssets.$": "$.foundAssets",
+                "missingAssets.$": "$.missingAssets",
+                "options.$": "$.options"
+            }
+        )
+        
         # Define Map state for small files with concurrency control
         small_files_map = sfn.Map(
             self,
@@ -1172,7 +1326,7 @@ class AssetsConstruct(Construct):
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
+                "zipPath.$": "$.zipPath",
                 "mapItem.$": "$$.Map.Item.Value"
             }
         ).iterator(
@@ -1201,7 +1355,7 @@ class AssetsConstruct(Construct):
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
+                "zipPath.$": "$.zipPath",
                 "mapItem.$": "$$.Map.Item.Value"
             }
         ).iterator(
@@ -1220,15 +1374,99 @@ class AssetsConstruct(Construct):
             )
         )
         
-        # Define task to finalize zip file
-        finalize_zip_task = tasks.LambdaInvoke(
+        # Define task to initialize multipart upload
+        init_multipart_task = tasks.LambdaInvoke(
             self,
-            "AssetsFinalizeZipTask",
-            lambda_function=self._finalize_zip_lambda.function,
+            "AssetsInitMultipartTask",
+            lambda_function=self._init_multipart_lambda.function,
             payload=sfn.TaskInput.from_object({
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
+                "zipPath.$": "$.zipPath",
+            }),
+            result_path="$.multipartInfo",
+        )
+        
+        # Define a Pass state to extract multipart upload info
+        extract_multipart_info = sfn.Pass(
+            self,
+            "ExtractMultipartInfo",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "zipPath.$": "$.zipPath",
+                "uploadId.$": "$.multipartInfo.Payload.uploadId",
+                "s3Key.$": "$.multipartInfo.Payload.s3Key",
+                "manifestKey.$": "$.multipartInfo.Payload.manifestKey",
+                "numParts.$": "$.multipartInfo.Payload.numParts",
+                "partSize.$": "$.multipartInfo.Payload.partSize",
+                "fileSize.$": "$.multipartInfo.Payload.fileSize",
+            }
+        )
+        
+        # Define a task to get parts from the manifest for the specified range
+        get_batch_parts = tasks.LambdaInvoke(
+            self,
+            "GetBatchPartsTask",
+            lambda_function=self._get_parts_manifest_lambda.function,
+            payload=sfn.TaskInput.from_object({
+                "jobId.$": "$.jobId",
+                "manifestKey.$": "$.manifestKey",
+                "startPart.$": "$.startPart",
+                "endPart.$": "$.endPart",
+            }),
+            result_path="$.batchParts",
+        )
+        
+        # Define a Map state for processing parts in parallel
+        process_parts_map = sfn.Map(
+            self,
+            "ProcessPartsMap",
+            max_concurrency=10,  # Process up to 10 parts in parallel
+            items_path="$.batchParts.Payload.parts",
+            result_path="$.completedParts",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "uploadId.$": "$.uploadId",
+                "s3Key.$": "$.s3Key",
+                "manifestKey.$": "$.manifestKey",
+                "part.$": "$$.Map.Item.Value"
+            }
+        ).iterator(
+            tasks.SqsSendMessage(
+                self,
+                "SendPartMessage",
+                queue=self._multipart_upload_queue,
+                message_body=sfn.TaskInput.from_object({
+                    "taskToken": sfn.JsonPath.task_token,
+                    "part": {
+                        "jobId.$": "$.jobId",
+                        "uploadId.$": "$.uploadId",
+                        "s3Key.$": "$.s3Key",
+                        "partNumber.$": "$.part.partNumber",
+                        "startByte.$": "$.part.startByte",
+                        "endByte.$": "$.part.endByte",
+                        "localPath.$": "$.part.localPath",
+                    }
+                }),
+                integration_pattern=sfn.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+                timeout=Duration.minutes(5),  # Set a 5-minute timeout for each part upload
+            )
+        )
+        
+        # Define task to complete multipart upload
+        complete_multipart_task = tasks.LambdaInvoke(
+            self,
+            "AssetsCompleteMultipartTask",
+            lambda_function=self._complete_multipart_lambda.function,
+            payload=sfn.TaskInput.from_object({
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "uploadId.$": "$.uploadId",
+                "s3Key.$": "$.s3Key",
+                "manifestKey.$": "$.manifestKey",
+                "completedParts.$": "$.completedParts",
             }),
             output_path="$.Payload",
         )
@@ -1314,12 +1552,13 @@ class AssetsConstruct(Construct):
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
+                "zipPath.$": "$.zipPath",
                 "processedFiles.$": "$"
             }
         )
         
-        streaming_workflow = init_zip_task.next(
+        # Define a new workflow for multipart upload
+        multipart_workflow = init_zip_task.next(debug_state).next(extract_zip_path).next(
             sfn.Parallel(
                 self,
                 "ProcessFilesInParallel",
@@ -1345,13 +1584,96 @@ class AssetsConstruct(Construct):
                     sfn.Pass(self, "NoLargeFiles")
                 )
             )
-        ).next(restore_context).next(finalize_zip_task).next(success_state)
+        ).next(restore_context).next(init_multipart_task).next(extract_multipart_info)
+        
+        # Get parts manifest using Lambda instead of direct S3 integration
+        get_parts_manifest = tasks.LambdaInvoke(
+            self,
+            "GetPartsManifestTask",
+            lambda_function=self._get_parts_manifest_lambda.function,
+            payload=sfn.TaskInput.from_object({
+                "jobId.$": "$.jobId",
+                "manifestKey.$": "$.manifestKey",
+            }),
+            result_path="$.partsManifest",
+        )
+        
+        # Add the parts manifest to the state
+        add_parts_to_state = sfn.Pass(
+            self,
+            "AddPartsToState",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "zipPath.$": "$.zipPath",
+                "uploadId.$": "$.uploadId",
+                "s3Key.$": "$.s3Key",
+                "manifestKey.$": "$.manifestKey",
+                "totalParts.$": "$.partsManifest.Payload.totalParts",
+                "partBatches.$": "$.partsManifest.Payload.partBatches"
+            }
+        )
+        
+        # Define a Map state for processing part batches
+        process_batches_map = sfn.Map(
+            self,
+            "ProcessBatchesMap",
+            max_concurrency=5,  # Process up to 5 batches in parallel
+            items_path="$.partBatches",
+            result_path="$.batchResults",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "uploadId.$": "$.uploadId",
+                "s3Key.$": "$.s3Key",
+                "manifestKey.$": "$.manifestKey",
+                "batch.$": "$$.Map.Item.Value"
+            }
+        ).iterator(
+            # For each batch, get the parts and process them
+            sfn.Pass(
+                self,
+                "PrepareBatchParts",
+                parameters={
+                    "jobId.$": "$.jobId",
+                    "userId.$": "$.userId",
+                    "uploadId.$": "$.uploadId",
+                    "s3Key.$": "$.s3Key",
+                    "manifestKey.$": "$.manifestKey",
+                    "startPart.$": "$.batch.startPart",
+                    "endPart.$": "$.batch.endPart"
+                }
+            ).next(
+                # Get parts from the manifest for the specified range
+                get_batch_parts
+            ).next(
+                # Process the parts in the batch
+                process_parts_map
+            )
+        )
+        
+        # Add a Pass state to flatten completed parts from all batches
+        flatten_completed_parts = sfn.Pass(
+            self,
+            "FlattenCompletedParts",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "uploadId.$": "$.uploadId",
+                "s3Key.$": "$.s3Key",
+                "manifestKey.$": "$.manifestKey",
+                "completedParts.$": "$.batchResults[*].completedParts[*]"
+            }
+        )
+        
+        # Complete the workflow
+        multipart_workflow = multipart_workflow.next(get_parts_manifest).next(add_parts_to_state).next(process_batches_map).next(flatten_completed_parts).next(complete_multipart_task).next(success_state)
         
         # Build the main workflow
         workflow = assess_scale_task.next(
             job_size_choice
             .when(sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"), single_file_task.next(success_state))
-            .otherwise(streaming_workflow)
+            .otherwise(multipart_workflow)
         )
         
         # Note: single_file_task already connected to success_state in the workflow definition
@@ -1377,6 +1699,39 @@ class AssetsConstruct(Construct):
             iam.PolicyStatement(
                 actions=["states:StartExecution"],
                 resources=[self._state_machine.state_machine_arn],
+            )
+        )
+        
+        # Add permissions to the state machine
+        self._add_state_machine_permissions()
+    
+    def _add_state_machine_permissions(self):
+        """Add necessary permissions to the state machine role."""
+        # Add KMS permissions to the state machine role
+        self._state_machine.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                    "kms:GenerateDataKey",
+                    "kms:Encrypt",
+                ],
+                resources=["*"],  # Use a wildcard for now since we don't have the exact ARN
+            )
+        )
+        
+        # Add S3 permissions to the state machine role
+        self._state_machine.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",    # Access to all buckets
+                ],
             )
         )
     
