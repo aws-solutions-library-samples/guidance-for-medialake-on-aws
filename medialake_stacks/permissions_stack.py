@@ -96,7 +96,7 @@ class PermissionsStack(cdk.NestedStack):
             "CreatePermissionSetLambda",
             config=LambdaConfig(
                 name="permissions_create_permission_set",  # New name to avoid conflicts
-                entry="lambdas/api/authorization/permission_sets/post_permission_set",
+                entry="lambdas/api/permissions/post_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -115,7 +115,7 @@ class PermissionsStack(cdk.NestedStack):
             "ListPermissionSetsLambda",
             config=LambdaConfig(
                 name="permissions_list_permission_sets",  # New name to avoid conflicts
-                entry="lambdas/api/authorization/permission_sets/get_permission_sets",
+                entry="lambdas/api/permissions/get_permission_sets",
                 environment_variables=common_env_vars,
             ),
         )
@@ -137,7 +137,7 @@ class PermissionsStack(cdk.NestedStack):
             "GetPermissionSetLambda",
             config=LambdaConfig(
                 name="permissions_get_permission_set",  # New name to avoid conflicts
-                entry="lambdas/api/authorization/permission_sets/get_permission_set",
+                entry="lambdas/api/permissions/get_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -161,7 +161,7 @@ class PermissionsStack(cdk.NestedStack):
             "UpdatePermissionSetLambda",
             config=LambdaConfig(
                 name="permissions_update_permission_set",  # New name to avoid conflicts
-                entry="lambdas/api/authorization/permission_sets/put_permission_set",
+                entry="lambdas/api/permissions/put_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -185,7 +185,7 @@ class PermissionsStack(cdk.NestedStack):
             "DeletePermissionSetLambda",
             config=LambdaConfig(
                 name="permissions_delete_permission_set",  # New name to avoid conflicts
-                entry="lambdas/api/authorization/permission_sets/delete_permission_set",
+                entry="lambdas/api/permissions/delete_permission_set",
                 environment_variables=common_env_vars,
             ),
         )

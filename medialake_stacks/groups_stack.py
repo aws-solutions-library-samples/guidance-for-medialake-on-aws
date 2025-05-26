@@ -87,7 +87,7 @@ class GroupsStack(cdk.NestedStack):
             "post-groups",
             config=LambdaConfig(
                 name="post-groups",
-                entry="lambdas/api/authorization/groups/create_group",
+                entry="lambdas/api/groups/create_group",
                 environment_variables=common_env_vars,
             ),
         )
@@ -106,7 +106,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-get",
             config=LambdaConfig(
                 name="authorization-groups-get",
-                entry="lambdas/api/authorization/groups/list_groups",
+                entry="lambdas/api/groups/list_groups",
                 environment_variables=common_env_vars,
             ),
         )
@@ -128,7 +128,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-group-id-get",
             config=LambdaConfig(
                 name="authorization-groups-group-id-get",
-                entry="lambdas/api/authorization/groups/get_group",
+                entry="lambdas/api/groups/get_group",
                 environment_variables=common_env_vars,
             ),
         )
@@ -152,7 +152,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-group-id-put",
             config=LambdaConfig(
                 name="authorization-groups-group-id-put",
-                entry="lambdas/api/authorization/groups/update_group",
+                entry="lambdas/api/groups/update_group",
                 environment_variables=common_env_vars,
             ),
         )
@@ -176,7 +176,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-group-id-delete",
             config=LambdaConfig(
                 name="authorization-groups-group-id-delete",
-                entry="lambdas/api/authorization/groups/delete_group",
+                entry="lambdas/api/groups/delete_group",
                 environment_variables=common_env_vars,
             ),
         )
@@ -203,7 +203,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-group-id-members-post",
             config=LambdaConfig(
                 name="authorization-groups-group-id-members-post",
-                entry="lambdas/api/authorization/groups/add_group_members",
+                entry="lambdas/api/groups/add_group_members",
                 environment_variables=common_env_vars,
             ),
         )
@@ -230,7 +230,7 @@ class GroupsStack(cdk.NestedStack):
             "RemoveGroupMemberLambda",
             config=LambdaConfig(
                 name="remove_group_member",
-                entry="lambdas/api/authorization/groups/remove_group_member",
+                entry="lambdas/api/groups/remove_group_member",
                 environment_variables=common_env_vars,
             ),
         )

@@ -102,7 +102,7 @@ class AuthorizationApi(Construct):
             "CreatePermissionSetLambda",
             config=LambdaConfig(
                 name="create_permission_set",
-                entry="lambdas/api/authorization/permission_sets/post_permission_set",
+                entry="lambdas/api/permissions/post_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -121,7 +121,7 @@ class AuthorizationApi(Construct):
             "ListPermissionSetsLambda",
             config=LambdaConfig(
                 name="permission-sets-get",
-                entry="lambdas/api/authorization/permission_sets/get_permission_sets",
+                entry="lambdas/api/permissions/get_permission_sets",
                 environment_variables=common_env_vars,
             ),
         )
@@ -143,7 +143,7 @@ class AuthorizationApi(Construct):
             "GetPermissionSetLambda",
             config=LambdaConfig(
                 name="get_permission_set",
-                entry="lambdas/api/authorization/permission_sets/get_permission_set",
+                entry="lambdas/api/permissions/get_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -167,7 +167,7 @@ class AuthorizationApi(Construct):
             "UpdatePermissionSetLambda",
             config=LambdaConfig(
                 name="update_permission_set",
-                entry="lambdas/api/authorization/permission_sets/put_permission_set",
+                entry="lambdas/api/permissions/put_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
@@ -191,7 +191,7 @@ class AuthorizationApi(Construct):
             "DeletePermissionSetLambda",
             config=LambdaConfig(
                 name="delete_permission_set",
-                entry="lambdas/api/authorization/permission_sets/delete_permission_set",
+                entry="lambdas/api/permissions/delete_permission_set",
                 environment_variables=common_env_vars,
             ),
         )
