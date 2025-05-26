@@ -1,13 +1,16 @@
 export default {
   languages: {
-    english: 'अंग्रेज़ी',
+    english: 'अंग्रे़ी',
     german: 'जर्मन',
     portuguese: 'पुर्तगाली',
     french: 'फ्रेंच',
     chinese: 'चीनी',
     hindi: 'हिन्दी',
     arabic: 'अरबी',
-    hebrew: 'हिब्रू'
+    hebrew: 'हिब्रू',
+    japanese: 'जापानी',
+    korean: 'कोरियाई',
+    spanish: 'स्पेनिश'
   },
   assetsPage: {
     title: 'संपत्तियाँ',
@@ -322,6 +325,23 @@ export default {
       performance: {
         title: 'प्रदर्शन सेटिंग्स',
         comingSoon: 'जल्द ही प्रदर्शन सेटिंग्स उपलब्ध होंगी।'
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'समूह जोड़ें',
+        editGroup: 'समूह संपादित करें',
+        deleteGroup: 'समूह हटाएँ',
+        createGroup: 'समूह बनाएँ',
+        manageGroups: 'समूहों का प्रबंधन करें'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'कोई अनुमति सेट नहीं',
+      actions: {
+        addPermissionSet: 'अनुमति सेट जोड़ें',
+        editPermissionSet: 'अनुमति सेट संपादित करें',
+        deletePermissionSet: 'अनुमति सेट हटाएँ'
       }
     }
   },
@@ -760,6 +780,23 @@ export default {
         environments: {
           title: 'पर्यावरण'
         }
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'समूह जोड़ें',
+        editGroup: 'समूह संपादित करें',
+        deleteGroup: 'समूह हटाएँ',
+        createGroup: 'समूह बनाएँ',
+        manageGroups: 'समूहों का प्रबंधन करें'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'कोई अनुमति सेट नहीं',
+      actions: {
+        addPermissionSet: 'अनुमति सेट जोड़ें',
+        editPermissionSet: 'अनुमति सेट संपादित करें',
+        deletePermissionSet: 'अनुमति सेट हटाएँ'
       }
     }
   }

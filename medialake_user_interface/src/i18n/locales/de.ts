@@ -7,13 +7,61 @@ export default {
         chinese: 'Chinesisch',
         hindi: 'Hindi',
         arabic: 'Arabisch',
-        hebrew: 'Hebräisch'
+        hebrew: 'Hebräisch',
+        japanese: 'Japanisch',
+        korean: 'Koreanisch',
+        spanish: 'Spanisch'
     },
     assetsPage: {
         title: 'Assets',
         connectors: 'Connectors',
         selectConnector: 'Wählen Sie einen Connector'
       },
+    connectors: {
+        apiMessages: {
+            creating: {
+                loading: 'Connector wird erstellt...',
+                success: 'Connector erstellt',
+                successMessage: 'Neuer Connector wurde erfolgreich erstellt.',
+                error: 'Connector-Erstellung fehlgeschlagen'
+            },
+            updating: {
+                loading: 'Connector wird aktualisiert...',
+                success: 'Connector aktualisiert',
+                successMessage: 'Connector wurde erfolgreich aktualisiert.',
+                error: 'Connector-Aktualisierung fehlgeschlagen'
+            },
+            deleting: {
+                loading: 'Connector wird gelöscht...',
+                success: 'Connector gelöscht',
+                successMessage: 'Connector wurde erfolgreich gelöscht.',
+                error: 'Connector-Löschung fehlgeschlagen'
+            },
+            enabling: {
+                loading: 'Connector wird aktiviert...',
+                success: 'Connector aktiviert',
+                successMessage: 'Connector wurde erfolgreich aktiviert.',
+                error: 'Connector-Aktivierung fehlgeschlagen'
+            },
+            disabling: {
+                loading: 'Connector wird deaktiviert...',
+                success: 'Connector deaktiviert',
+                successMessage: 'Connector wurde erfolgreich deaktiviert.',
+                error: 'Connector-Deaktivierung fehlgeschlagen'
+            }
+        }
+    },
+    assets: {
+        "favorite": "Favorit",
+        "unfavorite": "Favorit entfernen",
+        "rename": "Umbenennen",
+        "delete": "Löschen",
+        "download": "Herunterladen",
+        "share": "Teilen",
+        "viewDetails": "Details anzeigen",
+        "retry": "Wiederholen",
+        "retryFromCurrent": "Von aktueller Position wiederholen",
+    },
     assetExplorer: {
         noConnectorSelected: 'Wählen Sie einen Connector, um Assets anzuzeigen',
         noAssetsFound: 'Keine Assets für diesen Connector gefunden',
@@ -31,6 +79,18 @@ export default {
           confirm: 'Löschen'
         }
       },
+    home: {
+        title: 'Startseite',
+        description: 'MediaLake - Ein Data Lake für Ihre Medien und Metadaten',
+        statistics: 'Statistiken',
+        collections: 'Sammlungen',
+        sharedCollections: 'Geteilte Sammlungen',
+        favorites: 'Favoriten',
+        smartFolders: 'Intelligente Ordner',
+        connectedStorage: 'Verbundener Speicher',
+        sharing: 'Teilen',
+        comingSoon: 'Demnächst verfügbar'
+    },
     sidebar: {
       menu: {
         home: 'Startseite',
@@ -60,7 +120,9 @@ export default {
       pushNotifications: 'Push-Benachrichtigungen',
       changePassword: 'Passwort ändern',
       twoFactorAuth: 'Zwei-Faktor-Authentifizierung',
-      appearance: 'Erscheinungsbild'
+      appearance: 'Erscheinungsbild',
+      noFirstName: 'Benutzer hat keinen Vornamen konfiguriert',
+      noLastName: 'Benutzer hat keinen Nachnamen konfiguriert'
     },
     app: {
       loading: 'Lädt...',
@@ -78,7 +140,11 @@ export default {
       }
     },
     search: {
-      semantic: 'Semantische Suche',
+      semantic: {
+        label: 'Semantisch',
+        enable: 'Semantische Suche aktivieren',
+        disable: 'Semantische Suche deaktivieren'
+      },
       filters: {
         dateRange: 'Datumsbereich',
         contentType: 'Inhaltstyp',
@@ -115,6 +181,11 @@ export default {
       configureIntegration: 'Integration konfigurieren',
       description: 'Verwalten Sie Ihre Integrationen und Verbindungen',
       addIntegration: 'Integration hinzufügen',
+      deleteConfirmation: {
+        title: 'Integration löschen',
+        message: 'Sind Sie sicher, dass Sie diese Integration löschen möchten?',
+        warning: 'Achtung: Das Entfernen dieser Integration kann dazu führen, dass Pipelines, die darauf angewiesen sind, fehlschlagen.'
+      },
       form: {
         search: {
           placeholder: 'Integrationen suchen'
@@ -213,9 +284,41 @@ export default {
     },
     users: {
       title: 'Benutzerverwaltung',
-      description: 'Verwalten Sie Systembenutzer und deren Zugriffe',
+      description: 'Systembenutzer und deren Zugriff verwalten',
       actions: {
         addUser: 'Benutzer hinzufügen'
+      },
+      apiMessages: {
+        creating: {
+          loading: 'Benutzer wird erstellt...',
+          success: 'Benutzer erstellt',
+          successMessage: 'Neuer Benutzer wurde erfolgreich erstellt.',
+          error: 'Benutzererstellung fehlgeschlagen'
+        },
+        updating: {
+          loading: 'Benutzer wird aktualisiert...',
+          success: 'Benutzer aktualisiert',
+          successMessage: 'Benutzer wurde erfolgreich aktualisiert.',
+          error: 'Benutzeraktualisierung fehlgeschlagen'
+        },
+        deleting: {
+          loading: 'Benutzer wird gelöscht...',
+          success: 'Benutzer gelöscht',
+          successMessage: 'Benutzer wurde erfolgreich gelöscht.',
+          error: 'Benutzerlöschung fehlgeschlagen'
+        },
+        enabling: {
+          loading: 'Benutzer wird aktiviert...',
+          success: 'Benutzer aktiviert',
+          successMessage: 'Benutzer wurde erfolgreich aktiviert.',
+          error: 'Benutzeraktivierung fehlgeschlagen'
+        },
+        disabling: {
+          loading: 'Benutzer wird deaktiviert...',
+          success: 'Benutzer deaktiviert',
+          successMessage: 'Benutzer wurde erfolgreich deaktiviert.',
+          error: 'Benutzerdeaktivierung fehlgeschlagen'
+        }
       },
       form: {
         title: {
@@ -241,14 +344,14 @@ export default {
             label: 'Rollen',
             tooltip: 'Wählen Sie die Rollen für den Benutzer aus',
             options: {
-              Admin: 'Admin',
+              Admin: 'Administrator',
               Editor: 'Editor',
-              Viewer: 'Viewer'
+              Viewer: 'Betrachter'
             }
           },
           email_verified: {
-            label: 'E-Mail bestätigt',
-            tooltip: 'Geben Sie an, ob die E-Mail des Benutzers bestätigt wurde'
+            label: 'E-Mail verifiziert',
+            tooltip: 'Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde'
           },
           enabled: {
             label: 'Aktiviert',
@@ -257,14 +360,14 @@ export default {
         }
       },
       roles: {
-        admin: 'Admin',
+        admin: 'Administrator',
         editor: 'Editor',
-        viewer: 'Viewer'
+        viewer: 'Betrachter'
       }
     },
     roles: {
       title: 'Rollenverwaltung',
-      description: 'Verwalten Sie Systemrollen und deren Berechtigungen',
+      description: 'Systemrollen und deren Berechtigungen verwalten',
       actions: {
         addRole: 'Rolle hinzufügen'
       }
@@ -272,7 +375,7 @@ export default {
     settings: {
       environments: {
         title: 'Umgebungen',
-        description: 'Verwalten Sie Systemumgebungen und deren Konfigurationen',
+        description: 'Systemumgebungen und deren Konfigurationen verwalten',
         addButton: 'Umgebung hinzufügen',
         searchPlaceholder: 'Umgebungen suchen',
         createTitle: 'Umgebung erstellen',
@@ -298,7 +401,7 @@ export default {
         },
         search: {
           title: 'Suchkonfiguration',
-          description: 'Konfigurieren Sie den Suchanbieter für erweiterte Suchfunktionen über Ihre Medieninhalte.',
+          description: 'Konfigurieren Sie den Suchanbieter für erweiterte Suchfunktionen in Ihren Medien-Assets.',
           provider: 'Suchanbieter:',
           configureProvider: 'Suchanbieter konfigurieren',
           editProvider: 'Anbieter bearbeiten',
@@ -306,7 +409,7 @@ export default {
           providerDetails: 'Anbieterdetails',
           providerName: 'Anbietername',
           apiKey: 'API-Schlüssel',
-          endpoint: 'Endpoint-URL (optional)',
+          endpoint: 'Endpunkt-URL (Optional)',
           enabled: 'Suche aktiviert',
           noProvider: 'Kein Suchanbieter konfiguriert.',
           configurePrompt: 'Konfigurieren Sie Twelve Labs, um Suchfunktionen zu aktivieren.'
@@ -331,7 +434,7 @@ export default {
       search: 'Suchen',
       profile: 'Profil',
       logout: 'Abmelden',
-      theme: 'Thema',
+      theme: 'Design',
       close: 'Schließen',
       refresh: 'Aktualisieren',
       cancel: 'Abbrechen',
@@ -339,15 +442,25 @@ export default {
       loading: 'Lädt...',
       loadMore: 'Mehr laden',
       tableDensity: 'Tabellendichte',
-      moreInfo: 'Mehr Informationen',
+      moreInfo: 'Weitere Informationen',
       error: 'Fehler',
       language: 'Sprache',
-      delete: 'Löschen',
-      create: 'Erstellen',
+      noResults: 'Keine Ergebnisse gefunden',
+      selectFilter: 'Filter auswählen',
+      textFilter: 'Textfilter',
+      all: 'Alle',
+      filter: 'Filter',
+      noGroups: 'Keine Gruppen',
       actions: {
-        add: 'Hinzufügen'
+        add: 'Hinzufügen',
+        save: 'Speichern',
+        delete: 'Löschen',
+        edit: 'Bearbeiten',
+        activate: 'Aktivieren',
+        deactivate: 'Deaktivieren'
       },
       columns: {
+        permissionSets: 'Berechtigungssätze',
         username: 'Benutzername',
         firstName: 'Vorname',
         lastName: 'Nachname',
@@ -373,11 +486,11 @@ export default {
           deactivate: 'Deaktivieren',
           create: 'Erstellen'
         },
-        tableDensity: 'Tabellendichte',
-        theme: 'Thema',
+        tableDensity: "Tabellendichte",
+        theme: "Design",
         back: 'Zurück',
         loading: 'Lädt...',
-        error: 'Etwas ist schief gelaufen',
+        error: 'Etwas ist schiefgelaufen',
         save: 'Speichern',
         cancel: 'Abbrechen',
         delete: 'Löschen',
@@ -385,13 +498,13 @@ export default {
         search: 'Suchen',
         profile: 'Profil',
         filterColumn: 'Filter',
-        searchValue: 'Suche',
+        searchValue: 'Suchen',
         logout: 'Abmelden',
         language: 'Sprache',
         alerts: 'Warnungen',
         warnings: 'Warnungen',
         notifications: 'Benachrichtigungen',
-        searchPlaceholder: 'Suchen oder Schlüssel:Wert verwenden...',
+        searchPlaceholder: 'Suchen oder key:value verwenden...',
         close: 'Schließen',
         success: 'Erfolg',
         refresh: 'Aktualisieren',
@@ -404,11 +517,11 @@ export default {
           inactive: 'Inaktiv'
         },
         rename: 'Umbenennen',
-        root: 'Root',
+        root: 'Wurzel',
         folder: 'Ordner',
         loadMore: 'Mehr laden',
-        darkMode: 'Dunkelmodus',
-        lightMode: 'Hellmodus',
+        darkMode: 'Dunkler Modus',
+        lightMode: 'Heller Modus',
         filter: 'Filter',
         textFilter: 'Textfilter',
         selectFilter: 'Filter auswählen',
@@ -419,6 +532,7 @@ export default {
           lastName: 'Nachname',
           email: 'E-Mail',
           status: 'Status',
+          role: 'Rolle',
           groups: 'Gruppen',
           created: 'Erstellt',
           modified: 'Geändert',
@@ -426,12 +540,12 @@ export default {
         },
         noGroups: 'Keine Gruppen',
         select: 'Auswählen',
-        moreInfo: 'Mehr Informationen'
+        moreInfo: 'Weitere Informationen'
       },
       users: {
         title: 'Benutzerverwaltung',
         search: 'Benutzer suchen',
-        description: 'Verwalten Sie Systembenutzer und deren Zugriffe',
+        description: 'Systembenutzer und deren Zugriff verwalten',
         form: {
           fields: {
             given_name: {
@@ -454,14 +568,14 @@ export default {
               errors: {
                 required: 'E-Mail ist erforderlich',
                 invalid: 'Ungültige E-Mail-Adresse'
-              }
+              },
             },
             enabled: {
               label: 'Aktiviert',
               tooltip: 'Benutzer aktivieren oder deaktivieren',
               errors: {
                 required: 'Aktivierung ist erforderlich'
-              }
+              },
             },
             roles: {
               label: 'Rollen',
@@ -471,10 +585,10 @@ export default {
               }
             },
             email_verified: {
-              label: 'E-Mail bestätigt',
-              tooltip: 'Geben Sie an, ob die E-Mail des Benutzers bestätigt wurde',
+              label: 'E-Mail verifiziert',
+              tooltip: 'Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde',
               errors: {
-                required: 'E-Mail-Bestätigung ist erforderlich'
+                required: 'E-Mail-Verifizierung ist erforderlich'
               }
             }
           }
@@ -482,10 +596,10 @@ export default {
       },
       roles: {
         title: 'Rollenverwaltung',
-        description: 'Verwalten Sie Systemrollen und deren Berechtigungen',
-        admin: 'Admin',
+        description: 'Systemrollen und deren Berechtigungen verwalten',
+        admin: 'Administrator',
         editor: 'Editor',
-        viewer: 'Viewer',
+        viewer: 'Betrachter',
         actions: {
           addRole: 'Rolle hinzufügen'
         }
@@ -499,7 +613,7 @@ export default {
         groups: 'Gruppen',
         created: 'Erstellt',
         modified: 'Geändert',
-        actions: 'Aktionen'
+        actions: 'Aktionen',
       },
       actions: {
         addUser: 'Benutzer hinzufügen',
@@ -513,9 +627,9 @@ export default {
         inactive: 'Inaktiv'
       },
       errors: {
-        loadFailed: 'Fehler beim Laden der Benutzer',
-        saveFailed: 'Fehler beim Speichern des Benutzers',
-        deleteFailed: 'Fehler beim Löschen des Benutzers'
+        loadFailed: 'Laden der Benutzer fehlgeschlagen',
+        saveFailed: 'Speichern des Benutzers fehlgeschlagen',
+        deleteFailed: 'Löschen des Benutzers fehlgeschlagen'
       },
       navigation: {
         home: 'Startseite',
@@ -531,8 +645,8 @@ export default {
         favorites: 'Favoriten',
         smartFolders: 'Intelligente Ordner',
         connectedStorage: 'Verbundener Speicher',
-        sharing: 'Teilen',
-        comingSoon: 'Demnächst'
+        sharing: 'Teilen',          
+        comingSoon: 'Demnächst verfügbar' 
       },
       notifications: {
         'Pipeline Complete': 'Pipeline abgeschlossen',
@@ -540,11 +654,11 @@ export default {
         'Storage Warning': 'Speicherwarnung',
         'Storage capacity reaching 80%': 'Speicherkapazität erreicht 80%',
         'Pipeline Failed': 'Pipeline fehlgeschlagen',
-        'Video processing pipeline failed': 'Videoverarbeitungspipeline fehlgeschlagen'
+        'Video processing pipeline failed': 'Video-Verarbeitungspipeline fehlgeschlagen'
       },
       modal: {
         confirmDelete: 'Sind Sie sicher, dass Sie dieses Element löschen möchten?',
-        confirmAction: 'Sind Sie sicher, dass Sie diese Aktion durchführen möchten?',
+        confirmAction: 'Sind Sie sicher, dass Sie diese Aktion ausführen möchten?',
         error: 'Ein Fehler ist aufgetreten',
         success: 'Vorgang erfolgreich abgeschlossen'
       },
@@ -563,18 +677,18 @@ export default {
         status: {
           succeeded: 'Erfolgreich',
           failed: 'Fehlgeschlagen',
-          running: 'Laufend',
+          running: 'Läuft',
           timedOut: 'Zeitüberschreitung',
           aborted: 'Abgebrochen'
         },
         actions: {
-          retryFromCurrent: 'Ab aktueller Position wiederholen',
-          retryFromStart: 'Von Anfang an wiederholen',
+          retryFromCurrent: 'Von aktueller Position wiederholen',
+          retryFromStart: 'Von Anfang wiederholen',
           viewDetails: 'Details anzeigen'
         },
         pagination: {
           page: 'Seite {{page}} von {{total}}',
-          showEntries: 'Zeige {{count}}'
+          showEntries: '{{count}} anzeigen'
         }
       },
       s3Explorer: {
@@ -597,8 +711,8 @@ export default {
         connectedStorage: 'Verbundener Speicher'
       },
       metadata: {
-        title: 'Kommt bald',
-        description: "Wir arbeiten daran, Ihnen Funktionen zur Metadatenverwaltung bereitzustellen. Bleiben Sie dran!"
+        title: 'Demnächst verfügbar',
+        description: "Wir arbeiten daran, Ihnen Metadatenverwaltungsfunktionen zu bringen. Bleiben Sie dran!"
       },
       pipelines: {
         title: 'Pipelines',
@@ -606,12 +720,12 @@ export default {
         searchPlaceholder: 'Pipelines suchen...',
         actions: {
           create: 'Neue Pipeline hinzufügen',
-          deploy: 'Image-Pipeline bereitstellen',
+          deploy: 'Bild-Pipeline bereitstellen',
           addNew: 'Neue Pipeline hinzufügen',
-          viewAll: 'Alle Pipelines anzeigen'
+          viewAll: 'Alle Pipelines anzeigen',
         },
         search: 'Pipelines suchen',
-        deploy: 'Image-Pipeline bereitstellen',
+        deploy: 'Bild-Pipeline bereitstellen',
         addNew: 'Neue Pipeline hinzufügen',
         columns: {
           name: 'Name',
@@ -626,12 +740,12 @@ export default {
           validate: 'Pipeline validieren',
           sidebar: {
             title: 'Knoten',
-            dragNodes: 'Ziehen Sie Knoten auf die Arbeitsfläche',
+            dragNodes: 'Knoten auf die Leinwand ziehen',
             loading: 'Knoten werden geladen...',
             error: 'Fehler beim Laden der Knoten'
           },
           node: {
-            configure: 'Konfiguriere {{type}}',
+            configure: '{{type}} konfigurieren',
             delete: 'Knoten löschen',
             edit: 'Knoten bearbeiten'
           },
@@ -643,20 +757,20 @@ export default {
           modals: {
             error: {
               title: 'Fehler',
-              incompatibleNodes: 'Der Ausgang des vorherigen Knotens ist nicht kompatibel mit dem Eingang des Zielknotens.',
+              incompatibleNodes: 'Die Ausgabe des vorherigen Knotens ist nicht mit der Eingabe des Zielknotens kompatibel.',
               validation: 'Pipeline-Validierung fehlgeschlagen'
             },
             delete: {
               title: 'Pipeline löschen',
               message: 'Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
-              confirm: 'Geben Sie den Namen der Pipeline zur Bestätigung ein:'
+              confirm: 'Geben Sie den Pipeline-Namen ein, um die Löschung zu bestätigen:'
             }
           },
           controls: {
             undo: 'Rückgängig',
             redo: 'Wiederholen',
-            zoomIn: 'Hineinzoomen',
-            zoomOut: 'Herauszoomen',
+            zoomIn: 'Vergrößern',
+            zoomOut: 'Verkleinern',
             fitView: 'Ansicht anpassen',
             lockView: 'Ansicht sperren'
           },
@@ -664,104 +778,130 @@ export default {
             saved: 'Pipeline erfolgreich gespeichert',
             validated: 'Pipeline-Validierung erfolgreich',
             error: {
-              save: 'Fehler beim Speichern der Pipeline',
+              save: 'Pipeline konnte nicht gespeichert werden',
               validation: 'Pipeline-Validierung fehlgeschlagen',
               incompatibleNodes: 'Inkompatible Knotenverbindung'
             }
           }
+        }
+      },
+      integrations: {
+        title: 'Integrationen',
+        description: 'Verwalten Sie Ihre Integrationen und Verbindungen',
+        addIntegration: 'Integration hinzufügen',
+        selectIntegration: 'Integration auswählen',
+        selectProvider: 'Anbieter auswählen',
+        configureIntegration: 'Integration konfigurieren',
+        deleteConfirmation: {
+          title: 'Integration löschen',
+          message: 'Sind Sie sicher, dass Sie diese Integration löschen möchten?',
+          warning: 'Warnung: Das Löschen dieser Integration kann Pipelines beschädigen, die sie verwenden.'
         },
-        integrations: {
-          title: 'Integrationen',
-          description: 'Verwalten Sie Ihre Integrationen und Verbindungen',
-          addIntegration: 'Integration hinzufügen',
-          selectIntegration: 'Integration auswählen',
-          selectProvider: 'Provider auswählen',
-          configureIntegration: 'Integration konfigurieren',
-          form: {
-            title: 'Integration hinzufügen',
-            fields: {
-              nodeId: {
-                label: 'Integration',
-                tooltip: 'Wählen Sie einen Integrationsanbieter aus',
+        form: {
+          title: 'Integration hinzufügen',
+          fields: {
+            nodeId: {
+              label: 'Integration',
+              tooltip: 'Wählen Sie einen Integrationsanbieter aus',
+              errors: {
+                required: 'Integrationsauswahl ist erforderlich'
+              }
+            },
+            description: {
+              label: 'Beschreibung',
+              tooltip: 'Geben Sie eine Beschreibung für diese Integration ein',
+              helper: 'Kurze Beschreibung dieser Integration',
+              errors: {
+                required: 'Beschreibung ist erforderlich'
+              }
+            },
+            environmentId: {
+              label: 'Umgebung',
+              tooltip: 'Wählen Sie die Umgebung für diese Integration aus',
+              errors: {
+                required: 'Umgebungsauswahl ist erforderlich'
+              }
+            },
+            enabled: {
+              label: 'Aktiviert',
+              tooltip: 'Aktivieren oder deaktivieren Sie diese Integration',
+              errors: {
+                required: 'Aktivierung ist erforderlich'
+              }
+            },
+            auth: {
+              type: {
+                label: 'Authentifizierungstyp',
+                tooltip: 'Wählen Sie die Authentifizierungsmethode aus',
+                options: {
+                  awsIam: 'AWS IAM',
+                  apiKey: 'API-Schlüssel'
+                },
                 errors: {
-                  required: 'Integrationsauswahl ist erforderlich'
+                  required: 'Authentifizierungstyp ist erforderlich'
                 }
               },
-              description: {
-                label: 'Beschreibung',
-                tooltip: 'Geben Sie eine Beschreibung für diese Integration ein',
-                errors: {
-                  required: 'Beschreibung ist erforderlich'
-                }
-              },
-              environmentId: {
-                label: 'Umgebung',
-                tooltip: 'Wählen Sie die Umgebung für diese Integration aus',
-                errors: {
-                  required: 'Umgebungsauswahl ist erforderlich'
-                }
-              },
-              enabled: {
-                label: 'Aktiviert',
-                tooltip: 'Aktivieren oder deaktivieren Sie diese Integration',
-                errors: {
-                  required: 'Aktivierung ist erforderlich'
-                }
-              },
-              auth: {
-                type: {
-                  label: 'Authentifizierungstyp',
-                  tooltip: 'Wählen Sie die Authentifizierungsmethode aus',
-                  options: {
-                    awsIam: 'AWS IAM',
-                    apiKey: 'API-Schlüssel'
-                  },
+              credentials: {
+                apiKey: {
+                  label: 'API-Schlüssel',
+                  tooltip: 'Geben Sie Ihren API-Schlüssel ein',
+                  helper: 'API-Schlüssel für die Authentifizierung mit dem Dienst',
                   errors: {
-                    required: 'Authentifizierungstyp ist erforderlich'
+                    required: 'API-Schlüssel ist erforderlich'
                   }
                 },
-                credentials: {
-                  apiKey: {
-                    label: 'API-Schlüssel',
-                    tooltip: 'Geben Sie Ihren API-Schlüssel ein',
-                    errors: {
-                      required: 'API-Schlüssel ist erforderlich'
-                    }
-                  },
-                  iamRole: {
-                    label: 'IAM-Rolle',
-                    tooltip: 'Geben Sie die ARN der IAM-Rolle ein',
-                    errors: {
-                      required: 'IAM-Rolle ist erforderlich'
-                    }
+                iamRole: {
+                  label: 'IAM-Rolle',
+                  tooltip: 'Geben Sie die ARN der IAM-Rolle ein',
+                  errors: {
+                    required: 'IAM-Rolle ist erforderlich'
                   }
                 }
               }
-            },
-            search: {
-              placeholder: 'Integrationen suchen'
-            },
-            errors: {
-              required: 'Dieses Feld ist erforderlich',
-              nodeId: {
-                unrecognized_keys: 'Ungültige Integrationsauswahl'
-              }
             }
           },
-          columns: {
-            nodeName: 'Node-Name',
-            environment: 'Umgebung',
-            createdDate: 'Erstellungsdatum',
-            modifiedDate: 'Änderungsdatum',
-            actions: 'Aktionen'
+          search: {
+            placeholder: 'Integrationen suchen'
           },
-          settings: {
-            environments: {
-              title: 'Umgebungen'
+          
+          errors: {
+            required: 'Dieses Feld ist erforderlich',
+            nodeId: {
+              unrecognized_keys: 'Ungültige Integrationsauswahl'
             }
+          }
+        },
+        columns: {
+          nodeName: 'Knotenname',
+          environment: 'Umgebung',
+          createdDate: 'Erstellungsdatum',
+          modifiedDate: 'Änderungsdatum',
+          actions: 'Aktionen'
+        },
+       
+        settings: {
+          environments: {
+            title: 'Umgebungen'
           }
         }
       }
+    },
+    groups: {
+      actions: {
+        addGroup: 'Gruppe hinzufügen',
+        editGroup: 'Gruppe bearbeiten',
+        deleteGroup: 'Gruppe löschen',
+        createGroup: 'Gruppe erstellen',
+        manageGroups: 'Gruppen verwalten'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'Keine Berechtigungssätze',
+      actions: {
+        addPermissionSet: 'Berechtigungssatz hinzufügen',
+        editPermissionSet: 'Berechtigungssatz bearbeiten',
+        deletePermissionSet: 'Berechtigungssatz löschen'
+      }
     }
-  }
+}
   

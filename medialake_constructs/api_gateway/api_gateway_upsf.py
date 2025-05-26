@@ -60,15 +60,6 @@ class UPSFApi(Construct):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
 
-        # # Set up common CORS configuration
-        # cors_config = api_gateway.CorsOptions(
-        #     allow_origins=["http://localhost:5173"],
-        #     allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-        #     allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
-        #     allow_credentials=True,
-        #     max_age=Duration.seconds(300),
-        # )
-
         # 1. User Profile Endpoints
         profile_resource = users_resource.add_resource("profile")
 

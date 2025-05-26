@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useDirection } from './contexts/DirectionContext';
+import { Can, usePermission } from './permissions';
 import {
     Drawer,
     List,
@@ -136,7 +137,7 @@ function Sidebar() {
             subItems: [
                 { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
                 { text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'), icon: <GroupIcon />, path: '/settings/users-groups' },
-                { text: t('sidebar.submenu.permissionSets', 'Permission Sets'), icon: <SecurityIcon />, path: '/settings/permission-sets' },
+                { text: t('sidebar.submenu.permissionSets', 'Permissions'), icon: <SecurityIcon />, path: '/settings/permission-sets' },
                 { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations' },
                 // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
                 { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system' },
@@ -262,8 +263,158 @@ function Sidebar() {
                     overflowX: 'hidden',
                     py: 2
                 }}>
-                    {mainMenuItems.map((item) => (
-                        <React.Fragment key={item.text}>
+                    {mainMenuItems.map((item) => {
+                        // If this is the Settings menu item, wrap it with Can component
+                        if (item.text === t('sidebar.menu.settings')) {
+                            return (
+                                <Can key={item.text} I="manage" a="settings">
+                                    <React.Fragment>
+                                        <ListItem disablePadding>
+                                            {isCollapsed ? (
+                                                <Tooltip title={item.text} placement="right">
+                                                    <ListItemButton
+                                                        onClick={item.isExpandable ? item.onClick : () => handleNavigation(item.path || '/')}
+                                                        sx={{
+                                                            minHeight: 48,
+                                                            justifyContent: 'center',
+                                                            px: 2.5,
+                                                            backgroundColor: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                                ? `${theme.palette.primary.main}08`
+                                                                : 'transparent',
+                                                            '&:hover': {
+                                                                backgroundColor: `${theme.palette.primary.main}15`,
+                                                            },
+                                                        }}
+                                                    >
+                                                        <ListItemIcon
+                                                            sx={{
+                                                                minWidth: 0,
+                                                                mr: 'auto',
+                                                                justifyContent: 'center',
+                                                                color: getIconColor(isActive(item.path || '') || (item.isExpandable && item.isExpanded)),
+                                                            }}
+                                                        >
+                                                            {item.icon}
+                                                        </ListItemIcon>
+                                                    </ListItemButton>
+                                                </Tooltip>
+                                            ) : (
+                                                <ListItemButton
+                                                    onClick={item.isExpandable ? item.onClick : () => handleNavigation(item.path || '/')}
+                                                    sx={{
+                                                        backgroundColor: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                            ? `${theme.palette.primary.main}08`
+                                                            : 'transparent',
+                                                        '&:hover': {
+                                                            backgroundColor: `${theme.palette.primary.main}15`,
+                                                        },
+                                                        borderRight: isActive(item.path || '') && !isRTL
+                                                            ? `3px solid ${theme.palette.primary.main}`
+                                                            : 'none',
+                                                        borderLeft: isActive(item.path || '') && isRTL
+                                                            ? `3px solid ${theme.palette.primary.main}`
+                                                            : 'none',
+                                                        mx: 1,
+                                                        borderRadius: '8px',
+                                                        flexDirection: 'row',
+                                                        justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                                                    }}
+                                                >
+                                                    <ListItemIcon sx={{
+                                                        color: getIconColor(isActive(item.path || '') || (item.isExpandable && item.isExpanded)),
+                                                        minWidth: '40px'
+                                                    }}>
+                                                        {item.icon}
+                                                    </ListItemIcon>
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontWeight: isActive(item.path || '') || (item.isExpandable && item.isExpanded) ? 600 : 400,
+                                                                    color: isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                                                        ? theme.palette.primary.main
+                                                                        : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                                                    textAlign: isRTL ? 'right' : 'left'
+                                                                }}
+                                                            >
+                                                                {item.text}
+                                                            </Typography>
+                                                        }
+                                                        sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                                                    />
+                                                    {item.isExpandable && (
+                                                        <Box sx={{ color: customTheme === 'dark' ? 'white' : 'inherit' }}>
+                                                            {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
+                                                        </Box>
+                                                    )}
+                                                </ListItemButton>
+                                            )}
+                                        </ListItem>
+                                        {!isCollapsed && item.isExpandable && item.subItems && (
+                                            <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
+                                                <List component="div" disablePadding>
+                                                    {item.subItems.map((subItem) => (
+                                                        <ListItem key={subItem.text} disablePadding>
+                                                            <ListItemButton
+                                                                onClick={() => handleNavigation(subItem.path)}
+                                                                sx={{
+                                                                    [isRTL ? 'pr' : 'pl']: 6,
+                                                                    backgroundColor: isSettingsActive(subItem.path)
+                                                                        ? `${theme.palette.primary.main}08`
+                                                                        : 'transparent',
+                                                                    '&:hover': {
+                                                                        backgroundColor: `${theme.palette.primary.main}15`,
+                                                                    },
+                                                                    borderRight: isSettingsActive(subItem.path) && !isRTL
+                                                                        ? `3px solid ${theme.palette.primary.main}`
+                                                                        : 'none',
+                                                                    borderLeft: isSettingsActive(subItem.path) && isRTL
+                                                                        ? `3px solid ${theme.palette.primary.main}`
+                                                                        : 'none',
+                                                                    mx: 1,
+                                                                    borderRadius: '8px',
+                                                                    flexDirection: 'row',
+                                                                    justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                                                                }}
+                                                            >
+                                                                <ListItemIcon sx={{
+                                                                    color: getIconColor(isSettingsActive(subItem.path)),
+                                                                    minWidth: '40px'
+                                                                }}>
+                                                                    {subItem.icon}
+                                                                </ListItemIcon>
+                                                                <ListItemText
+                                                                    primary={
+                                                                        <Typography
+                                                                            variant="body2"
+                                                                            sx={{
+                                                                                fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
+                                                                                color: isSettingsActive(subItem.path)
+                                                                                    ? theme.palette.primary.main
+                                                                                    : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                                                                textAlign: isRTL ? 'right' : 'left'
+                                                                            }}
+                                                                        >
+                                                                            {subItem.text}
+                                                                        </Typography>
+                                                                    }
+                                                                    sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                                                                />
+                                                            </ListItemButton>
+                                                        </ListItem>
+                                                    ))}
+                                                </List>
+                                            </Collapse>
+                                        )}
+                                    </React.Fragment>
+                                </Can>
+                            );
+                        }
+                        
+                        // For other menu items, render normally
+                        return (
+                            <React.Fragment key={item.text}>
                             <ListItem disablePadding>
                                 {isCollapsed ? (
                                     <Tooltip title={item.text} placement="right">
@@ -349,61 +500,77 @@ function Sidebar() {
                             {!isCollapsed && item.isExpandable && item.subItems && (
                                 <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
                                     <List component="div" disablePadding>
-                                        {item.subItems.map((subItem) => (
-                                            <ListItem key={subItem.text} disablePadding>
-                                                <ListItemButton
-                                                    onClick={() => handleNavigation(subItem.path)}
-                                                    sx={{
-                                                        [isRTL ? 'pr' : 'pl']: 6,
-                                                        backgroundColor: isSettingsActive(subItem.path)
-                                                            ? `${theme.palette.primary.main}08`
-                                                            : 'transparent',
-                                                        '&:hover': {
-                                                            backgroundColor: `${theme.palette.primary.main}15`,
-                                                        },
-                                                        borderRight: isSettingsActive(subItem.path) && !isRTL
-                                                            ? `3px solid ${theme.palette.primary.main}`
-                                                            : 'none',
-                                                        borderLeft: isSettingsActive(subItem.path) && isRTL
-                                                            ? `3px solid ${theme.palette.primary.main}`
-                                                            : 'none',
-                                                        mx: 1,
-                                                        borderRadius: '8px',
-                                                        flexDirection: 'row',
-                                                        justifyContent: isRTL ? 'flex-start' : 'flex-start',
-                                                    }}
-                                                >
-                                                    <ListItemIcon sx={{
-                                                        color: getIconColor(isSettingsActive(subItem.path)),
-                                                        minWidth: '40px'
-                                                    }}>
-                                                        {subItem.icon}
-                                                    </ListItemIcon>
-                                                    <ListItemText
-                                                        primary={
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{
-                                                                    fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
-                                                                    color: isSettingsActive(subItem.path)
-                                                                        ? theme.palette.primary.main
-                                                                        : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
-                                                                    textAlign: isRTL ? 'right' : 'left'
-                                                                }}
-                                                            >
-                                                                {subItem.text}
-                                                            </Typography>
-                                                        }
-                                                        sx={{ textAlign: isRTL ? 'right' : 'left' }}
-                                                    />
-                                                </ListItemButton>
-                                            </ListItem>
-                                        ))}
+                                        {item.subItems.map((subItem) => {
+                                            // Check if this is a system settings item that requires permission
+                                            const isSystemSettings = subItem.path === '/settings/system' ||
+                                                                    subItem.path === '/settings/users-groups' ||
+                                                                    subItem.path === '/settings/permission-sets';
+                                            
+                                            // Wrap system settings items with Can component
+                                            const menuItem = (
+                                                <ListItem key={subItem.text} disablePadding>
+                                                    <ListItemButton
+                                                        onClick={() => handleNavigation(subItem.path)}
+                                                        sx={{
+                                                            [isRTL ? 'pr' : 'pl']: 6,
+                                                            backgroundColor: isSettingsActive(subItem.path)
+                                                                ? `${theme.palette.primary.main}08`
+                                                                : 'transparent',
+                                                            '&:hover': {
+                                                                backgroundColor: `${theme.palette.primary.main}15`,
+                                                            },
+                                                            borderRight: isSettingsActive(subItem.path) && !isRTL
+                                                                ? `3px solid ${theme.palette.primary.main}`
+                                                                : 'none',
+                                                            borderLeft: isSettingsActive(subItem.path) && isRTL
+                                                                ? `3px solid ${theme.palette.primary.main}`
+                                                                : 'none',
+                                                            mx: 1,
+                                                            borderRadius: '8px',
+                                                            flexDirection: 'row',
+                                                            justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                                                        }}
+                                                    >
+                                                        <ListItemIcon sx={{
+                                                            color: getIconColor(isSettingsActive(subItem.path)),
+                                                            minWidth: '40px'
+                                                        }}>
+                                                            {subItem.icon}
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primary={
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
+                                                                        color: isSettingsActive(subItem.path)
+                                                                            ? theme.palette.primary.main
+                                                                            : customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                                                                        textAlign: isRTL ? 'right' : 'left'
+                                                                    }}
+                                                                >
+                                                                    {subItem.text}
+                                                                </Typography>
+                                                            }
+                                                            sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                                                        />
+                                                    </ListItemButton>
+                                                </ListItem>
+                                            );
+                                            
+                                            // Return the menu item wrapped in Can component if it's a system settings item
+                                            return isSystemSettings ? (
+                                                <Can key={subItem.text} I="manage" a="settings">
+                                                    {menuItem}
+                                                </Can>
+                                            ) : menuItem;
+                                        })}
                                     </List>
                                 </Collapse>
                             )}
-                        </React.Fragment>
-                    ))}
+                            </React.Fragment>
+                        );
+                    })}
                 </List>
                 
                 {/* Bottom Section */}

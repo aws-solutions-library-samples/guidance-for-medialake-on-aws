@@ -16,8 +16,6 @@ import { useGetGroups } from '@/api/hooks/useGroups';
 import { useApiMutationHandler } from '@/shared/hooks/useApiMutationHandler';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/api/types/api.types';
 
-const availableRoles = ['Admin', 'Editor', 'Viewer'];
-
 const UserManagement: React.FC = () => {
     const { t } = useTranslation();
     const [openUserForm, setOpenUserForm] = useState(false);
@@ -75,7 +73,7 @@ const UserManagement: React.FC = () => {
                 email: userData.email,
                 enabled: userData.enabled,
                 groups: userData.groups,
-                roles: userData.roles,
+                permissions: userData.permissions,
                 given_name: userData.given_name,
                 family_name: userData.family_name,
             };
@@ -230,7 +228,6 @@ const UserManagement: React.FC = () => {
                 onClose={() => setOpenUserForm(false)}
                 onSave={handleSaveUser}
                 user={editingUser}
-                availableRoles={availableRoles}
                 availableGroups={groups?.map(group => {
                     console.log('Mapping group for UserForm:', group);
                     return { id: group.id, name: group.name };

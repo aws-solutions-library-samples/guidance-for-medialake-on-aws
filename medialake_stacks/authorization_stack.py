@@ -85,6 +85,7 @@ class AuthorizationStack(Stack):
         )
         self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
+
         # 2. Create the AVP Policy Store
         self._policy_store = avp.CfnPolicyStore(
             self,
@@ -153,7 +154,7 @@ class AuthorizationStack(Stack):
             props=SharedAuthorizerConstructProps(
                 auth_table_name=self._auth_table.table_name,
                 avp_policy_store_id=self._policy_store.attr_policy_store_id,
-                avp_policy_store_arn=f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{self._policy_store.attr_policy_store_id}",
+                avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
                 cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
             ),
         )
@@ -193,7 +194,7 @@ class AuthorizationStack(Stack):
                     "verifiedpermissions:IsAuthorizedWithToken",
                     "verifiedpermissions:IsAuthorized",
                 ],
-                resources=[f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{self._policy_store.attr_policy_store_id}"],
+                resources=[f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"],
             )
         )
     
@@ -291,7 +292,7 @@ class AuthorizationStack(Stack):
                     "verifiedpermissions:GetPolicy",
                     "verifiedpermissions:BatchIsAuthorized",
                 ],
-                resources=[f"arn:aws:verifiedpermissions:{self.region}:{self.account}:policy-store/{self._policy_store.attr_policy_store_id}"],
+                resources=[f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"],
             )
         )
 
@@ -371,16 +372,18 @@ def handler(event, context):
         
         
         # Create a custom resource to add the Pre-Token-Generation trigger
-        pre_token_generation_trigger = cdk.CustomResource(
-            self,
-            "PreTokenGenerationTrigger",
-            service_token=pre_token_generation_provider.service_token,
-            properties={
-                "UserPoolId": props.cognito_user_pool.user_pool_id,
-                "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
-                "Timestamp": str(datetime.datetime.now().timestamp()),
-            },
-        )
+        ######
+        #########   Commented out just barely RR
+        # pre_token_generation_trigger = cdk.CustomResource(
+        #     self,
+        #     "PreTokenGenerationTrigger",
+        #     service_token=pre_token_generation_provider.service_token,
+        #     properties={
+        #         "UserPoolId": props.cognito_user_pool.user_pool_id,
+        #         "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
+        #         "Timestamp": str(datetime.datetime.now().timestamp()),
+        #     },
+        # )
 
         # Add the Pre-Token-Generation trigger to the Cognito user pool
         # props.cognito_user_pool.add_trigger(

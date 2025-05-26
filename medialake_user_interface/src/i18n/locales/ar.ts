@@ -1,13 +1,16 @@
 export default {
   languages: {
-    english: 'إنجليزية',
-    german: 'ألمانية',
-    portuguese: 'برتغالية',
-    french: 'فرنسية',
-    chinese: 'صينية',
-    hindi: 'هندية',
-    arabic: 'عربية',
-    hebrew: 'عبرية'
+    english: 'الإنجليزية',
+    german: 'الألمانية',
+    portuguese: 'البرتغالية',
+    french: 'الفرنسية',
+    chinese: 'الصينية',
+    hindi: 'الهندية',
+    arabic: 'العربية',
+    hebrew: 'العبرية',
+    japanese: 'اليابانية',
+    korean: 'الكورية',
+    spanish: 'الإسبانية'
   },
   assetsPage: {
     title: 'الأصول',
@@ -322,6 +325,23 @@ export default {
       performance: {
         title: 'إعدادات الأداء',
         comingSoon: 'الإعدادات ستتوفر قريباً.'
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'إضافة مجموعة',
+        editGroup: 'تعديل المجموعة',
+        deleteGroup: 'حذف المجموعة',
+        createGroup: 'إنشاء مجموعة',
+        manageGroups: 'إدارة المجموعات'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'لا توجد مجموعات أذونات',
+      actions: {
+        addPermissionSet: 'إضافة مجموعة أذونات',
+        editPermissionSet: 'تعديل مجموعة الأذونات',
+        deletePermissionSet: 'حذف مجموعة الأذونات'
       }
     }
   },

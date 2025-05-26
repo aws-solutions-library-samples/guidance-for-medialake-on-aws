@@ -25,6 +25,14 @@ from medialake_stacks.authorization_stack import (
     AuthorizationStack,
     AuthorizationStackProps,
 )
+from medialake_stacks.permissions_stack import (
+    PermissionsStack,
+    PermissionsStackProps,
+)
+from medialake_stacks.groups_stack import (
+    GroupsStack,
+    GroupsStackProps,
+)
 from medialake_stacks.auth_lambda_stack import AuthLambdaStack, AuthLambdaStackProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
@@ -139,16 +147,18 @@ class MediaLakeStack(cdk.Stack):
         # Add dependency to ensure shared authorizer is created first
         users_groups_roles_stack.add_dependency(props.authorization_stack)
 
-        _ = AuthorizationApi(
+        groups_stack = GroupsStack(
             self,
-            "MediaLakeApiGatewayAuthorization",
-            props=AuthorizationApiProps(
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                api_resource=props.api_gateway_core_stack.rest_api,
+            "MediaLakeGroupsStack",
+            props=GroupsStackProps(
+                # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.api_gateway_core_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
             ),
         )
+        # Add dependency to ensure shared authorizer is created first
+        groups_stack.add_dependency(props.authorization_stack)
+
         settings_stack = SettingsStack(
             self, "MediaLakeSettings", props=SettingsStackProps()
         )
@@ -214,6 +224,18 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
+        # Create the Permissions Stack as a nested stack
+        permissions_stack = PermissionsStack(
+            self,
+            "MediaLakePermissionsStack",
+            props=PermissionsStackProps(
+                api_resource=props.api_gateway_core_stack.rest_api,
+                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                cognito_user_pool=props.api_gateway_core_stack.user_pool,
+                auth_table=props.authorization_stack.auth_table,
+            ),
+        )
+
         pipeline_stack = PipelineStack(
             self,
             "MediaLakePipeline",
@@ -258,7 +280,6 @@ class MediaLakeStack(cdk.Stack):
     def connector_table(self):
         return self._api_gateway_stack.connector_table
 
-
 medialake_stack = MediaLakeStack(
     app,
     "MediaLakeStack",
@@ -270,7 +291,6 @@ medialake_stack = MediaLakeStack(
     env=env,
 )
 medialake_stack.add_dependency(api_gateway_core_stack)
-medialake_stack.add_dependency(cloudfront_waf_stack)
 
 # Get API resources for dependencies
 api_resources = medialake_stack._api_gateway_stack.api_resources

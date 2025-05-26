@@ -2,7 +2,7 @@
 Authorization Table Seeder Lambda for Media Lake.
 
 This Lambda function is triggered by a CloudFormation Custom Resource
-and seeds the default system permission sets (Administrator, Editor, Viewer)
+and seeds the default system groups and permission sets (Administrator, Editor, Viewer)
 into the DynamoDB authorization table.
 """
 
@@ -26,7 +26,30 @@ AUTH_TABLE_NAME = os.environ.get("AUTH_TABLE_NAME")
 
 # Constants for DynamoDB keys
 PREFIX_PERMISSION_SET = "PS#"
+PREFIX_GROUP = "GROUP#"
 PREFIX_METADATA = "METADATA"
+
+# Default groups definitions
+DEFAULT_GROUPS = [
+    {
+        "id": "administrators",
+        "name": "Administrators",
+        "description": "System administrators with full access to all features and settings",
+        "department": "IT"
+    },
+    {
+        "id": "editors",
+        "name": "Editors",
+        "description": "Content editors who can create, modify, and manage media assets",
+        "department": "Content"
+    },
+    {
+        "id": "readonly",
+        "name": "Read Only",
+        "description": "Users with read-only access to view media assets and reports",
+        "department": "General"
+    }
+]
 
 # Default permission sets definitions
 DEFAULT_PERMISSION_SETS = [
@@ -88,6 +111,58 @@ DEFAULT_PERMISSION_SETS = [
     }
 ]
 
+def seed_group(group: Dict[str, Any]) -> bool:
+    """
+    Seed a group into the DynamoDB authorization table.
+    
+    Args:
+        group: Group definition
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Initialize DynamoDB table
+        table = dynamodb.Table(AUTH_TABLE_NAME)
+        
+        # Generate timestamps
+        current_time = datetime.datetime.now().isoformat()
+        
+        # Prepare DynamoDB item following the group data model
+        item = {
+            "PK": f"{PREFIX_GROUP}{group['id']}",
+            "SK": PREFIX_METADATA,
+            "name": group["name"],
+            "description": group["description"],
+            "department": group["department"],
+            "createdAt": current_time,
+            "updatedAt": current_time,
+            "entity": "group",
+            "id": group["id"]
+        }
+        
+        # Check if the group already exists
+        response = table.get_item(
+            Key={
+                "PK": item["PK"],
+                "SK": item["SK"]
+            }
+        )
+        
+        if "Item" in response:
+            logger.info(f"Group {group['id']} already exists, updating it")
+            # Update the existing item
+            table.put_item(Item=item)
+        else:
+            logger.info(f"Creating group {group['id']}")
+            # Create a new item
+            table.put_item(Item=item)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error seeding group {group['id']}: {str(e)}")
+        return False
+
 def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
     """
     Seed a permission set into the DynamoDB authorization table.
@@ -146,24 +221,41 @@ def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
 @helper.create
 def create_handler(event: Dict[str, Any], context: Any) -> None:
     """
-    Handle the creation of the default permission sets.
+    Handle the creation of the default groups and permission sets.
     
     Args:
         event: CloudFormation Custom Resource event
         context: Lambda context
     """
-    logger.info("Creating default permission sets")
+    logger.info("Creating default groups and permission sets")
     
-    success_count = 0
-    failure_count = 0
+    # Seed groups first
+    group_success_count = 0
+    group_failure_count = 0
+    
+    for group in DEFAULT_GROUPS:
+        if seed_group(group):
+            group_success_count += 1
+        else:
+            group_failure_count += 1
+    
+    logger.info(f"Group seeding completed: {group_success_count} succeeded, {group_failure_count} failed")
+    
+    # Then seed permission sets
+    ps_success_count = 0
+    ps_failure_count = 0
     
     for permission_set in DEFAULT_PERMISSION_SETS:
         if seed_permission_set(permission_set):
-            success_count += 1
+            ps_success_count += 1
         else:
-            failure_count += 1
+            ps_failure_count += 1
     
-    logger.info(f"Permission set seeding completed: {success_count} succeeded, {failure_count} failed")
+    logger.info(f"Permission set seeding completed: {ps_success_count} succeeded, {ps_failure_count} failed")
+    
+    total_success = group_success_count + ps_success_count
+    total_failure = group_failure_count + ps_failure_count
+    logger.info(f"Total seeding completed: {total_success} succeeded, {total_failure} failed")
 
 @helper.update
 def update_handler(event: Dict[str, Any], context: Any) -> None:
@@ -174,8 +266,8 @@ def update_handler(event: Dict[str, Any], context: Any) -> None:
         event: CloudFormation Custom Resource event
         context: Lambda context
     """
-    logger.info("Update operation - ensuring default permission sets exist")
-    # For updates, we'll just ensure the default permission sets exist
+    logger.info("Update operation - ensuring default groups and permission sets exist")
+    # For updates, we'll just ensure the default groups and permission sets exist
     create_handler(event, context)
 
 @helper.delete
@@ -187,8 +279,8 @@ def delete_handler(event: Dict[str, Any], context: Any) -> None:
         event: CloudFormation Custom Resource event
         context: Lambda context
     """
-    # We don't delete the default permission sets when the stack is deleted
-    logger.info("Delete operation - not removing default permission sets")
+    # We don't delete the default groups and permission sets when the stack is deleted
+    logger.info("Delete operation - not removing default groups and permission sets")
     pass
 
 @logger.inject_lambda_context

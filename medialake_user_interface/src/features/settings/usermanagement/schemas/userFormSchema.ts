@@ -5,7 +5,7 @@ export const userFormSchema = z.object({
     family_name: z.string().trim().min(1, 'Last name is required'),
     email: z.string().trim().email('Invalid email format'),
     email_verified: z.boolean().default(false),
-    roles: z.array(z.string()).min(1, 'At least one role is required'),
+    permissions: z.array(z.string()).default([]),
     groups: z.array(z.string()).default([]),
     enabled: z.boolean().default(true),
 });
@@ -17,7 +17,7 @@ export const createUserFormDefaults: UserFormData = {
     family_name: '',
     email: '',
     email_verified: false,
-    roles: [],
+    permissions: [],
     groups: [],
     enabled: true,
 };

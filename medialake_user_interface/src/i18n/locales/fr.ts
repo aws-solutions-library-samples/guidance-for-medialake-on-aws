@@ -7,7 +7,10 @@ export default {
         chinese: 'Chinois',
         hindi: 'Hindi',
         arabic: 'Arabe',
-        hebrew: 'Hébreu'
+        hebrew: 'Hébreu',
+        japanese: 'Japonais',
+        korean: 'Coréen',
+        spanish: 'Espagnol'
     },
     assetsPage: {
       title: 'Actifs',
@@ -769,6 +772,23 @@ export default {
             title: 'Environnements'
           }
         }
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'Ajouter un groupe',
+        editGroup: 'Modifier le groupe',
+        deleteGroup: 'Supprimer le groupe',
+        createGroup: 'Créer un groupe',
+        manageGroups: 'Gérer les groupes'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'Aucun ensemble de permissions',
+      actions: {
+        addPermissionSet: 'Ajouter un ensemble de permissions',
+        editPermissionSet: 'Modifier l\'ensemble de permissions',
+        deletePermissionSet: 'Supprimer l\'ensemble de permissions'
       }
     }
   }

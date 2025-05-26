@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '../api/queryClient';
 import { AwsConfigProvider } from '../common/hooks/aws-config-context';
 import { AuthProvider } from '../common/hooks/auth-context';
+import { PermissionProvider } from '../permissions';
 import '@aws-amplify/ui-react/styles.css';
 import { ModalProvider } from './common/ModalConnector';
 import { ThemeProvider } from '../hooks/useTheme';
@@ -47,7 +48,8 @@ const AppConfigured = () => {
                 <QueryClientProvider client={queryClient}>
                     <AwsConfigProvider>
                         <AuthProvider>
-                            <TimezoneProvider>
+                            <PermissionProvider>
+                                <TimezoneProvider>
                                 <ThemeProvider>
                                     <DirectionProvider>
                                         <TableDensityProvider>
@@ -60,6 +62,7 @@ const AppConfigured = () => {
                                         </DirectionProvider>
                                     </ThemeProvider>
                                 </TimezoneProvider>
+                            </PermissionProvider>
                         </AuthProvider>
                     </AwsConfigProvider>
                 </QueryClientProvider>

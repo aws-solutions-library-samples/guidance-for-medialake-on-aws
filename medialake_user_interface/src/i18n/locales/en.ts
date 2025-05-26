@@ -7,7 +7,10 @@ export default {
         chinese: 'Chinese',
         hindi: 'Hindi',
         arabic: 'Arabic',
-        hebrew: 'Hebrew'
+        hebrew: 'Hebrew',
+        japanese: 'Japanese',
+        korean: 'Korean',
+        spanish: 'Spanish'
     },
     assetsPage: {
         title: 'Assets',

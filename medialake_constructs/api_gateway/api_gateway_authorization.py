@@ -2,7 +2,7 @@
 API Gateway Authorization module for MediaLake.
 
 This module defines the AuthorizationApi class which sets up API Gateway endpoints
-and associated Lambda functions for managing Permission Sets, Groups, and other authorization resources.
+and associated Lambda functions for managing Permission Sets and other authorization resources.
 """
 
 from dataclasses import dataclass
@@ -37,7 +37,7 @@ class AuthorizationApiProps:
 
 class AuthorizationApi(Construct):
     """
-    Authorization API Gateway deployment for managing Permission Sets, Groups, and other authorization resources.
+    Authorization API Gateway deployment for managing Permission Sets and other authorization resources.
     """
 
     def __init__(
@@ -115,12 +115,7 @@ class AuthorizationApi(Construct):
             authorizer=self._api_authorizer,
         )
 
-        # GET /authorization/# The above code is a comment in Python. Comments are used to provide
-        # explanations or notes within the code for better understanding. In this
-        # case, the comment is "permission". Comments in Python start with the
-        # hash symbol (#) and extend to the end of the line. They are ignored by
-        # the Python interpreter and do not affect the execution of the code.
-        # permission-sets - List all Permission Sets
+        # GET /authorization/permission-sets - List all Permission Sets
         list_permission_sets_lambda = Lambda(
             self,
             "ListPermissionSetsLambda",
@@ -214,177 +209,7 @@ class AuthorizationApi(Construct):
             authorizer=self._api_authorizer,
         )
 
-        # 2. Groups Endpoints
-        groups_resource = authorization_resource.add_resource("groups")
-        
-        # POST /authorization/groups - Create a new Group
-        post_groups_lambda = Lambda(
-            self,
-            "post-groups",
-            config=LambdaConfig(
-                name="post-groups",
-                entry="lambdas/api/authorization/groups/create_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(post_groups_lambda.function)
-        
-        groups_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(post_groups_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # GET /authorization/groups - List all Groups
-        authorization_groups_get = Lambda(
-            self,
-            "authorization-groups-get",
-            config=LambdaConfig(
-                name="authorization-groups-get",
-                entry="lambdas/api/authorization/groups/list_groups",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_data(authorization_groups_get.function)
-        
-        groups_resource.add_method(
-            "GET",
-            api_gateway.LambdaIntegration(authorization_groups_get.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # Group by ID resource
-        group_id_resource = groups_resource.add_resource("{groupId}")
-        
-        # GET /authorization/groups/{groupId} - Get details of a specific Group
-        authorization_groups_group_id_get = Lambda(
-            self,
-            "authorization-groups-group-id-get",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-get",
-                entry="lambdas/api/authorization/groups/get_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_data(authorization_groups_group_id_get.function)
-        
-        group_id_resource.add_method(
-            "GET",
-            api_gateway.LambdaIntegration(
-                authorization_groups_group_id_get.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
-                },
-            ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # PUT /authorization/groups/{groupId} - Update an existing Group
-        authorization_groups_group_id_put = Lambda(
-            self,
-            "authorization-groups-group-id-put",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-put",
-                entry="lambdas/api/authorization/groups/update_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(authorization_groups_group_id_put.function)
-        
-        group_id_resource.add_method(
-            "PUT",
-            api_gateway.LambdaIntegration(
-                authorization_groups_group_id_put.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
-                },
-            ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # DELETE /authorization/groups/{groupId} - Delete a Group
-        authorization_groups_group_id_delete = Lambda(
-            self,
-            "authorization-groups-group-id-delete",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-delete",
-                entry="lambdas/api/authorization/groups/delete_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(authorization_groups_group_id_delete.function)
-        
-        group_id_resource.add_method(
-            "DELETE",
-            api_gateway.LambdaIntegration(
-                authorization_groups_group_id_delete.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
-                },
-            ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # Group members resource
-        group_members_resource = group_id_resource.add_resource("members")
-        
-        # POST /authorization/groups/{groupId}/members - Add members to a Group
-        add_group_members_lambda = Lambda(
-            self,
-            "authorization-groups-group-id-members-post",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-members-post",
-                entry="lambdas/api/authorization/groups/add_group_members",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(add_group_members_lambda.function)
-        
-        group_members_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(
-                add_group_members_lambda.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
-                },
-            ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-        
-        # Group member by ID resource
-        group_member_id_resource = group_members_resource.add_resource("{userId}")
-        
-        # DELETE /authorization/groups/{groupId}/members/{userId} - Remove a member from a Group
-        remove_group_member_lambda = Lambda(
-            self,
-            "RemoveGroupMemberLambda",
-            config=LambdaConfig(
-                name="remove_group_member",
-                entry="lambdas/api/authorization/groups/remove_group_member",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(remove_group_member_lambda.function)
-        
-        group_member_id_resource.add_method(
-            "DELETE",
-            api_gateway.LambdaIntegration(
-                remove_group_member_lambda.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')", "userId": "$input.params(\'userId\')" }'
-                },
-            ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
-        )
-                
-        # 3. Assignments Endpoints
+        # 2. Assignments Endpoints
         assignments_resource = authorization_resource.add_resource("assignments")
         
         # User Assignments
@@ -549,7 +374,6 @@ class AuthorizationApi(Construct):
         
         # Add CORS support to all resources
         add_cors_options_method(authorization_resource)
-        add_cors_options_method(group_member_id_resource)
         add_cors_options_method(assignments_resource)
         add_cors_options_method(user_assignments_resource)
         add_cors_options_method(user_id_assignments_resource)
@@ -561,6 +385,3 @@ class AuthorizationApi(Construct):
         add_cors_options_method(group_ps_id_resource)
         add_cors_options_method(permission_sets_resource)
         add_cors_options_method(permission_set_id_resource)
-        add_cors_options_method(groups_resource)
-        add_cors_options_method(group_id_resource)
-        add_cors_options_method(group_members_resource)

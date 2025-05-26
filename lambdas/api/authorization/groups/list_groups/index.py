@@ -10,7 +10,7 @@ import boto3
 import os
 from botocore.exceptions import ClientError
 import json
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize AWS PowerTools
 logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -117,30 +117,30 @@ def _list_groups(
     query_params: Dict[str, str]
 ) -> List[Dict[str, Any]]:
     """
-    List all groups from DynamoDB
-    
-    We can use the GSI1 to query all groups efficiently
+    List all groups from DynamoDB using a scan operation with a filter expression
+    to find all items where PK begins with "GROUP#" and SK equals "METADATA"
     """
     try:
         table = dynamodb.Table(table_name)
         
-        # Query the GSI1 for all groups
-        # GSI1PK = "GROUPS" and GSI1SK starts with "GROUP#"
-        response = table.query(
-            IndexName="GSI1",
-            KeyConditionExpression=Key("GSI1PK").eq("GROUPS")
+        # Use scan with filter expression to find all group items
+        # This is more efficient than using a GSI when we have a known prefix pattern
+        response = table.scan(
+            FilterExpression=Attr("PK").begins_with("GROUP#") & Attr("SK").eq("METADATA")
         )
         
         items = response.get("Items", [])
         
         # Process pagination if there are more results
         while "LastEvaluatedKey" in response:
-            response = table.query(
-                IndexName="GSI1",
-                KeyConditionExpression=Key("GSI1PK").eq("GROUPS"),
+            response = table.scan(
+                FilterExpression=Attr("PK").begins_with("GROUP#") & Attr("SK").eq("METADATA"),
                 ExclusiveStartKey=response["LastEvaluatedKey"]
             )
             items.extend(response.get("Items", []))
+        
+        # Log the number of items found
+        logger.info(f"Found {len(items)} group items in DynamoDB")
         
         # Transform the items to remove DynamoDB-specific attributes
         groups = []
@@ -151,8 +151,12 @@ def _list_groups(
                 "description": item.get("description"),
                 "createdBy": item.get("createdBy"),
                 "createdAt": item.get("createdAt"),
-                "updatedAt": item.get("updatedAt")
+                "updatedAt": item.get("updatedAt"),
+                # Include any additional fields that might be useful
+                "department": item.get("department")
             }
+            # Remove None values
+            group = {k: v for k, v in group.items() if v is not None}
             groups.append(group)
         
         return groups

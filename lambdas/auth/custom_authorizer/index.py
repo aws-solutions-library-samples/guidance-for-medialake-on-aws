@@ -40,14 +40,18 @@ ACTION_TYPE = f"{NAMESPACE}::Action" if NAMESPACE else "MediaLake::Action"
 # Initialize AWS clients outside handler for reuse
 import boto3
 
-# Initialize Verified Permissions client with optional endpoint
+# Get the AWS region from environment variable or default to us-east-1
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+
+# Initialize Verified Permissions client with explicit region
 if os.environ.get('ENDPOINT'):
     verified_permissions = boto3.client(
         'verifiedpermissions',
-        endpoint_url=f"https://{os.environ.get('ENDPOINT')}.{os.environ.get('AWS_REGION', 'us-east-1')}.amazonaws.com"
+        region_name=AWS_REGION,
+        endpoint_url=f"https://{os.environ.get('ENDPOINT')}.{AWS_REGION}.amazonaws.com"
     )
 else:
-    verified_permissions = boto3.client('verifiedpermissions')
+    verified_permissions = boto3.client('verifiedpermissions', region_name=AWS_REGION)
 
 # Safety checks for production environments
 if ENVIRONMENT == 'prod' and DEBUG_MODE:

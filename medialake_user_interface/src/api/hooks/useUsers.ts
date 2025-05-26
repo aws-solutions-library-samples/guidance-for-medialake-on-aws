@@ -37,10 +37,10 @@ export const useGetUsers = () => {
             const { data } = await apiClient.get<{ statusCode: number; body: string }>(API_ENDPOINTS.USERS);
             const parsedBody = JSON.parse(data.body) as UsersResponse;
             console.log('Raw user data:', JSON.stringify(parsedBody.data.users[0]));
-            // Map API response to include roles if not present
+            // Map API response to include permissions if not present
             return parsedBody.data.users.map(user => ({
                 ...user,
-                roles: user.roles || [] // Ensure roles is always present
+                permissions: user.permissions || [] // Ensure permissions is always present
             }));
         },
     });

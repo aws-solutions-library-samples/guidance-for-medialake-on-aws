@@ -19,7 +19,6 @@ interface UserFormProps {
     onClose: () => void;
     onSave: (user: CreateUserRequest) => Promise<any>;
     user?: User;
-    availableRoles: string[];
     availableGroups?: { id: string; name: string }[];
 }
 
@@ -28,7 +27,6 @@ export const UserForm: React.FC<UserFormProps> = ({
     onClose,
     onSave,
     user,
-    availableRoles,
     availableGroups = [],
 }) => {
     const { t } = useTranslation();
@@ -43,7 +41,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                 family_name: user.family_name || '',
                 email: user.email || '',
                 email_verified: user.email_verified === 'true',
-                roles: user.roles || [],
+                permissions: [], // Initialize as empty array for now
                 groups: user.groups || [],
                 enabled: user.enabled ?? true,
             }
@@ -61,7 +59,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                     family_name: user.family_name || '',
                     email: user.email || '',
                     email_verified: user.email_verified === 'true',
-                    roles: user.roles || [],
+                    permissions: [], // Initialize as empty array for now
                     groups: user.groups || [],
                     enabled: user.enabled ?? true,
                   }
@@ -80,7 +78,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                 email: data.email,
                 given_name: data.given_name,
                 family_name: data.family_name,
-                roles: data.roles,
+                permissions: data.permissions,
                 groups: data.groups,
                 enabled: data.enabled,
             };
@@ -136,16 +134,12 @@ export const UserForm: React.FC<UserFormProps> = ({
                             translationPrefix="users.form"
                         />
                         <FormSelect
-                            name="roles"
+                            name="permissions"
                             control={form.control}
-                            label={t('users.form.fields.roles.label')}
-                            tooltip={t('users.form.fields.roles.tooltip')}
-                            options={availableRoles.map(role => ({
-                                label: t(`users.roles.${role.toLowerCase()}`),
-                                value: role,
-                            }))}
+                            label={t('users.form.fields.permissions.label')}
+                            tooltip={t('users.form.fields.permissions.tooltip')}
+                            options={[]}
                             multiple
-                            required
                             translationPrefix="users.form"
                         />
                         <FormSelect

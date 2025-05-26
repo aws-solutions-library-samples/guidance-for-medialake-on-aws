@@ -14,29 +14,29 @@ export const API_ENDPOINTS = {
     USER: '/users/user',
     ROLES: '/settings/roles',
     PERMISSION_SETS: {
-        BASE: '/authorization/permission-sets',
-        GET: (id: string) => `/authorization/permission-sets/${id}`,
-        UPDATE: (id: string) => `/authorization/permission-sets/${id}`,
-        DELETE: (id: string) => `/authorization/permission-sets/${id}`,
+        BASE: '/permissions',
+        GET: (id: string) => `/permissions/${id}`,
+        UPDATE: (id: string) => `/permissions/${id}`,
+        DELETE: (id: string) => `/permissions/${id}`,
     },
     GROUPS: {
-        BASE: '/authorization/groups',
-        GET: (id: string) => `/authorization/groups/${id}`,
-        UPDATE: (id: string) => `/authorization/groups/${id}`,
-        DELETE: (id: string) => `/authorization/groups/${id}`,
-        ADD_MEMBERS: (id: string) => `/authorization/groups/${id}/members`,
-        REMOVE_MEMBER: (groupId: string, userId: string) => `/authorization/groups/${groupId}/members/${userId}`,
+        BASE: '/groups',
+        GET: (id: string) => `/groups/${id}`,
+        UPDATE: (id: string) => `/groups/${id}`,
+        DELETE: (id: string) => `/groups/${id}`,
+        ADD_MEMBERS: (id: string) => `/groups/${id}/members`,
+        REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
     },
     ASSIGNMENTS: {
         USER: {
-            BASE: (userId: string) => `/authorization/assignments/users/${userId}`,
+            BASE: (userId: string) => `/assignments/users/${userId}`,
             REMOVE: (userId: string, permissionSetId: string) =>
-                `/authorization/assignments/users/${userId}/permission-sets/${permissionSetId}`,
+                `/assignments/users/${userId}/permission-sets/${permissionSetId}`,
         },
         GROUP: {
-            BASE: (groupId: string) => `/authorization/assignments/groups/${groupId}`,
+            BASE: (groupId: string) => `/assignments/groups/${groupId}`,
             REMOVE: (groupId: string, permissionSetId: string) =>
-                `/authorization/assignments/groups/${groupId}/permission-sets/${permissionSetId}`,
+                `/assignments/groups/${groupId}/permission-sets/${permissionSetId}`,
         },
     },
     DISABLE_USER: (userId: string) => `/users/user/${userId}/disableuser`,

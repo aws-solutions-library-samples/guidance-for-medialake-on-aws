@@ -71,8 +71,6 @@ class UsersGroupsRolesStack(cdk.NestedStack):
             "UsersGroupsRoles",
             api
         )
-                
-        # Create the DynamoDB tables for User/Sharing Features
         
         # 1. User Table
         user_table_props = DynamoDBProps(
@@ -205,18 +203,6 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                 x_origin_verify_secret=props.x_origin_verify_secret,
             ),
         )
-
-        # Create the Roles API construct
-        # self._roles_api = RolesApi(
-        #     self,
-        #     "RolesApi",
-        #     props=RolesApiProps(
-        #         api_resource=api.root,
-        #         cognito_authorizer=self._api_authorizer,
-        #         cognito_user_pool=props.cognito_user_pool,
-        #         x_origin_verify_secret=props.x_origin_verify_secret,
-        #     ),
-        # )
         
         # Create the UPSF API construct
         self._upsf_api = UPSFApi(
