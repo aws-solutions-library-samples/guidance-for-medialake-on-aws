@@ -22,23 +22,50 @@ export function transformPermissions(permissionSets: any[]): Permission[] {
       return;
     }
     
-    // Map each permission to our internal format
-    const mappedPermissions = permissionSet.permissions.map((p: any) => {
-      // Extract action and resource from API format
-      // The API might return them in different formats
-      const action = p.action || p.actionId || '';
-      const resource = p.resource || p.resourceId || '';
-      
-      return {
-        id: p.id || `${action}-${resource}`,
-        principalId: p.principalId || permissionSet.principalId || '',
-        principalType: p.principalType || permissionSet.principalType || 'USER',
-        action: mapAction(action),
-        resource: mapResource(resource),
-        effect: p.effect || 'Allow',
-        conditions: p.conditions || undefined
-      };
-    });
+    // Handle permissions based on its type
+    let mappedPermissions: Permission[] = [];
+    
+    if (permissionSet.permissions) {
+      // Check if permissions is an object with boolean properties
+      if (typeof permissionSet.permissions === 'object' && !Array.isArray(permissionSet.permissions)) {
+        // Convert object with boolean properties to array of Permission objects
+        Object.entries(permissionSet.permissions).forEach(([key, value]) => {
+          // Split the key into resource and action parts (e.g., "assets.delete" -> resource="assets", action="delete")
+          const parts = key.split('.');
+          const resource = parts[0] || '';
+          const action = parts.length > 1 ? parts[1] : key;
+          
+          mappedPermissions.push({
+            id: `${resource}-${action}`,
+            principalId: permissionSet.principalId || '',
+            principalType: permissionSet.principalType || 'USER',
+            action: mapAction(action),
+            resource: mapResource(resource),
+            effect: value ? 'Allow' : 'Deny',
+            conditions: undefined
+          });
+        });
+      }
+      // Handle if permissions is already an array
+      else if (Array.isArray(permissionSet.permissions)) {
+        mappedPermissions = permissionSet.permissions.map((p: any) => {
+          // Extract action and resource from API format
+          // The API might return them in different formats
+          const action = p.action || p.actionId || '';
+          const resource = p.resource || p.resourceId || '';
+          
+          return {
+            id: p.id || `${action}-${resource}`,
+            principalId: p.principalId || permissionSet.principalId || '',
+            principalType: p.principalType || permissionSet.principalType || 'USER',
+            action: mapAction(action),
+            resource: mapResource(resource),
+            effect: p.effect || 'Allow',
+            conditions: p.conditions || undefined
+          };
+        });
+      }
+    }
     
     permissions.push(...mappedPermissions);
   });

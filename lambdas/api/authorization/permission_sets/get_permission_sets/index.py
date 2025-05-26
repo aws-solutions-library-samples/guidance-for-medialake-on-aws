@@ -10,7 +10,7 @@ import boto3
 import os
 from botocore.exceptions import ClientError
 import json
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize AWS PowerTools
 logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -113,48 +113,86 @@ def lambda_handler(
 
 @tracer.capture_method
 def _list_permission_sets(
-    table_name: str, 
+    table_name: str,
     query_params: Dict[str, str]
 ) -> List[Dict[str, Any]]:
     """
-    List all permission sets from DynamoDB
+    List all permission sets from DynamoDB using a scan operation with a filter expression
+    to find all items where PK begins with "PS#" and SK equals "METADATA"
     
-    We can use the GSI1 to query all permission sets efficiently
+    This approach leverages the single table design pattern and doesn't require GSI attributes
     """
     try:
         table = dynamodb.Table(table_name)
         
-        # Query the GSI1 for all permission sets
-        # GSI1PK = "PERMISSION_SETS" and GSI1SK starts with "PS#"
-        response = table.query(
-            IndexName="GSI1",
-            KeyConditionExpression=Key("GSI1PK").eq("PERMISSION_SETS")
+        # Use scan with filter expression to find all permission set items
+        # This is more efficient than using a GSI when we have a known prefix pattern
+        logger.info("Scanning for permission sets with PK begins_with('PS#') and SK='METADATA'")
+        response = table.scan(
+            FilterExpression=Attr("PK").begins_with("PS#") & Attr("SK").eq("METADATA")
         )
         
         items = response.get("Items", [])
         
         # Process pagination if there are more results
         while "LastEvaluatedKey" in response:
-            response = table.query(
-                IndexName="GSI1",
-                KeyConditionExpression=Key("GSI1PK").eq("PERMISSION_SETS"),
+            response = table.scan(
+                FilterExpression=Attr("PK").begins_with("PS#") & Attr("SK").eq("METADATA"),
                 ExclusiveStartKey=response["LastEvaluatedKey"]
             )
             items.extend(response.get("Items", []))
         
+        # Log the number of items found
+        logger.info(f"Found {len(items)} permission set items in DynamoDB")
+        
         # Transform the items to remove DynamoDB-specific attributes
         permission_sets = []
         for item in items:
+            # Extract the ID from the PK (remove the "PS#" prefix)
+            item_id = item.get("id")
+            if not item_id and "PK" in item:
+                # If id is not present but PK is, extract from PK
+                pk = item.get("PK")
+                if pk and pk.startswith("PS#"):
+                    item_id = pk[3:]  # Remove "PS#" prefix
+            
+            # Transform permissions from object to array format
+            permissions_obj = item.get("permissions", {})
+            permissions_array = []
+            
+            # Convert each key-value pair in the permissions object to a Permission object
+            for action_resource, allowed in permissions_obj.items():
+                # Split the action_resource into action and resource parts
+                # Format is typically "action.resource" like "assets.delete"
+                parts = action_resource.split(".", 1)
+                if len(parts) == 2:
+                    resource, action = parts
+                else:
+                    # If there's no dot, use the whole string as the action
+                    resource = "all"
+                    action = action_resource
+                
+                # Create a Permission object
+                permission = {
+                    "action": action,
+                    "resource": resource,
+                    "effect": "Allow" if allowed else "Deny"
+                }
+                permissions_array.append(permission)
+            
             permission_set = {
-                "id": item.get("id"),
+                "id": item_id,
                 "name": item.get("name"),
                 "description": item.get("description"),
-                "permissions": item.get("permissions", []),
+                "permissions": permissions_array,  # Use the transformed array
                 "isSystem": item.get("isSystem", False),
+                "effectiveRole": item.get("effectiveRole"),
                 "createdBy": item.get("createdBy"),
                 "createdAt": item.get("createdAt"),
                 "updatedAt": item.get("updatedAt")
             }
+            # Remove None values
+            permission_set = {k: v for k, v in permission_set.items() if v is not None}
             permission_sets.append(permission_set)
         
         return permission_sets

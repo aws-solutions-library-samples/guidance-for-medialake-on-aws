@@ -41,10 +41,25 @@ import { useGetPermissionSets, useCreatePermissionSet, useUpdatePermissionSet, u
 import { PermissionSet, Permission, CreatePermissionSetRequest } from '@/api/types/permissionSet.types';
 
 // Helper function to determine if a permission is allowed or denied
-const getPermissionStatus = (permissions: Permission[], action: string, resource: string): 'Allowed' | 'Denied' | 'Not Set' => {
-  const permission = permissions.find(p => p.action === action && p.resource === resource);
-  if (!permission) return 'Not Set';
-  return permission.effect === 'Allow' ? 'Allowed' : 'Denied';
+const getPermissionStatus = (permissions: any, action: string, resource: string): 'Allowed' | 'Denied' | 'Not Set' => {
+  // Handle permissions as an object with boolean properties
+  if (permissions && typeof permissions === 'object' && !Array.isArray(permissions)) {
+    // Check if there's a key like "resource.action" (e.g., "asset.view")
+    const key = `${resource}.${action}`;
+    if (key in permissions) {
+      return permissions[key] ? 'Allowed' : 'Denied';
+    }
+    return 'Not Set';
+  }
+  
+  // Handle permissions as an array of Permission objects
+  if (Array.isArray(permissions)) {
+    const permission = permissions.find(p => p.action === action && p.resource === resource);
+    if (!permission) return 'Not Set';
+    return permission.effect === 'Allow' ? 'Allowed' : 'Denied';
+  }
+  
+  return 'Not Set';
 };
 
 // Component to display permission status

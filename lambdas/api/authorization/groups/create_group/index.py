@@ -23,12 +23,13 @@ dynamodb = boto3.resource("dynamodb")
 
 
 class GroupRequest(BaseModel):
-    """Model for group creation request"""
+    """Model for group creation request from frontend"""
     name: str = Field(..., description="Name of the group")
     description: str = Field(..., description="Description of the group")
+    department: Optional[str] = Field(None, description="Department associated with the group")
     
     @validator('name')
-    def name_not_empty(cls, v):
+    def name_not_empty(cls, v, values, **kwargs):
         if not v.strip():
             raise ValueError('name cannot be empty')
         return v
@@ -54,12 +55,13 @@ def lambda_handler(
 ) -> Dict[str, Any]:
     """
     Lambda handler to create a new group in DynamoDB
+    
+    This function handles requests from the frontend to create a new group
+    following the single table design pattern with primary key structure:
+    PK="GROUP#{groupId}", SK="METADATA"
     """
     logger.info("Received event", extra={"event": json.dumps(event)})
     try:
-        # Log the entire event structure for debugging
-        logger.info("Received event", extra={"event": json.dumps(event)})
-        
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
         logger.info("Request context", extra={"request_context": json.dumps(request_context)})
@@ -103,6 +105,7 @@ def lambda_handler(
         # Parse the request body
         try:
             body = json.loads(event.get("body", "{}"))
+            logger.info("Request body", extra={"body": json.dumps(body)})
             group_request = GroupRequest(**body)
         except Exception as e:
             logger.error(f"Invalid request body: {str(e)}")
@@ -161,7 +164,15 @@ def _create_group(
     created_by: str
 ) -> Dict[str, Any]:
     """
-    Create a new group in DynamoDB
+    Create a new group in DynamoDB following the single table design pattern
+    
+    Primary key structure:
+    - PK: "GROUP#{groupId}"
+    - SK: "METADATA"
+    
+    This function also sets up GSI1 keys for backward compatibility, but
+    the list_groups function has been modified to use a direct scan with
+    a filter expression on the primary key instead of using the GSI.
     """
     try:
         # Generate a unique ID for the group
@@ -180,10 +191,17 @@ def _create_group(
             "createdBy": created_by,
             "createdAt": current_time,
             "updatedAt": current_time,
+            "entity": "group",
             "type": "GROUP"
         }
         
-        # Add GSI1 keys for querying groups
+        # Add optional fields if provided
+        if group_request.department:
+            group_item["department"] = group_request.department
+        
+        # Add GSI1 keys for backward compatibility
+        # Note: The list_groups function has been modified to use a direct scan
+        # with a filter expression on the primary key instead of using the GSI
         group_item["GSI1PK"] = "GROUPS"
         group_item["GSI1SK"] = f"GROUP#{group_id}"
         
@@ -201,6 +219,10 @@ def _create_group(
             "updatedAt": current_time
         }
         
+        # Include optional fields in the response if they were provided
+        if group_request.department:
+            result["department"] = group_request.department
+        
         return result
 
     except ClientError as e:
@@ -217,6 +239,11 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
 
     return {
         "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+            "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH"
+        },
         "body": error_response.model_dump_json(),
     }
