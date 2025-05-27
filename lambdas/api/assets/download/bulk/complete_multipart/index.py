@@ -454,11 +454,49 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Add metrics
         metrics.add_metric(name="MultipartUploadsCompleted", unit=MetricUnit.Count, value=1)
         
-        return {
-            "jobId": job_id,
-            "status": "COMPLETED",
-            "downloadUrl": download_url,
-        }
+        # Check if we have large file URLs to combine (for MIXED jobs)
+        large_file_urls = event.get("largeFileUrls", [])
+        
+        # Flatten large file URLs if they're nested
+        flattened_large_urls = []
+        if large_file_urls:
+            for url_item in large_file_urls:
+                if isinstance(url_item, list):
+                    flattened_large_urls.extend(url_item)
+                elif isinstance(url_item, dict) and "largeFileUrls" in url_item:
+                    flattened_large_urls.extend(url_item["largeFileUrls"])
+                elif isinstance(url_item, str):
+                    flattened_large_urls.append(url_item)
+        
+        if flattened_large_urls:
+            # For MIXED jobs: structured format with both categories
+            logger.info(
+                "Completed MIXED job with combined URLs",
+                extra={
+                    "jobId": job_id,
+                    "zipUrl": download_url,
+                    "largeFileUrls": flattened_large_urls,
+                    "totalUrls": len(flattened_large_urls) + 1,
+                },
+            )
+            
+            return {
+                "jobId": job_id,
+                "status": "COMPLETED",
+                "downloadUrls": {
+                    "zippedFiles": download_url,
+                    "files": flattened_large_urls
+                }
+            }
+        else:
+            # For SMALL jobs: only small files category
+            return {
+                "jobId": job_id,
+                "status": "COMPLETED",
+                "downloadUrls": {
+                    "zippedFiles": download_url
+                }
+            }
     
     except Exception as e:
         logger.error(

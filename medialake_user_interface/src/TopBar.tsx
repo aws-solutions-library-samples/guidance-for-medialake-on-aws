@@ -404,9 +404,6 @@ function TopBar() {
                         {t('common.search')}
                     </Button>
                     
-                    {/* Notification Center */}
-                    <NotificationCenter />
-                    
                     {/* Semantic Search Text Button */}
                     <Button
                         variant={isSemanticSearch ? "contained" : "outlined"}
@@ -476,23 +473,8 @@ function TopBar() {
                     </IconButton>
                 )}
                 
-                {/* Notifications Icon Button - Only shown if notifications are enabled */}
-                {isNotificationEnabled && (
-                    <IconButton
-                        size="small"
-                        sx={{
-                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            '&:hover': {
-                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                            }
-                        }}
-                    >
-                        <NotificationsIcon />
-                    </IconButton>
-                )}
+                {/* Notification Center */}
+                <NotificationCenter />
                 
                 {/* Chat Icon Button - Only shown if chat is enabled */}
                 {isChatEnabled && (
