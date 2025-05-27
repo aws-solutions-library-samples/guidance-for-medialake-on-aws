@@ -50,37 +50,61 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 @tracer.capture_method
 def update_job_progress(job_id: str, part_number: int, total_parts: int) -> None:
     """
-    Update the job progress in DynamoDB.
+    Update the job progress in DynamoDB for multipart upload phase (50-100%).
+    Uses atomic counter to track completed parts across all batches.
     
     Args:
         job_id: Job ID
-        part_number: Current part number
+        part_number: Current part number (for logging only)
         total_parts: Total number of parts
     """
     try:
-        # Calculate progress (50% for initialization + 50% for uploading parts)
-        progress = 50 + int((part_number / total_parts) * 50)
-        
-        bulk_download_table.update_item(
+        # Use atomic counter to increment completed parts
+        response = bulk_download_table.update_item(
             Key={"jobId": job_id},
-            UpdateExpression="SET #progress = :progress, #updatedAt = :updatedAt",
+            UpdateExpression="ADD #completedParts :increment SET #status = :status, #updatedAt = :updatedAt",
             ExpressionAttributeNames={
-                "#progress": "progress",
+                "#completedParts": "completedParts",
+                "#status": "status",
                 "#updatedAt": "updatedAt",
             },
             ExpressionAttributeValues={
-                ":progress": progress,
+                ":increment": 1,
+                ":status": "PROCESSING",
                 ":updatedAt": datetime.utcnow().isoformat(),
+            },
+            ReturnValues="ALL_NEW"
+        )
+        
+        # Get the updated completed parts count
+        completed_parts = response["Attributes"].get("completedParts", 0)
+        
+        # Calculate multipart upload progress (50-100% of total progress)
+        upload_phase_progress = (completed_parts / total_parts) if total_parts > 0 else 0
+        progress = 50 + int(upload_phase_progress * 50)  # Map to 50-100% range
+        
+        # Update progress separately to avoid conflicts
+        bulk_download_table.update_item(
+            Key={"jobId": job_id},
+            UpdateExpression="SET #progress = :progress",
+            ExpressionAttributeNames={
+                "#progress": "progress",
+            },
+            ExpressionAttributeValues={
+                ":progress": progress,
             },
         )
         
         logger.info(
-            "Updated job progress",
+            "Updated multipart upload progress",
             extra={
                 "jobId": job_id,
                 "progress": progress,
                 "partNumber": part_number,
+                "completedParts": completed_parts,
                 "totalParts": total_parts,
+                "phase": "MULTIPART_UPLOAD",
+                "uploadPhaseProgress": f"{upload_phase_progress:.2%}",
             },
         )
     
@@ -294,7 +318,48 @@ def send_task_failure(task_token: str, error: str, cause: str) -> None:
 
 
 @tracer.capture_method
-def get_parts_from_manifest(manifest_key: str, start_part: int, end_part: int) -> list:
+def get_total_parts_from_manifest(manifest_key: str) -> int:
+    """
+    Get the total number of parts from the manifest file.
+    
+    Args:
+        manifest_key: S3 key of the manifest file
+        
+    Returns:
+        Total number of parts
+    """
+    try:
+        response = s3.get_object(
+            Bucket=MEDIA_ASSETS_BUCKET,
+            Key=manifest_key,
+        )
+        
+        manifest = json.loads(response["Body"].read().decode("utf-8"))
+        total_parts = len(manifest)
+        
+        logger.info(
+            "Got total parts from manifest",
+            extra={
+                "manifestKey": manifest_key,
+                "totalParts": total_parts,
+            },
+        )
+        
+        return total_parts
+    
+    except Exception as e:
+        logger.error(
+            "Failed to get total parts from manifest",
+            extra={
+                "error": str(e),
+                "manifestKey": manifest_key,
+            },
+        )
+        raise
+
+
+@tracer.capture_method
+def get_parts_from_manifest(manifest_key: str, start_part: int, end_part: int) -> dict:
     """
     Get parts from the manifest file.
     
@@ -304,7 +369,7 @@ def get_parts_from_manifest(manifest_key: str, start_part: int, end_part: int) -
         end_part: End part number (1-based)
         
     Returns:
-        List of parts
+        Dictionary containing parts list and total parts count
     """
     try:
         response = s3.get_object(
@@ -313,10 +378,11 @@ def get_parts_from_manifest(manifest_key: str, start_part: int, end_part: int) -
         )
         
         manifest = json.loads(response["Body"].read().decode("utf-8"))
+        total_parts = len(manifest)
         
         # Filter parts by part number
         filtered_parts = [
-            part for part in manifest 
+            part for part in manifest
             if part["partNumber"] >= start_part and part["partNumber"] <= end_part
         ]
         
@@ -327,10 +393,14 @@ def get_parts_from_manifest(manifest_key: str, start_part: int, end_part: int) -
                 "startPart": start_part,
                 "endPart": end_part,
                 "numParts": len(filtered_parts),
+                "totalParts": total_parts,
             },
         )
         
-        return filtered_parts
+        return {
+            "parts": filtered_parts,
+            "totalParts": total_parts
+        }
     
     except Exception as e:
         logger.error(
@@ -387,6 +457,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     start_byte = part_info.get("startByte")
                     end_byte = part_info.get("endByte")
                     local_path = part_info.get("localPath")
+                    manifest_key = part_info.get("manifestKey")
                     
                     if not all([
                         job_id is not None,
@@ -395,9 +466,13 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         part_number is not None,
                         start_byte is not None,
                         end_byte is not None,
-                        local_path is not None
+                        local_path is not None,
+                        manifest_key is not None
                     ]):
                         raise ValueError("Missing required parameters in part info")
+                    
+                    # Get total parts count from manifest
+                    total_parts = get_total_parts_from_manifest(manifest_key)
                     
                     # Read the part from the file
                     part_data = read_part_from_file(local_path, start_byte, end_byte)
@@ -406,6 +481,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     result = upload_part(
                         MEDIA_ASSETS_BUCKET, s3_key, upload_id, part_number, part_data
                     )
+                    
+                    # Update job progress with accurate total parts count
+                    update_job_progress(job_id, part_number, total_parts)
                     
                     # Send task success to Step Functions
                     send_task_success(task_token, result)
@@ -454,7 +532,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             raise ValueError("Missing required parameters in event")
         
         # Get parts from the manifest
-        parts = get_parts_from_manifest(manifest_key, start_part, end_part)
+        manifest_result = get_parts_from_manifest(manifest_key, start_part, end_part)
+        parts = manifest_result["parts"]
+        total_parts = manifest_result["totalParts"]
         
         # Process each part
         results = []
@@ -476,8 +556,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             # Add the result to the list
             results.append(result)
             
-            # Update job progress
-            update_job_progress(job_id, part_number, len(parts))
+            # Update job progress with total parts count
+            update_job_progress(job_id, part_number, total_parts)
         
         # Add metrics
         metrics.add_metric(name="PartsUploaded", unit=MetricUnit.Count, value=len(results))

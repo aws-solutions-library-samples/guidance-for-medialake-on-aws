@@ -76,13 +76,13 @@ def get_job_details(job_id: str) -> Dict[str, Any]:
 
 
 @tracer.capture_method
-def update_job_completed(job_id: str, download_urls: List[str]) -> None:
+def update_job_completed(job_id: str, download_urls: Dict[str, Any]) -> None:
     """
     Update the job record with all download URLs and mark as completed.
     
     Args:
         job_id: ID of the job to update
-        download_urls: List of all download URLs (zip + individual files)
+        download_urls: Structured download URLs (zippedFiles and/or files)
         
     Raises:
         Exception: If job update fails
@@ -200,18 +200,20 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         if not download_urls_structured:
             raise ValueError("No download URLs found to complete the job")
         
-        # Create flat list for database storage (backward compatibility)
-        flat_urls = []
-        if small_file_zip_url:
-            flat_urls.append(small_file_zip_url)
-        flat_urls.extend(unique_large_urls)
-        
-        # Update job as completed
-        update_job_completed(job_id, flat_urls)
+        # Update job as completed with structured URLs
+        update_job_completed(job_id, download_urls_structured)
         
         # Add metrics
         metrics.add_metric(name="MixedJobsCompleted", unit=MetricUnit.Count, value=1)
-        metrics.add_metric(name="TotalDownloadUrls", unit=MetricUnit.Count, value=len(flat_urls))
+        
+        # Calculate total URL count from structured format
+        total_url_count = 0
+        if download_urls_structured.get("zippedFiles"):
+            total_url_count += 1
+        if download_urls_structured.get("files"):
+            total_url_count += len(download_urls_structured["files"])
+        
+        metrics.add_metric(name="TotalDownloadUrls", unit=MetricUnit.Count, value=total_url_count)
         
         # Return updated job details
         return {

@@ -917,24 +917,24 @@ class AssetsConstruct(Construct):
             ),
         )
         
-        # Create Lambda for finalizing zip file (keep for backward compatibility)
-        self._finalize_zip_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadFinalizeZipLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_finalize_zip_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/finalize_zip",
-                environment_variables={
-                    **common_env_vars,
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=1024,
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
+        # UNUSED: Create Lambda for finalizing zip file (keep for backward compatibility)
+        # self._finalize_zip_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadFinalizeZipLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_download_finalize_zip_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/finalize_zip",
+        #         environment_variables={
+        #             **common_env_vars,
+        #         },
+        #         vpc=props.vpc,
+        #         security_groups=[props.security_group],
+        #         timeout_minutes=15,
+        #         memory_size=1024,
+        #         filesystem_access_point=self._efs_access_point,
+        #         filesystem_mount_path="/mnt/bulk-downloads",
+        #     ),
+        # )
         
         # Create Lambda for getting parts manifest
         self._get_parts_manifest_lambda = Lambda(
@@ -984,94 +984,94 @@ class AssetsConstruct(Construct):
             ),
         )
         
-        # Create a custom Lambda function with EFS filesystem
-        self._handle_small_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadHandleSmallLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_handle_small_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/handle_small",
-                environment_variables={
-                    **common_env_vars,
-                    "ASSET_TABLE": props.asset_table.table_name,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "ENVIRONMENT": config.environment,
-                    "METRICS_NAMESPACE": config.resource_prefix,
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
+        # UNUSED: Create a custom Lambda function with EFS filesystem
+        # self._handle_small_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadHandleSmallLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_download_handle_small_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/handle_small",
+        #         environment_variables={
+        #             **common_env_vars,
+        #             "ASSET_TABLE": props.asset_table.table_name,
+        #             "RESOURCE_PREFIX": config.resource_prefix,
+        #             "ENVIRONMENT": config.environment,
+        #             "METRICS_NAMESPACE": config.resource_prefix,
+        #         },
+        #         vpc=props.vpc,
+        #         security_groups=[props.security_group],
+        #         timeout_minutes=15,
+        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
+        #         filesystem_access_point=self._efs_access_point,
+        #         filesystem_mount_path="/mnt/bulk-downloads",
+        #     ),
+        # )
         
-        # Handle Large Files Lambda
-        self._handle_large_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadHandleLargeLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_handle_large_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/handle_large",
-                environment_variables={
-                    **common_env_vars,
-                    "ASSET_TABLE": props.asset_table.table_name,
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
+        # UNUSED: Handle Large Files Lambda
+        # self._handle_large_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadHandleLargeLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_download_handle_large_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/handle_large",
+        #         environment_variables={
+        #             **common_env_vars,
+        #             "ASSET_TABLE": props.asset_table.table_name,
+        #         },
+        #         vpc=props.vpc,
+        #         security_groups=[props.security_group],
+        #         timeout_minutes=15,
+        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
+        #         filesystem_access_point=self._efs_access_point,
+        #         filesystem_mount_path="/mnt/bulk-downloads",
+        #     ),
+        # )
         
-        # Create Lambda for merging batches of zip files with ZipmergeLayer
-        self._merge_batch_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadMergeBatchLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_merge_batch_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/merge_batch",
-                environment_variables={
-                    **common_env_vars,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "ENVIRONMENT": config.environment,
-                    "METRICS_NAMESPACE": config.resource_prefix,
-                },
-                layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
+        # UNUSED: Create Lambda for merging batches of zip files with ZipmergeLayer
+        # self._merge_batch_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadMergeBatchLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_download_merge_batch_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/merge_batch",
+        #         environment_variables={
+        #             **common_env_vars,
+        #             "RESOURCE_PREFIX": config.resource_prefix,
+        #             "ENVIRONMENT": config.environment,
+        #             "METRICS_NAMESPACE": config.resource_prefix,
+        #         },
+        #         layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
+        #         vpc=props.vpc,
+        #         security_groups=[props.security_group],
+        #         timeout_minutes=15,
+        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
+        #         filesystem_access_point=self._efs_access_point,
+        #         filesystem_mount_path="/mnt/bulk-downloads",
+        #     ),
+        # )
         
-        # Create Lambda for final merge of batch results with ZipmergeLayer
-        self._final_merge_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadFinalMergeLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_final_merge_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/final_merge",
-                environment_variables={
-                    **common_env_vars,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "ENVIRONMENT": config.environment,
-                    "METRICS_NAMESPACE": config.resource_prefix,
-                },
-                layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
+        # UNUSED: Create Lambda for final merge of batch results with ZipmergeLayer
+        # self._final_merge_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadFinalMergeLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_download_final_merge_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/final_merge",
+        #         environment_variables={
+        #             **common_env_vars,
+        #             "RESOURCE_PREFIX": config.resource_prefix,
+        #             "ENVIRONMENT": config.environment,
+        #             "METRICS_NAMESPACE": config.resource_prefix,
+        #         },
+        #         layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
+        #         vpc=props.vpc,
+        #         security_groups=[props.security_group],
+        #         timeout_minutes=15,
+        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
+        #         filesystem_access_point=self._efs_access_point,
+        #         filesystem_mount_path="/mnt/bulk-downloads",
+        #     ),
+        # )
         
         # Status Lambda
         self._status_lambda = Lambda(
@@ -1117,20 +1117,20 @@ class AssetsConstruct(Construct):
             ),
         )
         
-        # Complete Mixed Job Lambda
-        self._complete_mixed_job_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadCompleteMixedJobLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_complete_mixed_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/complete_mixed_job",
-                environment_variables={
-                    **common_env_vars,
-                },
-                timeout_minutes=1,
-                memory_size=512,
-            ),
-        )
+        # UNUSED: Complete Mixed Job Lambda
+        # self._complete_mixed_job_lambda = Lambda(
+        #     self,
+        #     "AssetsBulkDownloadCompleteMixedJobLambda",
+        #     config=LambdaConfig(
+        #         name=f"{config.resource_prefix}_assets_bulk_complete_mixed_{config.environment}",
+        #         entry="lambdas/api/assets/download/bulk/complete_mixed_job",
+        #         environment_variables={
+        #             **common_env_vars,
+        #         },
+        #         timeout_minutes=1,
+        #         memory_size=512,
+        #     ),
+        # )
         
         # Delete Lambda
         self._delete_bulk_download_lambda = Lambda(
@@ -1157,21 +1157,21 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._kickoff_lambda,
             self._assess_scale_lambda,
-            self._handle_small_lambda,
-            self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
+            # self._merge_batch_lambda,  # UNUSED
+            # self._final_merge_lambda,  # UNUSED
             self._status_lambda,
             self._mark_downloaded_lambda,
             self._init_zip_lambda,
             self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
+            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
-            self._complete_mixed_job_lambda,
+            # self._complete_mixed_job_lambda,  # UNUSED
             self._delete_bulk_download_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
@@ -1193,8 +1193,8 @@ class AssetsConstruct(Construct):
         # Asset table permissions for assess scale and handler lambdas
         for lambda_function in [
             self._assess_scale_lambda,
-            self._handle_small_lambda,
-            self._handle_large_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
         ]:
@@ -1208,13 +1208,13 @@ class AssetsConstruct(Construct):
         # S3 permissions for handler and merge lambdas
         # Add EC2 permissions for VPC access to Lambda functions
         for lambda_function in [
-            self._handle_small_lambda,
-            self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
+            # self._merge_batch_lambda,  # UNUSED
+            # self._final_merge_lambda,  # UNUSED
             self._init_zip_lambda,
             self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
+            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1232,8 +1232,8 @@ class AssetsConstruct(Construct):
         
         # Add S3 GetObject permission for all resources to handle_small_lambda and handle_large_lambda
         for lambda_function in [
-            self._handle_small_lambda,
-            self._handle_large_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
         ]:
@@ -1251,12 +1251,12 @@ class AssetsConstruct(Construct):
             
         # Add S3 permissions for handler and merge lambdas
         for lambda_function in [
-            self._handle_small_lambda,
-            self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
+            # self._merge_batch_lambda,  # UNUSED
+            # self._final_merge_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
+            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1279,12 +1279,12 @@ class AssetsConstruct(Construct):
             )
         # Add comprehensive KMS permissions for all Lambda functions that interact with S3
         for lambda_function in [
-            self._handle_small_lambda,
-            self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            # self._handle_small_lambda,  # UNUSED
+            # self._handle_large_lambda,  # UNUSED
+            # self._merge_batch_lambda,  # UNUSED
+            # self._final_merge_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
+            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1502,6 +1502,7 @@ class AssetsConstruct(Construct):
                         "jobId.$": "$.jobId",
                         "uploadId.$": "$.uploadId",
                         "s3Key.$": "$.s3Key",
+                        "manifestKey.$": "$.manifestKey",
                         "partNumber.$": "$.part.partNumber",
                         "startByte.$": "$.part.startByte",
                         "endByte.$": "$.part.endByte",
@@ -1599,13 +1600,13 @@ class AssetsConstruct(Construct):
             output_path="$.Payload",
         )
         
-        # Create a task for completing mixed jobs
-        complete_mixed_job_task = tasks.LambdaInvoke(
-            self,
-            "AssetsCompleteMixedJobTask",
-            lambda_function=self._complete_mixed_job_lambda.function,
-            output_path="$.Payload",
-        )
+        # UNUSED: Create a task for completing mixed jobs
+        # complete_mixed_job_task = tasks.LambdaInvoke(
+        #     self,
+        #     "AssetsCompleteMixedJobTask",
+        #     lambda_function=self._complete_mixed_job_lambda.function,
+        #     output_path="$.Payload",
+        # )
         
         # Define choice state for job size decision
         job_size_choice = sfn.Choice(self, "AssetsJobSizeDecision")
@@ -1627,7 +1628,8 @@ class AssetsConstruct(Construct):
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipPath"
+                "zipPath.$": "$.zipPath",
+                "parallelResults.$": "$.parallelResults"
             }
         )
         

@@ -193,12 +193,9 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {/* Select All Checkbox - only visible when assets are selected */}
+                {/* Select All Checkbox - always visible */}
                 <Box
                     sx={{
-                        opacity: hasSelectedAssets ? 1 : 0,
-                        visibility: hasSelectedAssets ? 'visible' : 'hidden',
-                        transition: 'opacity 0.2s ease-in-out, visibility 0.2s ease-in-out',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
@@ -212,6 +209,13 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                                 onChange={onSelectAllToggle}
                                 size="small"
                                 sx={{
+                                    color: 'primary.main',
+                                    '&.Mui-checked': {
+                                        color: 'primary.main',
+                                    },
+                                    '&.MuiCheckbox-indeterminate': {
+                                        color: 'primary.main',
+                                    },
                                     '& .MuiSvgIcon-root': {
                                         fontSize: '1.2rem',
                                     }
@@ -224,6 +228,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                             '& .MuiFormControlLabel-label': {
                                 fontSize: '0.875rem',
                                 fontWeight: 500,
+                                color: 'primary.main',
                             }
                         }}
                     />
@@ -549,3 +554,4 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
 };
 
 export default AssetViewControls;
+

@@ -331,7 +331,9 @@ def update_job_completed(job_id: str, download_urls: List[str]) -> None:
             },
             ExpressionAttributeValues={
                 ":status": "COMPLETED",
-                ":downloadUrls": download_urls,
+                ":downloadUrls": {
+                    "zippedFiles": download_urls[0] if download_urls else None
+                },
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":progress": 100,
                 ":updatedAt": datetime.utcnow().isoformat(),
@@ -343,6 +345,67 @@ def update_job_completed(job_id: str, download_urls: List[str]) -> None:
             extra={
                 "jobId": job_id,
                 "urlCount": len(download_urls),
+                "expiresAt": expiration_time.isoformat(),
+            },
+        )
+    
+    except ClientError as e:
+        logger.error(
+            "Failed to update job as completed",
+            extra={
+                "error": str(e),
+                "jobId": job_id,
+            },
+        )
+        raise Exception(f"Failed to update job as completed: {str(e)}")
+
+
+@tracer.capture_method
+def update_job_completed_structured(job_id: str, download_urls: Dict[str, Any]) -> None:
+    """
+    Update the job record with structured download URLs and mark as completed.
+    
+    Args:
+        job_id: ID of the job to update
+        download_urls: Structured download URLs (zippedFiles and/or files)
+        
+    Raises:
+        Exception: If job update fails
+    """
+    try:
+        # Calculate expiration time (7 days from now)
+        expiration_time = datetime.utcnow() + timedelta(days=7)
+        
+        bulk_download_table.update_item(
+            Key={"jobId": job_id},
+            UpdateExpression=(
+                "SET #status = :status, "
+                "#downloadUrls = :downloadUrls, "
+                "#expiresAt = :expiresAt, "
+                "#progress = :progress, "
+                "#updatedAt = :updatedAt"
+            ),
+            ExpressionAttributeNames={
+                "#status": "status",
+                "#downloadUrls": "downloadUrls",
+                "#expiresAt": "expiresAt",
+                "#progress": "progress",
+                "#updatedAt": "updatedAt",
+            },
+            ExpressionAttributeValues={
+                ":status": "COMPLETED",
+                ":downloadUrls": download_urls,
+                ":expiresAt": int(expiration_time.timestamp()),
+                ":progress": 100,
+                ":updatedAt": datetime.utcnow().isoformat(),
+            },
+        )
+        
+        logger.info(
+            "Updated job as completed with structured URLs",
+            extra={
+                "jobId": job_id,
+                "downloadUrls": download_urls,
                 "expiresAt": expiration_time.isoformat(),
             },
         )
@@ -445,15 +508,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Generate a presigned URL for the file
         download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
         
-        # Update the job record with the download URL
-        update_job_completed(job_id, [download_url])
-        
-        # Clean up temporary files
-        cleanup_temp_files(job_id)
-        
-        # Add metrics
-        metrics.add_metric(name="MultipartUploadsCompleted", unit=MetricUnit.Count, value=1)
-        
         # Check if we have large file URLs to combine (for MIXED jobs)
         large_file_urls = event.get("largeFileUrls", [])
         
@@ -468,8 +522,13 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 elif isinstance(url_item, str):
                     flattened_large_urls.append(url_item)
         
+        # Determine the structured format based on whether we have large files
         if flattened_large_urls:
             # For MIXED jobs: structured format with both categories
+            structured_download_urls = {
+                "zippedFiles": download_url,
+                "files": flattened_large_urls
+            }
             logger.info(
                 "Completed MIXED job with combined URLs",
                 extra={
@@ -479,24 +538,26 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "totalUrls": len(flattened_large_urls) + 1,
                 },
             )
-            
-            return {
-                "jobId": job_id,
-                "status": "COMPLETED",
-                "downloadUrls": {
-                    "zippedFiles": download_url,
-                    "files": flattened_large_urls
-                }
-            }
         else:
             # For SMALL jobs: only small files category
-            return {
-                "jobId": job_id,
-                "status": "COMPLETED",
-                "downloadUrls": {
-                    "zippedFiles": download_url
-                }
+            structured_download_urls = {
+                "zippedFiles": download_url
             }
+        
+        # Update the job record with the structured download URLs
+        update_job_completed_structured(job_id, structured_download_urls)
+        
+        # Clean up temporary files
+        cleanup_temp_files(job_id)
+        
+        # Add metrics
+        metrics.add_metric(name="MultipartUploadsCompleted", unit=MetricUnit.Count, value=1)
+        
+        return {
+            "jobId": job_id,
+            "status": "COMPLETED",
+            "downloadUrls": structured_download_urls
+        }
     
     except Exception as e:
         logger.error(

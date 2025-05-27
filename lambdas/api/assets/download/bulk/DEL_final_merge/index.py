@@ -239,7 +239,9 @@ def update_job_completed(job_id: str, download_urls: List[str]) -> None:
             },
             ExpressionAttributeValues={
                 ":status": "COMPLETED",
-                ":downloadUrls": download_urls,
+                ":downloadUrls": {
+                    "zippedFiles": download_urls[0] if download_urls else None
+                },
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":progress": 100,
                 ":updatedAt": datetime.utcnow().isoformat(),

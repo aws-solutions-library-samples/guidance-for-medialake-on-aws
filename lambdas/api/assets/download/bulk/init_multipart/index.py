@@ -223,12 +223,14 @@ def update_job_multipart_info(
                 "SET #multipartInfo = :multipartInfo, "
                 "#status = :status, "
                 "#progress = :progress, "
+                "#completedParts = :completedParts, "
                 "#updatedAt = :updatedAt"
             ),
             ExpressionAttributeNames={
                 "#multipartInfo": "multipartInfo",
                 "#status": "status",
                 "#progress": "progress",
+                "#completedParts": "completedParts",
                 "#updatedAt": "updatedAt",
             },
             ExpressionAttributeValues={
@@ -242,6 +244,7 @@ def update_job_multipart_info(
                 },
                 ":status": "STAGING",
                 ":progress": 50,  # 50% progress after initializing multipart upload
+                ":completedParts": 0,  # Initialize completed parts counter
                 ":updatedAt": datetime.utcnow().isoformat(),
             },
         )
