@@ -32,6 +32,7 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
 import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import ApiStatusModal from '../components/ApiStatusModal';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import { useAssetSelection } from '@/hooks/useAssetSelection';
 import { useAssetFavorites } from '@/hooks/useAssetFavorites';
@@ -610,6 +611,11 @@ const SearchPage: React.FC = () => {
                                 // Only pass selection props if multi-select feature is enabled
                                 selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
                                 onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
+                                hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
+                                selectAllState={multiSelectFeature.value ? assetSelection.getSelectAllState(filteredResults) : 'none'}
+                                onSelectAllToggle={multiSelectFeature.value ? () => {
+                                    assetSelection.handleSelectAll(filteredResults);
+                                } : undefined}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -627,6 +633,7 @@ const SearchPage: React.FC = () => {
                             onBatchShare={assetSelection.handleBatchShare}
                             onClearSelection={assetSelection.handleClearSelection}
                             onRemoveItem={assetSelection.handleRemoveAsset}
+                            isDownloadLoading={assetSelection.isDownloadLoading}
                             filterComponent={
                                 <>
                                     <SearchFilters
@@ -667,6 +674,15 @@ const SearchPage: React.FC = () => {
                         </Button>
                     </DialogActions>
                 </Dialog>
+
+                {/* API Status Modal for bulk download */}
+                <ApiStatusModal
+                    open={assetSelection.modalState.open}
+                    onClose={assetSelection.handleModalClose}
+                    status={assetSelection.modalState.status}
+                    action={assetSelection.modalState.action}
+                    message={assetSelection.modalState.message}
+                />
             </>
         </RightSidebarProvider>
     );

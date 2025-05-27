@@ -270,14 +270,14 @@ def format_job_response(job: Dict[str, Any]) -> Dict[str, Any]:
         large_files_count = job.get('largeFilesCount', 0)
         
         if small_files_count > 0 and large_files_count > 0:
-            response["description"] = f"Mixed download: {small_files_count} small files (zipped) + {large_files_count} large files (individual)"
+            response["description"] = f"Mixed download: {small_files_count} zipped files + {large_files_count} large files"
         elif large_files_count > 0 and small_files_count == 0:
             if large_files_count == 1:
                 response["description"] = "Single file download"
             else:
                 response["description"] = f"Individual downloads: {large_files_count} large files"
         elif small_files_count > 0 and large_files_count == 0:
-            response["description"] = f"Zip download: {small_files_count} small files"
+            response["description"] = f"Zip download: {small_files_count} zipped files"
     
     # Add error if available
     if job.get("error"):

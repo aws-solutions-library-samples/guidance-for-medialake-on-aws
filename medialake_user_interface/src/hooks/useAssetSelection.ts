@@ -1,29 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useBulkDownload, useBulkDownloadStatus } from '@/api/hooks/useAssets';
+import { useBulkDownload } from '@/api/hooks/useAssets';
 
 /**
  * Hook for managing asset selection and bulk operations.
  *
- * To use with notifications for bulk downloads:
+ * Bulk download notifications are now handled automatically by the global
+ * notification system. When you call handleBatchDownload, the job will be
+ * tracked automatically and notifications will appear in the NotificationCenter.
  *
- * ```typescript
- * import { useNotifications } from '@/components/NotificationCenter';
- * import { useProcessNotifications } from '@/hooks/useProcessNotifications';
- * import { useBulkDownloadStatus } from '@/api/hooks/useAssets';
- *
- * const { bulkDownloadJobId, handleBatchDownload } = useAssetSelection({...});
- * const { add: addNotification, dismiss: dismissNotification } = useNotifications();
- * const { data: downloadStatus } = useBulkDownloadStatus(bulkDownloadJobId || '', !!bulkDownloadJobId);
- *
- * useProcessNotifications({
- *   processId: bulkDownloadJobId,
- *   processType: 'bulk-download',
- *   status: downloadStatus?.data,
- *   addNotification,
- *   dismissNotification,
- * });
- * ```
+ * The JobNotificationSync component polls for all user jobs every 15 seconds
+ * and syncs them with the notification system.
  */
 
 interface SelectedAsset {
@@ -37,16 +24,32 @@ export function useAssetSelection<T>({
   getAssetId,
   getAssetName,
   getAssetType,
+  onDownloadSuccess,
 }: {
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
   getAssetType: (asset: T) => string;
+  onDownloadSuccess?: () => void; // Callback to close side panel
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
   const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(null);
+  const [isDownloadLoading, setIsDownloadLoading] = useState(false);
   
-  // Bulk download hooks
+  // Modal state for API status
+  const [modalState, setModalState] = useState<{
+    open: boolean;
+    status: 'loading' | 'success' | 'error';
+    action: string;
+    message?: string;
+  }>({
+    open: false,
+    status: 'loading',
+    action: '',
+    message: '',
+  });
+  
+  // Hooks
   const bulkDownloadMutation = useBulkDownload();
 
   // Load selections from localStorage on component mount
@@ -141,6 +144,60 @@ export function useAssetSelection<T>({
     return selectedAssets.some(item => item.id === assetId);
   }, [selectedAssets]);
 
+  // Handle select all functionality - additive across pages
+  const handleSelectAll = useCallback((currentPageAssets: T[]) => {
+    const currentPageAssetIds = currentPageAssets.map(asset => getAssetId(asset));
+    
+    setSelectedAssets(prev => {
+      // Check if all current page assets are already selected
+      const allCurrentPageSelected = currentPageAssetIds.every(id =>
+        prev.some(selected => selected.id === id)
+      );
+      
+      let newSelectedAssets;
+      if (allCurrentPageSelected) {
+        // If all current page assets are selected, deselect only the current page assets
+        newSelectedAssets = prev.filter(selected => !currentPageAssetIds.includes(selected.id));
+      } else {
+        // Add current page assets to selection (avoiding duplicates)
+        const newAssets = currentPageAssets
+          .filter(asset => !prev.some(selected => selected.id === getAssetId(asset)))
+          .map(asset => ({
+            id: getAssetId(asset),
+            name: getAssetName(asset),
+            type: getAssetType(asset),
+            inventoryID: getAssetId(asset)
+          }));
+        
+        newSelectedAssets = [...prev, ...newAssets];
+      }
+      
+      // Update URL parameter based on new selection state
+      if (newSelectedAssets.length > 0) {
+        searchParams.set('selected', 'true');
+      } else {
+        searchParams.delete('selected');
+      }
+      setSearchParams(searchParams);
+      
+      return newSelectedAssets;
+    });
+  }, [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]);
+
+  // Get select all state for current page
+  const getSelectAllState = useCallback((currentPageAssets: T[]): 'none' | 'some' | 'all' => {
+    if (selectedAssets.length === 0) return 'none';
+    
+    const currentPageAssetIds = currentPageAssets.map(asset => getAssetId(asset));
+    const selectedCurrentPageAssets = currentPageAssetIds.filter(id =>
+      selectedAssets.some(selected => selected.id === id)
+    );
+    
+    if (selectedCurrentPageAssets.length === 0) return 'none';
+    if (selectedCurrentPageAssets.length === currentPageAssetIds.length) return 'all';
+    return 'some';
+  }, [selectedAssets, getAssetId]);
+
   // Handle batch operations
   const handleBatchDelete = useCallback(() => {
     console.log('Batch delete:', selectedAssets);
@@ -151,9 +208,27 @@ export function useAssetSelection<T>({
 
   const handleBatchDownload = useCallback(async () => {
     if (selectedAssets.length === 0) {
-      console.warn('No assets selected for download');
+      setModalState({
+        open: true,
+        status: 'error',
+        action: 'Download Failed',
+        message: 'No assets selected for download',
+      });
       return;
     }
+
+    if (isDownloadLoading) {
+      return; // Prevent multiple simultaneous requests
+    }
+
+    setIsDownloadLoading(true);
+    
+    // Show loading modal
+    setModalState({
+      open: true,
+      status: 'loading',
+      action: 'Starting bulk download...',
+    });
 
     try {
       console.log('Starting batch download for:', selectedAssets);
@@ -173,16 +248,52 @@ export function useAssetSelection<T>({
       if (response.data?.jobId) {
         setBulkDownloadJobId(response.data.jobId);
         console.log('Bulk download job started:', response.data.jobId);
+        
+        // Success: Clear selection and close side panel
+        handleClearSelection();
+        
+        // Show success modal
+        setModalState({
+          open: true,
+          status: 'success',
+          action: 'Download Started',
+          message: `Bulk download started for ${selectedAssets.length} assets. You'll be notified when it's ready.`,
+        });
+        
+        // Call the callback to close side panel if provided
+        if (onDownloadSuccess) {
+          onDownloadSuccess();
+        }
+      } else {
+        throw new Error('No job ID returned from server');
       }
     } catch (error) {
       console.error('Failed to start bulk download:', error);
+      
+      // Show error message to user
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Failed to start bulk download. Please try again.';
+      
+      setModalState({
+        open: true,
+        status: 'error',
+        action: 'Download Failed',
+        message: errorMessage,
+      });
+    } finally {
+      setIsDownloadLoading(false);
     }
-  }, [selectedAssets, bulkDownloadMutation]);
+  }, [selectedAssets, bulkDownloadMutation, isDownloadLoading, handleClearSelection, onDownloadSuccess]);
 
   const handleBatchShare = useCallback(() => {
     console.log('Batch share:', selectedAssets);
     // Implement batch share functionality
   }, [selectedAssets]);
+
+  const handleModalClose = useCallback(() => {
+    setModalState(prev => ({ ...prev, open: false }));
+  }, []);
 
   return {
     selectedAssets,
@@ -191,11 +302,17 @@ export function useAssetSelection<T>({
     handleRemoveAsset,
     handleClearSelection,
     isAssetSelected,
+    handleSelectAll,
+    getSelectAllState,
     handleBatchDelete,
     handleBatchDownload,
     handleBatchShare,
     // Bulk download state
     bulkDownloadJobId,
     isDownloadInProgress: !!bulkDownloadJobId,
+    isDownloadLoading,
+    // Modal state
+    modalState,
+    handleModalClose,
   };
 }
