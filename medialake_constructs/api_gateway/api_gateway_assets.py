@@ -1605,10 +1605,49 @@ class AssetsConstruct(Construct):
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
+                "zipPath.$": "$.zipPath"
+            }
+        )
+        
+        # Add a Choice state to conditionally extract largeFileUrls
+        extract_large_file_urls = sfn.Choice(self, "ExtractLargeFileUrls")
+        
+        # Pass state for when large files exist
+        extract_with_large_files = sfn.Pass(
+            self,
+            "ExtractWithLargeFiles",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
                 "zipPath.$": "$.zipPath",
                 "largeFileUrls.$": "$.parallelResults[1].largeFileUrls"
             }
         )
+        
+        # Pass state for when no large files exist
+        extract_without_large_files = sfn.Pass(
+            self,
+            "ExtractWithoutLargeFiles",
+            parameters={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "zipPath.$": "$.zipPath",
+                "largeFileUrls": []
+            }
+        )
+        
+        # Configure the choice logic
+        extract_large_file_urls.when(
+            sfn.Condition.is_present("$.parallelResults[1].largeFileUrls"),
+            extract_with_large_files
+        ).otherwise(
+            extract_without_large_files
+        )
+        
+        # Both branches converge to init_multipart_task
+        extract_with_large_files.next(init_multipart_task)
+        extract_without_large_files.next(init_multipart_task)
+        init_multipart_task.next(extract_multipart_info)
         
         # Define a new workflow for multipart upload
         multipart_workflow = init_zip_task.next(debug_state).next(extract_zip_path).next(
@@ -1637,7 +1676,7 @@ class AssetsConstruct(Construct):
                     sfn.Pass(self, "NoLargeFiles")
                 )
             )
-        ).next(restore_context).next(init_multipart_task).next(extract_multipart_info)
+        ).next(restore_context).next(extract_large_file_urls)
         
         # Get parts manifest using Lambda instead of direct S3 integration
         get_parts_manifest = tasks.LambdaInvoke(
@@ -1722,9 +1761,9 @@ class AssetsConstruct(Construct):
         )
         
         # Add Pass states for handling large file URLs
-        extract_large_file_urls = sfn.Pass(
+        flatten_with_large_files = sfn.Pass(
             self,
-            "ExtractLargeFileUrls",
+            "FlattenWithLargeFiles",
             parameters={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
@@ -1756,13 +1795,16 @@ class AssetsConstruct(Construct):
             "CheckForLargeFileUrls"
         ).when(
             sfn.Condition.is_present("$.largeFileUrls[0]"),
-            extract_large_file_urls
+            flatten_with_large_files
         ).otherwise(
             no_large_file_urls
         )
         
-        # Complete the workflow
-        multipart_workflow = multipart_workflow.next(get_parts_manifest).next(add_parts_to_state).next(process_batches_map).next(flatten_completed_parts).next(check_large_file_urls)
+        # Complete the workflow - start from extract_multipart_info since multipart_workflow ends with a Choice state
+        extract_multipart_info.next(get_parts_manifest).next(add_parts_to_state).next(process_batches_map).next(flatten_completed_parts)
+        
+        # Connect flatten_completed_parts to the choice state
+        flatten_completed_parts.next(check_large_file_urls)
         
         # Connect complete multipart task to success state
         complete_multipart_task.next(success_state)
