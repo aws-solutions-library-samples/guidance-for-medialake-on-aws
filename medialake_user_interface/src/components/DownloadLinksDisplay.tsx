@@ -13,11 +13,17 @@ import {
   InsertDriveFile as FileIcon,
 } from '@mui/icons-material';
 
+interface FileDownload {
+  url: string;
+  filename: string;
+  assetId?: string;
+}
+
 interface DownloadLinksDisplayProps {
   downloadUrls: {
     zippedFiles?: string;
-    files?: string[];
-    singleFiles?: string[];
+    files?: FileDownload[] | string[];
+    singleFiles?: FileDownload[] | string[];
   } | string[];
   expiresAt?: string;
   description?: string;
@@ -151,31 +157,37 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
               Individual Files:
             </Typography>
             <Stack spacing={0.5}>
-              {files.map((url, index) => (
-                <Link
-                  key={index}
-                  href={isExpired ? undefined : url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    fontSize: '0.875rem',
-                    textDecoration: 'none',
-                    color: isExpired ? 'text.disabled' : 'primary.main',
-                    cursor: isExpired ? 'not-allowed' : 'pointer',
-                    opacity: isExpired ? 0.5 : 1,
-                    '&:hover': {
-                      textDecoration: isExpired ? 'none' : 'underline',
-                    },
-                  }}
-                  onClick={isExpired ? (e) => e.preventDefault() : undefined}
-                >
-                  <FileIcon fontSize="small" />
-                  File {index + 1} {isExpired && '(EXPIRED)'}
-                </Link>
-              ))}
+              {files.map((file, index) => {
+                // Handle both old format (string) and new format (object)
+                const url = typeof file === 'string' ? file : file.url;
+                const filename = typeof file === 'string' ? `File ${index + 1}` : file.filename;
+                
+                return (
+                  <Link
+                    key={index}
+                    href={isExpired ? undefined : url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: '0.875rem',
+                      textDecoration: 'none',
+                      color: isExpired ? 'text.disabled' : 'primary.main',
+                      cursor: isExpired ? 'not-allowed' : 'pointer',
+                      opacity: isExpired ? 0.5 : 1,
+                      '&:hover': {
+                        textDecoration: isExpired ? 'none' : 'underline',
+                      },
+                    }}
+                    onClick={isExpired ? (e) => e.preventDefault() : undefined}
+                  >
+                    <FileIcon fontSize="small" />
+                    {filename} {isExpired && '(EXPIRED)'}
+                  </Link>
+                );
+              })}
             </Stack>
           </Box>
         )}
@@ -185,31 +197,37 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
           <Box>
             {(zippedFiles || files.length > 0) && <Divider sx={{ my: 0.5 }} />}
             <Stack spacing={0.5}>
-              {singleFiles.map((url, index) => (
-                <Link
-                  key={index}
-                  href={isExpired ? undefined : url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    fontSize: '0.875rem',
-                    textDecoration: 'none',
-                    color: isExpired ? 'text.disabled' : 'primary.main',
-                    cursor: isExpired ? 'not-allowed' : 'pointer',
-                    opacity: isExpired ? 0.5 : 1,
-                    '&:hover': {
-                      textDecoration: isExpired ? 'none' : 'underline',
-                    },
-                  }}
-                  onClick={isExpired ? (e) => e.preventDefault() : undefined}
-                >
-                  <DownloadIcon fontSize="small" />
-                  Download File {index + 1} {isExpired && '(EXPIRED)'}
-                </Link>
-              ))}
+              {singleFiles.map((file, index) => {
+                // Handle both old format (string) and new format (object)
+                const url = typeof file === 'string' ? file : file.url;
+                const filename = typeof file === 'string' ? `Download File ${index + 1}` : file.filename;
+                
+                return (
+                  <Link
+                    key={index}
+                    href={isExpired ? undefined : url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: '0.875rem',
+                      textDecoration: 'none',
+                      color: isExpired ? 'text.disabled' : 'primary.main',
+                      cursor: isExpired ? 'not-allowed' : 'pointer',
+                      opacity: isExpired ? 0.5 : 1,
+                      '&:hover': {
+                        textDecoration: isExpired ? 'none' : 'underline',
+                      },
+                    }}
+                    onClick={isExpired ? (e) => e.preventDefault() : undefined}
+                  >
+                    <DownloadIcon fontSize="small" />
+                    {filename} {isExpired && '(EXPIRED)'}
+                  </Link>
+                );
+              })}
             </Stack>
           </Box>
         )}

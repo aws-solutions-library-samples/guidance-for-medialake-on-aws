@@ -265,20 +265,34 @@ def format_job_response(job: Dict[str, Any]) -> Dict[str, Any]:
         response["expiresAt"] = job.get("expiresAt")
         response["expiresIn"] = expires_in
         
-        # Add job type specific information based on file counts
+        # Add job type specific information based on job type and file counts
+        job_type = job.get("jobType", "")
         small_files_count = job.get('smallFilesCount', 0)
         large_files_count = job.get('largeFilesCount', 0)
         total_files_count = small_files_count + large_files_count
         
-        if total_files_count == 1:
+        if job_type == "SINGLE_FILE":
             # Single file download (whether large or small)
             response["description"] = "Single file download"
-        elif small_files_count > 0 and large_files_count > 0:
+        elif job_type == "LARGE_INDIVIDUAL":
+            # Individual downloads for all files (including mixed small+large that are handled individually)
+            response["description"] = f"Individual downloads: {total_files_count} files"
+        elif job_type == "MIXED":
+            # True mixed job where small files are zipped and large files are individual
             response["description"] = f"Mixed download: {small_files_count} zipped files + {large_files_count} large files"
-        elif large_files_count > 0 and small_files_count == 0:
-            response["description"] = f"Individual downloads: {large_files_count} large files"
-        elif small_files_count > 0 and large_files_count == 0:
+        elif job_type == "SMALL":
+            # All small files zipped together
             response["description"] = f"Zip download: {small_files_count} zipped files"
+        else:
+            # Fallback to old logic for backward compatibility
+            if total_files_count == 1:
+                response["description"] = "Single file download"
+            elif small_files_count > 0 and large_files_count > 0:
+                response["description"] = f"Mixed download: {small_files_count} zipped files + {large_files_count} large files"
+            elif large_files_count > 0 and small_files_count == 0:
+                response["description"] = f"Individual downloads: {large_files_count} large files"
+            elif small_files_count > 0 and large_files_count == 0:
+                response["description"] = f"Zip download: {small_files_count} zipped files"
     
     # Add error if available
     if job.get("error"):
