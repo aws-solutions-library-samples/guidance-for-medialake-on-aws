@@ -129,7 +129,7 @@ def create_index_with_retry(host,
                                            body=body)
 
             if response.status_code == 200:
-                logger.info("Index creation successful",
+                logger.info(response.text,
                             extra={"index_name": index_name})
                 return True
 
