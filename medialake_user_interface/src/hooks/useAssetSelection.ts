@@ -267,13 +267,21 @@ export function useAssetSelection<T>({
       } else {
         throw new Error('No job ID returned from server');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to start bulk download:', error);
       
-      // Show error message to user
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Failed to start bulk download. Please try again.';
+      // Extract server error message if available
+      let errorMessage = 'Failed to start bulk download. Please try again.';
+      
+      if (error instanceof Error) {
+        // Check if this is an enhanced error with server message
+        const enhancedError = error as any;
+        if (enhancedError.serverMessage) {
+          errorMessage = enhancedError.serverMessage;
+        } else {
+          errorMessage = error.message;
+        }
+      }
       
       setModalState({
         open: true,

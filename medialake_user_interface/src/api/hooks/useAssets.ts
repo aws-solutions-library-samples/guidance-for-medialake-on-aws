@@ -224,6 +224,19 @@ interface BulkDownloadResponse {
     };
 }
 
+// Error response interface for API errors
+interface ApiErrorResponse {
+    status: string;
+    message: string;
+    data?: any;
+}
+
+// Enhanced error type with server message
+interface EnhancedError extends Error {
+    originalError?: any;
+    serverMessage?: string;
+}
+
 interface BulkDownloadStatusResponse {
     status: string;
     message: string;
@@ -409,8 +422,6 @@ export const useTranscription = (inventoryId: string) => {
 
 // Hook to initiate bulk download
 export const useBulkDownload = () => {
-    const { showError } = useErrorModal();
-
     return useMutation({
         mutationFn: async (request: BulkDownloadRequest) => {
             try {
@@ -419,15 +430,28 @@ export const useBulkDownload = () => {
                     request
                 );
                 return response.data;
-            } catch (error) {
+            } catch (error: any) {
                 logger.error('Error initiating bulk download:', error);
-                showError('Failed to initiate bulk download');
-                throw error;
+                
+                // Extract server error message if available
+                let errorMessage = 'Failed to initiate bulk download';
+                let serverMessage: string | undefined;
+                
+                // Check if it's an axios error with response data
+                if (error?.response?.data?.message) {
+                    serverMessage = error.response.data.message;
+                    errorMessage = serverMessage;
+                } else if (error?.message) {
+                    errorMessage = error.message;
+                }
+                
+                // Create enhanced error with server message
+                const enhancedError: EnhancedError = new Error(errorMessage);
+                enhancedError.originalError = error;
+                enhancedError.serverMessage = serverMessage;
+                
+                throw enhancedError;
             }
-        },
-        onError: (error) => {
-            logger.error('Error in bulk download mutation:', error);
-            showError('Failed to initiate bulk download');
         },
     });
 };

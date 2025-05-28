@@ -1644,7 +1644,7 @@ class AssetsConstruct(Construct):
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
                 "zipPath.$": "$.zipPath",
-                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls[0].largeFileUrls"
+                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls[*].largeFileUrls"
             }
         )
         
