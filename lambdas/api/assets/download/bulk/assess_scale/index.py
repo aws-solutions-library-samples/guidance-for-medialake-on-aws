@@ -39,7 +39,7 @@ BULK_DOWNLOAD_TABLE = os.environ["BULK_DOWNLOAD_TABLE"]
 ASSET_TABLE = os.environ["ASSET_TABLE"]
 SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
 SMALL_FILE_THRESHOLD = SMALL_FILE_THRESHOLD_MB  # For backward compatibility
-LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "1000"))  # MB
+LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "1024"))  # MB
 SINGLE_FILE_CHECK = os.environ.get("SINGLE_FILE_CHECK", "false").lower() == "true"
 
 # Initialize DynamoDB tables
@@ -224,14 +224,24 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
         
         # Determine job type based on file composition
         if large_files_count > 0 and small_files_count > 0:
-            # Mixed files: small files get zipped, large files get individual presigned URLs
-            job_type = "MIXED"
+            # Mixed files: check if we have only 1 small file
+            if small_files_count == 1:
+                # Single small file with large files: treat all as individual
+                job_type = "LARGE_INDIVIDUAL"
+            else:
+                # Multiple small files with large files: small files get zipped, large files get individual presigned URLs
+                job_type = "MIXED"
         elif large_files_count > 0:
             # Only large files: each gets individual presigned URLs
             job_type = "LARGE_INDIVIDUAL"
         else:
-            # Only small files: all get zipped together
-            job_type = "SMALL"
+            # Only small files: check if we have only 1 small file
+            if small_files_count == 1:
+                # Single small file: treat as individual
+                job_type = "SINGLE_FILE"
+            else:
+                # Multiple small files: all get zipped together
+                job_type = "SMALL"
     
     logger.info(
         "Job size calculation complete",
@@ -395,8 +405,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         small_files = []
         large_files = []
         
-        # For SINGLE_FILE job type, we don't need to prepare arrays as it's handled separately
-        if job_type != "SINGLE_FILE":
+        # For SINGLE_FILE and LARGE_INDIVIDUAL job types, we don't need to prepare arrays as they're handled separately
+        # LARGE_INDIVIDUAL now includes cases where we have individual files (including single small files mixed with large files)
+        if job_type not in ["SINGLE_FILE", "LARGE_INDIVIDUAL"]:
             for asset in assets:
                 asset_id = asset.get("InventoryID")
                 if asset_id in found_asset_ids:

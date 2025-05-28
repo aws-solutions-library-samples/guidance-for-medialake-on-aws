@@ -1102,12 +1102,12 @@ class AssetsConstruct(Construct):
         )
         
         # Handle Large Individual Lambda
-        self._handle_large_individual_lambda = Lambda(
+        self._handle_individual_lambda = Lambda(
             self,
-            "AssetsBulkDownloadHandleLargeIndividualLambda",
+            "AssetsBulkDownloadHandleIndividualLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_large_individual_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/handle_large_individual",
+                name=f"{config.resource_prefix}_assets_bulk_individual_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/handle_individual",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -1170,7 +1170,7 @@ class AssetsConstruct(Construct):
             self._upload_part_lambda,
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
-            self._handle_large_individual_lambda,
+            self._handle_individual_lambda,
             # self._complete_mixed_job_lambda,  # UNUSED
             self._delete_bulk_download_lambda,
         ]:
@@ -1196,7 +1196,7 @@ class AssetsConstruct(Construct):
             # self._handle_small_lambda,  # UNUSED
             # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            self._handle_large_individual_lambda,
+            self._handle_individual_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1235,7 +1235,7 @@ class AssetsConstruct(Construct):
             # self._handle_small_lambda,  # UNUSED
             # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            self._handle_large_individual_lambda,
+            self._handle_individual_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1289,7 +1289,7 @@ class AssetsConstruct(Construct):
             self._upload_part_lambda,
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
-            self._handle_large_individual_lambda,
+            self._handle_individual_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1343,48 +1343,17 @@ class AssetsConstruct(Construct):
             result_path="$.zipInfo",
         )
         
-        # Add a debug state to log the structure of the Lambda response
-        debug_state = sfn.Pass(
-            self,
-            "DebugZipInfo",
-            parameters={
-                "zipInfo.$": "$.zipInfo",
-                "debug": "Debugging zipInfo structure"
-            },
-            result_path="$.debug"
-        )
-        
-        # Add a Pass state to extract zipPath from init_zip_task result and preserve context
-        extract_zip_path = sfn.Pass(
-            self,
-            "ExtractZipPath",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
-                "smallFiles.$": "$.smallFiles",
-                "largeFiles.$": "$.largeFiles",
-                "jobType.$": "$.jobType",
-                "totalSize.$": "$.totalSize",
-                "smallFilesCount.$": "$.smallFilesCount",
-                "largeFilesCount.$": "$.largeFilesCount",
-                "foundAssets.$": "$.foundAssets",
-                "missingAssets.$": "$.missingAssets",
-                "options.$": "$.options"
-            }
-        )
-        
         # Define Map state for small files with concurrency control
         small_files_map = sfn.Map(
             self,
             "ProcessSmallFilesMap",
             max_concurrency=1,  # Limit to 1 to prevent concurrent file access issues
             items_path="$.smallFiles",
-            result_path="$.processedFiles",
+            result_path=sfn.JsonPath.DISCARD,
             item_selector={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipPath",
+                "zipPath.$": "$.zipInfo.Payload.zipPath",
                 "mapItem.$": "$$.Map.Item.Value"
             }
         ).item_processor(
@@ -1399,7 +1368,9 @@ class AssetsConstruct(Construct):
                     "options.$": "$.mapItem.options",
                     "zipPath.$": "$.zipPath",
                 }),
-                output_path="$.Payload",
+                result_selector={
+                    "processedCount.$": "$.Payload.processedCount"
+                }
             )
         )
         
@@ -1409,7 +1380,7 @@ class AssetsConstruct(Construct):
             "ProcessLargeFilesMap",
             max_concurrency=5,  # Can process more in parallel since we're just generating URLs
             items_path="$.largeFiles",
-            result_path="$.largeFileUrls",
+            result_path=sfn.JsonPath.DISCARD,
             item_selector={
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
@@ -1420,7 +1391,7 @@ class AssetsConstruct(Construct):
             tasks.LambdaInvoke(
                 self,
                 "GenerateLargeFileUrlTask",
-                lambda_function=self._handle_large_individual_lambda.function,
+                lambda_function=self._handle_individual_lambda.function,
                 payload=sfn.TaskInput.from_object({
                     "jobId.$": "$.jobId",
                     "userId.$": "$.userId",
@@ -1458,7 +1429,7 @@ class AssetsConstruct(Construct):
                 "numParts.$": "$.multipartInfo.Payload.numParts",
                 "partSize.$": "$.multipartInfo.Payload.partSize",
                 "fileSize.$": "$.multipartInfo.Payload.fileSize",
-                "largeFileUrls.$": "$.largeFileUrls"
+                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls[*].largeFileUrls"
             }
         )
         
@@ -1532,71 +1503,11 @@ class AssetsConstruct(Construct):
         )
         
         
-        # Create a new Lambda for handling single file downloads
-        self._single_file_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadSingleFileLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_single_file_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/single_file",
-                environment_variables={
-                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
-                    "ASSET_TABLE": asset_table_name,
-                },
-                timeout_minutes=1,
-                memory_size=512,
-            ),
-        )
-        
-        # Add necessary permissions to the single file Lambda
-        self._single_file_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "dynamodb:GetItem",
-                    "dynamodb:UpdateItem",
-                ],
-                resources=[self._bulk_download_table.table_arn],
-            )
-        )
-
-       
-        self._single_file_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["kms:Decrypt"],
-                resources=["*"],  # Use a wildcard for now since we don't have the exact ARN
-            )
-        )
-        
-        self._single_file_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"],
-                resources=["*"],  # Use a wildcard for now since we don't have the exact ARN
-            )
-        )
-        
-        self._single_file_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:HeadObject",
-                ],
-                resources=["*"],
-            )
-        )
-        
-        # Create a task for the single file Lambda
-        single_file_task = tasks.LambdaInvoke(
-            self,
-            "AssetsSingleFileTask",
-            lambda_function=self._single_file_lambda.function,
-            output_path="$.Payload",
-        )
-        
         # Create a task for handling large files individually
         handle_large_individual_task = tasks.LambdaInvoke(
             self,
-            "AssetsHandleLargeIndividualTask",
-            lambda_function=self._handle_large_individual_lambda.function,
+            "AssetsHandleIndividualTask",
+            lambda_function=self._handle_individual_lambda.function,
             output_path="$.Payload",
         )
         
@@ -1622,68 +1533,16 @@ class AssetsConstruct(Construct):
         # For SMALL and LARGE job types, we need to process both small and large files
         # Create a workflow that initializes the zip file, processes files, and finalizes the zip
         # Add a Pass state to transform the output of the Parallel state
-        restore_context = sfn.Pass(
-            self,
-            "RestoreContext",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipPath",
-                "parallelResults.$": "$.parallelResults"
-            }
-        )
-        
-        # Add a Choice state to conditionally extract largeFileUrls
-        extract_large_file_urls = sfn.Choice(self, "ExtractLargeFileUrls")
-        
-        # Pass state for when large files exist
-        extract_with_large_files = sfn.Pass(
-            self,
-            "ExtractWithLargeFiles",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipPath",
-                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls[*].largeFileUrls"
-            }
-        )
-        
-        # Pass state for when no large files exist
-        extract_without_large_files = sfn.Pass(
-            self,
-            "ExtractWithoutLargeFiles",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipPath",
-                "largeFileUrls": []
-            }
-        )
-        
-        # Configure the choice logic - check if large file URLs actually exist and contain URLs
-        extract_large_file_urls.when(
-            sfn.Condition.and_(
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0]"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0].largeFileUrls"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0].largeFileUrls[0]")
-            ),
-            extract_with_large_files
-        ).otherwise(
-            extract_without_large_files
-        )
-        
-        # Both branches converge to init_multipart_task
-        extract_with_large_files.next(init_multipart_task)
-        extract_without_large_files.next(init_multipart_task)
-        init_multipart_task.next(extract_multipart_info)
-        
         # Define a new workflow for multipart upload
-        multipart_workflow = init_zip_task.next(debug_state).next(extract_zip_path).next(
+        multipart_workflow = init_zip_task.next(
             sfn.Parallel(
                 self,
                 "ProcessFilesInParallel",
-                result_path="$.parallelResults"  # Store results in a field to preserve original context
+                result_selector={
+                    "zipPath.$": "$[0].zipInfo.Payload.zipPath",
+                    "jobId.$": "$$.Execution.Input.jobId",
+                    "userId.$": "$$.Execution.Input.userId"
+                }
             ).branch(
                 # Process small files if there are any
                 sfn.Choice(self, "CheckSmallFiles")
@@ -1705,7 +1564,10 @@ class AssetsConstruct(Construct):
                     sfn.Pass(self, "NoLargeFiles")
                 )
             )
-        ).next(restore_context).next(extract_large_file_urls)
+        ).next(init_multipart_task)
+        
+        # Connect init_multipart_task to extract_multipart_info
+        init_multipart_task.next(extract_multipart_info)
         
         # Get parts manifest using Lambda instead of direct S3 integration
         get_parts_manifest = tasks.LambdaInvoke(
@@ -1789,51 +1651,11 @@ class AssetsConstruct(Construct):
             }
         )
         
-        # Add Pass states for handling large file URLs
-        flatten_with_large_files = sfn.Pass(
-            self,
-            "FlattenWithLargeFiles",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "uploadId.$": "$.uploadId",
-                "s3Key.$": "$.s3Key",
-                "manifestKey.$": "$.manifestKey",
-                "completedParts.$": "$.completedParts",
-                "largeFileUrls.$": "$.largeFileUrls"
-            }
-        ).next(complete_multipart_task)
-        
-        no_large_file_urls = sfn.Pass(
-            self,
-            "NoLargeFileUrls",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "uploadId.$": "$.uploadId",
-                "s3Key.$": "$.s3Key",
-                "manifestKey.$": "$.manifestKey",
-                "completedParts.$": "$.completedParts",
-                "largeFileUrls": []
-            }
-        ).next(complete_multipart_task)
-        
-        # Add a Choice state to safely handle large file URLs
-        check_large_file_urls = sfn.Choice(
-            self,
-            "CheckForLargeFileUrls"
-        ).when(
-            sfn.Condition.is_present("$.largeFileUrls[0]"),
-            flatten_with_large_files
-        ).otherwise(
-            no_large_file_urls
-        )
-        
         # Complete the workflow - start from extract_multipart_info since multipart_workflow ends with a Choice state
         extract_multipart_info.next(get_parts_manifest).next(add_parts_to_state).next(process_batches_map).next(flatten_completed_parts)
         
-        # Connect flatten_completed_parts to the choice state
-        flatten_completed_parts.next(check_large_file_urls)
+        # Connect flatten_completed_parts directly to complete_multipart_task
+        flatten_completed_parts.next(complete_multipart_task)
         
         # Connect complete multipart task to success state
         complete_multipart_task.next(success_state)
@@ -1846,12 +1668,15 @@ class AssetsConstruct(Construct):
         # The difference is in how ProcessLargeFilesMap handles large files (presigned URLs vs chunking)
         workflow = assess_scale_task.next(
             job_size_choice
-            .when(sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"), single_file_task.next(success_state))
-            .when(sfn.Condition.string_equals("$.jobType", "LARGE_INDIVIDUAL"), handle_large_individual_task.next(success_state))
+            .when(
+                sfn.Condition.or_(
+                    sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"),
+                    sfn.Condition.string_equals("$.jobType", "LARGE_INDIVIDUAL")
+                ),
+                handle_large_individual_task.next(success_state)
+            )
             .otherwise(multipart_workflow)  # Used for SMALL, MIXED, and legacy job types
         )
-        
-        # Note: single_file_task already connected to success_state in the workflow definition
         
         # Final merge task is already connected to success_state in the workflow definition
         

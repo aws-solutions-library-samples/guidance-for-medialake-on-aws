@@ -268,14 +268,15 @@ def format_job_response(job: Dict[str, Any]) -> Dict[str, Any]:
         # Add job type specific information based on file counts
         small_files_count = job.get('smallFilesCount', 0)
         large_files_count = job.get('largeFilesCount', 0)
+        total_files_count = small_files_count + large_files_count
         
-        if small_files_count > 0 and large_files_count > 0:
+        if total_files_count == 1:
+            # Single file download (whether large or small)
+            response["description"] = "Single file download"
+        elif small_files_count > 0 and large_files_count > 0:
             response["description"] = f"Mixed download: {small_files_count} zipped files + {large_files_count} large files"
         elif large_files_count > 0 and small_files_count == 0:
-            if large_files_count == 1:
-                response["description"] = "Single file download"
-            else:
-                response["description"] = f"Individual downloads: {large_files_count} large files"
+            response["description"] = f"Individual downloads: {large_files_count} large files"
         elif small_files_count > 0 and large_files_count == 0:
             response["description"] = f"Zip download: {small_files_count} zipped files"
     

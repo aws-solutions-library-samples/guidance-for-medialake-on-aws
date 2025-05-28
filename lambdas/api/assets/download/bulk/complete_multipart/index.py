@@ -364,6 +364,7 @@ def update_job_completed(job_id: str, download_urls: List[str]) -> None:
 def update_job_completed_structured(job_id: str, download_urls: Dict[str, Any]) -> None:
     """
     Update the job record with structured download URLs and mark as completed.
+    Merges with existing downloadUrls to preserve large file URLs.
     
     Args:
         job_id: ID of the job to update
@@ -375,6 +376,20 @@ def update_job_completed_structured(job_id: str, download_urls: Dict[str, Any]) 
     try:
         # Calculate expiration time (7 days from now)
         expiration_time = datetime.utcnow() + timedelta(days=7)
+        
+        # First, get the current job to check for existing downloadUrls
+        current_job = get_job_details(job_id)
+        existing_download_urls = current_job.get("downloadUrls", {})
+        
+        # Merge existing URLs with new ones
+        merged_download_urls = {}
+        
+        # Preserve existing files URLs if they exist
+        if "files" in existing_download_urls:
+            merged_download_urls["files"] = existing_download_urls["files"]
+        
+        # Add new URLs from the parameter
+        merged_download_urls.update(download_urls)
         
         bulk_download_table.update_item(
             Key={"jobId": job_id},
@@ -394,7 +409,7 @@ def update_job_completed_structured(job_id: str, download_urls: Dict[str, Any]) 
             },
             ExpressionAttributeValues={
                 ":status": "COMPLETED",
-                ":downloadUrls": download_urls,
+                ":downloadUrls": merged_download_urls,
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":progress": 100,
                 ":updatedAt": datetime.utcnow().isoformat(),
@@ -402,10 +417,12 @@ def update_job_completed_structured(job_id: str, download_urls: Dict[str, Any]) 
         )
         
         logger.info(
-            "Updated job as completed with structured URLs",
+            "Updated job as completed with merged URLs",
             extra={
                 "jobId": job_id,
-                "downloadUrls": download_urls,
+                "existingUrls": existing_download_urls,
+                "newUrls": download_urls,
+                "mergedUrls": merged_download_urls,
                 "expiresAt": expiration_time.isoformat(),
             },
         )
