@@ -18,7 +18,59 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     return build();
   }
 
-  // Add group-based permissions
+  // Check for custom permissions from JWT token first
+  if ((user as any).customPermissions && Array.isArray((user as any).customPermissions)) {
+    const customPermissions = (user as any).customPermissions as string[];
+    console.log('Using custom permissions from JWT:', customPermissions);
+    
+    // Parse custom permissions (format: "resource:level")
+    customPermissions.forEach(permission => {
+      const [resource, level] = permission.split(':');
+      
+      if (level === 'admin') {
+        // Admin level - full manage permissions
+        switch (resource) {
+          case 'asset':
+            can('manage', 'asset');
+            can('view', 'asset');
+            can('create', 'asset');
+            can('edit', 'asset');
+            can('delete', 'asset');
+            break;
+          case 'pipeline':
+            can('manage', 'pipeline');
+            can('view', 'pipeline');
+            can('create', 'pipeline');
+            can('edit', 'pipeline');
+            can('delete', 'pipeline');
+            break;
+          case 'integration':
+            can('manage', 'integration');
+            can('view', 'integration');
+            can('create', 'integration');
+            can('edit', 'integration');
+            can('delete', 'integration');
+            break;
+          case 'settings':
+            can('manage', 'settings');
+            can('view', 'settings');
+            // Settings sub-permissions
+            can('manage', 'user');
+            can('manage', 'group');
+            can('manage', 'permission-set');
+            can('manage', 'connector');
+            can('manage', 'region');
+            can('manage', 'system-settings');
+            break;
+        }
+      }
+    });
+    
+    // Return early if using custom permissions
+    return build();
+  }
+
+  // Fallback to group-based permissions
   // Users in the "administrators" group can manage all settings and resources
   if (user.groups && user.groups.includes('administrators')) {
     // Settings permissions
@@ -113,12 +165,23 @@ export function transformPermissionSets(permissionSets: any[]): Permission[] {
  */
 export function extractUserFromClaims(claims: any): User {
   if (!claims) {
+    console.log('extractUserFromClaims: No claims provided');
     return { id: '', username: '', groups: [] };
   }
   
-  return {
+  console.log('=== Extracting User from Claims ===');
+  console.log('claims.sub:', claims.sub);
+  console.log('claims["cognito:username"]:', claims['cognito:username']);
+  console.log('claims["cognito:groups"]:', claims['cognito:groups']);
+  console.log('claims.email:', claims.email);
+  console.log('================================');
+  
+  const user = {
     id: claims.sub || '',
     username: claims['cognito:username'] || claims.email || claims.sub || '',
     groups: claims['cognito:groups'] || [],
   };
+  
+  console.log('Extracted user object:', user);
+  return user;
 }

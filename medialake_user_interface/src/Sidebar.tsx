@@ -107,26 +107,33 @@ function Sidebar() {
         return customTheme === 'dark' ? 'white' : theme.palette.text.secondary;
     };
 
+    const { ability } = usePermission();
+    
+    // Build menu items based on permissions
     const mainMenuItems = [
         {
             text: t('sidebar.menu.home'),
             icon: <HomeIcon />,
-            path: '/'
+            path: '/',
+            visible: true // Always show home
         },
         {
             text: t('sidebar.menu.assets'),
             icon: <MediaAssetsIcon />,
-            path: '/assets'
+            path: '/assets',
+            visible: ability?.can('view', 'asset') ?? false
         },
         {
             text: t('sidebar.menu.pipelines'),
             icon: <PipelineIcon />,
-            path: '/pipelines'
+            path: '/pipelines',
+            visible: ability?.can('view', 'pipeline') ?? false
         },
         {
             text: t('sidebar.menu.pipelineExecutions'),
             icon: <ExecutionsIcon />,
-            path: '/executions'
+            path: '/executions',
+            visible: ability?.can('view', 'pipeline') ?? false
         },
         {
             text: t('sidebar.menu.settings'),
@@ -134,16 +141,17 @@ function Sidebar() {
             onClick: () => setSettingsOpen(!settingsOpen),
             isExpandable: true,
             isExpanded: settingsOpen,
+            visible: ability?.can('view', 'settings') ?? false,
             subItems: [
-                { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors' },
-                { text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'), icon: <GroupIcon />, path: '/settings/users-groups' },
-                { text: t('sidebar.submenu.permissionSets', 'Permissions'), icon: <SecurityIcon />, path: '/settings/permission-sets' },
-                { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations' },
+                { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors', visible: ability?.can('view', 'connector') ?? false },
+                { text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'), icon: <GroupIcon />, path: '/settings/users-groups', visible: (ability?.can('view', 'user') || ability?.can('view', 'group')) ?? false },
+                { text: t('sidebar.submenu.permissionSets', 'Permissions'), icon: <SecurityIcon />, path: '/settings/permission-sets', visible: ability?.can('view', 'permission-set') ?? false },
+                { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations', visible: ability?.can('view', 'integration') ?? false },
                 // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
-                { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system' },
-            ]
+                { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system', visible: ability?.can('view', 'system-settings') ?? false },
+            ].filter(item => item.visible !== false)
         }
-    ];
+    ].filter(item => item.visible !== false);
 
     const handleNavigation = (path: string) => {
         // Don't navigate if:

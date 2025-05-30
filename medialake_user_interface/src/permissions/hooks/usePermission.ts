@@ -54,7 +54,7 @@ export function usePermission() {
     return !can(action, subject, field);
   }, [can]);
   
-  return { can, cannot, loading, error };
+  return { ability, can, cannot, loading, error };
 }
 
 /**

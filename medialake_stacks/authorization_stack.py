@@ -338,8 +338,16 @@ def handler(event, context):
             response = cognito.describe_user_pool(UserPoolId=user_pool_id)
             lambda_config = response.get('UserPool', {}).get('LambdaConfig', {})
             
-            # Update with our trigger
-            lambda_config['PreTokenGeneration'] = lambda_arn
+            # Update with our trigger - use V2_0 to support custom claims
+            # Clear V1 trigger if it exists
+            if 'PreTokenGeneration' in lambda_config:
+                del lambda_config['PreTokenGeneration']
+            
+            # Set V2 trigger
+            lambda_config['PreTokenGenerationConfig'] = {
+                'LambdaVersion': 'V2_0',
+                'LambdaArn': lambda_arn
+            }
             
             # Update the user pool
             cognito.update_user_pool(
@@ -363,6 +371,17 @@ def handler(event, context):
             timeout=cdk.Duration.minutes(5),
         )
         
+        # Grant permission for the custom resource Lambda to update Cognito
+        pre_token_generation_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "cognito-idp:DescribeUserPool",
+                    "cognito-idp:UpdateUserPool",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
+        
         # Create a provider for the Pre-Token-Generation trigger
         pre_token_generation_provider = cdk.custom_resources.Provider(
             self,
@@ -371,25 +390,25 @@ def handler(event, context):
         )
         
         
+        # Grant permission for Cognito to invoke the Pre-Token Generation Lambda
+        # This must be done BEFORE creating the custom resource
+        self._pre_token_generation_lambda.function.add_permission(
+            "CognitoInvokePermission",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            source_arn=props.cognito_user_pool.user_pool_arn,
+        )
+        
         # Create a custom resource to add the Pre-Token-Generation trigger
-        ######
-        #########   Commented out just barely RR
-        # pre_token_generation_trigger = cdk.CustomResource(
-        #     self,
-        #     "PreTokenGenerationTrigger",
-        #     service_token=pre_token_generation_provider.service_token,
-        #     properties={
-        #         "UserPoolId": props.cognito_user_pool.user_pool_id,
-        #         "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
-        #         "Timestamp": str(datetime.datetime.now().timestamp()),
-        #     },
-        # )
-
-        # Add the Pre-Token-Generation trigger to the Cognito user pool
-        # props.cognito_user_pool.add_trigger(
-        #     trigger_type=cognito.UserPoolTriggerType.PRE_TOKEN_GENERATION,
-        #     trigger_handler=pre_token_generation_trigger,
-        # )
+        pre_token_generation_trigger = cdk.CustomResource(
+            self,
+            "PreTokenGenerationTrigger",
+            service_token=pre_token_generation_provider.service_token,
+            properties={
+                "UserPoolId": props.cognito_user_pool.user_pool_id,
+                "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
+                "Timestamp": str(datetime.datetime.now().timestamp()),
+            },
+        )
 
         # Create a Lambda function for the Pre-Signup trigger
         pre_signup_lambda = lambda_.Function(
@@ -449,6 +468,17 @@ def handler(event, context):
             timeout=cdk.Duration.minutes(5),
         )
         
+        # Grant permission for the custom resource Lambda to update Cognito
+        pre_signup_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "cognito-idp:DescribeUserPool",
+                    "cognito-idp:UpdateUserPool",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
+        
         # Create a provider for the Pre-Signup trigger
         pre_signup_provider = cdk.custom_resources.Provider(
             self,
@@ -466,6 +496,13 @@ def handler(event, context):
                 "LambdaArn": self._pre_signup_lambda.function.function_arn,
                 "Timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
             },
+        )
+        
+        # Grant permission for Cognito to invoke the Pre-Signup Lambda
+        self._pre_signup_lambda.function.add_permission(
+            "CognitoInvokePermissionPreSignup",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            source_arn=props.cognito_user_pool.user_pool_arn,
         )
         
         # 9. Create a Custom Resource to seed the default permission sets

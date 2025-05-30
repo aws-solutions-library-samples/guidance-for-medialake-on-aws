@@ -167,7 +167,7 @@ export const router = createBrowserRouter([
             {
                 path: 'settings/integrations',
                 element: <RoutePermissionGuard
-                    permission={{ action: 'manage', subject: 'settings' }}
+                    permission={{ action: 'manage', subject: 'integration' }}
                     element={<IntegrationsPage />}
                 />
             },
@@ -202,7 +202,7 @@ export const router = createBrowserRouter([
             {
                 path: 'settings/system',
                 element: <RoutePermissionGuard
-                    permission={{ action: 'manage', subject: 'settings' }}
+                    permission={{ action: 'manage', subject: 'system-settings' }}
                     element={<SystemSettingsPage />}
                 />
             },

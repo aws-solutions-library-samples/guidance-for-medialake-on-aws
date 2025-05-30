@@ -22,6 +22,9 @@ export type Subjects =
   | 'group'
   | 'settings'
   | 'permission-set'
+  | 'integration'
+  | 'region'
+  | 'system-settings'
   | 'all';
 
 // Define the conditions type for subject-based authorization

@@ -9,6 +9,7 @@ import { useGetPermissionSets } from '../../api/hooks/usePermissionSets';
 import { useAuth } from '../../common/hooks/auth-context';
 import { StorageHelper } from '../../common/helpers/storage-helper';
 import { permissionCache } from '../utils/permission-cache';
+import PermissionTokenCache from '../utils/permission-token-cache';
 
 // Create the permission context with default values
 const PermissionContext = createContext<PermissionContextType>({
@@ -41,11 +42,53 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       try {
         const token = StorageHelper.getToken();
         if (token) {
+          // Check cache first
+          const cached = PermissionTokenCache.get(token);
+          if (cached) {
+            console.log('Using cached user and permissions');
+            const cachedUser = { ...cached.user, customPermissions: cached.customPermissions };
+            setUser(cachedUser);
+            return;
+          }
+          
           // Parse the JWT token to get user claims
           const tokenParts = token.split('.');
           if (tokenParts.length === 3) {
             const payload = JSON.parse(atob(tokenParts[1]));
+            console.log('=== JWT Token Claims ===');
+            console.log('Full token payload:', JSON.stringify(payload, null, 2));
+            console.log('cognito:groups claim:', payload['cognito:groups']);
+            console.log('custom:permissions claim:', payload['custom:permissions']);
+            console.log('cognito:username claim:', payload['cognito:username']);
+            console.log('sub claim:', payload.sub);
+            console.log('email claim:', payload.email);
+            console.log('======================');
+            
             const extractedUser = extractUserFromClaims(payload);
+            let customPermissions: string[] = [];
+            
+            // Parse custom:permissions from JWT
+            if (payload['custom:permissions']) {
+              try {
+                customPermissions = JSON.parse(payload['custom:permissions']);
+                console.log('Parsed custom permissions:', customPermissions);
+                // Store permissions in user object
+                extractedUser.customPermissions = customPermissions;
+              } catch (e) {
+                console.error('Failed to parse custom:permissions:', e);
+              }
+            }
+            
+            // Cache the permissions with token expiry
+            const exp = payload.exp;
+            if (exp) {
+              const expiresIn = exp - Math.floor(Date.now() / 1000); // Time until expiry in seconds
+              if (expiresIn > 0) {
+                PermissionTokenCache.set(extractedUser, customPermissions, token, expiresIn);
+              }
+            }
+            
+            console.log('Extracted user from claims:', extractedUser);
             setUser(extractedUser);
           }
         }
@@ -54,6 +97,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       setUser(null);
+      PermissionTokenCache.clear(); // Clear cache on logout
     }
   }, [isAuthenticated]);
 
@@ -62,22 +106,35 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     console.log('Permission context effect triggered');
     console.log('isAuthenticated:', isAuthenticated);
     console.log('user:', user);
+    console.log('user.customPermissions:', (user as any)?.customPermissions);
     console.log('permissionSets:', permissionSets);
     
     if (isAuthenticated && user) {
       try {
-        // Transform permission sets to the format expected by CASL
-        const transformedPermissions = transformPermissions(permissionSets || []);
-        console.log('Transformed permissions:', transformedPermissions);
-        
-        // Clear the permission cache before creating a new ability
-        console.log('Clearing permission cache before creating new ability');
-        permissionCache.clear();
-        
-        // Create the ability instance
-        const newAbility = defineAbilityFor(user, transformedPermissions);
-        console.log('New ability created:', newAbility);
-        setAbility(newAbility);
+        // Check if we have custom permissions from JWT
+        if ((user as any).customPermissions) {
+          console.log('Using custom permissions from JWT, skipping permission sets API');
+          // Clear the permission cache before creating a new ability
+          permissionCache.clear();
+          
+          // Create ability using custom permissions (empty permission sets)
+          const newAbility = defineAbilityFor(user, []);
+          console.log('New ability created with custom permissions:', newAbility);
+          setAbility(newAbility);
+        } else {
+          // Transform permission sets to the format expected by CASL
+          const transformedPermissions = transformPermissions(permissionSets || []);
+          console.log('Transformed permissions:', transformedPermissions);
+          
+          // Clear the permission cache before creating a new ability
+          console.log('Clearing permission cache before creating new ability');
+          permissionCache.clear();
+          
+          // Create the ability instance
+          const newAbility = defineAbilityFor(user, transformedPermissions);
+          console.log('New ability created:', newAbility);
+          setAbility(newAbility);
+        }
       } catch (error) {
         console.error('Error creating ability:', error);
       }

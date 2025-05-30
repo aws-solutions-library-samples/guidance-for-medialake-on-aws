@@ -222,7 +222,8 @@ class UPSFApi(Construct):
         )
 
         # Add CORS support to all resources
-        add_cors_options_method(users_resource)
+        # Don't add OPTIONS to users_resource if it was reused from UsersApi
+        # Only add OPTIONS to the sub-resources that UPSFApi creates
         add_cors_options_method(settings_namespace_resource)
         add_cors_options_method(favorites_item_type_resource)
         add_cors_options_method(profile_resource)

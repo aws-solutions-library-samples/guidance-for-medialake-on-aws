@@ -36,6 +36,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Got session after SAML redirect:', session);
           const token = session.tokens?.idToken?.toString();
           if (token) {
+            console.log('=== SAML Redirect Token ===');
+            const tokenParts = token.split('.');
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              console.log('Token claims:', JSON.stringify(payload, null, 2));
+              console.log('cognito:groups:', payload['cognito:groups']);
+              console.log('custom:permissions:', payload['custom:permissions']);
+            }
+            console.log('========================');
             StorageHelper.setToken(token);
             setIsAuthenticated(true);
           }
@@ -51,6 +60,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Auth session:', session);
           const token = session.tokens?.idToken?.toString();
           if (token) {
+            console.log('=== Regular Auth Token ===');
+            const tokenParts = token.split('.');
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              console.log('Token claims:', JSON.stringify(payload, null, 2));
+              console.log('cognito:groups:', payload['cognito:groups']);
+              console.log('custom:permissions:', payload['custom:permissions']);
+            }
+            console.log('========================');
             StorageHelper.setToken(token);
             setIsAuthenticated(true);
             // Only try to get user after we have a valid token
