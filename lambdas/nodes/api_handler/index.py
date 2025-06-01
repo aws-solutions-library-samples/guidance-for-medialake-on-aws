@@ -95,8 +95,9 @@ def make_api_call(
             return {"statusCode": response.status_code, "body": json.dumps({"error": "API call failed"})}
 
     except requests.RequestException as e:
-        logger.exception(f"Error making API call: {str(e)}")
-        return {"body": json.dumps({"error": "Internal server error"})}
+        error_message = f"Error making API call: {str(e)}"
+        logger.exception(error_message)
+        raise Exception(error_message)
 
 def build_environment_dict(config):
     env_vars = {}
@@ -362,4 +363,4 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         error_message = f"Error in lambda_handler: {str(e)}"
         logger.error(error_message)
-        return {"statusCode": 500, "body": json.dumps({"error": error_message})}
+        raise Exception(error_message)

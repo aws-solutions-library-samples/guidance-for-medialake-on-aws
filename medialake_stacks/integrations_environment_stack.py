@@ -41,7 +41,7 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    post_pipelines_v2_lambda: lambda_.Function
+    post_pipelines_lambda: lambda_.Function
 
 
 class IntegrationsEnvironmentStack(cdk.NestedStack):
@@ -105,14 +105,14 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
             ),
         )
 
-        self._props.post_pipelines_v2_lambda.add_to_role_policy(
+        self._props.post_pipelines_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Query"],
                 resources=[self._integrations_stack.integrations_table.table_arn],
             )
         )
         
-        self._props.post_pipelines_v2_lambda.add_environment(
+        self._props.post_pipelines_lambda.add_environment(
             "INTEGRATIONS_TABLE",
             self._integrations_stack.integrations_table.table_arn,
         )

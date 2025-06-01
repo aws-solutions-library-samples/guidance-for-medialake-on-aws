@@ -403,7 +403,7 @@ def build_search_query(params: SearchParams) -> Dict:
             logger.info(f"Applying Connector Bucket filter: {path_value}")
             query["bool"]["filter"].append({
                 "wildcard": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket.keyword": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": {
                         "value": path_value[0]
                     }
                 }

@@ -7,7 +7,7 @@ import { ActionsCell } from '../components/IntegrationList/cells/ActionsCell';
 import { DateCell } from '../components/IntegrationList/cells/DateCell';
 
 interface UseColumnsProps {
-    onEditIntegration: (id: string, data: Partial<Integration>) => void;
+    onEditIntegration: (id: string, integration: Integration) => void;
     onDeleteIntegration: (id: string) => void;
 }
 

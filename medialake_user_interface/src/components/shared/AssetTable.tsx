@@ -261,16 +261,17 @@ export function AssetTable<T>({
                             <Box sx={{ p: 1 }}>
                                 <Box
                                     sx={{
-                                        width: 150,
+                                        width: 60,
                                         height: 60,
                                         borderRadius: 1,
                                         overflow: 'hidden',
                                     }}
                                 >
-                                    <AssetAudio 
-                                        src={info.getValue()} 
+                                    <AssetAudio
+                                        src={info.getValue()}
                                         alt={getName(info.row.original)}
                                         compact={true}
+                                        size="small"
                                     />
                                 </Box>
                             </Box>
