@@ -493,7 +493,7 @@ class AssetsConstruct(Construct):
             self,
             "RenameAssetLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_rename_asset_{config.environment}",
+                name=f"rename_asset",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/rp_assets_id/rename/post_rename",
                 environment_variables={
@@ -671,7 +671,7 @@ class AssetsConstruct(Construct):
             self,
             "TranscriptAssetLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_transcript_asset_{config.environment}",
+                name="transcript_asset",
                 entry="lambdas/api/assets/rp_assets_id/transcript",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
@@ -858,7 +858,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadInitZipLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_init_zip_{config.environment}",
+                name=f"assets_bulk_download_init_zip",
                 entry="lambdas/api/assets/download/bulk/init_zip",
                 environment_variables={
                     **common_env_vars,
@@ -877,7 +877,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadAppendToZipLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_append_to_zip_{config.environment}",
+                name="assets_bulk_download_append_to_zip",
                 entry="lambdas/api/assets/download/bulk/append_to_zip",
                 environment_variables={
                     **common_env_vars,
@@ -898,7 +898,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadInitMultipartLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_init_multipart_{config.environment}",
+                name="assets_bulk_download_init_multipart",
                 entry="lambdas/api/assets/download/bulk/init_multipart",
                 environment_variables={
                     **common_env_vars,
@@ -917,7 +917,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadUploadPartLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_upload_part_{config.environment}",
+                name="assets_bulk_download_upload_part",
                 entry="lambdas/api/assets/download/bulk/upload_part",
                 environment_variables={
                     **common_env_vars,
@@ -946,7 +946,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadCompleteMultipartLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_complete_multipart_{config.environment}",
+                name="assets_bulk_download_complete_multipart",
                 entry="lambdas/api/assets/download/bulk/complete_multipart",
                 environment_variables={
                     **common_env_vars,
@@ -965,7 +965,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadFinalizeZipLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_download_finalize_zip_{config.environment}",
+        #         name="assets_bulk_download_finalize_zip",
         #         entry="lambdas/api/assets/download/bulk/finalize_zip",
         #         environment_variables={
         #             **common_env_vars,
@@ -984,7 +984,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadGetPartsManifestLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_get_parts_manifest_{config.environment}",
+                name="assets_bulk_download_get_parts_manifest",
                 entry="lambdas/api/assets/download/bulk/get_parts_manifest",
                 environment_variables={
                     **common_env_vars,
@@ -999,7 +999,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadKickoffLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_kickoff_{config.environment}",
+                name="assets_bulk_download_kickoff",
                 entry="lambdas/api/assets/download/bulk/kickoff",
                 environment_variables={
                     **common_env_vars,
@@ -1013,7 +1013,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadAssessScaleLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_assess_scale_{config.environment}",
+                name="assets_bulk_download_assess_scale",
                 entry="lambdas/api/assets/download/bulk/assess_scale",
                 environment_variables={
                     **common_env_vars,
@@ -1032,7 +1032,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadHandleSmallLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_download_handle_small_{config.environment}",
+        #         name="assets_bulk_download_handle_small",
         #         entry="lambdas/api/assets/download/bulk/handle_small",
         #         environment_variables={
         #             **common_env_vars,
@@ -1055,7 +1055,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadHandleLargeLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_download_handle_large_{config.environment}",
+        #         name="assets_bulk_download_handle_large",
         #         entry="lambdas/api/assets/download/bulk/handle_large",
         #         environment_variables={
         #             **common_env_vars,
@@ -1075,7 +1075,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadMergeBatchLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_download_merge_batch_{config.environment}",
+        #         name="assets_bulk_download_merge_batch",
         #         entry="lambdas/api/assets/download/bulk/merge_batch",
         #         environment_variables={
         #             **common_env_vars,
@@ -1098,7 +1098,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadFinalMergeLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_download_final_merge_{config.environment}",
+        #         name="assets_bulk_download_final_merge",
         #         entry="lambdas/api/assets/download/bulk/final_merge",
         #         environment_variables={
         #             **common_env_vars,
@@ -1121,7 +1121,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadStatusLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_status_{config.environment}",
+                name="assets_bulk_download_status",
                 entry="lambdas/api/assets/download/bulk/status",
                 environment_variables={
                     **common_env_vars,
@@ -1135,7 +1135,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadMarkDownloadedLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_mark_downloaded_{config.environment}",
+                name="assets_bulk_download_mark_downloaded",
                 entry="lambdas/api/assets/download/bulk/mark_downloaded",
                 environment_variables={
                     **common_env_vars,
@@ -1149,7 +1149,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadHandleIndividualLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_individual_{config.environment}",
+                name="assets_bulk_individual",
                 entry="lambdas/api/assets/download/bulk/handle_individual",
                 environment_variables={
                     **common_env_vars,
@@ -1165,7 +1165,7 @@ class AssetsConstruct(Construct):
         #     self,
         #     "AssetsBulkDownloadCompleteMixedJobLambda",
         #     config=LambdaConfig(
-        #         name=f"{config.resource_prefix}_assets_bulk_complete_mixed_{config.environment}",
+        #         name="assets_bulk_complete_mixed",
         #         entry="lambdas/api/assets/download/bulk/complete_mixed_job",
         #         environment_variables={
         #             **common_env_vars,
@@ -1180,7 +1180,7 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadDeleteLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_delete_{config.environment}",
+                name="assets_bulk_download_delete",
                 entry="lambdas/api/assets/download/bulk/delete",
                 environment_variables={
                     **common_env_vars,
@@ -1727,7 +1727,7 @@ class AssetsConstruct(Construct):
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
-            state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
+            state_machine_name="Asset-Bulk-Download",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
         )
