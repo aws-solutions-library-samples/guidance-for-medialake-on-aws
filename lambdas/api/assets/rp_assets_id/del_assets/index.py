@@ -1,146 +1,205 @@
 """
 Asset Deletion Lambda Handler
-
-This Lambda function handles the deletion of assets from DynamoDB based on asset ID.
-It implements best practices for AWS Lambda including:
-- Structured logging with AWS Lambda Powertools
-- Tracing with AWS X-Ray
-- Input validation and error handling
-- Metrics and monitoring
-- Security best practices
+─────────────────────────────
+• Deletes S3 objects, DynamoDB record **and matching OpenSearch docs**
+• Uses low-level SigV4-signed HTTPS calls (no opensearch-py)
+• Structured logging, tracing, metrics with AWS Lambda Powertools
 """
 
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
+import json, os, time, http.client
+from decimal          import Decimal
+from http             import HTTPStatus
+from typing           import Any, Dict, Optional, List
+from urllib.parse     import urlparse
+
+import boto3
+from botocore.auth    import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.exceptions import ClientError
+
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.metrics import MetricUnit
-from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-import boto3
-import os
-import json
-from http import HTTPStatus
-from decimal import Decimal
 
-# Initialize AWS Lambda Powertools
-logger = Logger(service="asset-deletion-service")
-tracer = Tracer(service="asset-deletion-service")
+# ── Powertools ───────────────────────────────────────────────────────────────
+logger  = Logger(service="asset-deletion-service")
+tracer  = Tracer(service="asset-deletion-service")
 metrics = Metrics(namespace="AssetDeletionService", service="asset-deletion-service")
 
-# Initialize AWS clients with X-Ray tracing
-dynamodb = boto3.resource("dynamodb")
-s3 = boto3.client("s3")
-table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+# ── AWS clients / resources ──────────────────────────────────────────────────
+dynamodb   = boto3.resource("dynamodb")
+s3         = boto3.client("s3")
+table      = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+# ── OpenSearch settings ──────────────────────────────────────────────────────
+OPENSEARCH_ENDPOINT = os.getenv("OPENSEARCH_ENDPOINT", "")
+INDEX_NAME          = os.getenv("INDEX_NAME", "media")
+AWS_REGION          = os.getenv("AWS_REGION", "us-east-1")
+OPENSEARCH_SERVICE  = os.getenv("OPENSEARCH_SERVICE", "es")      # “es” for both ES & OS
+
+_session     = boto3.Session()
+_credentials = _session.get_credentials()
+
+# ── Low-level SigV4 helper ───────────────────────────────────────────────────
+def _signed_request(method: str,
+                    url: str,
+                    credentials,
+                    service: str,
+                    region: str,
+                    payload: dict | None = None,
+                    extra_headers: dict | None = None,
+                    timeout: int = 30) -> tuple[int, str]:
+    """
+    Build, sign and send an HTTPS request with SigV4 auth.
+    Returns (status_code, response_body)
+    """
+    headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
+
+    req = AWSRequest(method=method,
+                     url=url,
+                     data=json.dumps(payload) if payload else None,
+                     headers=headers)
+    SigV4Auth(credentials, service, region).add_auth(req)
+    prepared = req.prepare()
+
+    parsed = urlparse(prepared.url)
+    path   = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+    conn = http.client.HTTPSConnection(parsed.hostname,
+                                       parsed.port or 443,
+                                       timeout=timeout)
+    conn.request(prepared.method,
+                 path,
+                 body=prepared.body,
+                 headers=dict(prepared.headers))
+    resp  = conn.getresponse()
+    body  = resp.read().decode("utf-8")
+    conn.close()
+    return resp.status, body
 
 
+# ── Utilities ────────────────────────────────────────────────────────────────
 class DecimalEncoder(json.JSONEncoder):
-    """Custom JSON encoder for Decimal types."""
-
     def default(self, obj):
         if isinstance(obj, Decimal):
             return str(obj)
-        return super(DecimalEncoder, self).default(obj)
+        return super().default(obj)
 
 
 class AssetDeletionError(Exception):
-    """Custom exception for asset deletion errors"""
-
-    def __init__(
-        self, message: str, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR
-    ):
+    def __init__(self, message: str, status_code: int = HTTPStatus.INTERNAL_SERVER_ERROR):
         super().__init__(message)
         self.status_code = status_code
 
 
 class DeleteRequest(BaseModel):
-    """Request model for delete operation"""
-
     inventoryId: str = Field(..., description="Inventory ID of the asset to delete")
 
 
 @tracer.capture_method
 def get_asset(inventory_id: str) -> Dict[str, Any]:
-    """
-    Retrieves asset details for deletion.
-    """
     try:
-        response = table.get_item(Key={"InventoryID": inventory_id})
-
-        if "Item" not in response:
-            raise AssetDeletionError(
-                f"Asset with ID {inventory_id} not found", HTTPStatus.NOT_FOUND
-            )
-
-        # Convert Decimal objects for JSON serialization
-        return json.loads(json.dumps(response["Item"], cls=DecimalEncoder))
-
+        resp = table.get_item(Key={"InventoryID": inventory_id})
+        if "Item" not in resp:
+            raise AssetDeletionError(f"Asset with ID {inventory_id} not found",
+                                     HTTPStatus.NOT_FOUND)
+        return json.loads(json.dumps(resp["Item"], cls=DecimalEncoder))
     except ClientError as e:
-        logger.error(f"DynamoDB error: {str(e)}")
-        raise AssetDeletionError(f"Failed to retrieve asset: {str(e)}")
+        logger.error(f"DynamoDB error: {e}")
+        raise AssetDeletionError(f"Failed to retrieve asset: {e}")
 
 
 @tracer.capture_method
 def delete_s3_objects(asset: Dict[str, Any]) -> None:
-    """
-    Deletes all S3 objects associated with the asset.
-    """
     try:
-        # Delete main representation
-        main_rep = asset["DigitalSourceAsset"]["MainRepresentation"]
-        main_storage = main_rep["StorageInfo"]["PrimaryLocation"]
-        main_bucket = main_storage["Bucket"]
-        main_key = main_storage["ObjectKey"]["FullPath"]
+        # Main representation
+        main = asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+        s3.delete_object(Bucket=main["Bucket"], Key=main["ObjectKey"]["FullPath"])
+        logger.info("Deleted main representation",
+                    extra={"bucket": main['Bucket'], "key": main['ObjectKey']['FullPath']})
 
-        logger.info(
-            "Deleting main representation",
-            extra={
-                "bucket": main_bucket,
-                "key": main_key,
-                "operation": "delete_main_representation",
-            },
-        )
-
-        s3.delete_object(Bucket=main_bucket, Key=main_key)
-
-        # Delete derived representations
-        for derived in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
-            if not derived.get("StorageInfo", {}).get("PrimaryLocation"):
+        # Derived
+        for rep in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
+            pl = rep.get("StorageInfo", {}).get("PrimaryLocation")
+            if not pl:
                 continue
-
-            storage = derived["StorageInfo"]["PrimaryLocation"]
-            derived_bucket = storage["Bucket"]
-            derived_key = storage["ObjectKey"]["FullPath"]
-
-            logger.info(
-                "Deleting derived representation",
-                extra={
-                    "bucket": derived_bucket,
-                    "key": derived_key,
-                    "operation": "delete_derived_representation",
-                },
-            )
-
-            s3.delete_object(Bucket=derived_bucket, Key=derived_key)
+            s3.delete_object(Bucket=pl["Bucket"], Key=pl["ObjectKey"]["FullPath"])
+            logger.info("Deleted derived representation",
+                        extra={"bucket": pl['Bucket'], "key": pl['ObjectKey']['FullPath']})
 
     except ClientError as e:
-        logger.error(f"S3 deletion error: {str(e)}")
-        raise AssetDeletionError(f"Failed to delete S3 objects: {str(e)}")
+        logger.error(f"S3 deletion error: {e}")
+        raise AssetDeletionError(f"Failed to delete S3 objects: {e}")
 
 
-def create_response(
-    status_code: int, message: str, data: Dict[str, Any] = None
-) -> Dict[str, Any]:
-    """Creates a standardized API response."""
-    body = {
-        "status": "success" if status_code < 400 else "error",
-        "message": message,
-        "data": data or {},
+@tracer.capture_method
+def delete_opensearch_docs(asset: Dict[str, Any]) -> None:
+    """
+    Delete OpenSearch documents whose DigitalSourceAsset.ID equals the asset’s ID.
+    Uses _delete_by_query with SigV4-signed request.
+    """
+    if not OPENSEARCH_ENDPOINT:
+        logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
+        return
+
+    host   = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
+    dsa_id = asset.get("DigitalSourceAsset", {}).get("ID")
+    if not dsa_id:
+        logger.warning("DigitalSourceAsset.ID missing – skipping OpenSearch deletion.")
+        return
+
+    query = {
+        "query": {
+            "term": {
+                "DigitalSourceAsset.ID": dsa_id
+            }
+        }
     }
 
+    url = f"https://{host}/{INDEX_NAME}/_delete_by_query?refresh=true&conflicts=proceed"
+    logger.info("Executing _delete_by_query",
+                extra={"url": url, "query": query, "dsa_id": dsa_id})
+
+    status, body = _signed_request(
+        "POST",
+        url,
+        _credentials,
+        OPENSEARCH_SERVICE,
+        AWS_REGION,
+        payload=query,
+        timeout=60
+    )
+
+    if status not in (200, 202):
+        logger.error("OpenSearch deletion failed",
+                     extra={"status": status, "body": body, "dsa_id": dsa_id})
+        raise AssetDeletionError(f"Failed to delete OpenSearch docs (status {status})")
+
+    deleted = 0
+    try:
+        deleted = json.loads(body).get("deleted", 0)
+    except (ValueError, AttributeError):
+        pass
+
+    logger.info("OpenSearch deletion complete",
+                extra={"deleted_docs": deleted, "dsa_id": dsa_id})
+    metrics.add_metric("OpenSearchDocsDeleted", MetricUnit.Count, deleted)
+
+
+def create_response(status: int, msg: str, data: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    body = {"status": "success" if status < 400 else "error",
+            "message": msg,
+            "data": data or {}}
+
     return {
-        "statusCode": status_code,
+        "statusCode": status,
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
@@ -150,48 +209,42 @@ def create_response(
     }
 
 
+# ── Lambda entrypoint ────────────────────────────────────────────────────────
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: APIGatewayProxyEvent, context: LambdaContext
-) -> Dict[str, Any]:
-    """Lambda handler for asset deletion."""
+def lambda_handler(event: APIGatewayProxyEvent,
+                   _ctx: LambdaContext) -> Dict[str, Any]:
+    inventory_id = None
     try:
-        # Extract and validate inventory ID from path parameters
         inventory_id = event.get("pathParameters", {}).get("id")
         if not inventory_id:
             raise AssetDeletionError("Missing inventory ID", HTTPStatus.BAD_REQUEST)
 
-        # Get asset details
+        # 1. Fetch asset (Dynamo)
         asset = get_asset(inventory_id)
 
-        # Delete S3 objects
+        # 2. Delete from S3
         delete_s3_objects(asset)
 
-        # Delete DynamoDB record
+        # 3. Delete DynamoDB row
         table.delete_item(Key={"InventoryID": inventory_id})
+        metrics.add_metric("AssetDeletionsDynamo", MetricUnit.Count, 1)
 
-        # Record successful deletion metric
-        metrics.add_metric(name="AssetDeletions", unit=MetricUnit.Count, value=1)
+        # 4. Delete from OpenSearch
+        delete_opensearch_docs(asset)
 
-        return create_response(
-            HTTPStatus.OK, "Asset deleted successfully", {"inventoryId": inventory_id}
-        )
+        return create_response(HTTPStatus.OK,
+                               "Asset deleted successfully",
+                               {"inventoryId": inventory_id})
 
     except AssetDeletionError as e:
-        logger.warning(
-            f"Asset deletion failed: {str(e)}",
-            extra={"inventory_id": inventory_id, "error_code": e.status_code},
-        )
+        logger.warning("Asset deletion failed",
+                       extra={"inventory_id": inventory_id, "error": str(e)})
         return create_response(e.status_code, str(e))
 
     except Exception as e:
-        logger.error(
-            f"Unexpected error during asset deletion: {str(e)}",
-            extra={"inventory_id": inventory_id},
-        )
-        metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
-        return create_response(
-            HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error"
-        )
+        logger.exception("Unexpected error during asset deletion",
+                         extra={"inventory_id": inventory_id})
+        metrics.add_metric("UnexpectedErrors", MetricUnit.Count, 1)
+        return create_response(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")

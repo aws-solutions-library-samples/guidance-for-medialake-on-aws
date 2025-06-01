@@ -24,7 +24,7 @@ from dynamodb_operations import (
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
 tracer = Tracer()
-metrics = Metrics(namespace="PostPipeliNeV2")
+metrics = Metrics(namespace="PostPipeline")
 
 def transform_pipeline_data(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
     """

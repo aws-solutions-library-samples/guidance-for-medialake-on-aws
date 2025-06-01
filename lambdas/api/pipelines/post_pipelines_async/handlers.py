@@ -272,7 +272,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 # Get the Step Function ARN from environment variables
 PIPELINE_CREATION_STATE_MACHINE_ARN = os.environ.get("PIPELINE_CREATION_STATE_MACHINE_ARN")
 
-@app.post("/pipelinesv2")
+@app.post("/pipelines")
 @tracer.capture_method
 def create_pipeline() -> Dict[str, Any]:
     """
@@ -394,7 +394,7 @@ def create_pipeline() -> Dict[str, Any]:
             "body": json.dumps(error_body),
         }
 
-@app.get("/pipelinesv2/status/{executionArn}")
+@app.get("/pipelines/status/{executionArn}")
 @tracer.capture_method
 def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
     """
@@ -511,7 +511,7 @@ def get_pipeline_status(executionArn: str) -> Dict[str, Any]:
             "body": json.dumps(error_body),
         }
 
-@app.get("/pipelinesv2/pipeline/{pipelineId}")
+@app.get("/pipelines/pipeline/{pipelineId}")
 @tracer.capture_method
 def get_pipeline_by_id_handler(pipelineId: str) -> Dict[str, Any]:
     """

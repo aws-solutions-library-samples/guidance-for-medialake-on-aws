@@ -16,11 +16,12 @@ import { FormSelect } from '@/forms/components/FormSelect';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
 import { IntegrationConfigurationProps, IntegrationFormData } from '@/features/settings/integrations/components/IntegrationForm/types';
 
-export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> = ({
+export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps & { isEditMode?: boolean }> = ({
     formData,
     onSubmit,
     onBack,
     onClose,
+    isEditMode = false,
 }) => {
     const { t } = useTranslation();
     const [showApiKey, setShowApiKey] = React.useState(false);
@@ -38,7 +39,17 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                     iamRole: z.string().optional()
                 })
             })
-        }).strict();
+        }).strict().refine((data) => {
+            // For apiKey auth type, require apiKey unless it's the placeholder for existing key
+            if (data.auth.type === 'apiKey') {
+                const apiKey = data.auth.credentials.apiKey;
+                return apiKey && (apiKey.length > 0 || apiKey === '***existing***');
+            }
+            return true;
+        }, {
+            message: 'API Key is required',
+            path: ['auth', 'credentials', 'apiKey']
+        });
     }, []);
 
     // Ensure form data matches schema structure exactly
@@ -66,6 +77,32 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         translationPrefix: 'integrations.form',
     });
 
+    // Reset form only once when component mounts with initial data
+    const [hasInitialized, setHasInitialized] = React.useState(false);
+    const [lastNodeId, setLastNodeId] = React.useState('');
+    
+    React.useEffect(() => {
+        // Reset if we have a new nodeId (different integration) or haven't initialized yet
+        if ((!hasInitialized || lastNodeId !== initialFormData.nodeId) && initialFormData.nodeId) {
+            console.log('[IntegrationConfiguration] Initial form setup:', initialFormData);
+            form.reset(initialFormData);
+            setHasInitialized(true);
+            setLastNodeId(initialFormData.nodeId);
+            // Trigger validation after reset
+            setTimeout(() => {
+                form.trigger();
+            }, 0);
+        }
+    }, [initialFormData, form, hasInitialized, lastNodeId]);
+
+    // Reset initialization when component unmounts or form closes
+    React.useEffect(() => {
+        return () => {
+            setHasInitialized(false);
+            setLastNodeId('');
+        };
+    }, []);
+
     React.useEffect(() => {
         // Log form state changes
         const subscription = form.watch((value) => {
@@ -78,7 +115,8 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         values: form.getValues(),
         isValid: form.formState.isValid,
         isDirty: form.formState.isDirty,
-        errors: form.formState.errors
+        errors: form.formState.errors,
+        errorDetails: JSON.stringify(form.formState.errors, null, 2)
     });
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
@@ -89,24 +127,28 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
         try {
             const now = new Date().toISOString();
 
-            // Add metadata to the form data before submitting
-            const submissionData = {
-                ...data, // This includes all required fields from IntegrationFormData
-                integrationType: data.nodeId.replace('node-', '').replace('-api', ''),
-                integrationEnabled: enabled,
-                createdDate: now,
-                modifiedDate: now,
-            };
-            
+            // Handle the case where API key is the placeholder (not changed in edit mode)
+            const submissionData = { ...data };
+            if (data.auth.credentials.apiKey === '***existing***') {
+                // Don't include the placeholder in the submission - let the backend keep the existing key
+                submissionData.auth = {
+                    ...data.auth,
+                    credentials: {
+                        ...data.auth.credentials,
+                        apiKey: undefined, // Remove the placeholder
+                    }
+                };
+            }
+
             console.log('[IntegrationConfiguration] Prepared submission data:', submissionData);
 
-            await onSubmit(data);
+            await onSubmit(submissionData);
             console.log('[IntegrationConfiguration] Submission completed');
         } catch (error) {
             console.error('[IntegrationConfiguration] Error during submission:', error);
             throw error; // Re-throw to allow parent component to handle the error
         }
-    }, [onSubmit, enabled]);
+    }, [onSubmit, enabled, onClose]);
 
     const authMethod = formData.auth.type;
 
@@ -157,6 +199,7 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                         type={showApiKey ? 'text' : 'password'}
                         required
                         translationPrefix="integrations.form"
+                        placeholder={formData.auth?.credentials?.apiKey === '***existing***' ? 'Leave unchanged to keep existing API key' : 'Enter your API key'}
                         InputProps={{
                             endAdornment: (
                                 <InputAdornment position="end">
@@ -173,10 +216,12 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps> =
                 )}
             </Box>
 
-            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-                <Button onClick={onBack} variant="outlined">
-                    {t('common.back')}
-                </Button>
+            <Box sx={{ mt: 4, display: 'flex', justifyContent: isEditMode ? 'flex-end' : 'space-between' }}>
+                {!isEditMode && (
+                    <Button onClick={onBack} variant="outlined">
+                        {t('common.back')}
+                    </Button>
+                )}
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button onClick={onClose} variant="outlined">
                         {t('common.cancel')}

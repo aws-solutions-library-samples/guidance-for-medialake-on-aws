@@ -20,7 +20,7 @@ from resource_cleanup import cleanup_pipeline_resources
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
 tracer = Tracer()
-metrics = Metrics(namespace="DeletePipelineV2")
+metrics = Metrics(namespace="DeletePipeline")
 
 # Configure CORS and API Gateway resolver
 cors_config = CORSConfig(allow_origin="*", allow_headers=["*"])
@@ -30,7 +30,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 # --------
 # Route Handler
 # --------
-@app.delete("/pipelinesv2/<pipeline_id>")
+@app.delete("/pipelines/<pipeline_id>")
 @tracer.capture_method
 def delete_pipeline_by_id(pipeline_id: str) -> Dict[str, Any]:
     """
@@ -65,9 +65,11 @@ def delete_pipeline_by_id(pipeline_id: str) -> Dict[str, Any]:
         # Get dependent resources
         dependent_resources = pipeline.get("dependentResources", [])
         logger.info(f"Found {len(dependent_resources)} dependent resources to clean up")
+        logger.info(f"Dependent resources details: {dependent_resources}")
 
         # Clean up resources
         cleanup_results = cleanup_pipeline_resources(dependent_resources)
+        logger.info(f"Cleanup results: {cleanup_results}")
 
         # Delete pipeline from DynamoDB
         delete_success = delete_pipeline_from_dynamodb(pipeline_id)
@@ -108,7 +110,7 @@ def delete_pipeline_by_id(pipeline_id: str) -> Dict[str, Any]:
         }
 
 
-@app.delete("/pipelinesv2")
+@app.delete("/pipelines")
 @tracer.capture_method
 def delete_pipeline() -> Dict[str, Any]:
     """
@@ -172,9 +174,11 @@ def delete_pipeline() -> Dict[str, Any]:
         logger.info(
             f"Found pipeline with ID {pipeline_id} and {len(dependent_resources)} dependent resources"
         )
+        logger.info(f"Dependent resources details: {dependent_resources}")
 
         # Clean up resources
         cleanup_results = cleanup_pipeline_resources(dependent_resources)
+        logger.info(f"Cleanup results: {cleanup_results}")
 
         # Delete pipeline from DynamoDB
         delete_success = delete_pipeline_from_dynamodb(pipeline_id)

@@ -31,6 +31,83 @@ def _strip_decimals(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
 
+# ── helpers: field sanitization ────────────────────────────────────
+def _sanitize_field_name(field_name: str) -> str:
+    """Sanitize all field names to avoid conflicts with object mapping."""
+    # Remove problematic characters and prefixes
+    sanitized = field_name.replace("@", "").replace("#", "")
+    
+    # Convert to lowercase with underscores (snake_case)
+    # This ensures consistent naming and avoids case-sensitive conflicts
+    import re
+    
+    # Insert underscores before uppercase letters (CamelCase to snake_case)
+    sanitized = re.sub(r'(?<!^)(?=[A-Z])', '_', sanitized)
+    
+    # Convert to lowercase
+    sanitized = sanitized.lower()
+    
+    # Replace any remaining problematic characters with underscores
+    sanitized = re.sub(r'[^a-z0-9_]', '_', sanitized)
+    
+    # Remove multiple consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure field name doesn't start with a number
+    if sanitized and sanitized[0].isdigit():
+        sanitized = f"field_{sanitized}"
+    
+    # Ensure we have a valid field name
+    if not sanitized:
+        sanitized = "unknown_field"
+    
+    return sanitized
+
+def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
+    """Ensure field values are simple types, not complex objects."""
+    if isinstance(value, (dict, list)):
+        # Convert complex objects to string representation to avoid mapping conflicts
+        return str(value)
+    elif isinstance(value, (int, float, str, bool)) or value is None:
+        return value
+    else:
+        # For numeric-looking strings, try to preserve as numbers if the field should be numeric
+        if isinstance(value, str) and _should_be_numeric_field(field_name):
+            try:
+                # Try to convert to int first, then float
+                if '.' in value:
+                    return float(value)
+                else:
+                    return int(value)
+            except (ValueError, TypeError):
+                pass
+        
+        # Convert any other type to string
+        return str(value)
+
+def _should_be_numeric_field(field_name: str) -> bool:
+    """Check if a field should remain numeric based on its name."""
+    numeric_fields = {
+        'channels', 'channel_count', 'sample_rate', 'bit_rate', 'bitrate',
+        'duration', 'width', 'height', 'frame_rate', 'framerate', 'fps',
+        'size', 'filesize', 'file_size', 'length', 'count', 'number',
+        'index', 'id', 'level', 'profile', 'delay', 'stream_size'
+    }
+    
+    # Convert field name to lowercase for comparison
+    field_lower = field_name.lower()
+    
+    # Check exact matches
+    if field_lower in numeric_fields:
+        return True
+    
+    # Check if field name contains numeric indicators
+    numeric_indicators = ['_rate', '_count', '_size', '_duration', '_width', '_height', '_fps']
+    return any(indicator in field_lower for indicator in numeric_indicators)
+
 # ── helpers: analysis tools ────────────────────────────────────────
 def run_ffprobe(file_path: str) -> Dict[str, Any]:
     cmd = ["/opt/bin/ffprobe", "-v", "error",
@@ -66,7 +143,10 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(video_mi):
             for k, v in video_mi[i].items():
                 if v and not merged_v.get(k):
-                    merged_v[k] = v
+                    # Sanitize field name and ensure it's a simple value
+                    sanitized_key = _sanitize_field_name(k)
+                    sanitized_value = _sanitize_field_value(v, sanitized_key)
+                    merged_v[sanitized_key] = sanitized_value
         merged["video"].append(merged_v)
 
     for i, s in enumerate(audio_ff):
@@ -74,7 +154,10 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(audio_mi):
             for k, v in audio_mi[i].items():
                 if v and not merged_a.get(k):
-                    merged_a[k] = v
+                    # Sanitize field name and ensure it's a simple value
+                    sanitized_key = _sanitize_field_name(k)
+                    sanitized_value = _sanitize_field_value(v, sanitized_key)
+                    merged_a[sanitized_key] = sanitized_value
         merged["audio"].append(merged_a)
 
     return merged

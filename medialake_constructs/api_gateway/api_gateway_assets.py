@@ -162,10 +162,14 @@ class AssetsConstruct(Construct):
             config=LambdaConfig(
                 name="rp_asset_id_delete",
                 entry="lambdas/api/assets/rp_assets_id/del_assets",
+                vpc=props.vpc,
+                security_groups=[props.security_group],
                 layers=[search_layer.layer],
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "INDEX_NAME": props.opensearch_index,
                 },
             ),
         )
@@ -237,6 +241,45 @@ class AssetsConstruct(Construct):
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
                 resources=[props.asset_table.table_arn],
+            )
+        )
+
+        # Add OpenSearch permissions for DELETE Lambda
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpGet",
+                    "es:ESHttpPost",
+                    "es:ESHttpPut",
+                    "es:ESHttpDelete",
+                    "es:DescribeElasticsearchDomain",
+                    "es:ListDomainNames",
+                    "es:ESHttpHead",
+                ],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
+        )
+
+        # Add Secrets Manager permissions for DELETE Lambda
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[props.x_origin_verify_secret.secret_arn],
+            )
+        )
+
+        # Add EC2 permissions for VPC access for DELETE Lambda
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
             )
         )
 
