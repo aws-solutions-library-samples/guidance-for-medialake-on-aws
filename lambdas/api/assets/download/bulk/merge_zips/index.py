@@ -57,7 +57,7 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 MAX_PRESIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60  # 7 days in seconds
 MAX_RETRIES = 3  # Maximum number of retries for S3 operations
 FINAL_ZIP_PREFIX = "temp/zip/final"
-MERGE_BATCH_SIZE = int(os.environ.get("MERGE_BATCH_SIZE", "5"))  # Number of zip files to merge at once
+MERGE_BATCH_SIZE = int(os.environ.get("MERGE_BATCH_SIZE", "100"))  # Number of zip files to merge at once
 MAX_ZIP_ENTRIES = 65000  # Slightly below the 65,535 limit for safety
 
 
@@ -151,9 +151,8 @@ def merge_zip_files(
         True if merge was successful, False otherwise
     """
     try:
-        # Create a temporary directory for downloaded large zip files (use EFS for more space)
-        base_dir = os.environ.get("EFS_MOUNT_PATH", "/tmp")
-        with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
+        # Create a temporary directory for downloaded large zip files
+        with tempfile.TemporaryDirectory() as temp_dir:
             # Download large zip files from S3
             large_zip_local_paths = []
             for s3_path in large_zip_files:
@@ -470,14 +469,8 @@ def cleanup_temp_files(job_id: str, small_zip_files: List[str], large_zip_files:
     
     # Clean up S3 temporary files
     try:
-        for item in large_zip_files:
+        for s3_path in large_zip_files:
             try:
-                # Handle both string paths and dictionary objects
-                if isinstance(item, dict) and "chunkZipPath" in item:
-                    s3_path = item.get("chunkZipPath")
-                else:
-                    s3_path = item
-                
                 # Parse S3 path
                 parsed = urlparse(s3_path)
                 bucket = parsed.netloc
@@ -488,7 +481,7 @@ def cleanup_temp_files(job_id: str, small_zip_files: List[str], large_zip_files:
             except Exception as e:
                 logger.warning(
                     f"Failed to delete S3 temporary file: {str(e)}",
-                    extra={"s3Path": item}
+                    extra={"s3Path": s3_path}
                 )
     
     except Exception as e:
@@ -516,31 +509,11 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         raise ValueError("Missing jobId in event")
     
     # Get small and large zip files from event
-    small_zip_files_input = event.get("smallZipFiles", [])
-    large_zip_files_input = event.get("largeZipFiles", [])
-    
-    # Extract actual file paths from the input
-    small_zip_files = []
-    for item in small_zip_files_input:
-        if isinstance(item, dict) and "smallZipFiles" in item:
-            # Extract the array of paths from the dictionary
-            small_zip_files.extend(item.get("smallZipFiles", []))
-        elif isinstance(item, str):
-            small_zip_files.append(item)
-    
-    # Extract S3 paths from large zip files
-    large_zip_files = []
-    for item in large_zip_files_input:
-        if isinstance(item, dict) and "chunkZipPath" in item:
-            # Extract the S3 path from the dictionary
-            large_zip_files.append(item.get("chunkZipPath"))
-        elif isinstance(item, str):
-            large_zip_files.append(item)
+    small_zip_files = event.get("smallZipFiles", [])
+    large_zip_files = event.get("largeZipFiles", [])
     
     # Create a temporary directory for merged zip files
-    # Use EFS for temporary storage instead of Lambda's local storage
-    base_dir = os.environ.get("EFS_MOUNT_PATH", "/tmp")
-    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
+    with tempfile.TemporaryDirectory() as temp_dir:
         try:
             logger.info(
                 "Merging zip files",
@@ -570,232 +543,49 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 }
             )
             
-            # Process files in smaller batches to avoid disk space issues
-            # First process small files in batches
-            small_batches = []
-            for i in range(0, len(small_zip_files), MERGE_BATCH_SIZE):
-                small_batch = small_zip_files[i:i + MERGE_BATCH_SIZE]
-                small_batches.append(small_batch)
+            # First, download any large zip files from S3 to local storage
+            local_large_zip_files = []
+            for s3_path in large_zip_files:
+                local_path = os.path.join(temp_dir, os.path.basename(s3_path))
+                if download_s3_zip(s3_path, local_path):
+                    local_large_zip_files.append(local_path)
             
-            # Then process large files in batches
-            large_batches = []
-            for i in range(0, len(large_zip_files), MERGE_BATCH_SIZE // 2):  # Smaller batches for large files
-                large_batch = large_zip_files[i:i + MERGE_BATCH_SIZE // 2]
-                large_batches.append(large_batch)
+            # Combine all zip files
+            all_zip_files = small_zip_files + local_large_zip_files
             
-            # Process each batch and create intermediate zips
-            intermediate_zips = []
+            # Merge in batches if needed
+            success, intermediate_zips = merge_in_batches(all_zip_files, temp_dir, job_id)
             
-            # Process small file batches
-            for batch_idx, small_batch in enumerate(small_batches):
-                batch_zip_name = f"small_batch_{batch_idx}_{job_id}.zip"
-                batch_zip_path = os.path.join(temp_dir, batch_zip_name)
-                
-                logger.info(
-                    f"Processing small files batch {batch_idx + 1}/{len(small_batches)}",
-                    extra={
-                        "jobId": job_id,
-                        "batchSize": len(small_batch),
-                    }
-                )
-                
-                # Create a zip file for this batch
-                with zipfile.ZipFile(batch_zip_path, 'w', zipfile.ZIP_DEFLATED) as output_zip:
-                    # Track files already added to avoid duplicates
-                    added_files = set()
-                    
-                    # Process each zip file in the batch
-                    for zip_path in small_batch:
-                        try:
-                            with zipfile.ZipFile(zip_path, 'r') as input_zip:
-                                # Get list of files in this zip
-                                for file_info in input_zip.infolist():
-                                    # Skip directories and duplicates
-                                    if file_info.filename.endswith('/') or file_info.filename in added_files:
-                                        continue
-                                    
-                                    # Read file from input zip and write to output zip
-                                    file_data = input_zip.read(file_info.filename)
-                                    output_zip.writestr(file_info, file_data)
-                                    added_files.add(file_info.filename)
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing zip file {zip_path}: {str(e)}",
-                                extra={"zipPath": zip_path}
-                            )
-                            # Continue with next zip file
-                
-                intermediate_zips.append(batch_zip_path)
-            
-            # Process large file batches
-            for batch_idx, large_batch in enumerate(large_batches):
-                batch_zip_name = f"large_batch_{batch_idx}_{job_id}.zip"
-                batch_zip_path = os.path.join(temp_dir, batch_zip_name)
-                
-                logger.info(
-                    f"Processing large files batch {batch_idx + 1}/{len(large_batches)}",
-                    extra={
-                        "jobId": job_id,
-                        "batchSize": len(large_batch),
-                    }
-                )
-                
-                # Create a temporary directory for downloaded large zip files (use EFS for more space)
-                with tempfile.TemporaryDirectory(dir=base_dir) as download_temp_dir:
-                    # Download large zip files from S3 for this batch only
-                    local_large_zip_files = []
-                    for s3_path in large_batch:
-                        local_path = os.path.join(download_temp_dir, os.path.basename(s3_path))
-                        if download_s3_zip(s3_path, local_path):
-                            local_large_zip_files.append(local_path)
-                    
-                    # Create a zip file for this batch
-                    with zipfile.ZipFile(batch_zip_path, 'w', zipfile.ZIP_DEFLATED) as output_zip:
-                        # Track files already added to avoid duplicates
-                        added_files = set()
-                        
-                        # Process each zip file in the batch
-                        for zip_path in local_large_zip_files:
-                            try:
-                                with zipfile.ZipFile(zip_path, 'r') as input_zip:
-                                    # Get list of files in this zip
-                                    for file_info in input_zip.infolist():
-                                        # Skip directories and duplicates
-                                        if file_info.filename.endswith('/') or file_info.filename in added_files:
-                                            continue
-                                        
-                                        # Read file from input zip and write to output zip
-                                        file_data = input_zip.read(file_info.filename)
-                                        output_zip.writestr(file_info, file_data)
-                                        added_files.add(file_info.filename)
-                            except Exception as e:
-                                logger.error(
-                                    f"Error processing zip file {zip_path}: {str(e)}",
-                                    extra={"zipPath": zip_path}
-                                )
-                                # Continue with next zip file
-                
-                intermediate_zips.append(batch_zip_path)
-                
-                # Clean up downloaded files after each batch to save space
-                # The temporary directory will be automatically cleaned up
-            
-            # Now merge the intermediate zips in batches if needed
-            if intermediate_zips:
+            if success and intermediate_zips:
                 # If we have multiple intermediate zips, merge them into a final zip
                 if len(intermediate_zips) > 1:
                     logger.info(
                         f"Merging {len(intermediate_zips)} intermediate zip files into final zip",
                         extra={"jobId": job_id}
                     )
-                    
-                    # If we have too many intermediate zips, merge them in batches
-                    if len(intermediate_zips) > MERGE_BATCH_SIZE:
-                        logger.info(
-                            f"Too many intermediate zips ({len(intermediate_zips)}), merging in batches",
-                            extra={"jobId": job_id}
-                        )
+                    if merge_zip_files(intermediate_zips, [], final_zip_path, job_id):
+                        # Upload merged zip to S3
+                        s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
                         
-                        # Merge intermediate zips in batches
-                        second_level_zips = []
-                        for i in range(0, len(intermediate_zips), MERGE_BATCH_SIZE):
-                            batch = intermediate_zips[i:i + MERGE_BATCH_SIZE]
-                            batch_zip_name = f"level2_batch_{i//MERGE_BATCH_SIZE}_{job_id}.zip"
-                            batch_zip_path = os.path.join(temp_dir, batch_zip_name)
-                            
-                            logger.info(
-                                f"Merging level 2 batch {i//MERGE_BATCH_SIZE + 1}/{(len(intermediate_zips) + MERGE_BATCH_SIZE - 1)//MERGE_BATCH_SIZE}",
-                                extra={
-                                    "jobId": job_id,
-                                    "batchSize": len(batch),
-                                }
-                            )
-                            
-                            if merge_zip_files(batch, [], batch_zip_path, job_id):
-                                second_level_zips.append(batch_zip_path)
-                                
-                                # Clean up intermediate zips after merging to save space
-                                for zip_path in batch:
-                                    try:
-                                        if os.path.exists(zip_path):
-                                            os.remove(zip_path)
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"Failed to remove intermediate zip file: {str(e)}",
-                                            extra={"zipPath": zip_path}
-                                        )
+                        # Generate presigned URL
+                        download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
                         
-                        # Now merge the second level zips into the final zip
-                        if merge_zip_files(second_level_zips, [], final_zip_path, job_id):
-                            # Clean up second level zips
-                            for zip_path in second_level_zips:
-                                try:
-                                    if os.path.exists(zip_path):
-                                        os.remove(zip_path)
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Failed to remove second level zip file: {str(e)}",
-                                        extra={"zipPath": zip_path}
-                                    )
-                            
-                            # Upload merged zip to S3
-                            s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
-                            
-                            # Generate presigned URL
-                            download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
-                            
-                            # Update job as completed
-                            update_job_completed(job_id, [download_url])
-                            
-                            # Clean up temporary files
-                            cleanup_temp_files(job_id, small_zip_files, large_zip_files_input)
-                            
-                            # Add metrics
-                            metrics.add_metric(name="JobsCompleted", unit=MetricUnit.Count, value=1)
-                            
-                            # Return updated job details
-                            return {
-                                "jobId": job_id,
-                                "userId": job.get("userId"),
-                                "status": "COMPLETED",
-                                "downloadUrls": [download_url],
-                            }
-                    else:
-                        # Merge all intermediate zips directly into the final zip
-                        if merge_zip_files(intermediate_zips, [], final_zip_path, job_id):
-                            # Upload merged zip to S3
-                            s3_key = upload_to_s3_with_expiration(final_zip_path, job_id)
-                            
-                            # Generate presigned URL
-                            download_url = generate_presigned_url(MEDIA_ASSETS_BUCKET, s3_key)
-                            
-                            # Update job as completed
-                            update_job_completed(job_id, [download_url])
-                            
-                            # Clean up temporary files
-                            cleanup_temp_files(job_id, small_zip_files, large_zip_files_input)
-                            
-                            # Also clean up intermediate zips
-                            for zip_path in intermediate_zips:
-                                try:
-                                    if os.path.exists(zip_path):
-                                        os.remove(zip_path)
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Failed to remove intermediate zip file: {str(e)}",
-                                        extra={"zipPath": zip_path}
-                                    )
-                            
-                            # Add metrics
-                            metrics.add_metric(name="JobsCompleted", unit=MetricUnit.Count, value=1)
-                            
-                            # Return updated job details
-                            return {
-                                "jobId": job_id,
-                                "userId": job.get("userId"),
-                                "status": "COMPLETED",
-                                "downloadUrls": [download_url],
-                            }
+                        # Update job as completed
+                        update_job_completed(job_id, [download_url])
+                        
+                        # Clean up temporary files
+                        cleanup_temp_files(job_id, small_zip_files, large_zip_files)
+                        
+                        # Also clean up intermediate zips
+                        for zip_path in intermediate_zips:
+                            try:
+                                if os.path.exists(zip_path):
+                                    os.remove(zip_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to remove intermediate zip file: {str(e)}",
+                                    extra={"zipPath": zip_path}
+                                )
                 else:
                     # Only one intermediate zip, use it as the final zip
                     final_zip_path = intermediate_zips[0]
@@ -810,20 +600,20 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     update_job_completed(job_id, [download_url])
                     
                     # Clean up temporary files
-                    cleanup_temp_files(job_id, small_zip_files, large_zip_files_input)
-                    
-                    # Add metrics
-                    metrics.add_metric(name="JobsCompleted", unit=MetricUnit.Count, value=1)
-                    
-                    # Return updated job details
-                    return {
-                        "jobId": job_id,
-                        "userId": job.get("userId"),
-                        "status": "COMPLETED",
-                        "downloadUrls": [download_url],
-                    }
+                    cleanup_temp_files(job_id, small_zip_files, large_zip_files)
+                
+                # Add metrics
+                metrics.add_metric(name="JobsCompleted", unit=MetricUnit.Count, value=1)
+                
+                # Return updated job details
+                return {
+                    "jobId": job_id,
+                    "userId": job.get("userId"),
+                    "status": "COMPLETED",
+                    "downloadUrls": [download_url],
+                }
             else:
-                # Handle case where no intermediate zips were created
+                # Handle case where no files were merged
                 logger.warning("No files were merged", extra={"jobId": job_id})
                 
                 # Update job status
