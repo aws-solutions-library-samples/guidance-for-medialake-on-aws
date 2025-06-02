@@ -358,20 +358,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     {/* Checkbox for bulk selection - only show if feature flag is enabled */}
                     {multiSelectFeature.value && (
                         <Box
-                            sx={(theme) => ({
+                            sx={{
                                 display: 'flex',
                                 justifyContent: 'center',
                                 alignItems: 'center',
                                 transition: 'all 0.2s ease-in-out',
                                 transform: isSelected ? 'scale(1.15)' : 'scale(1)', // Slightly larger when selected
-                                bgcolor: alpha(theme.palette.background.paper, 0.7),
-                                borderRadius: '50%',
-                                width: '32px',
-                                height: '32px',
-                                '&:hover': {
-                                    bgcolor: alpha(theme.palette.background.default, 0.9),
-                                }
-                            })}
+                            }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (onSelectToggle) {

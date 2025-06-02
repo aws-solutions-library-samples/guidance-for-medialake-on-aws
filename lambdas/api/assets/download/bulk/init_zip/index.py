@@ -57,15 +57,13 @@ def update_job_with_zip_path(job_id: str, zip_path: str) -> None:
     try:
         bulk_download_table.update_item(
             Key={"jobId": job_id},
-            UpdateExpression="SET #zipPath = :zipPath, #completedParts = :completedParts, #updatedAt = :updatedAt",
+            UpdateExpression="SET #zipPath = :zipPath, #updatedAt = :updatedAt",
             ExpressionAttributeNames={
                 "#zipPath": "zipPath",
-                "#completedParts": "completedParts",
                 "#updatedAt": "updatedAt",
             },
             ExpressionAttributeValues={
                 ":zipPath": zip_path,
-                ":completedParts": 0,  # Initialize completed parts counter for multipart upload tracking
                 ":updatedAt": datetime.utcnow().isoformat(),
             },
         )

@@ -169,58 +169,13 @@ def generate_presigned_url(bucket: str, key: str) -> str:
 
 
 @tracer.capture_method
-def update_zip_creation_completed(job_id: str) -> None:
-    """
-    Update job progress to 50% when zip creation is completed.
-    
-    Args:
-        job_id: ID of the job to update
-        
-    Raises:
-        Exception: If job update fails
-    """
-    try:
-        bulk_download_table.update_item(
-            Key={"jobId": job_id},
-            UpdateExpression="SET #progress = :progress, #updatedAt = :updatedAt",
-            ExpressionAttributeNames={
-                "#progress": "progress",
-                "#updatedAt": "updatedAt",
-            },
-            ExpressionAttributeValues={
-                ":progress": 50,  # Zip creation phase complete (50%)
-                ":updatedAt": datetime.utcnow().isoformat(),
-            },
-        )
-        
-        logger.info(
-            "Updated zip creation progress to 50%",
-            extra={
-                "jobId": job_id,
-                "progress": 50,
-                "phase": "ZIP_CREATION_COMPLETE",
-            },
-        )
-    
-    except ClientError as e:
-        logger.error(
-            "Failed to update zip creation progress",
-            extra={
-                "error": str(e),
-                "jobId": job_id,
-            },
-        )
-        # Continue processing even if update fails
-
-
-@tracer.capture_method
 def update_job_completed(job_id: str, download_urls: List[str]) -> None:
     """
     Update the job record with download URLs and mark as completed.
     
     Args:
         job_id: ID of the job to update
-        download_urls: List of presigned download URLs (typically one ZIP file)
+        download_urls: List of presigned download URLs
         
     Raises:
         Exception: If job update fails
@@ -247,9 +202,7 @@ def update_job_completed(job_id: str, download_urls: List[str]) -> None:
             },
             ExpressionAttributeValues={
                 ":status": "COMPLETED",
-                ":downloadUrls": {
-                    "zippedFiles": download_urls[0] if download_urls else None
-                },
+                ":downloadUrls": download_urls,
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":progress": 100,
                 ":updatedAt": datetime.utcnow().isoformat(),
@@ -327,9 +280,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Ensure the zip file exists
         if not os.path.exists(zip_path):
             raise ValueError(f"Zip file not found at {zip_path}")
-        
-        # Update progress to 50% - zip creation phase complete
-        update_zip_creation_completed(job_id)
         
         # Upload the zip file to S3
         s3_key = upload_to_s3_with_expiration(zip_path, job_id)
