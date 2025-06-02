@@ -178,110 +178,23 @@ def format_job_response(job: Dict[str, Any]) -> Dict[str, Any]:
         "progress": job.get("progress", 0),
         "createdAt": job.get("createdAt"),
         "updatedAt": job.get("updatedAt"),
-        "totalSize": job.get("totalSize", 0),
-        "smallFilesCount": job.get("smallFilesCount", 0),
-        "largeFilesCount": job.get("largeFilesCount", 0),
+        "totalFiles": job.get("totalFiles", 0),
+        "processedFiles": job.get("processedFiles", 0),
     }
-    
-    # Add found and missing assets if available
-    found_assets = job.get("foundAssets")
-    if found_assets:
-        response["foundAssets"] = found_assets
-        response["foundAssetsCount"] = len(found_assets)
-    
-    missing_assets = job.get("missingAssets")
-    if missing_assets:
-        response["missingAssets"] = missing_assets
-        response["missingAssetsCount"] = len(missing_assets)
     
     # Add download URLs if available
     if job.get("status") == "COMPLETED" and job.get("downloadUrls"):
-        download_urls = job.get("downloadUrls")
-        
-        # Convert old format (flat array) to new format (structured object) if needed
-        if isinstance(download_urls, list):
-            # Old format - convert to new structured format based on job type
-            job_type = job.get("jobType", "")
-            small_files_count = job.get("smallFilesCount", 0)
-            large_files_count = job.get("largeFilesCount", 0)
-            
-            if job_type == "MIXED" or (small_files_count > 0 and large_files_count > 0):
-                # For mixed jobs, first URL is ZIP, rest are large files
-                structured_urls = {
-                    "zippedFiles": download_urls[0] if download_urls else None,
-                    "files": download_urls[1:] if len(download_urls) > 1 else []
-                }
-            elif job_type == "LARGE_INDIVIDUAL" or (large_files_count > 0 and small_files_count == 0):
-                # All URLs are large files
-                structured_urls = {
-                    "files": download_urls
-                }
-            elif job_type == "SMALL" or (small_files_count > 0 and large_files_count == 0):
-                # Only small files (ZIP)
-                structured_urls = {
-                    "zippedFiles": download_urls[0] if download_urls else None
-                }
-            elif job_type == "SINGLE_FILE":
-                # Single file treated as large file
-                structured_urls = {
-                    "singleFiles": download_urls
-                }
-            else:
-                # Unknown job type, try to infer from counts or keep as is for backward compatibility
-                if small_files_count > 0 and large_files_count > 0:
-                    structured_urls = {
-                        "zippedFiles": download_urls[0] if download_urls else None,
-                        "files": download_urls[1:] if len(download_urls) > 1 else []
-                    }
-                elif large_files_count > 0:
-                    structured_urls = {
-                        "files": download_urls
-                    }
-                elif small_files_count > 0:
-                    structured_urls = {
-                        "zippedFiles": download_urls[0] if download_urls else None
-                    }
-                else:
-                    structured_urls = download_urls
-            
-            response["downloadUrls"] = structured_urls
-        else:
-            # New format - already structured
-            response["downloadUrls"] = download_urls
-        
-        # Count total URLs for backward compatibility
-        if isinstance(download_urls, list):
-            response["downloadUrlsCount"] = len(download_urls)
-        else:
-            # Count URLs in structured format
-            total_count = 0
-            if isinstance(download_urls, dict):
-                if download_urls.get("zippedFiles"):
-                    total_count += 1
-                if download_urls.get("files"):
-                    total_count += len(download_urls.get("files", []))
-            response["downloadUrlsCount"] = total_count
-        
+        response["downloadUrls"] = job.get("downloadUrls")
         response["expiresAt"] = job.get("expiresAt")
         response["expiresIn"] = expires_in
-        
-        # Add job type specific information based on file counts
-        small_files_count = job.get('smallFilesCount', 0)
-        large_files_count = job.get('largeFilesCount', 0)
-        
-        if small_files_count > 0 and large_files_count > 0:
-            response["description"] = f"Mixed download: {small_files_count} small files (zipped) + {large_files_count} large files (individual)"
-        elif large_files_count > 0 and small_files_count == 0:
-            if large_files_count == 1:
-                response["description"] = "Single file download"
-            else:
-                response["description"] = f"Individual downloads: {large_files_count} large files"
-        elif small_files_count > 0 and large_files_count == 0:
-            response["description"] = f"Zip download: {small_files_count} small files"
     
     # Add error if available
     if job.get("error"):
         response["error"] = job.get("error")
+    
+    # Add size information if available
+    if job.get("totalSize"):
+        response["totalSize"] = job.get("totalSize")
     
     return response
 

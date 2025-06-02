@@ -222,16 +222,8 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
             else:
                 large_files_count += 1
         
-        # Determine job type based on file composition
-        if large_files_count > 0 and small_files_count > 0:
-            # Mixed files: small files get zipped, large files get individual presigned URLs
-            job_type = "MIXED"
-        elif large_files_count > 0:
-            # Only large files: each gets individual presigned URLs
-            job_type = "LARGE_INDIVIDUAL"
-        else:
-            # Only small files: all get zipped together
-            job_type = "SMALL"
+        # Determine job type based on total size
+        job_type = "SMALL" if total_size <= LARGE_JOB_THRESHOLD * MB else "LARGE"
     
     logger.info(
         "Job size calculation complete",
@@ -397,6 +389,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         
         # For SINGLE_FILE job type, we don't need to prepare arrays as it's handled separately
         if job_type != "SINGLE_FILE":
+            # Always categorize files by their individual size, regardless of job type
+            # Group large file chunks by asset to prevent race conditions
+            large_file_assets = []  # Store large file assets first
+            
             for asset in assets:
                 asset_id = asset.get("InventoryID")
                 if asset_id in found_asset_ids:
@@ -405,7 +401,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     file_info = storage_info.get("FileInfo", {})
                     file_size = file_info.get("Size", 0)
                     
-                    # If it's a small file, add to small_files for zipping
+                    # If it's a small file, add to small_files
                     if file_size <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
                         small_files.append({
                             "jobId": job_id,
@@ -413,14 +409,48 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                             "assetId": asset_id,
                             "options": job.get("options", {})
                         })
-                    # If it's a large file, add to large_files for individual presigned URLs
+                    # If it's a large file, store asset info for chunking
                     else:
-                        large_files.append({
-                            "jobId": job_id,
-                            "userId": job.get("userId"),
-                            "assetId": asset_id,
+                        large_file_assets.append({
+                            "asset_id": asset_id,
+                            "file_size": file_size,
+                            "job_id": job_id,
+                            "user_id": job.get("userId"),
                             "options": job.get("options", {})
                         })
+            
+            # Now process large files and group chunks by file to prevent race conditions
+            for large_asset in large_file_assets:
+                asset_id = large_asset["asset_id"]
+                file_size = large_asset["file_size"]
+                
+                chunk_size_mb = int(os.environ.get("CHUNK_SIZE_MB", "100"))
+                chunk_size = chunk_size_mb * 1024 * 1024
+                # Convert to integer to avoid Decimal issues with range()
+                num_chunks = int((file_size + chunk_size - 1) // chunk_size)
+                
+                logger.info(
+                    f"Chunking large file {asset_id} into {num_chunks} chunks",
+                    extra={
+                        "assetId": asset_id,
+                        "fileSize": file_size,
+                        "chunkSize": chunk_size,
+                        "numChunks": num_chunks,
+                    }
+                )
+                
+                # Add ALL chunks for this file together to ensure sequential processing
+                for chunk_index in range(num_chunks):
+                    large_files.append({
+                        "jobId": large_asset["job_id"],
+                        "userId": large_asset["user_id"],
+                        "assetId": asset_id,
+                        "chunkIndex": chunk_index,
+                        "totalChunks": num_chunks,
+                        "chunkSize": chunk_size,
+                        "fileSize": file_size,
+                        "options": large_asset["options"]
+                    })
         
         # Return updated job details for the next step
         return {

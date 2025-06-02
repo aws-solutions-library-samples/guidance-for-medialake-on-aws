@@ -200,9 +200,7 @@ def update_job_completed(job_id: str, download_url: str) -> None:
             },
             ExpressionAttributeValues={
                 ":status": "COMPLETED",
-                ":downloadUrls": {
-                    "files": [download_url]  # Single files are treated as individual files
-                },
+                ":downloadUrls": [download_url],
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":progress": 100,
                 ":updatedAt": datetime.utcnow().isoformat(),
@@ -311,14 +309,12 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Add metrics
         metrics.add_metric(name="SingleFileDownloads", unit=MetricUnit.Count, value=1)
         
-        # Return updated job details with structured format
+        # Return updated job details
         return {
             "jobId": job_id,
             "userId": job.get("userId"),
             "status": "COMPLETED",
-            "downloadUrls": {
-                "files": [download_url]  # Single files are treated as individual files
-            },
+            "downloadUrls": [download_url],
         }
     
     except Exception as e:

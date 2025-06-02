@@ -47,7 +47,7 @@ EFS_MOUNT_PATH = os.environ["EFS_MOUNT_PATH"]
 bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 
 # Constants
-PART_SIZE_MB = 25  # 25 MB per part
+PART_SIZE_MB = 10  # 10 MB per part
 PART_SIZE = PART_SIZE_MB * 1024 * 1024  # Convert to bytes
 FINAL_ZIP_PREFIX = "temp/zip/final"
 MULTIPART_WORKING_PREFIX = "temp/zip/multipart"
