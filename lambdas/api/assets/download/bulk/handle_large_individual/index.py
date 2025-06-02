@@ -1,9 +1,9 @@
 """
-Bulk Download Handle Individual Lambda
+Bulk Download Handle Large Individual Lambda
 
-This Lambda function handles files individually by:
+This Lambda function handles large files individually by:
 1. Retrieving asset details from DynamoDB
-2. Generating presigned URLs for each file
+2. Generating presigned URLs for each large file
 3. Updating the job record with the download URLs
 
 The function implements AWS best practices including:
@@ -27,9 +27,9 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 
 # Initialize AWS Lambda Powertools
-logger = Logger(service="bulk-download-handle-individual")
-tracer = Tracer(service="bulk-download-handle-individual")
-metrics = Metrics(namespace="BulkDownloadService", service="bulk-download-handle-individual")
+logger = Logger(service="bulk-download-handle-large-individual")
+tracer = Tracer(service="bulk-download-handle-large-individual")
+metrics = Metrics(namespace="BulkDownloadService", service="bulk-download-handle-large-individual")
 
 # Initialize AWS clients
 dynamodb = boto3.resource("dynamodb")
@@ -167,23 +167,23 @@ def generate_presigned_url(bucket: str, key: str, filename: str) -> str:
 
 
 @tracer.capture_method
-def process_files(job_id: str, files: List[Dict[str, Any]], options: Dict[str, Any]) -> List[Dict[str, str]]:
+def process_large_files(job_id: str, large_files: List[Dict[str, Any]], options: Dict[str, Any]) -> List[str]:
     """
-    Process files and generate presigned URLs for each.
+    Process large files and generate presigned URLs for each.
     
     Args:
         job_id: ID of the job
-        files: List of file asset IDs
+        large_files: List of large file asset IDs
         options: Download options
         
     Returns:
-        List of dictionaries containing URL and filename
+        List of presigned URLs
     """
-    download_files = []
+    download_urls = []
     quality = options.get("quality", "original")  # original or proxy
     
-    for file in files:
-        asset_id = file.get("assetId")
+    for large_file in large_files:
+        asset_id = large_file.get("assetId")
         
         try:
             # Get asset details
@@ -231,14 +231,10 @@ def process_files(job_id: str, files: List[Dict[str, Any]], options: Dict[str, A
             
             # Generate presigned URL
             download_url = generate_presigned_url(bucket, file_path, file_name)
-            download_files.append({
-                "url": download_url,
-                "filename": file_name,
-                "assetId": asset_id
-            })
+            download_urls.append(download_url)
             
             logger.info(
-                "Generated presigned URL for file",
+                "Generated presigned URL for large file",
                 extra={
                     "assetId": asset_id,
                     "fileName": file_name,
@@ -248,7 +244,7 @@ def process_files(job_id: str, files: List[Dict[str, Any]], options: Dict[str, A
             
         except Exception as e:
             logger.error(
-                f"Failed to process file {asset_id}: {str(e)}",
+                f"Failed to process large file {asset_id}: {str(e)}",
                 extra={
                     "assetId": asset_id,
                     "jobId": job_id,
@@ -257,17 +253,17 @@ def process_files(job_id: str, files: List[Dict[str, Any]], options: Dict[str, A
             # Continue processing other files even if one fails
             continue
     
-    return download_files
+    return download_urls
 
 
 @tracer.capture_method
-def update_job_with_file_urls(job_id: str, file_data: List[Dict[str, str]]) -> None:
+def update_job_with_large_file_urls(job_id: str, large_file_urls: List[str]) -> None:
     """
-    Update the job record with file URLs in downloadUrls structure.
+    Update the job record with large file URLs in downloadUrls structure.
     
     Args:
         job_id: ID of the job to update
-        file_data: List of dictionaries containing URL and filename for files
+        large_file_urls: List of presigned URLs for large files
         
     Raises:
         Exception: If job update fails
@@ -276,9 +272,9 @@ def update_job_with_file_urls(job_id: str, file_data: List[Dict[str, str]]) -> N
         # Calculate expiration time (7 days from now)
         expiration_time = datetime.utcnow() + timedelta(days=7)
         
-        # Store file data in downloadUrls.files structure for mixed jobs
+        # Store URLs in downloadUrls.files structure for mixed jobs
         structured_urls = {
-            "files": file_data
+            "files": large_file_urls
         }
         
         bulk_download_table.update_item(
@@ -301,37 +297,37 @@ def update_job_with_file_urls(job_id: str, file_data: List[Dict[str, str]]) -> N
         )
         
         logger.info(
-            "Updated job with file URLs in downloadUrls structure",
+            "Updated job with large file URLs in downloadUrls structure",
             extra={
                 "jobId": job_id,
-                "urlCount": len(file_data),
+                "urlCount": len(large_file_urls),
                 "expiresAt": expiration_time.isoformat(),
             },
         )
     
     except ClientError as e:
         logger.error(
-            "Failed to update job with file URLs",
+            "Failed to update job with large file URLs",
             extra={
                 "error": str(e),
                 "jobId": job_id,
             },
         )
-        raise Exception(f"Failed to update job with file URLs: {str(e)}")
+        raise Exception(f"Failed to update job with large file URLs: {str(e)}")
 
 
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
-    Lambda handler for generating presigned URLs for files.
+    Lambda handler for generating presigned URLs for large files.
     
     Args:
-        event: Event containing job details and files
+        event: Event containing job details and large files
         context: Lambda context
         
     Returns:
-        Updated job details with file URLs
+        Updated job details with large file URLs
     """
     try:
         # Get job ID from event
@@ -344,54 +340,53 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         options = job.get("options", {})
         job_type = job.get("jobType", "")
         
-        # Handle both single file and individual file jobs
-        files = []
+        # Handle both single file and large individual file jobs
+        large_files = []
         
-        if job_type in ["SINGLE_FILE", "LARGE_INDIVIDUAL"]:
-            # For individual file jobs, get assets from foundAssets
+        if job_type == "SINGLE_FILE":
+            # For single file jobs, get asset from foundAssets
             asset_ids = job.get("foundAssets", [])
             if not asset_ids:
-                logger.info("No assets found for individual file job", extra={"jobId": job_id})
+                logger.info("No assets found for single file job", extra={"jobId": job_id})
                 return {
                     "jobId": job_id,
                     "largeFileUrls": [],
                 }
             
-            # Convert assets to files format
+            # Convert single file to large_files format
             for asset_id in asset_ids:
-                files.append({
+                large_files.append({
                     "assetId": asset_id,
                     "options": options
                 })
             
             logger.info(
-                "Processing individual file job",
+                "Processing single file job as individual download",
                 extra={
                     "jobId": job_id,
-                    "jobType": job_type,
                     "assetCount": len(asset_ids),
                 }
             )
         else:
-            # For mixed jobs, get files from event (this should only be for MIXED job type now)
-            files = event.get("largeFiles", [])
-            if not files:
-                logger.info("No files to process", extra={"jobId": job_id})
+            # For large individual jobs, get large files from event
+            large_files = event.get("largeFiles", [])
+            if not large_files:
+                logger.info("No large files to process", extra={"jobId": job_id})
                 return {
                     "jobId": job_id,
                     "largeFileUrls": [],
                 }
             
             logger.info(
-                "Processing files for mixed job",
+                "Processing large files for individual download",
                 extra={
                     "jobId": job_id,
-                    "fileCount": len(files),
+                    "largeFileCount": len(large_files),
                 }
             )
         
-        # Process files and generate presigned URLs with metadata
-        file_data = process_files(job_id, files, options)
+        # Process large files and generate presigned URLs
+        large_file_urls = process_large_files(job_id, large_files, options)
         
         # If this is a LARGE_INDIVIDUAL or SINGLE_FILE job (individual downloads), complete the job
         if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"]:
@@ -400,7 +395,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             
             # Store structured format in database for LARGE_INDIVIDUAL jobs
             structured_urls = {
-                "files": file_data
+                "files": large_file_urls
             }
             
             bulk_download_table.update_item(
@@ -433,35 +428,35 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 extra={
                     "jobId": job_id,
                     "jobType": job_type,
-                    "urlCount": len(file_data),
+                    "urlCount": len(large_file_urls),
                     "expiresAt": expiration_time.isoformat(),
                 },
             )
         else:
-            # For mixed jobs, just update with file URLs (small files will be handled separately)
-            update_job_with_file_urls(job_id, file_data)
+            # For mixed jobs, just update with large file URLs (small files will be handled separately)
+            update_job_with_large_file_urls(job_id, large_file_urls)
         
         # Add metrics
-        metrics.add_metric(name="FilesProcessed", unit=MetricUnit.Count, value=len(file_data))
+        metrics.add_metric(name="LargeFilesProcessed", unit=MetricUnit.Count, value=len(large_file_urls))
         
         # Return updated job details with structured format
         response = {
             "jobId": job_id,
-            "largeFileUrls": [item["url"] for item in file_data],  # Keep for internal workflow compatibility
+            "largeFileUrls": large_file_urls,  # Keep for internal workflow compatibility
             "status": "COMPLETED" if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"] else "PROCESSING",
         }
         
         # Add structured downloadUrls for individual download jobs
         if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"]:
             response["downloadUrls"] = {
-                "files": file_data
+                "files": large_file_urls
             }
         
         return response
     
     except Exception as e:
         logger.error(
-            f"Error processing files: {str(e)}",
+            f"Error processing large files: {str(e)}",
             exc_info=True,
             extra={"jobId": event.get("jobId")},
         )
@@ -479,7 +474,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     },
                     ExpressionAttributeValues={
                         ":status": "FAILED",
-                        ":error": f"Failed to process files: {str(e)}",
+                        ":error": f"Failed to process large files: {str(e)}",
                         ":updatedAt": datetime.utcnow().isoformat(),
                     },
                 )
@@ -489,7 +484,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 extra={"jobId": event.get("jobId")},
             )
         
-        metrics.add_metric(name="FileProcessingErrors", unit=MetricUnit.Count, value=1)
+        metrics.add_metric(name="LargeFileProcessingErrors", unit=MetricUnit.Count, value=1)
         
         # Re-raise the exception to be handled by Step Functions
         raise
