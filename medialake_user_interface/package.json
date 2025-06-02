@@ -79,6 +79,7 @@
     "test:e2e:login": "playwright test playwright/tests/login.spec.ts",
     "test:e2e:api": "playwright test playwright/tests/api.spec.ts",
     "test:e2e:ui-tests": "playwright test playwright/tests/ui.spec.ts",
+    "test:e2e:cognito": "playwright test tests/auth/cognito-e2e.spec.ts --headed",
     "test:report": "playwright show-report"
   },
   "browserslist": {

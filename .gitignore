@@ -30,12 +30,12 @@ dist/
 .Python
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
 __pycache__
 .pytest_cache
-.venv
 *.egg-info
 
 # Python CDK
@@ -55,6 +55,8 @@ cdk.context.json
 docs/
 cline_docs/
 CLAUDE.md
+*.claude
+*.claude-ignore
 
 # Playwrght testing
 playwright-report/

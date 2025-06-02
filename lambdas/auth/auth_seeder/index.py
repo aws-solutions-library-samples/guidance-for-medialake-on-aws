@@ -33,21 +33,24 @@ PREFIX_METADATA = "METADATA"
 DEFAULT_GROUPS = [
     {
         "id": "administrators",
-        "name": "Administrators",
+        "name": "MediaLake Super Admin",
         "description": "System administrators with full access to all features and settings",
-        "department": "IT"
+        "department": "IT",
+        "assignedPermissionSets": ["administrator"]
     },
     {
         "id": "editors",
         "name": "Editors",
         "description": "Content editors who can create, modify, and manage media assets",
-        "department": "Content"
+        "department": "Content",
+        "assignedPermissionSets": ["editor"]
     },
     {
         "id": "readonly",
         "name": "Read Only",
         "description": "Users with read-only access to view media assets and reports",
-        "department": "General"
+        "department": "General",
+        "assignedPermissionSets": ["viewer"]
     }
 ]
 
@@ -59,16 +62,32 @@ DEFAULT_PERMISSION_SETS = [
         "description": "Full access to all system features and resources",
         "isSystem": True,
         "permissions": {
-            "assets.view": True,
-            "assets.edit": True,
-            "assets.delete": True,
-            "pipelines.view": True,
-            "pipelines.edit": True,
-            "pipelines.delete": True,
-            "collections.view": True,
-            "collections.edit": True,
-            "collections.delete": True,
-            "admin.full": True
+            "assets": {
+                "view": True,
+                "edit": True,
+                "delete": True
+            },
+            "pipelines": {
+                "view": True,
+                "edit": True,
+                "delete": True
+            },
+            "collections": {
+                "view": True,
+                "edit": True,
+                "delete": True
+            },
+            "settings": {
+                "users": {
+                    "edit": True
+                },
+                "system": {
+                    "edit": True
+                }
+            },
+            "admin": {
+                "full": True
+            }
         }
     },
     {
@@ -78,16 +97,32 @@ DEFAULT_PERMISSION_SETS = [
         "isSystem": True,
         "effectiveRole": "Editor",
         "permissions": {
-            "assets.view": True,
-            "assets.edit": True,
-            "assets.delete": True,
-            "pipelines.view": True,
-            "pipelines.edit": True,
-            "pipelines.delete": False,
-            "collections.view": True,
-            "collections.edit": True,
-            "collections.delete": False,
-            "admin.full": False
+            "assets": {
+                "view": True,
+                "edit": True,
+                "delete": True
+            },
+            "pipelines": {
+                "view": True,
+                "edit": True,
+                "delete": False
+            },
+            "collections": {
+                "view": True,
+                "edit": True,
+                "delete": False
+            },
+            "settings": {
+                "users": {
+                    "edit": False
+                },
+                "system": {
+                    "edit": False
+                }
+            },
+            "admin": {
+                "full": False
+            }
         }
     },
     {
@@ -97,16 +132,32 @@ DEFAULT_PERMISSION_SETS = [
         "isSystem": True,
         "effectiveRole": "Viewer",
         "permissions": {
-            "assets.view": True,
-            "assets.edit": False,
-            "assets.delete": False,
-            "pipelines.view": True,
-            "pipelines.edit": False,
-            "pipelines.delete": False,
-            "collections.view": True,
-            "collections.edit": False,
-            "collections.delete": False,
-            "admin.full": False
+            "assets": {
+                "view": True,
+                "edit": False,
+                "delete": False
+            },
+            "pipelines": {
+                "view": True,
+                "edit": False,
+                "delete": False
+            },
+            "collections": {
+                "view": True,
+                "edit": False,
+                "delete": False
+            },
+            "settings": {
+                "users": {
+                    "edit": False
+                },
+                "system": {
+                    "edit": False
+                }
+            },
+            "admin": {
+                "full": False
+            }
         }
     }
 ]
@@ -135,6 +186,7 @@ def seed_group(group: Dict[str, Any]) -> bool:
             "name": group["name"],
             "description": group["description"],
             "department": group["department"],
+            "assignedPermissionSets": group.get("assignedPermissionSets", []),
             "createdAt": current_time,
             "updatedAt": current_time,
             "entity": "group",
