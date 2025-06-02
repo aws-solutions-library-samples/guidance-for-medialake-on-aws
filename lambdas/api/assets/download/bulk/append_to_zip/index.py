@@ -211,7 +211,7 @@ def append_file_to_zip(
         content_length = response.get('ContentLength', 0)
         
         logger.info(
-            "Directly appending file from S3 to zip",
+            "Appending file from S3 to zip",
             extra={
                 "bucket": bucket,
                 "key": key,
@@ -221,13 +221,16 @@ def append_file_to_zip(
             },
         )
         
-        # Ensure the zip file exists and is accessible
-        if not os.path.exists(zip_path):
-            logger.error(f"Zip file does not exist: {zip_path}")
-            return False
+        # Create a temporary file for the new zip
+        temp_dir = os.path.dirname(zip_path)
+        temp_zip_path = os.path.join(temp_dir, f"temp_{uuid.uuid4()}.zip")
         
-        # Directly append to the existing zip file without using a lock file
-        with zipfile.ZipFile(zip_path, 'a', zipfile.ZIP_DEFLATED) as zipf:
+        # Copy the existing zip file to the temporary file
+        with open(zip_path, 'rb') as src, open(temp_zip_path, 'wb') as dst:
+            dst.write(src.read())
+        
+        # Append the new file to the temporary zip
+        with zipfile.ZipFile(temp_zip_path, 'a', zipfile.ZIP_DEFLATED) as zipf:
             # Create a ZipInfo object to store file info
             zip_info = zipfile.ZipInfo(archive_name)
             zip_info.compress_type = zipfile.ZIP_DEFLATED
@@ -250,8 +253,11 @@ def append_file_to_zip(
                     
                     offset = end
         
-        return True
+        # Replace the original zip with the temporary one
+        os.replace(temp_zip_path, zip_path)
         
+        return True
+    
     except Exception as e:
         logger.error(
             "Failed to append file to zip",
@@ -262,6 +268,14 @@ def append_file_to_zip(
                 "zipPath": zip_path,
             },
         )
+        
+        # Clean up temporary file if it exists
+        if os.path.exists(temp_zip_path):
+            try:
+                os.remove(temp_zip_path)
+            except Exception:
+                pass
+                
         return False
 
 

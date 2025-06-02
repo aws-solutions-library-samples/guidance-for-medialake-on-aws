@@ -1159,22 +1159,16 @@ class AssetsConstruct(Construct):
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
             }),
-            result_path="$.zipInfo",
+            output_path="$.Payload",
         )
         
         # Define Map state for small files with concurrency control
         small_files_map = sfn.Map(
             self,
             "ProcessSmallFilesMap",
-            max_concurrency=1,  # Limit to 1 to prevent concurrent file access issues
+            max_concurrency=self.node.try_get_context("max_small_file_concurrency") or 1000,
             items_path="$.smallFiles",
             result_path="$.processedFiles",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
-                "mapItem.$": "$$.Map.Item.Value"
-            }
         ).iterator(
             tasks.LambdaInvoke(
                 self,
@@ -1183,9 +1177,8 @@ class AssetsConstruct(Construct):
                 payload=sfn.TaskInput.from_object({
                     "jobId.$": "$.jobId",
                     "userId.$": "$.userId",
-                    "assetId.$": "$.mapItem.assetId",
-                    "options.$": "$.mapItem.options",
-                    "zipPath.$": "$.zipPath",
+                    "assetId.$": "$.assetId",  # Pass the specific asset ID from the Map state item
+                    "options.$": "$.options",
                 }),
                 output_path="$.Payload",
             )
@@ -1195,15 +1188,9 @@ class AssetsConstruct(Construct):
         large_files_map = sfn.Map(
             self,
             "ProcessLargeFilesMap",
-            max_concurrency=1,  # Limit to 1 to prevent concurrent file access issues
+            max_concurrency=self.node.try_get_context("max_large_chunk_concurrency") or 100,
             items_path="$.largeFiles",
             result_path="$.processedFiles",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
-                "mapItem.$": "$$.Map.Item.Value"
-            }
         ).iterator(
             tasks.LambdaInvoke(
                 self,
@@ -1212,9 +1199,8 @@ class AssetsConstruct(Construct):
                 payload=sfn.TaskInput.from_object({
                     "jobId.$": "$.jobId",
                     "userId.$": "$.userId",
-                    "assetId.$": "$.mapItem.assetId",
-                    "options.$": "$.mapItem.options",
-                    "zipPath.$": "$.zipPath",
+                    "assetId.$": "$.assetId",  # Pass the specific asset ID from the Map state item
+                    "options.$": "$.options",
                 }),
                 output_path="$.Payload",
             )
@@ -1228,7 +1214,6 @@ class AssetsConstruct(Construct):
             payload=sfn.TaskInput.from_object({
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
             }),
             output_path="$.Payload",
         )
@@ -1307,23 +1292,10 @@ class AssetsConstruct(Construct):
         
         # For SMALL and LARGE job types, we need to process both small and large files
         # Create a workflow that initializes the zip file, processes files, and finalizes the zip
-        # Add a Pass state to transform the output of the Parallel state
-        restore_context = sfn.Pass(
-            self,
-            "RestoreContext",
-            parameters={
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-                "zipPath.$": "$.zipInfo.Payload.zipPath",
-                "processedFiles.$": "$"
-            }
-        )
-        
         streaming_workflow = init_zip_task.next(
             sfn.Parallel(
                 self,
-                "ProcessFilesInParallel",
-                result_path="$.parallelResults"  # Store results in a field to preserve original context
+                "ProcessFilesInParallel"
             ).branch(
                 # Process small files if there are any
                 sfn.Choice(self, "CheckSmallFiles")
@@ -1345,7 +1317,7 @@ class AssetsConstruct(Construct):
                     sfn.Pass(self, "NoLargeFiles")
                 )
             )
-        ).next(restore_context).next(finalize_zip_task).next(success_state)
+        ).next(finalize_zip_task).next(success_state)
         
         # Build the main workflow
         workflow = assess_scale_task.next(
@@ -1362,7 +1334,6 @@ class AssetsConstruct(Construct):
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
-            state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
         )
