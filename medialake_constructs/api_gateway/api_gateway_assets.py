@@ -32,7 +32,7 @@ from medialake_constructs.shared_constructs.lambda_base import (
 )
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from config import config
-from medialake_constructs.shared_constructs.lambda_layers import SearchLayer, ZipmergeLayer
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from config import config
 from typing import Optional
@@ -780,24 +780,18 @@ class AssetsConstruct(Construct):
         
         # Create Step Functions state machine
         # Pass the asset table name to the step functions workflow
-        self._create_bulk_download_step_functions_workflow(props.asset_table.table_name, props)
+        self._create_bulk_download_step_functions_workflow(props.asset_table.table_name)
         
         # Create API Gateway endpoints
         self._create_bulk_download_api_endpoints(props)
     
     def _create_bulk_download_lambda_functions(self, props: AssetsProps):
         """Create Lambda functions for bulk download processing."""
-        # Create the ZipmergeLayer for fast ZIP merging
-        zipmerge_layer = ZipmergeLayer(self, "ZipmergeLayer")
-        
         # Common environment variables for all Lambda functions
         common_env_vars = {
             "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
-            "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
-            "BATCH_SIZE": "5",  # Reduce batch size to prevent timeouts
-            "FILE_MERGE_TIMEOUT": "120",  # 2 minute timeout per file merge
         }
         
         # Kickoff Lambda
@@ -850,7 +844,7 @@ class AssetsConstruct(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
+                memory_size=1024,
                 filesystem_access_point=self._efs_access_point,
                 filesystem_mount_path="/mnt/bulk-downloads",
             ),
@@ -870,53 +864,29 @@ class AssetsConstruct(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
+                memory_size=1024,
                 filesystem_access_point=self._efs_access_point,
                 filesystem_mount_path="/mnt/bulk-downloads",
             ),
         )
         
-        # Create Lambda for merging batches of zip files with ZipmergeLayer
-        self._merge_batch_lambda = Lambda(
+        # Create a custom Lambda function with EFS filesystem
+        self._merge_zips_lambda = Lambda(
             self,
-            "AssetsBulkDownloadMergeBatchLambda",
+            "AssetsBulkDownloadMergeZipsLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_merge_batch_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/merge_batch",
+                name=f"{config.resource_prefix}_assets_bulk_download_merge_zips_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/merge_zips",
                 environment_variables={
                     **common_env_vars,
                     "RESOURCE_PREFIX": config.resource_prefix,
                     "ENVIRONMENT": config.environment,
                     "METRICS_NAMESPACE": config.resource_prefix,
                 },
-                layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
-        
-        # Create Lambda for final merge of batch results with ZipmergeLayer
-        self._final_merge_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadFinalMergeLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_final_merge_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/final_merge",
-                environment_variables={
-                    **common_env_vars,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "ENVIRONMENT": config.environment,
-                    "METRICS_NAMESPACE": config.resource_prefix,
-                },
-                layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=15,
-                memory_size=10240,  # Maximum memory for Lambda to handle large files
+                memory_size=1024,
                 filesystem_access_point=self._efs_access_point,
                 filesystem_mount_path="/mnt/bulk-downloads",
             ),
@@ -961,8 +931,7 @@ class AssetsConstruct(Construct):
             self._assess_scale_lambda,
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            self._merge_zips_lambda,
             self._status_lambda,
             self._mark_downloaded_lambda,
         ]:
@@ -996,8 +965,7 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            self._merge_zips_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1031,8 +999,7 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            self._merge_zips_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1051,8 +1018,7 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._merge_batch_lambda,
-            self._final_merge_lambda,
+            self._merge_zips_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1069,7 +1035,7 @@ class AssetsConstruct(Construct):
         
         # Step Functions permissions will be added after Step Function creation
     
-    def _create_bulk_download_step_functions_workflow(self, asset_table_name=None, props=None):
+    def _create_bulk_download_step_functions_workflow(self, asset_table_name=None):
         """Create Step Functions state machine for orchestrating the bulk download process."""
         # Define task states
         assess_scale_task = tasks.LambdaInvoke(
@@ -1091,12 +1057,6 @@ class AssetsConstruct(Construct):
                 self,
                 "ProcessSmallFileTask",
                 lambda_function=self._handle_small_lambda.function,
-                payload=sfn.TaskInput.from_object({
-                    "jobId.$": "$.jobId",
-                    "userId.$": "$.userId",
-                    "assetId.$": "$.assetId",  # Pass the specific asset ID from the Map state item
-                    "options.$": "$.options",
-                }),
                 output_path="$.Payload",
             )
         )
@@ -1113,20 +1073,16 @@ class AssetsConstruct(Construct):
                 self,
                 "ProcessLargeFileTask",
                 lambda_function=self._handle_large_lambda.function,
-                payload=sfn.TaskInput.from_object({
-                    "jobId.$": "$.jobId",
-                    "userId.$": "$.userId",
-                    "assetId.$": "$.assetId",  # Pass the specific asset ID from the Map state item
-                    "chunkIndex.$": "$.chunkIndex",  # Pass chunk information if present
-                    "totalChunks.$": "$.totalChunks",
-                    "chunkSize.$": "$.chunkSize",
-                    "fileSize.$": "$.fileSize",
-                    "options.$": "$.options",
-                }),
                 output_path="$.Payload",
             )
         )
         
+        merge_zips_task = tasks.LambdaInvoke(
+            self,
+            "AssetsMergeZipsTask",
+            lambda_function=self._merge_zips_lambda.function,
+            output_path="$.Payload",
+        )
         
         # Create a new Lambda for handling single file downloads
         self._single_file_lambda = Lambda(
@@ -1200,104 +1156,12 @@ class AssetsConstruct(Construct):
             self,
             "CombineResults",
             parameters={
-                "jobId.$": "$[0].jobId",
-                "userId.$": "$[0].userId",
-                "smallZipFiles.$": "$[0].smallZipFiles",
-                "largeZipFiles.$": "$[1].largeZipFiles",
-                "options.$": "$[0].options"
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "smallZipFiles.$": "$.smallZipFiles",
+                "largeZipFiles.$": "$.largeZipFiles",
+                "options.$": "$.options"
             }
-        )
-        
-        # Create a Map state for merging batches of zip files
-        # This will distribute the merge workload across multiple Lambda invocations
-        merge_batches_map = sfn.Map(
-            self,
-            "MergeBatchesMap",
-            max_concurrency=10,  # Adjust based on your needs
-            items_path="$.zipBatches",
-            result_path="$.batchResults",
-        ).iterator(
-            tasks.LambdaInvoke(
-                self,
-                "MergeBatchTask",
-                lambda_function=self._merge_batch_lambda.function,
-                # Each item in zipBatches is now a complete object with all necessary context
-                payload=sfn.TaskInput.from_object({
-                    "jobId.$": "$.jobId",
-                    "userId.$": "$.userId",
-                    "batchId.$": "$.batchId",
-                    "zipFiles.$": "$.zipFiles",
-                    "options.$": "$.options",
-                }),
-                output_path="$.Payload",
-            )
-        )
-        
-        # Create a task for final merging of all batch results
-        final_merge_task = tasks.LambdaInvoke(
-            self,
-            "AssetsFinalMergeTask",
-            lambda_function=self._final_merge_lambda.function,
-            output_path="$.Payload",
-        )
-        
-        # Create a Lambda function to prepare batches
-        self._prepare_batches_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadPrepareBatchesLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_prepare_batches_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/prepare_batches",
-                environment_variables={
-                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
-                    "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
-                    "BATCH_SIZE": "10",  # Number of files per batch
-                },
-                timeout_minutes=1,
-                memory_size=512,
-            ),
-        )
-        
-        # Add necessary permissions
-        self._prepare_batches_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
-                resources=[self._bulk_download_table.table_arn],
-            )
-        )
-        
-        # Add S3 permissions for validating paths
-        self._prepare_batches_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:HeadObject",
-                    "s3:GetObject",
-                ],
-                resources=["arn:aws:s3:::*/*"],
-            )
-        )
-        
-        # Create a task for preparing batches
-        prepare_batches_task = tasks.LambdaInvoke(
-            self,
-            "PrepareZipBatchesTask",
-            lambda_function=self._prepare_batches_lambda.function,
-            output_path="$.Payload",
-        )
-        
-        # Connect the prepare batches task to the map state
-        prepare_batches = prepare_batches_task.next(merge_batches_map).next(final_merge_task)
-        
-        # Add permissions for the prepare_batches Lambda
-        self._prepare_batches_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "dynamodb:GetItem",
-                    "dynamodb:UpdateItem",
-                    "dynamodb:Query",
-                ],
-                resources=[self._bulk_download_table.table_arn],
-            )
         )
         
         # For SMALL and LARGE job types, we need to process both small and large files
@@ -1325,7 +1189,7 @@ class AssetsConstruct(Construct):
             .otherwise(
                 sfn.Pass(self, "NoLargeFiles", result_path="$.largeZipFiles", result=sfn.Result.from_array([]))
             )
-        ).next(combine_results).next(prepare_batches)
+        ).next(combine_results).next(merge_zips_task)
         
         # Build the main workflow
         workflow = assess_scale_task.next(
@@ -1336,14 +1200,15 @@ class AssetsConstruct(Construct):
         
         # Note: single_file_task already connected to success_state in the workflow definition
         
-        # Final merge task is already connected to success_state in the workflow definition
+        # Complete the workflow
+        merge_zips_task.next(success_state)
         
         # Create the state machine using the non-deprecated API
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
-            timeout=Duration.hours(6),  # Increase timeout for large file processing
+            timeout=Duration.hours(2),
         )
         
         # Update the Kickoff Lambda with the state machine ARN

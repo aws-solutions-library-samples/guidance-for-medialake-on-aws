@@ -52,7 +52,7 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 asset_table = dynamodb.Table(ASSET_TABLE)
 
 # Constants
-MAX_FILES_PER_ZIP = int(os.environ.get("MERGE_BATCH_SIZE", "10"))  # Maximum number of files per zip
+MAX_FILES_PER_ZIP = int(os.environ.get("MERGE_BATCH_SIZE", "100"))  # Maximum number of files per zip
 MAX_RETRIES = 3  # Maximum number of retries for S3 downloads
 PROGRESS_UPDATE_FREQUENCY = 5  # Update progress every N files
 SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
@@ -287,9 +287,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     if not job_id:
         raise ValueError("Missing jobId in event")
     
-    # Check if this is a Map state invocation with a specific asset
-    specific_asset_id = event.get("assetId")
-    
     # Create a unique working directory for this job
     working_dir = os.path.join(EFS_MOUNT_PATH, job_id)
     os.makedirs(working_dir, exist_ok=True)
@@ -308,16 +305,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Get job details
         job = get_job_details(job_id)
         
-        # Get asset IDs from job or use the specific asset ID
-        if specific_asset_id:
-            # If a specific asset ID is provided, only process that asset
-            asset_ids = [specific_asset_id]
-            logger.info(f"Processing specific asset: {specific_asset_id}", extra={"jobId": job_id})
-        else:
-            # Otherwise, process all assets in the job
-            asset_ids = job.get("foundAssets", [])
-            logger.info(f"Processing all assets: {len(asset_ids)}", extra={"jobId": job_id})
-        
+        # Get asset IDs from job
+        asset_ids = job.get("foundAssets", [])
         if not asset_ids:
             logger.warning("No assets found for job", extra={"jobId": job_id})
             return {
