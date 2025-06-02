@@ -800,65 +800,6 @@ class AssetsConstruct(Construct):
             "FILE_MERGE_TIMEOUT": "120",  # 2 minute timeout per file merge
         }
         
-        # Create Lambda for initializing zip file
-        self._init_zip_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadInitZipLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_init_zip_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/init_zip",
-                environment_variables={
-                    **common_env_vars,
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=1,
-                memory_size=512,
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
-        
-        # Create Lambda for appending to zip file
-        self._append_to_zip_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadAppendToZipLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_append_to_zip_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/append_to_zip",
-                environment_variables={
-                    **common_env_vars,
-                    "ASSET_TABLE": props.asset_table.table_name,
-                    "CHUNK_SIZE_MB": str(props.chunk_size_mb),
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=5,
-                memory_size=1024,
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
-        
-        # Create Lambda for finalizing zip file
-        self._finalize_zip_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadFinalizeZipLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_finalize_zip_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/finalize_zip",
-                environment_variables={
-                    **common_env_vars,
-                },
-                vpc=props.vpc,
-                security_groups=[props.security_group],
-                timeout_minutes=5,
-                memory_size=1024,
-                filesystem_access_point=self._efs_access_point,
-                filesystem_mount_path="/mnt/bulk-downloads",
-            ),
-        )
-        
         # Kickoff Lambda
         self._kickoff_lambda = Lambda(
             self,
@@ -1024,9 +965,6 @@ class AssetsConstruct(Construct):
             self._final_merge_lambda,
             self._status_lambda,
             self._mark_downloaded_lambda,
-            self._init_zip_lambda,
-            self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1045,7 +983,6 @@ class AssetsConstruct(Construct):
             self._assess_scale_lambda,
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._append_to_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1061,9 +998,6 @@ class AssetsConstruct(Construct):
             self._handle_large_lambda,
             self._merge_batch_lambda,
             self._final_merge_lambda,
-            self._init_zip_lambda,
-            self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1080,7 +1014,6 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._handle_small_lambda,
             self._handle_large_lambda,
-            self._append_to_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1100,8 +1033,6 @@ class AssetsConstruct(Construct):
             self._handle_large_lambda,
             self._merge_batch_lambda,
             self._final_merge_lambda,
-            self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1122,8 +1053,6 @@ class AssetsConstruct(Construct):
             self._handle_large_lambda,
             self._merge_batch_lambda,
             self._final_merge_lambda,
-            self._append_to_zip_lambda,
-            self._finalize_zip_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1150,30 +1079,18 @@ class AssetsConstruct(Construct):
             output_path="$.Payload",
         )
         
-        # Define task to initialize zip file
-        init_zip_task = tasks.LambdaInvoke(
-            self,
-            "AssetsInitZipTask",
-            lambda_function=self._init_zip_lambda.function,
-            payload=sfn.TaskInput.from_object({
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-            }),
-            output_path="$.Payload",
-        )
-        
         # Define Map state for small files with concurrency control
         small_files_map = sfn.Map(
             self,
             "ProcessSmallFilesMap",
             max_concurrency=self.node.try_get_context("max_small_file_concurrency") or 1000,
             items_path="$.smallFiles",
-            result_path="$.processedFiles",
+            result_path="$.smallZipFiles",
         ).iterator(
             tasks.LambdaInvoke(
                 self,
-                "AppendSmallFileTask",
-                lambda_function=self._append_to_zip_lambda.function,
+                "ProcessSmallFileTask",
+                lambda_function=self._handle_small_lambda.function,
                 payload=sfn.TaskInput.from_object({
                     "jobId.$": "$.jobId",
                     "userId.$": "$.userId",
@@ -1190,32 +1107,24 @@ class AssetsConstruct(Construct):
             "ProcessLargeFilesMap",
             max_concurrency=self.node.try_get_context("max_large_chunk_concurrency") or 100,
             items_path="$.largeFiles",
-            result_path="$.processedFiles",
+            result_path="$.largeZipFiles",
         ).iterator(
             tasks.LambdaInvoke(
                 self,
-                "AppendLargeFileTask",
-                lambda_function=self._append_to_zip_lambda.function,
+                "ProcessLargeFileTask",
+                lambda_function=self._handle_large_lambda.function,
                 payload=sfn.TaskInput.from_object({
                     "jobId.$": "$.jobId",
                     "userId.$": "$.userId",
                     "assetId.$": "$.assetId",  # Pass the specific asset ID from the Map state item
+                    "chunkIndex.$": "$.chunkIndex",  # Pass chunk information if present
+                    "totalChunks.$": "$.totalChunks",
+                    "chunkSize.$": "$.chunkSize",
+                    "fileSize.$": "$.fileSize",
                     "options.$": "$.options",
                 }),
                 output_path="$.Payload",
             )
-        )
-        
-        # Define task to finalize zip file
-        finalize_zip_task = tasks.LambdaInvoke(
-            self,
-            "AssetsFinalizeZipTask",
-            lambda_function=self._finalize_zip_lambda.function,
-            payload=sfn.TaskInput.from_object({
-                "jobId.$": "$.jobId",
-                "userId.$": "$.userId",
-            }),
-            output_path="$.Payload",
         )
         
         
@@ -1283,47 +1192,146 @@ class AssetsConstruct(Construct):
         job_size_choice = sfn.Choice(self, "AssetsJobSizeDecision")
         
         # Define success and failure states
-        success_state = sfn.Succeed(self, "StreamingDownloadJobSucceeded")
-        fail_state = sfn.Fail(self, "StreamingDownloadJobFailed", cause="Job processing failed")
-        
-        # Define success and failure states
         success_state = sfn.Succeed(self, "AssetsDownloadJobSucceeded")
         fail_state = sfn.Fail(self, "AssetsDownloadJobFailed", cause="Job processing failed")
         
-        # For SMALL and LARGE job types, we need to process both small and large files
-        # Create a workflow that initializes the zip file, processes files, and finalizes the zip
-        streaming_workflow = init_zip_task.next(
-            sfn.Parallel(
+        # Define a pass state to combine results
+        combine_results = sfn.Pass(
+            self,
+            "CombineResults",
+            parameters={
+                "jobId.$": "$[0].jobId",
+                "userId.$": "$[0].userId",
+                "smallZipFiles.$": "$[0].smallZipFiles",
+                "largeZipFiles.$": "$[1].largeZipFiles",
+                "options.$": "$[0].options"
+            }
+        )
+        
+        # Create a Map state for merging batches of zip files
+        # This will distribute the merge workload across multiple Lambda invocations
+        merge_batches_map = sfn.Map(
+            self,
+            "MergeBatchesMap",
+            max_concurrency=10,  # Adjust based on your needs
+            items_path="$.zipBatches",
+            result_path="$.batchResults",
+        ).iterator(
+            tasks.LambdaInvoke(
                 self,
-                "ProcessFilesInParallel"
-            ).branch(
-                # Process small files if there are any
-                sfn.Choice(self, "CheckSmallFiles")
-                .when(
-                    sfn.Condition.is_present("$.smallFiles[0]"),
-                    small_files_map
-                )
-                .otherwise(
-                    sfn.Pass(self, "NoSmallFiles")
-                )
-            ).branch(
-                # Process large files if there are any
-                sfn.Choice(self, "CheckLargeFiles")
-                .when(
-                    sfn.Condition.is_present("$.largeFiles[0]"),
-                    large_files_map
-                )
-                .otherwise(
-                    sfn.Pass(self, "NoLargeFiles")
-                )
+                "MergeBatchTask",
+                lambda_function=self._merge_batch_lambda.function,
+                # Each item in zipBatches is now a complete object with all necessary context
+                payload=sfn.TaskInput.from_object({
+                    "jobId.$": "$.jobId",
+                    "userId.$": "$.userId",
+                    "batchId.$": "$.batchId",
+                    "zipFiles.$": "$.zipFiles",
+                    "options.$": "$.options",
+                }),
+                output_path="$.Payload",
             )
-        ).next(finalize_zip_task).next(success_state)
+        )
+        
+        # Create a task for final merging of all batch results
+        final_merge_task = tasks.LambdaInvoke(
+            self,
+            "AssetsFinalMergeTask",
+            lambda_function=self._final_merge_lambda.function,
+            output_path="$.Payload",
+        )
+        
+        # Create a Lambda function to prepare batches
+        self._prepare_batches_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadPrepareBatchesLambda",
+            config=LambdaConfig(
+                name=f"{config.resource_prefix}_assets_bulk_download_prepare_batches_{config.environment}",
+                entry="lambdas/api/assets/download/bulk/prepare_batches",
+                environment_variables={
+                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+                    "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
+                    "BATCH_SIZE": "10",  # Number of files per batch
+                },
+                timeout_minutes=1,
+                memory_size=512,
+            ),
+        )
+        
+        # Add necessary permissions
+        self._prepare_batches_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+                resources=[self._bulk_download_table.table_arn],
+            )
+        )
+        
+        # Add S3 permissions for validating paths
+        self._prepare_batches_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:HeadObject",
+                    "s3:GetObject",
+                ],
+                resources=["arn:aws:s3:::*/*"],
+            )
+        )
+        
+        # Create a task for preparing batches
+        prepare_batches_task = tasks.LambdaInvoke(
+            self,
+            "PrepareZipBatchesTask",
+            lambda_function=self._prepare_batches_lambda.function,
+            output_path="$.Payload",
+        )
+        
+        # Connect the prepare batches task to the map state
+        prepare_batches = prepare_batches_task.next(merge_batches_map).next(final_merge_task)
+        
+        # Add permissions for the prepare_batches Lambda
+        self._prepare_batches_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Query",
+                ],
+                resources=[self._bulk_download_table.table_arn],
+            )
+        )
+        
+        # For SMALL and LARGE job types, we need to process both small and large files
+        # Create a parallel state to process both small and large files
+        parallel_processing = sfn.Parallel(
+            self,
+            "ProcessFilesInParallel"
+        ).branch(
+            # Process small files if there are any
+            sfn.Choice(self, "CheckSmallFiles")
+            .when(
+                sfn.Condition.is_present("$.smallFiles[0]"),
+                small_files_map
+            )
+            .otherwise(
+                sfn.Pass(self, "NoSmallFiles", result_path="$.smallZipFiles", result=sfn.Result.from_array([]))
+            )
+        ).branch(
+            # Process large files if there are any
+            sfn.Choice(self, "CheckLargeFiles")
+            .when(
+                sfn.Condition.is_present("$.largeFiles[0]"),
+                large_files_map
+            )
+            .otherwise(
+                sfn.Pass(self, "NoLargeFiles", result_path="$.largeZipFiles", result=sfn.Result.from_array([]))
+            )
+        ).next(combine_results).next(prepare_batches)
         
         # Build the main workflow
         workflow = assess_scale_task.next(
             job_size_choice
             .when(sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"), single_file_task.next(success_state))
-            .otherwise(streaming_workflow)
+            .otherwise(parallel_processing)
         )
         
         # Note: single_file_task already connected to success_state in the workflow definition
