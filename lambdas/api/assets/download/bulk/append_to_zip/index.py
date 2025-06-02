@@ -131,7 +131,7 @@ def get_asset_details(asset_id: str) -> Dict[str, Any]:
 @tracer.capture_method
 def update_job_progress(job_id: str, processed_count: int, total_count: int) -> None:
     """
-    Update job progress in DynamoDB for zip creation phase (0-50%).
+    Update job progress in DynamoDB.
     
     Args:
         job_id: ID of the job to update
@@ -141,9 +141,7 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int) -> 
     Raises:
         Exception: If job update fails
     """
-    # Calculate zip creation progress (0-50% of total progress)
-    zip_phase_progress = (processed_count / total_count) if total_count > 0 else 0
-    progress = int(zip_phase_progress * 50)  # Map to 0-50% range
+    progress = int((processed_count / total_count) * 100) if total_count > 0 else 0
     
     update_expression = "SET #status = :status, #progress = :progress, #processedFiles = :processedFiles, #updatedAt = :updatedAt"
     expression_attribute_names = {
@@ -168,14 +166,12 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int) -> 
         )
         
         logger.info(
-            "Updated zip creation progress",
+            "Updated job progress",
             extra={
                 "jobId": job_id,
                 "progress": progress,
                 "processedFiles": processed_count,
                 "totalFiles": total_count,
-                "phase": "ZIP_CREATION",
-                "zipPhaseProgress": f"{zip_phase_progress:.2%}",
             },
         )
     

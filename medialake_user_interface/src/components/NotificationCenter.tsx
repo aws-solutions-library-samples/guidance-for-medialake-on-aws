@@ -31,7 +31,6 @@ import {
 import { DownloadLinksDisplay } from "./DownloadLinksDisplay";
 import { DismissConfirmationDialog } from "./DismissConfirmationDialog";
 import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
-import { useJobNotifications } from "@/hooks/useJobNotifications";
 
 // Helper function to format file sizes
 const formatFileSize = (bytes: string | number): string => {
@@ -64,9 +63,9 @@ const getStatusIconColor = (jobStatus?: string) => {
     case 'INITIATED':
       return '#1976d2'; // Blue
     case 'ASSESSED':
-      return '#1976d2'; // Orange
+      return '#ed6c02'; // Orange
     case 'STAGING':
-      return '#1976d2'; // Purple
+      return '#9c27b0'; // Purple
     case 'PROCESSING':
       return '#1976d2'; // Blue
     case 'COMPLETED':
@@ -241,7 +240,6 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
 // ──────────────────────────/
 export const NotificationCenter: React.FC = () => {
   const { notifications, markAsSeen, dismiss } = useNotifications();
-  const { dismissJobNotification, clearAllJobNotifications } = useJobNotifications();
   const deleteBulkDownloadJob = useDeleteBulkDownloadJob();
   
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -264,22 +262,11 @@ export const NotificationCenter: React.FC = () => {
     }
   };
 
-  // Calculate active jobs count (not COMPLETED or FAILED)
-  const getActiveJobsCount = (): number => {
-    return notifications.filter(n =>
-      n.jobStatus &&
-      n.jobStatus !== 'COMPLETED' &&
-      n.jobStatus !== 'FAILED'
-    ).length;
-  };
-
   const [unseenCount, setUnseenCount] = useState(getUnseenCount());
-  const [activeJobsCount, setActiveJobsCount] = useState(getActiveJobsCount());
 
-  // Update counts when notifications change
+  // Update unseen count when notifications change
   useEffect(() => {
     setUnseenCount(getUnseenCount());
-    setActiveJobsCount(getActiveJobsCount());
   }, [notifications]);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -297,39 +284,10 @@ export const NotificationCenter: React.FC = () => {
     localStorage.removeItem('medialake_unseen_notifications');
     setUnseenCount(0);
     
-    // Mark all job notifications as seen in job tracking
+    // Mark all notifications as seen in the context
     notifications.forEach((n) => {
-      if (n.jobId && n.jobStatus) {
-        // Mark this job+status combination as seen
-        const seenJobs = getSeenJobNotifications();
-        const jobKey = `${n.jobId}:${n.jobStatus}`;
-        seenJobs.add(jobKey);
-        localStorage.setItem('medialake_seen_job_notifications', JSON.stringify([...seenJobs]));
-      }
       if (!n.seen) markAsSeen(n.id);
     });
-  };
-
-  // Helper function to get seen job notifications
-  const getSeenJobNotifications = (): Set<string> => {
-    try {
-      const seen = localStorage.getItem('medialake_seen_job_notifications');
-      return new Set(seen ? JSON.parse(seen) : []);
-    } catch {
-      return new Set();
-    }
-  };
-
-  // Helper function to determine which dismiss function to use
-  const dismissNotification = (notificationId: string) => {
-    const notification = notifications.find(n => n.id === notificationId);
-    if (notification?.jobId) {
-      // Use custom dismiss for job notifications
-      dismissJobNotification(notificationId);
-    } else {
-      // Use regular dismiss for non-job notifications
-      dismiss(notificationId);
-    }
   };
 
   const handleDismissClick = (notification: Notification) => {
@@ -342,7 +300,7 @@ export const NotificationCenter: React.FC = () => {
       });
     } else {
       // Direct dismiss for other notifications
-      dismissNotification(notification.id);
+      dismiss(notification.id);
     }
   };
 
@@ -351,7 +309,7 @@ export const NotificationCenter: React.FC = () => {
     const notification = notifications.find(n => n.id === dismissDialog.notificationId);
     
     // Dismiss the notification from UI first
-    dismissNotification(dismissDialog.notificationId);
+    dismiss(dismissDialog.notificationId);
     setDismissDialog({ open: false, notificationId: '', message: '' });
     
     // Delete the job from database if it has a jobId
@@ -372,42 +330,25 @@ export const NotificationCenter: React.FC = () => {
 
   return (
     <>
-      <Tooltip
-        title={
-          unseenCount > 0
-            ? `${unseenCount} New`
-            : activeJobsCount > 0
-              ? `${activeJobsCount} Running`
-              : "No notifications"
-        }
-        arrow
+      <IconButton
+        aria-label="notifications"
+        onClick={handleClick}
+        sx={{ position: "relative" }}
       >
-        <IconButton
-          aria-label="notifications"
-          onClick={handleClick}
-          sx={{ position: "relative" }}
+        <Badge
+          badgeContent={unseenCount > 0 ? unseenCount : undefined}
+          color="error"
+          sx={{
+            "& .MuiBadge-badge": {
+              fontSize: "0.75rem",
+              height: 16,
+              minWidth: 16,
+            },
+          }}
         >
-          <Badge
-            badgeContent={
-              unseenCount > 0
-                ? unseenCount
-                : activeJobsCount > 0
-                  ? activeJobsCount
-                  : undefined
-            }
-            color={unseenCount > 0 ? "error" : "success"}
-            sx={{
-              "& .MuiBadge-badge": {
-                fontSize: "0.75rem",
-                height: 16,
-                minWidth: 16,
-              },
-            }}
-          >
-            <NotificationsIcon />
-          </Badge>
-        </IconButton>
-      </Tooltip>
+          <NotificationsIcon />
+        </Badge>
+      </IconButton>
 
       <Popover
         open={open}
@@ -422,50 +363,11 @@ export const NotificationCenter: React.FC = () => {
           horizontal: "right",
         }}
       >
-        <Paper sx={{
-          width: 340,
-          maxHeight: 400,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}>
-          {/* Sticky Header */}
-          <Box sx={{
-            p: 2,
-            pb: 1,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.paper',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1
-          }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">
-                Notifications
-              </Typography>
-              {/* Clear dismissible job notifications */}
-              {/* <Tooltip title="Clear completed and failed downloads (active downloads will remain)">
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  onClick={clearAllJobNotifications}
-                  sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}
-                >
-                  Clear Jobs
-                </Button>
-              </Tooltip> */}
-            </Box>
-          </Box>
-          
-          {/* Scrollable Content */}
-          <Box sx={{
-            flex: 1,
-            overflow: 'auto',
-            p: 2,
-            pt: 1
-          }}>
+        <Paper sx={{ width: 340, maxHeight: 400, overflow: "auto" }}>
+          <Box p={2}>
+            <Typography variant="h6" gutterBottom>
+              Notifications
+            </Typography>
             <Stack spacing={1}>
               {notifications.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
@@ -537,7 +439,7 @@ export const NotificationCenter: React.FC = () => {
                       {n.type === "dismissible" && (
                         <IconButton
                           size="small"
-                          onClick={() => dismissNotification(n.id)}
+                          onClick={() => dismiss(n.id)}
                           sx={{ p: 0.5 }}
                         >
                           <CloseIcon fontSize="small" />
@@ -554,16 +456,8 @@ export const NotificationCenter: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box sx={{ flex: 1 }}>
                             <LinearProgress
-                              variant={
-                                (n.jobStatus === 'STAGING' || n.jobStatus === 'PROCESSING') && n.progress !== undefined
-                                  ? "determinate"
-                                  : "indeterminate"
-                              }
-                              value={
-                                (n.jobStatus === 'STAGING' || n.jobStatus === 'PROCESSING') && n.progress !== undefined
-                                  ? n.progress
-                                  : undefined
-                              }
+                              // variant={n.progress !== undefined ? "determinate" : "indeterminate"}
+                              value={n.progress !== undefined ? n.progress : undefined}
                               // sx={{
                               //   height: 6,
                               //   borderRadius: 3,
