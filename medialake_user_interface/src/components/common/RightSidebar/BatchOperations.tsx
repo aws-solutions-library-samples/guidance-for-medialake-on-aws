@@ -1,16 +1,15 @@
 import React from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  Button,
+import { 
+  Box, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  Divider, 
+  Button, 
   IconButton,
-  Tooltip,
-  CircularProgress
+  Tooltip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -28,7 +27,6 @@ interface BatchOperationsProps {
   onBatchShare?: () => void;
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
-  isDownloadLoading?: boolean;
 }
 
 const BatchOperations: React.FC<BatchOperationsProps> = ({
@@ -37,8 +35,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onBatchDownload,
   onBatchShare,
   onClearSelection,
-  onRemoveItem,
-  isDownloadLoading = false
+  onRemoveItem
 }) => {
   const { openSidebar, setHasSelectedItems } = useRightSidebar();
   
@@ -107,14 +104,13 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           </Button>
         </Tooltip>
         <Tooltip title="Download selected">
-          <Button
-            variant="outlined"
+          <Button 
+            variant="outlined" 
             size="small"
-            startIcon={isDownloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />}
+            startIcon={<DownloadIcon />}
             onClick={onBatchDownload}
-            disabled={isDownloadLoading}
           >
-            {isDownloadLoading ? 'Starting...' : 'Download'}
+            Download
           </Button>
         </Tooltip>
         <Tooltip title="Share selected">

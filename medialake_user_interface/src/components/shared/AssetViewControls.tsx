@@ -54,10 +54,6 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
     showMetadata: boolean;
     onShowMetadataChange: (show: boolean) => void;
-    // Selection props
-    hasSelectedAssets?: boolean;
-    selectAllState?: 'none' | 'some' | 'all';
-    onSelectAllToggle?: () => void;
 }
 
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
@@ -83,10 +79,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     onThumbnailScaleChange,
     showMetadata,
     onShowMetadataChange,
-    // Selection props
-    hasSelectedAssets = false,
-    selectAllState = 'none',
-    onSelectAllToggle,
 }) => {
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
@@ -193,42 +185,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {/* Select All Checkbox - only visible when assets are selected */}
-                <Box
-                    sx={{
-                        opacity: hasSelectedAssets ? 1 : 0,
-                        visibility: hasSelectedAssets ? 'visible' : 'hidden',
-                        transition: 'opacity 0.2s ease-in-out, visibility 0.2s ease-in-out',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                    }}
-                >
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={selectAllState === 'all'}
-                                indeterminate={selectAllState === 'some'}
-                                onChange={onSelectAllToggle}
-                                size="small"
-                                sx={{
-                                    '& .MuiSvgIcon-root': {
-                                        fontSize: '1.2rem',
-                                    }
-                                }}
-                            />
-                        }
-                        label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
-                        sx={{
-                            margin: 0,
-                            '& .MuiFormControlLabel-label': {
-                                fontSize: '0.875rem',
-                                fontWeight: 500,
-                            }
-                        }}
-                    />
-                </Box>
-
                 {/* Sort Button */}
                 <Button
                     size="small"

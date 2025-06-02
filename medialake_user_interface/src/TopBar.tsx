@@ -452,7 +452,7 @@ function TopBar() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2, // Increased spacing between icons
-                mr: 2, // Add margin to the right to create gap from screen edge
+                // Removed ml: 2 to position icons at the absolute far right edge
             }}>
                 {/* Upload Button - Only shown if file upload is enabled */}
                 {isFileUploadEnabled && (
