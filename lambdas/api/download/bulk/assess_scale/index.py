@@ -37,10 +37,8 @@ dynamodb = boto3.resource("dynamodb")
 # Get environment variables
 BULK_DOWNLOAD_TABLE = os.environ["BULK_DOWNLOAD_TABLE"]
 ASSET_TABLE = os.environ["ASSET_TABLE"]
-SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
-SMALL_FILE_THRESHOLD = SMALL_FILE_THRESHOLD_MB  # For backward compatibility
+SMALL_FILE_THRESHOLD = int(os.environ.get("SMALL_FILE_THRESHOLD", "100"))  # MB
 LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "1000"))  # MB
-SINGLE_FILE_CHECK = os.environ.get("SINGLE_FILE_CHECK", "false").lower() == "true"
 
 # Initialize DynamoDB tables
 bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
@@ -175,55 +173,24 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
     small_files_count = 0
     large_files_count = 0
     
-    # Check if this is a single file job
-    if SINGLE_FILE_CHECK and len(assets) == 1:
-        job_type = "SINGLE_FILE"
-        
-        # Still calculate the size for logging purposes
-        asset = assets[0]
+    for asset in assets:
+        # Get the main representation size
         main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
         storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
         file_info = storage_info.get("FileInfo", {})
         
         # Get file size in bytes
         file_size = file_info.get("Size", 0)
-        total_size = file_size
+        total_size += file_size
         
-        # Determine if this is a small or large file for metrics
+        # Determine if this is a small or large file
         if file_size <= SMALL_FILE_THRESHOLD * MB:
-            small_files_count = 1
+            small_files_count += 1
         else:
-            large_files_count = 1
-            
-        logger.info(
-            "Single file job detected",
-            extra={
-                "totalSize": total_size,
-                "totalSizeMB": total_size / MB,
-                "jobType": job_type,
-                "assetId": asset.get("InventoryID", "unknown"),
-            }
-        )
-    else:
-        # Multiple files - process normally
-        for asset in assets:
-            # Get the main representation size
-            main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-            storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-            file_info = storage_info.get("FileInfo", {})
-            
-            # Get file size in bytes
-            file_size = file_info.get("Size", 0)
-            total_size += file_size
-            
-            # Determine if this is a small or large file
-            if file_size <= SMALL_FILE_THRESHOLD * MB:
-                small_files_count += 1
-            else:
-                large_files_count += 1
-        
-        # Determine job type based on total size
-        job_type = "SMALL" if total_size <= LARGE_JOB_THRESHOLD * MB else "LARGE"
+            large_files_count += 1
+    
+    # Determine job type based on total size
+    job_type = "SMALL" if total_size <= LARGE_JOB_THRESHOLD * MB else "LARGE"
     
     logger.info(
         "Job size calculation complete",
@@ -233,7 +200,6 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
             "smallFilesCount": small_files_count,
             "largeFilesCount": large_files_count,
             "jobType": job_type,
-            "assetCount": len(assets),
         }
     )
     
@@ -383,56 +349,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         metrics.add_metric(name="JobsAssessed", unit=MetricUnit.Count, value=1)
         metrics.add_metric(name="TotalDownloadSize", unit=MetricUnit.Megabytes, value=total_size / MB)
         
-        # Prepare data for Map states
-        small_files = []
-        large_files = []
-        
-        # For SINGLE_FILE job type, we don't need to prepare arrays as it's handled separately
-        if job_type != "SINGLE_FILE":
-            # Always categorize files by their individual size, regardless of job type
-            for asset in assets:
-                asset_id = asset.get("InventoryID")
-                if asset_id in found_asset_ids:
-                    main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-                    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-                    file_info = storage_info.get("FileInfo", {})
-                    file_size = file_info.get("Size", 0)
-                    
-                    # If it's a small file, add to small_files
-                    if file_size <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
-                        small_files.append({
-                            "jobId": job_id,
-                            "assetId": asset_id,
-                            "options": job.get("options", {})
-                        })
-                    # If it's a large file, calculate chunks and add to large_files
-                    else:
-                        chunk_size_mb = int(os.environ.get("CHUNK_SIZE_MB", "100"))
-                        chunk_size = chunk_size_mb * 1024 * 1024
-                        # Convert to integer to avoid Decimal issues with range()
-                        num_chunks = int((file_size + chunk_size - 1) // chunk_size)
-                        
-                        logger.info(
-                            f"Chunking large file {asset_id} into {num_chunks} chunks",
-                            extra={
-                                "assetId": asset_id,
-                                "fileSize": file_size,
-                                "chunkSize": chunk_size,
-                                "numChunks": num_chunks,
-                            }
-                        )
-                        
-                        for chunk_index in range(num_chunks):
-                            large_files.append({
-                                "jobId": job_id,
-                                "assetId": asset_id,
-                                "chunkIndex": chunk_index,
-                                "totalChunks": num_chunks,
-                                "chunkSize": chunk_size,
-                                "fileSize": file_size,
-                                "options": job.get("options", {})
-                            })
-        
         # Return updated job details for the next step
         return {
             "jobId": job_id,
@@ -444,8 +360,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             "foundAssets": found_asset_ids,
             "missingAssets": missing_asset_ids,
             "options": job.get("options", {}),
-            "smallFiles": small_files,
-            "largeFiles": large_files,
         }
     
     except Exception as e:
