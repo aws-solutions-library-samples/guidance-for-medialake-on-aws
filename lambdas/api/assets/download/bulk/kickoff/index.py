@@ -45,7 +45,7 @@ STEP_FUNCTION_ARN = os.environ["STEP_FUNCTION_ARN"]
 table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 
 # Constants
-MAX_ASSETS_PER_JOB = 1000  # Maximum number of assets per job
+MAX_ASSETS_PER_JOB = 2000  # Maximum number of assets per job
 JOB_EXPIRATION_DAYS = 7    # Number of days until job expires
 
 
