@@ -299,9 +299,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         return {
             "jobId": job_id,
             "status": "COMPLETED",
-            "downloadUrls": {
-                "zippedFiles": download_url
-            }
+            "downloadUrl": download_url,
         }
     
     except Exception as e:
