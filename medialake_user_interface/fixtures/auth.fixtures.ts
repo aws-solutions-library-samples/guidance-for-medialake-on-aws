@@ -17,8 +17,12 @@ export const test = base.extend<AuthFixtures>({
     await page.getByRole('textbox', { name: 'Password' }).fill(cognitoTestUser.password);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     
-    // Wait for successful login (adjust selector based on your app's behavior)
-    await page.waitForURL('**/dashboard', { timeout: 15000 });
+    // Wait for successful login - SPA redirects to root
+    const rootUrl = baseURL ? baseURL : 'http://localhost:5173';
+    await page.waitForURL(rootUrl, { timeout: 15000 });
+    
+    // Additional wait to ensure the page is fully loaded and authenticated
+    await page.waitForLoadState('networkidle');
     
     // Use the authenticated page
     await use(page);
@@ -36,8 +40,12 @@ export const test = base.extend<AuthFixtures>({
       await page.getByRole('textbox', { name: 'Password' }).fill(cognitoTestUser.password);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       
-      // Wait for navigation or a specific element indicating login success
-      await page.waitForURL('**/dashboard', { timeout: 15000 });
+      // Wait for navigation to root - SPA redirects to root
+      const rootUrl = baseURL ? baseURL : 'http://localhost:5173';
+      await page.waitForURL(rootUrl, { timeout: 15000 });
+      
+      // Additional wait to ensure the page is fully loaded and authenticated
+      await page.waitForLoadState('networkidle');
 
       await use(context);
 

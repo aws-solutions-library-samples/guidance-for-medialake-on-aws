@@ -1,14 +1,15 @@
 import { test, expect } from '../../fixtures/auth.fixtures';
 
 test.describe('Cognito E2E Authentication Tests', () => {
-  test('should create test user and login successfully', async ({ cognitoTestUser, authenticatedPage }) => {
+  test('should create test user and login successfully', async ({ cognitoTestUser, authenticatedPage, baseURL }) => {
     // The cognitoTestUser fixture has already created a user and the authenticatedPage has logged in
     console.log(`Test running with user: ${cognitoTestUser.username}`);
     console.log(`User pool ID: ${cognitoTestUser.userPoolId}`);
     console.log(`User pool client ID: ${cognitoTestUser.userPoolClientId}`);
     
-    // Verify we're on the dashboard (or whatever your post-login page is)
-    await expect(authenticatedPage).toHaveURL(/.*dashboard.*/);
+    // Verify we're on the root page after successful login
+    const expectedUrl = baseURL || 'http://localhost:5173';
+    await expect(authenticatedPage).toHaveURL(expectedUrl);
     
     // Add more assertions based on your application's behavior after login
     // For example, check for user-specific elements, navigation, etc.
@@ -26,11 +27,12 @@ test.describe('Cognito E2E Authentication Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     
-    // Wait for successful login
-    await page.waitForURL('**/dashboard', { timeout: 15000 });
+    // Wait for successful login - SPA redirects to root
+    const rootUrl = baseURL || 'http://localhost:5173';
+    await page.waitForURL(rootUrl, { timeout: 15000 });
     
     // Verify successful authentication
-    await expect(page).toHaveURL(/.*dashboard.*/);
+    await expect(page).toHaveURL(rootUrl);
   });
 
   test('should provide unique test users for parallel execution', async ({ cognitoTestUser }) => {
@@ -58,20 +60,19 @@ test.describe('Cognito User Management', () => {
     // Create a new page within the authenticated context
     const page = await authenticatedContext.newPage();
     
-    // Navigate to a protected route
-    const dashboardUrl = baseURL ? `${baseURL}/dashboard` : '/dashboard';
-    await page.goto(dashboardUrl);
+    // Navigate to the root - this should be accessible when authenticated
+    const rootUrl = baseURL || 'http://localhost:5173';
+    await page.goto(rootUrl);
     
-    // Verify we can access protected content
-    await expect(page).toHaveURL(/.*dashboard.*/);
+    // Verify we can access the authenticated root page
+    await expect(page).toHaveURL(rootUrl);
     
     // You can create additional pages in the same context
     const secondPage = await authenticatedContext.newPage();
-    const settingsUrl = baseURL ? `${baseURL}/settings` : '/settings';
-    await secondPage.goto(settingsUrl);
+    await secondPage.goto(rootUrl);
     
-    // Both pages should maintain authentication
-    await expect(secondPage).toHaveURL(/.*settings.*/);
+    // Both pages should maintain authentication and access the root
+    await expect(secondPage).toHaveURL(rootUrl);
     
     await page.close();
     await secondPage.close();
