@@ -390,9 +390,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # For SINGLE_FILE job type, we don't need to prepare arrays as it's handled separately
         if job_type != "SINGLE_FILE":
             # Always categorize files by their individual size, regardless of job type
-            # Group large file chunks by asset to prevent race conditions
-            large_file_assets = []  # Store large file assets first
-            
             for asset in assets:
                 asset_id = asset.get("InventoryID")
                 if asset_id in found_asset_ids:
@@ -409,48 +406,34 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                             "assetId": asset_id,
                             "options": job.get("options", {})
                         })
-                    # If it's a large file, store asset info for chunking
+                    # If it's a large file, calculate chunks and add to large_files
                     else:
-                        large_file_assets.append({
-                            "asset_id": asset_id,
-                            "file_size": file_size,
-                            "job_id": job_id,
-                            "user_id": job.get("userId"),
-                            "options": job.get("options", {})
-                        })
-            
-            # Now process large files and group chunks by file to prevent race conditions
-            for large_asset in large_file_assets:
-                asset_id = large_asset["asset_id"]
-                file_size = large_asset["file_size"]
-                
-                chunk_size_mb = int(os.environ.get("CHUNK_SIZE_MB", "100"))
-                chunk_size = chunk_size_mb * 1024 * 1024
-                # Convert to integer to avoid Decimal issues with range()
-                num_chunks = int((file_size + chunk_size - 1) // chunk_size)
-                
-                logger.info(
-                    f"Chunking large file {asset_id} into {num_chunks} chunks",
-                    extra={
-                        "assetId": asset_id,
-                        "fileSize": file_size,
-                        "chunkSize": chunk_size,
-                        "numChunks": num_chunks,
-                    }
-                )
-                
-                # Add ALL chunks for this file together to ensure sequential processing
-                for chunk_index in range(num_chunks):
-                    large_files.append({
-                        "jobId": large_asset["job_id"],
-                        "userId": large_asset["user_id"],
-                        "assetId": asset_id,
-                        "chunkIndex": chunk_index,
-                        "totalChunks": num_chunks,
-                        "chunkSize": chunk_size,
-                        "fileSize": file_size,
-                        "options": large_asset["options"]
-                    })
+                        chunk_size_mb = int(os.environ.get("CHUNK_SIZE_MB", "100"))
+                        chunk_size = chunk_size_mb * 1024 * 1024
+                        # Convert to integer to avoid Decimal issues with range()
+                        num_chunks = int((file_size + chunk_size - 1) // chunk_size)
+                        
+                        logger.info(
+                            f"Chunking large file {asset_id} into {num_chunks} chunks",
+                            extra={
+                                "assetId": asset_id,
+                                "fileSize": file_size,
+                                "chunkSize": chunk_size,
+                                "numChunks": num_chunks,
+                            }
+                        )
+                        
+                        for chunk_index in range(num_chunks):
+                            large_files.append({
+                                "jobId": job_id,
+                                "userId": job.get("userId"),
+                                "assetId": asset_id,
+                                "chunkIndex": chunk_index,
+                                "totalChunks": num_chunks,
+                                "chunkSize": chunk_size,
+                                "fileSize": file_size,
+                                "options": job.get("options", {})
+                            })
         
         # Return updated job details for the next step
         return {
