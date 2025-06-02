@@ -259,7 +259,7 @@ def process_large_files(job_id: str, large_files: List[Dict[str, Any]], options:
 @tracer.capture_method
 def update_job_with_large_file_urls(job_id: str, large_file_urls: List[str]) -> None:
     """
-    Update the job record with large file URLs in downloadUrls structure.
+    Update the job record with large file URLs.
     
     Args:
         job_id: ID of the job to update
@@ -272,32 +272,27 @@ def update_job_with_large_file_urls(job_id: str, large_file_urls: List[str]) -> 
         # Calculate expiration time (7 days from now)
         expiration_time = datetime.utcnow() + timedelta(days=7)
         
-        # Store URLs in downloadUrls.files structure for mixed jobs
-        structured_urls = {
-            "files": large_file_urls
-        }
-        
         bulk_download_table.update_item(
             Key={"jobId": job_id},
             UpdateExpression=(
-                "SET #downloadUrls = :downloadUrls, "
+                "SET #largeFileUrls = :largeFileUrls, "
                 "#expiresAt = :expiresAt, "
                 "#updatedAt = :updatedAt"
             ),
             ExpressionAttributeNames={
-                "#downloadUrls": "downloadUrls",
+                "#largeFileUrls": "largeFileUrls",
                 "#expiresAt": "expiresAt",
                 "#updatedAt": "updatedAt",
             },
             ExpressionAttributeValues={
-                ":downloadUrls": structured_urls,
+                ":largeFileUrls": large_file_urls,
                 ":expiresAt": int(expiration_time.timestamp()),
                 ":updatedAt": datetime.utcnow().isoformat(),
             },
         )
         
         logger.info(
-            "Updated job with large file URLs in downloadUrls structure",
+            "Updated job with large file URLs",
             extra={
                 "jobId": job_id,
                 "urlCount": len(large_file_urls),
@@ -335,61 +330,33 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         if not job_id:
             raise ValueError("Missing jobId in event")
         
-        # Get job details for options and job type
+        # Get large files from event
+        large_files = event.get("largeFiles", [])
+        if not large_files:
+            logger.info("No large files to process", extra={"jobId": job_id})
+            return {
+                "jobId": job_id,
+                "largeFileUrls": [],
+            }
+        
+        logger.info(
+            "Processing large files for individual download",
+            extra={
+                "jobId": job_id,
+                "largeFileCount": len(large_files),
+            }
+        )
+        
+        # Get job details for options
         job = get_job_details(job_id)
         options = job.get("options", {})
         job_type = job.get("jobType", "")
         
-        # Handle both single file and large individual file jobs
-        large_files = []
-        
-        if job_type == "SINGLE_FILE":
-            # For single file jobs, get asset from foundAssets
-            asset_ids = job.get("foundAssets", [])
-            if not asset_ids:
-                logger.info("No assets found for single file job", extra={"jobId": job_id})
-                return {
-                    "jobId": job_id,
-                    "largeFileUrls": [],
-                }
-            
-            # Convert single file to large_files format
-            for asset_id in asset_ids:
-                large_files.append({
-                    "assetId": asset_id,
-                    "options": options
-                })
-            
-            logger.info(
-                "Processing single file job as individual download",
-                extra={
-                    "jobId": job_id,
-                    "assetCount": len(asset_ids),
-                }
-            )
-        else:
-            # For large individual jobs, get large files from event
-            large_files = event.get("largeFiles", [])
-            if not large_files:
-                logger.info("No large files to process", extra={"jobId": job_id})
-                return {
-                    "jobId": job_id,
-                    "largeFileUrls": [],
-                }
-            
-            logger.info(
-                "Processing large files for individual download",
-                extra={
-                    "jobId": job_id,
-                    "largeFileCount": len(large_files),
-                }
-            )
-        
         # Process large files and generate presigned URLs
         large_file_urls = process_large_files(job_id, large_files, options)
         
-        # If this is a LARGE_INDIVIDUAL or SINGLE_FILE job (individual downloads), complete the job
-        if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"]:
+        # If this is a LARGE_INDIVIDUAL job (only large files), complete the job
+        if job_type == "LARGE_INDIVIDUAL":
             # Calculate expiration time (7 days from now)
             expiration_time = datetime.utcnow() + timedelta(days=7)
             
@@ -424,10 +391,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             )
             
             logger.info(
-                f"Completed {job_type} job with individual file URLs",
+                "Completed LARGE_INDIVIDUAL job with individual file URLs",
                 extra={
                     "jobId": job_id,
-                    "jobType": job_type,
                     "urlCount": len(large_file_urls),
                     "expiresAt": expiration_time.isoformat(),
                 },
@@ -443,11 +409,11 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         response = {
             "jobId": job_id,
             "largeFileUrls": large_file_urls,  # Keep for internal workflow compatibility
-            "status": "COMPLETED" if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"] else "PROCESSING",
+            "status": "COMPLETED" if job_type == "LARGE_INDIVIDUAL" else "PROCESSING",
         }
         
-        # Add structured downloadUrls for individual download jobs
-        if job_type in ["LARGE_INDIVIDUAL", "SINGLE_FILE"]:
+        # Add structured downloadUrls for LARGE_INDIVIDUAL jobs
+        if job_type == "LARGE_INDIVIDUAL":
             response["downloadUrls"] = {
                 "files": large_file_urls
             }
