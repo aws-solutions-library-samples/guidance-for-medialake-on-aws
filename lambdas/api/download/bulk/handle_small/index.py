@@ -52,10 +52,9 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 asset_table = dynamodb.Table(ASSET_TABLE)
 
 # Constants
-MAX_FILES_PER_ZIP = int(os.environ.get("MERGE_BATCH_SIZE", "100"))  # Maximum number of files per zip
+MAX_FILES_PER_ZIP = 100  # Maximum number of files per zip
 MAX_RETRIES = 3  # Maximum number of retries for S3 downloads
 PROGRESS_UPDATE_FREQUENCY = 5  # Update progress every N files
-SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
 
 
 @tracer.capture_method
