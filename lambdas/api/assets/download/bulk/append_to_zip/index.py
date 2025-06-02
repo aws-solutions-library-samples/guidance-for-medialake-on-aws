@@ -188,13 +188,13 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int) -> 
 
 @tracer.capture_method
 def append_file_to_zip(
-    bucket: str,
-    key: str,
-    zip_path: str,
+    bucket: str, 
+    key: str, 
+    zip_path: str, 
     archive_name: str
 ) -> bool:
     """
-    Append a file from S3 to an existing zip file using streaming with file locking.
+    Append a file from S3 to an existing zip file using streaming.
     
     Args:
         bucket: S3 bucket name
@@ -205,138 +205,64 @@ def append_file_to_zip(
     Returns:
         True if appending was successful, False otherwise
     """
-    lock_file_path = f"{zip_path}.lock"
-    max_lock_retries = 10
-    lock_retry_delay = 0.5  # Start with 500ms delay
-    
-    for lock_attempt in range(max_lock_retries):
-        try:
-            # Try to acquire lock by creating a lock file atomically
-            lock_fd = os.open(lock_file_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            
-            try:
-                # Write process info to lock file for debugging
-                os.write(lock_fd, f"PID: {os.getpid()}, Time: {time.time()}\n".encode())
-                os.close(lock_fd)
-                
-                # We have the lock, proceed with zip operation
-                logger.info(
-                    "Acquired zip file lock, appending file",
-                    extra={
-                        "bucket": bucket,
-                        "key": key,
-                        "archiveName": archive_name,
-                        "zipPath": zip_path,
-                        "lockAttempt": lock_attempt + 1,
-                    },
-                )
-                
-                # Get object size
-                response = s3.head_object(Bucket=bucket, Key=key)
-                content_length = response.get('ContentLength', 0)
-                
-                # Ensure the zip file exists and is accessible
-                if not os.path.exists(zip_path):
-                    logger.error(f"Zip file does not exist: {zip_path}")
-                    return False
-                
-                # Directly append to the existing zip file
-                with zipfile.ZipFile(zip_path, 'a', zipfile.ZIP_DEFLATED) as zipf:
-                    # Create a ZipInfo object to store file info
-                    zip_info = zipfile.ZipInfo(archive_name)
-                    zip_info.compress_type = zipfile.ZIP_DEFLATED
-                    zip_info.date_time = time.localtime(time.time())[:6]
-                    
-                    # Stream the file in chunks
-                    with zipf.open(zip_info, 'w') as dest_file:
-                        # Get the S3 object
-                        s3_object = s3_resource.Object(bucket, key)
-                        
-                        # Stream the object in chunks
-                        offset = 0
-                        while offset < content_length:
-                            end = min(offset + CHUNK_SIZE, content_length)
-                            range_str = f'bytes={offset}-{end-1}'
-                            
-                            response = s3_object.get(Range=range_str)
-                            data = response['Body'].read()
-                            dest_file.write(data)
-                            
-                            offset = end
-                
-                logger.info(
-                    "Successfully appended file to zip",
-                    extra={
-                        "bucket": bucket,
-                        "key": key,
-                        "archiveName": archive_name,
-                        "zipPath": zip_path,
-                        "size": content_length,
-                    },
-                )
-                
-                return True
-                
-            finally:
-                # Always release the lock
-                try:
-                    os.unlink(lock_file_path)
-                    logger.debug(f"Released zip file lock: {lock_file_path}")
-                except OSError as e:
-                    logger.warning(f"Failed to remove lock file: {e}")
-                    
-        except OSError as e:
-            if e.errno == 17:  # File exists (lock is held by another process)
-                logger.info(
-                    f"Zip file is locked, retrying in {lock_retry_delay}s (attempt {lock_attempt + 1}/{max_lock_retries})",
-                    extra={
-                        "zipPath": zip_path,
-                        "lockFile": lock_file_path,
-                        "attempt": lock_attempt + 1,
-                    }
-                )
-                time.sleep(lock_retry_delay)
-                # Exponential backoff with jitter
-                lock_retry_delay = min(lock_retry_delay * 1.5 + (time.time() % 0.1), 5.0)
-                continue
-            else:
-                logger.error(
-                    "Failed to create lock file",
-                    extra={
-                        "error": str(e),
-                        "errno": e.errno,
-                        "lockFile": lock_file_path,
-                    },
-                )
-                return False
-        except Exception as e:
-            logger.error(
-                "Failed to append file to zip",
-                extra={
-                    "error": str(e),
-                    "bucket": bucket,
-                    "key": key,
-                    "zipPath": zip_path,
-                },
-            )
-            # Clean up lock file if we created it
-            try:
-                os.unlink(lock_file_path)
-            except OSError:
-                pass
+    try:
+        # Get object size
+        response = s3.head_object(Bucket=bucket, Key=key)
+        content_length = response.get('ContentLength', 0)
+        
+        logger.info(
+            "Directly appending file from S3 to zip",
+            extra={
+                "bucket": bucket,
+                "key": key,
+                "size": content_length,
+                "archiveName": archive_name,
+                "zipPath": zip_path,
+            },
+        )
+        
+        # Ensure the zip file exists and is accessible
+        if not os.path.exists(zip_path):
+            logger.error(f"Zip file does not exist: {zip_path}")
             return False
-    
-    # If we get here, we failed to acquire the lock after all retries
-    logger.error(
-        "Failed to acquire zip file lock after all retries",
-        extra={
-            "zipPath": zip_path,
-            "maxRetries": max_lock_retries,
-            "bucket": bucket,
-            "key": key,
-        },
-    )
-    return False
+        
+        # Directly append to the existing zip file without using a lock file
+        with zipfile.ZipFile(zip_path, 'a', zipfile.ZIP_DEFLATED) as zipf:
+            # Create a ZipInfo object to store file info
+            zip_info = zipfile.ZipInfo(archive_name)
+            zip_info.compress_type = zipfile.ZIP_DEFLATED
+            zip_info.date_time = time.localtime(time.time())[:6]
+            
+            # Stream the file in chunks
+            with zipf.open(zip_info, 'w') as dest_file:
+                # Get the S3 object
+                s3_object = s3_resource.Object(bucket, key)
+                
+                # Stream the object in chunks
+                offset = 0
+                while offset < content_length:
+                    end = min(offset + CHUNK_SIZE, content_length)
+                    range_str = f'bytes={offset}-{end-1}'
+                    
+                    response = s3_object.get(Range=range_str)
+                    data = response['Body'].read()
+                    dest_file.write(data)
+                    
+                    offset = end
+        
+        return True
+        
+    except Exception as e:
+        logger.error(
+            "Failed to append file to zip",
+            extra={
+                "error": str(e),
+                "bucket": bucket,
+                "key": key,
+                "zipPath": zip_path,
+            },
+        )
+        return False
 
 
 @tracer.capture_lambda_handler
@@ -362,15 +288,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         raise ValueError("Missing assetId in event")
     
     try:
-        logger.info(
-            "Starting append operation",
-            extra={
-                "jobId": job_id,
-                "assetId": asset_id,
-                "event": event,
-            },
-        )
-        
         # Get job details
         job = get_job_details(job_id)
         
@@ -382,19 +299,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Ensure the zip file exists
         if not os.path.exists(zip_path):
             raise ValueError(f"Zip file not found at {zip_path}")
-        
-        # Log zip file status
-        zip_stat = os.stat(zip_path)
-        logger.info(
-            "Zip file status before append",
-            extra={
-                "zipPath": zip_path,
-                "zipSize": zip_stat.st_size,
-                "zipMtime": zip_stat.st_mtime,
-                "jobId": job_id,
-                "assetId": asset_id,
-            },
-        )
         
         # Get asset details
         asset = get_asset_details(asset_id)
@@ -441,20 +345,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         
         # Append the file to the zip
         if append_file_to_zip(bucket, file_path, zip_path, file_name):
-            # Log zip file status after append
-            zip_stat = os.stat(zip_path)
-            logger.info(
-                "Zip file status after successful append",
-                extra={
-                    "zipPath": zip_path,
-                    "zipSize": zip_stat.st_size,
-                    "zipMtime": zip_stat.st_mtime,
-                    "jobId": job_id,
-                    "assetId": asset_id,
-                    "fileName": file_name,
-                },
-            )
-            
             # Update job progress
             processed_count = job.get("processedFiles", 0) + 1
             total_count = job.get("totalFiles", 0)
@@ -462,17 +352,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             
             # Add metrics
             metrics.add_metric(name="FilesAppendedToZip", unit=MetricUnit.Count, value=1)
-            
-            logger.info(
-                "Successfully completed append operation",
-                extra={
-                    "jobId": job_id,
-                    "assetId": asset_id,
-                    "fileName": file_name,
-                    "processedCount": processed_count,
-                    "totalCount": total_count,
-                },
-            )
             
             return {
                 "jobId": job_id,
