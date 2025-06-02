@@ -511,54 +511,16 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Check if we have large file URLs to combine (for MIXED jobs)
         large_file_urls = event.get("largeFileUrls", [])
         
-        # Debug logging for large file URLs
-        logger.info(
-            "Processing large file URLs",
-            extra={
-                "jobId": job_id,
-                "largeFileUrls": large_file_urls,
-                "largeFileUrlsType": type(large_file_urls).__name__,
-                "largeFileUrlsLength": len(large_file_urls) if isinstance(large_file_urls, (list, dict)) else "N/A",
-            },
-        )
-        
         # Flatten large file URLs if they're nested
         flattened_large_urls = []
         if large_file_urls:
-            for i, url_item in enumerate(large_file_urls):
-                logger.info(
-                    f"Processing URL item {i}",
-                    extra={
-                        "jobId": job_id,
-                        "urlItem": url_item,
-                        "urlItemType": type(url_item).__name__,
-                    },
-                )
-                
+            for url_item in large_file_urls:
                 if isinstance(url_item, list):
-                    logger.info(f"Found list with {len(url_item)} URLs", extra={"jobId": job_id})
                     flattened_large_urls.extend(url_item)
                 elif isinstance(url_item, dict) and "largeFileUrls" in url_item:
-                    nested_urls = url_item["largeFileUrls"]
-                    logger.info(f"Found dict with {len(nested_urls)} nested URLs", extra={"jobId": job_id})
-                    flattened_large_urls.extend(nested_urls)
+                    flattened_large_urls.extend(url_item["largeFileUrls"])
                 elif isinstance(url_item, str):
-                    logger.info("Found string URL", extra={"jobId": job_id})
                     flattened_large_urls.append(url_item)
-                else:
-                    logger.warning(
-                        f"Unexpected URL item type: {type(url_item)}",
-                        extra={"jobId": job_id, "urlItem": url_item}
-                    )
-        
-        logger.info(
-            "Flattened large file URLs",
-            extra={
-                "jobId": job_id,
-                "flattenedUrls": flattened_large_urls,
-                "flattenedUrlsCount": len(flattened_large_urls),
-            },
-        )
         
         # Determine the structured format based on whether we have large files
         if flattened_large_urls:
