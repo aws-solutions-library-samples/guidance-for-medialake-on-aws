@@ -52,66 +52,6 @@ class JinjaLambdaLayer(Construct):
             ),
         )
 
-class ZipmergeLayer(Construct):
-    def __init__(
-        self,
-        scope: Construct,
-        id: str,
-        *,
-        architecture: lambda_.Architecture = lambda_.Architecture.ARM_64,
-        **kwargs,
-    ):
-        super().__init__(scope, id, **kwargs)
-
-        goarch = "arm64" if architecture == lambda_.Architecture.ARM_64 else "amd64"
-
-        self.layer = lambda_.LayerVersion(
-            self,
-            "ZipmergeLayer",
-            layer_version_name="zipmerge-layer",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[architecture],
-            description="Static zipmerge binary (rsc.io/zipmerge)",
-            code=lambda_.Code.from_asset(
-                path=".",  # dummy; all work happens in the container
-                bundling=BundlingOptions(
-                    user="root",
-                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
-                        set -euo pipefail
-
-                        yum -y update && yum -y install golang git
-
-                        # Where Go will put the binary
-                        export GOPATH=/tmp/go
-
-                        # 1. Cross-compile zipmerge
-                        GOOS=linux GOARCH={goarch} CGO_ENABLED=0 \
-                        go install rsc.io/zipmerge@latest
-
-                        # 2. Copy the resulting binary into the layer structure
-                        BIN_PATH="$GOPATH/bin/linux_{goarch}/zipmerge"
-                        if [ ! -f "$BIN_PATH" ]; then
-                            # Try alternate path
-                            BIN_PATH="$GOPATH/bin/zipmerge"
-                        fi
-                        
-                        mkdir -p /asset-output/bin
-                        cp "$BIN_PATH" /asset-output/bin/zipmerge
-                        
-                        # 3. Ensure the binary is executable
-                        chmod 755 /asset-output/bin/zipmerge
-                        """
-                    ],
-
-
-                ),
-            ),
-        )
-
 
 class OpenSearchPyLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):

@@ -33,7 +33,6 @@ import { S3UploaderModal } from './features/upload';
 import { useFeatureFlag } from './contexts/FeatureFlagsContext';
 import FilterModal from './components/search/FilterModal';
 import { useFacetSearch } from './hooks/useFacetSearch';
-import { NotificationCenter } from './components/NotificationCenter';
 
 interface SearchTag {
     key: string;
@@ -452,7 +451,7 @@ function TopBar() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2, // Increased spacing between icons
-                mr: 2, // Add margin to the right to create gap from screen edge
+                // Removed ml: 2 to position icons at the absolute far right edge
             }}>
                 {/* Upload Button - Only shown if file upload is enabled */}
                 {isFileUploadEnabled && (
@@ -473,8 +472,23 @@ function TopBar() {
                     </IconButton>
                 )}
                 
-                {/* Notification Center */}
-                <NotificationCenter />
+                {/* Notifications Icon Button - Only shown if notifications are enabled */}
+                {isNotificationEnabled && (
+                    <IconButton
+                        size="small"
+                        sx={{
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            '&:hover': {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                            }
+                        }}
+                    >
+                        <NotificationsIcon />
+                    </IconButton>
+                )}
                 
                 {/* Chat Icon Button - Only shown if chat is enabled */}
                 {isChatEnabled && (

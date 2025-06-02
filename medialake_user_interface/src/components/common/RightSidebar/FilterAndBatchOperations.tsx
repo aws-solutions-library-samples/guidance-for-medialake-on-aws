@@ -12,7 +12,6 @@ interface FilterAndBatchOperationsProps {
   onBatchDelete?: () => void;
   onBatchDownload?: () => void;
   onBatchShare?: () => void;
-  isDownloadLoading?: boolean;
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
   filterComponent?: React.ReactNode;
@@ -23,7 +22,6 @@ const FilterAndBatchOperations: React.FC<FilterAndBatchOperationsProps> = ({
   onBatchDelete,
   onBatchDownload,
   onBatchShare,
-  isDownloadLoading,
   onClearSelection,
   onRemoveItem,
   filterComponent
@@ -115,7 +113,6 @@ const FilterAndBatchOperations: React.FC<FilterAndBatchOperationsProps> = ({
               onBatchDelete={onBatchDelete}
               onBatchDownload={onBatchDownload}
               onBatchShare={onBatchShare}
-              isDownloadLoading={isDownloadLoading}
               onClearSelection={onClearSelection}
               onRemoveItem={onRemoveItem}
             />
