@@ -1,5 +1,4 @@
 import React from 'react';
-import { useFeatureFlag } from '@/utils/featureFlags';
 import {
     Box,
     Typography,
@@ -92,9 +91,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
     const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
-    
-    // Check if multi-select feature is enabled
-    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
 
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
@@ -197,48 +193,46 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {/* Select All Checkbox - only show if feature flag is enabled */}
-                {multiSelectFeature.value && (
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                        }}
-                    >
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={selectAllState === 'all'}
-                                    indeterminate={selectAllState === 'some'}
-                                    onChange={onSelectAllToggle}
-                                    size="small"
-                                    sx={{
-                                        color: 'primary.main',
-                                        '&.Mui-checked': {
-                                            color: 'primary.main',
-                                        },
-                                        '&.MuiCheckbox-indeterminate': {
-                                            color: 'primary.main',
-                                        },
-                                        '& .MuiSvgIcon-root': {
-                                            fontSize: '1.2rem',
-                                        }
-                                    }}
-                                />
-                            }
-                            label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
-                            sx={{
-                                margin: 0,
-                                '& .MuiFormControlLabel-label': {
-                                    fontSize: '0.875rem',
-                                    fontWeight: 500,
+                {/* Select All Checkbox - always visible */}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                    }}
+                >
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={selectAllState === 'all'}
+                                indeterminate={selectAllState === 'some'}
+                                onChange={onSelectAllToggle}
+                                size="small"
+                                sx={{
                                     color: 'primary.main',
-                                }
-                            }}
-                        />
-                    </Box>
-                )}
+                                    '&.Mui-checked': {
+                                        color: 'primary.main',
+                                    },
+                                    '&.MuiCheckbox-indeterminate': {
+                                        color: 'primary.main',
+                                    },
+                                    '& .MuiSvgIcon-root': {
+                                        fontSize: '1.2rem',
+                                    }
+                                }}
+                            />
+                        }
+                        label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
+                        sx={{
+                            margin: 0,
+                            '& .MuiFormControlLabel-label': {
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                color: 'primary.main',
+                            }
+                        }}
+                    />
+                </Box>
 
                 {/* Sort Button */}
                 <Button
