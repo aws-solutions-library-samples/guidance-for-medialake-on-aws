@@ -57,6 +57,7 @@ cline_docs/
 CLAUDE.md
 *.claude
 *.claude-ignore
+*.roomodes
 
 # Playwrght testing
 playwright-report/
