@@ -1132,22 +1132,6 @@ class AssetsConstruct(Construct):
             ),
         )
         
-        # Delete Lambda
-        self._delete_bulk_download_lambda = Lambda(
-            self,
-            "AssetsBulkDownloadDeleteLambda",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_assets_bulk_download_delete_{config.environment}",
-                entry="lambdas/api/assets/download/bulk/delete",
-                environment_variables={
-                    **common_env_vars,
-                    "TEMP_BUCKET": props.media_assets_bucket.bucket_name,  # For S3 cleanup
-                },
-                timeout_minutes=2,
-                memory_size=512,
-            ),
-        )
-        
         # Add permissions to Lambda functions
         self._add_bulk_download_lambda_permissions(props)
     
@@ -1172,7 +1156,6 @@ class AssetsConstruct(Construct):
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
             self._complete_mixed_job_lambda,
-            self._delete_bulk_download_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1180,13 +1163,9 @@ class AssetsConstruct(Construct):
                         "dynamodb:GetItem",
                         "dynamodb:PutItem",
                         "dynamodb:UpdateItem",
-                        "dynamodb:DeleteItem",
                         "dynamodb:Query",
                     ],
-                    resources=[
-                        self._bulk_download_table.table_arn,
-                        f"{self._bulk_download_table.table_arn}/index/*",  # Allow access to all GSIs
-                    ],
+                    resources=[self._bulk_download_table.table_arn],
                 )
             )
         
@@ -1261,7 +1240,6 @@ class AssetsConstruct(Construct):
             self._upload_part_lambda,
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
-            self._delete_bulk_download_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1642,7 +1620,7 @@ class AssetsConstruct(Construct):
                 "jobId.$": "$.jobId",
                 "userId.$": "$.userId",
                 "zipPath.$": "$.zipPath",
-                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls[0].largeFileUrls"
+                "largeFileUrls.$": "$.parallelResults[1].largeFileUrls"
             }
         )
         
@@ -1658,14 +1636,9 @@ class AssetsConstruct(Construct):
             }
         )
         
-        # Configure the choice logic - check if large file URLs actually exist and contain URLs
+        # Configure the choice logic
         extract_large_file_urls.when(
-            sfn.Condition.and_(
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0]"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0].largeFileUrls"),
-                sfn.Condition.is_present("$.parallelResults[1].largeFileUrls[0].largeFileUrls[0]")
-            ),
+            sfn.Condition.is_present("$.parallelResults[1].largeFileUrls"),
             extract_with_large_files
         ).otherwise(
             extract_without_large_files
@@ -1935,14 +1908,6 @@ class AssetsConstruct(Construct):
         job_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._mark_downloaded_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer
-        )
-        
-        # DELETE /assets/download/bulk/{jobId} - Delete job and cleanup resources
-        job_resource.add_method(
-            "DELETE",
-            api_gateway.LambdaIntegration(self._delete_bulk_download_lambda.function),
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer
         )

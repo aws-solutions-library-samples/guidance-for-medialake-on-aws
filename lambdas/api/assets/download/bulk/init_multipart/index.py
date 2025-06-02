@@ -240,7 +240,7 @@ def update_job_multipart_info(
                     "partSize": part_size,
                     "fileSize": file_size,
                 },
-                ":status": "STAGING",
+                ":status": "UPLOADING",
                 ":progress": 50,  # 50% progress after initializing multipart upload
                 ":updatedAt": datetime.utcnow().isoformat(),
             },

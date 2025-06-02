@@ -217,7 +217,7 @@ interface BulkDownloadResponse {
     message: string;
     data: {
         jobId: string;
-        status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+        status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
         downloadUrl?: string;
         estimatedSize?: number;
         createdAt: string;
@@ -229,7 +229,7 @@ interface BulkDownloadStatusResponse {
     message: string;
     data: {
         jobId: string;
-        status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+        status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
         downloadUrl?: string;
         progress?: number;
         estimatedSize?: number;
@@ -453,80 +453,6 @@ export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) =>
         enabled: !!jobId && enabled,
         refetchInterval: 2000, // Poll every 2 seconds
         retry: 1,
-    });
-};
-
-// Hook to get all bulk download jobs for the current user
-export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
-    const { showError } = useErrorModal();
-
-    return useQuery({
-        queryKey: ['userBulkDownloadJobs'],
-        queryFn: async () => {
-            try {
-                const response = await apiClient.get<{
-                    status: string;
-                    message: string;
-                    data: {
-                        jobs: Array<{
-                            jobId: string;
-                            status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-                            progress?: number;
-                            createdAt: string;
-                            updatedAt: string;
-                            downloadUrls?: {
-                                zippedFiles?: string;
-                                files?: string[];
-                                singleFiles?: string[];
-                            } | string[];
-                            expiresAt?: string;
-                            expiresIn?: string;
-                            error?: string;
-                            totalSize?: number;
-                            foundAssetsCount?: number;
-                            missingAssetsCount?: number;
-                            description?: string;
-                        }>;
-                        nextToken?: string;
-                    };
-                }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_USER_JOBS);
-                return response.data;
-            } catch (error) {
-                logger.error('Error fetching user bulk download jobs:', error);
-                showError('Failed to fetch download jobs');
-                throw error;
-            }
-        },
-        enabled,
-        refetchInterval: 15000, // Poll every 15 seconds
-        refetchIntervalInBackground: true, // Continue polling when tab is not active
-        retry: 1,
-    });
-};
-
-// Hook to delete a bulk download job
-export const useDeleteBulkDownloadJob = () => {
-    const { showError } = useErrorModal();
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (jobId: string) => {
-            try {
-                const response = await apiClient.delete<{
-                    status: string;
-                    message: string;
-                }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_DELETE(jobId));
-                return response.data;
-            } catch (error) {
-                logger.error('Error deleting bulk download job:', error);
-                showError('Failed to delete download job');
-                throw error;
-            }
-        },
-        onSuccess: () => {
-            // Invalidate and refetch user jobs
-            queryClient.invalidateQueries({ queryKey: ['userBulkDownloadJobs'] });
-        },
     });
 };
 
