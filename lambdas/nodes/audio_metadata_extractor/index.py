@@ -72,13 +72,25 @@ def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
         # Convert complex objects to string representation to avoid mapping conflicts
         return str(value)
     elif isinstance(value, (int, float, str, bool)) or value is None:
+        # Handle duration fields specially - always convert to float for consistency
+        if _should_be_duration_field(field_name):
+            if isinstance(value, (int, float)):
+                return float(value)
+            elif isinstance(value, str):
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return value
         return value
     else:
         # For numeric-looking strings, try to preserve as numbers if the field should be numeric
         if isinstance(value, str) and _should_be_numeric_field(field_name):
             try:
-                # Try to convert to int first, then float
-                if '.' in value:
+                # Duration fields should always be float
+                if _should_be_duration_field(field_name):
+                    return float(value)
+                # Other numeric fields: Try to convert to int first, then float
+                elif '.' in value:
                     return float(value)
                 else:
                     return int(value)
@@ -88,24 +100,60 @@ def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
         # Convert any other type to string
         return str(value)
 
+def _should_be_duration_field(field_name: str) -> bool:
+    """Check if a field should be treated as a duration (always float) based on patterns."""
+    # Convert field name to lowercase for comparison
+    field_lower = field_name.lower()
+    
+    # Pattern-based detection for duration/time fields
+    duration_patterns = [
+        'duration', 'time', 'length', 'runtime',
+        'play', 'playback', 'total', 'media',
+        'stream', 'file', 'track'
+    ]
+    
+    # Check if field name contains duration-related patterns
+    for pattern in duration_patterns:
+        if pattern in field_lower:
+            # Additional check to ensure it's actually time-related
+            time_indicators = ['duration', 'time', 'length', '_ts', 'play', 'runtime']
+            if any(indicator in field_lower for indicator in time_indicators):
+                return True
+    
+    # Check for timestamp and time-specific suffixes
+    time_suffixes = ['_ts', '_time', '_duration', '_length', '_runtime']
+    return any(suffix in field_lower for suffix in time_suffixes)
+
 def _should_be_numeric_field(field_name: str) -> bool:
-    """Check if a field should remain numeric based on its name."""
-    numeric_fields = {
-        'channels', 'channel_count', 'sample_rate', 'bit_rate', 'bitrate',
-        'duration', 'width', 'height', 'frame_rate', 'framerate', 'fps',
-        'size', 'filesize', 'file_size', 'length', 'count', 'number',
-        'index', 'id', 'level', 'profile', 'delay', 'stream_size'
-    }
+    """Check if a field should remain numeric based on its name patterns (excluding duration fields)."""
+    # Duration fields are handled separately, so exclude them from general numeric fields
+    if _should_be_duration_field(field_name):
+        return False
     
     # Convert field name to lowercase for comparison
     field_lower = field_name.lower()
     
-    # Check exact matches
-    if field_lower in numeric_fields:
-        return True
+    # Pattern-based detection for numeric fields
+    numeric_patterns = [
+        # Rate-related fields
+        'rate', 'bitrate', 'framerate', 'samplerate',
+        # Count/quantity fields
+        'count', 'number', 'channels', 'channel',
+        # Size/dimension fields
+        'size', 'width', 'height', 'filesize',
+        # Index/ID fields
+        'index', 'id', 'level', 'profile',
+        # Performance/technical fields
+        'fps', 'delay', 'stream_size'
+    ]
     
-    # Check if field name contains numeric indicators
-    numeric_indicators = ['_rate', '_count', '_size', '_duration', '_width', '_height', '_fps']
+    # Check if field name contains any numeric patterns
+    for pattern in numeric_patterns:
+        if pattern in field_lower:
+            return True
+    
+    # Check for common numeric suffixes/prefixes
+    numeric_indicators = ['_rate', '_count', '_size', '_width', '_height', '_fps', '_id', '_index']
     return any(indicator in field_lower for indicator in numeric_indicators)
 
 # ── helpers: analysis tools ────────────────────────────────────────
