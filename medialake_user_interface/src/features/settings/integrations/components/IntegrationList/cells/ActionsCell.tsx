@@ -7,7 +7,7 @@ import { Integration } from '../types';
 
 interface ActionsCellProps {
     row: Row<Integration>;
-    onEdit: (id: string, data: Partial<Integration>) => void;
+    onEdit: (id: string, integration: Integration) => void;
     onDelete: (id: string) => void;
 }
 

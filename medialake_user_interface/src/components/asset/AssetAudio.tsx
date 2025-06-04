@@ -142,6 +142,42 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false, size
   // Position indicator for the waveform, based on current time
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Size-based styling
+  const getSizeStyles = () => {
+    switch (size) {
+      case 'small':
+        return {
+          musicIconSize: 22,
+          playIconSize: 18,
+          buttonPadding: '4px',
+          marginBottom: 0.5
+        };
+      case 'medium':
+        return {
+          musicIconSize: 28,
+          playIconSize: 22,
+          buttonPadding: '6px',
+          marginBottom: 0.75
+        };
+      case 'large':
+        return {
+          musicIconSize: 36,
+          playIconSize: 28,
+          buttonPadding: '8px',
+          marginBottom: 1
+        };
+      default:
+        return {
+          musicIconSize: 28,
+          playIconSize: 22,
+          buttonPadding: '6px',
+          marginBottom: 0.75
+        };
+    }
+  };
+
+  const sizeStyles = getSizeStyles();
+
   // Render compact version for card and table views
   if (compact) {
     return (
@@ -177,7 +213,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false, size
             sx={{
               fontSize: sizeStyles.musicIconSize,
               color: alpha(theme.palette.primary.main, 0.8),
-              mb: 1
+              mb: sizeStyles.marginBottom
             }}
           />
 
@@ -189,7 +225,8 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false, size
               padding: sizeStyles.buttonPadding,
               '&:hover': {
                 backgroundColor: alpha(theme.palette.primary.main, 0.2),
-              }
+              },
+              padding: sizeStyles.buttonPadding
             }}
           >
             {isPlaying
