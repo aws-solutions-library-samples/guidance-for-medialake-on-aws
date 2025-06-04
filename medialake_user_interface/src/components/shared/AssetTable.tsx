@@ -76,7 +76,7 @@ export function AssetTable<T>({
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-    
+
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
         // Root level fields (new API structure)
@@ -89,7 +89,7 @@ export function AssetTable<T>({
         'fullPath': 'fullPath',
         'bucket': 'bucket',
         'FileHash': 'hash',
-        
+
         // Legacy nested fields (for backward compatibility)
         'DigitalSourceAsset.Type': 'type',
         'DigitalSourceAsset.MainRepresentation.Format': 'format',
@@ -104,7 +104,7 @@ export function AssetTable<T>({
         'Metadata.Consolidated': 'metadata',
         'InventoryID': 'id'
     };
-    
+
     // Create a reverse mapping for easier lookup
     const reverseFieldMapping: Record<string, string[]> = {};
     Object.entries(fieldMapping).forEach(([apiId, colId]) => {
@@ -113,13 +113,13 @@ export function AssetTable<T>({
         }
         reverseFieldMapping[colId].push(apiId);
     });
-    
+
     // Component initialization
-    
+
     // Add state to track if all rows are selected
     const [allSelected, setAllSelected] = useState(false);
     const [someSelected, setSomeSelected] = useState(false);
-    
+
     // Function to handle selecting/deselecting all rows
     const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         if (onSelectToggle) {
@@ -131,7 +131,7 @@ export function AssetTable<T>({
             });
         }
     }, [data, onSelectToggle, isSelected]);
-    
+
     // Update allSelected and someSelected states when data or isSelected changes
     useEffect(() => {
         if (data.length === 0) {
@@ -139,7 +139,7 @@ export function AssetTable<T>({
             setSomeSelected(false);
             return;
         }
-        
+
         const selectedCount = data.filter(row => isSelected(row)).length;
         setAllSelected(selectedCount === data.length);
         setSomeSelected(selectedCount > 0 && selectedCount < data.length);
@@ -148,7 +148,7 @@ export function AssetTable<T>({
     const tableColumns = React.useMemo(() => {
         // Filter columns based on selectedSearchFields
         let visibleColumns = columns.filter(col => col.visible);
-        
+
         if (selectedSearchFields && selectedSearchFields.length > 0) {
             visibleColumns = visibleColumns.filter(col => {
                 // Special case for name field
@@ -157,21 +157,21 @@ export function AssetTable<T>({
                         field.includes('Name') || field === 'objectName'
                     );
                 }
-                
+
                 // Special case for date field
                 if (col.id === 'date') {
                     return selectedSearchFields.some(field =>
                         field.includes('CreateDate') || field === 'createdAt'
                     );
                 }
-                
+
                 // Special case for size field
                 if (col.id === 'size') {
                     return selectedSearchFields.some(field =>
                         field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
                     );
                 }
-                
+
                 // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
                 const apiFieldIds = reverseFieldMapping[col.id] || [];
                 return apiFieldIds.some(apiFieldId =>
@@ -179,9 +179,9 @@ export function AssetTable<T>({
                 );
             });
         }
-        
+
         const tableColumns = [];
-        
+
         // Only include the selection checkbox column if onSelectToggle is provided
         if (onSelectToggle) {
             tableColumns.push(
@@ -244,10 +244,10 @@ export function AssetTable<T>({
                 })
             );
         }
-        
+
         // Add the rest of the columns
         tableColumns.push(
-            
+
             columnHelper.accessor(row => getThumbnailUrl(row), {
                 id: 'preview',
                 header: 'Preview',
@@ -255,7 +255,7 @@ export function AssetTable<T>({
                 enableSorting: false,
                 cell: info => {
                     const assetType = getAssetType(info.row.original);
-                    
+
                     if (assetType === 'Audio') {
                         return (
                             <Box sx={{ p: 1 }}>
@@ -267,16 +267,18 @@ export function AssetTable<T>({
                                         overflow: 'hidden',
                                     }}
                                 >
-                                    <AssetAudio 
-                                        src={info.getValue()} 
+                                    <AssetAudio
+                                        src={info.getValue()}
                                         alt={getName(info.row.original)}
                                         compact={true}
+                                        size="small"
                                     />
                                 </Box>
                             </Box>
                         );
                     }
-                    
+
+
                     return (
                         <Box sx={{ p: 1 }}>
                             <Box
@@ -306,19 +308,19 @@ export function AssetTable<T>({
                         if (col.id === 'name' && onEditClick) {
                             const isEditing = editingId === getId(info.row.original);
                             return (
-                                <Box sx={{ 
-                                    display: 'flex', 
-                                    alignItems: isEditing ? 'flex-start' : 'center', 
-                                    gap: 1, 
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: isEditing ? 'flex-start' : 'center',
+                                    gap: 1,
                                     p: 1,
                                     minWidth: 0,
                                     width: '100%'
                                 }}>
                                     {isEditing ? (
-                                        <Box sx={{ 
-                                            display: 'flex', 
+                                        <Box sx={{
+                                            display: 'flex',
                                             flexDirection: 'column',
-                                            gap: 1, 
+                                            gap: 1,
                                             width: '100%'
                                         }}>
                                             <TextField
@@ -334,7 +336,7 @@ export function AssetTable<T>({
                                                 onClick={(e) => e.stopPropagation()}
                                                 autoFocus
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     flex: 1,
                                                     minWidth: '100%',
                                                     '& .MuiInputBase-root': {
@@ -448,7 +450,7 @@ export function AssetTable<T>({
                 )
             })
         );
-        
+
         return tableColumns;
     }, [columns, editingId, editedName, onSelectToggle, isSelected, allSelected, someSelected, handleSelectAll, onFavoriteToggle, isFavorite, columnHelper, selectedSearchFields, reverseFieldMapping]);
 
@@ -487,8 +489,8 @@ export function AssetTable<T>({
     };
 
     return (
-        <TableContainer 
-            sx={{ 
+        <TableContainer
+            sx={{
                 maxHeight: '100%',
                 overflowY: 'visible',
                 width: '100%',

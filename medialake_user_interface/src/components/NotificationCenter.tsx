@@ -20,18 +20,13 @@ import {
 import {
   Notifications as NotificationsIcon,
   Close as CloseIcon,
-  Download as DownloadIcon,
-  CloudDownload as CloudDownloadIcon,
-  Archive as ArchiveIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Sync as SyncIcon,
-  Build as BuildIcon
+  Download as DownloadIcon
 } from "@mui/icons-material";
 import { DownloadLinksDisplay } from "./DownloadLinksDisplay";
 import { DismissConfirmationDialog } from "./DismissConfirmationDialog";
 import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
+import { useFeatureFlag } from '@/utils/featureFlags';
 
 // Helper function to format file sizes
 const formatFileSize = (bytes: string | number): string => {
@@ -160,6 +155,9 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  if (!multiSelectFeature) return <>{children}</>;
 
   // Load notifications from localStorage on mount
   useEffect(() => {
