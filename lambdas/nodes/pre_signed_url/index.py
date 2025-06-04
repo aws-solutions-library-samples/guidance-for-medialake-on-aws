@@ -7,7 +7,7 @@ import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.config import Config
-from lambda_middleware import lambda_middleware  # keep if still used
+from lambda_middleware import lambda_middleware      # keep if still used
 
 # ── Powertools / logging ────────────────────────────────────────────────────
 logger = Logger()
@@ -24,7 +24,7 @@ _SIGV4_CFG = Config(
 )
 
 _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
-_S3_CLIENT_CACHE: dict[str, boto3.client] = {}     # {region → client}
+_S3_CLIENT_CACHE: dict[str, boto3.client] = {}       # {region → client}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +33,6 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     Return an S3 client **pinned to the bucket’s actual region**.
     Clients are cached to reuse TCP connections across warm invocations.
     """
-    # Use a generic us-east-1 client only for the GetBucketLocation call
     generic = _S3_CLIENT_CACHE.setdefault(
         "us-east-1",
         boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
@@ -45,7 +44,6 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     except generic.exceptions.NoSuchBucket:
         raise ValueError(f"S3 bucket {bucket!r} does not exist")
 
-    # Build or reuse a region-specific client
     if region not in _S3_CLIENT_CACHE:
         _S3_CLIENT_CACHE[region] = boto3.client(
             "s3",
@@ -56,6 +54,7 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     return _S3_CLIENT_CACHE[region]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
 def _pick_representation(assets: list[Dict[str, Any]]
                           ) -> Tuple[str, str, str]:
     """
@@ -69,14 +68,14 @@ def _pick_representation(assets: list[Dict[str, Any]]
     if not reps:
         raise ValueError("payload.assets[0].DerivedRepresentations is empty")
 
-    # 1️⃣ Video/Audio proxy
+    # 1️⃣ Video / Audio proxy
     for rep in reps:
         if rep.get("Purpose") == "proxy" and rep.get("Type") in ("Video", "Audio"):
             loc = rep["StorageInfo"]["PrimaryLocation"]
             return (
                 loc["Bucket"],
-                loc["ObjectKey"]["FullPath"].lstrip("/"),  # strip accidental leading “/”
-                rep.get("Format") or rep.get("Type")
+                loc["ObjectKey"]["FullPath"].lstrip("/"),
+                rep.get("Format") or rep.get("Type"),
             )
 
     # 2️⃣ Image thumbnail
@@ -86,12 +85,36 @@ def _pick_representation(assets: list[Dict[str, Any]]
             return (
                 loc["Bucket"],
                 loc["ObjectKey"]["FullPath"].lstrip("/"),
-                rep.get("Format") or rep.get("Type")
+                rep.get("Format") or rep.get("Type"),
             )
 
     raise ValueError("No representation matched the selection rules")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+def _extract_location(payload: Dict[str, Any]) -> Tuple[str, str, str]:
+    """
+    Determine (bucket, key, media_type) using *priority* order:
+
+    1. payload.data.{bucket,key,mediaType}
+    2. payload.map.item.{bucket,key,mediaType}
+    3. First asset’s DerivedRepresentations (legacy rule set)
+    """
+    # 1️⃣  Direct “data” structure
+    data = payload.get("data") or {}
+    if data.get("bucket") and data.get("key"):
+        return data["bucket"], data["key"].lstrip("/"), data.get("mediaType", "")
+
+    # 2️⃣  Mapper output
+    mapper_item = (payload.get("map") or {}).get("item", {})
+    if mapper_item.get("bucket") and mapper_item.get("key"):
+        return mapper_item["bucket"], mapper_item["key"].lstrip("/"), mapper_item.get("mediaType", "")
+
+    # 3️⃣  Legacy representation-selection
+    return _pick_representation(payload.get("assets", []))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 @lambda_middleware(  # remove if not needed
     event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"),
 )
@@ -99,7 +122,7 @@ def _pick_representation(assets: list[Dict[str, Any]]
 @tracer.capture_lambda_handler
 def lambda_handler(event: Dict[str, Any], context: LambdaContext):
     """
-    Lambda entry – generate a pre-signed URL for the selected representation.
+    Lambda entry – generate a pre-signed URL for the selected object.
     The URL is signed in the bucket’s own region, preventing
     SignatureDoesNotMatch errors outside us-east-1.
     """
@@ -107,9 +130,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
 
     try:
         # ── 1. Extract bucket / key / mediaType ────────────────────────────
-        bucket, key, media_type = _pick_representation(
-            event.get("payload", {}).get("assets", [])
-        )
+        bucket, key, media_type = _extract_location(event.get("payload", {}))
 
         # ── 2. URL validity (env-driven, capped) ──────────────────────────
         url_validity = int(os.getenv("URL_VALIDITY", URL_VALIDITY_DEFAULT))
@@ -128,7 +149,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
 
         logger.info(
             "Generated URL for s3://%s/%s (region %s) valid %ss",
-            bucket, key, s3_client.meta.region_name, url_validity
+            bucket, key, s3_client.meta.region_name, url_validity,
         )
 
         return {

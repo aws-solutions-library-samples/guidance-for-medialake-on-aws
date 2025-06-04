@@ -205,7 +205,6 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # Create pipelines resource
         pipelines_resource = props.api_resource.add_resource("pipelines")
-        pipelines_v2_resource = props.api_resource.add_resource("pipelinesv2")
 
         self._get_pipelines_handler = Lambda(
             self,
@@ -236,7 +235,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
 
 
-        ## Pipelines v2
+        ## Pipelines
         pyaml_layer = PyamlLayer(self, "PyamlLayer")
         shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
         powertools_layer_config = PowertoolsLayerConfig()
@@ -244,11 +243,11 @@ class ApiGatewayPipelinesConstruct(Construct):
             self, "PowertoolsLayer", config=powertools_layer_config
         )
 
-        # POST /api/pipelines V2
-        post_pipelines_v2_lambda_config = LambdaConfig(
-            name="pipeline_post_v2",
+        # POST /api/pipelines
+        post_pipelines_lambda_config = LambdaConfig(
+            name="pipeline_post",
             timeout_minutes=15,
-            entry="lambdas/api/pipelines/post_pipelines_v2",
+            entry="lambdas/api/pipelines/post_pipelines",
             layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=post_lambda_iam_boundary_policy,
             environment_variables={
@@ -272,13 +271,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             },
         )
         
-        self._post_pipelines_v2_handler = Lambda(
+        self._post_pipelines_handler = Lambda(
             self,
-            "PostPipelinesHandlerV2",
-            config=post_pipelines_v2_lambda_config,
+            "PostPipelinesHandler",
+            config=post_pipelines_lambda_config,
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                actions=[
                     "ec2:DescribeVpcs",
@@ -289,7 +288,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "sqs:CreateQueue",
@@ -303,7 +302,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:ListBucket", "s3:GetObject"],
                 resources=[
@@ -313,7 +312,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "iam:TagRole",
@@ -333,7 +332,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:CreateFunction",
@@ -350,7 +349,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "states:CreateStateMachine",
@@ -364,28 +363,28 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],
                 resources=[props.node_table.table_arn],
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem","dynamodb:PutItem", "dynamodb:Scan", "dynamodb:UpdateItem"],
                 resources=[props.pipeline_table.table_arn],
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:Scan"],
                 resources=[props.connector_table.table_arn],
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "events:TagResource",
@@ -398,21 +397,21 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
                 resources=["*"],
             )
         )
 
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["kms:Decrypt"],
                 resources=["*"],
             )
         )
        
-        self._post_pipelines_v2_handler.function.add_to_role_policy(
+        self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "logs:CreateLogStream",
@@ -423,15 +422,15 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         props.iac_assets_bucket.bucket.grant_read_write(
-            self._post_pipelines_v2_handler.function
+            self._post_pipelines_handler.function
         )
 
         
-        # Create a simple Step Function that just invokes the pipeline v2 Lambda
+        # Create a simple Step Function that just invokes the pipeline Lambda
         pipeline_worker_task = tasks.LambdaInvoke(
             self,
-            "PipelineV2WorkerTask",
-            lambda_function=self._post_pipelines_v2_handler.function,
+            "PipelineWorkerTask",
+            lambda_function=self._post_pipelines_handler.function,
             output_path="$",
             retry_on_service_exceptions=True,
             payload_response_only=True
@@ -447,6 +446,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._pipeline_creation_state_machine = sfn.StateMachine(
             self,
             "PipelineCreationStateMachine",
+            state_machine_name=f"{config.resource_prefix}_Pipeline_Creator",
             definition=definition,
             timeout=Duration.minutes(300),
         )
@@ -454,10 +454,10 @@ class ApiGatewayPipelinesConstruct(Construct):
         # Create the front-end Lambda
         self._post_pipelines_async_handler = Lambda(
             self,
-            "PostPipelinesV2AsyncHandler",
+            "PostPipelinesAsyncHandler",
             config=LambdaConfig(
                 name="pipeline_post_async",
-                entry="lambdas/api/pipelines/post_pipelines_v2_async",
+                entry="lambdas/api/pipelines/post_pipelines_async",
                 layers=[pyaml_layer.layer, shortuuid_layer.layer],
                 iam_role_boundary_policy=post_lambda_iam_boundary_policy,
                 environment_variables={
@@ -493,7 +493,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        pipelines_v2_resource.add_method(
+        pipelines_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
@@ -501,8 +501,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
         
         # Add status endpoint
-        pipelines_v2_status_resource = pipelines_v2_resource.add_resource("status")
-        pipelines_v2_status_resource.add_resource("{executionArn}").add_method(
+        pipelines_status_resource = pipelines_resource.add_resource("status")
+        pipelines_status_resource.add_resource("{executionArn}").add_method(
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
@@ -510,18 +510,18 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
         
         # Add get pipeline by ID endpoint - use a different name to avoid conflicts
-        pipelines_v2_resource.add_resource("pipeline").add_resource("{pipelineId}").add_method(
+        pipelines_resource.add_resource("pipeline").add_resource("{pipelineId}").add_method(
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
-        # DELETE /api/pipelinesv2
-        delete_pipelines_v2_lambda_config = LambdaConfig(
-            name="pipeline_delete_v2",
+        # DELETE /api/pipelines
+        delete_pipelines_lambda_config = LambdaConfig(
+            name="pipeline_delete",
             timeout_minutes=15,
-            entry="lambdas/api/pipelines/delete_pipelines_v2",
+            entry="lambdas/api/pipelines/delete_pipelines",
             layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
@@ -530,14 +530,14 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "ACCOUNT_ID": scope.account,
             },
         )
-        self._delete_pipelines_v2_handler = Lambda(
+        self._delete_pipelines_handler = Lambda(
             self,
-            "DeletePipelinesHandlerV2",
-            config=delete_pipelines_v2_lambda_config,
+            "DeletePipelinesHandler",
+            config=delete_pipelines_lambda_config,
         )
 
         # Add Lambda function deletion permissions
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:DeleteFunction",
@@ -550,7 +550,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Add Step Functions deletion permissions
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["states:DeleteStateMachine", "states:DescribeStateMachine"],
                 resources=["*"],
@@ -558,7 +558,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Add EventBridge permissions
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "events:RemoveTargets",
@@ -569,7 +569,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 resources=["*"],
             )
         )
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "sqs:deletequeue",
@@ -579,7 +579,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Add IAM role and policy deletion permissions
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "iam:DeleteRole",
@@ -594,28 +594,17 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Add DynamoDB permissions
-        self._delete_pipelines_v2_handler.function.add_to_role_policy(
+        self._delete_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
             )
         )
 
-        # Add the DELETE method to the pipelines_v2_resource
-        pipelines_v2_resource.add_method(
+        # Add the DELETE method to the pipelines_resource
+        pipelines_resource.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
-
-        # Add a resource for pipeline ID specific operations
-        pipeline_id_v2_resource = pipelines_v2_resource.add_resource("{pipelineId}")
-
-        # Add the DELETE method to the pipeline_id_v2_resource
-        pipeline_id_v2_resource.add_method(
-            "DELETE",
-            apigateway.LambdaIntegration(self._delete_pipelines_v2_handler.function),
+            apigateway.LambdaIntegration(self._delete_pipelines_handler.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
@@ -645,9 +634,20 @@ class ApiGatewayPipelinesConstruct(Construct):
             },
         )
        
-
-        # Pipeline ID specific endpoints
+        # Pipeline ID specific endpoints - create only one {pipelineId} resource
         pipeline_id_resource = pipelines_resource.add_resource("{pipelineId}")
+
+        # Comment out duplicate resource creation to avoid conflicts
+        # # Add a resource for pipeline ID specific operations
+        # pipeline_id_resource = pipelines_resource.add_resource("{pipelineId}")
+
+        # # Add the DELETE method to the pipeline_id_resource
+        # pipeline_id_resource.add_method(
+        #     "DELETE",
+        #     apigateway.LambdaIntegration(self._delete_pipelines_handler.function),
+        #     authorization_type=apigateway.AuthorizationType.COGNITO,
+        #     authorizer=props.cognito_authorizer,
+        # )
 
         # GET /api/pipelines/{pipelineId}
         get_pipeline_id_lambda_config = LambdaConfig(
@@ -826,9 +826,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         
         # Add CORS support to all pipeline API resources
         add_cors_options_method(pipelines_resource)
-        add_cors_options_method(pipelines_v2_resource)
         add_cors_options_method(pipelines_executions_resource)
-        add_cors_options_method(pipelines_v2_status_resource)
         add_cors_options_method(pipeline_id_resource)
         add_cors_options_method(execution_id_resource)
         add_cors_options_method(retry_resource)
@@ -840,8 +838,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         return self._post_pipelines_async_handler
 
     @property
-    def post_pipelinesv2_async_handler(self) -> lambda_.Function:
-        return self._post_pipelines_v2_handler.function
+    def post_pipelines_async_handler(self) -> lambda_.Function:
+        return self._post_pipelines_handler.function
     
     @property
     def get_pipelines_handler(self) -> Lambda:
@@ -860,8 +858,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         return self._del_pipeline_id_handler
 
     @property
-    def delete_pipelines_v2_handler(self) -> Lambda:
-        return self._delete_pipelines_v2_handler
+    def delete_pipelines_handler(self) -> Lambda:
+        return self._delete_pipelines_handler
 
     @property
     def pipeline_trigger_lambda(self) -> Lambda:

@@ -168,7 +168,7 @@ class MediaLakeStack(cdk.Stack):
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
             pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-            post_pipelines_v2_lambda=pipeline_stack.post_pipelinesv2_async_handler,
+            post_pipelines_lambda=pipeline_stack.post_pipelines_async_handler,
             ),
         )
         

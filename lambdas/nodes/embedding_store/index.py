@@ -103,20 +103,74 @@ def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
 
 def extract_scope(container: Dict[str, Any]) -> Optional[str]:
     """
-    1. payload.data.item.embedding_scope   (new shape – PRIMARY)
-    2. payload.embedding_scope
-    3. payload.externalTaskResults[*].embedding_scope
+    Locate the embedding_scope in the following order:
+
+    1. payload.data.item.embedding_scope
+    2. payload.data.embedding_scope        <-- NEW
+    3. payload.map.item.embedding_scope
+    4. payload.embedding_scope
+    5. payload.externalTaskResults[*].embedding_scope
     """
+    # 1️⃣  payload.data.item.embedding_scope  (existing logic)
     itm = _item(container)
     if itm and itm.get("embedding_scope"):
         return itm["embedding_scope"]
 
+    # 2️⃣  payload.data.embedding_scope  (flat data shape)
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("embedding_scope"):
+        return data["embedding_scope"]
+
+    # 3️⃣  payload.map.item.embedding_scope
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("embedding_scope"):
+        return m_itm["embedding_scope"]
+
+    # 4️⃣  top-level payload.embedding_scope
     if container.get("embedding_scope"):
         return container["embedding_scope"]
 
+    # 5️⃣  externalTaskResults[*].embedding_scope
     for res in container.get("externalTaskResults", []):
-        if "embedding_scope" in res:
+        if res.get("embedding_scope"):
             return res["embedding_scope"]
+
+    return None
+
+
+def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
+    """
+    Locate the embedding_option in the following order:
+    
+    1. payload.data.item.embedding_option
+    2. payload.data.embedding_option
+    3. payload.map.item.embedding_option
+    4. payload.embedding_option
+    5. payload.externalTaskResults[*].embedding_option
+    """
+    # 1️⃣  payload.data.item.embedding_option
+    itm = _item(container)
+    if itm and itm.get("embedding_option"):
+        return itm["embedding_option"]
+
+    # 2️⃣  payload.data.embedding_option
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("embedding_option"):
+        return data["embedding_option"]
+
+    # 3️⃣  payload.map.item.embedding_option
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("embedding_option"):
+        return m_itm["embedding_option"]
+
+    # 4️⃣  top-level payload.embedding_option
+    if container.get("embedding_option"):
+        return container["embedding_option"]
+
+    # 5️⃣  externalTaskResults[*].embedding_option
+    for res in container.get("externalTaskResults", []):
+        if res.get("embedding_option"):
+            return res["embedding_option"]
 
     return None
 
@@ -249,6 +303,25 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             return _bad_request(error_msg)
 
         scope = extract_scope(payload)
+        embedding_option = extract_embedding_option(payload)
+        logger.info(f"Scope: {scope}, Embedding option: {embedding_option}")
+
+        # Check if we should skip processing for audio embedding_option with video scope
+        if embedding_option == "audio" and scope == "video":
+            logger.info("Skipping processing: embedding_option='audio' with embedding_scope='video'", extra={
+                "embedding_option": embedding_option,
+                "embedding_scope": scope,
+                "asset_id": asset_id
+            })
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "message": "Skipped processing: audio embedding option with video scope",
+                    "asset_id": asset_id,
+                    "embedding_option": embedding_option,
+                    "embedding_scope": scope
+                })
+            }
 
         # 3️⃣ OpenSearch client (skip if unavailable) ---------------------------
         client = get_opensearch_client()
@@ -274,14 +347,13 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
             if scope == "clip":
                 itm = _item(payload) or {}
-                start_sec        = itm.get("start_offset_sec", 0)
-                end_sec          = itm.get("end_offset_sec",   0)
-                embedding_option = itm.get("embedding_option")
+                start_sec = itm.get("start_offset_sec", 0)
+                end_sec   = itm.get("end_offset_sec",   0)
+
             else:  # audio
                 itm = _map_item(payload) or _item(payload) or {}
                 start_sec = itm.get("start_time", 0)
                 end_sec   = itm.get("end_time",   0)
-                embedding_option = None  # audio: not stored
 
             document |= {
                 "DigitalSourceAsset": {"ID": asset_id},
@@ -319,8 +391,11 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             "query": {
                 "bool": {
                     "filter": [
-                        {"term": {"DigitalSourceAsset.ID": asset_id}},
-                        {"exists": {"field": "InventoryID"}},
+                        # exact match on the parent document
+                        { "term": { "DigitalSourceAsset.ID": asset_id } },
+                        { "exists": { "field": "InventoryID" } },
+
+                        # look inside the nested array “DerivedRepresentations”
                         {
                             "nested": {
                                 "path": "DerivedRepresentations",
@@ -335,6 +410,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 }
             }
         }
+
 
         logger.info("Searching for existing document", extra={
             "operation": "search",
