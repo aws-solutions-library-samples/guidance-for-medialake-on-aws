@@ -54,6 +54,7 @@ cdk.context.json
 *.cursorignore
 docs/
 cline_docs/
+CLAUDE.md
 
 # Playwrght testing
 playwright-report/
