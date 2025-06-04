@@ -121,7 +121,7 @@ function Sidebar() {
             text: t('sidebar.menu.assets'),
             icon: <MediaAssetsIcon />,
             path: '/assets',
-            visible: ability?.can('view', 'asset') ?? false
+            visible: true // Assets should always be shown
         },
         {
             text: t('sidebar.menu.pipelines'),
@@ -143,12 +143,41 @@ function Sidebar() {
             isExpanded: settingsOpen,
             visible: ability?.can('view', 'settings') ?? false,
             subItems: [
-                { text: t('sidebar.submenu.connectors'), icon: <StorageIcon />, path: '/settings/connectors', visible: ability?.can('view', 'connector') ?? false },
-                { text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'), icon: <GroupIcon />, path: '/settings/users-groups', visible: (ability?.can('view', 'user') || ability?.can('view', 'group')) ?? false },
-                { text: t('sidebar.submenu.permissionSets', 'Permissions'), icon: <SecurityIcon />, path: '/settings/permission-sets', visible: ability?.can('view', 'permission-set') ?? false },
-                { text: t('sidebar.submenu.integrations'), icon: <IntegrationIcon />, path: '/settings/integrations', visible: ability?.can('view', 'integration') ?? false },
+                {
+                    text: t('sidebar.submenu.connectors'),
+                    icon: <StorageIcon />,
+                    path: '/settings/connectors',
+                    visible: (ability?.can('view', 'connector') ?? false) ||
+                             (ability?.can('view', 'settings.connectors') ?? false)
+                },
+                {
+                    text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'),
+                    icon: <GroupIcon />,
+                    path: '/settings/users-groups',
+                    visible: (ability?.can('view', 'user') ||
+                              ability?.can('view', 'group') ||
+                              ability?.can('view', 'settings.users')) ?? false
+                },
+                {
+                    text: t('sidebar.submenu.permissionSets', 'Permissions'),
+                    icon: <SecurityIcon />,
+                    path: '/settings/permission-sets',
+                    visible: ability?.can('view', 'permission-set') ?? false
+                },
+                {
+                    text: t('sidebar.submenu.integrations'),
+                    icon: <IntegrationIcon />,
+                    path: '/settings/integrations',
+                    visible: (ability?.can('view', 'integration') ?? false) ||
+                             (ability?.can('view', 'settings.integrations') ?? false)
+                },
                 // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
-                { text: t('sidebar.submenu.system'), icon: <SettingsIcon />, path: '/settings/system', visible: ability?.can('view', 'system-settings') ?? false },
+                {
+                    text: t('sidebar.submenu.system'),
+                    icon: <SettingsIcon />,
+                    path: '/settings/system',
+                    visible: ability?.can('view', 'system-settings') ?? false
+                },
             ].filter(item => item.visible !== false)
         }
     ].filter(item => item.visible !== false);

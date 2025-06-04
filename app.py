@@ -17,6 +17,10 @@ from medialake_stacks.api_gateway_core_stack import (
     ApiGatewayCoreStack,
     ApiGatewayCoreStackProps,
 )
+from medialake_stacks.cognito_stack import (
+    CognitoStack,
+    CognitoStackProps,
+)
 from medialake_stacks.users_groups_roles_stack import (
     UsersGroupsRolesStack,
     UsersGroupsRolesStackProps,
@@ -95,12 +99,21 @@ base_infrastructure = BaseInfrastructureStack(
     app, "MediaLakeBaseInfrastructure", env=env
 )
 
+# Create the Cognito Stack first (no dependencies)
+cognito_stack = CognitoStack(
+    app,
+    "MediaLakeCognito",
+    props=CognitoStackProps(),
+    env=env,
+)
 
+# Create the API Gateway Core Stack (depends on Cognito)
 api_gateway_core_stack = ApiGatewayCoreStack(
     app,
     "MediaLakeApiGatewayCore",
     props=ApiGatewayCoreStackProps(
         access_log_bucket=base_infrastructure.access_log_bucket,
+        cognito_user_pool=cognito_stack.user_pool,
     ),
     env=env,
 )
@@ -108,17 +121,20 @@ api_gateway_core_stack = ApiGatewayCoreStack(
 waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
+api_gateway_core_stack.add_dependency(cognito_stack)
 
-# Create the Authorization Stack (which now includes the shared authorizer)
+# Create the Authorization Stack (depends on Cognito, NOT on ApiGatewayCore)
 authorization_stack = AuthorizationStack(
     app,
     "MediaLakeAuthorizationStack",
     props=AuthorizationStackProps(
-        cognito_user_pool=api_gateway_core_stack.user_pool,
-        user_pool_client=api_gateway_core_stack.user_pool_client_id,
+        cognito_user_pool=cognito_stack.user_pool,
+        cognito_construct=cognito_stack.cognito_construct,
+        cognito_user_pool_client=cognito_stack.user_pool_client,
     ),
     env=env,
 )
+authorization_stack.add_dependency(cognito_stack)
 
 
 @dataclass
@@ -126,6 +142,7 @@ class MediaLakeStackProps:
     api_gateway_core_stack: ApiGatewayCoreStack
     base_infrastructure: BaseInfrastructureStack
     authorization_stack: AuthorizationStack
+    cognito_stack: CognitoStack
 
 
 class MediaLakeStack(cdk.Stack):
@@ -137,8 +154,8 @@ class MediaLakeStack(cdk.Stack):
             self,
             "MediaLakeUsersGroupsRolesStack",
             props=UsersGroupsRolesStackProps(
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
-                cognito_app_client=props.api_gateway_core_stack.user_pool_client,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 auth_table_name=props.authorization_stack._auth_table.table_name,
                 avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
@@ -152,7 +169,7 @@ class MediaLakeStack(cdk.Stack):
             "MediaLakeGroupsStack",
             props=GroupsStackProps(
                 # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
+                cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
             ),
         )
@@ -183,8 +200,8 @@ class MediaLakeStack(cdk.Stack):
             self,
             "MediaLakeSettingsApi",
             props=SettingsApiStackProps(
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
-                cognito_app_client=props.api_gateway_core_stack.user_pool_client_id,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client_id,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 system_settings_table_name=settings_stack.system_settings_table_name,
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
@@ -217,9 +234,9 @@ class MediaLakeStack(cdk.Stack):
                 system_settings_table=settings_stack.system_settings_table_name,
                 rest_api=props.api_gateway_core_stack.rest_api,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                user_pool=props.api_gateway_core_stack.user_pool,
-                identity_pool=props.api_gateway_core_stack.identity_pool,
-                user_pool_client=props.api_gateway_core_stack.user_pool_client,
+                user_pool=props.cognito_stack.user_pool,
+                identity_pool=props.cognito_stack.identity_pool,
+                user_pool_client=props.cognito_stack.user_pool_client,
                 waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
             ),
         )
@@ -231,7 +248,7 @@ class MediaLakeStack(cdk.Stack):
             props=PermissionsStackProps(
                 api_resource=props.api_gateway_core_stack.rest_api,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
+                cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
             ),
         )
@@ -241,8 +258,8 @@ class MediaLakeStack(cdk.Stack):
             "MediaLakePipeline",
             props=PipelineStackProps(
                 iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
-                cognito_app_client=props.api_gateway_core_stack.user_pool_client,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client,
                 asset_table=props.base_infrastructure.asset_table,
                 connector_table=api_gateway_stack.connector_table,
                 node_table=nodes_stack.pipelines_nodes_table,
@@ -266,7 +283,7 @@ class MediaLakeStack(cdk.Stack):
             "MediaLakeIntegrationsEnvironment",
             props=IntegrationsEnvironmentStackProps(
                 api_resource=props.api_gateway_core_stack.rest_api,
-                cognito_user_pool=props.api_gateway_core_stack.user_pool,
+                cognito_user_pool=props.cognito_stack.user_pool,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
                 post_pipelines_v2_lambda=pipeline_stack.post_pipelinesv2_async_handler,
@@ -287,6 +304,7 @@ medialake_stack = MediaLakeStack(
         api_gateway_core_stack=api_gateway_core_stack,
         base_infrastructure=base_infrastructure,
         authorization_stack=authorization_stack,
+        cognito_stack=cognito_stack,
     ),
     env=env,
 )
@@ -310,11 +328,11 @@ user_interface_stack = UserInterfaceStack(
     app,
     "MediaLakeUserInterface",
     props=UserInterfaceStackProps(
-        cognito_user_pool_id=api_gateway_core_stack.user_pool_id,
-        cognito_user_pool_client_id=api_gateway_core_stack.user_pool_client_id,
-        cognito_identity_pool=api_gateway_core_stack.identity_pool,
-        cognito_user_pool_arn=api_gateway_core_stack.user_pool_arn,
-        cognito_domain_prefix=api_gateway_core_stack.cognito_domain_prefix,
+        cognito_user_pool_id=cognito_stack.user_pool_id,
+        cognito_user_pool_client_id=cognito_stack.user_pool_client_id,
+        cognito_identity_pool=cognito_stack.identity_pool,
+        cognito_user_pool_arn=cognito_stack.user_pool_arn,
+        cognito_domain_prefix=cognito_stack.cognito_domain_prefix,
         api_gateway_rest_id=api_gateway_core_stack.rest_api.rest_api_id,
         api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
         access_log_bucket=base_infrastructure.access_log_bucket,

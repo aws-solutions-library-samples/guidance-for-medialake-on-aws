@@ -3,17 +3,23 @@ from dataclasses import dataclass
 from constructs import Construct
 from aws_cdk import (
     aws_cognito as cognito,
+    aws_iam as iam,
     RemovalPolicy,
     CfnOutput,
     Stack,
     custom_resources as cr,
+    Fn,
+    Aws,
 )
+import aws_cdk as cdk
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
     UserPoolAuthenticationProvider,
     IdentityPoolAuthenticationProviders,
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from aws_cdk import aws_dynamodb as dynamodb
 from config import config
 
 
@@ -47,16 +53,40 @@ class CognitoConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Get the region from the stack
+        # Setup
         stack = Stack.of(self)
-        account = stack.account
         region = stack.region
-
-        # Use provided props or create default props
         self.props = props or CognitoProps()
-
-        # Store the placeholder for CloudFront domain that we'll update later
         self._cloudfront_domain = None
+
+        # Create the DynamoDB table for authorization configuration
+        self._auth_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-authorization-{config.environment}",
+            partition_key_name="PK",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="SK",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand(),
+            # Enable DynamoDB Streams for policy synchronization
+            stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+            global_secondary_indexes=[
+                # GSI1 (Query assignments by PermissionSet or Group)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI1",
+                    partition_key=dynamodb.Attribute(
+                        name="GSI1PK",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="GSI1SK",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                ),
+            ]
+        )
+        self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
         # Create Lambda functions
         self._cognito_trigger_lambda = Lambda(
@@ -67,6 +97,26 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/cognito_trigger",
             ),
         )
+        
+        # Create Pre-Token Generation Lambda
+        self._pre_token_generation_lambda = Lambda(
+            self,
+            "CognitoPreTokenGeneration",
+            LambdaConfig(
+                name="pre_token_generation",
+                entry="lambdas/auth/pre_token_generation",
+                timeout_minutes=1,
+                lambda_handler="handler",
+                environment_variables={
+                    "AUTH_TABLE_NAME": self._auth_table.table_name,
+                    "DEBUG_MODE": "true",
+                },
+            ),
+        )
+        
+        # Grant read access to the auth table
+        self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
+        
 
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
@@ -129,7 +179,11 @@ class CognitoConstruct(Construct):
                 )
             ),
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
-                post_confirmation=self._cognito_trigger_lambda.function.function_arn
+                post_confirmation=self._cognito_trigger_lambda.function.function_arn,
+                pre_token_generation_config={
+                    "lambda_arn": self._pre_token_generation_lambda.function.function_arn,
+                    "lambda_version": "V2_0"
+                }
             ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
@@ -205,6 +259,26 @@ class CognitoConstruct(Construct):
         )
         self._domain_prefix = domain_prefix
 
+        # Configure the pre-token generation Lambda as a trigger for the user pool
+        lambda_config = {
+            "PreTokenGenerationConfig": {
+                "LambdaArn": self._pre_token_generation_lambda.function_arn,
+                "LambdaVersion": "V2_0"
+            }
+        }
+        
+        # Update the user pool with the Lambda trigger configuration
+        cfn_user_pool.add_property_override("LambdaConfig", lambda_config)
+        
+        # Grant the Cognito service permission to invoke the Lambda
+        self._pre_token_generation_lambda.function.add_permission(
+            "CognitoInvokePermission",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=self._user_pool.user_pool_arn
+        )
+        
+        
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
@@ -382,6 +456,16 @@ class CognitoConstruct(Construct):
     @property
     def cognito_domain_prefix(self) -> str:
         return self._domain_prefix
+    
+    @property
+    def auth_table(self):
+        """Return the authorization table"""
+        return self._auth_table.table
+    
+    @property
+    def auth_table_name(self) -> str:
+        """Return the authorization table name"""
+        return self._auth_table.table_name
 
     def update_callback_urls(self, cloudfront_domain: str) -> None:
         """

@@ -10,7 +10,6 @@ This stack defines the AWS resources for the new authorization system, including
 
 from aws_cdk import (
     Stack,
-    aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_event_sources,
     aws_iam as iam,
@@ -18,6 +17,7 @@ from aws_cdk import (
     aws_verifiedpermissions as avp,
     RemovalPolicy,
     CustomResource,
+    Fn,
 )
 import aws_cdk as cdk
 import datetime
@@ -25,7 +25,7 @@ import datetime
 from constructs import Construct
 from dataclasses import dataclass
 
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+# DynamoDB table is now created in the Cognito construct
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.auth.shared_authorizer_construct import (
     SharedAuthorizerConstruct,
@@ -39,8 +39,8 @@ from config import config
 class AuthorizationStackProps:
     """Configuration for Authorization Stack."""
     cognito_user_pool: cognito.UserPool
-    user_pool_client: str
-
+    cognito_user_pool_client: cognito.UserPoolClient
+    cognito_construct: any
 
 class AuthorizationStack(Stack):
     """
@@ -55,35 +55,8 @@ class AuthorizationStack(Stack):
     ):
         super().__init__(scope, id, **kwargs)
 
-        # Create the DynamoDB table for authorization configuration
-        
-        self._auth_table_props = DynamoDBProps(
-            name=f"{config.resource_prefix}-authorization-{config.environment}",
-            partition_key_name="PK",
-            partition_key_type=dynamodb.AttributeType.STRING,
-            sort_key_name="SK",
-            sort_key_type=dynamodb.AttributeType.STRING,
-            point_in_time_recovery=True,
-            billing_mode=dynamodb.Billing.on_demand(),
-            # Enable DynamoDB Streams for policy synchronization
-            stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-            global_secondary_indexes=[
-                # GSI1 (Query assignments by PermissionSet or Group)
-                dynamodb.GlobalSecondaryIndexPropsV2(
-                    index_name="GSI1",
-                    partition_key=dynamodb.Attribute(
-                        name="GSI1PK",
-                        type=dynamodb.AttributeType.STRING
-                    ),
-                    sort_key=dynamodb.Attribute(
-                        name="GSI1SK",
-                        type=dynamodb.AttributeType.STRING
-                    ),
-                    projection_type=dynamodb.ProjectionType.ALL
-                ),
-            ]
-        )
-        self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
+        # Get the auth table from the Cognito construct (to avoid circular dependencies)
+        self._auth_table = props.cognito_construct.auth_table
 
 
         # 2. Create the AVP Policy Store
@@ -160,7 +133,7 @@ class AuthorizationStack(Stack):
         )
 
         # Grant table read access to the shared authorizer
-        self._auth_table.table.grant_read_data(self._shared_authorizer.authorizer_lambda)
+        self._auth_table.grant_read_data(self._shared_authorizer.authorizer_lambda)
 
         # Common environment variables for Lambda functions
         common_env_vars = {
@@ -168,7 +141,6 @@ class AuthorizationStack(Stack):
             "AVP_POLICY_STORE_ID": self._policy_store.attr_policy_store_id,
             "DEBUG_MODE": "true",
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
-            
         }
 
         # 3. Use the Custom API Gateway Lambda Authorizer from props
@@ -186,7 +158,7 @@ class AuthorizationStack(Stack):
             ),
         )
         
-        self._auth_table.table.grant_read_data(self._custom_authorizer_lambda.function)
+        self._auth_table.grant_read_data(self._custom_authorizer_lambda.function)
         self._custom_authorizer_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -227,26 +199,11 @@ class AuthorizationStack(Stack):
         # Add DynamoDB Stream as an event source for the Policy Sync Lambda
         self._policy_sync_lambda.function.add_event_source(
             lambda_event_sources.DynamoEventSource(
-                table=self._auth_table.table,
+                table=self._auth_table,
                 starting_position=lambda_.StartingPosition.LATEST,
                 batch_size=100,
                 retry_attempts=3,
             )
-        )
-
-
-
-        # 5. Create the Cognito Pre-Token Generation Lambda
-        self._pre_token_generation_lambda = Lambda(
-            self,
-            "PreTokenGenerationLambda",
-            config=LambdaConfig(
-                name="cognito_pre_token_generation",
-                entry="lambdas/auth/cognito_pre_token_generation",
-                memory_size=256,
-                timeout_minutes=1,
-                environment_variables=common_env_vars,
-            ),
         )
 
         # 6. Create the Cognito Pre-Signup Lambda
@@ -262,12 +219,10 @@ class AuthorizationStack(Stack):
             ),
         )
 
-        # 7. Grant necessary permissions
-
-        # Custom Authorizer Lambda: Read access to the auth table
-        # self._auth_table.table.grant_read_data(self._custom_authorizer_lambda)
-
         # Add the Cognito Identity Source to the AVP Policy Store
+        # Get the client ID directly from the cognito construct
+        cognito_client_id = props.cognito_user_pool_client.user_pool_client_id
+        
         self._identity_source = avp.CfnIdentitySource(
             self,
             "CognitoIdentitySource",
@@ -275,7 +230,7 @@ class AuthorizationStack(Stack):
             configuration=avp.CfnIdentitySource.IdentitySourceConfigurationProperty(
                 cognito_user_pool_configuration=avp.CfnIdentitySource.CognitoUserPoolConfigurationProperty(
                     user_pool_arn=props.cognito_user_pool.user_pool_arn,
-                    client_ids=[props.user_pool_client]
+                    client_ids=[cognito_client_id]
                 )
             ),
             principal_entity_type="MediaLake::User"
@@ -296,119 +251,14 @@ class AuthorizationStack(Stack):
             )
         )
 
-        # Cognito Pre-Token Generation Lambda: Read access to the auth table
-        self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
+        # Cognito Pre-Token Generation Lambda permissions and environment variables
+        # are now configured in the Cognito stack to avoid circular dependencies
 
         # Cognito Pre-Signup Lambda: Write access to the auth table
-        self._auth_table.table.grant_read_write_data(self._pre_signup_lambda.function)
+        self._auth_table.grant_read_write_data(self._pre_signup_lambda.function)
         
         # Auth Table Seeder Lambda: Write access to the auth table
-        self._auth_table.table.grant_read_write_data(self._auth_seeder_lambda.function)
-
-        # Create a custom resource to add the Pre-Token-Generation trigger
-        pre_token_generation_lambda = lambda_.Function(
-            self,
-            "PreTokenGenerationTriggerProvider",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.handler",
-            code=lambda_.Code.from_inline("""
-import boto3
-import cfnresponse
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-cognito = boto3.client('cognito-idp')
-
-def handler(event, context):
-    logger.info(f"Event: {event}")
-    
-    request_type = event['RequestType']
-    physical_id = event.get('PhysicalResourceId', 'PreTokenGenerationTrigger')
-    
-    try:
-        user_pool_id = event['ResourceProperties']['UserPoolId']
-        lambda_arn = event['ResourceProperties']['LambdaArn']
-        
-        if request_type in ['Create', 'Update']:
-            logger.info(f"Adding Pre-Token-Generation trigger to user pool {user_pool_id}")
-            
-            # Get current Lambda config
-            response = cognito.describe_user_pool(UserPoolId=user_pool_id)
-            lambda_config = response.get('UserPool', {}).get('LambdaConfig', {})
-            
-            # Update with our trigger - use V2_0 to support custom claims
-            # Clear V1 trigger if it exists
-            if 'PreTokenGeneration' in lambda_config:
-                del lambda_config['PreTokenGeneration']
-            
-            # Set V2 trigger
-            lambda_config['PreTokenGenerationConfig'] = {
-                'LambdaVersion': 'V2_0',
-                'LambdaArn': lambda_arn
-            }
-            
-            # Update the user pool
-            cognito.update_user_pool(
-                UserPoolId=user_pool_id,
-                LambdaConfig=lambda_config
-            )
-            
-            logger.info("Successfully added Pre-Token-Generation trigger")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-        elif request_type == 'Delete':
-            # Optionally remove the trigger on delete
-            logger.info(f"Delete request for Pre-Token-Generation trigger on user pool {user_pool_id}")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-        else:
-            logger.error(f"Unexpected request type: {request_type}")
-            cfnresponse.send(event, context, cfnresponse.FAILED, {}, physical_id)
-    except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, physical_id)
-"""),
-            timeout=cdk.Duration.minutes(5),
-        )
-        
-        # Grant permission for the custom resource Lambda to update Cognito
-        pre_token_generation_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "cognito-idp:DescribeUserPool",
-                    "cognito-idp:UpdateUserPool",
-                ],
-                resources=[props.cognito_user_pool.user_pool_arn],
-            )
-        )
-        
-        # Create a provider for the Pre-Token-Generation trigger
-        pre_token_generation_provider = cdk.custom_resources.Provider(
-            self,
-            "PreTokenGenerationProvider",
-            on_event_handler=pre_token_generation_lambda,
-        )
-        
-        
-        # Grant permission for Cognito to invoke the Pre-Token Generation Lambda
-        # This must be done BEFORE creating the custom resource
-        self._pre_token_generation_lambda.function.add_permission(
-            "CognitoInvokePermission",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=props.cognito_user_pool.user_pool_arn,
-        )
-        
-        # Create a custom resource to add the Pre-Token-Generation trigger
-        pre_token_generation_trigger = cdk.CustomResource(
-            self,
-            "PreTokenGenerationTrigger",
-            service_token=pre_token_generation_provider.service_token,
-            properties={
-                "UserPoolId": props.cognito_user_pool.user_pool_id,
-                "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
-                "Timestamp": str(datetime.datetime.now().timestamp()),
-            },
-        )
+        self._auth_table.grant_read_write_data(self._auth_seeder_lambda.function)
 
         # Create a Lambda function for the Pre-Signup trigger
         pre_signup_lambda = lambda_.Function(
@@ -516,13 +366,11 @@ def handler(event, context):
             },
         )
         
-        # Ensure the custom resource is created after the DynamoDB table
-        self._auth_seeder_custom_resource.node.add_dependency(self._auth_table)
 
     @property
     def auth_table(self):
         """Return the authorization table"""
-        return self._auth_table.table
+        return self._auth_table
 
     @property
     def policy_store(self):
@@ -533,11 +381,6 @@ def handler(event, context):
     def policy_sync_lambda(self):
         """Return the policy sync Lambda function"""
         return self._policy_sync_lambda.function
-
-    @property
-    def pre_token_generation_lambda(self):
-        """Return the pre-token generation Lambda function"""
-        return self._pre_token_generation_lambda.function
 
     @property
     def pre_signup_lambda(self):
@@ -558,3 +401,4 @@ def handler(event, context):
     def shared_authorizer_lambda(self):
         """Return the shared authorizer Lambda function"""
         return self._shared_authorizer.authorizer_lambda
+

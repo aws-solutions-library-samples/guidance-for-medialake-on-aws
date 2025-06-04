@@ -3,14 +3,14 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_cognito as cognito,
     RemovalPolicy,
-    CfnOutput
+    CfnOutput,
+    Fn
 )
 import aws_cdk as cdk
 
 from constructs import Construct
 from dataclasses import dataclass
 
-from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
     ApiGatewayProps,
@@ -21,6 +21,7 @@ from medialake_constructs.api_gateway.api_gateway_main_construct import (
 class ApiGatewayCoreStackProps:
     """Configuration for API Gateway Core Stack."""
     access_log_bucket: s3.Bucket
+    cognito_user_pool: cognito.IUserPool
 
 
 class ApiGatewayCoreStack(Stack):
@@ -29,29 +30,15 @@ class ApiGatewayCoreStack(Stack):
     ):
         super().__init__(scope, id, **kwargs)
 
-        # Create Cognito construct first
-        self._cognito_construct = CognitoConstruct(
-            self,
-            "Cognito",
-            props=CognitoProps(
-                self_sign_up_enabled=False,
-                auto_verify_email=True,
-                auto_verify_phone=True,
-                sign_in_with_email=True,
-                generate_secret=False,
-                admin_user_password=True,
-                user_password=True,
-                user_srp=True,
-                removal_policy=RemovalPolicy.DESTROY,
-            ),
-        )
+        # Store the Cognito User Pool from props
+        self._cognito_user_pool = props.cognito_user_pool
 
         # Create API Gateway construct
         self._api_gateway = ApiGatewayConstruct(
             self,
             "ApiGateway",
             props=ApiGatewayProps(
-                user_pool=self._cognito_construct.user_pool,
+                user_pool=props.cognito_user_pool,
                 access_log_bucket=props.access_log_bucket,
                 deploy_api=False,
             ),
@@ -87,28 +74,34 @@ class ApiGatewayCoreStack(Stack):
 
     @property
     def user_pool(self) -> cognito.IUserPool:
-        return self._cognito_construct.user_pool
+        return self._cognito_user_pool
     
 
     @property
     def user_pool_arn(self):
-        return self._cognito_construct.user_pool_arn
+        # Import from the CognitoStack export
+        return Fn.import_value("MediaLakeCognito-UserPoolArn")
     
     @property
     def identity_pool(self):
-        return self._cognito_construct.identity_pool
+        # Import from the CognitoStack export
+        return Fn.import_value("MediaLakeCognito-IdentityPoolId")
     
     @property
     def user_pool_client(self) -> cognito.UserPoolClient:
-        return self._cognito_construct.user_pool_client
+        # Since we can't return the actual client object from exports, 
+        # this will need to be handled differently or removed
+        raise NotImplementedError("user_pool_client property not available when using separate Cognito stack")
 
     @property
     def user_pool_client_id(self):
-        return self._cognito_construct.user_pool_client_id
+        # Import from the CognitoStack export
+        return Fn.import_value("MediaLakeCognito-UserPoolClientId")
     
     @property
     def user_pool_id(self):
-        return self._cognito_construct.user_pool_id
+        # Import from the CognitoStack export
+        return Fn.import_value("MediaLakeCognito-UserPoolId")
         
     @property
     def waf_acl_arn(self):
@@ -116,4 +109,10 @@ class ApiGatewayCoreStack(Stack):
     
     @property
     def cognito_domain_prefix(self):
-        return self._cognito_construct.cognito_domain_prefix
+        # Import from the CognitoStack export
+        return Fn.import_value("MediaLakeCognito-CognitoDomainPrefix")
+        
+    @property
+    def cognito_construct(self):
+        # This property is no longer available since Cognito is in a separate stack
+        raise NotImplementedError("cognito_construct property not available when using separate Cognito stack")

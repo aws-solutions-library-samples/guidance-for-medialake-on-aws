@@ -23,14 +23,17 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     const customPermissions = (user as any).customPermissions as string[];
     console.log('Using custom permissions from JWT:', customPermissions);
     
-    // Parse custom permissions (format: "resource:level")
+    // Parse custom permissions (format: "resource:action")
     customPermissions.forEach(permission => {
-      const [resource, level] = permission.split(':');
+      const [resource, action] = permission.split(':');
+      console.log(`Processing permission: ${resource}:${action}`);
       
-      if (level === 'admin') {
-        // Admin level - full manage permissions
+      // Handle admin level permissions (full access)
+      if (action === 'admin' || action === 'full') {
+        console.log(`Processing admin/full permission: ${resource}:${action}`);
         switch (resource) {
           case 'asset':
+          case 'assets':
             can('manage', 'asset');
             can('view', 'asset');
             can('create', 'asset');
@@ -38,6 +41,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             can('delete', 'asset');
             break;
           case 'pipeline':
+          case 'pipelines':
             can('manage', 'pipeline');
             can('view', 'pipeline');
             can('create', 'pipeline');
@@ -45,6 +49,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             can('delete', 'pipeline');
             break;
           case 'integration':
+          case 'integrations':
             can('manage', 'integration');
             can('view', 'integration');
             can('create', 'integration');
@@ -62,6 +67,140 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             can('manage', 'region');
             can('manage', 'system-settings');
             break;
+          case 'admin':
+            // Full admin access to everything
+            can('manage', 'all');
+            
+            // Explicitly grant access to all resources for admin
+            can('manage', 'asset');
+            can('manage', 'pipeline');
+            can('manage', 'connector');
+            can('manage', 'user');
+            can('manage', 'group');
+            can('manage', 'settings');
+            can('manage', 'permission-set');
+            can('manage', 'integration');
+            can('manage', 'region');
+            can('manage', 'system-settings');
+            
+            // Also grant view permissions for sidebar visibility
+            can('view', 'asset');
+            can('view', 'pipeline');
+            can('view', 'connector');
+            can('view', 'user');
+            can('view', 'group');
+            can('view', 'settings');
+            can('view', 'permission-set');
+            can('view', 'integration');
+            can('view', 'region');
+            can('view', 'system-settings');
+            
+            // Grant settings.* permissions for sidebar visibility
+            can('view', 'settings.users' as any);
+            can('view', 'settings.connectors' as any);
+            can('view', 'settings.integrations' as any);
+            can('view', 'settings.permissions' as any);
+            can('view', 'settings.system' as any);
+            
+            // Grant manage permissions for settings.* resources
+            can('manage', 'settings.users' as any);
+            can('manage', 'settings.connectors' as any);
+            can('manage', 'settings.integrations' as any);
+            can('manage', 'settings.permissions' as any);
+            can('manage', 'settings.system' as any);
+            
+            console.log('Admin full permission granted - explicitly adding settings.* permissions');
+            break;
+        }
+      }
+      // Handle specific action permissions
+      else if (action !== 'full') {  // Skip 'full' as it's handled in the admin section
+        // Handle standard resource:action format
+        if (action === 'view' || action === 'edit' || action === 'delete' || action === 'create' || action === 'full') {
+          // Map plural resource names to singular for CASL
+          const resourceMapping: {[key: string]: string} = {
+            'assets': 'asset',
+            'pipelines': 'pipeline',
+            'collections': 'collection',
+            'integrations': 'integration',
+            'users': 'user',
+            'groups': 'group',
+            'connectors': 'connector',
+            'permissions': 'permission-set',
+            'systems': 'system-settings'
+          };
+          
+          const caslResource = resourceMapping[resource] || resource;
+          const caslAction = action === 'full' ? 'manage' : action;
+          
+          console.log(`Granting ${caslAction} permission on ${caslResource}`);
+          can(caslAction as Actions, caslResource as Subjects);
+          
+          // For view permissions, always add the ability to view the parent resource
+          if (action === 'view' && resource === 'pipelines') {
+            can('view', 'pipeline');
+          }
+        }
+        // Handle settings.* format (e.g., settings.users:edit)
+        else if (resource.startsWith('settings.')) {
+          const [_, settingsResource] = resource.split('.');
+          
+          // Map settings resources to CASL subjects
+          const settingsMapping: {[key: string]: string} = {
+            'users': 'user',
+            'system': 'system-settings',
+            'permissions': 'permission-set',
+            'connectors': 'connector',
+            'integrations': 'integration',
+            'groups': 'group',
+            'regions': 'region'
+          };
+          
+          const caslResource = settingsMapping[settingsResource] || settingsResource;
+          
+          // Enable view on the parent settings menu
+          can('view', 'settings');
+          
+          // Enable view on the specific settings resource
+          can('view', caslResource as Subjects);
+          
+          // Also enable view on the settings.* resource for sidebar menu visibility
+          can('view', `settings.${settingsResource}` as any);
+          
+          // For users specifically, ensure the menu is visible
+          if (settingsResource === 'users') {
+            console.log('Explicitly granting view permission on user for settings.users');
+            can('view', 'user' as Subjects);
+          }
+          
+          // For groups specifically, ensure the menu is visible
+          if (settingsResource === 'groups') {
+            console.log('Explicitly granting view permission on group for settings.groups');
+            can('view', 'group' as Subjects);
+          }
+          
+          // For connectors specifically, ensure the menu is visible
+          if (settingsResource === 'connectors') {
+            console.log('Explicitly granting view permission on connector for settings.connectors');
+            can('view', 'connector' as Subjects);
+          }
+          
+          // For integrations specifically, ensure the menu is visible
+          if (settingsResource === 'integrations') {
+            console.log('Explicitly granting view permission on integration for settings.integrations');
+            can('view', 'integration' as Subjects);
+          }
+          
+          // Enable the specific action on the settings resource
+          console.log(`Granting ${action} permission on ${caslResource} (from settings.${settingsResource})`);
+          can(action as Actions, caslResource as Subjects);
+          
+          // For edit permissions, also grant view permission to ensure menu visibility
+          if (action === 'edit' || action === 'manage') {
+            console.log(`Also granting view permission on ${caslResource} for menu visibility`);
+            can('view', caslResource as Subjects);
+            can('view', `settings.${settingsResource}` as any);
+          }
         }
       }
     });
@@ -90,6 +229,32 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     can('create', 'pipeline');
     can('edit', 'pipeline');
     
+    // Additional specific permissions for settings
+    
+    // System settings
+    can('manage', 'system-settings');
+    
+    // Connector settings
+    can('create', 'connector');
+    can('edit', 'connector');
+    can('delete', 'connector');
+    
+    // User settings
+    can('create', 'user');
+    can('edit', 'user');
+    can('disable', 'user');
+    can('delete', 'user');
+    
+    // Permission settings
+    can('create', 'permission-set');
+    can('edit', 'permission-set');
+    can('delete', 'permission-set');
+    
+    // Integration settings
+    can('create', 'integration');
+    can('edit', 'integration');
+    can('delete', 'integration');
+    
     console.log('Added administrator permissions for user:', user.username);
   }
 
@@ -114,9 +279,9 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     .filter(p => p.effect === 'Allow')
     .forEach(permission => {
       if (permission.conditions) {
-        can(permission.action, permission.resource, permission.conditions);
+        can(permission.action as Actions, permission.resource as Subjects, permission.conditions);
       } else {
-        can(permission.action, permission.resource);
+        can(permission.action as Actions, permission.resource as Subjects);
       }
     });
   
@@ -125,9 +290,9 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     .filter(p => p.effect === 'Deny')
     .forEach(permission => {
       if (permission.conditions) {
-        cannot(permission.action, permission.resource, permission.conditions);
+        cannot(permission.action as Actions, permission.resource as Subjects, permission.conditions);
       } else {
-        cannot(permission.action, permission.resource);
+        cannot(permission.action as Actions, permission.resource as Subjects);
       }
     });
   

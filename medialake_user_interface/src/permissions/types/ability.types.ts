@@ -2,7 +2,7 @@
 import { Ability, AbilityBuilder, AbilityClass, MongoQuery, RawRuleOf } from '@casl/ability';
 
 // Define the possible actions
-export type Actions = 
+export type Actions =
   | 'view'
   | 'edit'
   | 'delete'
@@ -11,7 +11,9 @@ export type Actions =
   | 'download'
   | 'share'
   | 'manage'
-  | 'run';
+  | 'run'
+  | 'add'
+  | 'disable';
 
 // Define the possible subjects
 export type Subjects = 
