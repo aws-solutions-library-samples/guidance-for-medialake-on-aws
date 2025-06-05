@@ -20,6 +20,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
+    aws_ssm as ssm,
     Stack,
     aws_stepfunctions as sfn,
 )
@@ -213,6 +214,15 @@ class ConnectorsConstruct(Construct):
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
+        )
+
+        # Store connector table name in SSM for other stacks to reference
+        ssm.StringParameter(
+            self,
+            "ConnectorTableNameParameter",
+            parameter_name=f"/{config.resource_prefix}/connector-table-name",
+            string_value=self.connectors_table.table.table_name,
+            description="MediaLake Connector Table Name"
         )
 
         # Create connectors resource

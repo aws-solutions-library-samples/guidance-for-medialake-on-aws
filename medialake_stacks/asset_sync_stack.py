@@ -33,6 +33,7 @@ class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
     ingest_event_bus: events.EventBus
     connector_table: dynamodb.TableV2
+    connector_table_name: Optional[str] = None
 
 
 class AssetSyncStack(cdk.NestedStack):
@@ -143,7 +144,8 @@ class AssetSyncStack(cdk.NestedStack):
             "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
             "CHUNK_TABLE_NAME": self._asset_sync_chunk_table.table.table_name,
             "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
-            "CONNECTOR_TABLE_NAME": props.connector_table.table_name,
+            "CONNECTOR_TABLE_NAME": props.connector_table_name or props.connector_table.table_name,
+            "CONNECTOR_TABLE_SSM_PARAMETER": f"/{config.resource_prefix}/connector-table-name",
             "PROCESSOR_QUEUE_URL": self.processor_queue.queue_url,
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
             "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,
@@ -433,6 +435,14 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["sts:GetCallerIdentity"],
                 resources=["*"],
+            )
+        )
+
+        # Add SSM permission to read connector table name
+        self._asset_sync_engine_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:*:*:parameter/{config.resource_prefix}/connector-table-name"],
             )
         )
 

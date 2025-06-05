@@ -250,6 +250,7 @@ import { Currency } from 'lucide-react';
         const resizeObserver = new ResizeObserver((entries) => {
           // When the timeline container's size changes, settle the layout.
           if (playerRef.current?.timeline) {
+            playerRef.current.timeline.zoomTo(100);
             playerRef.current.timeline.settleLayout();
             console.log('Timeline layout settled via ResizeObserver');
           }
