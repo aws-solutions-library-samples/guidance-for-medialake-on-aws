@@ -71,8 +71,6 @@ class ApiGatewayStackProps:
     collection_arn: str
     access_log_bucket: s3.Bucket
     pipeline_table: dynamodb.TableV2
-    # image_metadata_extractor_lambda: lambda_.Function
-    # image_proxy_lambda: lambda_.Function
     pipelines_nodes_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     asset_sync_job_table: dynamodb.TableV2
