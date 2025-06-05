@@ -142,7 +142,6 @@ class AssetSyncStack(cdk.NestedStack):
             "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
             "CHUNK_TABLE_NAME": self._asset_sync_chunk_table.table.table_name,
             "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
-            # "CONNECTOR_TABLE_NAME": props.connector_table.table_name,
             "PROCESSOR_QUEUE_URL": self.processor_queue.queue_url,
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
             "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,
@@ -362,9 +361,6 @@ class AssetSyncStack(cdk.NestedStack):
         # Asset table permissions
         props.asset_table.grant_read_data(self._asset_sync_engine_lambda.function)
         props.asset_table.grant_read_write_data(self._asset_sync_processor_lambda.function)
-
-        # Connector table permissions
-        # props.connector_table.grant_read_data(self._asset_sync_engine_lambda.function)
 
         # Ingest event bus permissions
         props.ingest_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
