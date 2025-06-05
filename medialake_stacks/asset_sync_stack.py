@@ -32,7 +32,6 @@ from config import config
 class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
     ingest_event_bus: events.EventBus
-    connector_table: dynamodb.TableV2
 
 
 class AssetSyncStack(cdk.NestedStack):
@@ -365,7 +364,7 @@ class AssetSyncStack(cdk.NestedStack):
         props.asset_table.grant_read_write_data(self._asset_sync_processor_lambda.function)
 
         # Connector table permissions
-        props.connector_table.grant_read_data(self._asset_sync_engine_lambda.function)
+        # props.connector_table.grant_read_data(self._asset_sync_engine_lambda.function)
 
         # Ingest event bus permissions
         props.ingest_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
