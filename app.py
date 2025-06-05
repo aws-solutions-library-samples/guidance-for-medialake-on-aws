@@ -87,11 +87,7 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
-            asset_table=props.base_infrastructure.asset_table,
-            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-            ),
-        )
+
 
         settings_api_stack = SettingsApiStack(self, "MediaLakeSettingsApi", props=SettingsApiStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
@@ -138,6 +134,13 @@ class MediaLakeStack(cdk.Stack):
             identity_pool=props.api_gateway_core_stack.identity_pool,
             user_pool_client=props.api_gateway_core_stack.user_pool_client,
             waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
+            ),
+        )
+        
+        asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
+            asset_table=props.base_infrastructure.asset_table,
+            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+            connector_table=api_gateway_stack.connector_table,
             ),
         )
         
