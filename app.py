@@ -140,9 +140,7 @@ class MediaLakeStack(cdk.Stack):
             waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn
             ),
         )
-        
 
-        
         pipeline_stack = PipelineStack(self, "MediaLakePipeline", props=PipelineStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
             cognito_user_pool=props.api_gateway_core_stack.user_pool,

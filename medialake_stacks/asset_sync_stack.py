@@ -142,7 +142,7 @@ class AssetSyncStack(cdk.NestedStack):
             "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
             "CHUNK_TABLE_NAME": self._asset_sync_chunk_table.table.table_name,
             "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
-            "CONNECTOR_TABLE_NAME": props.connector_table.table_name,
+            # "CONNECTOR_TABLE_NAME": props.connector_table.table_name,
             "PROCESSOR_QUEUE_URL": self.processor_queue.queue_url,
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
             "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,

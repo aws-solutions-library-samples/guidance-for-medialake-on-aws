@@ -130,13 +130,11 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
-        self._connectors_api_gateway.connector_table.grant_read_data(props.asset_sync_engine_lambda)
-        
-        # props.asset_sync_processor_lambda.update_environment(
-        #     {
-        #         "CONNECTOR_TABLE": self._connectors_api_gateway.connector_table,
-        #     }
-        # )
+        self._connectors_api_gateway.connector_table.grant_read_data(props.asset_sync_engine_lambda)        
+        props.asset_sync_engine_lambda.add_environment(
+            "CONNECTOR_TABLE", 
+            self._connectors_api_gateway.connector_table.table_name
+        )
 
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(
