@@ -11,13 +11,14 @@ import {
   PermissionSetResponse
 } from '../types/permissionSet.types';
 
-export const useGetPermissionSets = () => {
+export const useGetPermissionSets = (enabled = false) => {
   // Add a unique identifier to track each hook instance
   const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
   console.log(`useGetPermissionSets hook instance created: ${hookId}`);
   
   return useQuery<PermissionSet[], Error>({
     queryKey: QUERY_KEYS.PERMISSION_SETS.all,
+    enabled: enabled,
     queryFn: async () => {
       try {
         console.log(`Fetching permission sets... [${new Date().toISOString()}] from hook instance: ${hookId}`);
@@ -60,9 +61,10 @@ export const useGetPermissionSets = () => {
   });
 };
 
-export const useGetPermissionSet = (id: string) => {
+export const useGetPermissionSet = (id: string, enabled = true) => {
   return useQuery<PermissionSet, Error>({
     queryKey: QUERY_KEYS.PERMISSION_SETS.detail(id),
+    enabled: enabled && !!id,
     queryFn: async () => {
       console.log(`Fetching permission set with id: ${id}`);
       const { data } = await apiClient.get<any>(API_ENDPOINTS.PERMISSION_SETS.GET(id));
@@ -88,8 +90,7 @@ export const useGetPermissionSet = (id: string) => {
       }
       
       throw new Error('Failed to fetch permission set');
-    },
-    enabled: !!id
+    }
   });
 };
 

@@ -304,7 +304,7 @@ function Sidebar() {
                         // If this is the Settings menu item, wrap it with Can component
                         if (item.text === t('sidebar.menu.settings')) {
                             return (
-                                <Can key={item.text} I="manage" a="settings">
+                                <Can key={item.text} I="view" a="settings">
                                     <React.Fragment>
                                         <ListItem disablePadding>
                                             {isCollapsed ? (
@@ -597,7 +597,7 @@ function Sidebar() {
                                             
                                             // Return the menu item wrapped in Can component if it's a system settings item
                                             return isSystemSettings ? (
-                                                <Can key={subItem.text} I="manage" a="settings">
+                                                <Can key={subItem.text} I="view" a="settings">
                                                     {menuItem}
                                                 </Can>
                                             ) : menuItem;

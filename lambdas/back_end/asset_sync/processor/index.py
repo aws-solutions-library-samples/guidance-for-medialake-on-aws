@@ -25,6 +25,26 @@ logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
 
+# Asset type classification constants
+image_mimes = ['image/', 'picture/']
+video_mimes = ['video/']
+audio_mimes = ['audio/']
+
+image_extensions = {
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp', 'svg', 'ico', 
+    'heic', 'heif', 'raw', 'cr2', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw'
+}
+
+video_extensions = {
+    'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'mpg', 
+    'mpeg', 'mxf', 'asf', 'rm', 'swf', 'vob', 'ogv', 'm2ts', 'mts', 'ts'
+}
+
+audio_extensions = {
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'aiff', 'au', 
+    'ra', 'amr', '3ga', 'ac3', 'ape', 'dts', 'spx', 'tta', 'tak', 'mpc'
+}
+
 # Define retry constants
 MAX_RETRY_ATTEMPTS = 15
 BASE_BACKOFF_TIME = 0.1  # 100 ms
@@ -390,15 +410,49 @@ class AssetSyncProcessor:
     def _get_object_tags(self, object_key: str) -> Dict[str, str]:
         """Get tags for an S3 object"""
         try:
+            # URL decode the object key to handle encoded characters like spaces
+            decoded_key = unquote_plus(object_key)
+            
             response = self.s3_client.get_object_tagging(
                 Bucket=self.bucket_name,
-                Key=object_key
+                Key=decoded_key
             )
             
             return {tag['Key']: tag['Value'] for tag in response.get('TagSet', [])}
         except Exception as e:
-            logger.warning(f"Error getting tags for object {object_key}: {str(e)}")
+            logger.warning(f"Error getting tags for object {object_key} (decoded: {unquote_plus(object_key)}): {str(e)}")
             return {}
+            
+    def _get_ingest_queue_url(self) -> Optional[str]:
+        """
+        Get the SQS queue URL for ingesting events from the job metadata
+        
+        Returns:
+            SQS queue URL or None if not found
+        """
+        try:
+            # Get job details which should contain the queue URL
+            job_details = AssetProcessor.get_job_details(self.job_id)
+            if not job_details:
+                logger.error(f"Job {self.job_id} not found when looking up queue URL")
+                return None
+            
+            # Check job metadata for queue URL (set by engine lambda)
+            metadata = job_details.get('metadata', {})
+            queue_url = metadata.get('ingestQueueUrl')
+            
+            if queue_url:
+                logger.info(f"Found ingest queue URL in job metadata: {queue_url}")
+                return queue_url
+            
+            logger.error(f"No ingest queue URL found in job metadata for job {self.job_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting ingest queue URL: {str(e)}", exc_info=True)
+            return None
+    
+
             
     def _filter_objects_to_process(self, objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -558,24 +612,103 @@ class AssetSyncProcessor:
                 logger.warning(f"Error fetching tags for {object_key}: {str(e)}")
                 existing_tags = {}
             
-            # Simulate S3 copy operation to trigger ObjectCreated event
-            copy_source = {'Bucket': self.bucket_name, 'Key': object_key}
+            # Send simulated S3 event message to SQS instead of EventBridge
+            sqs = boto3.client('sqs')
             
-            # Generate tag string from existing tags
-            tag_string = "&".join([f"{k}={v}" for k, v in existing_tags.items()])
+            # Get the ingest SQS queue URL dynamically based on the job configuration
+            ingest_queue_url = self._get_ingest_queue_url()
             
-            logger.info(f"Simulating S3 copy for object {object_key}")
+            if not ingest_queue_url:
+                logger.error("No ingest queue URL found for this job/bucket")
+                raise ValueError("No ingest queue URL found for this job/bucket")
             
-            # Copy object to itself, preserving existing tags
-            self.s3_client.copy_object(
-                Bucket=self.bucket_name,
-                CopySource=copy_source,
-                Key=object_key,
-                TaggingDirective='REPLACE',
-                Tagging=tag_string
-            )
+            logger.info(f"Sending simulated S3 event for object {object_key} to SQS queue {ingest_queue_url}")
             
-            logger.info(f"Successfully copied object {object_key}")
+            # Create simulated S3 event message that matches real S3 SQS notifications
+            # This mimics the structure of S3 event notifications sent to SQS
+            s3_event_message = {
+                "Records": [
+                    {
+                        "eventVersion": "2.1",
+                        "eventSource": "medialake.AssetSyncProcessor",
+                        "eventTime": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                        "eventName": "ObjectCreated:Put",
+                        "userIdentity": {
+                            "principalId": "AssetSyncProcessor"
+                        },
+                        "requestParameters": {
+                            "sourceIPAddress": "127.0.0.1"
+                        },
+                        "responseElements": {
+                            "x-amz-request-id": str(uuid.uuid4()),
+                            "x-amz-id-2": str(uuid.uuid4())
+                        },
+                        "s3": {
+                            "s3SchemaVersion": "1.0",
+                            "configurationId": "AssetSyncProcessor",
+                            "bucket": {
+                                "name": self.bucket_name,
+                                "ownerIdentity": {
+                                    "principalId": "AssetSyncProcessor"
+                                },
+                                "arn": f"arn:aws:s3:::{self.bucket_name}"
+                            },
+                            "object": {
+                                "key": object_key,
+                                "size": obj.get('size', 0),
+                                "eTag": obj.get('etag', ''),
+                                "sequencer": hex(int(time.time() * 1000000))[2:].upper().zfill(16)
+                            }
+                        }
+                    }
+                ]
+            }
+            
+            # Check if this is a FIFO queue (ends with .fifo)
+            is_fifo_queue = ingest_queue_url.endswith('.fifo')
+            
+            # Prepare message parameters
+            message_params = {
+                'QueueUrl': ingest_queue_url,
+                'MessageBody': json.dumps(s3_event_message),
+                'MessageAttributes': {
+                    'source': {
+                        'StringValue': 'medialake.AssetSyncProcessor',
+                        'DataType': 'String'
+                    },
+                    'eventType': {
+                        'StringValue': 'ObjectCreated:Put',
+                        'DataType': 'String'
+                    }
+                }
+            }
+            
+            # Add FIFO-specific parameters if needed
+            if is_fifo_queue:
+                # Use job ID as MessageGroupId to ensure processing order per job
+                message_params['MessageGroupId'] = self.job_id
+                
+                # Use object key + timestamp for deduplication to prevent duplicates
+                dedup_id = f"{object_key}-{int(time.time() * 1000000)}"
+                # MessageDeduplicationId has a max length of 128 characters
+                if len(dedup_id) > 128:
+                    # Use a hash if too long
+                    import hashlib
+                    dedup_id = hashlib.md5(dedup_id.encode()).hexdigest()
+                message_params['MessageDeduplicationId'] = dedup_id
+                
+                logger.info(f"Sending to FIFO queue with MessageGroupId: {self.job_id}")
+            
+            # Send message to SQS
+            response = sqs.send_message(**message_params)
+            
+            # Check if message was sent successfully
+            if not response.get('MessageId'):
+                error_msg = f"Failed to send SQS message: {response}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+            
+            logger.info(f"Successfully sent simulated S3 event for object {object_key} to SQS. MessageId: {response['MessageId']}")
             
             # Record successful object processing metric
             metrics.add_metric(
@@ -589,7 +722,7 @@ class AssetSyncProcessor:
             return {
                 'status': 'success',
                 'key': object_key,
-                'action': 'COPY'
+                'action': 'SIMULATED_SQS_MESSAGE'
             }
             
         except Exception as e:
@@ -636,11 +769,19 @@ def lambda_handler(event, context):
             for record in event['Records']:
                 try:
                     body = json.loads(record.get('body', '{}'))
+                    logger.info(f"Processing SQS record with body: {json.dumps(body)}")
+                    
                     operation = body.get('operation')
                     job_id = body.get('jobId')
                     
+                    # Check if this is an S3 event notification instead of a job processing message
+                    if 'Records' in body and isinstance(body.get('Records'), list):
+                        logger.info("Received S3 event notification, skipping as this Lambda processes job operations")
+                        continue
+                    
                     if not job_id:
-                        logger.error("No job ID found in message")
+                        logger.error(f"No job ID found in message. Message body keys: {list(body.keys())}")
+                        logger.error(f"Full message body: {json.dumps(body)}")
                         continue
                         
                     # Get the job details from DynamoDB

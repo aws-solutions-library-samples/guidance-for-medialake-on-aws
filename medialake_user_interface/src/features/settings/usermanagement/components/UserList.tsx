@@ -326,7 +326,7 @@ const UserList: React.FC<UserListProps> = ({
     
     // Fetch groups and permission sets at the parent level
     const { data: groups } = useGetGroups();
-    const { data: permissionSets } = useGetPermissionSets();
+    const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
     // Sync external state with internal state
     React.useEffect(() => {

@@ -57,8 +57,8 @@ DEFAULT_GROUPS = [
 # Default permission sets definitions
 DEFAULT_PERMISSION_SETS = [
     {
-        "id": "administrator",
-        "name": "Administrator",
+        "id": "superAdministrator",
+        "name": "Super Administrator",
         "description": "Full access to all system features and resources",
         "isSystem": True,
         "permissions": {
@@ -72,6 +72,11 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True
             },
+            "pipelinesExecutions": {
+                "view": True,
+                "retry": True,
+                "cancel": True
+            },
             "collections": {
                 "view": True,
                 "edit": True,
@@ -83,10 +88,18 @@ DEFAULT_PERMISSION_SETS = [
                 },
                 "system": {
                     "edit": True
+                },
+                "integrations": {
+                    "edit": True,
+                    "view": True,
+                    "delete": True
+                },
+                "regions": {
+                    "edit": True
+                },
+                "system-settings": {
+                    "edit": True
                 }
-            },
-            "admin": {
-                "full": True
             }
         }
     },
@@ -105,23 +118,17 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {
                 "view": True,
                 "edit": True,
-                "delete": False
+                "delete": True
+            },
+            "pipelinesExecutions": {
+                "view": True,
+                "retry": True,
+                "cancel": True
             },
             "collections": {
                 "view": True,
                 "edit": True,
-                "delete": False
-            },
-            "settings": {
-                "users": {
-                    "edit": False
-                },
-                "system": {
-                    "edit": False
-                }
-            },
-            "admin": {
-                "full": False
+                "delete": True
             }
         }
     },
@@ -142,21 +149,15 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
                 "delete": False
             },
+            "pipelinesExecutions": {
+                "view": True,
+                "retry": False,
+                "cancel": False
+            },
             "collections": {
                 "view": True,
                 "edit": False,
                 "delete": False
-            },
-            "settings": {
-                "users": {
-                    "edit": False
-                },
-                "system": {
-                    "edit": False
-                }
-            },
-            "admin": {
-                "full": False
             }
         }
     }

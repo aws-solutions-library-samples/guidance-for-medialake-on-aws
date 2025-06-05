@@ -29,7 +29,7 @@ const UserManagement: React.FC = () => {
 
     const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
     const { data: groups } = useGetGroups();
-    const { data: permissionSets } = useGetPermissionSets();
+    const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this page is loaded
     
     // Debug logs
     console.log('Groups data in UserManagement:', groups);

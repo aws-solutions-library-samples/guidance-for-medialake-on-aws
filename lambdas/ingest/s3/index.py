@@ -1273,19 +1273,32 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             # Process records in parallel
             s3_records = []
             for record in event["Records"]:
-                if "body" in record:
-                    # Parse SQS message body
+                if "body" in record and "eventSource" in record and record["eventSource"] == "aws:sqs":
+                    # This is an SQS message, parse the body
                     try:
                         body = json.loads(record["body"])
-                        if "Records" in body:
-                            # Add these records to the batch
-                            s3_records.extend(body["Records"])
-                    except json.JSONDecodeError:
-                        logger.warning(f"Failed to parse SQS message body")
+                        if "Records" in body and isinstance(body["Records"], list):
+                            # Extract S3 records from SQS message body
+                            for s3_record in body["Records"]:
+                                # Validate that this is a proper S3 record
+                                if "s3" in s3_record and "eventSource" in s3_record:
+                                    valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
+                                    if s3_record.get("eventSource") in valid_sources:
+                                        s3_records.append(s3_record)
+                                        logger.info(f"Extracted S3 record from SQS: {s3_record.get('eventSource')} - {s3_record['s3']['bucket']['name']}/{s3_record['s3']['object']['key']}")
+                        else:
+                            logger.warning(f"SQS message body does not contain Records array")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse SQS message body: {str(e)}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"Error processing SQS message: {str(e)}")
                         continue
                 elif "s3" in record:
-                    # Direct S3 record
+                    # Direct S3 record (not from SQS)
                     s3_records.append(record)
+                else:
+                    logger.warning(f"Unrecognized record format: {json_serialize(record)}")
             
             # Process the collected records in parallel
             if s3_records:
@@ -1454,6 +1467,9 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
             bucket = event_record["s3"]["bucket"]["name"]
             key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
             event_name = event_record.get("eventName", "ObjectCreated:")
+            # Log the source for debugging
+            event_source = event_record.get("eventSource", "unknown")
+            logger.info(f"Processing direct S3 record from {event_source}: {bucket}/{key}")
             return bucket, key, event_name
     
     # SQS message with EventBridge payload
@@ -1464,12 +1480,14 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
             # Check if this is an S3 event (might be in Records array)
             if "Records" in body and isinstance(body["Records"], list) and len(body["Records"]) > 0:
                 for record in body["Records"]:
-                    if record.get("eventSource") == "aws:s3" and "s3" in record:
+                    # Accept both real S3 events and simulated events from AssetSyncProcessor
+                    valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
+                    if record.get("eventSource") in valid_sources and "s3" in record:
                         bucket = record["s3"]["bucket"]["name"]
                         key = urllib.parse.unquote(record["s3"]["object"]["key"])
                         event_name = record.get("eventName", "ObjectCreated:")
                         # Log the extracted details for debugging
-                        logger.info(f"Extracted from SQS S3 record: bucket={bucket}, key={key}, event={event_name}")
+                        logger.info(f"Extracted from SQS S3 record (source: {record.get('eventSource')}): bucket={bucket}, key={key}, event={event_name}")
                         return bucket, key, event_name
             
             # Check if this is an S3 event from EventBridge

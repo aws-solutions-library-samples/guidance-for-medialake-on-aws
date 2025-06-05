@@ -148,16 +148,56 @@ def _get_permission_set(
         
         # Transform the item to remove DynamoDB-specific attributes
         item = response["Item"]
+        
+        # Extract the ID from the PK if not present
+        item_id = item.get("id")
+        if not item_id and "PK" in item:
+            pk = item.get("PK")
+            if pk and pk.startswith("PS#"):
+                item_id = pk[3:]  # Remove "PS#" prefix
+        
+        # Transform permissions from object to array format if needed
+        permissions = item.get("permissions", {})
+        permissions_array = []
+        
+        # Check if permissions is already an array or an object
+        if isinstance(permissions, dict):
+            # Convert each key-value pair in the permissions object to a Permission object
+            for resource_action, allowed in permissions.items():
+                # Split the resource_action into resource and action parts
+                parts = resource_action.split(".")
+                if len(parts) == 2:
+                    resource, action = parts
+                else:
+                    # If there's no dot, use the whole string as the action
+                    resource = "all"
+                    action = resource_action
+                
+                # Create a Permission object
+                permission = {
+                    "action": action,
+                    "resource": resource,
+                    "effect": "Allow" if allowed else "Deny"
+                }
+                permissions_array.append(permission)
+        else:
+            # If it's already an array, use it as is
+            permissions_array = permissions
+        
         permission_set = {
-            "id": item.get("id"),
+            "id": item_id or item.get("id"),
             "name": item.get("name"),
             "description": item.get("description"),
-            "permissions": item.get("permissions", []),
+            "permissions": permissions_array,
             "isSystem": item.get("isSystem", False),
+            "effectiveRole": item.get("effectiveRole"),
             "createdBy": item.get("createdBy"),
             "createdAt": item.get("createdAt"),
             "updatedAt": item.get("updatedAt")
         }
+        
+        # Remove None values
+        permission_set = {k: v for k, v in permission_set.items() if v is not None}
         
         return permission_set
 

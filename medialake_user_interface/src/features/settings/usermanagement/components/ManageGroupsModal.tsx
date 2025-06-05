@@ -75,7 +75,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
 
   // Queries
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups();
-  const { data: permissionSets } = useGetPermissionSets();
+  const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
   
   // Debug logs
   console.log('ManageGroupsModal - groups data:', groups);

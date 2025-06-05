@@ -28,13 +28,16 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
   
-  // Get permission sets from API
-  const { 
-    data: permissionSets, 
-    isLoading, 
-    error, 
-    refetch 
-  } = useGetPermissionSets();
+  // State to control when to fetch permission sets from API
+  const [shouldFetchPermissions, setShouldFetchPermissions] = useState(false);
+  
+  // Get permission sets from API only when explicitly enabled
+  const {
+    data: permissionSets,
+    isLoading,
+    error,
+    refetch
+  } = useGetPermissionSets(shouldFetchPermissions);
 
   // Extract user information from JWT token
   useEffect(() => {
@@ -121,7 +124,8 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           const newAbility = defineAbilityFor(user, []);
           console.log('New ability created with custom permissions:', newAbility);
           setAbility(newAbility);
-        } else {
+        } else if (permissionSets) {
+          // If no custom permissions but we have permission sets from API
           // Transform permission sets to the format expected by CASL
           const transformedPermissions = transformPermissions(permissionSets || []);
           console.log('Transformed permissions:', transformedPermissions);
@@ -134,6 +138,11 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           const newAbility = defineAbilityFor(user, transformedPermissions);
           console.log('New ability created:', newAbility);
           setAbility(newAbility);
+        } else if (!shouldFetchPermissions) {
+          // If no custom permissions and no permission sets yet, enable fetching
+          // but only if we haven't already enabled it
+          console.log('No custom permissions in JWT, enabling permission sets API fetch');
+          setShouldFetchPermissions(true);
         }
       } catch (error) {
         console.error('Error creating ability:', error);
@@ -148,9 +157,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   // Function to refresh permissions
   const refreshPermissions = useCallback(async () => {
     if (isAuthenticated) {
+      // Enable fetching permissions from API
+      setShouldFetchPermissions(true);
+      // Then trigger the refetch
       await refetch();
     }
-  }, [isAuthenticated, refetch]);
+  }, [isAuthenticated, refetch, setShouldFetchPermissions]);
 
   // Context value
   const value = {

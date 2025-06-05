@@ -11,8 +11,9 @@ export interface PermissionSet {
   id: string;
   name: string;
   description: string;
-  permissions: Permission[];
+  permissions: Permission[] | Record<string, any>;
   isSystem: boolean;
+  effectiveRole?: string;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
