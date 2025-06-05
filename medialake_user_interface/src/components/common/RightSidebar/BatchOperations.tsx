@@ -40,21 +40,20 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onRemoveItem,
   isDownloadLoading = false
 }) => {
-  const { openSidebar, setHasSelectedItems } = useRightSidebar();
+  const { setHasSelectedItems } = useRightSidebar();
   
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
-  // Open sidebar when items are selected
+  // Update selected items state
   React.useEffect(() => {
     if (selectedAssets.length > 0) {
-      console.log('BatchOperations: Opening sidebar for', selectedAssets.length, 'selected assets');
+      console.log('BatchOperations: Setting selected items state for', selectedAssets.length, 'selected assets');
       setHasSelectedItems(true);
-      openSidebar();
     } else {
       setHasSelectedItems(false);
     }
-  }, [selectedAssets.length, openSidebar, setHasSelectedItems]);
+  }, [selectedAssets.length, setHasSelectedItems]);
 
   // Group assets by type
   const assetsByType = React.useMemo(() => {
@@ -95,7 +94,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           borderColor: 'divider',
         }}
       >
-        <Tooltip title="Delete selected">
+        {/* <Tooltip title="Delete selected">
           <Button 
             variant="outlined" 
             color="error" 
@@ -105,7 +104,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           >
             Delete
           </Button>
-        </Tooltip>
+        </Tooltip> */}
         <Tooltip title="Download selected">
           <Button
             variant="outlined"
@@ -117,7 +116,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             {isDownloadLoading ? 'Starting...' : 'Download'}
           </Button>
         </Tooltip>
-        <Tooltip title="Share selected">
+        {/* <Tooltip title="Share selected">
           <Button 
             variant="outlined" 
             size="small"
@@ -126,7 +125,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           >
             Share
           </Button>
-        </Tooltip>
+        </Tooltip> */}
       </Box>
 
       {/* Selected items list */}

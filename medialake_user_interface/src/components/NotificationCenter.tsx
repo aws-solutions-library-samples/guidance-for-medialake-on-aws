@@ -26,7 +26,6 @@ import { DownloadLinksDisplay } from "./DownloadLinksDisplay";
 import { DismissConfirmationDialog } from "./DismissConfirmationDialog";
 import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
-import { useFeatureFlag } from '@/utils/featureFlags';
 
 // Helper function to format file sizes
 const formatFileSize = (bytes: string | number): string => {
@@ -50,7 +49,16 @@ const formatDate = (dateString: string): string => {
   if (!dateString) return 'Unknown';
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return 'Unknown';
-  return date.toLocaleString();
+  return date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
 };
 
 // Helper function to get icon color for job status
@@ -155,9 +163,6 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  if (!multiSelectFeature) return <>{children}</>;
 
   // Load notifications from localStorage on mount
   useEffect(() => {

@@ -259,6 +259,7 @@ def build_search_query(params: SearchParams) -> Dict:
 
     clean_query, parsed_filters = parse_search_query(params.q)
     logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
+    logger.info(f"➔ raw q='{params.q}' → clean_query={clean_query!r}, parsed_filters={parsed_filters!r}")
 
     name_fields = [
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name^3",
@@ -397,15 +398,14 @@ def build_search_query(params: SearchParams) -> Dict:
                 "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
             })
         if 'storageIdentifier' in parsed_filters:
-            path_value = parsed_filters['storageIdentifier']
-            if isinstance(path_value, str) and not path_value.endswith('*'):
-                path_value = f"{path_value}*"
-            logger.info(f"Applying Connector Bucket filter: {path_value}")
+            bucket_name = parsed_filters['storageIdentifier'][0]
+            # bucket_name == "image-repo-cmk"
+
+            # Use match_phrase on the text field, so ES will analyze "image-repo-cmk"
+            # → tokens ["image","repo","cmk"], and then require those three in order.
             query["bool"]["filter"].append({
-                "wildcard": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": {
-                        "value": path_value[0]
-                    }
+                "match_phrase": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": bucket_name
                 }
             })
         if 'size' in parsed_filters:

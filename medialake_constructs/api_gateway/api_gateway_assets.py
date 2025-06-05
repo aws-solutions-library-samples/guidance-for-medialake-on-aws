@@ -50,6 +50,7 @@ class AssetsProps:
     open_search_endpoint: str
     opensearch_index: str
     open_search_arn: str
+    user_table: dynamodb.Table  # User table for bulk download jobs (replaces dedicated bulk download table)
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     media_assets_bucket: Optional[s3.Bucket] = None
@@ -760,38 +761,16 @@ class AssetsConstruct(Construct):
         Create resources for bulk download functionality.
         
         This method creates and configures:
-        - DynamoDB table for tracking bulk download jobs
         - EFS filesystem for temporary storage
         - Lambda functions for processing downloads
         - Step Functions state machine for orchestration
         - API Gateway endpoints for client interaction
-        """
-        # Create DynamoDB table for bulk download jobs
-        bulk_download_table = DynamoDB(
-            self,
-            "AssetsBulkDownloadJobsTable",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}-assets-bulk-download-jobs-{config.environment}",
-                partition_key_name="jobId",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                point_in_time_recovery=True,
-                ttl_attribute="expiresAt",
-                removal_policy=RemovalPolicy.DESTROY,
-            ),
-        )
-        self._bulk_download_table = bulk_download_table.table
         
-        # Add GSI for querying by userId
-        self._bulk_download_table.add_global_secondary_index(
-            index_name="UserIdIndex",
-            partition_key=dynamodb.Attribute(
-                name="userId", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="createdAt", type=dynamodb.AttributeType.STRING
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
-        )
+        Note: Bulk download jobs are now stored in the user table using the pattern:
+        itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
+        """
+        # Use the existing user table for bulk download jobs
+        self._bulk_download_table = props.user_table
         
         # Create EFS filesystem for temporary storage
         self._efs_filesystem = efs.FileSystem(
@@ -845,7 +824,7 @@ class AssetsConstruct(Construct):
         
         # Common environment variables for all Lambda functions
         common_env_vars = {
-            "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+            "USER_TABLE_NAME": props.user_table.table_name,  # Using user table for bulk download jobs
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
             "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
@@ -859,7 +838,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadInitZipLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_init_zip",
-                entry="lambdas/api/assets/download/bulk/init_zip",
+                entry="lambdas/api/assets/download/bulk/post_bulk/init_zip",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -878,7 +857,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadAppendToZipLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_append_to_zip",
-                entry="lambdas/api/assets/download/bulk/append_to_zip",
+                entry="lambdas/api/assets/download/bulk/post_bulk/append_to_zip",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -899,7 +878,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadInitMultipartLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_init_multipart",
-                entry="lambdas/api/assets/download/bulk/init_multipart",
+                entry="lambdas/api/assets/download/bulk/post_bulk/init_multipart",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -918,7 +897,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadUploadPartLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_upload_part",
-                entry="lambdas/api/assets/download/bulk/upload_part",
+                entry="lambdas/api/assets/download/bulk/post_bulk/upload_part",
                 environment_variables={
                     **common_env_vars,
                     "SQS_QUEUE_URL": self._multipart_upload_queue.queue_url,
@@ -947,7 +926,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadCompleteMultipartLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_complete_multipart",
-                entry="lambdas/api/assets/download/bulk/complete_multipart",
+                entry="lambdas/api/assets/download/bulk/post_bulk/complete_multipart",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -966,7 +945,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadFinalizeZipLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_download_finalize_zip",
-        #         entry="lambdas/api/assets/download/bulk/finalize_zip",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/finalize_zip",
         #         environment_variables={
         #             **common_env_vars,
         #         },
@@ -985,7 +964,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadGetPartsManifestLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_get_parts_manifest",
-                entry="lambdas/api/assets/download/bulk/get_parts_manifest",
+                entry="lambdas/api/assets/download/bulk/post_bulk/get_parts_manifest",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -1000,7 +979,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadKickoffLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_kickoff",
-                entry="lambdas/api/assets/download/bulk/kickoff",
+                entry="lambdas/api/assets/download/bulk/post_bulk",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -1014,7 +993,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadAssessScaleLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_assess_scale",
-                entry="lambdas/api/assets/download/bulk/assess_scale",
+                entry="lambdas/api/assets/download/bulk/post_bulk/assess_scale",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -1033,7 +1012,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadHandleSmallLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_download_handle_small",
-        #         entry="lambdas/api/assets/download/bulk/handle_small",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/handle_small",
         #         environment_variables={
         #             **common_env_vars,
         #             "ASSET_TABLE": props.asset_table.table_name,
@@ -1056,7 +1035,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadHandleLargeLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_download_handle_large",
-        #         entry="lambdas/api/assets/download/bulk/handle_large",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/handle_large",
         #         environment_variables={
         #             **common_env_vars,
         #             "ASSET_TABLE": props.asset_table.table_name,
@@ -1076,7 +1055,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadMergeBatchLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_download_merge_batch",
-        #         entry="lambdas/api/assets/download/bulk/merge_batch",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/merge_batch",
         #         environment_variables={
         #             **common_env_vars,
         #             "RESOURCE_PREFIX": config.resource_prefix,
@@ -1099,7 +1078,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadFinalMergeLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_download_final_merge",
-        #         entry="lambdas/api/assets/download/bulk/final_merge",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/final_merge",
         #         environment_variables={
         #             **common_env_vars,
         #             "RESOURCE_PREFIX": config.resource_prefix,
@@ -1122,7 +1101,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadStatusLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_status",
-                entry="lambdas/api/assets/download/bulk/status",
+                entry="lambdas/api/assets/download/bulk/rp_jobId/get_status",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -1136,7 +1115,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadMarkDownloadedLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_mark_downloaded",
-                entry="lambdas/api/assets/download/bulk/mark_downloaded",
+                entry="lambdas/api/assets/download/bulk/rp_jobId/put_downloaded",
                 environment_variables={
                     **common_env_vars,
                 },
@@ -1150,7 +1129,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadHandleLargeIndividualLambda",
             config=LambdaConfig(
                 name="assets_bulk_large_individual",
-                entry="lambdas/api/assets/download/bulk/handle_large_individual",
+                entry="lambdas/api/assets/download/bulk/post_bulk/handle_large_individual",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -1166,7 +1145,7 @@ class AssetsConstruct(Construct):
         #     "AssetsBulkDownloadCompleteMixedJobLambda",
         #     config=LambdaConfig(
         #         name="assets_bulk_complete_mixed",
-        #         entry="lambdas/api/assets/download/bulk/complete_mixed_job",
+        #         entry="lambdas/api/assets/download/bulk/post_bulk/complete_mixed_job",
         #         environment_variables={
         #             **common_env_vars,
         #         },
@@ -1181,7 +1160,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadDeleteLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_delete",
-                entry="lambdas/api/assets/download/bulk/delete",
+                entry="lambdas/api/assets/download/bulk/rp_jobId/delete_job",
                 environment_variables={
                     **common_env_vars,
                     "TEMP_BUCKET": props.media_assets_bucket.bucket_name,  # For S3 cleanup
@@ -1228,7 +1207,7 @@ class AssetsConstruct(Construct):
                     ],
                     resources=[
                         self._bulk_download_table.table_arn,
-                        f"{self._bulk_download_table.table_arn}/index/*",  # Allow access to all GSIs
+                        f"{self._bulk_download_table.table_arn}/index/*",  # Allow access to all GSIs (user table)
                     ],
                 )
             )
@@ -1543,6 +1522,7 @@ class AssetsConstruct(Construct):
                     "taskToken": sfn.JsonPath.task_token,
                     "part": {
                         "jobId.$": "$.jobId",
+                        "userId.$": "$.userId",
                         "uploadId.$": "$.uploadId",
                         "s3Key.$": "$.s3Key",
                         "manifestKey.$": "$.manifestKey",
@@ -1581,9 +1561,9 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadSingleFileLambda",
             config=LambdaConfig(
                 name="assets_bulk_download_single_file",
-                entry="lambdas/api/assets/download/bulk/single_file",
+                entry="lambdas/api/assets/download/bulk/post_bulk/single_file",
                 environment_variables={
-                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+                    "USER_TABLE_NAME": self._bulk_download_table.table_name,
                     "ASSET_TABLE": asset_table_name,
                 },
                 timeout_minutes=1,
@@ -1902,7 +1882,7 @@ class AssetsConstruct(Construct):
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
-            state_machine_name="Asset-Bulk-Download",
+            state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
         )
@@ -2008,7 +1988,8 @@ class AssetsConstruct(Construct):
         add_cors_options_method(user_resource)
     
     @property
-    def bulk_download_table(self) -> dynamodb.TableV2:
+    def bulk_download_table(self) -> dynamodb.Table:
+        """Returns the user table that stores bulk download jobs."""
         return self._bulk_download_table if hasattr(self, '_bulk_download_table') else None
     
     @property

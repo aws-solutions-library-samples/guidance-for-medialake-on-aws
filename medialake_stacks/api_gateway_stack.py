@@ -84,6 +84,7 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
+    user_table: dynamodb.Table  # User table for bulk download jobs and user data
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -164,6 +165,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
                 media_assets_bucket=props.media_assets_bucket,
+                user_table=props.user_table,  # User table for bulk download jobs
             ),
         )
 

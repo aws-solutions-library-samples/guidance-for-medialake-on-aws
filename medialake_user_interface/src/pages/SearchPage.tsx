@@ -30,7 +30,7 @@ import { type AssetBase, type ImageItem, type VideoItem, type AudioItem } from '
 import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import { SearchError } from '@/api/hooks/useSearch';
-import FilterAndBatchOperations from '../components/common/RightSidebar/FilterAndBatchOperations';
+import TabbedSidebar from '../components/common/RightSidebar/TabbedSidebar';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import ApiStatusModal from '../components/ApiStatusModal';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
@@ -626,7 +626,7 @@ const SearchPage: React.FC = () => {
                     </Box>
 
                     <RightSidebar>
-                        <FilterAndBatchOperations
+                        <TabbedSidebar
                             selectedAssets={assetSelection.selectedAssets}
                             onBatchDelete={assetSelection.handleBatchDelete}
                             onBatchDownload={assetSelection.handleBatchDownload}

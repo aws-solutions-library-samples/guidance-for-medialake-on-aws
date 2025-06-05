@@ -15,6 +15,7 @@ import {
     ListItemIcon,
     ListItemText,
 } from '@mui/material';
+
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -31,6 +32,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import InfoIcon from '@mui/icons-material/Info';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetField, type SortOption, type CardSize, type AspectRatio, type AssetViewControlsProps as BaseAssetViewControlsProps } from '../../types/shared/assetComponents';
+import { useFeatureFlag } from '@/utils/featureFlags';
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     // Search fields
@@ -43,7 +45,7 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
         isDefault: boolean;
     }>;
     onFieldsChange?: (event: any) => void;
-    
+
     groupByType: boolean;
     onGroupByTypeChange: (checked: boolean) => void;
     cardSize: CardSize;
@@ -95,7 +97,10 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
     const handleAppearanceClose = () => setAppearanceAnchor(null);
-    
+
+    // Check if multi-select feature is enabled
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
         // Root level fields (new API structure)
@@ -108,7 +113,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         'fullPath': 'fullPath',
         'bucket': 'bucket',
         'FileHash': 'hash',
-        
+
         // Legacy nested fields (for backward compatibility)
         'DigitalSourceAsset.Type': 'type',
         'DigitalSourceAsset.MainRepresentation.Format': 'format',
@@ -123,7 +128,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         'Metadata.Consolidated': 'metadata',
         'InventoryID': 'id'
     };
-    
+
     // Create a reverse mapping for easier lookup
     const reverseFieldMapping: Record<string, string[]> = {};
     Object.entries(fieldMapping).forEach(([apiId, colId]) => {
@@ -132,13 +137,13 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         }
         reverseFieldMapping[colId].push(apiId);
     });
-    
+
     // Filter sort options based on selected fields
     const filteredSortOptions = React.useMemo(() => {
         if (!selectedFields || selectedFields.length === 0) {
             return sortOptions;
         }
-        
+
         return sortOptions.filter(option => {
             // Special case for name field
             if (option.id === 'name') {
@@ -146,21 +151,21 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     field.includes('Name') || field === 'objectName'
                 );
             }
-            
+
             // Special case for date field
             if (option.id === 'date') {
                 return selectedFields.some(field =>
                     field.includes('CreateDate') || field === 'createdAt'
                 );
             }
-            
+
             // Special case for size field
             if (option.id === 'size') {
                 return selectedFields.some(field =>
                     field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
                 );
             }
-            
+
             // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
             const apiFieldIds = reverseFieldMapping[option.id] || [];
             return apiFieldIds.some(apiFieldId =>
@@ -193,47 +198,48 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {/* Select All Checkbox - always visible */}
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                    }}
-                >
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={selectAllState === 'all'}
-                                indeterminate={selectAllState === 'some'}
-                                onChange={onSelectAllToggle}
-                                size="small"
-                                sx={{
-                                    color: 'primary.main',
-                                    '&.Mui-checked': {
-                                        color: 'primary.main',
-                                    },
-                                    '&.MuiCheckbox-indeterminate': {
-                                        color: 'primary.main',
-                                    },
-                                    '& .MuiSvgIcon-root': {
-                                        fontSize: '1.2rem',
-                                    }
-                                }}
-                            />
-                        }
-                        label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
-                        sx={{
-                            margin: 0,
-                            '& .MuiFormControlLabel-label': {
-                                fontSize: '0.875rem',
-                                fontWeight: 500,
-                                color: 'primary.main',
-                            }
-                        }}
-                    />
-                </Box>
+                {multiSelectFeature.value && (
 
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectAllState === 'all'}
+                                    indeterminate={selectAllState === 'some'}
+                                    onChange={onSelectAllToggle}
+                                    size="small"
+                                    sx={{
+                                        color: 'primary.main',
+                                        '&.Mui-checked': {
+                                            color: 'primary.main',
+                                        },
+                                        '&.MuiCheckbox-indeterminate': {
+                                            color: 'primary.main',
+                                        },
+                                        '& .MuiSvgIcon-root': {
+                                            fontSize: '1.2rem',
+                                        }
+                                    }}
+                                />
+                            }
+                            label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
+                            sx={{
+                                margin: 0,
+                                '& .MuiFormControlLabel-label': {
+                                    fontSize: '0.875rem',
+                                    fontWeight: 500,
+                                    color: 'primary.main',
+                                }
+                            }}
+                        />
+                    </Box>
+                )}
                 {/* Sort Button */}
                 <Button
                     size="small"
@@ -354,7 +360,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                                                     const newSelectedFields = e.target.checked
                                                         ? [...selectedFields, field.name]
                                                         : selectedFields.filter(name => name !== field.name);
-                                                    
+
                                                     onFieldsChange({
                                                         target: { value: newSelectedFields }
                                                     });
@@ -420,7 +426,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     <Typography variant="subtitle2" sx={{ mb: 2 }}>
                         Appearance
                     </Typography>
-                    
+
                     {viewMode === 'card' && (
                         <>
                             <Box sx={{ mb: 2 }}>

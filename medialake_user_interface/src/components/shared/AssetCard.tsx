@@ -7,6 +7,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { AssetAudio } from '../asset';
 
 export interface AssetField {
@@ -81,7 +83,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
-    
+
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
     const favoritesFeature = useFeatureFlag('user-favorites-enabled', true);
@@ -97,12 +99,12 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const getCardDimensions = () => {
         const baseHeight = aspectRatio === 'vertical' ? 300
             : aspectRatio === 'square' ? 200
-            : aspectRatio === 'horizontal' ? 150
-            : 200;
+                : aspectRatio === 'horizontal' ? 150
+                    : 200;
 
         const sizeMultiplier = cardSize === 'small' ? 0.8
             : cardSize === 'large' ? 1.2
-            : 1;
+                : 1;
 
         return {
             height: baseHeight * sizeMultiplier,
@@ -142,7 +144,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
         // Add event listener for clicks
         document.addEventListener('mousedown', handleClickOutside);
-        
+
         // Cleanup
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
@@ -188,7 +190,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         'fullPath': 'fullPath',
         'bucket': 'bucket',
         'FileHash': 'hash',
-        
+
         // Legacy nested fields (for backward compatibility)
         'DigitalSourceAsset.Type': 'type',
         'DigitalSourceAsset.MainRepresentation.Format': 'format',
@@ -220,38 +222,38 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const visibleFields = fields.filter(field => {
         // First check if the field is marked as visible in cardFields
         if (!field.visible) return false;
-        
+
         // If no selectedSearchFields are provided, show all visible fields
         if (!selectedSearchFields || selectedSearchFields.length === 0) return true;
-        
+
         // Special case for name field - check if any selected field contains 'Name' or matches 'objectName'
         if (field.id === 'name') {
             return selectedSearchFields.some(field =>
                 field.includes('Name') || field === 'objectName'
             );
         }
-        
+
         // Special case for date field - check if any selected field contains 'CreateDate' or matches 'createdAt'
         if (field.id === 'createdAt') {
             return selectedSearchFields.some(field =>
                 field.includes('CreateDate') || field === 'createdAt'
             );
         }
-        
+
         // Special case for file size field - check if any selected field contains 'FileSize', 'Size', or matches 'fileSize'
         if (field.id === 'size') {
             return selectedSearchFields.some(field =>
                 field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
             );
         }
-        
+
         // Special case for fullPath field - check if any selected field contains 'FullPath' or 'Path'
         if (field.id === 'fullPath') {
             return selectedSearchFields.some(field =>
                 field.includes('FullPath') || field.includes('Path') || field === 'fullPath'
             );
         }
-        
+
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[field.id] || [];
         return apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
@@ -312,8 +314,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             overflow: 'hidden'
                         }}
                     >
-                        <AssetAudio 
-                            src={proxyUrl || ''} 
+                        <AssetAudio
+                            src={proxyUrl || ''}
                             alt={name}
                             compact={true}
                         />
@@ -357,49 +359,51 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 >
                     {/* Checkbox for bulk selection - only show if feature flag is enabled */}
                     {multiSelectFeature.value && (
+
                         <Box
                             sx={(theme) => ({
                                 display: 'flex',
                                 justifyContent: 'center',
                                 alignItems: 'center',
-                                transition: 'all 0.2s ease-in-out',
-                                transform: isSelected ? 'scale(1.15)' : 'scale(1)', // Slightly larger when selected
-                                bgcolor: alpha(theme.palette.background.paper, 0.7),
+                                // if selected and not hovered, make it transparent; otherwise show the light circle
+                                bgcolor: isSelected
+                                    ? 'transparent'
+                                    : alpha(theme.palette.background.paper, 0.7),
                                 borderRadius: '50%',
-                                width: '32px',
-                                height: '32px',
+                                width: 28,
+                                height: 28,
+                                transition: 'all 0.2s ease-in-out',
                                 '&:hover': {
+                                    // on hover always show the background
                                     bgcolor: alpha(theme.palette.background.default, 0.9),
-                                }
+                                },
                             })}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (onSelectToggle) {
-                                    onSelectToggle(id, e);
-                                }
+                                onSelectToggle?.(id, e);
                             }}
                         >
                             <Checkbox
                                 size="small"
-                                checked={isSelected}
                                 disableRipple
+                                checked={isSelected}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectToggle?.(id, e);
+                                }}
+                                icon={<CheckBoxOutlineBlankIcon />}
+                                checkedIcon={<CheckBoxIcon />}
                                 sx={{
                                     padding: 0,
-                                    color: isSelected ? 'primary.main' : 'text.secondary',
-                                    '&.Mui-checked': {
-                                        color: 'primary.main',
-                                    },
                                     '& .MuiSvgIcon-root': {
-                                        fontSize: '1.2rem',
-                                        // Apply a more visible checkmark when selected
-                                        fontWeight: isSelected ? 'bold' : 'normal',
-                                        filter: isSelected ? 'drop-shadow(0px 0px 1px rgba(0,0,0,0.5))' : 'none',
-                                    }
+                                        fontSize: 18,
+                                    },
                                 }}
                             />
                         </Box>
+
                     )}
-                    
+
                     {/* Favorite button - only show if feature flag is enabled */}
                     {favoritesFeature.value && (
                         <IconButton
