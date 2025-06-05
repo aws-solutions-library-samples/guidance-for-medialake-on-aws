@@ -9,7 +9,7 @@ from typing import Optional
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 
-from common import AssetProcessor, JobStatus
+from common import AssetProcessor, JobStatus, get_optimized_client
 
 logger = Logger()
 tracer = Tracer()
@@ -25,6 +25,63 @@ class AssetSyncEngine:
         self.max_concurrent_tasks = max_concurrent_tasks
         self.s3_client = boto3.client('s3')
         self.results_bucket = os.environ['RESULTS_BUCKET_NAME']
+        
+    def lookup_ingest_queue_url(self) -> Optional[str]:
+        """
+        Look up the SQS queue URL for this bucket from the connector table
+        
+        Returns:
+            SQS queue URL or None if not found
+        """
+        try:
+            # Get the connector table name from environment variables
+            connector_table_name = os.environ.get('CONNECTOR_TABLE_NAME')
+            if not connector_table_name:
+                logger.warning("CONNECTOR_TABLE_NAME environment variable not set, cannot lookup queue by bucket")
+                return None
+            
+            # Get DynamoDB client
+            dynamodb = get_optimized_client('dynamodb')
+            
+            logger.info(f"Looking up connector for bucket: {self.bucket_name}")
+            
+            # Scan the connector table to find a connector with matching storageIdentifier
+            response = dynamodb.scan(
+                TableName=connector_table_name,
+                FilterExpression='storageIdentifier = :bucket_name AND #status = :status',
+                ExpressionAttributeNames={
+                    '#status': 'status'
+                },
+                ExpressionAttributeValues={
+                    ':bucket_name': {'S': self.bucket_name},
+                    ':status': {'S': 'active'}
+                },
+                ProjectionExpression='id, queueUrl, storageIdentifier, #status'
+            )
+            
+            # Check if we found any matching connectors
+            items = response.get('Items', [])
+            if not items:
+                logger.warning(f"No active connector found for bucket: {self.bucket_name}")
+                return None
+            
+            if len(items) > 1:
+                logger.warning(f"Multiple active connectors found for bucket {self.bucket_name}, using the first one")
+            
+            # Extract the queue URL from the first matching connector
+            connector = items[0]
+            queue_url = connector.get('queueUrl', {}).get('S')
+            
+            if queue_url:
+                logger.info(f"Found queue URL for bucket {self.bucket_name}: {queue_url}")
+                return queue_url
+            else:
+                logger.warning(f"Connector found for bucket {self.bucket_name} but no queueUrl field")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error looking up queue by bucket {self.bucket_name}: {str(e)}", exc_info=True)
+            return None
 
     def create_batch_operations_job(self) -> str:
         """Create and start an S3 Batch Operations job with manifest generation"""
@@ -100,12 +157,25 @@ class AssetSyncEngine:
             batch_job_id = response['JobId']
             logger.info(f"Created Batch Job: {batch_job_id}")
 
-            AssetProcessor.update_job_metadata(self.job_id, {
+            # Look up the ingest queue URL for this bucket/connector
+            ingest_queue_url = self.lookup_ingest_queue_url()
+            
+            # Create metadata dictionary
+            metadata = {
                 'batchJobId': batch_job_id,
                 'inventoryPrefix': inventory_prefix,
                 'maxConcurrentTasks': self.max_concurrent_tasks,
                 'resultsBucket': os.environ['RESULTS_BUCKET_NAME']
-            })
+            }
+            
+            # Add queue URL to metadata if found
+            if ingest_queue_url:
+                metadata['ingestQueueUrl'] = ingest_queue_url
+                logger.info(f"Added ingest queue URL to job metadata: {ingest_queue_url}")
+            else:
+                logger.warning(f"No ingest queue URL found for bucket {self.bucket_name}, processor will use fallback")
+            
+            AssetProcessor.update_job_metadata(self.job_id, metadata)
 
             return batch_job_id
 
