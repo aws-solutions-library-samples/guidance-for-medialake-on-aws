@@ -87,11 +87,7 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
-            asset_table=props.base_infrastructure.asset_table,
-            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-            ),
-        )
+
 
         settings_api_stack = SettingsApiStack(self, "MediaLakeSettingsApi", props=SettingsApiStackProps(
             cognito_user_pool=props.api_gateway_core_stack.user_pool,
@@ -109,6 +105,12 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
+        asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
+            asset_table=props.base_infrastructure.asset_table,
+            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+            ),
+        )
+        
         api_gateway_stack = ApiGatewayStack(self, "MediaLakeApiGatewayStack", props=ApiGatewayStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
             external_payload_bucket=props.base_infrastructure.external_payload_bucket,
@@ -125,8 +127,6 @@ class MediaLakeStack(cdk.Stack):
             collection_arn=props.base_infrastructure.collection_arn,
             access_log_bucket=props.base_infrastructure.access_log_bucket,
             pipeline_table=props.base_infrastructure.pipeline_table,
-            # image_metadata_extractor_lambda=pipeline_nodes_stack.image_metadata_extractor_lambda,
-            # image_proxy_lambda=pipeline_nodes_stack.image_proxy_lambda,
             pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
             node_table=nodes_stack.pipelines_nodes_table,
             asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
@@ -137,11 +137,11 @@ class MediaLakeStack(cdk.Stack):
             user_pool=props.api_gateway_core_stack.user_pool,
             identity_pool=props.api_gateway_core_stack.identity_pool,
             user_pool_client=props.api_gateway_core_stack.user_pool_client,
-            waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
+            waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn
             user_table=users_groups_roles_stack.user_table,  # User table for bulk download jobs
             ),
         )
-        
+
         pipeline_stack = PipelineStack(self, "MediaLakePipeline", props=PipelineStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
             cognito_user_pool=props.api_gateway_core_stack.user_pool,

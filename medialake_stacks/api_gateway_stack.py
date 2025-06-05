@@ -84,7 +84,8 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
-    user_table: dynamodb.Table  # User table for bulk download jobs and user data
+    user_table: dynamodb.Table 
+    asset_sync_engine_lambda: lambda_.Function
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -130,7 +131,11 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
-       
+        self._connectors_api_gateway.connector_table.grant_read_data(props.asset_sync_engine_lambda)        
+        props.asset_sync_engine_lambda.add_environment(
+            "CONNECTOR_TABLE", 
+            self._connectors_api_gateway.connector_table.table_name
+        )
 
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(
