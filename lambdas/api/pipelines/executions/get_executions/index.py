@@ -75,6 +75,14 @@ def format_execution_response(execution: PipelineExecution) -> Dict[str, Any]:
     # Add optional fields if they exist
     if hasattr(execution, 'end_time') and execution.end_time is not None:
         response["end_time"] = str(execution.end_time)
+        # Calculate duration in seconds
+        try:
+            start_time_int = int(execution.start_time)
+            end_time_int = int(execution.end_time)
+            duration_seconds = end_time_int - start_time_int
+            response["duration_seconds"] = str(duration_seconds)
+        except (ValueError, TypeError):
+            response["duration_seconds"] = "0"
     if hasattr(execution, 'end_time_iso') and execution.end_time_iso is not None:
         response["end_time_iso"] = execution.end_time_iso
 
@@ -82,7 +90,7 @@ def format_execution_response(execution: PipelineExecution) -> Dict[str, Any]:
 
 @tracer.capture_method
 def get_pipeline_executions(
-    page_size: int, next_token: str = None, status: str = None
+    page_size: int, next_token: str = None, status: str = None, sort_by: str = "start_time", sort_order: str = "desc"
 ) -> Dict[str, Any]:
     """
     Retrieve paginated pipeline executions from DynamoDB using PynamoDB
@@ -110,13 +118,37 @@ def get_pipeline_executions(
         # Perform the scan
         scan_operation = PipelineExecution.scan(**scan_kwargs)
         
-        # Get items and sort them by start_time (descending)
+        # Get items
         for item in scan_operation:
             executions.append(item)
             count += 1
         
-        # Sort by start_time in descending order (numeric comparison)
-        executions.sort(key=lambda x: int(x.start_time), reverse=True)
+        # Sort based on the provided sort parameters
+        reverse_order = sort_order.lower() == "desc"
+        
+        if sort_by == "start_time":
+            executions.sort(key=lambda x: int(x.start_time), reverse=reverse_order)
+        elif sort_by == "end_time":
+            executions.sort(key=lambda x: int(x.end_time) if hasattr(x, 'end_time') and x.end_time is not None else 0, reverse=reverse_order)
+        elif sort_by == "pipeline_name":
+            executions.sort(key=lambda x: x.pipeline_name.lower(), reverse=reverse_order)
+        elif sort_by == "status":
+            executions.sort(key=lambda x: x.status.lower(), reverse=reverse_order)
+        elif sort_by == "execution_id":
+            executions.sort(key=lambda x: x.execution_id.lower(), reverse=reverse_order)
+        elif sort_by == "duration_seconds":
+            # Sort by duration (end_time - start_time)
+            def get_duration(x):
+                if hasattr(x, 'end_time') and x.end_time is not None:
+                    try:
+                        return int(x.end_time) - int(x.start_time)
+                    except (ValueError, TypeError):
+                        return 0
+                return 0
+            executions.sort(key=get_duration, reverse=reverse_order)
+        else:
+            # Default to start_time if unknown sort field
+            executions.sort(key=lambda x: int(x.start_time), reverse=reverse_order)
         
         # Format executions for response
         formatted_executions = [format_execution_response(execution) for execution in executions]
@@ -167,8 +199,12 @@ def handle_get_executions() -> Dict[str, Any]:
 
         # Get status filter if provided
         status = query_string.get("status")
+        
+        # Get sorting parameters
+        sort_by = query_string.get("sortBy", "start_time")
+        sort_order = query_string.get("sortOrder", "desc")
 
-        return get_pipeline_executions(page_size, next_token, status)
+        return get_pipeline_executions(page_size, next_token, status, sort_by, sort_order)
     except PipelineExecutionError as e:
         logger.exception("Error processing pipeline executions request")
         return {

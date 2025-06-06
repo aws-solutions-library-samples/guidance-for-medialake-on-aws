@@ -1,45 +1,57 @@
+import os
+import json
+from datetime import datetime
+from decimal import Decimal
+from typing import Dict, Any, Optional
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import EventBridgeEvent
-from aws_lambda_powertools.utilities.data_classes.dynamo_db_stream_event import (
-    DynamoDBRecord,
-)
-from aws_lambda_powertools import single_metric
-from typing import Dict, Any, Optional
-import os
-import boto3
-from datetime import datetime
-import json
-from decimal import Decimal
+
+# (Adjust these imports if your project structure differs)
 from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
 
-# Initialize AWS clients with X-Ray tracing
+# ─────────────────────────────────────────────────────────────────────────────
+# Initialize DynamoDB table (with X-Ray tracing)
+# ─────────────────────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["PIPELINES_EXECUTIONS_TABLE_NAME"])
+
+logger = Logger(service="pipelines_executions_event_processor")
+tracer = Tracer(service="pipelines_executions_event_processor")
+metrics = Metrics(service="pipelines_executions_event_processor", namespace="MyApp/Pipelines")
+
+
+def convert_to_decimal(obj: Any) -> Any:
+    """
+    Recursively walk a structure (dict, list, primitive) and convert
+    any float/int into a Decimal. Strings and other types pass through unchanged.
+    """
+    if isinstance(obj, dict):
+        return {k: convert_to_decimal(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convert_to_decimal(v) for v in obj]
+    if isinstance(obj, float):
+        # Convert float → Decimal via string to preserve precision
+        return Decimal(str(obj))
+    if isinstance(obj, int):
+        return Decimal(obj)
+    # leave strings, booleans, None, etc. as‐is
+    return obj
 
 
 def calculate_execution_duration(
     start_time: Any, end_time: Optional[str] = None
 ) -> Optional[Decimal]:
     """
-    Calculate the duration of the execution in seconds
+    Calculate the duration of the execution in seconds.
 
-    Parameters
-    ----------
-    start_time : Any
-        Start time (can be string or datetime)
-    end_time : Optional[str]
-        ISO formatted end time
-
-    Returns
-    -------
-    Optional[Decimal]
-        Duration in seconds if end_time is provided, None otherwise
+    Returns None if start_time or end_time is missing or unparseable.
     """
     if not end_time or not start_time:
         return None
 
-    # Convert start_time to string if it's a datetime object
     if isinstance(start_time, datetime):
         start_time = start_time.isoformat()
     elif not isinstance(start_time, str):
@@ -47,51 +59,33 @@ def calculate_execution_duration(
         return None
 
     try:
-        start = datetime.fromisoformat(start_time)
-        end = datetime.fromisoformat(end_time)
-        # Convert to Decimal for DynamoDB compatibility
-        return Decimal(str((end - start).total_seconds()))
+        start_dt = datetime.fromisoformat(start_time)
+        end_dt = datetime.fromisoformat(end_time)
+        return Decimal(str((end_dt - start_dt).total_seconds()))
     except (ValueError, TypeError) as e:
-        logger.warning(f"Error calculating duration: {str(e)}")
+        logger.warning(f"Error calculating duration: {e}")
         return None
 
 
 @tracer.capture_method
 def store_execution_details(item: Dict[str, Any]) -> None:
     """
-    Store execution details in DynamoDB with tracing
-
-    Parameters
-    ----------
-    item : Dict[str, Any]
-        Item to store in DynamoDB
+    Write one item into DynamoDB (with X-Ray tracing).
     """
+    logger.info(f"store_execution_details: about to write item to DynamoDB:\n{json.dumps(item, default=str)}")
     table.put_item(Item=item)
+    logger.info("store_execution_details: write complete")
 
 
 @tracer.capture_method
 def extract_pipeline_name(execution_arn: str) -> str:
     """
-    Extract pipeline name from Step Functions execution ARN
-
-    Parameters
-    ----------
-    execution_arn : str
-        Full execution ARN
-
-    Returns
-    -------
-    str
-        Pipeline name
-
-    Raises
-    ------
-    ValueError
-        If pipeline name cannot be extracted from ARN
+    Given an SFN execution ARN, return the pipeline name portion.
+    ARN format: arn:aws:states:region:acct:execution:pipeline_name:execution_id
     """
     try:
-        # ARN format: arn:aws:states:region:account:execution:pipeline_name:execution_id
         pipeline_name = execution_arn.split(":")[-2]
+        logger.debug(f"extract_pipeline_name: pipeline_name = {pipeline_name}")
         return pipeline_name
     except (IndexError, AttributeError):
         logger.error(f"Failed to extract pipeline name from ARN: {execution_arn}")
@@ -99,8 +93,129 @@ def extract_pipeline_name(execution_arn: str) -> str:
 
 
 def convert_to_unix_timestamp(time_ms: float) -> int:
-    """Convert milliseconds timestamp to unix timestamp (seconds)"""
+    """
+    Convert a millisecond timestamp into a Unix timestamp (seconds).
+    """
     return int(time_ms / 1000.0)
+
+
+def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
+    """
+    Parse the JSON string in detail.input and extract:
+
+    • inventory_id:
+        – top-level: nested["detail"]["InventoryID"]
+        – or second-level: nested["detail"]["detail"]["InventoryID"]
+
+    • pipeline_trace_id:
+        – nested["detail"]["metadata"]["pipelineTraceId"]
+
+    • dsa_type (DigitalSourceAsset Type):
+        – nested["detail"]["DigitalSourceAsset"]["Type"]
+
+    • object_key_name:
+        – nested["detail"]["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]
+          ["PrimaryLocation"]["ObjectKey"]["Name"]
+
+    • metadata fields (if present):
+        – stepName     → top-level "step_name"
+        – stepStatus   → top-level "step_status"
+        – stepResult   → top-level "step_result"
+        – the entire metadata object (with all numbers converted to Decimal)
+
+    Returns a dict containing any of:
+        {
+          "inventory_id": "...",
+          "pipeline_trace_id": "...",
+          "dsa_type": "...",
+          "object_key_name": "...",
+          "step_name": "...",
+          "step_status": "...",
+          "step_result": "...",
+          "metadata": { ... }    # full nested metadata, but nums as Decimal
+        }
+    """
+    nested_fields: Dict[str, Any] = {}
+    try:
+        nested = json.loads(detail_input_str)
+    except (TypeError, json.JSONDecodeError) as e:
+        # Not valid JSON (or not a string) → nothing to extract
+        logger.debug(f"parse_nested_metadata: could not parse detail.input as JSON: {e}")
+        return nested_fields
+
+    detail1 = nested.get("detail", {})
+
+    # —————————
+    # 1) InventoryID (top-level or second-level)
+    # —————————
+    inv_top = detail1.get("InventoryID")
+    if inv_top:
+        nested_fields["inventory_id"] = inv_top
+        logger.info(f"parse_nested_metadata: found top-level inventory_id = {inv_top}")
+    else:
+        detail2 = detail1.get("detail", {})
+        inv_second = detail2.get("InventoryID")
+        if inv_second:
+            nested_fields["inventory_id"] = inv_second
+            logger.info(f"parse_nested_metadata: found nested inventory_id = {inv_second}")
+
+    # —————————
+    # 2) pipelineTraceId
+    # —————————
+    meta = detail1.get("metadata", {})
+    pipeline_trace_id = meta.get("pipelineTraceId")
+    if pipeline_trace_id:
+        nested_fields["pipeline_trace_id"] = pipeline_trace_id
+        logger.info(f"parse_nested_metadata: pipelineTraceId = {pipeline_trace_id}")
+
+    # —————————
+    # 3) DigitalSourceAsset Type ("dsa_type")
+    # —————————
+    dsa = detail1.get("DigitalSourceAsset", {})
+    dsa_type = dsa.get("Type")
+    if dsa_type:
+        nested_fields["dsa_type"] = dsa_type
+        logger.info(f"parse_nested_metadata: dsa_type = {dsa_type}")
+
+    # —————————
+    # 4) ObjectKey → Name ("object_key_name")
+    # —————————
+    main_repr = dsa.get("MainRepresentation", {})
+    storage_info = main_repr.get("StorageInfo", {})
+    primary_loc = storage_info.get("PrimaryLocation", {})
+    object_key = primary_loc.get("ObjectKey", {})
+    obj_name = object_key.get("Name")
+    if obj_name:
+        nested_fields["object_key_name"] = obj_name
+        logger.info(f"parse_nested_metadata: object_key_name = {obj_name}")
+
+    # —————————
+    # 5) metadata: stepName, stepStatus, stepResult, plus the entire metadata map
+    # —————————
+    if meta:
+        # If the payload’s metadata dict exists, pull out specific fields:
+        step_name = meta.get("stepName")
+        if step_name:
+            nested_fields["step_name"] = step_name
+            logger.info(f"parse_nested_metadata: stepName = {step_name}")
+
+        step_status = meta.get("stepStatus")
+        if step_status:
+            nested_fields["step_status"] = step_status
+            logger.info(f"parse_nested_metadata: stepStatus = {step_status}")
+
+        step_result = meta.get("stepResult")
+        if step_result:
+            nested_fields["step_result"] = step_result
+            logger.info(f"parse_nested_metadata: stepResult = {step_result}")
+
+        # Convert the entire metadata dict so any floats/ints become Decimal
+        # before saving into DynamoDB.
+        decimal_metadata = convert_to_decimal(meta)
+        nested_fields["metadata"] = decimal_metadata
+        logger.info("parse_nested_metadata: stored full metadata map (nums→Decimal)")
+
+    return nested_fields
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -108,60 +223,49 @@ def convert_to_unix_timestamp(time_ms: float) -> int:
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
-    Process Step Functions execution events and store in DynamoDB
+    Processes Step Functions execution‐status events and writes (or updates) a row in DynamoDB.
 
-    Parameters
-    ----------
-    event : Dict[str, Any]
-        EventBridge event containing Step Functions execution details
-    context : LambdaContext
-        Lambda context object
-
-    Returns
-    -------
-    Dict[str, Any]
-        Response indicating processing status
+    Includes:
+      • inventory_id
+      • pipeline_trace_id
+      • dsa_type
+      • object_key_name
+      • step_name, step_status, step_result
+      • full metadata map (with numbers as Decimal)
     """
     try:
-        # Parse event using PowerTools EventBridge data class
-        event_bridge_event = EventBridgeEvent(event)
-        detail = event_bridge_event.detail
+        logger.info(f"lambda_handler: incoming event = {json.dumps(event)}")
+        evt = EventBridgeEvent(event)
+        detail = evt.detail
 
-        # Extract and validate required information
+        # ────────────────────────────────────────────────────────────────
+        # 1) Required top-level fields
+        # ────────────────────────────────────────────────────────────────
         execution_arn = detail.get("executionArn")
         if not execution_arn:
-            raise ValueError(
-                "executionArn is required but was not provided in the event"
-            )
+            raise ValueError("executionArn is required but missing")
 
-        # Extract execution_id from the ARN (last part after ':')
         execution_id = execution_arn.split(":")[-1]
         if not execution_id:
             raise ValueError("Could not extract execution_id from executionArn")
 
         state_machine_arn = detail.get("stateMachineArn")
         if not state_machine_arn:
-            raise ValueError(
-                "stateMachineArn is required but was not provided in the event"
-            )
+            raise ValueError("stateMachineArn is required but missing")
 
         status = detail.get("status")
         if not status:
-            raise ValueError("status is required but was not provided in the event")
+            raise ValueError("status is required but missing")
 
-        # Convert startDate from milliseconds to unix timestamp
         start_date_ms = detail.get("startDate")
         if not start_date_ms:
-            raise ValueError("startDate is required but was not provided in the event")
+            raise ValueError("startDate is required but missing")
 
-        # Store as unix timestamp for sorting
+        # Convert startDate → UNIX seconds + ISO string
         start_date_unix = convert_to_unix_timestamp(start_date_ms)
-        # Keep ISO format for display
         start_date_iso = datetime.fromtimestamp(start_date_unix).isoformat()
+        current_time_iso = datetime.utcnow().isoformat()
 
-        current_time = datetime.utcnow().isoformat()
-
-        # Log the event details for debugging
         logger.debug(
             "Processing execution event",
             extra={
@@ -173,68 +277,89 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             },
         )
 
-        # Extract pipeline name from execution ARN
+        # ────────────────────────────────────────────────────────────────
+        # 2) Extract pipeline name from execution ARN
+        # ────────────────────────────────────────────────────────────────
         pipeline_name = extract_pipeline_name(execution_arn)
-        logger.debug(
-            "Extracted pipeline information",
-            extra={
-                "pipeline_name": pipeline_name,
-                "execution_id": execution_id,
-            },
-        )
 
-        # Prepare DynamoDB item
-        item = {
-            "execution_id": execution_id,  # Partition key
-            "start_time": start_date_unix,  # Sort key as unix timestamp
-            "start_time_iso": start_date_iso,  # ISO format for display
+        # ────────────────────────────────────────────────────────────────
+        # 3) Build the “base” DynamoDB item
+        # ────────────────────────────────────────────────────────────────
+        base_item: Dict[str, Any] = {
+            "execution_id": execution_id,              # PK
+            "start_time": start_date_unix,             # sort key
+            "start_time_iso": start_date_iso,          # human-readable
             "pipeline_name": pipeline_name,
             "execution_arn": execution_arn,
             "state_machine_arn": state_machine_arn,
             "status": status,
-            "last_updated": current_time,
-            "ttl": int(
-                (datetime.utcnow().timestamp() + (90 * 24 * 60 * 60))
-            ),  # 90 days TTL
+            "last_updated": current_time_iso,
+            # TTL = now + 90 days (in UNIX seconds)
+            "ttl": int(datetime.utcnow().timestamp() + (90 * 24 * 60 * 60)),
         }
 
-        # Handle execution completion
+        logger.info(f"lambda_handler: base item = {json.dumps(base_item)}")
+
+        # ────────────────────────────────────────────────────────────────
+        # 4) Parse nested metadata (inventory_id, pipeline_trace_id, etc.)
+        # ────────────────────────────────────────────────────────────────
+        nested_meta_from_input: Dict[str, Any] = {}
+        raw_input = detail.get("input")
+        if isinstance(raw_input, str):
+            logger.info("lambda_handler: detail.input is a JSON string—parsing for nested metadata")
+            nested_meta_from_input = parse_nested_metadata(raw_input)
+            logger.info(f"lambda_handler: nested_meta_from_input = {nested_meta_from_input}")
+
+        # Merge any nested fields into base_item
+        if nested_meta_from_input:
+            base_item.update(nested_meta_from_input)
+
+        # ────────────────────────────────────────────────────────────────
+        # 5) If terminal status, capture stopDate / duration / error / cause
+        # ────────────────────────────────────────────────────────────────
         if status in ["SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"]:
             stop_date_ms = detail.get("stopDate")
             if stop_date_ms:
                 stop_date_unix = convert_to_unix_timestamp(stop_date_ms)
                 end_time_iso = datetime.fromtimestamp(stop_date_unix).isoformat()
-                item["end_time"] = stop_date_unix
-                item["end_time_iso"] = end_time_iso
-                item["duration_seconds"] = calculate_execution_duration(
-                    start_date_iso, end_time_iso
-                )
 
-            # Add failure details if applicable
+                base_item["end_time"] = stop_date_unix
+                base_item["end_time_iso"] = end_time_iso
+
+                duration = calculate_execution_duration(start_date_iso, end_time_iso)
+                if duration is not None:
+                    base_item["duration_seconds"] = duration  # Already a Decimal
+
             if status in ["FAILED", "TIMED_OUT", "ABORTED"]:
-                error = detail.get("error")
-                cause = detail.get("cause")
-                if error:
-                    item["error"] = error
-                if cause:
-                    item["cause"] = cause
+                error_msg = detail.get("error")
+                cause_msg = detail.get("cause")
+                if error_msg:
+                    base_item["error"] = error_msg
+                if cause_msg:
+                    base_item["cause"] = cause_msg
 
-        # Store in DynamoDB with tracing
-        store_execution_details(item)
+        # ────────────────────────────────────────────────────────────────
+        # 6) Write final item to DynamoDB
+        # ────────────────────────────────────────────────────────────────
+        store_execution_details(base_item)
 
-        # Add custom metrics
+        # ────────────────────────────────────────────────────────────────
+        # 7) Publish custom metrics
+        # ────────────────────────────────────────────────────────────────
         metrics.add_metric(name="SuccessfulExecutionUpdates", unit="Count", value=1)
-        if "duration_seconds" in item:
-            # Convert duration to float for metrics
-            duration = float(item["duration_seconds"])
-            metrics.add_metric(name="ExecutionDuration", unit="Seconds", value=duration)
+        if base_item.get("duration_seconds") is not None:
+            metrics.add_metric(
+                name="ExecutionDuration",
+                unit="Seconds",
+                value=float(base_item["duration_seconds"]),  # convert Decimal→float for metrics
+            )
 
         logger.info(
-            f"Successfully processed execution event",
+            "Successfully processed Step Functions execution",
             extra={
                 "execution_id": execution_id,
                 "status": status,
-                "duration_seconds": item.get("duration_seconds"),
+                "duration_seconds": base_item.get("duration_seconds"),
             },
         )
 
@@ -250,7 +375,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         }
 
     except Exception as e:
-        # Log error with context
         logger.exception("Error processing execution event")
         metrics.add_metric(name="FailedExecutionUpdates", unit="Count", value=1)
         raise
+
+
