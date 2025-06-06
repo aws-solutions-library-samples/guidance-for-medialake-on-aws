@@ -1,872 +1,81 @@
-import os
-import json
+from typing import Dict, Optional, TypedDict, List, Any, Callable, Tuple
 import boto3
+import json
 import uuid
-import csv
-import io
-import random
-import time
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Callable
-from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import unquote_plus
-from botocore.exceptions import ClientError
-
-from aws_lambda_powertools import Logger, Metrics, Tracer
+import os
+import urllib.parse
+from datetime import datetime
+import hashlib
+import functools
+import concurrent.futures
+import threading
+from botocore.config import Config
+from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.validation import validate
+from aws_lambda_powertools.utilities.parser import parse, event_parser
+from decimal import Decimal
+from contextlib import contextmanager
 
-from common import (
-    AssetProcessor, JobStatus, ErrorType,
-    get_optimized_client, get_optimized_s3_client, MAX_THREADS
-)
+# Configure environment-specific logging
+def configure_logging():
+    """Configure logging based on environment"""
+    env = os.environ.get("ENVIRONMENT", "dev")
+    if env == "prod":
+        # In production, only log warnings and errors to reduce costs
+        logger.setLevel("WARNING")
+    else:
+        # In dev/test, log everything
+        logger.setLevel("INFO")
 
-# Initialize powertools
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
 
-# Define retry constants
-MAX_RETRY_ATTEMPTS = 15
-BASE_BACKOFF_TIME = 0.1  # 100 ms
-MAX_BACKOFF_TIME = 30.0  # 30 seconds
+# Configure logging based on environment
+configure_logging()
 
-def retry_with_backoff(
-    func: Callable, 
-    *args, 
-    exception_class=ClientError, 
-    max_attempts=MAX_RETRY_ATTEMPTS, 
-    base_delay=BASE_BACKOFF_TIME, 
-    max_delay=MAX_BACKOFF_TIME,
-    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException'),
-    **kwargs
-) -> Any:
-    """
-    Execute a function with exponential backoff and jitter for retries.
-    Specifically handles DynamoDB throttling exceptions.
-    
-    Args:
-        func: Function to execute
-        *args: Arguments to pass to the function
-        exception_class: Exception class to catch and retry on
-        max_attempts: Maximum number of retry attempts
-        base_delay: Base delay time in seconds
-        max_delay: Maximum delay time in seconds
-        throttling_errors: Error codes that indicate throttling
-        **kwargs: Keyword arguments to pass to the function
-        
-    Returns:
-        Result from the function call
-        
-    Raises:
-        The last exception if all retries fail
-    """
-    attempt = 0
-    last_exception = None
-    metrics_count = 0
-    
-    while attempt < max_attempts:
-        try:
-            return func(*args, **kwargs)
-        except exception_class as e:
-            # Check if this is a throttling error
-            if hasattr(e, 'response') and 'Error' in e.response:
-                error_code = e.response['Error'].get('Code')
-                if error_code not in throttling_errors:
-                    # Not a throttling error, reraise
-                    raise
-            else:
-                # Not a ClientError with error code, reraise
-                raise
-                
-            attempt += 1
-            metrics_count += 1
-            last_exception = e
-            
-            if attempt >= max_attempts:
-                logger.error(f"Max retry attempts ({max_attempts}) exceeded: {str(e)}")
-                break
-                
-            # Calculate delay with exponential backoff and jitter
-            delay = min(max_delay, base_delay * (2 ** attempt))
-            jitter = random.uniform(0, 1)
-            delay = delay + (delay * 0.2 * jitter)  # Add up to 20% jitter
-            
-            logger.warning(
-                f"DynamoDB throttling error on attempt {attempt}/{max_attempts}. "
-                f"Retrying in {delay:.2f}s: {str(e)}"
-            )
-            
-            # Record metric for throttling
-            metrics.add_metric(
-                name="DynamoDBThrottlingRetries",
-                unit=MetricUnit.Count,
-                value=metrics_count
-            )
-            
-            # Sleep with backoff
-            time.sleep(delay)
-    
-    # If we get here, we've exhausted our retries
-    if last_exception:
-        raise last_exception
-        
-    # This should never happen
-    raise Exception("Unexpected error in retry mechanism")
+# Configure S3 client with retries
+s3_config = Config(
+    retries={
+        'max_attempts': 3,
+        'mode': 'adaptive'
+    },
+    read_timeout=15,
+    connect_timeout=5
+)
 
-# Patch AssetProcessor methods with retry
-original_increment_job_counter = AssetProcessor.increment_job_counter
-original_update_job_status = AssetProcessor.update_job_status
-original_update_job_metadata = AssetProcessor.update_job_metadata
-original_log_error = AssetProcessor.log_error
+# Improved JSON serialization
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects and Decimal types from DynamoDB"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            # Convert Decimal to int or float appropriately
+            return float(obj) if obj % 1 != 0 else int(obj)
+        return super(DateTimeEncoder, self).default(obj)
 
-@staticmethod
-def patched_increment_job_counter(job_id: str, counter_name: str, increment_by: int = 1) -> bool:
-    """Patched method with retry for DynamoDB throttling"""
-    return retry_with_backoff(
-        original_increment_job_counter,
-        job_id, counter_name, increment_by
-    )
+# Global instance to reduce instantiation costs
+datetime_encoder = DateTimeEncoder()
 
-@staticmethod
-def patched_update_job_status(job_id: str, status: JobStatus, message: str = None) -> bool:
-    """Patched method with retry for DynamoDB throttling"""
-    return retry_with_backoff(
-        original_update_job_status,
-        job_id, status, message
-    )
+def json_serialize(obj):
+    """Serialize object to JSON string handling datetime objects"""
+    return json.dumps(obj, cls=DateTimeEncoder)
 
-@staticmethod
-def patched_update_job_metadata(job_id: str, metadata: Dict[str, Any]) -> bool:
-    """Patched method with retry for DynamoDB throttling"""
-    return retry_with_backoff(
-        original_update_job_metadata,
-        job_id, metadata
-    )
+# LRU cache for type mappings
+@functools.lru_cache(maxsize=100)
+def get_type_abbreviation(asset_type: str) -> str:
+    """Cache type mappings to reduce dict lookups"""
+    type_abbreviations = {
+        "Image": "img",
+        "Video": "vid", 
+        "Audio": "aud"
+    }
+    return type_abbreviations.get(asset_type, "img")
 
-@staticmethod
-def patched_log_error(error_data: Dict[str, Any]) -> bool:
-    """Patched method with retry for DynamoDB throttling"""
-    return retry_with_backoff(
-        original_log_error,
-        error_data
-    )
-
-# Apply patches
-AssetProcessor.increment_job_counter = patched_increment_job_counter
-AssetProcessor.update_job_status = patched_update_job_status
-AssetProcessor.update_job_metadata = patched_update_job_metadata
-AssetProcessor.log_error = patched_log_error
-
-class AssetSyncProcessor:
-    """Processes objects for synchronization with the Asset Management system"""
-    
-    def __init__(self, job_id: str, bucket_name: str):
-        """
-        Initialize the Asset Sync Processor
-        
-        Args:
-            job_id: Unique job identifier
-            bucket_name: S3 bucket name
-        """
-        self.job_id = job_id
-        self.bucket_name = bucket_name
-        self.s3_client = get_optimized_s3_client(bucket_name)
-        self.results_bucket = os.environ.get('RESULTS_BUCKET_NAME')
-        
-        if not self.results_bucket:
-            logger.error("RESULTS_BUCKET_NAME environment variable is not set")
-            raise ValueError("RESULTS_BUCKET_NAME environment variable is not set")
-        
-    def process_s3_batch_operation(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process a single task from S3 batch operations
-        
-        Args:
-            task: Task information from S3 batch operations
-            
-        Returns:
-            Result of processing
-        """
-        logger.info(f"Processing S3 batch operation task: {json.dumps(task)}")
-        
-        # Extract the S3 key
-        try:
-            key = task.get('s3Key')
-            if not key:
-                logger.error("No S3 key found in task")
-                return {
-                    'resultCode': 'PermanentFailure',
-                    'resultString': 'No S3 key found in task'
-                }
-                
-            # Get object tags
-            tags = self._get_object_tags(key)
-            
-            # Prepare object for processing
-            obj = {
-                'key': key,
-                'assetId': tags.get('AssetID'),
-                'inventoryId': tags.get('InventoryID'),
-                'lastModified': datetime.now(timezone.utc).isoformat(),
-                'size': 0  # We don't need the size for processing
-            }
-            
-            # Filter and process the object
-            objects_to_process = self._filter_objects_to_process([obj])
-            
-            if not objects_to_process:
-                logger.info(f"Object {key} doesn't need processing")
-                return {
-                    'resultCode': 'Succeeded',
-                    'resultString': 'Object already processed'
-                }
-                
-            # Process the object
-            result = self._process_object(objects_to_process[0])
-            
-            if result.get('status') == 'success':
-                # Update job counters
-                AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsScanned', 1)
-                AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsToProcess', 1)
-                AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsProcessed', 1)
-                
-                return {
-                    'resultCode': 'Succeeded',
-                    'resultString': f"Successfully processed object: {key}"
-                }
-            else:
-                # Update error counters
-                AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsScanned', 1)
-                AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsToProcess', 1)
-                AssetProcessor.increment_job_counter(self.job_id, 'errors', 1)
-                
-                return {
-                    'resultCode': 'PermanentFailure',
-                    'resultString': f"Failed to process object: {key}. Error: {result.get('error')}"
-                }
-                
-        except Exception as e:
-            logger.error(f"Error processing S3 batch operation task: {str(e)}", exc_info=True)
-            
-            # Update error counters
-            AssetProcessor.increment_job_counter(self.job_id, 'errors', 1)
-            
-            return {
-                'resultCode': 'PermanentFailure',
-                'resultString': f"Exception: {str(e)}"
-            }
-            
-    def process_chunk(self, chunk_key: str, chunk_index: int, total_chunks: int) -> Dict[str, int]:
-        """
-        Process a manifest chunk
-        
-        Args:
-            chunk_key: S3 key of the chunk file
-            chunk_index: Index of this chunk
-            total_chunks: Total number of chunks
-            
-        Returns:
-            Processing statistics
-        """
-        logger.info(f"Processing chunk {chunk_key} ({chunk_index}/{total_chunks})")
-        
-        # Get the chunk from S3
-        try:
-            response = self.s3_client.get_object(
-                Bucket=self.results_bucket,
-                Key=chunk_key
-            )
-            
-            # Parse the CSV
-            csv_text = response['Body'].read().decode('utf-8')
-            csv_reader = csv.DictReader(io.StringIO(csv_text))
-            
-            objects = []
-            for row in csv_reader:
-                if 'Key' in row:
-                    objects.append({
-                        'key': row['Key'],
-                        'assetId': None,  # Will be populated during processing
-                        'inventoryId': None,  # Will be populated during processing
-                        'lastModified': row.get('LastModifiedDate', datetime.now(timezone.utc).isoformat()),
-                        'size': int(row.get('Size', 0))
-                    })
-            
-            logger.info(f"Found {len(objects)} objects in chunk {chunk_index}")
-            
-            # Post the number of objects in the chunk to CloudWatch metrics
-            metrics.add_metric(
-                name="ObjectsPerChunk",
-                unit=MetricUnit.Count,
-                value=len(objects)
-            )
-            # Add dimensions for job ID and chunk index
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
-            
-            # Fetch tags for objects to determine if they need processing
-            with ThreadPoolExecutor(max_workers=min(MAX_THREADS, len(objects))) as executor:
-                futures = [
-                    executor.submit(
-                        self._get_object_tags,
-                        obj['key']
-                    ) for obj in objects
-                ]
-                
-                # Process results
-                for i, future in enumerate(futures):
-                    try:
-                        tags = future.result()
-                        objects[i]['assetId'] = tags.get('AssetID')
-                        objects[i]['inventoryId'] = tags.get('InventoryID')
-                    except Exception as e:
-                        logger.warning(f"Error fetching tags for object {objects[i]['key']}: {str(e)}")
-            
-            # Filter objects that need processing
-            objects_to_process = self._filter_objects_to_process(objects)
-            
-            logger.info(f"Found {len(objects_to_process)} objects that need processing in chunk {chunk_index}")
-            
-            # Post the number of objects that need processing to CloudWatch metrics
-            metrics.add_metric(
-                name="ObjectsToProcess",
-                unit=MetricUnit.Count,
-                value=len(objects_to_process)
-            )
-            # Add dimensions for job ID and chunk index
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
-            
-            # Process objects
-            results = self._process_objects(objects_to_process)
-            
-            # Update job progress
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsScanned', len(objects))
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsToProcess', len(objects_to_process))
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsProcessed', results['successful'])
-            
-            if results['failed'] > 0:
-                AssetProcessor.increment_job_counter(self.job_id, 'errors', results['failed'])
-            
-            # Increment chunks processed counter
-            job_details = AssetProcessor.get_job_details(self.job_id)
-            metadata = job_details.get('metadata', {})
-            chunks_processed = metadata.get('chunksProcessed', 0) + 1
-            
-            AssetProcessor.update_job_metadata(self.job_id, {
-                'chunksProcessed': chunks_processed
-            })
-            
-            # Check if this was the last chunk
-            if chunks_processed >= total_chunks:
-                logger.info(f"Completed processing all {total_chunks} chunks for job {self.job_id}")
-                
-                # Update job status to completed
-                AssetProcessor.update_job_status(
-                    self.job_id,
-                    JobStatus.COMPLETED,
-                    f"Completed processing {metadata.get('objectsCount', 0)} objects"
-                )
-            
-            return {
-                'scanned': len(objects),
-                'to_process': len(objects_to_process),
-                'processed_successfully': results['successful'],
-                'failed': results['failed'],
-                'chunk_index': chunk_index,
-                'total_chunks': total_chunks,
-                'chunks_processed': chunks_processed
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing chunk {chunk_index}: {str(e)}", exc_info=True)
-            
-            # Update job counters
-            AssetProcessor.increment_job_counter(self.job_id, 'errors', 1)
-            
-            # Rethrow the exception
-            raise
-            
-    def _get_object_tags(self, object_key: str) -> Dict[str, str]:
-        """Get tags for an S3 object"""
-        try:
-            response = self.s3_client.get_object_tagging(
-                Bucket=self.bucket_name,
-                Key=object_key
-            )
-            
-            return {tag['Key']: tag['Value'] for tag in response.get('TagSet', [])}
-        except Exception as e:
-            logger.warning(f"Error getting tags for object {object_key}: {str(e)}")
-            return {}
-            
-    def _filter_objects_to_process(self, objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Filter objects that need processing
-        
-        Processing logic:
-        1. If neither asset ID nor inventory ID exists - process object (PUT)
-        2. If asset ID doesn't exist but inventory ID exists - process object (COPY)
-        3. If asset ID exists - skip object (already processed)
-        """
-        logger.info(f"Filtering {len(objects)} objects for processing")
-        
-        if not objects:
-            return []
-            
-        # Extract IDs for batch checking
-        asset_ids = [obj.get('assetId') for obj in objects if obj.get('assetId')]
-        inventory_ids = [obj.get('inventoryId') for obj in objects if obj.get('inventoryId')]
-        
-        try:
-            # Batch check existence with retry
-            existing = retry_with_backoff(
-                AssetProcessor.batch_check_asset_exists,
-                asset_ids, inventory_ids
-            )
-            existing_asset_ids = existing['asset_ids']
-            existing_inventory_ids = existing['inventory_ids']
-            
-            # Filter objects that need processing
-            objects_to_process = []
-            
-            for obj in objects:
-                asset_id = obj.get('assetId')
-                inventory_id = obj.get('inventoryId')
-                
-                # Determine processing action based on ID existence
-                if asset_id and asset_id in existing_asset_ids:
-                    # Asset ID exists - skip processing
-                    continue
-                elif inventory_id and inventory_id in existing_inventory_ids:
-                    # Inventory ID exists but asset ID doesn't - S3 copy
-                    obj['processingAction'] = 'COPY'
-                    objects_to_process.append(obj)
-                else:
-                    # Neither ID exists - full processing
-                    obj['processingAction'] = 'PUT'
-                    objects_to_process.append(obj)
-            
-            return objects_to_process
-            
-        except Exception as e:
-            logger.error(f"Error filtering objects: {str(e)}", exc_info=True)
-            raise
-            
-    def _process_objects(self, objects: List[Dict[str, Any]]) -> Dict[str, int]:
-        """
-        Process a list of objects
-        
-        Args:
-            objects: List of objects to process
-            
-        Returns:
-            Processing results statistics
-        """
-        logger.info(f"Processing {len(objects)} objects for job {self.job_id}")
-        
-        # Initialize results
-        results = {
-            'successful': 0,
-            'failed': 0,
-            'copy_operations': 0,
-            'put_operations': 0,
-            'skip_operations': 0
-        }
-        
-        # Process objects in parallel
-        with ThreadPoolExecutor(max_workers=min(MAX_THREADS, len(objects))) as executor:
-            futures = [
-                executor.submit(
-                    self._process_object, obj
-                ) for obj in objects
-            ]
-            
-            # Collect results
-            for future in futures:
-                try:
-                    result = future.result()
-                    
-                    if result.get('status') == 'success':
-                        results['successful'] += 1
-                        
-                        # Track operation type
-                        action = result.get('action')
-                        if action == 'COPY':
-                            results['copy_operations'] += 1
-                        elif action == 'PUT':
-                            results['put_operations'] += 1
-                        else:
-                            results['skip_operations'] += 1
-                    else:
-                        results['failed'] += 1
-                except Exception as e:
-                    logger.error(f"Error processing object: {str(e)}")
-                    results['failed'] += 1
-        
-        logger.info(f"Processing complete: {results['successful']} successful, {results['failed']} failed")
-        
-        # Post processing metrics to CloudWatch
-        metrics.add_metric(
-            name="SuccessfullyProcessedObjects",
-            unit=MetricUnit.Count,
-            value=results['successful']
-        )
-        metrics.add_metric(
-            name="FailedProcessedObjects",
-            unit=MetricUnit.Count,
-            value=results['failed']
-        )
-        metrics.add_metric(
-            name="CopyOperations",
-            unit=MetricUnit.Count,
-            value=results['copy_operations']
-        )
-        metrics.add_metric(
-            name="PutOperations",
-            unit=MetricUnit.Count,
-            value=results['put_operations']
-        )
-        # Add dimensions for job ID
-        metrics.add_dimension(name="JobId", value=self.job_id)
-        
-        return results
-        
-    def _process_object(self, obj: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process a single object
-        
-        Args:
-            obj: Object to process
-            
-        Returns:
-            Processing result
-        """
-        # URL decode the object key
-        object_key = unquote_plus(obj['key'])
-        processing_action = obj.get('processingAction', 'PUT')
-        
-        try:
-            # Get existing tags
-            try:
-                tags_response = self.s3_client.get_object_tagging(
-                    Bucket=self.bucket_name,
-                    Key=object_key
-                )
-                existing_tags = {tag['Key']: tag['Value'] for tag in tags_response.get('TagSet', [])}
-            except Exception as e:
-                logger.warning(f"Error fetching tags for {object_key}: {str(e)}")
-                existing_tags = {}
-            
-            # Simulate S3 copy operation to trigger ObjectCreated event
-            copy_source = {'Bucket': self.bucket_name, 'Key': object_key}
-            
-            # Generate tag string from existing tags
-            tag_string = "&".join([f"{k}={v}" for k, v in existing_tags.items()])
-            
-            logger.info(f"Simulating S3 copy for object {object_key}")
-            
-            # Copy object to itself, preserving existing tags
-            self.s3_client.copy_object(
-                Bucket=self.bucket_name,
-                CopySource=copy_source,
-                Key=object_key,
-                TaggingDirective='REPLACE',
-                Tagging=tag_string
-            )
-            
-            logger.info(f"Successfully copied object {object_key}")
-            
-            # Record successful object processing metric
-            metrics.add_metric(
-                name="SingleObjectProcessingSuccess",
-                unit=MetricUnit.Count,
-                value=1
-            )
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            
-            # Return success result
-            return {
-                'status': 'success',
-                'key': object_key,
-                'action': 'COPY'
-            }
-            
-        except Exception as e:
-            # Log error
-            error_id = str(uuid.uuid4())
-            AssetProcessor.log_error(
-                AssetProcessor.format_error(
-                    error_id=error_id,
-                    object_key=object_key,
-                    error_type=ErrorType.PROCESS_ERROR,
-                    error_message=str(e),
-                    retry_count=0,
-                    job_id=self.job_id,
-                    bucket_name=self.bucket_name
-                )
-            )
-            
-            # Record failed object processing metric
-            metrics.add_metric(
-                name="SingleObjectProcessingFailure",
-                unit=MetricUnit.Count,
-                value=1
-            )
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            
-            # Return error result
-            return {
-                'status': 'error',
-                'key': object_key,
-                'error': str(e),
-                'errorId': error_id
-            }
-
-
-@tracer.capture_lambda_handler
-@metrics.log_metrics
-def lambda_handler(event, context):
-    """Lambda handler for Asset Sync Processor"""
-    try:
-        logger.info(f"Received event: {json.dumps(event)}")
-        
-        if 'Records' in event:
-            # This is an SQS event
-            for record in event['Records']:
-                try:
-                    body = json.loads(record.get('body', '{}'))
-                    operation = body.get('operation')
-                    job_id = body.get('jobId')
-                    
-                    if not job_id:
-                        logger.error("No job ID found in message")
-                        continue
-                        
-                    # Get the job details from DynamoDB
-                    job_details = retry_with_backoff(
-                        AssetProcessor.get_job_details,
-                        job_id
-                    )
-                    if not job_details:
-                        logger.error(f"Job {job_id} not found")
-                        continue
-                        
-                    # Extract bucket name
-                    bucket_name = job_details.get('bucketName')
-                    
-                    # Initialize the processor
-                    processor = AssetSyncProcessor(job_id, bucket_name)
-                    
-                    if operation == 'PROCESS_CHUNK':
-                        # Process a manifest chunk
-                        chunk_key = body.get('chunkKey')
-                        chunk_index = body.get('chunkIndex', 1)
-                        total_chunks = body.get('totalChunks', 1)
-                        
-                        if not chunk_key:
-                            logger.error("No chunk key found in message")
-                            continue
-                            
-                        try:
-                            result = processor.process_chunk(chunk_key, chunk_index, total_chunks)
-                            logger.info(f"Processed chunk: {result}")
-                            
-                            # Record successful chunk processing metric
-                            metrics.add_metric(
-                                name="ChunkProcessingSuccess", 
-                                unit=MetricUnit.Count,
-                                value=1
-                            )
-                            metrics.add_dimension(name="JobId", value=job_id)
-                            
-                        except Exception as e:
-                            logger.error(f"Error processing chunk: {str(e)}", exc_info=True)
-                            
-                            # Record chunk processing error metric
-                            metrics.add_metric(
-                                name="ChunkProcessingErrors", 
-                                unit=MetricUnit.Count,
-                                value=1
-                            )
-                            metrics.add_dimension(name="JobId", value=job_id)
-                            
-                            # Update job status to failed if this is a critical error
-                            if chunk_index == total_chunks:
-                                AssetProcessor.update_job_status(
-                                    job_id, 
-                                    JobStatus.FAILED,
-                                    f"Failed to process chunk: {str(e)}"
-                                )
-                    else:
-                        logger.warning(f"Unknown operation: {operation}")
-                        
-                except Exception as e:
-                    logger.error(f"Error processing SQS record: {str(e)}", exc_info=True)
-                    
-                    # Record SQS processing errors
-                    metrics.add_metric(
-                        name="SQSProcessingErrors",
-                        unit=MetricUnit.Count,
-                        value=1
-                    )
-                    
-            # Add metrics for SQS message processing
-            metrics.add_metric(
-                name="ProcessedSQSMessages",
-                unit=MetricUnit.Count,
-                value=len(event['Records'])
-            )
-            
-            return {"status": "success", "message": f"Processed {len(event['Records'])} SQS messages"}
-                
-        elif 'tasks' in event or 'task' in event or 'job' in event:
-            # This is an S3 batch operations event
-            logger.info("Processing S3 batch operations event")
-            
-            # Get the invocation details
-            invocation_schema_version = event.get('invocationSchemaVersion', '1.0')
-            invocation_id = event.get('invocationId', 'unknown')
-            
-            # S3 batch operations sends the task directly or in an array
-            tasks = event.get('tasks', [])
-            if 'task' in event:
-                tasks = [event['task']]
-            
-            # Extract the INTERNAL job ID from userArguments
-            job_id = None
-            if 'job' in event and isinstance(event['job'], dict):
-                # Get userArguments which contains our application's job ID
-                user_args = event['job'].get('userArguments', {})
-                if isinstance(user_args, dict):
-                    job_id = user_args.get('jobId')
-                    
-                # If we didn't find it in userArguments, log that for debugging
-                if not job_id:
-                    logger.warning(f"No jobId found in userArguments: {user_args}")
-                    # Fallback to using S3 batch job ID
-                    s3_batch_job_id = event['job'].get('id')
-                    if s3_batch_job_id:
-                        logger.info(f"Using S3 batch job ID as fallback: {s3_batch_job_id}")
-                        job_id = f"s3batch-{s3_batch_job_id}"
-            
-            # Log the extracted information for debugging
-            logger.info(f"Batch operation details: jobId={job_id}, tasks={len(tasks)}")
-            
-            if not job_id:
-                logger.error("No job ID found in userArguments")
-                return {
-                    'invocationSchemaVersion': invocation_schema_version,
-                    'treatMissingKeysAs': 'PermanentFailure',
-                    'invocationId': invocation_id,
-                    'results': [
-                        {
-                            'taskId': task.get('taskId', 'unknown'),
-                            'resultCode': 'PermanentFailure',
-                            'resultString': 'No job ID found in userArguments'
-                        } for task in tasks
-                    ]
-                }
-            
-            # Extract bucket name from the tasks
-            bucket_name = None
-            if tasks:
-                # First, try to get from s3BucketArn
-                if 's3BucketArn' in tasks[0]:
-                    bucket_arn = tasks[0]['s3BucketArn']
-                    bucket_name = bucket_arn.split(':')[-1]
-                # Otherwise, try s3Bucket directly
-                elif 's3Bucket' in tasks[0]:
-                    bucket_name = tasks[0]['s3Bucket']
-                
-                logger.info(f"Extracted bucket name: {bucket_name}")
-            
-            if not bucket_name:
-                # Get the job details from DynamoDB to find the bucket name
-                job_details = retry_with_backoff(
-                    AssetProcessor.get_job_details,
-                    job_id
-                )
-                if not job_details:
-                    logger.error(f"Job {job_id} not found")
-                    return {
-                        'invocationSchemaVersion': invocation_schema_version,
-                        'treatMissingKeysAs': 'PermanentFailure',
-                        'invocationId': invocation_id,
-                        'results': [
-                            {
-                                'taskId': task.get('taskId', 'unknown'),
-                                'resultCode': 'PermanentFailure',
-                                'resultString': f'Job {job_id} not found'
-                            } for task in tasks
-                        ]
-                    }
-                # Extract bucket name from job details
-                bucket_name = job_details.get('bucketName')
-            
-            # Initialize the processor
-            processor = AssetSyncProcessor(job_id, bucket_name)
-            
-            # Process tasks and collect results
-            results = []
-            for task in tasks:
-                try:
-                    task_id = task.get('taskId', 'unknown')
-                    logger.info(f"Processing task {task_id}")
-                    
-                    result = processor.process_s3_batch_operation(task)
-                    
-                    # Record batch operation processing success/failure
-                    if result.get('resultCode') == 'Succeeded':
-                        metrics.add_metric(
-                            name="BatchOperationSuccesses",
-                            unit=MetricUnit.Count,
-                            value=1
-                        )
-                    else:
-                        metrics.add_metric(
-                            name="BatchOperationErrors",
-                            unit=MetricUnit.Count,
-                            value=1
-                        )
-                    
-                    results.append({
-                        'taskId': task_id,
-                        'resultCode': result.get('resultCode', 'PermanentFailure'),
-                        'resultString': result.get('resultString', 'Unknown error')
-                    })
-                except Exception as e:
-                    logger.error(f"Error processing task: {str(e)}", exc_info=True)
-                    
-                    # Record batch operation processing errors
-                    metrics.add_metric(
-                        name="BatchOperationErrors",
-                        unit=MetricUnit.Count,
-                        value=1
-                    )
-                    
-                    results.append({
-                        'taskId': task.get('taskId', 'unknown'),
-                        'resultCode': 'PermanentFailure',
-                        'resultString': f'Exception: {str(e)}'
-                    })
-            
-            # Return the results
-            return {
-                'invocationSchemaVersion': invocation_schema_version,
-                'treatMissingKeysAs': 'PermanentFailure',
-                'invocationId': invocation_id,
-                'results': results
-            }
-            
-        else:
-            logger.error("Unrecognized event format")
-            return {"error": "Unrecognized event format"}
-            
-    except Exception as e:
-        logger.error(f"Error in lambda handler: {str(e)}", exc_info=True)
-        return {"error": f"Error in lambda handler: {str(e)}"}
-
+@functools.lru_cache(maxsize=200)
 def determine_asset_type(content_type: str, file_extension: str) -> str:
     """
     Determine the asset type using content type and file extension.
@@ -879,55 +88,1424 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     Returns:
         One of: "Image", "Video", "Audio", or "Other"
     """
-    logger.info(f"Determining asset type for content_type: {content_type}, extension: {file_extension}")
-    
     # Convert to lowercase for comparison
     content_type = content_type.lower() if content_type else ""
     file_extension = file_extension.lower() if file_extension else ""
     
-    # Track what criteria matched
-    matched_criteria = []
+    # Image classification
+    image_mimes = ["image/", "application/photoshop", "application/illustrator"]
+    image_extensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "webp", "heic", "heif", "raw", "psd", "ai", "eps"]
+    
+    # Video classification
+    video_mimes = ["video/"]
+    video_extensions = ["mp4", "mov", "avi", "wmv", "webm", "flv", "mkv", "m4v", "mpg", "mpeg", "3gp"]
+    
+    # Audio classification
+    audio_mimes = ["audio/"]
+    audio_extensions = ["mp3", "wav", "aac", "flac", "ogg", "wma", "m4a", "aiff", "opus"]
     
     # Check MIME type first as it's more reliable
     for prefix in image_mimes:
         if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched image prefix {prefix}")
             return "Image"
     
     for prefix in video_mimes:
         if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched video prefix {prefix}")
             return "Video"
     
     for prefix in audio_mimes:
         if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched audio prefix {prefix}")
             return "Audio"
     
     # If MIME type doesn't give us a clear answer, check file extension
     if file_extension in image_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched image extension")
         return "Image"
     
     if file_extension in video_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched video extension")
         return "Video"
     
     if file_extension in audio_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched audio extension")
         return "Audio"
     
-    # Fall back to looking at the first part of the MIME type
+    # If we have a content type but no clear match, try to infer from the main type
     if content_type:
         mime_main_type = content_type.split('/')[0].capitalize()
         if mime_main_type in ["Image", "Video", "Audio"]:
-            matched_criteria.append(f"MIME main type {mime_main_type} matched")
             return mime_main_type
     
-    logger.warning(
-        f"Could not definitively determine asset type. Content-Type: {content_type}, "
-        f"Extension: {file_extension}, Matched criteria: {matched_criteria}"
-    )
+    # If we have a file extension but no clear match, try to infer from common patterns
+    if file_extension:
+        # Log the unknown extension for monitoring
+        logger.warning(f"Unknown file extension encountered: {file_extension}")
+        # Default to "Other" instead of "Image" for unknown types
+        return "Other"
     
-    # Return Other instead of defaulting to Image
+    # If we have no information at all, log it and return "Other"
+    logger.warning("No content type or file extension available for type determination")
     return "Other"
+
+# Event filtering optimization
+def is_relevant_event(event_name: str, allowed_prefixes=("ObjectCreated:", "ObjectRemoved:")) -> bool:
+    """Quick check if event should be processed"""
+    # For improved logging, explicitly check for 'Copy' events
+    if event_name == "ObjectCreated:Copy":
+        logger.info("Processing ObjectCreated:Copy event as a relevant event")
+        return True
+    return any(event_name.startswith(prefix) for prefix in allowed_prefixes)
+
+
+class FileHash(TypedDict):
+    Algorithm: str
+    Value: str
+    MD5Hash: str
+
+
+class FileInfo(TypedDict):
+    Size: int
+    Hash: FileHash
+    CreateDate: str
+
+
+class ObjectKey(TypedDict):
+    Name: str
+    Path: str
+    FullPath: str
+
+
+class PrimaryLocation(TypedDict):
+    StorageType: str
+    Bucket: str
+    ObjectKey: ObjectKey
+    Status: str
+    FileInfo: FileInfo
+
+
+class StorageInfo(TypedDict):
+    PrimaryLocation: PrimaryLocation
+
+
+class S3Metadata(TypedDict):
+    Metadata: Dict
+    ContentType: str
+    LastModified: str
+
+
+class EmbeddedMetadata(TypedDict):
+    ExtractedDate: str
+    S3: S3Metadata
+
+
+class AssetMetadata(TypedDict):
+    Embedded: EmbeddedMetadata
+
+
+class AssetRepresentation(TypedDict):
+    ID: str
+    Type: str
+    Format: str
+    Purpose: str
+    StorageInfo: StorageInfo
+
+
+class DigitalSourceAsset(TypedDict):
+    ID: str
+    Type: str
+    CreateDate: str
+    MainRepresentation: AssetRepresentation
+    originalIngestDate: Optional[str]
+    lastModifiedDate: Optional[str]
+
+
+class AssetRecord(TypedDict):
+    InventoryID: str
+    DigitalSourceAsset: DigitalSourceAsset
+    DerivedRepresentations: Optional[List[AssetRepresentation]]
+    Metadata: Optional[AssetMetadata]
+    FileHash: str
+    StoragePath: str
+
+
+class AssetProcessor:
+    def __init__(self):
+        # Use optimized S3 client with retries
+        self.s3 = boto3.client("s3", config=s3_config)
+        
+        # Setup DynamoDB with batch writer for efficiency
+        dynamodb = boto3.resource("dynamodb")
+        self.table = dynamodb.Table(os.environ["ASSETS_TABLE"])
+        self.dynamodb = self.table  # Keep original reference for compatibility
+        
+        # EventBridge client
+        self.eventbridge = boto3.client("events")
+        
+        # Cache for extension to content type mapping
+        self.extension_content_type_cache = {}
+        
+        # Initialize a lock for thread-safe access to processed_inventory_ids
+        self.lock = threading.Lock()
+        
+        # Set to track processed inventory IDs to prevent duplicates
+        self.processed_inventory_ids = set()
+        
+        # Add current asset tracking
+        self.current_asset_id = None
+        self.current_inventory_id = None
+
+    @contextmanager
+    def asset_context(self, asset_id=None, inventory_id=None):
+        """Context manager to set asset ID in logs for the duration of an operation"""
+        # Store previous values
+        previous_asset_id = self.current_asset_id
+        previous_inventory_id = self.current_inventory_id
+        
+        try:
+            # Set new values if provided
+            if asset_id:
+                self.current_asset_id = asset_id
+                logger.append_keys(assetID=asset_id)
+            if inventory_id:
+                self.current_inventory_id = inventory_id
+                logger.append_keys(inventoryID=inventory_id)
+            yield
+        finally:
+            # Restore previous values
+            self.current_asset_id = previous_asset_id
+            self.current_inventory_id = previous_inventory_id
+            # Update logger context
+            logger.append_keys(assetID=previous_asset_id, inventoryID=previous_inventory_id)
+    
+    def _log_with_asset_context(self, message, level="INFO", asset_id=None, inventory_id=None):
+        """Helper to log with asset context"""
+        asset_id = asset_id or self.current_asset_id
+        inventory_id = inventory_id or self.current_inventory_id
+        
+        context = {}
+        if asset_id:
+            context["assetID"] = asset_id
+        if inventory_id:
+            context["inventoryID"] = inventory_id
+            
+        if level.upper() == "INFO":
+            logger.info(message, **context)
+        elif level.upper() == "WARNING":
+            logger.warning(message, **context)
+        elif level.upper() == "ERROR":
+            logger.error(message, **context)
+        elif level.upper() == "CRITICAL":
+            logger.critical(message, **context)
+        else:
+            logger.info(message, **context)
+
+    def _decode_s3_event_key(self, encoded_key: str) -> str:
+        """Decode S3 event key by handling URL encoding"""
+        # Just decode URL encoding without replacing literal '+' characters
+        # urllib.parse.unquote properly handles %20, %2B etc.
+        return urllib.parse.unquote(encoded_key)
+
+    def _extract_file_extension(self, key: str) -> str:
+        """Extract file extension from key"""
+        # The key should already be URL-decoded by the time it reaches this method
+        # Just extract the extension directly
+        return key.split(".")[-1].lower() if "." in key else ""
+
+    @tracer.capture_method
+    def _calculate_md5(self, bucket: str, key: str, chunk_size: int = 8192) -> str:
+        """Calculate MD5 hash with optimal chunk size for memory efficiency"""
+        try:
+            response = self.s3.get_object(Bucket=bucket, Key=key)
+            md5_hash = hashlib.md5(usedforsecurity=False)
+                
+            # Use larger chunk size for better performance
+            bytes_processed = 0
+            for chunk in response["Body"].iter_chunks(chunk_size):
+                md5_hash.update(chunk)
+                bytes_processed += len(chunk)
+            
+            return md5_hash.hexdigest()
+        except Exception as e:
+            logger.exception(f"Error calculating MD5 hash for {bucket}/{key}, error: {e}")
+            raise
+
+    @tracer.capture_method
+    def _check_existing_file(self, md5_hash: str) -> Optional[Dict]:
+        """Check if file with same MD5 hash exists with optimized query"""
+        try:
+            # Use ProjectionExpression to only fetch needed attributes
+            response = self.dynamodb.query(
+                IndexName="FileHashIndex",
+                KeyConditionExpression="FileHash = :hash",
+                ExpressionAttributeValues={":hash": md5_hash},
+            )
+
+            if response["Items"]:
+                return response["Items"][0]
+                
+            return None
+        except Exception as e:
+            logger.exception(f"Error querying DynamoDB for hash {md5_hash}, error {e}")
+            raise
+
+    @tracer.capture_method
+    def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
+        """Process new asset from S3 with optimized performance"""
+        key = self._decode_s3_event_key(key)
+
+        try:
+            # Get S3 object metadata and tags in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                head_future = executor.submit(self.s3.head_object, Bucket=bucket, Key=key)
+                tag_future = executor.submit(self.s3.get_object_tagging, Bucket=bucket, Key=key)
+                
+                # Wait for both to complete
+                concurrent.futures.wait([head_future, tag_future])
+                
+                # Get results or handle exceptions
+                try:
+                    response = head_future.result()
+                except Exception as e:
+                    logger.exception(f"Error getting S3 object metadata: {str(e)}")
+                    raise
+                    
+                try:
+                    existing_tags = tag_future.result()
+                except Exception as e:
+                    logger.exception(f"Error getting S3 object tags: {str(e)}")
+                    raise
+            
+            # Early check for asset type
+            content_type = response.get("ContentType", "")
+            file_ext = self._extract_file_extension(key)
+            asset_type = determine_asset_type(content_type, file_ext)
+            
+            # Get S3 object's last modified date
+            s3_last_modified = response.get("LastModified", datetime.utcnow())
+            if isinstance(s3_last_modified, datetime):
+                s3_last_modified_str = s3_last_modified.isoformat()
+            else:
+                s3_last_modified_str = s3_last_modified
+            
+            # Log the type determination for debugging
+            logger.info(f"Asset type determination for {key}: content_type={content_type}, file_ext={file_ext}, determined_type={asset_type}")
+            
+            # Stop processing if asset type is not one of: "Image", "Video", "Audio"
+            if asset_type not in ["Image", "Video", "Audio"]:
+                logger.info(f"Skipping processing for unsupported asset type: {asset_type} for {bucket}/{key}")
+                metrics.add_metric(name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1)
+                return None
+
+            tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
+
+            # Check existing tags first - this is a fast path if object already processed
+            if "InventoryID" in tags and "AssetID" in tags:
+                # Use the asset context for consistent logging
+                with self.asset_context(asset_id=tags["AssetID"], inventory_id=tags["InventoryID"]):
+                    self._log_with_asset_context(f"Asset already fully processed: {tags['AssetID']}")
+                
+                    # Add logging to check if the record exists in DynamoDB
+                    try:
+                        existing_record = self.dynamodb.get_item(
+                            Key={
+                                "InventoryID": tags["InventoryID"]
+                            }
+                        )
+                        if "Item" in existing_record:
+                            self._log_with_asset_context(f"Found existing record in DynamoDB: {json_serialize(existing_record['Item'])}")
+                            
+                            # Update the lastModifiedDate field but preserve originalIngestDate
+                            # Create updateExpression and attributeValues for update operation
+                            update_expression = "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
+                            expression_attribute_values = {":lastModDate": s3_last_modified_str}
+                            
+                            # Update only the lastModifiedDate
+                            self.dynamodb.update_item(
+                                Key={"InventoryID": tags["InventoryID"]},
+                                UpdateExpression=update_expression,
+                                ExpressionAttributeValues=expression_attribute_values
+                            )
+                            self._log_with_asset_context(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}")
+                        else:
+                            self._log_with_asset_context(f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}", level="WARNING")
+                            
+                            # Recreate the record if it doesn't exist in DynamoDB
+                            self._log_with_asset_context(f"Recreating DynamoDB record for tagged asset: {key}")
+                            
+                            # Calculate MD5 hash for the file
+                            md5_hash = self._calculate_md5(bucket, key)
+                            
+                            # Create metadata structure
+                            metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                            
+                            # Create DynamoDB entry using existing InventoryID and AssetID
+                            asset_id = tags["AssetID"]
+                            inventory_id = tags["InventoryID"]
+                            
+                            # Extract asset type from AssetID or content type
+                            if ":" in asset_id:
+                                parts = asset_id.split(":")
+                                if len(parts) >= 2:
+                                    type_abbrev = parts[1]
+                                    asset_type_map = {"img": "Image", "vid": "Video", "aud": "Audio"}
+                                    asset_type = asset_type_map.get(type_abbrev, "Image")
+                                else:
+                                    content_type = response.get("ContentType", "")
+                                    file_ext = key.split(".")[-1] if "." in key else ""
+                                    asset_type = determine_asset_type(content_type, file_ext)
+                            else:
+                                content_type = response.get("ContentType", "")
+                                file_ext = key.split(".")[-1] if "." in key else ""
+                                asset_type = determine_asset_type(content_type, file_ext)
+                            
+                            # Current time for ingest date
+                            current_time = datetime.utcnow().isoformat()
+                            
+                            # Create the item structure
+                            item = {
+                                "InventoryID": inventory_id,
+                                "FileHash": md5_hash,
+                                "StoragePath": f"{bucket}:{key}",
+                                "DigitalSourceAsset": {
+                                    "ID": asset_id,
+                                    "Type": asset_type,
+                                    "CreateDate": datetime.utcnow().isoformat(),
+                                    "IngestedAt": datetime.utcnow().isoformat(),
+                                    "originalIngestDate": current_time,
+                                    "lastModifiedDate": s3_last_modified_str,
+                                    "MainRepresentation": {
+                                        "ID": f"{asset_id}:master",
+                                        "Type": asset_type,
+                                        "Format": key.split(".")[-1].upper() if "." in key else "",
+                                        "Purpose": "master",
+                                        "StorageInfo": metadata["StorageInfo"],
+                                    },
+                                },
+                                "DerivedRepresentations": [],
+                                "Metadata": metadata.get("Metadata"),
+                            }
+                            
+                            # Use batch writer for better DynamoDB performance
+                            try:
+                                self.dynamodb.put_item(Item=item)
+                                self._log_with_asset_context(f"Successfully recreated DynamoDB record for {inventory_id}")
+                                
+                                # Verify the write with a get_item
+                                verification = self.dynamodb.get_item(
+                                    Key={
+                                        "InventoryID": inventory_id
+                                    }
+                                )
+                                if "Item" in verification:
+                                    self._log_with_asset_context(f"Verification successful - recreated item exists in DynamoDB")
+                                else:
+                                    self._log_with_asset_context(f"Verification failed - recreated item not found in DynamoDB", level="WARNING")
+                                    
+                                # Publish event for the recreated record
+                                self.publish_event(
+                                    inventory_id,
+                                    asset_id,
+                                    metadata,
+                                )
+                                
+                                return item
+                            except Exception as e:
+                                self._log_with_asset_context(f"Error recreating DynamoDB record: {str(e)}", level="ERROR")
+                                logger.exception(f"Error recreating DynamoDB record: {str(e)}")
+                    except Exception as e:
+                        self._log_with_asset_context(f"Error checking existing record in DynamoDB: {str(e)}", level="ERROR")
+                        logger.exception(f"Error checking existing record in DynamoDB: {str(e)}")
+                    
+                    return None
+
+            # Calculate MD5 hash for duplicate checking
+            md5_hash = self._calculate_md5(bucket, key)
+            
+            # Check if file with same hash exists in DynamoDB
+            existing_file = self._check_existing_file(md5_hash)
+            
+            if existing_file:
+                logger.info(f"Duplicate file found with hash {md5_hash}")
+                
+                # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
+                if "InventoryID" in tags and "AssetID" not in tags:
+                    logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
+                    
+                    # Extract asset type from content type
+                    content_type = response.get("ContentType", "")
+                    file_ext = key.split(".")[-1] if "." in key else ""
+                    asset_type = determine_asset_type(content_type, file_ext)
+                    type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
+                    
+                    # Generate new AssetID
+                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
+                    
+                    # Tag with existing InventoryID and new AssetID
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {"Key": "InventoryID", "Value": tags["InventoryID"]},
+                                {"Key": "AssetID", "Value": new_asset_id},
+                                {"Key": "FileHash", "Value": md5_hash},
+                            ]
+                        },
+                    )
+                    
+                    # Create new asset entry with existing inventory ID
+                    metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
+                    
+                    self.publish_event(
+                        dynamo_entry["InventoryID"],
+                        dynamo_entry["DigitalSourceAsset"]["ID"],
+                        metadata,
+                    )
+                    
+                    return dynamo_entry
+                
+                # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
+                if "InventoryID" not in tags and "AssetID" not in tags:
+                    logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
+                                {"Key": "FileHash", "Value": md5_hash},
+                                {"Key": "DuplicateHash", "Value": "true"},
+                            ]
+                        },
+                    )
+                    
+                    # Update lastModifiedDate for the existing file in DynamoDB
+                    self.dynamodb.update_item(
+                        Key={"InventoryID": existing_file["InventoryID"]},
+                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                    )
+                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                    
+                    return None
+                
+                # Handle other cases from existing code
+                existing_object_key = (
+                    existing_file.get("DigitalSourceAsset", {})
+                    .get("MainRepresentation", {})
+                    .get("StorageInfo", {})
+                    .get("PrimaryLocation", {})
+                    .get("ObjectKey", {})
+                    .get("FullPath")
+                )
+
+                if existing_object_key == key:
+                    logger.info(
+                        "Duplicate file with same object key. Tagging with existing IDs"
+                    )
+                    # Tag with the same IDs as the existing file
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {
+                                    "Key": "InventoryID",
+                                    "Value": existing_file["InventoryID"],
+                                },
+                                {
+                                    "Key": "AssetID",
+                                    "Value": existing_file["DigitalSourceAsset"]["ID"],
+                                },
+                                {"Key": "FileHash", "Value": md5_hash},
+                            ]
+                        },
+                    )
+                    
+                    # Update lastModifiedDate for the existing file in DynamoDB
+                    self.dynamodb.update_item(
+                        Key={"InventoryID": existing_file["InventoryID"]},
+                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                    )
+                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                    
+                    return None
+                else:
+                    # Same hash but different key - tag with same InventoryID but new AssetID
+                    logger.info(
+                        "Same hash but different key. Tagging with same InventoryID but new AssetID"
+                    )
+                    # Extract asset type from content type
+                    content_type = response.get("ContentType", "")
+                    file_ext = key.split(".")[-1] if "." in key else ""
+                    asset_type = determine_asset_type(content_type, file_ext)
+                    type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
+                    
+                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
+                    self.s3.put_object_tagging(
+                        Bucket=bucket,
+                        Key=key,
+                        Tagging={
+                            "TagSet": [
+                                {
+                                    "Key": "InventoryID",
+                                    "Value": existing_file["InventoryID"],
+                                },
+                                {
+                                    "Key": "AssetID",
+                                    "Value": new_asset_id,
+                                },
+                                {"Key": "FileHash", "Value": md5_hash},
+                                {
+                                    "Key": "DuplicateHash",
+                                    "Value": "true",
+                                },
+                            ]
+                        },
+                    )
+                    return None
+
+            # Process new unique file...
+            metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+            
+            # If we have InventoryID tag but no AssetID tag, use existing inventory
+            if "InventoryID" in tags and "AssetID" not in tags:
+                logger.info(f"Using existing InventoryID: {tags['InventoryID']}")
+                dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
+            else:
+                # Normal processing for new file
+                dynamo_entry = self.create_dynamo_entry(metadata, s3_last_modified=s3_last_modified_str)
+
+            # Add tags to S3 object
+            self.s3.put_object_tagging(
+                Bucket=bucket,
+                Key=key,
+                Tagging={
+                    "TagSet": [
+                        {"Key": "InventoryID", "Value": dynamo_entry["InventoryID"]},
+                        {
+                            "Key": "AssetID",
+                            "Value": dynamo_entry["DigitalSourceAsset"]["ID"],
+                        },
+                        {"Key": "FileHash", "Value": md5_hash},
+                    ]
+                },
+            )
+
+            self.publish_event(
+                dynamo_entry["InventoryID"],
+                dynamo_entry["DigitalSourceAsset"]["ID"],
+                metadata,
+            )
+
+            return dynamo_entry
+
+        except Exception as e:
+            logger.exception(f"Error processing asset: {key}, error: {e}")
+            metrics.add_metric(name="AssetProcessingErrors", unit=MetricUnit.Count, value=1)
+            raise
+
+    def _create_asset_metadata(
+        self, s3_response: Dict, bucket: str, key: str, md5_hash: str
+    ) -> StorageInfo:
+        """Create asset metadata structure with optimized field extraction"""
+        # Get file extension from key
+        filename = key.split("/")[-1]
+        file_ext = self._extract_file_extension(filename)
+        
+        # Optimize path splitting
+        path_parts = key.split("/")
+        name = path_parts[-1]
+        path = "/".join(path_parts[:-1]) if len(path_parts) > 1 else ""
+        
+        # Use extraction for performance
+        content_length = s3_response.get("ContentLength", 0)
+        etag = s3_response.get("ETag", "").strip('"')
+        last_modified = s3_response.get("LastModified", datetime.utcnow()).isoformat()
+        content_type = s3_response.get("ContentType", "")
+        
+        return {
+            "StorageInfo": {
+                "PrimaryLocation": {
+                    "StorageType": "s3",
+                    "Bucket": bucket,
+                    "ObjectKey": {
+                        "Name": name,
+                        "Path": path,
+                        "FullPath": key,
+                    },
+                    "Status": "active",
+                    "FileInfo": {
+                        "Size": content_length,
+                        "Hash": {
+                            "Algorithm": "SHA256",
+                            "Value": etag,
+                            "MD5Hash": md5_hash,
+                        },
+                        "CreateDate": last_modified,
+                    },
+                }
+            },
+            "Metadata": {
+                "Embedded": {
+                    "ExtractedDate": datetime.utcnow().isoformat(),
+                    "S3": {
+                        "Metadata": s3_response.get("Metadata", {}),
+                        "ContentType": content_type,
+                        "LastModified": last_modified,
+                    },
+                }
+            },
+        }
+
+    @tracer.capture_method
+    def create_dynamo_entry(self, metadata: StorageInfo, inventory_id: str = None, s3_last_modified: str = None) -> AssetRecord:
+        """Create DynamoDB entry for the asset with optimized data handling"""
+        try:
+            if not inventory_id:
+                inventory_id = f"asset:uuid:{str(uuid.uuid4())}"
+            else:
+                # Use the provided inventory_id if it exists
+                if not inventory_id.startswith("asset:uuid:"):
+                    inventory_id = f"asset:uuid:{inventory_id}"
+            
+            # Thread-safe check for duplicate inventory IDs
+            if hasattr(self, 'lock') and hasattr(self, 'processed_inventory_ids'):
+                with self.lock:
+                    if inventory_id in self.processed_inventory_ids:
+                        logger.warning(f"Duplicate inventory ID detected: {inventory_id} - generating a new one")
+                        # Generate a new unique inventory ID instead
+                        inventory_id = f"asset:uuid:{str(uuid.uuid4())}"
+                    # Add this inventory ID to the set of processed IDs
+                    self.processed_inventory_ids.add(inventory_id)
+            
+            asset_id = str(uuid.uuid4())
+
+            # Extract bucket and key from metadata for StoragePath
+            bucket = metadata["StorageInfo"]["PrimaryLocation"]["Bucket"]
+            key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+            
+            # Extract content type and file extension for type determination
+            content_type = (
+                metadata.get("Metadata", {})
+                .get("Embedded", {})
+                .get("S3", {})
+                .get("ContentType", "")
+            )
+            file_ext = self._extract_file_extension(key)
+            
+            # Use more accurate asset type detection
+            asset_type = determine_asset_type(content_type, file_ext)
+
+            # Use cached type abbreviation lookup
+            type_abbrev = get_type_abbreviation(asset_type)
+
+            # Get current timestamp once for reuse
+            timestamp = datetime.utcnow().isoformat()
+            
+            # Use provided S3 last modified date or current timestamp
+            if not s3_last_modified:
+                s3_last_modified = timestamp
+
+            item: AssetRecord = {
+                "InventoryID": inventory_id,
+                "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"]["Hash"][
+                    "MD5Hash"
+                ],
+                "StoragePath": f"{bucket}:{key}",
+                "DigitalSourceAsset": {
+                    "ID": f"asset:{type_abbrev}:{asset_id}",
+                    "Type": asset_type,
+                    "CreateDate": timestamp,
+                    "IngestedAt": timestamp,
+                    "originalIngestDate": timestamp,  # Set original ingest date to current time for new assets
+                    "lastModifiedDate": s3_last_modified,  # Use the S3 object's last modified date
+                    "MainRepresentation": {
+                        "ID": f"asset:rep:{asset_id}:master",
+                        "Type": asset_type,
+                        "Format": file_ext.upper(),
+                        "Purpose": "master",
+                        "StorageInfo": metadata["StorageInfo"],
+                    },
+                },
+                "DerivedRepresentations": [],
+                "Metadata": metadata.get("Metadata"),
+            }
+
+            # Add detailed logging before DynamoDB operation
+            logger.info(f"Attempting to write to DynamoDB table: {os.environ['ASSETS_TABLE']}")
+            logger.info(f"Using inventory_id: {inventory_id} for DynamoDB key")
+            
+            # Use direct put_item instead of batch_writer for immediate feedback
+            try:
+                # First, check if the item with this ID already exists
+                existing_item = self.dynamodb.get_item(
+                    Key={"InventoryID": inventory_id}
+                ).get("Item")
+                
+                if existing_item:
+                    logger.warning(f"Item with InventoryID {inventory_id} already exists. Generating new ID.")
+                    # Generate a new ID and try again
+                    item["InventoryID"] = f"asset:uuid:{str(uuid.uuid4())}"
+                    logger.info(f"Using new InventoryID: {item['InventoryID']}")
+                
+                # Now do the put_item operation
+                self.dynamodb.put_item(Item=item)
+                logger.info(f"put_item operation completed for InventoryID: {item['InventoryID']}")
+            except Exception as e:
+                logger.exception(f"Error in put_item operation: {str(e)}")
+                raise
+            
+            # Verify the item was written by doing a get_item
+            logger.info(f"Verifying item with InventoryID: {item['InventoryID']}")
+            verification_response = self.dynamodb.get_item(
+                Key={
+                    "InventoryID": item["InventoryID"]
+                }
+            )
+            
+            # Log the full verification response
+            logger.info(f"Verification response: {json_serialize(verification_response)}")
+            
+            if "Item" in verification_response:
+                logger.info(f"Verification successful - item exists in DynamoDB")
+            else:
+                logger.warning(f"Verification failed - item not found in DynamoDB after put_item")
+                
+                # Log additional information to help diagnose the issue
+                try:
+                    # Check if the table is reachable
+                    table_info = boto3.client('dynamodb').describe_table(
+                        TableName=os.environ["ASSETS_TABLE"]
+                    )
+                    logger.info(f"Table status: {table_info['Table']['TableStatus']}")
+                    
+                    # Try a direct query on the table to see if the item exists
+                    query_response = self.dynamodb.query(
+                        KeyConditionExpression="InventoryID = :id",
+                        ExpressionAttributeValues={":id": item["InventoryID"]}
+                    )
+                    logger.info(f"Direct query response: {json_serialize(query_response)}")
+                    
+                    # Try to scan the table for recent items
+                    scan_response = self.dynamodb.scan(
+                        Limit=5
+                    )
+                    logger.info(f"Recent items scan (count={scan_response.get('Count', 0)})")
+                    
+                except Exception as e:
+                    logger.exception(f"Error during additional diagnostics: {str(e)}")
+            
+            return item
+        except Exception as e:
+            logger.exception(f"Error writing to DynamoDB: {str(e)}")
+            raise
+
+    @tracer.capture_method
+    def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
+        """Publish event to EventBridge with optimized serialization"""
+        with self.asset_context(asset_id=asset_id, inventory_id=inventory_id):
+            try:
+                # Extract content type information
+                content_type = (
+                    metadata.get("Metadata", {})
+                    .get("Embedded", {})
+                    .get("S3", {})
+                    .get("ContentType", "")
+                )
+                # Get file extension from the object key
+                object_key = metadata["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+                file_ext = self._extract_file_extension(object_key)
+                
+                # Use more accurate asset type detection
+                asset_type = determine_asset_type(content_type, file_ext)
+
+                # Get timestamp once for reuse
+                timestamp = datetime.utcnow().isoformat()
+                
+                # Get last modified date from S3 metadata if available
+                s3_last_modified = (
+                    metadata.get("Metadata", {})
+                    .get("Embedded", {})
+                    .get("S3", {})
+                    .get("LastModified", timestamp)
+                )
+
+                # Construct event detail
+                event_detail = {
+                    "InventoryID": inventory_id,
+                    "FileHash": metadata["StorageInfo"]["PrimaryLocation"]["FileInfo"][
+                        "Hash"
+                    ]["MD5Hash"],
+                    "DigitalSourceAsset": {
+                        "ID": asset_id,
+                        "Type": asset_type,
+                        "CreateDate": timestamp,
+                        "originalIngestDate": timestamp,
+                        "lastModifiedDate": s3_last_modified,
+                        "MainRepresentation": {
+                            "ID": f"{asset_id}:master",
+                            "Type": asset_type,
+                            "Format": file_ext.upper(),
+                            "Purpose": "master",
+                            "StorageInfo": metadata["StorageInfo"],
+                        },
+                    },
+                    "DerivedRepresentations": [],
+                    "Metadata": metadata.get("Metadata"),
+                }
+
+                # Use optimized JSON serialization
+                event_json = json_serialize(event_detail)
+                self._log_with_asset_context(f"Publishing event with detail size: {len(event_json)} bytes")
+
+                # Publish to EventBridge
+                response = self.eventbridge.put_events(
+                    Entries=[
+                        {
+                            "Source": "custom.asset.processor",
+                            "DetailType": "AssetCreated",
+                            "Detail": event_json,
+                            "EventBusName": os.environ["EVENT_BUS_NAME"],
+                        }
+                    ]
+                )
+
+                # Log only relevant parts of the response
+                if "FailedEntryCount" in response and response["FailedEntryCount"] > 0:
+                    self._log_with_asset_context(f"EventBridge publish failed: {json_serialize(response)}", level="ERROR")
+                else:
+                    self._log_with_asset_context(f"EventBridge publish successful")
+
+                # Add metrics
+                metrics.add_metric(name="EventsPublished", unit=MetricUnit.Count, value=1)
+
+            except Exception as e:
+                self._log_with_asset_context(f"Error publishing event: {str(e)}", level="ERROR")
+                metrics.add_metric(name="EventPublishErrors", unit=MetricUnit.Count, value=1)
+                raise
+
+    @tracer.capture_method
+    def delete_asset(self, bucket: str, key: str, is_delete_event: bool = True) -> None:
+        """Delete asset record from DynamoDB based on S3 object deletion"""
+        try:
+            # First, try to find the asset by S3 path
+            storage_path = f"{bucket}:{key}"
+            logger.info(f"Looking up asset by storage path: {storage_path}")
+            
+            # Define task for database lookup
+            def find_by_s3path():
+                try:
+                    return self.dynamodb.query(
+                        IndexName="S3PathIndex",
+                        KeyConditionExpression="StoragePath = :path",
+                        ExpressionAttributeValues={":path": storage_path}
+                    )
+                except Exception as e:
+                    logger.exception(f"Error querying DynamoDB for storage path: {str(e)}")
+                    return {"Items": []}
+            
+            # Find the record by S3 path first (this uses DynamoDB, not S3)
+            response = find_by_s3path()
+            inventory_id = None
+            
+            if response["Items"]:
+                # Found the item in DynamoDB
+                item = response["Items"][0]
+                inventory_id = item["InventoryID"]
+                logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
+                
+                # Delete from DynamoDB
+                self.dynamodb.delete_item(
+                    Key={
+                        "InventoryID": inventory_id
+                    }
+                )
+                
+                # Publish deletion event
+                self.publish_deletion_event(inventory_id)
+                
+                logger.info(f"Successfully deleted asset from DynamoDB: {inventory_id}")
+            else:
+                # For deletion events, skip trying to find by tags as the object is gone
+                if not is_delete_event:
+                    # Only try to get tags if it's NOT a deletion event
+                    try:
+                        # Only try tags if the object still exists
+                        existing_tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)
+                        tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
+                        
+                        if "InventoryID" in tags:
+                            inventory_id = tags["InventoryID"]
+                            logger.info(f"Found InventoryID in S3 tags: {inventory_id}")
+                            
+                            # Delete from DynamoDB
+                            self.dynamodb.delete_item(
+                                Key={
+                                    "InventoryID": inventory_id
+                                }
+                            )
+                            
+                            # Publish deletion event
+                            self.publish_deletion_event(inventory_id)
+                            
+                            logger.info(f"Successfully deleted asset from DynamoDB: {inventory_id}")
+                        else:
+                            logger.warning(f"No InventoryID found for object: {bucket}/{key}")
+                    except Exception as e:
+                        logger.warning(f"Error finding by tags: {str(e)}")
+                else:
+                    logger.info(f"No DynamoDB record found by S3 path and skipping tag lookup for deletion event: {bucket}/{key}")
+            
+            # Add metrics
+            metrics.add_metric(name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1)
+
+        except Exception as e:
+            logger.exception(f"Error in delete_asset: {bucket}/{key}, error: {e}")
+            metrics.add_metric(name="AssetDeletionErrors", unit=MetricUnit.Count, value=1)
+            raise
+
+    @tracer.capture_method
+    def publish_deletion_event(self, inventory_id: str):
+        """Publish asset deletion event to EventBridge with optimized serialization"""
+        try:
+            event_detail = {
+                "InventoryID": inventory_id,
+                "DeletedAt": datetime.utcnow().isoformat(),
+            }
+
+            # Use optimized JSON serialization
+            event_json = json_serialize(event_detail)
+            logger.info(f"Publishing deletion event for: {inventory_id}")
+
+            response = self.eventbridge.put_events(
+                Entries=[
+                    {
+                        "Source": "custom.asset.processor",
+                        "DetailType": "AssetDeleted",
+                        "Detail": event_json,
+                        "EventBusName": os.environ["EVENT_BUS_NAME"],
+                    }
+                ]
+            )
+
+            # Log only if there's an error
+            if "FailedEntryCount" in response and response["FailedEntryCount"] > 0:
+                logger.error(f"Deletion event publish failed: {json_serialize(response)}")
+            else:
+                logger.info(f"Deletion event published successfully")
+            
+            # Add metrics
+            metrics.add_metric(name="DeletionEventsPublished", unit=MetricUnit.Count, value=1)
+
+        except Exception as e:
+            logger.exception(f"Error publishing deletion event: {str(e)}")
+            metrics.add_metric(name="DeletionEventPublishErrors", unit=MetricUnit.Count, value=1)
+            raise
+
+
+# Process records in parallel with improved logging
+def process_records_in_parallel(processor: AssetProcessor, records: List[Dict], max_workers: int = 5):
+    """Process records in parallel using a ThreadPoolExecutor"""
+    # Add logging for initial record count
+    logger.info(f"Starting parallel processing with {len(records)} records")
+    
+    # Debug log the first record structure
+    if records and len(records) > 0:
+        logger.info(f"First record structure: {json_serialize(records[0])}")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        skipped_records = 0
+        
+        for i, record in enumerate(records):
+            try:
+                # Extract S3 details using the helper function
+                bucket, key, event_name = extract_s3_details_from_event(record)
+                
+                if bucket and key:
+                    # Debug log for keys containing special characters
+                    if '+' in key or '%' in key:
+                        logger.info(f"Key with special characters: {key}")
+                    
+                    logger.info(f"Submitting task for bucket: {bucket}, key: {key}, event: {event_name}")
+                    futures.append(
+                        executor.submit(process_s3_event, processor, bucket, key, event_name)
+                    )
+                else:
+                    logger.warning(f"Could not extract bucket/key from record {i}")
+                    skipped_records += 1
+            except Exception as e:
+                logger.exception(f"Error preparing record {i} for parallel processing: {e}")
+                skipped_records += 1
+        
+        # Log summary of submitted tasks
+        logger.info(f"Submitted {len(futures)} tasks for parallel processing, skipped {skipped_records} records")
+        
+        if not futures:
+            logger.warning("No tasks were submitted for processing! Check record format.")
+            # Safe serialization for the sample record
+            if len(records) > 0:
+                sample_record = records[0]
+                if isinstance(sample_record, dict):
+                    # Fix: Avoid using __name__ attribute for str type
+                    sample_str = json_serialize({k: type(v).__name__ if hasattr(type(v), '__name__') else str(type(v)) for k, v in sample_record.items()})
+                else:
+                    # Fix: Avoid using __name__ attribute for str type
+                    sample_str = type(sample_record).__name__ if hasattr(type(sample_record), '__name__') else str(type(sample_record))
+            else:
+                sample_str = "empty"
+                
+            logger.info(f"Full event format: {json_serialize({
+                'type': type(records).__name__ if hasattr(type(records), '__name__') else str(type(records)),
+                'length': len(records) if hasattr(records, '__len__') else 'unknown',
+                'sample_structure': sample_str
+            })}")
+            return
+        
+        # Wait for all to complete
+        completed_futures = concurrent.futures.wait(futures)
+        
+        # Process results and count successes/failures
+        success_count = 0
+        error_count = 0
+        for future in completed_futures.done:
+            try:
+                future.result()
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+                # Log the actual exception
+                logger.exception(f"Task execution failed: {str(e)}")
+        
+        logger.info(f"Parallel processing complete: {success_count} succeeded, {error_count} failed, {skipped_records} skipped")
+        
+        # Add metrics
+        metrics.add_metric(name="RecordsProcessedSuccessfully", unit=MetricUnit.Count, value=success_count)
+        metrics.add_metric(name="RecordsSkipped", unit=MetricUnit.Count, value=skipped_records)
+        if error_count > 0:
+            metrics.add_metric(name="RecordsProcessedWithErrors", unit=MetricUnit.Count, value=error_count)
+
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+@metrics.log_metrics(capture_cold_start_metric=True)
+def handler(event: Dict, context: LambdaContext) -> Dict:
+    """Handle S3 events via SQS from either direct S3 notifications or EventBridge Pipes"""
+    # Add overall Lambda metrics
+    metrics.add_metric(name="Invocations", unit=MetricUnit.Count, value=1)
+    
+    # Initialize memory usage metrics
+    initial_memory = get_memory_usage()
+    
+    # Thorough event investigation logging
+    logger.info(f"Received event type: {type(event).__name__}")
+    if isinstance(event, dict):
+        logger.info(f"Event keys: {list(event.keys())}")
+        if "Records" in event:
+            logger.info(f"Records count: {len(event['Records'])}")
+            if event['Records']:
+                logger.info(f"First record type: {type(event['Records'][0]).__name__}")
+                if isinstance(event['Records'][0], dict):
+                    logger.info(f"First record keys: {list(event['Records'][0].keys())}")
+                    # Check if it's an SQS event
+                    if "eventSource" in event['Records'][0] and event['Records'][0]["eventSource"] == "aws:sqs":
+                        logger.info("Detected SQS event source")
+    
+    # Create processor without using batch_writer
+    processor = AssetProcessor()
+
+    # Log environment variables at debug level
+    logger.debug(f"Environment variables: ASSETS_TABLE={os.environ.get('ASSETS_TABLE')}, EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME')}")
+    
+    # Check DynamoDB table exists
+    try:
+        dynamodb_client = boto3.client('dynamodb')
+        table_info = dynamodb_client.describe_table(
+            TableName=os.environ["ASSETS_TABLE"]
+        )
+        logger.debug(f"DynamoDB table info available - Table Status: {table_info.get('Table', {}).get('TableStatus')}")
+    except Exception as e:
+        logger.error(f"Error accessing DynamoDB table: {str(e)}")
+        metrics.add_metric(name="DynamoDBAccessErrors", unit=MetricUnit.Count, value=1)
+    
+    try:
+        # Quick filter for empty event
+        if not event:
+            logger.warning("Empty event received")
+            # Add comprehensive event structure logging to diagnose issues
+            logger.info(f"Event type: {type(event).__name__}")
+            if isinstance(event, dict):
+                logger.info(f"Event keys: {list(event.keys())}")
+                if "Records" in event:
+                    logger.info(f"Records count: {len(event['Records'])}")
+                    if event['Records']:
+                        logger.info(f"First record keys: {list(event['Records'][0].keys())}")
+                        if 's3' in event['Records'][0]:
+                            logger.info(f"S3 structure: {json_serialize(event['Records'][0]['s3'])}")
+            elif isinstance(event, list):
+                logger.info(f"List event length: {len(event)}")
+                if event:
+                    logger.info(f"First item type: {type(event[0]).__name__}")
+                    if isinstance(event[0], dict):
+                        logger.info(f"First item keys: {list(event[0].keys())}")
+            return {"statusCode": 200, "body": "No records to process"}
+            
+        # Check if it's a test event
+        if isinstance(event, dict) and event.get("Event") == "s3:TestEvent":
+            logger.info("Received S3 test event - skipping processing")
+            return {"statusCode": 200, "body": "Test event received"}
+        
+        # Count records for metrics
+        total_records = 0
+        
+        # Enhanced event detection - determine event type with less nesting
+        if isinstance(event, list):
+            # Direct list of records - process in parallel 
+            logger.info(f"Processing {len(event)} records directly")
+            total_records = len(event)
+            process_records_in_parallel(processor, event)
+            
+        elif isinstance(event, dict) and "Records" in event:
+            # Standard S3 event format
+            logger.info(f"Processing standard S3 event with {len(event['Records'])} records")
+            total_records = len(event["Records"])
+            
+            # Process records in parallel
+            s3_records = []
+            for record in event["Records"]:
+                if "body" in record:
+                    # Parse SQS message body
+                    try:
+                        body = json.loads(record["body"])
+                        if "Records" in body:
+                            # Add these records to the batch
+                            s3_records.extend(body["Records"])
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse SQS message body")
+                        continue
+                elif "s3" in record:
+                    # Direct S3 record
+                    s3_records.append(record)
+            
+            # Process the collected records in parallel
+            if s3_records:
+                logger.info(f"Processing {len(s3_records)} S3 records in parallel")
+                process_records_in_parallel(processor, s3_records)
+            
+        elif isinstance(event, dict) and "detail-type" in event:
+            # EventBridge event format - single event
+            logger.info("Processing EventBridge event")
+            total_records = 1
+            
+            if event.get("source") != "aws.s3":
+                logger.warning(f"Unexpected event source: {event.get('source')}")
+                return {"statusCode": 200, "body": "Event ignored - not from S3"}
+            
+            detail = event.get("detail", {})
+            
+            # Extract bucket and key with enhanced robustness
+            bucket = None
+            key = None
+            
+            # Check all possible locations for bucket
+            if isinstance(detail.get("bucket"), dict):
+                bucket = detail["bucket"].get("name")
+            elif isinstance(detail.get("bucket"), str):
+                bucket = detail["bucket"]
+            
+            # Check all possible locations for key
+            if isinstance(detail.get("object"), dict):
+                key = detail["object"].get("key")
+            elif isinstance(detail.get("object"), str):
+                key = detail["object"]
+            elif "key" in detail:
+                key = detail["key"]
+            
+            # Map EventBridge detail-type to S3 event name
+            detail_type = event.get("detail-type", "")
+            event_type_mapping = {
+                "Object Created": "ObjectCreated:",
+                "Object Deleted": "ObjectRemoved:",
+                "Object Restored": "ObjectRestore:",
+                "Object Tagged": "ObjectTagging:",
+                "PutObject": "ObjectCreated:Put",
+                "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
+                "DeleteObject": "ObjectRemoved:Delete",
+                "CopyObject": "ObjectCreated:Copy"  # Add mapping for CopyObject events
+            }
+            
+            event_name = event_type_mapping.get(detail_type, "")
+            
+            # If we have valid bucket and key, process the event
+            if bucket and key:
+                logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
+                process_s3_event(processor, bucket, key, event_name)
+            else:
+                logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
+        
+        # Calculate memory usage metrics
+        final_memory = get_memory_usage()
+        memory_used = final_memory - initial_memory
+        
+        metrics.add_metric(name="MemoryUsedMB", unit=MetricUnit.Megabytes, value=memory_used)
+        metrics.add_metric(name="RecordsProcessed", unit=MetricUnit.Count, value=total_records)
+        logger.info(f"Finished processing {total_records} records, memory used: {memory_used}MB")
+        
+        return {"statusCode": 200, "body": f"Processed {total_records} records successfully"}
+
+    except Exception as e:
+        logger.exception("Error in handler")
+        metrics.add_metric(name="ProcessingErrors", unit=MetricUnit.Count, value=1)
+        raise
+
+
+def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_name: str):
+    """Process a single S3 event with improved performance"""
+    # Skip processing if event type not relevant (quick filtering)
+    if not is_relevant_event(event_name):
+        logger.info(f"Skipping irrelevant event type: {event_name} for {bucket}/{key}")
+        return
+    
+    logger.info(f"Processing {event_name} event for asset: {bucket}/{key}")
+
+    # Record start time for duration tracking
+    start_time = datetime.now()
+    
+    try:
+        if event_name.startswith("ObjectRemoved:"):
+            # Handle deletion - only delete from DynamoDB, don't try to delete the S3 object again
+            logger.info(f"Processing deletion event for {bucket}/{key}")
+            processor.delete_asset(bucket, key, is_delete_event=True)
+            metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
+            logger.info(f"Asset deletion processed: {key}")
+        else:
+            # Handle creation/modification/copy events - process all ObjectCreated events the same way
+            logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
+            
+            # Verify object exists in S3 before processing
+            try:
+                # Try to get tags to identify asset early for logging
+                try:
+                    tag_response = processor.s3.get_object_tagging(Bucket=bucket, Key=key)
+                    tags = {tag["Key"]: tag["Value"] for tag in tag_response.get("TagSet", [])}
+                    
+                    if "AssetID" in tags and "InventoryID" in tags:
+                        # Add asset context for early logging
+                        logger.append_keys(assetID=tags["AssetID"], inventoryID=tags["InventoryID"])
+                        logger.info(f"Processing existing tagged asset: {tags['AssetID']}")
+                except Exception:
+                    # Continue without tags, not critical
+                    pass
+                    
+                processor.s3.head_object(Bucket=bucket, Key=key)
+            except Exception as s3_error:
+                logger.error(f"S3 object verification failed for {bucket}/{key}: {str(s3_error)}")
+                # Log exact key for debugging to see if there are encoding issues
+                logger.error(f"Failed key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
+                raise
+            
+            # Process all ObjectCreated events (including Copy) the same way
+            result = processor.process_asset(bucket, key)
+            if result:
+                # Add asset information to context for logging
+                logger.append_keys(
+                    assetID=result['DigitalSourceAsset']['ID'], 
+                    inventoryID=result['InventoryID']
+                )
+                metrics.add_metric(name="ProcessedAssets", unit=MetricUnit.Count, value=1)
+                metrics.add_metric(name="CreationEvents", unit=MetricUnit.Count, value=1)
+                logger.info(f"Asset processed successfully: {result['DigitalSourceAsset']['ID']}")
+            else:
+                logger.info(f"Asset already processed or skipped: {key}")
+        
+        # Track processing duration
+        duration = (datetime.now() - start_time).total_seconds()
+        metrics.add_metric(name="EventProcessingTime", unit=MetricUnit.Seconds, value=duration)
+        
+    except Exception as e:
+        logger.exception(f"Error in process_s3_event for {bucket}/{key}: {str(e)}")
+        # Log key details for troubleshooting
+        logger.error(f"Key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
+        metrics.add_metric(name="ProcessingErrors", unit=MetricUnit.Count, value=1)
+        # Track error duration too
+        duration = (datetime.now() - start_time).total_seconds()
+        metrics.add_metric(name="FailedEventProcessingTime", unit=MetricUnit.Seconds, value=duration)
+        raise
+
+
+# Helper function to get memory usage
+def get_memory_usage() -> float:
+    """Get current memory usage in MB"""
+    try:
+        import resource
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    except ImportError:
+        # If resource module not available (e.g., on Windows), return 0
+        return 0
+
+def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Extract S3 bucket, key and event type from various event structures
+    Returns: (bucket, key, event_name)
+    """
+    # Direct S3 event structure
+    if "s3" in event_record:
+        if "bucket" in event_record["s3"] and "object" in event_record["s3"]:
+            bucket = event_record["s3"]["bucket"]["name"]
+            key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
+            event_name = event_record.get("eventName", "ObjectCreated:")
+            return bucket, key, event_name
+    
+    # SQS message with EventBridge payload
+    if "body" in event_record and "eventSource" in event_record and event_record["eventSource"] == "aws:sqs":
+        try:
+            body = json.loads(event_record["body"])
+            
+            # Check if this is an S3 event (might be in Records array)
+            if "Records" in body and isinstance(body["Records"], list) and len(body["Records"]) > 0:
+                for record in body["Records"]:
+                    if record.get("eventSource") == "aws:s3" and "s3" in record:
+                        bucket = record["s3"]["bucket"]["name"]
+                        key = urllib.parse.unquote(record["s3"]["object"]["key"])
+                        event_name = record.get("eventName", "ObjectCreated:")
+                        # Log the extracted details for debugging
+                        logger.info(f"Extracted from SQS S3 record: bucket={bucket}, key={key}, event={event_name}")
+                        return bucket, key, event_name
+            
+            # Check if this is an S3 event from EventBridge
+            if body.get("source") == "aws.s3" and "detail" in body:
+                detail = body["detail"]
+                
+                # Extract bucket
+                bucket = None
+                if "bucket" in detail:
+                    if isinstance(detail["bucket"], dict):
+                        bucket = detail["bucket"].get("name")
+                    elif isinstance(detail["bucket"], str):
+                        bucket = detail["bucket"]
+                
+                # Extract key
+                key = None
+                if "object" in detail:
+                    if isinstance(detail["object"], dict):
+                        key = detail["object"].get("key")
+                    elif isinstance(detail["object"], str):
+                        key = detail["object"]
+                
+                # Apply URL decoding to the key if it exists
+                if key:
+                    key = urllib.parse.unquote(key)
+                
+                # Determine event type
+                event_name = "ObjectCreated:"
+                if body.get("detail-type") == "Object Deleted":
+                    event_name = "ObjectRemoved:"
+                
+                return bucket, key, event_name
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse SQS message body: {str(e)}")
+
+    # Log unrecognized event structure to help diagnose issues
+    logger.warning(f"Unrecognized event structure: {json_serialize(event_record)}")
+    
+    return None, None, None
