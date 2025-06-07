@@ -54,7 +54,7 @@ def retry_with_backoff(
     max_attempts=MAX_RETRY_ATTEMPTS, 
     base_delay=BASE_BACKOFF_TIME, 
     max_delay=MAX_BACKOFF_TIME,
-    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException'),
+    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException', 'RequestThrottled'),
     **kwargs
 ) -> Any:
     """
@@ -108,14 +108,27 @@ def retry_with_backoff(
             jitter = random.uniform(0, 1)
             delay = delay + (delay * 0.2 * jitter)  # Add up to 20% jitter
             
+            # Determine service name for better logging
+            service_name = "DynamoDB"  # Default
+            if hasattr(e, 'response') and 'Error' in e.response:
+                error_code = e.response['Error'].get('Code')
+                if error_code == 'RequestThrottled':
+                    service_name = "SQS"
+            
             logger.warning(
-                f"DynamoDB throttling error on attempt {attempt}/{max_attempts}. "
+                f"{service_name} throttling error on attempt {attempt}/{max_attempts}. "
                 f"Retrying in {delay:.2f}s: {str(e)}"
             )
             
-            # Record metric for throttling
+            # Record metric for throttling based on service
+            service_name = "DynamoDB"  # Default
+            if hasattr(e, 'response') and 'Error' in e.response:
+                error_code = e.response['Error'].get('Code')
+                if error_code == 'RequestThrottled':
+                    service_name = "SQS"
+            
             metrics.add_metric(
-                name="DynamoDBThrottlingRetries",
+                name=f"{service_name}ThrottlingRetries",
                 unit=MetricUnit.Count,
                 value=metrics_count
             )
@@ -479,8 +492,11 @@ class AssetSyncProcessor:
                 
                 logger.info(f"Sending to FIFO queue with MessageGroupId: {self.job_id}")
             
-            # Send message to SQS
-            response = sqs.send_message(**message_params)
+            # Send message to SQS with retry logic for throttling
+            response = retry_with_backoff(
+                sqs.send_message,
+                **message_params
+            )
             
             # Check if message was sent successfully
             if not response.get('MessageId'):
@@ -506,6 +522,23 @@ class AssetSyncProcessor:
             }
             
         except Exception as e:
+            # Check if this is an SQS throttling error that exhausted retries
+            is_sqs_throttling = (
+                hasattr(e, 'response') and 
+                'Error' in e.response and 
+                e.response['Error'].get('Code') == 'RequestThrottled'
+            )
+            
+            if is_sqs_throttling:
+                # Record specific metric for SQS throttling failures
+                metrics.add_metric(
+                    name="SQSThrottlingFailures",
+                    unit=MetricUnit.Count,
+                    value=1
+                )
+                metrics.add_dimension(name="JobId", value=self.job_id)
+                logger.error(f"SQS throttling exhausted all retries for object {object_key}")
+            
             # Log error locally instead of using AssetProcessor.log_error
             error_id = str(uuid.uuid4())
             logger.error(
@@ -515,7 +548,7 @@ class AssetSyncProcessor:
                     "objectKey": object_key,
                     "jobId": self.job_id,
                     "bucketName": self.bucket_name,
-                    "errorType": "PROCESS_ERROR"
+                    "errorType": "SQS_THROTTLING_ERROR" if is_sqs_throttling else "PROCESS_ERROR"
                 },
                 exc_info=True
             )

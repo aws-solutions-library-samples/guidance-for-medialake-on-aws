@@ -85,7 +85,7 @@ def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[
     if body is None:
         body = {}
     
-    concurrency_limit = min(int(body.get('concurrencyLimit', 10)), 100)
+    concurrency_limit = min(int(body.get('concurrencyLimit', 10)), 75)
     batch_size = min(int(body.get('batchSize', 1000)), 10000)
     
     # Calculate TTL for job record (30 days)
