@@ -4,10 +4,13 @@ import boto3
 import uuid
 import random
 import time
+import re
+import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 from urllib.parse import unquote_plus
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
@@ -22,30 +25,90 @@ logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
 
-# Asset type classification constants
-image_mimes = ['image/', 'picture/']
-video_mimes = ['video/']
-audio_mimes = ['audio/']
+# Configure boto3 clients with connection pooling and keep-alive for better performance
+BOTO3_CONFIG = Config(
+    region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+    retries={
+        'max_attempts': 3,
+        'mode': 'adaptive'
+    },
+    max_pool_connections=50,
+    parameter_validation=False  # Skip parameter validation for better performance
+)
 
-image_extensions = {
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp', 'svg', 'ico', 
-    'heic', 'heif', 'raw', 'cr2', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw'
-}
+# Initialize clients at module level for reuse across invocations
+sqs_client = boto3.client('sqs', config=BOTO3_CONFIG)
+dynamodb_client = boto3.client('dynamodb', config=BOTO3_CONFIG)
+dynamodb_resource = boto3.resource('dynamodb', config=BOTO3_CONFIG)
 
-video_extensions = {
-    'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'mpg', 
-    'mpeg', 'mxf', 'asf', 'rm', 'swf', 'vob', 'ogv', 'm2ts', 'mts', 'ts'
-}
+# S3 client cache - since bucket names can vary, we'll cache them
+_s3_client_cache = {}
 
-audio_extensions = {
-    'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'aiff', 'au', 
-    'ra', 'amr', '3ga', 'ac3', 'ape', 'dts', 'spx', 'tta', 'tak', 'mpc'
-}
+def get_cached_s3_client(bucket_name: str):
+    """
+    Get a cached S3 client for the specific bucket.
+    Creates and caches clients as needed.
+    """
+    if bucket_name not in _s3_client_cache:
+        logger.info(f"Creating new S3 client for bucket: {bucket_name}")
+        _s3_client_cache[bucket_name] = get_optimized_s3_client(bucket_name)
+    return _s3_client_cache[bucket_name]
 
-# Define retry constants
-MAX_RETRY_ATTEMPTS = 15
-BASE_BACKOFF_TIME = 0.1  # 100 ms
-MAX_BACKOFF_TIME = 30.0  # 30 seconds
+# Define retry constants with environment variable configuration
+MAX_RETRY_ATTEMPTS = int(os.environ.get('MAX_RETRY_ATTEMPTS', '15'))
+BASE_BACKOFF_TIME = float(os.environ.get('BASE_BACKOFF_TIME', '0.1'))
+MAX_BACKOFF_TIME = float(os.environ.get('MAX_BACKOFF_TIME', '30.0'))
+
+def sanitize_for_sqs(text: str, max_length: int = 128) -> str:
+    """
+    Sanitize text for SQS fields like MessageDeduplicationId and MessageGroupId.
+    
+    AWS SQS requirements:
+    - MessageDeduplicationId: alphanumeric (a-z, A-Z, 0-9), hyphens (-), and underscores (_) only
+    - MessageGroupId: alphanumeric (a-z, A-Z, 0-9), hyphens (-), and underscores (_) only
+    - Max length: 128 characters
+    
+    Args:
+        text: Text to sanitize
+        max_length: Maximum allowed length
+        
+    Returns:
+        Sanitized text that meets SQS requirements
+    """
+    if not text:
+        return str(uuid.uuid4())  # Fallback to UUID if empty
+    
+    # First, URL decode if needed
+    try:
+        decoded_text = unquote_plus(text)
+    except Exception:
+        decoded_text = text
+    
+    # Replace any character that's not alphanumeric, hyphen, or underscore with underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9\-_]', '_', decoded_text)
+    
+    # Remove consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure it's not empty after sanitization
+    if not sanitized:
+        sanitized = str(uuid.uuid4()).replace('-', '_')
+    
+    # Truncate if too long, but if we need to truncate, use a hash instead to maintain uniqueness
+    if len(sanitized) > max_length:
+        # Use MD5 hash to ensure uniqueness while staying within length limits
+        hash_suffix = hashlib.md5(text.encode()).hexdigest()[:8]
+        # Take as much of the sanitized string as possible, leaving room for hash
+        prefix_length = max_length - len(hash_suffix) - 1  # -1 for separator
+        if prefix_length > 0:
+            sanitized = sanitized[:prefix_length] + '_' + hash_suffix
+        else:
+            sanitized = hash_suffix
+    
+    return sanitized
 
 def retry_with_backoff(
     func: Callable, 
@@ -200,7 +263,8 @@ class AssetSyncProcessor:
         """
         self.job_id = job_id
         self.bucket_name = bucket_name
-        self.s3_client = get_optimized_s3_client(bucket_name)
+        # Use cached S3 client instead of creating new one
+        self.s3_client = get_cached_s3_client(bucket_name)
         
     def process_s3_batch_operation(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -405,9 +469,6 @@ class AssetSyncProcessor:
                 logger.warning(f"Error fetching tags for {object_key}: {str(e)}")
                 existing_tags = {}
             
-            # Send simulated S3 event message to SQS
-            sqs = boto3.client('sqs')
-            
             # Get the ingest SQS queue URL dynamically based on the job configuration
             ingest_queue_url = self._get_ingest_queue_url()
             
@@ -479,22 +540,21 @@ class AssetSyncProcessor:
             # Add FIFO-specific parameters if needed
             if is_fifo_queue:
                 # Use job ID as MessageGroupId to ensure processing order per job
-                message_params['MessageGroupId'] = self.job_id
+                # Sanitize job ID for SQS field requirements
+                sanitized_job_id = sanitize_for_sqs(self.job_id)
+                message_params['MessageGroupId'] = sanitized_job_id
                 
                 # Use object key + timestamp for deduplication to prevent duplicates
-                dedup_id = f"{object_key}-{int(time.time() * 1000000)}"
-                # MessageDeduplicationId has a max length of 128 characters
-                if len(dedup_id) > 128:
-                    # Use a hash if too long
-                    import hashlib
-                    dedup_id = hashlib.md5(dedup_id.encode()).hexdigest()
-                message_params['MessageDeduplicationId'] = dedup_id
+                dedup_base = f"{object_key}-{int(time.time() * 1000000)}"
+                # Sanitize the deduplication ID for SQS requirements
+                sanitized_dedup_id = sanitize_for_sqs(dedup_base)
+                message_params['MessageDeduplicationId'] = sanitized_dedup_id
                 
-                logger.info(f"Sending to FIFO queue with MessageGroupId: {self.job_id}")
+                logger.info(f"Sending to FIFO queue with MessageGroupId: {sanitized_job_id}, MessageDeduplicationId: {sanitized_dedup_id}")
             
-            # Send message to SQS with retry logic for throttling
+            # Send message to SQS with retry logic for throttling - use module-level client
             response = retry_with_backoff(
-                sqs.send_message,
+                sqs_client.send_message,
                 **message_params
             )
             
@@ -523,11 +583,13 @@ class AssetSyncProcessor:
             
         except Exception as e:
             # Check if this is an SQS throttling error that exhausted retries
-            is_sqs_throttling = (
-                hasattr(e, 'response') and 
-                'Error' in e.response and 
-                e.response['Error'].get('Code') == 'RequestThrottled'
-            )
+            is_sqs_throttling = False
+            if isinstance(e, ClientError):
+                is_sqs_throttling = (
+                    hasattr(e, 'response') and 
+                    'Error' in e.response and 
+                    e.response['Error'].get('Code') == 'RequestThrottled'
+                )
             
             if is_sqs_throttling:
                 # Record specific metric for SQS throttling failures
@@ -724,68 +786,3 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"Error in lambda handler: {str(e)}", exc_info=True)
         return {"error": f"Error in lambda handler: {str(e)}"}
-
-def determine_asset_type(content_type: str, file_extension: str) -> str:
-    """
-    Determine the asset type using content type and file extension.
-    Uses a more comprehensive classification based on mime types and extensions.
-    
-    Args:
-        content_type: The MIME type from S3 metadata
-        file_extension: The file extension (without the dot)
-    
-    Returns:
-        One of: "Image", "Video", "Audio", or "Other"
-    """
-    logger.info(f"Determining asset type for content_type: {content_type}, extension: {file_extension}")
-    
-    # Convert to lowercase for comparison
-    content_type = content_type.lower() if content_type else ""
-    file_extension = file_extension.lower() if file_extension else ""
-    
-    # Track what criteria matched
-    matched_criteria = []
-    
-    # Check MIME type first as it's more reliable
-    for prefix in image_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched image prefix {prefix}")
-            return "Image"
-    
-    for prefix in video_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched video prefix {prefix}")
-            return "Video"
-    
-    for prefix in audio_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched audio prefix {prefix}")
-            return "Audio"
-    
-    # If MIME type doesn't give us a clear answer, check file extension
-    if file_extension in image_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched image extension")
-        return "Image"
-    
-    if file_extension in video_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched video extension")
-        return "Video"
-    
-    if file_extension in audio_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched audio extension")
-        return "Audio"
-    
-    # Fall back to looking at the first part of the MIME type
-    if content_type:
-        mime_main_type = content_type.split('/')[0].capitalize()
-        if mime_main_type in ["Image", "Video", "Audio"]:
-            matched_criteria.append(f"MIME main type {mime_main_type} matched")
-            return mime_main_type
-    
-    logger.warning(
-        f"Could not definitively determine asset type. Content-Type: {content_type}, "
-        f"Extension: {file_extension}, Matched criteria: {matched_criteria}"
-    )
-    
-    # Return Other instead of defaulting to Image
-    return "Other"
