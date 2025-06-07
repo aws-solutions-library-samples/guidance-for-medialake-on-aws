@@ -13,7 +13,7 @@ from aws_lambda_powertools import Logger
 logger = Logger()
 
 # Constants
-MAX_THREADS = 50  # Maximum number of threads for parallel operations
+MAX_THREADS = 40  # Maximum number of threads for parallel operations
 MAX_RETRY_ATTEMPTS = 5  # Maximum number of retry attempts for operations
 
 class JobStatus(enum.Enum):
@@ -59,7 +59,7 @@ def get_optimized_client(service_name):
             'max_attempts': 10,
             'mode': 'adaptive'
         },
-        max_pool_connections=50
+        max_pool_connections=40
     )
     return boto3.client(service_name, config=config)
 
@@ -84,7 +84,7 @@ def get_optimized_s3_client(bucket_name=None):
             'max_attempts': 10,
             'mode': 'adaptive'
         },
-        max_pool_connections=50,
+        max_pool_connections=40,
         region_name=region
     )
     

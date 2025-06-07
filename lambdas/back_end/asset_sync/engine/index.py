@@ -18,7 +18,7 @@ metrics = Metrics()
 class AssetSyncEngine:
     """Handles S3 asset synchronization using S3 Batch Operations"""
     
-    def __init__(self, job_id: str, bucket_name: str, prefix: Optional[str] = None, max_concurrent_tasks: int = 500):
+    def __init__(self, job_id: str, bucket_name: str, prefix: Optional[str] = None, max_concurrent_tasks: int = 300):
         self.job_id = job_id
         self.bucket_name = bucket_name
         self.prefix = prefix
@@ -263,7 +263,7 @@ def lambda_handler(event, context):
                 event['jobId'],
                 event['bucketName'],
                 event.get('prefix'),
-                event.get('maxConcurrentTasks', 500)
+                event.get('maxConcurrentTasks', 300)
             )
             
             batch_job_id = engine.create_batch_operations_job()
