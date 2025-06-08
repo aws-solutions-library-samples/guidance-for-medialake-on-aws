@@ -348,6 +348,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
                     "pipes:ListPipes",
+                    "pipes:StopPipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
