@@ -33,6 +33,45 @@ dynamodb = boto3.resource("dynamodb")
 iam_client = boto3.client("iam")
 pipes = boto3.client("pipes")
 
+# AWS Resource Name Length Limits
+RESOURCE_NAME_LIMITS = {
+    "iam_role": 64,
+    "iam_policy": 128,
+    "sqs_queue": 80,  # Including .fifo suffix
+    "sqs_queue_fifo": 75,  # Excluding .fifo suffix (80 - 5 chars for .fifo)
+    "eventbridge_rule": 64,
+    "lambda_function": 64,
+    "eventbridge_pipe": 64,
+    "eventbridge_target_id": 64,
+}
+
+
+def truncate_resource_name(resource_type: str, name: str, suffix: str = "") -> str:
+    """
+    Truncate resource name based on AWS resource type limits
+    
+    Args:
+        resource_type: Type of AWS resource (iam_role, sqs_queue, etc.)
+        name: Proposed resource name
+        suffix: Optional suffix to append (will be included in length calculation)
+    
+    Returns:
+        str: Properly truncated resource name
+    """
+    max_length = RESOURCE_NAME_LIMITS.get(resource_type, 64)  # Default to 64 if not found
+    
+    # Calculate available length for the base name
+    available_length = max_length - len(suffix)
+    
+    if len(name) <= available_length:
+        return name + suffix
+    
+    # Truncate the name to fit within limits
+    truncated_name = name[:available_length] + suffix
+    logger.info(f"Truncated {resource_type} name from '{name + suffix}' to '{truncated_name}' (max: {max_length})")
+    
+    return truncated_name
+
 
 class S3ConnectorConfig(BaseModel):
     bucket: str
@@ -136,14 +175,8 @@ def setup_eventbridge_notifications(
     sanitized_bucket = ''.join(c for c in s3_bucket if c.isalnum() or c in '-_')
     
     # Create FIFO SQS queue with queue-level throughput limit
-    # Ensure the queue name with .fifo suffix is 80 chars or less
-    # Reserve 5 chars for suffix (.fifo)
-    max_queue_name_length = 75  # 80 - 5 (.fifo)
     base_name = f"medialake-connector-{sanitized_bucket}-eventbridge"
-    if len(base_name) > max_queue_name_length:
-        base_name = base_name[:max_queue_name_length]
-    
-    queue_name = f"{base_name}.fifo"
+    queue_name = truncate_resource_name("sqs_queue_fifo", base_name, ".fifo")
     
     logger.info(f"Creating FIFO queue with name: {queue_name}")
     
@@ -168,10 +201,8 @@ def setup_eventbridge_notifications(
     account_id = boto3.client("sts").get_caller_identity()["Account"]
 
     # Create EventBridge rule with comprehensive event pattern
-    rule_name = f"medialake-{s3_bucket}-s3-events"
-    # Truncate rule name if it exceeds 63 characters (AWS limit is 64)
-    if len(rule_name) > 63:
-        rule_name = rule_name[:63]
+    rule_name_base = f"medialake-{s3_bucket}-s3-events"
+    rule_name = truncate_resource_name("eventbridge_rule", rule_name_base)
     event_pattern = {
         "source": ["aws.s3"],
         "detail-type": [
@@ -234,7 +265,8 @@ def setup_eventbridge_notifications(
     created_resources.append(("queue_policy", queue_url))
 
     # Add SQS as target for the EventBridge rule
-    target_id = f"SQSTarget-{s3_bucket}"
+    target_id_base = f"SQSTarget-{s3_bucket}"
+    target_id = truncate_resource_name("eventbridge_target_id", target_id_base)
     eventbridge.put_targets(
         Rule=rule_name,
         Targets=[
@@ -258,10 +290,8 @@ def create_eventbridge_role(
     """Create IAM role for EventBridge to send events to SQS"""
 
     iam = boto3.client("iam")
-    # Truncate role name if it exceeds 64 characters
-    role_name = f"medialake-eb-{rule_name}"
-    if len(role_name) > 64:
-        role_name = role_name[:64]
+    role_name_base = f"medialake-eb-{rule_name}"
+    role_name = truncate_resource_name("iam_role", role_name_base)
 
     assume_role_policy = {
         "Version": "2012-10-17",
@@ -286,12 +316,13 @@ def create_eventbridge_role(
         ],
     }
 
+    policy_name = truncate_resource_name("iam_policy", f"{role_name}-policy")
     iam.put_role_policy(
         RoleName=role_name,
-        PolicyName=f"{role_name}-policy",
+        PolicyName=policy_name,
         PolicyDocument=json.dumps(policy),
     )
-    created_resources.append(("inline_policy", (role_name, f"{role_name}-policy")))
+    created_resources.append(("inline_policy", (role_name, policy_name)))
 
     return role["Role"]["Arn"]
 
@@ -345,9 +376,8 @@ def get_bucket_kms_key(s3_client, bucket_name):
 
 
 def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
-    # Truncate role name if it exceeds 64 characters
-    if len(role_name) > 64:
-        role_name = role_name[:64]
+    # Ensure role name is within AWS limits
+    role_name = truncate_resource_name("iam_role", role_name)
 
     assume_role_policy = {
         "Version": "2012-10-17",
@@ -385,9 +415,10 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
                 }
             ],
         }
+        kms_policy_name = truncate_resource_name("iam_policy", f"{role_name}-kms-policy")
         iam_client.put_role_policy(
             RoleName=role_name,
-            PolicyName=f"{role_name}-kms-policy",
+            PolicyName=kms_policy_name,
             PolicyDocument=json.dumps(kms_policy),
         )
     return role["Role"]["Arn"]
@@ -504,10 +535,9 @@ def create_eventbridge_pipe(
 ) -> tuple[str, str]:
     """Create EventBridge Pipe between SQS and Lambda"""
 
-    # Truncate pipe role name if it exceeds 64 characters
-    pipe_role_name = f"{resource_name_prefix}-pipe-role"
-    if len(pipe_role_name) > 64:
-        pipe_role_name = pipe_role_name[:64]
+    # Ensure pipe role name is within AWS limits
+    pipe_role_name_base = f"{resource_name_prefix}-pipe-role"
+    pipe_role_name = truncate_resource_name("iam_role", pipe_role_name_base)
 
     assume_role_policy = {
         "Version": "2012-10-17",
@@ -542,13 +572,14 @@ def create_eventbridge_pipe(
         ],
     }
 
+    source_policy_name = truncate_resource_name("iam_policy", f"{pipe_role_name}-source-policy")
     iam_client.put_role_policy(
         RoleName=pipe_role_name,
-        PolicyName=f"{pipe_role_name}-source-policy",
+        PolicyName=source_policy_name,
         PolicyDocument=json.dumps(source_policy),
     )
     created_resources.append(
-        ("inline_policy", (pipe_role_name, f"{pipe_role_name}-source-policy"))
+        ("inline_policy", (pipe_role_name, source_policy_name))
     )
 
     # Create policy for target (Lambda) permissions
@@ -563,13 +594,14 @@ def create_eventbridge_pipe(
         ],
     }
 
+    target_policy_name = truncate_resource_name("iam_policy", f"{pipe_role_name}-target-policy")
     iam_client.put_role_policy(
         RoleName=pipe_role_name,
-        PolicyName=f"{pipe_role_name}-target-policy",
+        PolicyName=target_policy_name,
         PolicyDocument=json.dumps(target_policy),
     )
     created_resources.append(
-        ("inline_policy", (pipe_role_name, f"{pipe_role_name}-target-policy"))
+        ("inline_policy", (pipe_role_name, target_policy_name))
     )
 
     # Wait for role and policies to propagate
@@ -577,7 +609,8 @@ def create_eventbridge_pipe(
         raise Exception(f"IAM role {pipe_role_name} did not propagate in time")
 
     # Create the pipe
-    pipe_name = f"{resource_name_prefix}-pipe"
+    pipe_name_base = f"{resource_name_prefix}-pipe"
+    pipe_name = truncate_resource_name("eventbridge_pipe", pipe_name_base)
     response = pipes.create_pipe(
         Name=pipe_name,
         RoleArn=pipe_role_arn,
@@ -640,12 +673,10 @@ def create_connector(createconnector: S3Connector) -> dict:
         resource_name_prefix = (
             f"{os.environ.get('RESOURCE_PREFIX')}_connector_{s3_bucket}"
         )
-        # Ensure the total length does not exceed 64 characters
-        max_prefix_length = 64 - len(suffix) - 1
-        if len(resource_name_prefix) > max_prefix_length:
-            resource_name_prefix = resource_name_prefix[:max_prefix_length]
-
-        target_function_name = f"{resource_name_prefix}_{suffix}"
+        
+        # Create target function name with proper truncation
+        target_function_name_base = f"{resource_name_prefix}_{suffix}"
+        target_function_name = truncate_resource_name("lambda_function", target_function_name_base)
 
         # Validate S3 bucket exists and get its region
         try:
@@ -681,7 +712,8 @@ def create_connector(createconnector: S3Connector) -> dict:
         elif integration_method in ["s3Notifications"]:
             # Set up S3 event notifications
             # Create SQS queue in the same region as the bucket
-            queue_name = f"-connector-{s3_bucket}-notifications"
+            queue_name_base = f"-connector-{s3_bucket}-notifications"
+            queue_name = truncate_resource_name("sqs_queue", queue_name_base)
             response = sqs.create_queue(
                 QueueName=queue_name, Attributes={"VisibilityTimeout": "360"}
             )
@@ -755,7 +787,8 @@ def create_connector(createconnector: S3Connector) -> dict:
             layer_arn = os.environ.get("INGEST_MEDIA_PROCESSOR_LAYER")
 
             # Create Lambda execution, IAM roles for Lambda
-            role_name = f"{resource_name_prefix}-role"
+            role_name_base = f"{resource_name_prefix}-role"
+            role_name = truncate_resource_name("iam_role", role_name_base)
             bucket_kms_key = get_bucket_kms_key(s3_client, s3_bucket)
             lambda_role_arn = create_lambda_iam_role(
                 iam_client, role_name, bucket_kms_key
@@ -821,13 +854,14 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ],
             }
 
+            sqs_policy_name = truncate_resource_name("iam_policy", f"{role_name}-sqs-policy")
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-sqs-policy",
+                PolicyName=sqs_policy_name,
                 PolicyDocument=json.dumps(sqs_policy),
             )
             created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-sqs-policy"))
+                ("inline_policy", (role_name, sqs_policy_name))
             )
             # Create custom policy for S3 permissions
             s3_policy = {
@@ -849,13 +883,14 @@ def create_connector(createconnector: S3Connector) -> dict:
                     }
                 ],
             }
+            s3_policy_name = truncate_resource_name("iam_policy", f"{role_name}-s3-policy")
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-s3-policy",
+                PolicyName=s3_policy_name,
                 PolicyDocument=json.dumps(s3_policy),
             )
             created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-s3-policy"))
+                ("inline_policy", (role_name, s3_policy_name))
             )
 
             # Create custom policy for EventBridge permissions
@@ -870,13 +905,14 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ],
             }
 
+            eventbridge_policy_name = truncate_resource_name("iam_policy", f"{role_name}-eventbridge-policy")
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-eventbridge-policy",
+                PolicyName=eventbridge_policy_name,
                 PolicyDocument=json.dumps(eventbridge_policy),
             )
             created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-eventbridge-policy"))
+                ("inline_policy", (role_name, eventbridge_policy_name))
             )
 
             # Create custom policy for DynamoDB permissions
@@ -906,13 +942,14 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ],
             }
 
+            dynamodb_policy_name = truncate_resource_name("iam_policy", f"{role_name}-dynamodb-policy")
             iam_client.put_role_policy(
                 RoleName=role_name,
-                PolicyName=f"{role_name}-dynamodb-policy",
+                PolicyName=dynamodb_policy_name,
                 PolicyDocument=json.dumps(dynamodb_policy),
             )
             created_resources.append(
-                ("inline_policy", (role_name, f"{role_name}-dynamodb-policy"))
+                ("inline_policy", (role_name, dynamodb_policy_name))
             )
 
             ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
@@ -1020,6 +1057,25 @@ def create_connector(createconnector: S3Connector) -> dict:
         logger.exception(f"Unexpected error: {str(e)}")
         error_traceback = traceback.format_exc()
 
+        # Initialize clients for cleanup (in case they weren't created yet)
+        try:
+            bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
+            bucket_region = bucket_location["LocationConstraint"]
+            bucket_region = bucket_region or "us-east-1"
+            s3 = boto3.client("s3", region_name=bucket_region)
+            sqs = boto3.client("sqs", region_name=bucket_region)
+            lambda_client = boto3.client(
+                "lambda",
+                config=Config(
+                    region_name=bucket_region, s3={"addressing_style": "virtual"}
+                ),
+            )
+        except:
+            # If we can't initialize clients, we'll skip resource cleanup that requires them
+            s3 = None
+            sqs = None
+            lambda_client = None
+
         # Clean up created resources in reverse order
         for resource_type, resource_id in reversed(created_resources):
             try:
@@ -1031,7 +1087,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                     eventbridge.remove_targets(Rule=rule_name, Ids=[target_id])
                 elif resource_type == "eventbridge_rule":
                     eventbridge.delete_rule(Name=resource_id)
-                elif resource_type == "eventbridge_config":
+                elif resource_type == "eventbridge_config" and s3:
                     # Remove EventBridge configuration from bucket
                     s3.put_bucket_notification_configuration(
                         Bucket=resource_id, NotificationConfiguration={}
@@ -1040,17 +1096,17 @@ def create_connector(createconnector: S3Connector) -> dict:
                     table_name, item_id = resource_id
                     table = dynamodb.Table(table_name)
                     table.delete_item(Key={"id": item_id})
-                elif resource_type == "bucket_notification":
+                elif resource_type == "bucket_notification" and s3:
                     s3.put_bucket_notification_configuration(
                         Bucket=resource_id, NotificationConfiguration={}
                     )
-                elif resource_type == "queue_policy":
+                elif resource_type == "queue_policy" and sqs:
                     sqs.set_queue_attributes(
                         QueueUrl=resource_id, Attributes={"Policy": ""}
                     )
-                elif resource_type == "event_source_mapping":
+                elif resource_type == "event_source_mapping" and lambda_client:
                     lambda_client.delete_event_source_mapping(UUID=resource_id)
-                elif resource_type == "lambda_function":
+                elif resource_type == "lambda_function" and lambda_client:
                     lambda_client.delete_function(FunctionName=resource_id)
                 elif resource_type == "inline_policy":
                     role_name, policy_name = resource_id
@@ -1065,7 +1121,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                     )
                 elif resource_type == "iam_role":
                     iam_client.delete_role(RoleName=resource_id)
-                elif resource_type == "sqs_queue":
+                elif resource_type == "sqs_queue" and sqs:
                     sqs.delete_queue(QueueUrl=resource_id)
                 logger.info(f"Cleaned up {resource_type}: {resource_id}")
             except Exception as cleanup_error:
