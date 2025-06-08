@@ -988,6 +988,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
                         "ASSETS_TABLE": medialake_asset_table,
                         "EVENT_BUS_NAME": ingest_event_bus,
+                        "DO_NOT_INGEST_DUPLICATES": "True",
                     }
                 },
                 Layers=layers,  # Updated to include both custom and AWS SDK layers
