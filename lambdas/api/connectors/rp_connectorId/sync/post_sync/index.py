@@ -76,7 +76,62 @@ def get_bucket_name_for_connector(connector_id: str) -> Optional[str]:
         return None
 
 @tracer.capture_method
-def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[str], body: Dict[str, Any] = None) -> Dict[str, Any]:
+def get_connector_details(connector_id: str) -> Optional[Dict[str, Any]]:
+    """Get full connector details including bucket name and object prefixes"""
+    logger.info(f"Retrieving connector details for connector ID: {connector_id}")
+    try:
+        # Log environment variables for debugging
+        logger.info(f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={os.environ.get('MEDIALAKE_CONNECTOR_TABLE', 'NOT_SET')}")
+        
+        # Use DynamoDB to look up the connector details
+        if 'MEDIALAKE_CONNECTOR_TABLE' in os.environ:
+            dynamodb = boto3.resource('dynamodb')
+            table_name = os.environ['MEDIALAKE_CONNECTOR_TABLE']
+            connector_table = dynamodb.Table(table_name)
+            
+            logger.info(f"Looking up connector {connector_id} in table {table_name}")
+            response = connector_table.get_item(Key={'id': connector_id})
+            
+            logger.info(f"DynamoDB response: {json.dumps(response, default=str)}")
+            
+            if 'Item' in response:
+                connector = response['Item']
+                bucket_name = connector.get('storageIdentifier')
+                object_prefix = connector.get('objectPrefix')
+                
+                # Handle different types of object prefix values
+                prefixes = []
+                if object_prefix:
+                    if isinstance(object_prefix, str):
+                        # Single string prefix
+                        prefixes = [object_prefix]
+                    elif isinstance(object_prefix, list):
+                        # List of prefixes
+                        prefixes = [prefix for prefix in object_prefix if prefix and prefix.strip()]
+                
+                result = {
+                    'bucketName': bucket_name,
+                    'objectPrefixes': prefixes,
+                    'connectorId': connector_id,
+                    'status': connector.get('status'),
+                    'name': connector.get('name')
+                }
+                
+                logger.info(f"Found connector details for {connector_id}: bucket='{bucket_name}', prefixes={prefixes}")
+                return result
+            else:
+                logger.error(f"Connector {connector_id} not found in DynamoDB table {table_name}")
+                return None
+        else:
+            logger.error("MEDIALAKE_CONNECTOR_TABLE environment variable is not set")
+            return None
+        
+    except Exception as e:
+        logger.error(f"Error getting connector details for {connector_id}: {str(e)}", exc_info=True)
+        return None
+
+@tracer.capture_method
+def initialize_job(connector_id: str, bucket_name: str, body: Dict[str, Any] = None) -> Dict[str, Any]:
     """Initialize a new sync job"""
     # Generate a unique job ID
     job_id = body.get('jobId') or str(uuid.uuid4())
@@ -96,7 +151,6 @@ def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[
         'jobId': job_id,
         'connectorId': connector_id,
         'bucketName': bucket_name,
-        'objectPrefix': object_prefix,
         'concurrencyLimit': concurrency_limit,
         'batchSize': batch_size,
         'status': JobStatus.INITIALIZING.value,
@@ -174,8 +228,7 @@ def initialize_job(connector_id: str, bucket_name: str, object_prefix: Optional[
         # Prepare payload
         payload = {
             'jobId': job_id,
-            'bucketName': bucket_name,
-            'objectPrefix': object_prefix
+            'bucketName': bucket_name
         }
         logger.info(f"Preparing to invoke engine Lambda with payload: {json.dumps(payload)}")
         
@@ -265,25 +318,22 @@ def lambda_handler(event, context):
             logger.error(f"Error parsing request body: {str(e)}", exc_info=True)
             body = {}
             
-        # Get bucket name for this connector
-        logger.info(f"Getting bucket name for connector: {connector_id}")
-        bucket_name = get_bucket_name_for_connector(connector_id)
+        # Get connector details to find the bucket name
+        logger.info(f"Getting connector details for connector: {connector_id}")
+        connector_details = get_connector_details(connector_id)
         
-        if not bucket_name:
+        if not connector_details or not connector_details.get('bucketName'):
             logger.error(f"No bucket found for connector ID: {connector_id}")
             return api_response(404, {
                 "error": f"Connector {connector_id} not found or has no associated bucket"
             })
             
+        bucket_name = connector_details['bucketName']
         logger.info(f"Found bucket name: {bucket_name}")
         
-        # Extract prefix for partial sync
-        object_prefix = body.get('objectPrefix')
-        logger.info(f"Object prefix from request: {object_prefix}")
-        
-        # Initialize the job
+        # Initialize the job (object prefixes will be retrieved by the engine from connector table)
         logger.info(f"Initializing job for connector {connector_id}, bucket {bucket_name}")
-        job = initialize_job(connector_id, bucket_name, object_prefix, body)
+        job = initialize_job(connector_id, bucket_name, body)
         
         # Return success response
         logger.info(f"Successfully initialized job {job['jobId']}, returning response")
@@ -292,8 +342,7 @@ def lambda_handler(event, context):
             "jobId": job['jobId'],
             "status": job['status'],
             "connectorId": connector_id,
-            "bucketName": bucket_name,
-            "objectPrefix": object_prefix
+            "bucketName": bucket_name
         })
         
     except Exception as e:

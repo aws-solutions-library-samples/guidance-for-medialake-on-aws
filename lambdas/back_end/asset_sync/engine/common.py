@@ -222,6 +222,48 @@ class AssetProcessor:
         return response.get('Item')
     
     @staticmethod
+    def get_job_by_batch_id(batch_job_id):
+        """
+        Get job details by S3 Batch Operations job ID
+        
+        Args:
+            batch_job_id: S3 Batch Operations job ID
+            
+        Returns:
+            Job details dict or None if not found
+        """
+        if not batch_job_id:
+            raise ValueError("batch_job_id is required")
+        
+        if 'JOB_TABLE_NAME' not in os.environ:
+            raise ValueError("JOB_TABLE_NAME environment variable is not set")
+        
+        try:
+            dynamodb = boto3.resource('dynamodb')
+            job_table = dynamodb.Table(os.environ['JOB_TABLE_NAME'])
+            
+            # Scan the table to find a job with the matching batch job ID in metadata
+            response = job_table.scan(
+                FilterExpression="metadata.batchJobId = :batch_job_id",
+                ExpressionAttributeValues={
+                    ':batch_job_id': batch_job_id
+                }
+            )
+            
+            # Return the first matching job
+            items = response.get('Items', [])
+            if items:
+                logger.info(f"Found job for batch ID {batch_job_id}: {items[0].get('jobId')}")
+                return items[0]
+            else:
+                logger.warning(f"No job found for batch ID: {batch_job_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error looking up job by batch ID {batch_job_id}: {str(e)}")
+            return None
+    
+    @staticmethod
     def format_error(error_id, object_key, error_type, error_message, retry_count, job_id, bucket_name):
         """Format error details in a standard way"""
         return {
