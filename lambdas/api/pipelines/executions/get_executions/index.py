@@ -75,7 +75,14 @@ def format_execution_response(execution: PipelineExecution) -> Dict[str, Any]:
     # Add optional fields if they exist
     if hasattr(execution, 'end_time') and execution.end_time is not None:
         response["end_time"] = str(execution.end_time)
-        # Calculate duration in seconds
+    if hasattr(execution, 'end_time_iso') and execution.end_time_iso is not None:
+        response["end_time_iso"] = execution.end_time_iso
+    
+    # Add duration_seconds - prefer stored value over calculated
+    if hasattr(execution, 'duration_seconds') and execution.duration_seconds is not None:
+        response["duration_seconds"] = str(execution.duration_seconds)
+    elif hasattr(execution, 'end_time') and execution.end_time is not None:
+        # Calculate duration in seconds if not stored
         try:
             start_time_int = int(execution.start_time)
             end_time_int = int(execution.end_time)
@@ -83,8 +90,25 @@ def format_execution_response(execution: PipelineExecution) -> Dict[str, Any]:
             response["duration_seconds"] = str(duration_seconds)
         except (ValueError, TypeError):
             response["duration_seconds"] = "0"
-    if hasattr(execution, 'end_time_iso') and execution.end_time_iso is not None:
-        response["end_time_iso"] = execution.end_time_iso
+    
+    # Add additional optional fields
+    if hasattr(execution, 'dsa_type') and execution.dsa_type is not None:
+        response["dsa_type"] = execution.dsa_type
+    if hasattr(execution, 'inventory_id') and execution.inventory_id is not None:
+        response["inventory_id"] = execution.inventory_id
+    if hasattr(execution, 'object_key_name') and execution.object_key_name is not None:
+        response["object_key_name"] = execution.object_key_name
+    if hasattr(execution, 'pipeline_trace_id') and execution.pipeline_trace_id is not None:
+        response["pipeline_trace_id"] = execution.pipeline_trace_id
+    if hasattr(execution, 'stepname') and execution.stepname is not None:
+        response["stepname"] = execution.stepname
+    if hasattr(execution, 'stepresult') and execution.stepresult is not None:
+        response["stepresult"] = execution.stepresult
+    if hasattr(execution, 'stepstatus') and execution.stepstatus is not None:
+        response["stepstatus"] = execution.stepstatus
+    if hasattr(execution, 'metadata') and execution.metadata is not None:
+        # Convert MapAttribute to dict for JSON serialization
+        response["metadata"] = execution.metadata.as_dict() if hasattr(execution.metadata, 'as_dict') else dict(execution.metadata)
 
     return response
 
@@ -137,15 +161,32 @@ def get_pipeline_executions(
         elif sort_by == "execution_id":
             executions.sort(key=lambda x: x.execution_id.lower(), reverse=reverse_order)
         elif sort_by == "duration_seconds":
-            # Sort by duration (end_time - start_time)
+            # Sort by duration - prefer stored value over calculated
             def get_duration(x):
-                if hasattr(x, 'end_time') and x.end_time is not None:
+                if hasattr(x, 'duration_seconds') and x.duration_seconds is not None:
+                    try:
+                        return int(x.duration_seconds)
+                    except (ValueError, TypeError):
+                        return 0
+                elif hasattr(x, 'end_time') and x.end_time is not None:
                     try:
                         return int(x.end_time) - int(x.start_time)
                     except (ValueError, TypeError):
                         return 0
                 return 0
             executions.sort(key=get_duration, reverse=reverse_order)
+        elif sort_by == "dsa_type":
+            executions.sort(key=lambda x: (x.dsa_type or "").lower(), reverse=reverse_order)
+        elif sort_by == "object_key_name":
+            executions.sort(key=lambda x: (x.object_key_name or "").lower(), reverse=reverse_order)
+        elif sort_by == "pipeline_trace_id":
+            executions.sort(key=lambda x: (x.pipeline_trace_id or "").lower(), reverse=reverse_order)
+        elif sort_by == "stepname":
+            executions.sort(key=lambda x: (x.stepname or "").lower(), reverse=reverse_order)
+        elif sort_by == "stepresult":
+            executions.sort(key=lambda x: (x.stepresult or "").lower(), reverse=reverse_order)
+        elif sort_by == "stepstatus":
+            executions.sort(key=lambda x: (x.stepstatus or "").lower(), reverse=reverse_order)
         else:
             # Default to start_time if unknown sort field
             executions.sort(key=lambda x: int(x.start_time), reverse=reverse_order)
