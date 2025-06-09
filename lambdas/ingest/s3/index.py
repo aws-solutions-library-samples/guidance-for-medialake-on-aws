@@ -268,7 +268,7 @@ class AssetProcessor:
         
         # Setup DynamoDB with global resources
         self.table = dynamodb_resource.Table(os.environ["ASSETS_TABLE"])
-        self.dynamodb = self.table  # Keep original reference for compatibility
+        self.dynamodb = self.table
         
         # EventBridge client
         self.eventbridge = eventbridge_client
