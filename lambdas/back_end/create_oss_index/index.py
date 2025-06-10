@@ -158,9 +158,6 @@ def create_index_with_retry(host,
 
     return False
 
-# --------------------------------------------------------------------------- #
-#  Lambda entry-point
-# --------------------------------------------------------------------------- #
 @lambda_handler_decorator(cors=True)
 def handler(event, context):
     """
@@ -180,7 +177,7 @@ def handler(event, context):
     host         = os.environ["COLLECTION_ENDPOINT"]
     index_names  = os.environ["INDEX_NAMES"]
     region       = os.environ["REGION"]
-    service      = os.environ["SCOPE"]          # usually “es”
+    service      = os.environ["SCOPE"]
     credentials  = boto3.Session().get_credentials()
 
     logger.info("Environment",
