@@ -264,6 +264,7 @@ def build_search_query(params: SearchParams) -> Dict:
     clean_query, parsed_filters = parse_search_query(params.q)
     print(clean_query,parsed_filters)
     logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
+    logger.info(f"➔ raw q='{params.q}' → clean_query={clean_query!r}, parsed_filters={parsed_filters!r}")
 
 
     name_fields = [

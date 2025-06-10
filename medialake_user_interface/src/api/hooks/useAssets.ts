@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/api/queryKeys';
 import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
 import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
 
@@ -202,6 +203,43 @@ export interface RelatedVersionsResponse {
     };
 }
 
+// Bulk download types
+interface BulkDownloadRequest {
+    assetIds: string[];
+    options?: {
+        includeMetadata?: boolean;
+        format?: 'zip';
+    };
+}
+
+interface BulkDownloadResponse {
+    status: string;
+    message: string;
+    data: {
+        jobId: string;
+        status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+        downloadUrl?: string;
+        estimatedSize?: number;
+        createdAt: string;
+    };
+}
+
+interface BulkDownloadStatusResponse {
+    status: string;
+    message: string;
+    data: {
+        jobId: string;
+        status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+        downloadUrl?: string;
+        progress?: number;
+        estimatedSize?: number;
+        actualSize?: number;
+        createdAt: string;
+        completedAt?: string;
+        error?: string;
+    };
+}
+
 // Hook to get a single asset by ID
 export const useAsset = (inventoryId: string) => {
     const { showError } = useErrorModal();
@@ -369,5 +407,136 @@ export const useTranscription = (inventoryId: string) => {
     });
 };
 
+// Hook to initiate bulk download
+export const useBulkDownload = () => {
+    const { showError } = useErrorModal();
+
+    return useMutation({
+        mutationFn: async (request: BulkDownloadRequest) => {
+            try {
+                const response = await apiClient.post<BulkDownloadResponse>(
+                    API_ENDPOINTS.ASSETS.BULK_DOWNLOAD,
+                    request
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Error initiating bulk download:', error);
+                showError('Failed to initiate bulk download');
+                throw error;
+            }
+        },
+        onError: (error) => {
+            logger.error('Error in bulk download mutation:', error);
+            showError('Failed to initiate bulk download');
+        },
+    });
+};
+
+// Hook to check bulk download status
+export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) => {
+    const { showError } = useErrorModal();
+
+    return useQuery({
+        queryKey: ['bulkDownloadStatus', jobId],
+        queryFn: async () => {
+            try {
+                const response = await apiClient.get<BulkDownloadStatusResponse>(
+                    `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`
+                );
+                return response.data;
+            } catch (error) {
+                logger.error('Error fetching bulk download status:', error);
+                showError('Failed to fetch download status');
+                throw error;
+            }
+        },
+        enabled: !!jobId && enabled,
+        refetchInterval: 2000, // Poll every 2 seconds
+        retry: 1,
+    });
+};
+
+// Hook to get all bulk download jobs for the current user
+export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
+    const { showError } = useErrorModal();
+
+    return useQuery({
+        queryKey: ['userBulkDownloadJobs'],
+        queryFn: async () => {
+            try {
+                const response = await apiClient.get<{
+                    status: string;
+                    message: string;
+                    data: {
+                        jobs: Array<{
+                            jobId: string;
+                            status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+                            progress?: number;
+                            createdAt: string;
+                            updatedAt: string;
+                            downloadUrls?: {
+                                zippedFiles?: string;
+                                files?: string[];
+                                singleFiles?: string[];
+                            } | string[];
+                            expiresAt?: string;
+                            expiresIn?: string;
+                            error?: string;
+                            totalSize?: number;
+                            foundAssetsCount?: number;
+                            missingAssetsCount?: number;
+                            description?: string;
+                        }>;
+                        nextToken?: string;
+                    };
+                }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_USER_JOBS);
+                return response.data;
+            } catch (error) {
+                logger.error('Error fetching user bulk download jobs:', error);
+                showError('Failed to fetch download jobs');
+                throw error;
+            }
+        },
+        enabled,
+        refetchInterval: 15000, // Poll every 15 seconds
+        refetchIntervalInBackground: true, // Continue polling when tab is not active
+        retry: 1,
+    });
+};
+
+// Hook to delete a bulk download job
+export const useDeleteBulkDownloadJob = () => {
+    const { showError } = useErrorModal();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (jobId: string) => {
+            try {
+                const response = await apiClient.delete<{
+                    status: string;
+                    message: string;
+                }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_DELETE(jobId));
+                return response.data;
+            } catch (error) {
+                logger.error('Error deleting bulk download job:', error);
+                showError('Failed to delete download job');
+                throw error;
+            }
+        },
+        onSuccess: () => {
+            // Invalidate and refetch user jobs
+            queryClient.invalidateQueries({ queryKey: ['userBulkDownloadJobs'] });
+        },
+    });
+};
+
 // Export types for use in components
-export type { Asset, AssetResponse, DeleteAssetResponse, TranscriptionResponse };
+export type { 
+    Asset, 
+    AssetResponse, 
+    DeleteAssetResponse, 
+    TranscriptionResponse,
+    BulkDownloadRequest,
+    BulkDownloadResponse,
+    BulkDownloadStatusResponse
+};

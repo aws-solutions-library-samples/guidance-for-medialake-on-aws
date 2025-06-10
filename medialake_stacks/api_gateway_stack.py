@@ -71,8 +71,6 @@ class ApiGatewayStackProps:
     collection_arn: str
     access_log_bucket: s3.Bucket
     pipeline_table: dynamodb.TableV2
-    # image_metadata_extractor_lambda: lambda_.Function
-    # image_proxy_lambda: lambda_.Function
     pipelines_nodes_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     asset_sync_job_table: dynamodb.TableV2
@@ -84,6 +82,7 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
+    user_table: dynamodb.Table 
     asset_sync_engine_lambda: lambda_.Function
 
 
@@ -163,6 +162,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
                 media_assets_bucket=props.media_assets_bucket,
+                user_table=props.user_table,  # User table for bulk download jobs
             ),
         )
 

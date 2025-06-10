@@ -81,6 +81,10 @@ export interface AssetViewControlsProps {
     onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
     showMetadata: boolean;
     onShowMetadataChange: (show: boolean) => void;
+    // Selection props
+    hasSelectedAssets?: boolean;
+    selectAllState?: 'none' | 'some' | 'all';
+    onSelectAllToggle?: () => void;
 }
 
 export interface SortOption {
