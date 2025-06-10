@@ -28,7 +28,7 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
                 const baseURL = awsConfig ? JSON.parse(awsConfig)?.API?.REST?.RestApi?.endpoint || '' : '';
 
                 // Call the API directly
-                const response = await fetch(`${baseURL}/pipelinesv2/${id}`, {
+                const response = await fetch(`${baseURL}/pipelines/${id}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
