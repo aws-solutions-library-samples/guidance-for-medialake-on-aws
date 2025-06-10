@@ -192,9 +192,16 @@ const AuthPage = () => {
                                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
                                 color: 'white',
                                 width: 'calc(100%)',
+                                textAlign: 'center',
                                 // marginLeft: '-50px',
                                 // paddingRight: '40px',
                                 paddingLeft: '50px',  // Padding only applies to placeholder text
+                            },
+                            '& [name="confirm_password"]': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                textAlign: 'center',
+                                paddingLeft: '50px',
                             },
                             '& .amplify-text': {
                                 color: 'rgba(255, 255, 255, 0.9)',

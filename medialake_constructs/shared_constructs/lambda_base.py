@@ -89,13 +89,7 @@ def validate_lambda_resources_names(base_name: str) -> str:
             f"maximum length of {MAX_LAMBDA_NAME_LENGTH} characters"
         )
 
-    # Check IAM role name length (prefix with 'role-')
-    role_name = f"role-{lambda_full_name}"
-    if len(role_name) > MAX_ROLE_NAME_LENGTH:
-        raise ValueError(
-            f"IAM role name '{role_name}' exceeds the maximum length of "
-            f"{MAX_ROLE_NAME_LENGTH} characters"
-        )
+    # Note: IAM role name length is handled by truncation in the Lambda constructor
 
     # Check CloudWatch log group name length
     log_group_name = f"/aws/lambda/{lambda_full_name}"
@@ -246,22 +240,28 @@ class Lambda(Construct):
         if config.iam_role_name:
             logger.debug(f"Using custom role name: {config.iam_role_name}")
             # Truncate role name if it exceeds 64 characters
-            role_name = (
-                config.iam_role_name[:MAX_ROLE_NAME_LENGTH]
-                if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH
-                else config.iam_role_name
-            )
-            logger.debug(f"Final role name after truncation: {role_name}")
+            if len(config.iam_role_name) > MAX_ROLE_NAME_LENGTH:
+                logger.warning(
+                    f"IAM role name '{config.iam_role_name}' exceeds {MAX_ROLE_NAME_LENGTH} characters. "
+                    f"Truncating to '{config.iam_role_name[:MAX_ROLE_NAME_LENGTH]}'"
+                )
+                role_name = config.iam_role_name[:MAX_ROLE_NAME_LENGTH]
+            else:
+                role_name = config.iam_role_name
+            logger.debug(f"Final role name: {role_name}")
             role_props["role_name"] = role_name
         else:
             # Handle default role name truncation
             default_role_name = f"role-{lambda_function_name}"
-            role_name = (
-                default_role_name[:MAX_ROLE_NAME_LENGTH]
-                if len(default_role_name) > MAX_ROLE_NAME_LENGTH
-                else default_role_name
-            )
-            logger.debug(f"Using default role name after truncation: {role_name}")
+            if len(default_role_name) > MAX_ROLE_NAME_LENGTH:
+                logger.warning(
+                    f"IAM role name '{default_role_name}' exceeds {MAX_ROLE_NAME_LENGTH} characters. "
+                    f"Truncating to '{default_role_name[:MAX_ROLE_NAME_LENGTH]}'"
+                )
+                role_name = default_role_name[:MAX_ROLE_NAME_LENGTH]
+            else:
+                role_name = default_role_name
+            logger.debug(f"Using role name: {role_name}")
             role_props["role_name"] = role_name
 
         if config.iam_role_boundary_policy:

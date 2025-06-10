@@ -108,6 +108,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     isDeleteModalOpen,
     menuAnchorEl,
     selectedAsset,
+    isLoading: assetOperationsLoading,
   } = useAssetOperations<AssetItem>();
 
   // Card fields configuration
@@ -438,11 +439,17 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel}>
+          <Button onClick={handleDeleteCancel} disabled={assetOperationsLoading.delete}>
             {t('assetExplorer.deleteDialog.cancel')}
           </Button>
-          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-            {t('assetExplorer.deleteDialog.confirm')}
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            autoFocus
+            disabled={assetOperationsLoading.delete}
+            startIcon={assetOperationsLoading.delete ? <CircularProgress size={16} /> : undefined}
+          >
+            {assetOperationsLoading.delete ? t('assetExplorer.deleteDialog.deleting') : t('assetExplorer.deleteDialog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>

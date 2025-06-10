@@ -87,7 +87,7 @@ def _extract_asset(event: Dict[str, Any]) -> Dict[str, Any]:
 def get_mediaconvert_endpoint() -> str:
     override = os.getenv("MEDIACONVERT_ENDPOINT_URL")
     if override: return override
-    mc = boto3.client("mediaconvert", region_name="us-east-1")
+    mc = boto3.client("mediaconvert")
     for attempt in range(60):
         try: return mc.describe_endpoints()["Endpoints"][0]["Url"]
         except ClientError as e:

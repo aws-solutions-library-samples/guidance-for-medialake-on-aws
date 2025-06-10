@@ -128,21 +128,30 @@ class AssetSyncStack(cdk.NestedStack):
             )
         )
 
-        # Common Lambda environment variables
-        asset_sync_lambda_env = {
-            "ASSETS_TABLE_NAME": props.asset_table.table_name,
+        # Common environment variables
+        common_env = {
+            "POWERTOOLS_SERVICE_NAME": "asset-management",
+            "POWERTOOLS_METRICS_NAMESPACE": "AssetManagement",
+            "LOG_LEVEL": "INFO",
+            "STATUS_TOPIC_ARN": self.status_topic.topic_arn,
+        }
+
+        # Engine-specific environment variables
+        engine_env = {
+            **common_env,
             "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
             "CHUNK_TABLE_NAME": self._asset_sync_chunk_table.table.table_name,
             "ERROR_TABLE_NAME": self._asset_sync_error_table.table.table_name,
             "PROCESSOR_QUEUE_URL": self.processor_queue.queue_url,
-            "DLQ_URL": self.dlq.queue_url,
-            "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
-            "STATUS_TOPIC_ARN": self.status_topic.topic_arn,
-            "POWERTOOLS_SERVICE_NAME": "asset-management",
-            "POWERTOOLS_METRICS_NAMESPACE": "AssetManagement",
-            "LOG_LEVEL": "INFO",
             "RESULTS_BUCKET_NAME": self.results_bucket.bucket_name,
             "BATCH_OPERATIONS_ROLE_ARN": self.batch_operations_role.role_arn,
+        }
+
+        # Processor-specific environment variables
+        processor_env = {
+            **common_env,
+            "ASSETS_TABLE_NAME": props.asset_table.table_name,
+            "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
         }
 
         # Create the Asset Sync Engine Lambda
@@ -154,7 +163,7 @@ class AssetSyncStack(cdk.NestedStack):
                 entry="lambdas/back_end/asset_sync/engine",
                 memory_size=10240,
                 timeout_minutes=15,
-                environment_variables=asset_sync_lambda_env,
+                environment_variables=engine_env,
             ),
         )
 
@@ -168,10 +177,7 @@ class AssetSyncStack(cdk.NestedStack):
                 entry="lambdas/back_end/asset_sync/processor",
                 memory_size=10240,
                 timeout_minutes=15,
-                environment_variables={
-                    **asset_sync_lambda_env,
-                    "PROCESSOR_FUNCTION_ARN": "",  # Will update after creation
-                },
+                environment_variables=processor_env,
             ),
         )
 

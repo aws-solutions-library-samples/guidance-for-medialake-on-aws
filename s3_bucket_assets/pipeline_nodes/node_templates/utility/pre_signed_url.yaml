@@ -16,6 +16,7 @@ node:
               actions:
                 - s3:ListBucket
                 - s3:GetObject
+                - s3:GetBucketLocation
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
