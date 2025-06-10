@@ -31,13 +31,14 @@ from medialake_constructs.shared_constructs.lambda_base import (
     LambdaConfig,
 )
 from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
+    DynamoDB as DynamoDBConstruct,
     DynamoDBProps,
 )
 
 from medialake_constructs.shared_constructs.lambda_layers import (
     IngestMediaProcessorLayer,
 )
+from constants import DynamoDB as DynamoDBConstants, EnvVars
 
 
 @dataclass
@@ -205,11 +206,11 @@ class ConnectorsConstruct(Construct):
             code_path=["lambdas", "ingest", "s3"],
         )
 
-        self.connectors_table = DynamoDB(
+        self.connectors_table = DynamoDBConstruct(
             self,
             "ConnectorsTable",
             props=DynamoDBProps(
-                name=f"{config.resource_prefix}_connector_table_{config.environment}",
+                name=DynamoDBConstants.connector_table_name(),
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
@@ -347,6 +348,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
                     "pipes:ListPipes",
+                    "pipes:StopPipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
@@ -609,7 +611,8 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                     "MEDIALAKE_ASSET_SYNC_JOB_TABLE_ARN": props.asset_sync_job_table.table_arn,
-                    "JOB_TABLE_NAME": props.asset_sync_job_table.table_name,
+                    EnvVars.JOB_TABLE_NAME: props.asset_sync_job_table.table_name,
+                    EnvVars.CONNECTOR_TABLE_NAME: DynamoDBConstants.connector_table_name(),
                     "ENGINE_FUNCTION_ARN": props.asset_sync_engine_lambda.function_arn,
                 },
             ),
