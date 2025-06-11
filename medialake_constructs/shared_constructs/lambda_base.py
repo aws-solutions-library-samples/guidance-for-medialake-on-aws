@@ -25,6 +25,7 @@ from aws_cdk import (
     Duration,
     BundlingOutput,
 )
+
 from aws_cdk.aws_lambda_python_alpha import (
     PythonFunction,
     PythonLayerVersion,
@@ -53,10 +54,64 @@ DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
 DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
-LOG_RETENTION = logs.RetentionDays.SIX_MONTHS
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
+
+
+def get_log_retention_from_config() -> logs.RetentionDays:
+    """
+    Get the log retention setting from config and convert to RetentionDays enum.
+    
+    Returns:
+        logs.RetentionDays: The retention period based on config
+    """
+    # Access the logging config properly from Pydantic model
+    try:
+        if hasattr(env_config, 'logging') and env_config.logging:
+            retention_days = getattr(env_config.logging, 'lambda_cloudwatch_log_retention_days', 180)
+        else:
+            retention_days = 180  # Default fallback
+    except (AttributeError, TypeError):
+        retention_days = 180  # Default fallback
+    
+    # Map days to RetentionDays enum values
+    retention_mapping = {
+        1: logs.RetentionDays.ONE_DAY,
+        3: logs.RetentionDays.THREE_DAYS,
+        5: logs.RetentionDays.FIVE_DAYS,
+        7: logs.RetentionDays.ONE_WEEK,
+        14: logs.RetentionDays.TWO_WEEKS,
+        30: logs.RetentionDays.ONE_MONTH,
+        60: logs.RetentionDays.TWO_MONTHS,
+        90: logs.RetentionDays.THREE_MONTHS,
+        120: logs.RetentionDays.FOUR_MONTHS,
+        150: logs.RetentionDays.FIVE_MONTHS,
+        180: logs.RetentionDays.SIX_MONTHS,
+        365: logs.RetentionDays.ONE_YEAR,
+        400: logs.RetentionDays.THIRTEEN_MONTHS,
+        545: logs.RetentionDays.EIGHTEEN_MONTHS,
+        731: logs.RetentionDays.TWO_YEARS,
+        1827: logs.RetentionDays.FIVE_YEARS,
+        3653: logs.RetentionDays.TEN_YEARS,
+    }
+    
+    # Find the closest matching retention period
+    if retention_days in retention_mapping:
+        return retention_mapping[retention_days]
+    
+    # Find the closest higher value if exact match not found
+    sorted_days = sorted(retention_mapping.keys())
+    for days in sorted_days:
+        if days >= retention_days:
+            return retention_mapping[days]
+    
+    # If retention_days is higher than any predefined value, use infinite retention
+    return logs.RetentionDays.INFINITE
+
+
+# Get log retention from config
+LOG_RETENTION = get_log_retention_from_config()
 
 
 def validate_lambda_resources_names(base_name: str) -> str:
@@ -190,6 +245,17 @@ class Lambda(Construct):
 
         logger = Logger()
         logger.debug(f"Initializing Lambda construct with config: {config}")
+        
+        # Get the actual retention days value for logging
+        try:
+            if hasattr(env_config, 'logging') and env_config.logging:
+                config_retention_days = getattr(env_config.logging, 'lambda_cloudwatch_log_retention_days', 180)
+            else:
+                config_retention_days = 180
+        except (AttributeError, TypeError):
+            config_retention_days = 180
+            
+        logger.debug(f"Using log retention from config: {LOG_RETENTION} (based on {config_retention_days} days)")
 
         # Validate config values
         if config.memory_size < 128 or config.memory_size > 10240:
@@ -222,9 +288,9 @@ class Lambda(Construct):
             logger.debug(f"Adding {len(config.layers)} additional layers")
             layer_objects.extend(config.layers)
 
-        # Create Log Group
+        # Create Log Group with retention from config
         log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
-        logger.debug(f"Creating log group: {log_group_name}")
+        logger.debug(f"Creating log group: {log_group_name} with retention: {LOG_RETENTION}")
         lambda_log_group = logs.LogGroup(
             self,
             "LambdaLogGroup",
