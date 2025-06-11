@@ -2,22 +2,22 @@ import os
 import json
 import boto3
 import uuid
-import csv
-import io
 import random
 import time
-from datetime import datetime, timezone, timedelta
+import re
+import hashlib
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
-from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote_plus
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 
 from common import (
     AssetProcessor, JobStatus, ErrorType,
-    get_optimized_client, get_optimized_s3_client, MAX_THREADS
+    get_optimized_client, get_optimized_s3_client
 )
 
 # Initialize powertools
@@ -25,30 +25,90 @@ logger = Logger()
 tracer = Tracer()
 metrics = Metrics()
 
-# Asset type classification constants
-image_mimes = ['image/', 'picture/']
-video_mimes = ['video/']
-audio_mimes = ['audio/']
+# Configure boto3 clients with connection pooling and keep-alive for better performance
+BOTO3_CONFIG = Config(
+    region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+    retries={
+        'max_attempts': 3,
+        'mode': 'adaptive'
+    },
+    max_pool_connections=50,
+    parameter_validation=False  # Skip parameter validation for better performance
+)
 
-image_extensions = {
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp', 'svg', 'ico', 
-    'heic', 'heif', 'raw', 'cr2', 'nef', 'arw', 'dng', 'orf', 'rw2', 'pef', 'srw'
-}
+# Initialize clients at module level for reuse across invocations
+sqs_client = boto3.client('sqs', config=BOTO3_CONFIG)
+dynamodb_client = boto3.client('dynamodb', config=BOTO3_CONFIG)
+dynamodb_resource = boto3.resource('dynamodb', config=BOTO3_CONFIG)
 
-video_extensions = {
-    'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'mpg', 
-    'mpeg', 'mxf', 'asf', 'rm', 'swf', 'vob', 'ogv', 'm2ts', 'mts', 'ts'
-}
+# S3 client cache - since bucket names can vary, we'll cache them
+_s3_client_cache = {}
 
-audio_extensions = {
-    'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'aiff', 'au', 
-    'ra', 'amr', '3ga', 'ac3', 'ape', 'dts', 'spx', 'tta', 'tak', 'mpc'
-}
+def get_cached_s3_client(bucket_name: str):
+    """
+    Get a cached S3 client for the specific bucket.
+    Creates and caches clients as needed.
+    """
+    if bucket_name not in _s3_client_cache:
+        logger.info(f"Creating new S3 client for bucket: {bucket_name}")
+        _s3_client_cache[bucket_name] = get_optimized_s3_client(bucket_name)
+    return _s3_client_cache[bucket_name]
 
-# Define retry constants
-MAX_RETRY_ATTEMPTS = 15
-BASE_BACKOFF_TIME = 0.1  # 100 ms
-MAX_BACKOFF_TIME = 30.0  # 30 seconds
+# Define retry constants with environment variable configuration
+MAX_RETRY_ATTEMPTS = int(os.environ.get('MAX_RETRY_ATTEMPTS', '15'))
+BASE_BACKOFF_TIME = float(os.environ.get('BASE_BACKOFF_TIME', '0.1'))
+MAX_BACKOFF_TIME = float(os.environ.get('MAX_BACKOFF_TIME', '30.0'))
+
+def sanitize_for_sqs(text: str, max_length: int = 128) -> str:
+    """
+    Sanitize text for SQS fields like MessageDeduplicationId and MessageGroupId.
+    
+    AWS SQS requirements:
+    - MessageDeduplicationId: alphanumeric (a-z, A-Z, 0-9), hyphens (-), and underscores (_) only
+    - MessageGroupId: alphanumeric (a-z, A-Z, 0-9), hyphens (-), and underscores (_) only
+    - Max length: 128 characters
+    
+    Args:
+        text: Text to sanitize
+        max_length: Maximum allowed length
+        
+    Returns:
+        Sanitized text that meets SQS requirements
+    """
+    if not text:
+        return str(uuid.uuid4())  # Fallback to UUID if empty
+    
+    # First, URL decode if needed
+    try:
+        decoded_text = unquote_plus(text)
+    except Exception:
+        decoded_text = text
+    
+    # Replace any character that's not alphanumeric, hyphen, or underscore with underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9\-_]', '_', decoded_text)
+    
+    # Remove consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure it's not empty after sanitization
+    if not sanitized:
+        sanitized = str(uuid.uuid4()).replace('-', '_')
+    
+    # Truncate if too long, but if we need to truncate, use a hash instead to maintain uniqueness
+    if len(sanitized) > max_length:
+        # Use MD5 hash to ensure uniqueness while staying within length limits
+        hash_suffix = hashlib.md5(text.encode()).hexdigest()[:8]
+        # Take as much of the sanitized string as possible, leaving room for hash
+        prefix_length = max_length - len(hash_suffix) - 1  # -1 for separator
+        if prefix_length > 0:
+            sanitized = sanitized[:prefix_length] + '_' + hash_suffix
+        else:
+            sanitized = hash_suffix
+    
+    return sanitized
 
 def retry_with_backoff(
     func: Callable, 
@@ -57,7 +117,7 @@ def retry_with_backoff(
     max_attempts=MAX_RETRY_ATTEMPTS, 
     base_delay=BASE_BACKOFF_TIME, 
     max_delay=MAX_BACKOFF_TIME,
-    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException'),
+    throttling_errors=('ThrottlingException', 'ProvisionedThroughputExceededException', 'RequestThrottled'),
     **kwargs
 ) -> Any:
     """
@@ -111,14 +171,27 @@ def retry_with_backoff(
             jitter = random.uniform(0, 1)
             delay = delay + (delay * 0.2 * jitter)  # Add up to 20% jitter
             
+            # Determine service name for better logging
+            service_name = "DynamoDB"  # Default
+            if hasattr(e, 'response') and 'Error' in e.response:
+                error_code = e.response['Error'].get('Code')
+                if error_code == 'RequestThrottled':
+                    service_name = "SQS"
+            
             logger.warning(
-                f"DynamoDB throttling error on attempt {attempt}/{max_attempts}. "
+                f"{service_name} throttling error on attempt {attempt}/{max_attempts}. "
                 f"Retrying in {delay:.2f}s: {str(e)}"
             )
             
-            # Record metric for throttling
+            # Record metric for throttling based on service
+            service_name = "DynamoDB"  # Default
+            if hasattr(e, 'response') and 'Error' in e.response:
+                error_code = e.response['Error'].get('Code')
+                if error_code == 'RequestThrottled':
+                    service_name = "SQS"
+            
             metrics.add_metric(
-                name="DynamoDBThrottlingRetries",
+                name=f"{service_name}ThrottlingRetries",
                 unit=MetricUnit.Count,
                 value=metrics_count
             )
@@ -178,7 +251,7 @@ AssetProcessor.update_job_metadata = patched_update_job_metadata
 AssetProcessor.log_error = patched_log_error
 
 class AssetSyncProcessor:
-    """Processes objects for synchronization with the Asset Management system"""
+    """Processes objects for synchronization with the Asset Management system via S3 batch operations"""
     
     def __init__(self, job_id: str, bucket_name: str):
         """
@@ -190,12 +263,8 @@ class AssetSyncProcessor:
         """
         self.job_id = job_id
         self.bucket_name = bucket_name
-        self.s3_client = get_optimized_s3_client(bucket_name)
-        self.results_bucket = os.environ.get('RESULTS_BUCKET_NAME')
-        
-        if not self.results_bucket:
-            logger.error("RESULTS_BUCKET_NAME environment variable is not set")
-            raise ValueError("RESULTS_BUCKET_NAME environment variable is not set")
+        # Use cached S3 client instead of creating new one
+        self.s3_client = get_cached_s3_client(bucket_name)
         
     def process_s3_batch_operation(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -276,137 +345,6 @@ class AssetSyncProcessor:
                 'resultString': f"Exception: {str(e)}"
             }
             
-    def process_chunk(self, chunk_key: str, chunk_index: int, total_chunks: int) -> Dict[str, int]:
-        """
-        Process a manifest chunk
-        
-        Args:
-            chunk_key: S3 key of the chunk file
-            chunk_index: Index of this chunk
-            total_chunks: Total number of chunks
-            
-        Returns:
-            Processing statistics
-        """
-        logger.info(f"Processing chunk {chunk_key} ({chunk_index}/{total_chunks})")
-        
-        # Get the chunk from S3
-        try:
-            response = self.s3_client.get_object(
-                Bucket=self.results_bucket,
-                Key=chunk_key
-            )
-            
-            # Parse the CSV
-            csv_text = response['Body'].read().decode('utf-8')
-            csv_reader = csv.DictReader(io.StringIO(csv_text))
-            
-            objects = []
-            for row in csv_reader:
-                if 'Key' in row:
-                    objects.append({
-                        'key': row['Key'],
-                        'assetId': None,  # Will be populated during processing
-                        'inventoryId': None,  # Will be populated during processing
-                        'lastModified': row.get('LastModifiedDate', datetime.now(timezone.utc).isoformat()),
-                        'size': int(row.get('Size', 0))
-                    })
-            
-            logger.info(f"Found {len(objects)} objects in chunk {chunk_index}")
-            
-            # Post the number of objects in the chunk to CloudWatch metrics
-            metrics.add_metric(
-                name="ObjectsPerChunk",
-                unit=MetricUnit.Count,
-                value=len(objects)
-            )
-            # Add dimensions for job ID and chunk index
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
-            
-            # Fetch tags for objects to determine if they need processing
-            with ThreadPoolExecutor(max_workers=min(MAX_THREADS, len(objects))) as executor:
-                futures = [
-                    executor.submit(
-                        self._get_object_tags,
-                        obj['key']
-                    ) for obj in objects
-                ]
-                
-                # Process results
-                for i, future in enumerate(futures):
-                    try:
-                        tags = future.result()
-                        objects[i]['assetId'] = tags.get('AssetID')
-                        objects[i]['inventoryId'] = tags.get('InventoryID')
-                    except Exception as e:
-                        logger.warning(f"Error fetching tags for object {objects[i]['key']}: {str(e)}")
-            
-            # Filter objects that need processing
-            objects_to_process = self._filter_objects_to_process(objects)
-            
-            logger.info(f"Found {len(objects_to_process)} objects that need processing in chunk {chunk_index}")
-            
-            # Post the number of objects that need processing to CloudWatch metrics
-            metrics.add_metric(
-                name="ObjectsToProcess",
-                unit=MetricUnit.Count,
-                value=len(objects_to_process)
-            )
-            # Add dimensions for job ID and chunk index
-            metrics.add_dimension(name="JobId", value=self.job_id)
-            metrics.add_dimension(name="ChunkIndex", value=str(chunk_index))
-            
-            # Process objects
-            results = self._process_objects(objects_to_process)
-            
-            # Update job progress
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsScanned', len(objects))
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsToProcess', len(objects_to_process))
-            AssetProcessor.increment_job_counter(self.job_id, 'totalObjectsProcessed', results['successful'])
-            
-            if results['failed'] > 0:
-                AssetProcessor.increment_job_counter(self.job_id, 'errors', results['failed'])
-            
-            # Increment chunks processed counter
-            job_details = AssetProcessor.get_job_details(self.job_id)
-            metadata = job_details.get('metadata', {})
-            chunks_processed = metadata.get('chunksProcessed', 0) + 1
-            
-            AssetProcessor.update_job_metadata(self.job_id, {
-                'chunksProcessed': chunks_processed
-            })
-            
-            # Check if this was the last chunk
-            if chunks_processed >= total_chunks:
-                logger.info(f"Completed processing all {total_chunks} chunks for job {self.job_id}")
-                
-                # Update job status to completed
-                AssetProcessor.update_job_status(
-                    self.job_id,
-                    JobStatus.COMPLETED,
-                    f"Completed processing {metadata.get('objectsCount', 0)} objects"
-                )
-            
-            return {
-                'scanned': len(objects),
-                'to_process': len(objects_to_process),
-                'processed_successfully': results['successful'],
-                'failed': results['failed'],
-                'chunk_index': chunk_index,
-                'total_chunks': total_chunks,
-                'chunks_processed': chunks_processed
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing chunk {chunk_index}: {str(e)}", exc_info=True)
-            
-            # Update job counters
-            AssetProcessor.increment_job_counter(self.job_id, 'errors', 1)
-            
-            # Rethrow the exception
-            raise
-            
     def _get_object_tags(self, object_key: str) -> Dict[str, str]:
         """Get tags for an S3 object"""
         try:
@@ -451,9 +389,7 @@ class AssetSyncProcessor:
         except Exception as e:
             logger.error(f"Error getting ingest queue URL: {str(e)}", exc_info=True)
             return None
-    
 
-            
     def _filter_objects_to_process(self, objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Filter objects that need processing
@@ -506,89 +442,10 @@ class AssetSyncProcessor:
         except Exception as e:
             logger.error(f"Error filtering objects: {str(e)}", exc_info=True)
             raise
-            
-    def _process_objects(self, objects: List[Dict[str, Any]]) -> Dict[str, int]:
-        """
-        Process a list of objects
-        
-        Args:
-            objects: List of objects to process
-            
-        Returns:
-            Processing results statistics
-        """
-        logger.info(f"Processing {len(objects)} objects for job {self.job_id}")
-        
-        # Initialize results
-        results = {
-            'successful': 0,
-            'failed': 0,
-            'copy_operations': 0,
-            'put_operations': 0,
-            'skip_operations': 0
-        }
-        
-        # Process objects in parallel
-        with ThreadPoolExecutor(max_workers=min(MAX_THREADS, len(objects))) as executor:
-            futures = [
-                executor.submit(
-                    self._process_object, obj
-                ) for obj in objects
-            ]
-            
-            # Collect results
-            for future in futures:
-                try:
-                    result = future.result()
-                    
-                    if result.get('status') == 'success':
-                        results['successful'] += 1
-                        
-                        # Track operation type
-                        action = result.get('action')
-                        if action == 'COPY':
-                            results['copy_operations'] += 1
-                        elif action == 'PUT':
-                            results['put_operations'] += 1
-                        else:
-                            results['skip_operations'] += 1
-                    else:
-                        results['failed'] += 1
-                except Exception as e:
-                    logger.error(f"Error processing object: {str(e)}")
-                    results['failed'] += 1
-        
-        logger.info(f"Processing complete: {results['successful']} successful, {results['failed']} failed")
-        
-        # Post processing metrics to CloudWatch
-        metrics.add_metric(
-            name="SuccessfullyProcessedObjects",
-            unit=MetricUnit.Count,
-            value=results['successful']
-        )
-        metrics.add_metric(
-            name="FailedProcessedObjects",
-            unit=MetricUnit.Count,
-            value=results['failed']
-        )
-        metrics.add_metric(
-            name="CopyOperations",
-            unit=MetricUnit.Count,
-            value=results['copy_operations']
-        )
-        metrics.add_metric(
-            name="PutOperations",
-            unit=MetricUnit.Count,
-            value=results['put_operations']
-        )
-        # Add dimensions for job ID
-        metrics.add_dimension(name="JobId", value=self.job_id)
-        
-        return results
         
     def _process_object(self, obj: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process a single object
+        Process a single object by sending a simulated S3 event to SQS
         
         Args:
             obj: Object to process
@@ -611,9 +468,6 @@ class AssetSyncProcessor:
             except Exception as e:
                 logger.warning(f"Error fetching tags for {object_key}: {str(e)}")
                 existing_tags = {}
-            
-            # Send simulated S3 event message to SQS instead of EventBridge
-            sqs = boto3.client('sqs')
             
             # Get the ingest SQS queue URL dynamically based on the job configuration
             ingest_queue_url = self._get_ingest_queue_url()
@@ -686,21 +540,23 @@ class AssetSyncProcessor:
             # Add FIFO-specific parameters if needed
             if is_fifo_queue:
                 # Use job ID as MessageGroupId to ensure processing order per job
-                message_params['MessageGroupId'] = self.job_id
+                # Sanitize job ID for SQS field requirements
+                sanitized_job_id = sanitize_for_sqs(self.job_id)
+                message_params['MessageGroupId'] = sanitized_job_id
                 
                 # Use object key + timestamp for deduplication to prevent duplicates
-                dedup_id = f"{object_key}-{int(time.time() * 1000000)}"
-                # MessageDeduplicationId has a max length of 128 characters
-                if len(dedup_id) > 128:
-                    # Use a hash if too long
-                    import hashlib
-                    dedup_id = hashlib.md5(dedup_id.encode()).hexdigest()
-                message_params['MessageDeduplicationId'] = dedup_id
+                dedup_base = f"{object_key}-{int(time.time() * 1000000)}"
+                # Sanitize the deduplication ID for SQS requirements
+                sanitized_dedup_id = sanitize_for_sqs(dedup_base)
+                message_params['MessageDeduplicationId'] = sanitized_dedup_id
                 
-                logger.info(f"Sending to FIFO queue with MessageGroupId: {self.job_id}")
+                logger.info(f"Sending to FIFO queue with MessageGroupId: {sanitized_job_id}, MessageDeduplicationId: {sanitized_dedup_id}")
             
-            # Send message to SQS
-            response = sqs.send_message(**message_params)
+            # Send message to SQS with retry logic for throttling - use module-level client
+            response = retry_with_backoff(
+                sqs_client.send_message,
+                **message_params
+            )
             
             # Check if message was sent successfully
             if not response.get('MessageId'):
@@ -726,18 +582,37 @@ class AssetSyncProcessor:
             }
             
         except Exception as e:
-            # Log error
-            error_id = str(uuid.uuid4())
-            AssetProcessor.log_error(
-                AssetProcessor.format_error(
-                    error_id=error_id,
-                    object_key=object_key,
-                    error_type=ErrorType.PROCESS_ERROR,
-                    error_message=str(e),
-                    retry_count=0,
-                    job_id=self.job_id,
-                    bucket_name=self.bucket_name
+            # Check if this is an SQS throttling error that exhausted retries
+            is_sqs_throttling = False
+            if isinstance(e, ClientError):
+                is_sqs_throttling = (
+                    hasattr(e, 'response') and 
+                    'Error' in e.response and 
+                    e.response['Error'].get('Code') == 'RequestThrottled'
                 )
+            
+            if is_sqs_throttling:
+                # Record specific metric for SQS throttling failures
+                metrics.add_metric(
+                    name="SQSThrottlingFailures",
+                    unit=MetricUnit.Count,
+                    value=1
+                )
+                metrics.add_dimension(name="JobId", value=self.job_id)
+                logger.error(f"SQS throttling exhausted all retries for object {object_key}")
+            
+            # Log error locally instead of using AssetProcessor.log_error
+            error_id = str(uuid.uuid4())
+            logger.error(
+                f"Error processing object {object_key}: {str(e)}",
+                extra={
+                    "errorId": error_id,
+                    "objectKey": object_key,
+                    "jobId": self.job_id,
+                    "bucketName": self.bucket_name,
+                    "errorType": "SQS_THROTTLING_ERROR" if is_sqs_throttling else "PROCESS_ERROR"
+                },
+                exc_info=True
             )
             
             # Record failed object processing metric
@@ -760,108 +635,12 @@ class AssetSyncProcessor:
 @tracer.capture_lambda_handler
 @metrics.log_metrics
 def lambda_handler(event, context):
-    """Lambda handler for Asset Sync Processor"""
+    """Lambda handler for Asset Sync Processor - S3 Batch Operations only"""
     try:
         logger.info(f"Received event: {json.dumps(event)}")
         
-        if 'Records' in event:
-            # This is an SQS event
-            for record in event['Records']:
-                try:
-                    body = json.loads(record.get('body', '{}'))
-                    logger.info(f"Processing SQS record with body: {json.dumps(body)}")
-                    
-                    operation = body.get('operation')
-                    job_id = body.get('jobId')
-                    
-                    # Check if this is an S3 event notification instead of a job processing message
-                    if 'Records' in body and isinstance(body.get('Records'), list):
-                        logger.info("Received S3 event notification, skipping as this Lambda processes job operations")
-                        continue
-                    
-                    if not job_id:
-                        logger.error(f"No job ID found in message. Message body keys: {list(body.keys())}")
-                        logger.error(f"Full message body: {json.dumps(body)}")
-                        continue
-                        
-                    # Get the job details from DynamoDB
-                    job_details = retry_with_backoff(
-                        AssetProcessor.get_job_details,
-                        job_id
-                    )
-                    if not job_details:
-                        logger.error(f"Job {job_id} not found")
-                        continue
-                        
-                    # Extract bucket name
-                    bucket_name = job_details.get('bucketName')
-                    
-                    # Initialize the processor
-                    processor = AssetSyncProcessor(job_id, bucket_name)
-                    
-                    if operation == 'PROCESS_CHUNK':
-                        # Process a manifest chunk
-                        chunk_key = body.get('chunkKey')
-                        chunk_index = body.get('chunkIndex', 1)
-                        total_chunks = body.get('totalChunks', 1)
-                        
-                        if not chunk_key:
-                            logger.error("No chunk key found in message")
-                            continue
-                            
-                        try:
-                            result = processor.process_chunk(chunk_key, chunk_index, total_chunks)
-                            logger.info(f"Processed chunk: {result}")
-                            
-                            # Record successful chunk processing metric
-                            metrics.add_metric(
-                                name="ChunkProcessingSuccess", 
-                                unit=MetricUnit.Count,
-                                value=1
-                            )
-                            metrics.add_dimension(name="JobId", value=job_id)
-                            
-                        except Exception as e:
-                            logger.error(f"Error processing chunk: {str(e)}", exc_info=True)
-                            
-                            # Record chunk processing error metric
-                            metrics.add_metric(
-                                name="ChunkProcessingErrors", 
-                                unit=MetricUnit.Count,
-                                value=1
-                            )
-                            metrics.add_dimension(name="JobId", value=job_id)
-                            
-                            # Update job status to failed if this is a critical error
-                            if chunk_index == total_chunks:
-                                AssetProcessor.update_job_status(
-                                    job_id, 
-                                    JobStatus.FAILED,
-                                    f"Failed to process chunk: {str(e)}"
-                                )
-                    else:
-                        logger.warning(f"Unknown operation: {operation}")
-                        
-                except Exception as e:
-                    logger.error(f"Error processing SQS record: {str(e)}", exc_info=True)
-                    
-                    # Record SQS processing errors
-                    metrics.add_metric(
-                        name="SQSProcessingErrors",
-                        unit=MetricUnit.Count,
-                        value=1
-                    )
-                    
-            # Add metrics for SQS message processing
-            metrics.add_metric(
-                name="ProcessedSQSMessages",
-                unit=MetricUnit.Count,
-                value=len(event['Records'])
-            )
-            
-            return {"status": "success", "message": f"Processed {len(event['Records'])} SQS messages"}
-                
-        elif 'tasks' in event or 'task' in event or 'job' in event:
+        # This lambda only handles S3 batch operations
+        if 'tasks' in event or 'task' in event or 'job' in event:
             # This is an S3 batch operations event
             logger.info("Processing S3 batch operations event")
             
@@ -1001,74 +780,9 @@ def lambda_handler(event, context):
             }
             
         else:
-            logger.error("Unrecognized event format")
-            return {"error": "Unrecognized event format"}
+            logger.error("Unrecognized event format - expected S3 batch operations event")
+            return {"error": "This lambda only handles S3 batch operations events"}
             
     except Exception as e:
         logger.error(f"Error in lambda handler: {str(e)}", exc_info=True)
         return {"error": f"Error in lambda handler: {str(e)}"}
-
-def determine_asset_type(content_type: str, file_extension: str) -> str:
-    """
-    Determine the asset type using content type and file extension.
-    Uses a more comprehensive classification based on mime types and extensions.
-    
-    Args:
-        content_type: The MIME type from S3 metadata
-        file_extension: The file extension (without the dot)
-    
-    Returns:
-        One of: "Image", "Video", "Audio", or "Other"
-    """
-    logger.info(f"Determining asset type for content_type: {content_type}, extension: {file_extension}")
-    
-    # Convert to lowercase for comparison
-    content_type = content_type.lower() if content_type else ""
-    file_extension = file_extension.lower() if file_extension else ""
-    
-    # Track what criteria matched
-    matched_criteria = []
-    
-    # Check MIME type first as it's more reliable
-    for prefix in image_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched image prefix {prefix}")
-            return "Image"
-    
-    for prefix in video_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched video prefix {prefix}")
-            return "Video"
-    
-    for prefix in audio_mimes:
-        if content_type.startswith(prefix):
-            matched_criteria.append(f"MIME type {content_type} matched audio prefix {prefix}")
-            return "Audio"
-    
-    # If MIME type doesn't give us a clear answer, check file extension
-    if file_extension in image_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched image extension")
-        return "Image"
-    
-    if file_extension in video_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched video extension")
-        return "Video"
-    
-    if file_extension in audio_extensions:
-        matched_criteria.append(f"File extension {file_extension} matched audio extension")
-        return "Audio"
-    
-    # Fall back to looking at the first part of the MIME type
-    if content_type:
-        mime_main_type = content_type.split('/')[0].capitalize()
-        if mime_main_type in ["Image", "Video", "Audio"]:
-            matched_criteria.append(f"MIME main type {mime_main_type} matched")
-            return mime_main_type
-    
-    logger.warning(
-        f"Could not definitively determine asset type. Content-Type: {content_type}, "
-        f"Extension: {file_extension}, Matched criteria: {matched_criteria}"
-    )
-    
-    # Return Other instead of defaulting to Image
-    return "Other"

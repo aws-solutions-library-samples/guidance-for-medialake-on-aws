@@ -22,6 +22,15 @@ export interface IntegrationFormProps {
     onClose: () => void;
     filteredNodes?: IntegrationNode[];
     onSubmitSuccess?: (result: IntegrationFormResult) => void;
+    editingIntegration?: {
+        id: string;
+        name: string;
+        type: string;
+        status: string;
+        configuration: Record<string, any>;
+        createdAt: string;
+        updatedAt: string;
+    } | null;
 }
 
 export interface IntegrationFormData {

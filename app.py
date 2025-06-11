@@ -187,14 +187,7 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        asset_sync_stack = AssetSyncStack(
-            self,
-            "MediaLakeAssetSyncStack",
-            props=AssetSyncStackProps(
-                asset_table=props.base_infrastructure.asset_table,
-                ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-            ),
-        )
+
 
         _ = SettingsApiStack(
             self,
@@ -207,37 +200,48 @@ class MediaLakeStack(cdk.Stack):
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
             ),
         )
+        
+        users_groups_roles_stack = UsersGroupsRolesStack(self, "MediaLakeUsersGroupsRolesStack", props=UsersGroupsRolesStackProps(
+            cognito_user_pool=props.api_gateway_core_stack.user_pool,
+            cognito_app_client=props.api_gateway_core_stack.user_pool_client,
+            x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+            ),
+        )
 
-        api_gateway_stack = ApiGatewayStack(
-            self,
-            "MediaLakeApiGatewayStack",
-            props=ApiGatewayStackProps(
-                iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
-                external_payload_bucket=props.base_infrastructure.external_payload_bucket,
-                media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
-                pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
-                asset_table_file_hash_index_arn=props.base_infrastructure.asset_table_file_hash_index_arn,
-                asset_table_asset_id_index_arn=props.base_infrastructure.asset_table_asset_id_index_arn,
-                asset_table_s3_path_index_arn=props.base_infrastructure.asset_table_s3_path_index_arn,
-                ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-                asset_table=props.base_infrastructure.asset_table,
-                vpc=props.base_infrastructure.vpc,
-                security_group=props.base_infrastructure.security_group,
-                collection_endpoint=props.base_infrastructure.collection_endpoint,
-                collection_arn=props.base_infrastructure.collection_arn,
-                access_log_bucket=props.base_infrastructure.access_log_bucket,
-                pipeline_table=props.base_infrastructure.pipeline_table,
-                pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-                node_table=nodes_stack.pipelines_nodes_table,
-                asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
-                asset_sync_engine_lambda=asset_sync_stack.asset_sync_engine_lambda,
-                system_settings_table=settings_stack.system_settings_table_name,
-                rest_api=props.api_gateway_core_stack.rest_api,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                user_pool=props.cognito_stack.user_pool,
-                identity_pool=props.cognito_stack.identity_pool,
-                user_pool_client=props.cognito_stack.user_pool_client,
-                waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
+        asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
+            asset_table=props.base_infrastructure.asset_table,
+            ingest_event_bus=props.base_infrastructure.ingest_event_bus
+            ),
+        )
+        
+        api_gateway_stack = ApiGatewayStack(self, "MediaLakeApiGatewayStack", props=ApiGatewayStackProps(
+            iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
+            external_payload_bucket=props.base_infrastructure.external_payload_bucket,
+            media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
+            pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
+            asset_table_file_hash_index_arn=props.base_infrastructure.asset_table_file_hash_index_arn,
+            asset_table_asset_id_index_arn=props.base_infrastructure.asset_table_asset_id_index_arn,
+            asset_table_s3_path_index_arn=props.base_infrastructure.asset_table_s3_path_index_arn,
+            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+            asset_table=props.base_infrastructure.asset_table,
+            vpc=props.base_infrastructure.vpc,
+            security_group=props.base_infrastructure.security_group,
+            collection_endpoint=props.base_infrastructure.collection_endpoint,
+            collection_arn=props.base_infrastructure.collection_arn,
+            access_log_bucket=props.base_infrastructure.access_log_bucket,
+            pipeline_table=props.base_infrastructure.pipeline_table,
+            pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
+            node_table=nodes_stack.pipelines_nodes_table,
+            asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
+            asset_sync_engine_lambda=asset_sync_stack.asset_sync_engine_lambda,
+            system_settings_table=settings_stack.system_settings_table_name,
+            rest_api=props.api_gateway_core_stack.rest_api,
+            x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+            user_pool=props.api_gateway_core_stack.user_pool,
+            identity_pool=props.api_gateway_core_stack.identity_pool,
+            user_pool_client=props.api_gateway_core_stack.user_pool_client,
+            waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
+            user_table=users_groups_roles_stack.user_table, 
             ),
         )
 
@@ -277,16 +281,13 @@ class MediaLakeStack(cdk.Stack):
                 mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
-
-        _ = IntegrationsEnvironmentStack(
-            self,
-            "MediaLakeIntegrationsEnvironment",
-            props=IntegrationsEnvironmentStackProps(
-                api_resource=props.api_gateway_core_stack.rest_api,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-                post_pipelines_v2_lambda=pipeline_stack.post_pipelinesv2_async_handler,
+        
+        integrations_environment_stack = IntegrationsEnvironmentStack(self, "MediaLakeIntegrationsEnvironment", props=IntegrationsEnvironmentStackProps(
+            api_resource=props.api_gateway_core_stack.rest_api,
+            cognito_user_pool=props.api_gateway_core_stack.user_pool,
+            x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+            pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
+            post_pipelines_lambda=pipeline_stack.post_pipelines_async_handler,
             ),
         )
 

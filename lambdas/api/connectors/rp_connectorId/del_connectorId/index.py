@@ -72,43 +72,88 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
 
         errors = []
 
-        # Delete Event Source Mapping or Pipe (if applicable)
-        event_source_type = connector.get("configuration", {}).get("eventSourceType")
-        event_source_arn = connector.get("configuration", {}).get("eventSourceArn") # Actually Pipe ARN or SQS ARN
-        esm_uuid = None # Store ESM UUID if needed for Lambda ESM deletion
+        # Get pipe and pipe role information from connector
+        pipe_arn = connector.get("pipeArn")
+        pipe_role_arn = connector.get("pipeRoleArn")
+        integration_method = connector.get("integrationMethod")
 
-        if event_source_type == "SQS":
-            # Find the Event Source Mapping UUID for the specific Lambda and SQS queue
-            try:
-                mappings = lambda_client.list_event_source_mappings(FunctionName=lambda_arn, EventSourceArn=event_source_arn)
-                if mappings.get('EventSourceMappings'):
-                    esm_uuid = mappings['EventSourceMappings'][0]['UUID']
-                    logger.info(f"Found Event Source Mapping UUID: {esm_uuid}")
-                    lambda_client.delete_event_source_mapping(UUID=esm_uuid)
-                    logger.info(f"Deleted Lambda Event Source Mapping: {esm_uuid}")
-            except ClientError as e:
-                if e.response["Error"]["Code"] != "ResourceNotFoundException":
-                    error_msg = f"Error deleting Lambda Event Source Mapping: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
-
-        elif event_source_type == "Pipe":
-            pipe_name = event_source_arn.split(':')[-1] # Extract pipe name from ARN
+        # Delete EventBridge Pipe if it exists
+        if pipe_arn and integration_method == "eventbridge":
+            pipe_name = pipe_arn.split(':')[-1].split('/')[-1]  # Extract pipe name from ARN
             try:
                 # Check pipe state and stop if running
                 pipe_info = pipes_client.describe_pipe(Name=pipe_name)
                 if pipe_info.get('CurrentState') == 'RUNNING':
-                   logger.info(f"Stopping pipe: {pipe_name}")
-                   pipes_client.stop_pipe(Name=pipe_name)
-                   # Add a short wait for the pipe to stop (adjust as needed)
-                   import time
-                   time.sleep(10) 
+                    logger.info(f"Stopping pipe: {pipe_name}")
+                    pipes_client.stop_pipe(Name=pipe_name)
+                    # Add a short wait for the pipe to stop (adjust as needed)
+                    import time
+                    time.sleep(10)
 
-                pipes_client.delete_pipe(Name=pipe_name)
-                logger.info(f"Deleted EventBridge Pipe: {pipe_name}")
+                # Delete pipe with exponential backoff retry logic
+                import time
+                max_retries = 4
+                base_delay = 2  # seconds
+                
+                for attempt in range(max_retries):
+                    try:
+                        pipes_client.delete_pipe(Name=pipe_name)
+                        logger.info(f"Deleted EventBridge Pipe: {pipe_name}")
+                        break
+                    except ClientError as delete_error:
+                        if delete_error.response["Error"]["Code"] == "ConflictException":
+                            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                                logger.warning(f"Pipe {pipe_name} is updating concurrently. Retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})")
+                                time.sleep(delay)
+                            else:
+                                error_msg = f"Error deleting Pipe {pipe_name} after {max_retries} attempts: {str(delete_error)}"
+                                logger.error(error_msg)
+                                errors.append(error_msg)
+                        else:
+                            # Different error, don't retry
+                            if delete_error.response["Error"]["Code"] == "ResourceNotFoundException":
+                                logger.warning(f"Pipe {pipe_name} does not exist, skipping deletion")
+                            else:
+                                error_msg = f"Error deleting Pipe {pipe_name}: {str(delete_error)}"
+                                logger.error(error_msg)
+                                errors.append(error_msg)
+                            break
+                            
             except ClientError as e:
-                if e.response["Error"]["Code"] != "ResourceNotFoundException":
-                    error_msg = f"Error deleting Pipe {pipe_name}: {str(e)}"
+                if e.response["Error"]["Code"] in ["ResourceNotFoundException", "NotFoundException"]:
+                    logger.warning(f"Pipe {pipe_name} does not exist, skipping deletion")
+                else:
+                    error_msg = f"Error describing/stopping Pipe {pipe_name}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+        # Delete Pipe IAM role if it exists
+        if pipe_role_arn and integration_method == "eventbridge":
+            pipe_role_name = pipe_role_arn.split("/")[-1]
+            try:
+                # Detach all managed policies from pipe role
+                attached_policies = iam.list_attached_role_policies(RoleName=pipe_role_name)[
+                    "AttachedPolicies"
+                ]
+                for policy in attached_policies:
+                    iam.detach_role_policy(
+                        RoleName=pipe_role_name, PolicyArn=policy["PolicyArn"]
+                    )
+
+                # Delete all inline policies from pipe role
+                inline_policies = iam.list_role_policies(RoleName=pipe_role_name)["PolicyNames"]
+                for policy_name in inline_policies:
+                    iam.delete_role_policy(RoleName=pipe_role_name, PolicyName=policy_name)
+
+                # Delete the pipe role
+                iam.delete_role(RoleName=pipe_role_name)
+                logger.info(f"Deleted Pipe IAM role: {pipe_role_name}")
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchEntity":
+                    logger.warning(f"Pipe IAM role {pipe_role_name} does not exist, skipping deletion")
+                else:
+                    error_msg = f"Error deleting Pipe IAM role: {str(e)}"
                     logger.error(error_msg)
                     errors.append(error_msg)
 
@@ -117,7 +162,9 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             lambda_client.delete_function(FunctionName=lambda_arn.split(":")[-1])
             logger.info(f"Deleted Lambda function: {lambda_arn}")
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                logger.warning(f"Lambda function {lambda_arn} does not exist, skipping deletion")
+            else:
                 error_msg = f"Error deleting Lambda: {str(e)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
@@ -143,7 +190,9 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             iam.delete_role(RoleName=role_name)
             logger.info(f"Deleted IAM role: {role_name}")
         except ClientError as e:
-            if e.response["Error"]["Code"] != "NoSuchEntity":
+            if e.response["Error"]["Code"] == "NoSuchEntity":
+                logger.warning(f"IAM role {role_name} does not exist, skipping deletion")
+            else:
                 error_msg = f"Error deleting IAM role: {str(e)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
@@ -154,19 +203,19 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             logger.info(f"Deleted SQS queue: {queue_url}")
         except ClientError as e:
             # Handle potential variations in error codes for non-existent queues
-            if e.response["Error"]["Code"] not in ["AWS.SimpleQueueService.NonExistentQueue", "QueueDoesNotExist"]:
+            if e.response["Error"]["Code"] in ["AWS.SimpleQueueService.NonExistentQueue", "QueueDoesNotExist"]:
+                logger.warning(f"SQS queue {queue_url} does not exist, skipping deletion")
+            else:
                 error_msg = f"Error deleting SQS queue: {str(e)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
 
-        # Remove S3 bucket notification
+        # Remove S3 bucket notification or EventBridge rule
         try:
-            
             # Handle different integration methods
-            integration_method = connector.get("integrationMethod")
             if integration_method == "s3Notifications":
                 notification_name = f"{os.environ.get('RESOURCE_PREFIX')}_notifications_{connector_id}"
-                errors.extend(remove_event_notification_by_name(s3, bucket_name,notification_name))
+                errors.extend(remove_event_notification_by_name(s3, bucket_name, notification_name))
             elif integration_method == "eventbridge":
                 errors.extend(remove_eventbridge_rule(eventbridge, connector_id, region))
             else:
@@ -175,7 +224,9 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 )
                 
         except ClientError as e:
-            if e.response["Error"]["Code"] != "NoSuchBucket":
+            if e.response["Error"]["Code"] == "NoSuchBucket":
+                logger.warning(f"S3 bucket {bucket_name} does not exist, skipping notification cleanup")
+            else:
                 error_msg = f"Error removing S3 bucket notification: {str(e)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
@@ -278,7 +329,9 @@ def remove_event_notification_by_name(s3: Any, bucket_name: str, notification_na
         logger.info(f"Removed notification '{notification_name}' from bucket: {bucket_name}")
         
     except ClientError as e:
-        if e.response["Error"]["Code"] != "NoSuchBucket":
+        if e.response["Error"]["Code"] == "NoSuchBucket":
+            logger.warning(f"S3 bucket {bucket_name} does not exist, skipping notification '{notification_name}' removal")
+        else:
             error_msg = f"Error removing S3 bucket notification '{notification_name}': {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
@@ -310,7 +363,9 @@ def remove_eventbridge_rule(
             f"Successfully removed EventBridge rule and targets for connector: {connector_id}"
         )
     except ClientError as e:
-        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+        if e.response["Error"]["Code"] == "ResourceNotFoundException":
+            logger.warning(f"EventBridge rule {rule_name} does not exist, skipping deletion")
+        else:
             error_msg = f"Error removing EventBridge rule: {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)

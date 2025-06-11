@@ -30,12 +30,7 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
     const openSidebar = () => setIsExpanded(true);
-    const closeSidebar = () => {
-        // Don't close if there are selected items and multi-select is enabled
-        if (!hasSelectedItems || !multiSelectFeature.value) {
-            setIsExpanded(false);
-        }
-    };
+    const closeSidebar = () => setIsExpanded(false);
     
     const [width, setWidth] = useState(DEFAULT_WIDTH);
 
@@ -50,12 +45,8 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
         }
     }, []);
 
-    // Keep sidebar open when items are selected (only if multi-select is enabled)
-    useEffect(() => {
-        if (hasSelectedItems && multiSelectFeature.value) {
-            openSidebar();
-        }
-    }, [hasSelectedItems, multiSelectFeature.value]);
+    // Note: Removed automatic sidebar opening when items are selected
+    // Users can now manually control sidebar visibility regardless of selection state
 
     return (
         <RightSidebarContext.Provider value={{ 

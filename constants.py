@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Constants used throughout the Media Lake CDK application.
 This file contains named constants to ensure consistency across stacks and constructs.
@@ -8,6 +6,7 @@ This file contains named constants to ensure consistency across stacks and const
 
 from enum import Enum
 from typing import Dict, List, Any
+from config import config
 
 # Environment names
 class Environment(str, Enum):
@@ -17,7 +16,7 @@ class Environment(str, Enum):
 
 # General constants
 APP_NAME = "medialake"
-APP_PREFIX = "ml"  # Short prefix for resource naming
+APP_PREFIX = "ml"
 
 # Resource naming patterns
 class ResourceNames:
@@ -119,10 +118,40 @@ class DynamoDB:
     ASSETS_TABLE = "assets"
     METADATA_TABLE = "metadata"
     USERS_TABLE = "users"
+    CONNECTOR_TABLE = "connectors"
+    ASSET_SYNC_JOB_TABLE = "asset-sync-job"
+    ASSET_SYNC_CHUNK_TABLE = "asset-sync-chunk"
+    ASSET_SYNC_ERROR_TABLE = "asset-sync-error"
     
     # Default capacity
     DEFAULT_READ_CAPACITY = 5
     DEFAULT_WRITE_CAPACITY = 5
+    
+    @staticmethod
+    def connector_table_name(environment: str = None) -> str:
+        """Get the full connector table name with prefix and environment"""
+        env = environment or config.environment
+        return f"{config.resource_prefix}_{DynamoDB.CONNECTOR_TABLE}_table_{env}"
+    
+    @staticmethod
+    def asset_sync_job_table_name() -> str:
+        """Get the full asset sync job table name with prefix"""
+        return f"{config.resource_prefix}-{DynamoDB.ASSET_SYNC_JOB_TABLE}-table"
+    
+    @staticmethod
+    def asset_sync_chunk_table_name() -> str:
+        """Get the full asset sync chunk table name with prefix"""
+        return f"{config.resource_prefix}-{DynamoDB.ASSET_SYNC_CHUNK_TABLE}-table"
+    
+    @staticmethod
+    def asset_sync_error_table_name() -> str:
+        """Get the full asset sync error table name with prefix"""
+        return f"{config.resource_prefix}-{DynamoDB.ASSET_SYNC_ERROR_TABLE}-table"
+    
+    @staticmethod
+    def connector_table_arn(region: str, account: str) -> str:
+        """Get the full connector table ARN"""
+        return f"arn:aws:dynamodb:{region}:{account}:table/{DynamoDB.connector_table_name()}"
 
 # CloudFront constants
 class CloudFront:
@@ -178,6 +207,56 @@ class Headers:
     AUTHORIZATION = "Authorization"
     CORS_ORIGIN = "Access-Control-Allow-Origin"
 
+# Environment variable names used across lambdas
+class EnvVars:
+    """Environment variable name constants"""
+    CONNECTOR_TABLE_NAME = "CONNECTOR_TABLE_NAME"
+    JOB_TABLE_NAME = "JOB_TABLE_NAME"
+    CHUNK_TABLE_NAME = "CHUNK_TABLE_NAME"
+    ERROR_TABLE_NAME = "ERROR_TABLE_NAME"
+    PROCESSOR_QUEUE_URL = "PROCESSOR_QUEUE_URL"
+    RESULTS_BUCKET_NAME = "RESULTS_BUCKET_NAME"
+    BATCH_OPERATIONS_ROLE_ARN = "BATCH_OPERATIONS_ROLE_ARN"
+    STATUS_TOPIC_ARN = "STATUS_TOPIC_ARN"
+    PROCESSOR_FUNCTION_ARN = "PROCESSOR_FUNCTION_ARN"
+
+# Common DynamoDB permission sets
+class DynamoDBPermissions:
+    """Common DynamoDB permission action sets"""
+    
+    READ_ONLY = [
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+    ]
+    
+    READ_WRITE = [
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:BatchWriteItem",
+    ]
+    
+    QUERY_ONLY = [
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+    ]
+
+# SNS Topic names
+class SNS:
+    """SNS topic name constants"""
+    ASSET_SYNC_STATUS_TOPIC = "asset-sync-status"
+    
+    @staticmethod
+    def asset_sync_status_topic_name() -> str:
+        """Get the full asset sync status topic name with prefix"""
+        return f"{config.resource_prefix}-{SNS.ASSET_SYNC_STATUS_TOPIC}-topic"
+
 # Media formats and MIME types
 class MediaFormats:
     """Supported media formats and their MIME types"""
@@ -196,5 +275,4 @@ class MediaFormats:
         "mov": "video/quicktime",
         "mp3": "audio/mpeg",
         "pdf": "application/pdf",
-        # Add more mappings as needed
     } 

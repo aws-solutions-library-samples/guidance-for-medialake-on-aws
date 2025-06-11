@@ -205,10 +205,10 @@ class PipelineStack(cdk.NestedStack):
                 ),
             )
             
-            # Invoke the post_pipeline_v2 Lambda to create the pipeline
+            # Invoke the post_pipeline Lambda to create the pipeline
             lambda_payload = {
                 "httpMethod": "POST",
-                "path": "/pipelines/v2",
+                "path": "/pipelines",
                 "definitionFile": {
                     "bucket": props.iac_assets_bucket.bucket_name,
                     "key": f"pipeline_library/{pipeline_filename}",
@@ -224,7 +224,7 @@ class PipelineStack(cdk.NestedStack):
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": self._pipelines_api.post_pipelinesv2_async_handler.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelines_async_handler.function_name,
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -235,7 +235,7 @@ class PipelineStack(cdk.NestedStack):
                     service="Lambda",
                     action="invoke",
                     parameters={
-                        "FunctionName": self._pipelines_api.post_pipelinesv2_async_handler.function_name,
+                        "FunctionName": self._pipelines_api.post_pipelines_async_handler.function_name,
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
@@ -246,7 +246,7 @@ class PipelineStack(cdk.NestedStack):
                     [
                         iam.PolicyStatement(
                             actions=["lambda:InvokeFunction"],
-                            resources=[self._pipelines_api.post_pipelinesv2_async_handler.function_arn],
+                            resources=[self._pipelines_api.post_pipelines_async_handler.function_arn],
                         )
                     ]
                 ),
@@ -256,5 +256,5 @@ class PipelineStack(cdk.NestedStack):
             
 
     @property
-    def post_pipelinesv2_async_handler(self) -> lambda_.Function:
-        return self._pipelines_api.post_pipelinesv2_async_handler
+    def post_pipelines_async_handler(self) -> lambda_.Function:
+        return self._pipelines_api.post_pipelines_async_handler

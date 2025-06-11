@@ -89,9 +89,13 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
 
   // Load a flow from a JSON file.
   const handleLoadFlow = (event: ChangeEvent<HTMLInputElement>) => {
+    console.log('[PipelineToolbar] handleLoadFlow called', event);
     const fileReader = new FileReader();
     const files = event.target.files;
+    console.log('[PipelineToolbar] Files selected:', files);
+    
     if (files && files.length > 0) {
+      console.log('[PipelineToolbar] Starting import process for file:', files[0].name);
       setIsImporting(true);
 
       // Extract the file name without extension to use as pipeline name
@@ -99,6 +103,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
       const pipelineNameFromFile = fileName.endsWith('.json')
         ? fileName.slice(0, -5) // Remove .json extension
         : fileName;
+
+      console.log('[PipelineToolbar] Pipeline name from file:', pipelineNameFromFile);
 
       // Update the pipeline name
       onPipelineNameChange(pipelineNameFromFile);
@@ -123,17 +129,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             // Check if the flow uses the nodes/edges structure
             if (processedFlow.nodes && processedFlow.edges) {
               // Fix edges first to ensure proper connections
-              const fixedEdges = flow.edges.map((edge: any) => {
+              const fixedEdges = (processedFlow.edges || []).map((edge: any) => {
                 // Ensure edge has data field
                 if (!edge.data) {
                   edge.data = { text: '' };
                 }
 
                 // Find the source node for this edge
-                const sourceNode = flow.nodes.find((n: any) => n.id === edge.source);
+                const sourceNode = processedFlow.nodes.find((n: any) => n.id === edge.source);
 
                 // Find the target node for this edge
-                const targetNode = flow.nodes.find((n: any) => n.id === edge.target);
+                const targetNode = processedFlow.nodes.find((n: any) => n.id === edge.target);
 
                 // Fix Map node connections
                 if (sourceNode && sourceNode.data && (sourceNode.data.id === 'map' || sourceNode.data.nodeId === 'map')) {
@@ -199,7 +205,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               });
 
               // Now fix the nodes
-              const fixedNodes = flow.nodes.map((node: any) => {
+              const fixedNodes = (processedFlow.nodes || []).map((node: any) => {
                 // Fix Map node configuration
                 if (node.data && (node.data.id === 'map' || node.data.nodeId === 'map') && node.data.type === 'FLOW') {
                   console.log('[PipelineToolbar] Fixing Map node for import:', node.id);
@@ -478,11 +484,18 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             }
           }
         } catch (error) {
-          console.error('Error parsing flow JSON', error);
+          console.error('[PipelineToolbar] Error parsing flow JSON', error);
         } finally {
           setIsImporting(false);
         }
       };
+
+      fileReader.onerror = (error) => {
+        console.error('[PipelineToolbar] FileReader error:', error);
+        setIsImporting(false);
+      };
+    } else {
+      console.log('[PipelineToolbar] No files selected or files array is empty');
     }
   };
 
@@ -770,6 +783,40 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   };
 
   // Export the current flow as a JSON file.
+  // Helper function to check if export should be disabled
+  const isExportDisabled = (): boolean => {
+    // Check if pipeline name is set
+    if (!pipelineName || !pipelineName.trim()) {
+      return true;
+    }
+
+    // Check if at least one node exists on the canvas
+    if (reactFlowInstance) {
+      const flow = reactFlowInstance.toObject();
+      if (!flow.nodes || flow.nodes.length === 0) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Helper function to get tooltip message for disabled export
+  const getExportTooltipMessage = (): string => {
+    if (!pipelineName || !pipelineName.trim()) {
+      return 'Pipeline name is required before exporting';
+    }
+
+    if (reactFlowInstance) {
+      const flow = reactFlowInstance.toObject();
+      if (!flow.nodes || flow.nodes.length === 0) {
+        return 'At least one node must be added to the canvas before exporting';
+      }
+    }
+
+    return 'Export Pipeline';
+  };
+
   const onExport = (): void => {
     if (reactFlowInstance) {
       // Get the flow object from ReactFlow
@@ -784,8 +831,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      // Use the pipeline name for the file name, or default to 'flow' if empty
-      const fileName = pipelineName.trim() ? `${pipelineName}.json` : 'flow.json';
+      // Use the pipeline name for the file name
+      const fileName = `${pipelineName.trim()}.json`;
       a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
@@ -989,16 +1036,13 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   };
 
   const handleImport = () => {
+    console.log('[PipelineToolbar] handleImport called');
+    console.log('[PipelineToolbar] fileInputRef.current:', fileInputRef.current);
     fileInputRef.current?.click();
     setImportExportOpen(false);
   };
 
-  // Reset file input value when importing is done
-  React.useEffect(() => {
-    if (!isImporting && fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, [isImporting]);
+  // Note: File input value is reset in the onClick handler to allow selecting the same file again
 
   const handleExport = () => {
     onExport();
@@ -1156,6 +1200,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
             ref={fileInputRef}
             style={{ display: 'none' }}
             onChange={handleLoadFlow}
+            onClick={(e) => {
+              console.log('[PipelineToolbar] File input clicked');
+              // Reset the value to allow selecting the same file again
+              (e.target as HTMLInputElement).value = '';
+            }}
           />
 
           {/* Import/Export ButtonGroup */}
@@ -1204,9 +1253,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
                 <Paper>
                   <ClickAwayListener onClickAway={handleImportExportClose}>
                     <MenuList id="import-export-menu" autoFocusItem>
-                      <MenuItem onClick={handleExport}>
-                        <FileDownloadIcon sx={{ mr: 1 }} /> Export Pipeline
-                      </MenuItem>
+                      <Tooltip title={getExportTooltipMessage()} placement="left">
+                        <span>
+                          <MenuItem
+                            onClick={handleExport}
+                            disabled={isExportDisabled()}
+                          >
+                            <FileDownloadIcon sx={{ mr: 1 }} /> Export Pipeline
+                          </MenuItem>
+                        </span>
+                      </Tooltip>
                     </MenuList>
                   </ClickAwayListener>
                 </Paper>

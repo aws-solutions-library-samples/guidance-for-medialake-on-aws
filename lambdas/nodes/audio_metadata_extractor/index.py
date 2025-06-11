@@ -31,6 +31,131 @@ def _strip_decimals(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
 
+# ── helpers: field sanitization ────────────────────────────────────
+def _sanitize_field_name(field_name: str) -> str:
+    """Sanitize all field names to avoid conflicts with object mapping."""
+    # Remove problematic characters and prefixes
+    sanitized = field_name.replace("@", "").replace("#", "")
+    
+    # Convert to lowercase with underscores (snake_case)
+    # This ensures consistent naming and avoids case-sensitive conflicts
+    import re
+    
+    # Insert underscores before uppercase letters (CamelCase to snake_case)
+    sanitized = re.sub(r'(?<!^)(?=[A-Z])', '_', sanitized)
+    
+    # Convert to lowercase
+    sanitized = sanitized.lower()
+    
+    # Replace any remaining problematic characters with underscores
+    sanitized = re.sub(r'[^a-z0-9_]', '_', sanitized)
+    
+    # Remove multiple consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Ensure field name doesn't start with a number
+    if sanitized and sanitized[0].isdigit():
+        sanitized = f"field_{sanitized}"
+    
+    # Ensure we have a valid field name
+    if not sanitized:
+        sanitized = "unknown_field"
+    
+    return sanitized
+
+def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
+    """Ensure field values are simple types, not complex objects."""
+    if isinstance(value, (dict, list)):
+        # Convert complex objects to string representation to avoid mapping conflicts
+        return str(value)
+    elif isinstance(value, (int, float, str, bool)) or value is None:
+        # Handle duration fields specially - always convert to float for consistency
+        if _should_be_duration_field(field_name):
+            if isinstance(value, (int, float)):
+                return float(value)
+            elif isinstance(value, str):
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return value
+        return value
+    else:
+        # For numeric-looking strings, try to preserve as numbers if the field should be numeric
+        if isinstance(value, str) and _should_be_numeric_field(field_name):
+            try:
+                # Duration fields should always be float
+                if _should_be_duration_field(field_name):
+                    return float(value)
+                # Other numeric fields: Try to convert to int first, then float
+                elif '.' in value:
+                    return float(value)
+                else:
+                    return int(value)
+            except (ValueError, TypeError):
+                pass
+        
+        # Convert any other type to string
+        return str(value)
+
+def _should_be_duration_field(field_name: str) -> bool:
+    """Check if a field should be treated as a duration (always float) based on patterns."""
+    # Convert field name to lowercase for comparison
+    field_lower = field_name.lower()
+    
+    # Pattern-based detection for duration/time fields
+    duration_patterns = [
+        'duration', 'time', 'length', 'runtime',
+        'play', 'playback', 'total', 'media',
+        'stream', 'file', 'track'
+    ]
+    
+    # Check if field name contains duration-related patterns
+    for pattern in duration_patterns:
+        if pattern in field_lower:
+            # Additional check to ensure it's actually time-related
+            time_indicators = ['duration', 'time', 'length', '_ts', 'play', 'runtime']
+            if any(indicator in field_lower for indicator in time_indicators):
+                return True
+    
+    # Check for timestamp and time-specific suffixes
+    time_suffixes = ['_ts', '_time', '_duration', '_length', '_runtime']
+    return any(suffix in field_lower for suffix in time_suffixes)
+
+def _should_be_numeric_field(field_name: str) -> bool:
+    """Check if a field should remain numeric based on its name patterns (excluding duration fields)."""
+    # Duration fields are handled separately, so exclude them from general numeric fields
+    if _should_be_duration_field(field_name):
+        return False
+    
+    # Convert field name to lowercase for comparison
+    field_lower = field_name.lower()
+    
+    # Pattern-based detection for numeric fields
+    numeric_patterns = [
+        # Rate-related fields
+        'rate', 'bitrate', 'framerate', 'samplerate',
+        # Count/quantity fields
+        'count', 'number', 'channels', 'channel',
+        # Size/dimension fields
+        'size', 'width', 'height', 'filesize',
+        # Index/ID fields
+        'index', 'id', 'level', 'profile',
+        # Performance/technical fields
+        'fps', 'delay', 'stream_size'
+    ]
+    
+    # Check if field name contains any numeric patterns
+    for pattern in numeric_patterns:
+        if pattern in field_lower:
+            return True
+    
+    # Check for common numeric suffixes/prefixes
+    numeric_indicators = ['_rate', '_count', '_size', '_width', '_height', '_fps', '_id', '_index']
+    return any(indicator in field_lower for indicator in numeric_indicators)
+
 # ── helpers: analysis tools ────────────────────────────────────────
 def run_ffprobe(file_path: str) -> Dict[str, Any]:
     cmd = ["/opt/bin/ffprobe", "-v", "error",
@@ -66,7 +191,10 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(video_mi):
             for k, v in video_mi[i].items():
                 if v and not merged_v.get(k):
-                    merged_v[k] = v
+                    # Sanitize field name and ensure it's a simple value
+                    sanitized_key = _sanitize_field_name(k)
+                    sanitized_value = _sanitize_field_value(v, sanitized_key)
+                    merged_v[sanitized_key] = sanitized_value
         merged["video"].append(merged_v)
 
     for i, s in enumerate(audio_ff):
@@ -74,7 +202,10 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(audio_mi):
             for k, v in audio_mi[i].items():
                 if v and not merged_a.get(k):
-                    merged_a[k] = v
+                    # Sanitize field name and ensure it's a simple value
+                    sanitized_key = _sanitize_field_name(k)
+                    sanitized_value = _sanitize_field_value(v, sanitized_key)
+                    merged_a[sanitized_key] = sanitized_value
         merged["audio"].append(merged_a)
 
     return merged

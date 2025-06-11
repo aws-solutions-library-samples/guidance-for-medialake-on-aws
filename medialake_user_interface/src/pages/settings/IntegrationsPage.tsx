@@ -10,7 +10,8 @@ import IntegrationForm from '@/features/settings/integrations/components/Integra
 import {
     IntegrationFilters,
     IntegrationSorting,
-    IntegrationsResponse
+    IntegrationsResponse,
+    Integration
 } from '@/features/settings/integrations/types/integrations.types';
 import { IntegrationFormResult } from '@/features/settings/integrations/components/IntegrationForm/types';
 import {
@@ -24,6 +25,7 @@ import queryClient from '@/api/queryClient';
 const IntegrationsPage: React.FC = () => {
     const { t } = useTranslation();
     const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
+    const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
     const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
     const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -107,11 +109,44 @@ const IntegrationsPage: React.FC = () => {
         }, 500);
     };
 
-    const handleCloseIntegrationForm = () => {
-        setOpenIntegrationForm(false);
+    // Handle successful integration update
+    const handleIntegrationUpdated = (result: IntegrationFormResult) => {
+        console.log('Integration updated callback received with result:', result);
+        
+        // Show the success status immediately with loading first
+        setApiStatus({
+            show: true,
+            status: 'loading',
+            action: 'Updating integration...',
+        });
+        
+        // Then show success after a brief moment
+        setTimeout(() => {
+            console.log('Setting API status to success for update');
+            setApiStatus({
+                show: true,
+                status: 'success',
+                action: 'Integration Updated',
+                message: `Integration "${result.nodeId}" has been successfully updated`,
+            });
+            
+            // Refresh the integrations data
+            refreshIntegrations();
+        }, 500);
     };
 
-    const handleEditIntegration = async (id: string, data: any) => {
+    const handleCloseIntegrationForm = () => {
+        setOpenIntegrationForm(false);
+        setEditingIntegration(null);
+    };
+
+    const handleEditIntegration = (id: string, integration: Integration) => {
+        // Set the integration to edit and open the form
+        setEditingIntegration(integration);
+        setOpenIntegrationForm(true);
+    };
+
+    const handleUpdateIntegration = async (id: string, data: any) => {
         setApiStatus({
             show: true,
             status: 'loading',
@@ -262,7 +297,8 @@ const IntegrationsPage: React.FC = () => {
                 open={openIntegrationForm}
                 onClose={handleCloseIntegrationForm}
                 filteredNodes={integrationNodes}
-                onSubmitSuccess={handleIntegrationCreated}
+                onSubmitSuccess={editingIntegration ? handleIntegrationUpdated : handleIntegrationCreated}
+                editingIntegration={editingIntegration}
             />
 
             {/* Confirmation Dialog for Integration Deletion */}

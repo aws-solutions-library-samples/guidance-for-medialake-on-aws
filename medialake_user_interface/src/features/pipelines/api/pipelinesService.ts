@@ -73,12 +73,12 @@ export class PipelinesService {
         pipeline: Pipeline | null;
     }> {
         const encodedArn = encodeURIComponent(executionArn);
-        const response = await apiClient.get<any>(`/pipelinesv2/status/${encodedArn}`);
+        const response = await apiClient.get<any>(`/pipelines/status/${encodedArn}`);
         return response.data;
     }
 
     static async updatePipeline(id: string, data: UpdatePipelineDto): Promise<Pipeline> {
-        // For deployed pipelines, use the pipelinesv2 endpoint with pipeline_id
+        // For deployed pipelines, use the pipelines endpoint with pipeline_id
         if (data.updateDeployed) {
             // Create a new request object with the pipeline_id
             const updateData = {

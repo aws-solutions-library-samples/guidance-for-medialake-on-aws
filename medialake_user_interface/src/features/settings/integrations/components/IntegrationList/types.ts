@@ -22,7 +22,7 @@ export interface ColumnFilter {
 
 export interface IntegrationListProps {
     integrations: Integration[];
-    onEditIntegration: (id: string, data: Partial<Integration>) => void;
+    onEditIntegration: (id: string, integration: Integration) => void;
     onDeleteIntegration: (id: string) => void;
     activeFilters: TanStackColumnFilter[];
     activeSorting: TanStackColumnSort[];

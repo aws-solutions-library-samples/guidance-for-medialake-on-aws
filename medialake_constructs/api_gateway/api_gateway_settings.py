@@ -237,6 +237,8 @@ class SettingsConstruct(Construct):
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
                 ],
                 resources=[self._system_settings_table_arn],
             )

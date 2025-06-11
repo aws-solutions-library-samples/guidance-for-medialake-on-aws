@@ -1,3 +1,4 @@
+// AssetAudio.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
@@ -21,7 +22,52 @@ interface AssetAudioProps {
   src: string;
   alt?: string;
   compact?: boolean;
+  size?: 'small' | 'medium' | 'large';
 }
+
+/**
+ * Now there is only one getSizeStyles(...) function. It returns:
+ *  • musicIconSize, playIconSize, buttonPadding, marginBottom (for compact mode)
+ *  • waveformHeight, barWidth, barCount (for full mode)
+ */
+const getSizeStyles = (size: 'small' | 'medium' | 'large') => {
+  switch (size) {
+    case 'small':
+      return {
+        musicIconSize: 22,
+        playIconSize: 18,
+        buttonPadding: '4px',
+        marginBottom: 0.5,
+
+        waveformHeight: 100,
+        barWidth: 2,
+        barCount: 60,
+      };
+    case 'large':
+      return {
+        musicIconSize: 40,
+        playIconSize: 30,
+        buttonPadding: '10px',
+        marginBottom: 1,
+
+        waveformHeight: 180,
+        barWidth: 5,
+        barCount: 100,
+      };
+    case 'medium':
+    default:
+      return {
+        musicIconSize: 32,
+        playIconSize: 24,
+        buttonPadding: '6px',
+        marginBottom: 0.75,
+
+        waveformHeight: 160,
+        barWidth: 4,
+        barCount: 80,
+      };
+  }
+};
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -29,7 +75,12 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) => {
+const AssetAudio: React.FC<AssetAudioProps> = ({
+  src,
+  alt,
+  compact = false,
+  size = 'medium',
+}) => {
   const theme = useTheme();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -37,6 +88,9 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Merge everything into one sizeStyles object
+  const sizeStyles = getSizeStyles(size);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -59,18 +113,17 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
 
   const togglePlay = () => {
     if (!audioRef.current) return;
-    
+
     if (isPlaying) {
       audioRef.current.pause();
     } else {
       audioRef.current.play();
     }
-    setIsPlaying(!isPlaying);
+    setIsPlaying((prev) => !prev);
   };
 
   const handleTimeChange = (_: Event, newValue: number | number[]) => {
     if (!audioRef.current) return;
-    
     const newTime = newValue as number;
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
@@ -78,11 +131,10 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
 
   const handleVolumeChange = (_: Event, newValue: number | number[]) => {
     if (!audioRef.current) return;
-    
     const newVolume = newValue as number;
     setVolume(newVolume);
     audioRef.current.volume = newVolume / 100;
-    
+
     if (newVolume === 0) {
       setIsMuted(true);
     } else if (isMuted) {
@@ -92,7 +144,6 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
 
   const toggleMute = () => {
     if (!audioRef.current) return;
-    
     if (isMuted) {
       audioRef.current.volume = volume / 100;
       setIsMuted(false);
@@ -102,10 +153,10 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
     }
   };
 
-  // Position indicator for the waveform, based on current time
+  // Calculate progress for waveform percentage
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Render compact version for card and table views
+  // If compact mode is requested, render only the small overlay version
   if (compact) {
     return (
       <Box
@@ -123,8 +174,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
         }}
       >
         <audio ref={audioRef} src={src} preload="metadata" />
-        
-        {/* Audio icon and play button overlay */}
+
         <Box
           sx={{
             display: 'flex',
@@ -136,31 +186,36 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
             height: '100%',
           }}
         >
-          <MusicNoteIcon 
-            sx={{ 
-              fontSize: 32, 
+          <MusicNoteIcon
+            sx={{
+              fontSize: sizeStyles.musicIconSize,
               color: alpha(theme.palette.primary.main, 0.8),
-              mb: 1
-            }} 
+              mb: sizeStyles.marginBottom,
+            }}
           />
-          
+
           <IconButton
             onClick={togglePlay}
             size="small"
             sx={{
               backgroundColor: alpha(theme.palette.primary.main, 0.1),
+              padding: sizeStyles.buttonPadding,
               '&:hover': {
                 backgroundColor: alpha(theme.palette.primary.main, 0.2),
-              }
+              },
+              // ↓ Removed the duplicate `padding` here (that caused the TS1117 error)
             }}
           >
-            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+            {isPlaying ? (
+              <PauseIcon sx={{ fontSize: sizeStyles.playIconSize }} />
+            ) : (
+              <PlayArrowIcon sx={{ fontSize: sizeStyles.playIconSize }} />
+            )}
           </IconButton>
-          
-          {/* Mini progress bar */}
+
           {duration > 0 && (
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 position: 'absolute',
                 bottom: 0,
                 left: 0,
@@ -168,13 +223,13 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
                 height: 3,
               }}
             >
-              <Box 
-                sx={{ 
-                  width: `${progressPercentage}%`, 
-                  height: '100%', 
+              <Box
+                sx={{
+                  width: `${progressPercentage}%`,
+                  height: '100%',
                   backgroundColor: theme.palette.secondary.main,
-                  transition: 'width 0.1s linear'
-                }} 
+                  transition: 'width 0.1s linear',
+                }}
               />
             </Box>
           )}
@@ -183,7 +238,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
     );
   }
 
-  // Original full version
+  // Otherwise, render the full‐sized audio player with waveform, time slider, controls, etc.
   return (
     <Box
       sx={{
@@ -195,62 +250,63 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
         position: 'relative',
         backgroundColor: alpha(theme.palette.background.paper, 0.7),
         borderRadius: 2,
-        p: 3
+        p: 3,
       }}
     >
       <audio ref={audioRef} src={src} preload="metadata" />
-      
-      <Box 
+
+      {/* Waveform Visualization Container */}
+      <Box
         sx={{
           width: '100%',
           maxWidth: 800,
-          height: '160px',
+          height: `${sizeStyles.waveformHeight}px`,
           mb: 4,
           position: 'relative',
           borderRadius: 2,
           p: 2,
           backgroundColor: alpha(theme.palette.background.default, 0.3),
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}
       >
-        {/* Waveform Visualization */}
         <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
-          {/* Colored bars representing waveform */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            height: '100%' 
-          }}>
-            {/* Generate bars dynamically */}
-            {Array.from({ length: 80 }).map((_, index) => {
-              // Create a pattern - higher in middle, lower at ends
+          {/* Bars */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              height: '100%',
+            }}
+          >
+            {Array.from({ length: sizeStyles.barCount }).map((_, index) => {
               const baseHeight = 20;
-              const middleBoost = Math.sin((index / 80) * Math.PI) * 80;
+              const middleBoost =
+                Math.sin((index / sizeStyles.barCount) * Math.PI) * 80;
               const randomVariation = Math.random() * 15;
               const height = baseHeight + middleBoost + randomVariation;
-              
-              // If the bar is before the current playback position, show it in the highlight color
-              const isBeforePlayhead = (index / 80) * 100 <= progressPercentage;
-              
+
+              const isBeforePlayhead =
+                (index / sizeStyles.barCount) * 100 <= progressPercentage;
+
               return (
                 <Box
                   key={index}
                   sx={{
-                    width: '4px',
+                    width: `${sizeStyles.barWidth}px`,
                     height: `${height}px`,
-                    backgroundColor: isBeforePlayhead 
+                    backgroundColor: isBeforePlayhead
                       ? alpha(theme.palette.secondary.main, 0.8)
                       : alpha(theme.palette.primary.main, 0.5),
                     borderRadius: '2px',
-                    transition: 'height 0.1s ease, background-color 0.2s ease'
+                    transition: 'height 0.1s ease, background-color 0.2s ease',
                   }}
                 />
               );
             })}
           </Box>
-          
-          {/* Playhead indicator */}
+
+          {/* Playhead Indicator */}
           <Box
             sx={{
               position: 'absolute',
@@ -261,11 +317,11 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
               backgroundColor: theme.palette.error.main,
               transform: 'translateX(-50%)',
               zIndex: 2,
-              transition: 'left 0.1s ease-out'
+              transition: 'left 0.1s ease-out',
             }}
           />
-          
-          {/* Center line */}
+
+          {/* Center Baseline */}
           <Box
             sx={{
               position: 'absolute',
@@ -274,12 +330,13 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
               top: '50%',
               height: '1px',
               backgroundColor: alpha(theme.palette.text.secondary, 0.3),
-              zIndex: 1
+              zIndex: 1,
             }}
           />
         </Box>
       </Box>
 
+      {/* Controls Panel */}
       <Paper
         elevation={0}
         sx={{
@@ -288,16 +345,30 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
           p: 2,
           borderRadius: 2,
           backgroundColor: alpha(theme.palette.background.paper, 0.9),
-          backdropFilter: 'blur(10px)'
+          backdropFilter: 'blur(10px)',
         }}
       >
         <Stack spacing={2}>
-          <Typography variant="h6" align="center" sx={{ fontWeight: 500 }}>
+          <Typography
+            variant="h6"
+            align="center"
+            sx={{ fontWeight: 500 }}
+          >
             {alt || 'Audio Player'}
           </Typography>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
-            <Typography variant="body2">{formatTime(currentTime)}</Typography>
+
+          {/* Time Slider + Timestamps */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 1,
+            }}
+          >
+            <Typography variant="body2">
+              {formatTime(currentTime)}
+            </Typography>
             <Slider
               value={currentTime}
               max={duration || 100}
@@ -309,37 +380,73 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
                 '& .MuiSlider-thumb': {
                   width: 12,
                   height: 12,
-                }
+                },
               }}
             />
-            <Typography variant="body2">{formatTime(duration)}</Typography>
+            <Typography variant="body2">
+              {formatTime(duration)}
+            </Typography>
           </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconButton aria-label="previous" sx={{ color: theme.palette.text.secondary }}>
+
+          {/* Play / Pause / Skip Controls */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconButton
+              aria-label="previous"
+              sx={{ color: theme.palette.text.secondary }}
+            >
               <SkipPreviousIcon fontSize="large" />
             </IconButton>
-            <IconButton 
-              aria-label={isPlaying ? 'pause' : 'play'} 
+            <IconButton
+              aria-label={isPlaying ? 'pause' : 'play'}
               onClick={togglePlay}
               sx={{
                 mx: 2,
                 color: theme.palette.primary.main,
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                backgroundColor: alpha(
+                  theme.palette.primary.main,
+                  0.1
+                ),
                 '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                }
+                  backgroundColor: alpha(
+                    theme.palette.primary.main,
+                    0.2
+                  ),
+                },
               }}
             >
-              {isPlaying ? <PauseIcon fontSize="large" /> : <PlayArrowIcon fontSize="large" />}
+              {isPlaying ? (
+                <PauseIcon fontSize="large" />
+              ) : (
+                <PlayArrowIcon fontSize="large" />
+              )}
             </IconButton>
-            <IconButton aria-label="next" sx={{ color: theme.palette.text.secondary }}>
+            <IconButton
+              aria-label="next"
+              sx={{ color: theme.palette.text.secondary }}
+            >
               <SkipNextIcon fontSize="large" />
             </IconButton>
           </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
-            <IconButton aria-label="toggle-mute" onClick={toggleMute} sx={{ color: theme.palette.text.secondary }}>
+
+          {/* Volume / Mute */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              px: 2,
+            }}
+          >
+            <IconButton
+              aria-label="toggle-mute"
+              onClick={toggleMute}
+              sx={{ color: theme.palette.text.secondary }}
+            >
               {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
             </IconButton>
             <Slider
@@ -354,18 +461,21 @@ const AssetAudio: React.FC<AssetAudioProps> = ({ src, alt, compact = false }) =>
                 '& .MuiSlider-thumb': {
                   width: 8,
                   height: 8,
-                }
+                },
               }}
             />
           </Box>
         </Stack>
       </Paper>
 
-      <Typography variant="caption" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+      <Typography
+        variant="caption"
+        sx={{ mt: 2, color: theme.palette.text.secondary }}
+      >
         Format: MP3 • Sample Rate: 44.1 kHz • Bit Rate: 320 kbps • Channels: Stereo
       </Typography>
     </Box>
   );
 };
 
-export default AssetAudio; 
+export default AssetAudio;

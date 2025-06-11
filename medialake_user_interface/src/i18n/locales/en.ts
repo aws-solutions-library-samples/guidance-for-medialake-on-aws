@@ -76,7 +76,8 @@ export default {
           title: 'Confirm Delete',
           description: 'Are you sure you want to delete this asset? This action cannot be undone.',
           cancel: 'Cancel',
-          confirm: 'Delete'
+          confirm: 'Delete',
+          deleting: 'Deleting...'
         }
       },
     home: {

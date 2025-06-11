@@ -9,6 +9,7 @@ import hashlib
 import functools
 import concurrent.futures
 import threading
+import resource
 from botocore.config import Config
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -17,6 +18,15 @@ from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.parser import parse, event_parser
 from decimal import Decimal
 from contextlib import contextmanager
+
+# Global clients - initialized once for Lambda container reuse
+s3_client = None
+dynamodb_resource = None
+dynamodb_client = None
+eventbridge_client = None
+
+# Environment configuration
+DO_NOT_INGEST_DUPLICATES = os.environ.get("DO_NOT_INGEST_DUPLICATES", "True").lower() == "true"
 
 # Configure environment-specific logging
 def configure_logging():
@@ -36,6 +46,9 @@ metrics = Metrics()
 # Configure logging based on environment
 configure_logging()
 
+# Log configuration at startup
+logger.info(f"Lambda configuration - DO_NOT_INGEST_DUPLICATES: {DO_NOT_INGEST_DUPLICATES}")
+
 # Configure S3 client with retries
 s3_config = Config(
     retries={
@@ -45,6 +58,26 @@ s3_config = Config(
     read_timeout=15,
     connect_timeout=5
 )
+
+def initialize_global_clients():
+    """Initialize global AWS clients for container reuse"""
+    global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client
+    
+    if s3_client is None:
+        s3_client = boto3.client("s3", config=s3_config)
+        logger.info("Initialized global S3 client")
+    
+    if dynamodb_resource is None:
+        dynamodb_resource = boto3.resource("dynamodb")
+        logger.info("Initialized global DynamoDB resource")
+    
+    if dynamodb_client is None:
+        dynamodb_client = boto3.client('dynamodb')
+        logger.info("Initialized global DynamoDB client")
+    
+    if eventbridge_client is None:
+        eventbridge_client = boto3.client("events")
+        logger.info("Initialized global EventBridge client")
 
 # Improved JSON serialization
 class DateTimeEncoder(json.JSONEncoder):
@@ -227,16 +260,18 @@ class AssetRecord(TypedDict):
 
 class AssetProcessor:
     def __init__(self):
-        # Use optimized S3 client with retries
-        self.s3 = boto3.client("s3", config=s3_config)
+        # Ensure global clients are initialized
+        initialize_global_clients()
         
-        # Setup DynamoDB with batch writer for efficiency
-        dynamodb = boto3.resource("dynamodb")
-        self.table = dynamodb.Table(os.environ["ASSETS_TABLE"])
-        self.dynamodb = self.table  # Keep original reference for compatibility
+        # Use global clients for better performance
+        self.s3 = s3_client
+        
+        # Setup DynamoDB with global resources
+        self.table = dynamodb_resource.Table(os.environ["ASSETS_TABLE"])
+        self.dynamodb = self.table
         
         # EventBridge client
-        self.eventbridge = boto3.client("events")
+        self.eventbridge = eventbridge_client
         
         # Cache for extension to content type mapping
         self.extension_content_type_cache = {}
@@ -518,10 +553,17 @@ class AssetProcessor:
             # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
             
-            # Check if file with same hash exists in DynamoDB
-            existing_file = self._check_existing_file(md5_hash)
+            # Check if file with same hash exists in DynamoDB (if duplicate checking is enabled)
+            existing_file = None
+            if DO_NOT_INGEST_DUPLICATES:
+                existing_file = self._check_existing_file(md5_hash)
+                logger.info(f"Duplicate checking enabled - checked for existing file with hash {md5_hash}")
+                metrics.add_metric(name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1)
+            else:
+                logger.info(f"Duplicate checking disabled - skipping duplicate check for hash {md5_hash}")
+                metrics.add_metric(name="DuplicateCheckSkipped", unit=MetricUnit.Count, value=1)
             
-            if existing_file:
+            if existing_file and DO_NOT_INGEST_DUPLICATES:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
                 
                 # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
@@ -875,7 +917,7 @@ class AssetProcessor:
                 # Log additional information to help diagnose the issue
                 try:
                     # Check if the table is reachable
-                    table_info = boto3.client('dynamodb').describe_table(
+                    table_info = dynamodb_client.describe_table(
                         TableName=os.environ["ASSETS_TABLE"]
                     )
                     logger.info(f"Table status: {table_info['Table']['TableStatus']}")
@@ -986,9 +1028,14 @@ class AssetProcessor:
                 raise
 
     @tracer.capture_method
-    def delete_asset(self, bucket: str, key: str, is_delete_event: bool = True) -> None:
+    def delete_asset(self, bucket: str, key: str, is_delete_event: bool = True, version_id: str = None) -> None:
         """Delete asset record from DynamoDB based on S3 object deletion"""
         try:
+            # Check if this deletion should be processed based on versioning
+            if not self._should_process_deletion(bucket, key, version_id, is_delete_event):
+                logger.info(f"Skipping deletion processing for {bucket}/{key} - not latest version or versioning check failed")
+                return
+            
             # First, try to find the asset by S3 path
             storage_path = f"{bucket}:{key}"
             logger.info(f"Looking up asset by storage path: {storage_path}")
@@ -1065,6 +1112,75 @@ class AssetProcessor:
             metrics.add_metric(name="AssetDeletionErrors", unit=MetricUnit.Count, value=1)
             raise
 
+    def _should_process_deletion(self, bucket: str, key: str, version_id: str = None, is_delete_event: bool = True) -> bool:
+        """
+        Determine if a deletion should be processed based on versioning.
+        Only process deletions for the latest version if versioning is enabled.
+        """
+        try:
+            # Check if the bucket has versioning enabled
+            try:
+                versioning_response = self.s3.get_bucket_versioning(Bucket=bucket)
+                versioning_status = versioning_response.get('Status', 'Suspended')
+                logger.info(f"Bucket {bucket} versioning status: {versioning_status}")
+                
+                # If versioning is not enabled or suspended, proceed with normal deletion
+                if versioning_status not in ['Enabled']:
+                    logger.info(f"Versioning not enabled for bucket {bucket}, proceeding with deletion")
+                    return True
+                    
+            except Exception as e:
+                logger.warning(f"Could not check versioning status for bucket {bucket}: {str(e)}")
+                # If we can't check versioning, proceed with caution but allow deletion
+                return True
+            
+            # If we have a version_id from the event, check if it's the latest
+            if version_id and version_id != "null":
+                try:
+                    # List object versions to get versions for this specific key
+                    versions_response = self.s3.list_object_versions(
+                        Bucket=bucket,
+                        Prefix=key,
+                        MaxKeys=10  # Get more versions to ensure we find the exact match
+                    )
+                    
+                    # Filter versions to match exact key (since Prefix can return other keys)
+                    exact_versions = [v for v in versions_response.get('Versions', []) if v.get('Key') == key]
+                    
+                    if exact_versions:
+                        # Sort by LastModified to get the latest version first
+                        exact_versions.sort(key=lambda x: x.get('LastModified', datetime.min), reverse=True)
+                        latest_version = exact_versions[0]
+                        latest_version_id = latest_version.get('VersionId')
+                        
+                        logger.info(f"Latest version ID: {latest_version_id}, deletion version ID: {version_id}")
+                        
+                        # Only process if this is the latest version
+                        if version_id == latest_version_id:
+                            logger.info(f"Deletion is for latest version, proceeding")
+                            return True
+                        else:
+                            logger.info(f"Deletion is for older version {version_id}, skipping")
+                            metrics.add_metric(name="OlderVersionDeletionSkipped", unit=MetricUnit.Count, value=1)
+                            return False
+                    else:
+                        logger.warning(f"No versions found for exact key {bucket}/{key}")
+                        return True
+                        
+                except Exception as e:
+                    logger.warning(f"Error checking object versions for {bucket}/{key}: {str(e)}")
+                    # If we can't check versions, be conservative and skip
+                    return False
+            else:
+                # No version ID provided, this might be a non-versioned deletion or delete marker
+                logger.info(f"No version ID provided for deletion, treating as latest version")
+                return True
+                
+        except Exception as e:
+            logger.exception(f"Error in _should_process_deletion for {bucket}/{key}: {str(e)}")
+            # If there's an error in the check, err on the side of caution and skip
+            return False
+
     @tracer.capture_method
     def publish_deletion_event(self, inventory_id: str):
         """Publish asset deletion event to EventBridge with optimized serialization"""
@@ -1121,16 +1237,16 @@ def process_records_in_parallel(processor: AssetProcessor, records: List[Dict], 
         for i, record in enumerate(records):
             try:
                 # Extract S3 details using the helper function
-                bucket, key, event_name = extract_s3_details_from_event(record)
+                bucket, key, event_name, version_id = extract_s3_details_from_event(record)
                 
                 if bucket and key:
                     # Debug log for keys containing special characters
                     if '+' in key or '%' in key:
                         logger.info(f"Key with special characters: {key}")
                     
-                    logger.info(f"Submitting task for bucket: {bucket}, key: {key}, event: {event_name}")
+                    logger.info(f"Submitting task for bucket: {bucket}, key: {key}, event: {event_name}, version: {version_id}")
                     futures.append(
-                        executor.submit(process_s3_event, processor, bucket, key, event_name)
+                        executor.submit(process_s3_event, processor, bucket, key, event_name, version_id)
                     )
                 else:
                     logger.warning(f"Could not extract bucket/key from record {i}")
@@ -1217,9 +1333,11 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
     # Log environment variables at debug level
     logger.debug(f"Environment variables: ASSETS_TABLE={os.environ.get('ASSETS_TABLE')}, EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME')}")
     
+    # Initialize global clients
+    initialize_global_clients()
+    
     # Check DynamoDB table exists
     try:
-        dynamodb_client = boto3.client('dynamodb')
         table_info = dynamodb_client.describe_table(
             TableName=os.environ["ASSETS_TABLE"]
         )
@@ -1319,6 +1437,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             # Extract bucket and key with enhanced robustness
             bucket = None
             key = None
+            version_id = None
             
             # Check all possible locations for bucket
             if isinstance(detail.get("bucket"), dict):
@@ -1329,6 +1448,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             # Check all possible locations for key
             if isinstance(detail.get("object"), dict):
                 key = detail["object"].get("key")
+                version_id = detail["object"].get("version-id") or detail["object"].get("versionId")
             elif isinstance(detail.get("object"), str):
                 key = detail["object"]
             elif "key" in detail:
@@ -1351,8 +1471,8 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             
             # If we have valid bucket and key, process the event
             if bucket and key:
-                logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}")
-                process_s3_event(processor, bucket, key, event_name)
+                logger.info(f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}, version: {version_id}")
+                process_s3_event(processor, bucket, key, event_name, version_id)
             else:
                 logger.warning(f"Missing bucket or key in EventBridge event: {json_serialize(detail)}")
         
@@ -1372,14 +1492,14 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
         raise
 
 
-def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_name: str):
+def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_name: str, version_id: str = None):
     """Process a single S3 event with improved performance"""
     # Skip processing if event type not relevant (quick filtering)
     if not is_relevant_event(event_name):
         logger.info(f"Skipping irrelevant event type: {event_name} for {bucket}/{key}")
         return
     
-    logger.info(f"Processing {event_name} event for asset: {bucket}/{key}")
+    logger.info(f"Processing {event_name} event for asset: {bucket}/{key}, version: {version_id}")
 
     # Record start time for duration tracking
     start_time = datetime.now()
@@ -1387,8 +1507,8 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
     try:
         if event_name.startswith("ObjectRemoved:"):
             # Handle deletion - only delete from DynamoDB, don't try to delete the S3 object again
-            logger.info(f"Processing deletion event for {bucket}/{key}")
-            processor.delete_asset(bucket, key, is_delete_event=True)
+            logger.info(f"Processing deletion event for {bucket}/{key}, version: {version_id}")
+            processor.delete_asset(bucket, key, is_delete_event=True, version_id=version_id)
             metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
             logger.info(f"Asset deletion processed: {key}")
         else:
@@ -1450,16 +1570,15 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
 def get_memory_usage() -> float:
     """Get current memory usage in MB"""
     try:
-        import resource
         return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
-    except ImportError:
+    except (ImportError, AttributeError):
         # If resource module not available (e.g., on Windows), return 0
         return 0
 
-def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
-    Extract S3 bucket, key and event type from various event structures
-    Returns: (bucket, key, event_name)
+    Extract S3 bucket, key, event type, and version ID from various event structures
+    Returns: (bucket, key, event_name, version_id)
     """
     # Direct S3 event structure
     if "s3" in event_record:
@@ -1467,10 +1586,11 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
             bucket = event_record["s3"]["bucket"]["name"]
             key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
             event_name = event_record.get("eventName", "ObjectCreated:")
+            version_id = event_record["s3"]["object"].get("versionId")
             # Log the source for debugging
             event_source = event_record.get("eventSource", "unknown")
-            logger.info(f"Processing direct S3 record from {event_source}: {bucket}/{key}")
-            return bucket, key, event_name
+            logger.info(f"Processing direct S3 record from {event_source}: {bucket}/{key}, version: {version_id}")
+            return bucket, key, event_name, version_id
     
     # SQS message with EventBridge payload
     if "body" in event_record and "eventSource" in event_record and event_record["eventSource"] == "aws:sqs":
@@ -1486,9 +1606,10 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                         bucket = record["s3"]["bucket"]["name"]
                         key = urllib.parse.unquote(record["s3"]["object"]["key"])
                         event_name = record.get("eventName", "ObjectCreated:")
+                        version_id = record["s3"]["object"].get("versionId")
                         # Log the extracted details for debugging
-                        logger.info(f"Extracted from SQS S3 record (source: {record.get('eventSource')}): bucket={bucket}, key={key}, event={event_name}")
-                        return bucket, key, event_name
+                        logger.info(f"Extracted from SQS S3 record (source: {record.get('eventSource')}): bucket={bucket}, key={key}, event={event_name}, version={version_id}")
+                        return bucket, key, event_name, version_id
             
             # Check if this is an S3 event from EventBridge
             if body.get("source") == "aws.s3" and "detail" in body:
@@ -1510,6 +1631,11 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                     elif isinstance(detail["object"], str):
                         key = detail["object"]
                 
+                # Extract version ID
+                version_id = None
+                if "object" in detail and isinstance(detail["object"], dict):
+                    version_id = detail["object"].get("version-id") or detail["object"].get("versionId")
+                
                 # Apply URL decoding to the key if it exists
                 if key:
                     key = urllib.parse.unquote(key)
@@ -1519,11 +1645,11 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                 if body.get("detail-type") == "Object Deleted":
                     event_name = "ObjectRemoved:"
                 
-                return bucket, key, event_name
+                return bucket, key, event_name, version_id
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse SQS message body: {str(e)}")
 
     # Log unrecognized event structure to help diagnose issues
     logger.warning(f"Unrecognized event structure: {json_serialize(event_record)}")
     
-    return None, None, None
+    return None, None, None, None

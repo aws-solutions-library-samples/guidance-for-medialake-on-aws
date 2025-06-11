@@ -107,6 +107,19 @@ class UsersGroupsRolesStack(cdk.NestedStack):
                         type=dynamodb.AttributeType.STRING
                     ),
                     projection_type=dynamodb.ProjectionType.ALL
+                ),
+                # GSI3 (BulkDownloadJobLookup)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI3",
+                    partition_key=dynamodb.Attribute(
+                        name="gsi3Pk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="gsi3Sk",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
                 )
             ]
         )

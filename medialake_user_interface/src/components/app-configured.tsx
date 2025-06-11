@@ -15,6 +15,8 @@ import { TableDensityProvider } from '../contexts/TableDensityContext';
 import { DirectionProvider } from '../contexts/DirectionContext';
 import { router } from '../routes/router';
 import { Box, CircularProgress } from '@mui/material';
+import { NotificationProvider } from './NotificationCenter';
+import { JobNotificationSync } from './JobNotificationSync';
 
 const LoadingFallback = () => (
     <Box sx={{
@@ -55,8 +57,11 @@ const AppConfigured = () => {
                                         <TableDensityProvider>
                                             <ThemeWrapper>
                                                 <ModalProvider>
-                                                    <RouterProvider router={router} />
-                                                    </ModalProvider>
+                                                    <NotificationProvider>
+                                                        <JobNotificationSync />
+                                                        <RouterProvider router={router} />
+                                                    </NotificationProvider>
+                                                </ModalProvider>
                                                 </ThemeWrapper>
                                             </TableDensityProvider>
                                         </DirectionProvider>
