@@ -203,9 +203,9 @@ def seed_group(group: Dict[str, Any]) -> bool:
         )
         
         if "Item" in response:
-            logger.info(f"Group {group['id']} already exists, updating it")
-            # Update the existing item
-            table.put_item(Item=item)
+            logger.info(f"Group {group['id']} already exists, skipping to preserve existing data")
+            # Skip updating existing groups to preserve any customizations
+            return True
         else:
             logger.info(f"Creating group {group['id']}")
             # Create a new item
@@ -258,9 +258,9 @@ def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
         )
         
         if "Item" in response:
-            logger.info(f"Permission set {permission_set['id']} already exists, updating it")
-            # Update the existing item
-            table.put_item(Item=item)
+            logger.info(f"Permission set {permission_set['id']} already exists, skipping to preserve existing data")
+            # Skip updating existing permission sets to preserve any customizations
+            return True
         else:
             logger.info(f"Creating permission set {permission_set['id']}")
             # Create a new item
@@ -319,9 +319,11 @@ def update_handler(event: Dict[str, Any], context: Any) -> None:
         event: CloudFormation Custom Resource event
         context: Lambda context
     """
-    logger.info("Update operation - ensuring default groups and permission sets exist")
-    # For updates, we'll just ensure the default groups and permission sets exist
-    create_handler(event, context)
+    logger.info("Update operation - skipping seeding to preserve existing data")
+    # For updates, we skip seeding to avoid overwriting existing custom groups, 
+    # permission sets, and user assignments that may have been created after initial deployment
+    logger.info("No action taken on UPDATE event to preserve user customizations")
+    pass
 
 @helper.delete
 def delete_handler(event: Dict[str, Any], context: Any) -> None:

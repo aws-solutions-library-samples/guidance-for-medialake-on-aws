@@ -107,6 +107,7 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/pre_token_generation",
                 timeout_minutes=1,
                 lambda_handler="handler",
+                snap_start=True,  # Enable SnapStart for faster cold starts
                 environment_variables={
                     "AUTH_TABLE_NAME": self._auth_table.table_name,
                     "DEBUG_MODE": "true",
@@ -117,6 +118,13 @@ class CognitoConstruct(Construct):
         # Grant read access to the auth table
         self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
         
+        # Grant Cognito permission to invoke the pre_token_generation Lambda
+        self._pre_token_generation_lambda.function.add_permission(
+            "CognitoInvokePreTokenGeneration",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=f"arn:aws:cognito-idp:{Aws.REGION}:{Aws.ACCOUNT_ID}:userpool/*"
+        )
 
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
@@ -259,17 +267,6 @@ class CognitoConstruct(Construct):
         )
         self._domain_prefix = domain_prefix
 
-        # Configure the pre-token generation Lambda as a trigger for the user pool
-        lambda_config = {
-            "PreTokenGenerationConfig": {
-                "LambdaArn": self._pre_token_generation_lambda.function_arn,
-                "LambdaVersion": "V2_0"
-            }
-        }
-        
-        # Update the user pool with the Lambda trigger configuration
-        cfn_user_pool.add_property_override("LambdaConfig", lambda_config)
-        
         # Grant the Cognito service permission to invoke the Lambda
         self._pre_token_generation_lambda.function.add_permission(
             "CognitoInvokePermission",

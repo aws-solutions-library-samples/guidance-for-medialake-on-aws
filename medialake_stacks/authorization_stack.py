@@ -154,6 +154,7 @@ class AuthorizationStack(Stack):
                 entry="lambdas/auth/custom_authorizer",
                 memory_size=256,
                 timeout_minutes=1,
+                snap_start=True,  # Enable SnapStart for faster cold starts
                 environment_variables=common_env_vars,
             ),
         )

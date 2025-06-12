@@ -180,6 +180,8 @@ class LambdaConfig:
         nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
+        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
+                                      Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
     """
 
     name: Optional[str] = None
@@ -201,6 +203,7 @@ class LambdaConfig:
     reserved_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
+    snap_start: Optional[bool] = False
 
 
 class Lambda(Construct):
@@ -408,6 +411,26 @@ class Lambda(Construct):
                 config.filesystem_access_point,
                 config.filesystem_mount_path
             )
+
+        # Add SnapStart if enabled
+        if config.snap_start:
+            logger.debug("SnapStart enabled for Lambda function")
+            # SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes
+            # SnapStart requires SnapStartConf object, not a simple boolean
+            common_lambda_props["snap_start"] = lambda_.SnapStartConf.ON_PUBLISHED_VERSIONS
+            logger.info(f"SnapStart enabled for {config.runtime.family} function - using ON_PUBLISHED_VERSIONS")
+            
+            # Validate runtime support for SnapStart
+            supported_families = [lambda_.RuntimeFamily.JAVA, lambda_.RuntimeFamily.DOTNET_CORE, lambda_.RuntimeFamily.PYTHON]
+            if config.runtime.family not in supported_families:
+                logger.warning(f"SnapStart requested for runtime {config.runtime.family}. SnapStart is currently supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.")
+            elif config.runtime.family == lambda_.RuntimeFamily.PYTHON:
+                # Additional validation for Python - must be 3.12 or later
+                python_version = config.runtime.name
+                if "python3.12" not in python_version.lower() and not any(ver in python_version.lower() for ver in ["python3.13", "python3.14", "python3.15"]):
+                    logger.warning(f"SnapStart requires Python 3.12 or later. Current runtime: {config.runtime.name}")
+                else:
+                    logger.info(f"SnapStart is supported for {config.runtime.name}")
 
         # Create the Lambda function based on runtime
         logger.info(

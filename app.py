@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Entry point for the MediaLake CDK application."""
 import os
+from dataclasses import dataclass
+
 import aws_cdk as cdk
-from cdk_logger import CDKLogger, get_logger
+from aws_cdk import aws_ssm as ssm
+from constructs import Construct
 from cdk_nag import (
     AwsSolutionsChecks,
     NagSuppressions,
-)  # Used for AWS Solutions checks ad-hoc
+)
+
+from cdk_logger import CDKLogger, get_logger
 from config import config
-from aws_cdk import aws_ssm as ssm
-from constructs import Construct
-from dataclasses import dataclass
 
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.api_gateway_core_stack import (
@@ -21,9 +23,9 @@ from medialake_stacks.cognito_stack import (
     CognitoStack,
     CognitoStackProps,
 )
-from medialake_stacks.users_groups_roles_stack import (
-    UsersGroupsRolesStack,
-    UsersGroupsRolesStackProps,
+from medialake_stacks.users_groups_stack import (
+    UsersGroupsStack,
+    UsersGroupsStackProps,
 )
 from medialake_stacks.authorization_stack import (
     AuthorizationStack,
@@ -146,11 +148,10 @@ class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        # All other stacks that use the authorizer should depend on authorization_stack
-        users_groups_roles_stack = UsersGroupsRolesStack(
+        users_groups_roles_stack = UsersGroupsStack(
             self,
             "MediaLakeUsersGroupsRolesStack",
-            props=UsersGroupsRolesStackProps(
+            props=UsersGroupsStackProps(
                 cognito_user_pool=props.cognito_stack.user_pool,
                 cognito_app_client=props.cognito_stack.user_pool_client,
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
@@ -158,7 +159,6 @@ class MediaLakeStack(cdk.Stack):
                 avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
             ),
         )
-        # Add dependency to ensure shared authorizer is created first
         users_groups_roles_stack.add_dependency(props.authorization_stack)
 
         groups_stack = GroupsStack(
@@ -170,7 +170,6 @@ class MediaLakeStack(cdk.Stack):
                 auth_table=props.authorization_stack.auth_table,
             ),
         )
-        # Add dependency to ensure shared authorizer is created first
         groups_stack.add_dependency(props.authorization_stack)
 
         settings_stack = SettingsStack(
@@ -190,18 +189,6 @@ class MediaLakeStack(cdk.Stack):
             props=AssetSyncStackProps(
                 asset_table=props.base_infrastructure.asset_table,
                 ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-            ),
-        )
-
-        _ = SettingsApiStack(
-            self,
-            "MediaLakeSettingsApi",
-            props=SettingsApiStackProps(
-                cognito_user_pool=props.cognito_stack.user_pool,
-                cognito_app_client=props.cognito_stack.user_pool_client_id,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                system_settings_table_name=settings_stack.system_settings_table_name,
-                system_settings_table_arn=settings_stack.system_settings_table_arn,
             ),
         )
 
@@ -239,20 +226,6 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-
-
-        # Create the Permissions Stack as a nested stack
-        permissions_stack = PermissionsStack(
-            self,
-            "MediaLakePermissionsStack",
-            props=PermissionsStackProps(
-                api_resource=props.api_gateway_core_stack.rest_api,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                auth_table=props.authorization_stack.auth_table,
-            ),
-        )
-
         pipeline_stack = PipelineStack(self, "MediaLakePipeline", props=PipelineStackProps(
             iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
             cognito_user_pool=props.cognito_stack.user_pool,
@@ -274,9 +247,32 @@ class MediaLakeStack(cdk.Stack):
             mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
+        
+        _ = SettingsApiStack(
+            self,
+            "MediaLakeSettingsApi",
+            props=SettingsApiStackProps(
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client_id,
+                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                system_settings_table_name=settings_stack.system_settings_table_name,
+                system_settings_table_arn=settings_stack.system_settings_table_arn,
+            ),
+        )
 
+        # Create the Permissions Stack as a nested stack
+        _ = PermissionsStack(
+            self,
+            "MediaLakePermissionsStack",
+            props=PermissionsStackProps(
+                api_resource=props.api_gateway_core_stack.rest_api,
+                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                auth_table=props.authorization_stack.auth_table,
+            ),
+        )
 
-        integrations_environment_stack = IntegrationsEnvironmentStack(self, "MediaLakeIntegrationsEnvironment", props=IntegrationsEnvironmentStackProps(
+        _ = IntegrationsEnvironmentStack(self, "MediaLakeIntegrationsEnvironment", props=IntegrationsEnvironmentStackProps(
             api_resource=props.api_gateway_core_stack.rest_api,
             cognito_user_pool=props.cognito_stack.user_pool,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
@@ -285,8 +281,6 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-
-        # Store api_gateway_stack as an instance variable so it can be accessed by the property
         self._api_gateway_stack = api_gateway_stack
 
     @property

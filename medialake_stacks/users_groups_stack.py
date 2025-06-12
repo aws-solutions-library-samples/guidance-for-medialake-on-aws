@@ -30,7 +30,7 @@ from medialake_constructs.auth.authorizer_utils import create_shared_custom_auth
 
 
 @dataclass
-class UsersGroupsRolesStackProps:
+class UsersGroupsStackProps:
     """Configuration for Users, Groups, and Roles Stack."""
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
@@ -38,14 +38,14 @@ class UsersGroupsRolesStackProps:
     auth_table_name: str
     avp_policy_store_id: str
 
-class UsersGroupsRolesStack(cdk.NestedStack):
+class UsersGroupsStack(cdk.NestedStack):
     """
     Stack for Users, Groups, and Roles API and management.
     This stack creates the users, groups, and roles API endpoints and all related resources.
     """
 
     def __init__(
-        self, scope: Construct, id: str, props: UsersGroupsRolesStackProps, **kwargs
+        self, scope: Construct, id: str, props: UsersGroupsStackProps, **kwargs
     ):
         super().__init__(scope, id, **kwargs)
 

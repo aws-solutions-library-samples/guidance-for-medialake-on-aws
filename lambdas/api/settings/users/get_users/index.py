@@ -1,5 +1,5 @@
 import boto3
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
 import json
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -60,6 +60,25 @@ INPUT_SCHEMA = {
 
 
 @tracer.capture_method
+def get_user_groups(username: str) -> List[str]:
+    """Get groups for a specific user."""
+    try:
+        response = cognito.admin_list_groups_for_user(
+            UserPoolId=USER_POOL_ID, 
+            Username=username
+        )
+        
+        groups = []
+        for group in response.get("Groups", []):
+            groups.append(group.get("GroupName"))
+        
+        return groups
+    except Exception as e:
+        logger.error(f"Error getting groups for user {username}: {str(e)}")
+        return []
+
+
+@tracer.capture_method
 def get_detailed_user_info(username: str) -> Dict[str, Any]:
     """Get detailed user information using admin_get_user."""
     try:
@@ -69,6 +88,9 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
         attributes = {}
         for attr in response.get("UserAttributes", []):
             attributes[attr["Name"]] = attr["Value"]
+
+        # Get user groups
+        user_groups = get_user_groups(username)
 
         return {
             "username": username,
@@ -88,7 +110,7 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
             "email_verified": attributes.get("email_verified"),
             "name": attributes.get("given_name"),
             "family_name": attributes.get("family_name"),
-            "groups": [],
+            "groups": user_groups,
         }
     except Exception as e:
         logger.error(f"Error getting detailed user info for {username}: {str(e)}")
