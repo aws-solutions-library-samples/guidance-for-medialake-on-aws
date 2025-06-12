@@ -15,7 +15,6 @@ import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from 'reac
 import { useGetUnconfiguredNodeMethods } from '@/shared/nodes/api/nodesController';
 import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
 import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
-// import { createJobStatusNodeData } from './jobStatusNodeUtils';
 
 interface NodeSection {
     title: string;
@@ -316,15 +315,6 @@ const SidebarContent: React.FC = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
-    // Handler for dragging the custom job status node
-    // const onDragStartJobStatus = (event: React.DragEvent) => {
-    //     const nodeData = createJobStatusNodeData();
-    //     event.dataTransfer.setData('application/reactflow', JSON.stringify({
-    //         ...nodeData,
-    //         customNodeType: 'jobStatusNode' // This helps identify it as a special node type
-    //     }));
-    //     event.dataTransfer.effectAllowed = 'move';
-    // };
 
     const sections = useMemo(() => {
         if (!nodesResponse?.data) return [];

@@ -35,13 +35,11 @@ import {
     Sidebar,
     NodeConfigurationForm,
     PipelineToolbar,
-    // JobStatusNode
 } from '../components/PipelineEditor';
 import type { PipelineToolbarProps } from '../components/PipelineEditor/PipelineToolbar';
 import IntegrationValidationDialog from '../components/IntegrationValidationDialog';
 import { Node as NodeType, NodeConfiguration, NodeMethod } from '../types';
 import { RightSidebarProvider, useRightSidebar } from '@/components/common/RightSidebar/SidebarContext';
-// import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -60,7 +58,6 @@ interface CustomNodeData {
 
 const nodeTypes = {
     custom: CustomNode,
-    // jobStatusNode: JobStatusNode
 };
 
 const edgeTypes = {
@@ -1175,7 +1172,6 @@ const PipelineEditorContent = () => {
             });
 
             // Check if this is our special job status node
-            // const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
 
             const newReactFlowNode: Node<CustomNodeData> = {
                 id: getId(),
@@ -1224,17 +1220,18 @@ const PipelineEditorContent = () => {
                 }
             }));
 
-            // Determine whether configuration parameters exist
+            // Determine whether configuration parameters exist or if it's an integration node
             const parameters = newReactFlowNode.data.configuration?.parameters;
             const hasParameters = parameters && Object.keys(parameters).length > 0;
+            const isIntegrationNode = newReactFlowNode.data.type === 'INTEGRATION';
 
-            if (hasParameters) {
-                // If parameters exist, open the configuration dialog
+            if (hasParameters || isIntegrationNode) {
+                // If parameters exist or it's an integration node, open the configuration dialog
                 setSelectedNode(nodeWithHandlers);
                 setIsNodeConfigOpen(true);
             } else {
                 // No configuration needed—skip opening the dialog
-                console.log("Node has no configuration parameters; skipping config dialog.");
+                console.log("Node has no configuration parameters and is not an integration node; skipping config dialog.");
             }
 
 
