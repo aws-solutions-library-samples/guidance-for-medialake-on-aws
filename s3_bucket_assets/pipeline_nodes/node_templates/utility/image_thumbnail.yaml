@@ -52,17 +52,17 @@ actions:
       - in: body
         name: width
         required: false
-        default: 200
         schema:
           type: integer
           description: Width of the thumbnail in pixels
+          default: 200
       - in: body
         name: height
         required: false
-        default: 113
         schema:
           type: integer
           description: Height of the thumbnail in pixels
+          default: 113
       - in: body
         name: crop
         required: false
