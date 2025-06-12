@@ -517,97 +517,8 @@ class ApiGatewayPipelinesConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        # DELETE /api/pipelines
-        delete_pipelines_lambda_config = LambdaConfig(
-            name="pipeline_delete",
-            timeout_minutes=15,
-            entry="lambdas/api/pipelines/delete_pipelines",
-            layers=[pyaml_layer.layer, shortuuid_layer.layer],
-            iam_role_boundary_policy=del_lambda_iam_boundary_policy,
-            environment_variables={
-                "PIPELINES_TABLE": props.pipeline_table.table_arn,
-                "NODE_TABLE": props.node_table.table_arn,
-                "ACCOUNT_ID": scope.account,
-            },
-        )
-        self._delete_pipelines_handler = Lambda(
-            self,
-            "DeletePipelinesHandler",
-            config=delete_pipelines_lambda_config,
-        )
-
-        # Add Lambda function deletion permissions
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "lambda:DeleteFunction",
-                    "lambda:ListEventSourceMappings",
-                    "lambda:DeleteEventSourceMapping",
-                    "lambda:GetFunction",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add Step Functions deletion permissions
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["states:DeleteStateMachine", "states:DescribeStateMachine"],
-                resources=["*"],
-            )
-        )
-
-        # Add EventBridge permissions
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "events:RemoveTargets",
-                    "events:DeleteRule",
-                    "events:DescribeRule",
-                    "events:ListTargetsByRule",
-                ],
-                resources=["*"],
-            )
-        )
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "sqs:deletequeue",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add IAM role and policy deletion permissions
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "iam:DeleteRole",
-                    "iam:DeleteRolePolicy",
-                    "iam:DetachRolePolicy",
-                    "iam:ListAttachedRolePolicies",
-                    "iam:ListRolePolicies",
-                    "iam:GetRole",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add DynamoDB permissions
-        self._delete_pipelines_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
-                resources=[props.pipeline_table.table_arn],
-            )
-        )
-
-        # Add the DELETE method to the pipelines_resource
-        pipelines_resource.add_method(
-            "DELETE",
-            apigateway.LambdaIntegration(self._delete_pipelines_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
+        # DELETE /api/pipelines - now handled by the comprehensive del_pipelinesId handler
+        # This endpoint is removed as we're consolidating to use only the {pipelineId} endpoint
 
         # POST /api/pipelines
         post_pipelines_lambda_config = LambdaConfig(
@@ -721,11 +632,21 @@ class ApiGatewayPipelinesConstruct(Construct):
         # DELETE /pipelines/{pipelineId}
         del_pipeline_id_lambda_config = LambdaConfig(
             name="pipeline_del",
+            timeout_minutes=15,
             entry=("lambdas/api/pipelines/rp_pipelinesId/del_pipelinesId"),
+            layers=[pyaml_layer.layer, shortuuid_layer.layer],
             iam_role_boundary_policy=del_lambda_iam_boundary_policy,
             environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "PIPELINES_TABLE": props.pipeline_table.table_arn,
+                "NODE_TABLE": props.node_table.table_arn,
+                "ACCOUNT_ID": scope.account,
+                "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+                "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
+                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
+                "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
+                "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
+                "AWS_REGION": self.region,
             },
         )
 
@@ -758,7 +679,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # Add SQS deletion permissions
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["sqs:DeleteQueue", "sqs:setqueueattributes"],
+                actions=["sqs:DeleteQueue", "sqs:GetQueueAttributes"],
                 resources=["*"],
             )
         )
@@ -794,7 +715,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         # Add DynamoDB delete permission
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
+                actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
             )
         )
@@ -856,10 +777,6 @@ class ApiGatewayPipelinesConstruct(Construct):
     @property
     def del_pipeline_id_handler(self) -> Lambda:
         return self._del_pipeline_id_handler
-
-    @property
-    def delete_pipelines_handler(self) -> Lambda:
-        return self._delete_pipelines_handler
 
     @property
     def pipeline_trigger_lambda(self) -> Lambda:
