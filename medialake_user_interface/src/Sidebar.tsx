@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
@@ -109,6 +109,35 @@ function Sidebar() {
 
     const { ability } = usePermission();
     
+    // Memoize permission checks with error handling
+    const canViewSettings = useMemo(() => {
+        try {
+            return ability?.can('view', 'settings') ?? false;
+        } catch (error) {
+            console.error('Error checking settings permission:', error);
+            return false;
+        }
+    }, [ability]);
+    
+    const canViewPipeline = useMemo(() => {
+        try {
+            return ability?.can('view', 'pipeline') ?? false;
+        } catch (error) {
+            console.error('Error checking pipeline permission:', error);
+            return false;
+        }
+    }, [ability]);
+    
+    // Helper function to safely check permissions
+    const safePermissionCheck = useCallback((action: string, resource: string) => {
+        try {
+            return ability?.can(action as any, resource as any) ?? false;
+        } catch (error) {
+            console.error(`Error checking ${action} permission on ${resource}:`, error);
+            return false;
+        }
+    }, [ability]);
+    
     // Build menu items based on permissions
     const mainMenuItems = [
         {
@@ -127,13 +156,13 @@ function Sidebar() {
             text: t('sidebar.menu.pipelines'),
             icon: <PipelineIcon />,
             path: '/pipelines',
-            visible: ability?.can('view', 'pipeline') ?? false
+            visible: canViewPipeline
         },
         {
             text: t('sidebar.menu.pipelineExecutions'),
             icon: <ExecutionsIcon />,
             path: '/executions',
-            visible: ability?.can('view', 'pipeline') ?? false
+            visible: canViewPipeline
         },
         {
             text: t('sidebar.menu.settings'),
@@ -141,42 +170,42 @@ function Sidebar() {
             onClick: () => setSettingsOpen(!settingsOpen),
             isExpandable: true,
             isExpanded: settingsOpen,
-            visible: ability?.can('view', 'settings') ?? false,
+            visible: canViewSettings,
             subItems: [
                 {
                     text: t('sidebar.submenu.connectors'),
                     icon: <StorageIcon />,
                     path: '/settings/connectors',
-                    visible: (ability?.can('view', 'connector') ?? false) ||
-                             (ability?.can('view', 'settings.connectors') ?? false)
+                    visible: safePermissionCheck('view', 'connector') ||
+                             safePermissionCheck('view', 'settings.connectors')
                 },
                 {
                     text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'),
                     icon: <GroupIcon />,
                     path: '/settings/users-groups',
-                    visible: (ability?.can('view', 'user') ||
-                              ability?.can('view', 'group') ||
-                              ability?.can('view', 'settings.users')) ?? false
+                    visible: safePermissionCheck('view', 'user') ||
+                              safePermissionCheck('view', 'group') ||
+                              safePermissionCheck('view', 'settings.users')
                 },
                 {
                     text: t('sidebar.submenu.permissionSets', 'Permissions'),
                     icon: <SecurityIcon />,
                     path: '/settings/permission-sets',
-                    visible: ability?.can('view', 'permission-set') ?? false
+                    visible: safePermissionCheck('view', 'permission-set')
                 },
                 {
                     text: t('sidebar.submenu.integrations'),
                     icon: <IntegrationIcon />,
                     path: '/settings/integrations',
-                    visible: (ability?.can('view', 'integration') ?? false) ||
-                             (ability?.can('view', 'settings.integrations') ?? false)
+                    visible: safePermissionCheck('view', 'integration') ||
+                             safePermissionCheck('view', 'settings.integrations')
                 },
                 // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
                 {
                     text: t('sidebar.submenu.system'),
                     icon: <SettingsIcon />,
                     path: '/settings/system',
-                    visible: ability?.can('view', 'system-settings') ?? false
+                    visible: safePermissionCheck('view', 'system-settings')
                 },
             ].filter(item => item.visible !== false)
         }

@@ -33,8 +33,6 @@ from config import config
 class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
     ingest_event_bus: events.EventBus
-    connector_table: dynamodb.TableV2
-    connector_table_name: Optional[str] = None
 
 
 class AssetSyncStack(cdk.NestedStack):
@@ -155,13 +153,6 @@ class AssetSyncStack(cdk.NestedStack):
             **common_env,
             "ASSETS_TABLE_NAME": props.asset_table.table_name,
             EnvVars.JOB_TABLE_NAME: self._asset_sync_job_table.table.table_name,
-        }
-
-        # Processor-specific environment variables
-        processor_env = {
-            **common_env,
-            "ASSETS_TABLE_NAME": props.asset_table.table_name,
-            "JOB_TABLE_NAME": self._asset_sync_job_table.table.table_name,
         }
 
         # Create the Asset Sync Engine Lambda
@@ -447,14 +438,6 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["sts:GetCallerIdentity"],
                 resources=["*"],
-            )
-        )
-
-        # Add SSM permission to read connector table name
-        self._asset_sync_engine_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["ssm:GetParameter"],
-                resources=[f"arn:aws:ssm:*:*:parameter/{config.resource_prefix}/connector-table-name"],
             )
         )
 

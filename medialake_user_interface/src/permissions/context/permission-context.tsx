@@ -104,6 +104,60 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthenticated]);
 
+  // Listen for storage changes (token updates) to refresh permissions
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      // Handle token changes in storage
+      if (e.key === 'medialake-auth-token' && e.newValue !== e.oldValue) {
+        console.log('Token changed in storage, refreshing permissions...');
+        
+        const newToken = e.newValue;
+        if (newToken) {
+          try {
+            // Parse the JWT token to get user claims
+            const tokenParts = newToken.split('.');
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              const extractedUser = extractUserFromClaims(payload);
+              
+              // Parse custom:permissions from JWT
+              if (payload['custom:permissions']) {
+                try {
+                  const customPermissions = JSON.parse(payload['custom:permissions']);
+                  console.log('Parsed custom permissions from refreshed token:', customPermissions);
+                  // Store permissions in user object
+                  extractedUser.customPermissions = customPermissions;
+                } catch (e) {
+                  console.error('Failed to parse custom:permissions from refreshed token:', e);
+                }
+              }
+              
+              console.log('Extracted user from new token:', extractedUser);
+              setUser(extractedUser);
+              // Clear cache to force fresh evaluation
+              permissionCache.clear();
+              PermissionTokenCache.clear();
+            }
+          } catch (error) {
+            console.error('Error extracting user from refreshed token:', error);
+          }
+        } else {
+          // Token was cleared, reset user and ability
+          console.log('Token was cleared, resetting permissions');
+          setUser(null);
+          setAbility(createAppAbility());
+          permissionCache.clear();
+          PermissionTokenCache.clear();
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isAuthenticated]);
+
   // Update ability when user or permission sets change
   useEffect(() => {
     console.log('Permission context effect triggered');
@@ -146,6 +200,8 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
         }
       } catch (error) {
         console.error('Error creating ability:', error);
+        // On error, ensure we have a fallback ability
+        setAbility(createAppAbility());
       }
     } else {
       // Reset ability when not authenticated

@@ -17,6 +17,7 @@ import { router } from '../routes/router';
 import { Box, CircularProgress } from '@mui/material';
 import { NotificationProvider } from './NotificationCenter';
 import { JobNotificationSync } from './JobNotificationSync';
+import { TokenRefreshManager } from './TokenRefreshManager';
 
 const LoadingFallback = () => (
     <Box sx={{
@@ -50,7 +51,8 @@ const AppConfigured = () => {
                 <QueryClientProvider client={queryClient}>
                     <AwsConfigProvider>
                         <AuthProvider>
-                            <PermissionProvider>
+                            <TokenRefreshManager>
+                                <PermissionProvider>
                                 <TimezoneProvider>
                                 <ThemeProvider>
                                     <DirectionProvider>
@@ -68,6 +70,7 @@ const AppConfigured = () => {
                                     </ThemeProvider>
                                 </TimezoneProvider>
                             </PermissionProvider>
+                        </TokenRefreshManager>
                         </AuthProvider>
                     </AwsConfigProvider>
                 </QueryClientProvider>
