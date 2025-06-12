@@ -33,7 +33,6 @@ import { User } from '@/api/types/api.types';
 import { useGetGroups } from '@/api/hooks/useGroups';
 import { useGetPermissionSets } from '@/api/hooks/usePermissionSets';
 import { useAddGroupMembers, useRemoveGroupMember } from '@/api/hooks/useGroups';
-import { useAssignPsToUser, useRemoveUserAssignment } from '@/api/hooks/useAssignments';
 import { useListUserAssignments } from '@/api/hooks/useAssignments';
 import { useTranslation } from 'react-i18next';
 import { UserFilterPopover } from './UserFilterPopover';
@@ -173,7 +172,7 @@ const GroupChips: React.FC<{
     );
 };
 
-// Helper component for managing permission set chips
+// Helper component for displaying permission set chips (read-only)
 const PermissionSetChips: React.FC<{
     user: User,
     theme: any,
@@ -181,48 +180,6 @@ const PermissionSetChips: React.FC<{
     userAssignments: any | undefined
 }> = ({ user, theme, permissionSets, userAssignments }) => {
     const { t } = useTranslation();
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const assignPsToUserMutation = useAssignPsToUser();
-    const removeUserAssignmentMutation = useRemoveUserAssignment();
-
-    const handleAddClick = (event: React.MouseEvent<HTMLElement>) => {
-        setAnchorEl(event.currentTarget);
-    };
-
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
-
-    const handleAssignPermissionSet = async (permissionSetId: string) => {
-        try {
-            await assignPsToUserMutation.mutateAsync({
-                userId: user.username,
-                request: { permissionSetIds: [permissionSetId] }
-            });
-            handleClose();
-        } catch (error) {
-            console.error('Error assigning permission set to user:', error);
-        }
-    };
-
-    const handleRemovePermissionSet = async (permissionSetId: string) => {
-        try {
-            await removeUserAssignmentMutation.mutateAsync({
-                userId: user.username,
-                permissionSetId
-            });
-        } catch (error) {
-            console.error('Error removing permission set from user:', error);
-        }
-    };
-
-    // Get assigned permission set IDs
-    const assignedPermissionSetIds = userAssignments?.assignments?.map(a => a.permissionSetId) || [];
-    
-    // Filter out already assigned permission sets
-    const availablePermissionSets = permissionSets?.filter(
-        ps => !assignedPermissionSetIds.includes(ps.id)
-    ) || [];
 
     return (
         <Box sx={{
@@ -237,8 +194,6 @@ const PermissionSetChips: React.FC<{
                         key={assignment.permissionSetId}
                         label={assignment.permissionSetName}
                         size="small"
-                        onDelete={() => handleRemovePermissionSet(assignment.permissionSetId)}
-                        deleteIcon={<CloseIcon fontSize="small" />}
                         sx={{
                             backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                             color: theme.palette.secondary.main,
@@ -256,37 +211,6 @@ const PermissionSetChips: React.FC<{
                     {t('permissionSets.noAssignments')}
                 </Typography>
             )}
-            
-            <IconButton
-                size="small"
-                onClick={handleAddClick}
-                sx={{
-                    width: 24,
-                    height: 24,
-                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                }}
-            >
-                <AddIcon fontSize="small" />
-            </IconButton>
-            
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-            >
-                {availablePermissionSets.length > 0 ? (
-                    availablePermissionSets.map(ps => (
-                        <MenuItem
-                            key={ps.id}
-                            onClick={() => handleAssignPermissionSet(ps.id)}
-                        >
-                            {ps.name}
-                        </MenuItem>
-                    ))
-                ) : (
-                    <MenuItem disabled>{t('permissionSets.noAvailablePermissionSets')}</MenuItem>
-                )}
-            </Menu>
         </Box>
     );
 };
@@ -370,7 +294,8 @@ const UserList: React.FC<UserListProps> = ({
     const [globalFilter, setGlobalFilter] = useState('');
     const [columnVisibility, setColumnVisibility] = useState({
         username: false,
-        modified: false,
+        modified: true, // Show modified column by default
+        permissionSets: false, // Hide permission sets column by default
     });
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
@@ -748,6 +673,7 @@ const UserList: React.FC<UserListProps> = ({
                     anchorEl={columnMenuAnchor}
                     columns={table.getAllLeafColumns()}
                     onClose={handleColumnMenuClose}
+                    excludeIds={['actions', 'permissionSets']}
                 />
 
                 <UserFilterPopover
