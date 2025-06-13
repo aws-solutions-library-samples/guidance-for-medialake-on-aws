@@ -17,6 +17,7 @@ from jose import jwt, JWTError
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from lambda_middleware import is_lambda_warmer_event
 
 # Initialize observability tools with proper namespace
 logger = Logger()
@@ -574,6 +575,9 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     Returns:
         IAM policy document
     """
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
     start_time = time.time()
     correlation_id = context.aws_request_id
     

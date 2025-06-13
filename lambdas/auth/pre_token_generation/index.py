@@ -14,6 +14,7 @@ import boto3
 from boto3.dynamodb.conditions import Key, Attr
 from aws_lambda_powertools import Logger
 from typing import List, Dict, Any, Set
+from lambda_middleware import is_lambda_warmer_event
 
 logger = Logger()
 
@@ -212,6 +213,9 @@ def handler(event, context):
     """
     Cognito Pre-Token Generation trigger to enrich JWT tokens with dynamic permissions
     """
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
     try:
         logger.info("Cognito Pre-Token Generation Lambda invoked")
         

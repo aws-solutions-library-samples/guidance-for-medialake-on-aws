@@ -450,6 +450,13 @@ class Lambda(Construct):
                     common_lambda_props, config, entry_path, common_libs
                 )
 
+            # --- SnapStart: Ensure versioning if enabled ---
+            if config.snap_start:
+                self._function_version = self._function.current_version
+            else:
+                self._function_version = None
+            # --- End SnapStart versioning ---
+
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
@@ -702,3 +709,13 @@ class Lambda(Construct):
             iam.Role: The IAM role attached to the Lambda function
         """
         return self._lambda_role
+
+    @property
+    def function_version(self) -> Optional[lambda_.Version]:
+        """
+        Get the versioned Lambda function (if SnapStart is enabled).
+
+        Returns:
+            lambda_.Version | None: The versioned Lambda function, or None if not versioned
+        """
+        return getattr(self, '_function_version', None)

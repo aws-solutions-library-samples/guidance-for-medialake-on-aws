@@ -18,6 +18,9 @@ from aws_cdk import (
     RemovalPolicy,
     CustomResource,
     Fn,
+    aws_events as events,
+    aws_events_targets as targets,
+    Duration,
 )
 import aws_cdk as cdk
 import datetime
@@ -33,6 +36,7 @@ from medialake_constructs.auth.shared_authorizer_construct import (
 )
 
 from config import config
+from constants import Lambda as LambdaConstants
 
 
 @dataclass
@@ -367,6 +371,18 @@ def handler(event, context):
             },
         )
         
+        # Lambda warming for pre_token_generation and custom_authorizer
+        # Add EventBridge rule to keep both Lambdas warm
+        events.Rule(
+            self,
+            "PreTokenGenerationWarmerRule",
+            schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
+            targets=[
+                targets.LambdaFunction(props.cognito_construct._pre_token_generation_lambda.function, event=events.RuleTargetInput.from_object({"lambda_warmer": True})),
+                targets.LambdaFunction(self._custom_authorizer_lambda.function, event=events.RuleTargetInput.from_object({"lambda_warmer": True})),
+            ],
+            description="Keeps pre_token_generation and custom_authorizer Lambdas warm via scheduled EventBridge rule."
+        )
 
     @property
     def auth_table(self):
