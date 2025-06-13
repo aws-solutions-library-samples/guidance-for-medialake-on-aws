@@ -646,7 +646,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
                 "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
-                "AWS_REGION": self.region,
             },
         )
 
