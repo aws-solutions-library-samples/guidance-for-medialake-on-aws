@@ -41,6 +41,9 @@ class NodesStack(cdk.NestedStack):
         self, scope: Construct, construct_id: str, props: NodesStackProps, **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        
+        # Store props for use in other methods
+        self._props = props
 
         # Create S3 bucket for node definitions and templates
         self._pipelines_nodes_bucket = S3Bucket(
@@ -355,7 +358,7 @@ class NodesStack(cdk.NestedStack):
         self.resource.node.add_dependency(bucket_deployment)
         
         # Create MediaConvert role and queue
-        self.mediaconvert_role = self.create_mediaconvert_role(props)
+        self.mediaconvert_role = self.create_mediaconvert_role()
         
         self.proxy_queue = MediaConvert.create_queue(
             self,
@@ -372,7 +375,7 @@ class NodesStack(cdk.NestedStack):
             ),
         )
 
-    def create_mediaconvert_role(self, props: NodesStackProps):
+    def create_mediaconvert_role(self):
         mediaconvert_role = iam.Role(
             self,
             "MediaConvertRole",
@@ -401,7 +404,7 @@ class NodesStack(cdk.NestedStack):
                     "kms:DescribeKey",
                 ],
                 resources=[
-                    props.iac_bucket.encryption_key.key_arn,
+                    self._props.iac_bucket.encryption_key.key_arn,
                     self._pipelines_nodes_bucket.bucket.encryption_key.key_arn,
                 ],
             )
