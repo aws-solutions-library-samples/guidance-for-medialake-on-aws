@@ -355,7 +355,7 @@ class NodesStack(cdk.NestedStack):
         self.resource.node.add_dependency(bucket_deployment)
         
         # Create MediaConvert role and queue
-        self.mediaconvert_role = self.create_mediaconvert_role()
+        self.mediaconvert_role = self.create_mediaconvert_role(props)
         
         self.proxy_queue = MediaConvert.create_queue(
             self,
@@ -372,7 +372,7 @@ class NodesStack(cdk.NestedStack):
             ),
         )
 
-    def create_mediaconvert_role(self):
+    def create_mediaconvert_role(self, props: NodesStackProps):
         mediaconvert_role = iam.Role(
             self,
             "MediaConvertRole",
