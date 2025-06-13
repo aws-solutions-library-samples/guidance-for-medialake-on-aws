@@ -74,12 +74,6 @@ actions:
         default: ${MEDIACONVERT_ROLE_ARN}
         schema:
           type: string
-      - in: body
-        name: output_bucket
-        required: true
-        schema:
-          type: string
-          description: S3 bucket name for output
     x-requestMapping: processor/audio_proxy/extract/
     x-responseMapping: processor/audio_proxy/extract/
     connections:

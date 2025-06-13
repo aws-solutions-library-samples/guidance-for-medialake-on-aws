@@ -151,7 +151,10 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 }
                 
                 // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
-                if ((param as any).default !== undefined) {
+                if (param.schema?.default !== undefined) {
+                    parameterData.defaultValue = param.schema.default;
+                    console.log(`[PipelineEditorPage] Found default value for ${param.name}:`, param.schema.default);
+                } else if ((param as any).default !== undefined) {
                     parameterData.defaultValue = (param as any).default;
                     console.log(`[PipelineEditorPage] Found default value for ${param.name}:`, (param as any).default);
                 }
