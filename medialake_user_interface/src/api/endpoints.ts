@@ -5,9 +5,9 @@ export const API_ENDPOINTS = {
     PIPELINES: "/pipelines",
     PIPELINE_EXECUTIONS: "/pipelines/executions",
     PIPELINE_EXECUTION_RETRY: {
-        FROM_CURRENT: (id: string) => `/pipelines/executions/${id}/retry-from-current`,
-        FROM_START: (id: string) => `/pipelines/executions/${id}/retry-from-start`,
-        LEGACY: (id: string) => `/pipelines/executions/${id}/retry`
+        FROM_CURRENT: (id: string) => `/pipelines/executions/${id}/retry?type=from_current`,
+        FROM_START: (id: string) => `/pipelines/executions/${id}/retry?type=from_start`,
+        BASE: (id: string) => `/pipelines/executions/${id}/retry`
     },
     SEARCH: "/search",
     ASSETS: {

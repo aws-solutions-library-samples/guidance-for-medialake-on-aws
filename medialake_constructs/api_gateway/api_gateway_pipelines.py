@@ -823,6 +823,13 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         retry_resource = execution_id_resource.add_resource("retry")
 
+        # POST /pipelines/executions/{executionId}/retry - retry execution
+        retry_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(props.post_retry_pipelines_executions_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
         
         # Add CORS support to all pipeline API resources
         add_cors_options_method(pipelines_resource)

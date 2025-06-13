@@ -6,16 +6,12 @@ import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
 import { useSnackbar } from '@/hooks/useSnackbar';
 
-interface RetryFromCurrentResponse {
+interface UnifiedRetryResponse {
     status: string;
     message: string;
-    redrive_date?: string;
-}
-
-interface RetryFromStartResponse {
-    status: string;
-    message: string;
+    retry_type: string;
     new_execution_arn?: string;
+    redrive_date?: string;
 }
 
 interface RetryError {
@@ -30,9 +26,9 @@ export const useRetryFromCurrent = () => {
     const { showSnackbar } = useSnackbar();
 
     return useMutation({
-        mutationFn: async (executionId: string): Promise<RetryFromCurrentResponse> => {
+        mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
             try {
-                const response = await apiClient.post<RetryFromCurrentResponse>(
+                const response = await apiClient.post<UnifiedRetryResponse>(
                     API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_CURRENT(executionId)
                 );
                 return response.data;
@@ -82,9 +78,9 @@ export const useRetryFromStart = () => {
     const { showSnackbar } = useSnackbar();
 
     return useMutation({
-        mutationFn: async (executionId: string): Promise<RetryFromStartResponse> => {
+        mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
             try {
-                const response = await apiClient.post<RetryFromStartResponse>(
+                const response = await apiClient.post<UnifiedRetryResponse>(
                     API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_START(executionId)
                 );
                 return response.data;
@@ -123,21 +119,21 @@ export const useRetryFromStart = () => {
     });
 };
 
-// Legacy retry hook for backward compatibility
+// Generic retry hook that uses the base endpoint with default behavior (from_start)
 export const useRetryExecution = () => {
     const queryClient = useQueryClient();
     const { showError } = useErrorModal();
     const { showSnackbar } = useSnackbar();
 
     return useMutation({
-        mutationFn: async (executionId: string): Promise<{ status: string; message: string }> => {
+        mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
             try {
-                const response = await apiClient.post<{ status: string; message: string }>(
-                    API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.LEGACY(executionId)
+                const response = await apiClient.post<UnifiedRetryResponse>(
+                    API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.BASE(executionId)
                 );
                 return response.data;
             } catch (error: any) {
-                logger.error('Legacy retry error:', error);
+                logger.error('Retry execution error:', error);
                 
                 if (error.response?.status === 404) {
                     throw new Error('Execution not found');
@@ -149,11 +145,15 @@ export const useRetryExecution = () => {
             }
         },
         onSuccess: (data, executionId) => {
-            logger.info('Successfully retried execution (legacy):', { executionId, data });
+            logger.info('Successfully retried execution:', { executionId, data });
             
-            // Show success notification
+            // Show success notification based on retry type
+            const message = data.retry_type === 'from_current'
+                ? 'Execution successfully restarted from current position'
+                : 'New execution started successfully from beginning';
+            
             showSnackbar({
-                message: 'Execution retried successfully',
+                message,
                 severity: 'success'
             });
             
@@ -163,7 +163,7 @@ export const useRetryExecution = () => {
             });
         },
         onError: (error: Error) => {
-            logger.error('Failed to retry execution (legacy):', error);
+            logger.error('Failed to retry execution:', error);
             showError(error.message);
         }
     });
