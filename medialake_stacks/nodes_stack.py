@@ -390,24 +390,11 @@ class NodesStack(cdk.NestedStack):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=["arn:aws:s3:::*"],
+                resources=[self._pipelines_nodes_bucket.kms_key.key_arn,self._props.iac_bucket.encryption_key.key_arn],
             )
         )
 
-        # Get KMS key ARNs for specific bucket encryption keys
-        kms_resources = []
-        
-        # Add IAC bucket KMS key if available
-        if hasattr(self._props.iac_bucket, 'encryption_key') and self._props.iac_bucket.encryption_key:
-            kms_resources.append(self._props.iac_bucket.encryption_key.key_arn)
-        
-        # Add nodes bucket KMS key
-        kms_resources.append(self._pipelines_nodes_bucket.kms_key.key_arn)
-        
-        # If no specific keys found, use account-level KMS permissions (less secure but functional)
-        if not kms_resources:
-            kms_resources = [f"arn:aws:kms:{self.region}:{self.account}:key/*"]
-        
+
         mediaconvert_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
