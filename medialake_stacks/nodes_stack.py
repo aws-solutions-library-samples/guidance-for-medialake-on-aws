@@ -400,7 +400,10 @@ class NodesStack(cdk.NestedStack):
                     "kms:GenerateDataKey*",
                     "kms:DescribeKey",
                 ],
-                resources=["*"],
+                resources=[
+                    props.iac_bucket.encryption_key.key_arn,
+                    self._pipelines_nodes_bucket.bucket.encryption_key.key_arn,
+                ],
             )
         )
 
