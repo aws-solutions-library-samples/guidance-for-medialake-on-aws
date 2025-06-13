@@ -189,8 +189,8 @@ class CognitoConstruct(Construct):
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn,
                 # pre_token_generation=self._pre_token_generation_lambda.function.function_arn,
                 pre_token_generation_config={
-                    "lambda_arn": self._pre_token_generation_lambda.function.function_arn,
-                    "lambda_version": "V2_0"
+                    "LambdaArn": self._pre_token_generation_lambda.function.function_arn,
+                    "LambdaVersion": "V2_0"
                 }
             ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(

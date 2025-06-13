@@ -80,7 +80,7 @@ logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.lev
 
 app = cdk.App()
 
-# us-east-1 environment, required for the WAF, certain configuration has to be deployed in us-east-1
+# us-east-1 environment, required for the WAF, webACL configuration has to be deployed in us-east-1
 env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
 
 if "CDK_DEFAULT_ACCOUNT" in os.environ and "CDK_DEFAULT_REGION" in os.environ:
