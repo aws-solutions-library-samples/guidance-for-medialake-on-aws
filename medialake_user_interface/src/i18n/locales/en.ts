@@ -17,6 +17,10 @@ export default {
         connectors: 'Connectors',
         selectConnector: 'Select a connector'
     },
+    upload: {
+        title: 'Upload Media Files',
+        description: 'Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.'
+    },
     connectors: {
         apiMessages: {
             creating: {
@@ -150,6 +154,13 @@ export default {
             dateRange: 'Date Range',
             contentType: 'Content Type',
             storageLocation: 'Storage Location',
+            title: 'Filter Results',
+            apply: 'Apply Filters',
+            reset: 'Reset',
+            toDate: 'To Date & Time',
+            fromDate: 'From Date & Time',
+            maxSize: 'Max',
+            minSize: 'Min',
             comingSoon: 'More filters coming soon...'
         }
     },

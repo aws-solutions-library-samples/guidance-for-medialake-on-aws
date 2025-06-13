@@ -107,7 +107,7 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/pre_token_generation",
                 timeout_minutes=1,
                 lambda_handler="handler",
-                snap_start=True,  # Enable SnapStart for faster cold starts
+                snap_start=True,
                 environment_variables={
                     "AUTH_TABLE_NAME": self._auth_table.table_name,
                     "DEBUG_MODE": "true",
@@ -115,7 +115,6 @@ class CognitoConstruct(Construct):
             ),
         )
         
-        # Grant read access to the auth table
         self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
         
         # Grant Cognito permission to invoke the pre_token_generation Lambda
@@ -188,7 +187,11 @@ class CognitoConstruct(Construct):
             ),
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn,
-                pre_token_generation=self._pre_token_generation_lambda.function.function_arn,
+                # pre_token_generation=self._pre_token_generation_lambda.function.function_arn,
+                pre_token_generation_config={
+                    "lambda_arn": self._pre_token_generation_lambda.function.function_arn,
+                    "lambda_version": "V2_0"
+                }
             ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
