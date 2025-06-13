@@ -390,10 +390,9 @@ class NodesStack(cdk.NestedStack):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=[self._pipelines_nodes_bucket.kms_key.key_arn,self._props.iac_bucket.encryption_key.key_arn],
+                resources=["arn:aws:s3:::*"],
             )
         )
-
 
         mediaconvert_role.add_to_policy(
             iam.PolicyStatement(
@@ -404,7 +403,7 @@ class NodesStack(cdk.NestedStack):
                     "kms:GenerateDataKey*",
                     "kms:DescribeKey",
                 ],
-                resources=kms_resources,
+                resources=[self._pipelines_nodes_bucket.kms_key.key_arn,self._props.iac_bucket.encryption_key.key_arn],
             )
         )
 
