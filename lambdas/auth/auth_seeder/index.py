@@ -99,6 +99,16 @@ DEFAULT_PERMISSION_SETS = [
                 },
                 "system-settings": {
                     "edit": True
+                },
+                "connectors": {
+                    "edit": True,
+                    "delete": True,
+                    "add": True
+                },
+                "permissions": {
+                    "edit": True,
+                    "delete": True,
+                    "add": True
                 }
             }
         }

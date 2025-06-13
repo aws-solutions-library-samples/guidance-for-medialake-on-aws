@@ -94,7 +94,9 @@ export default {
         smartFolders: 'Smart Folders',
         connectedStorage: 'Connected Storage',
         sharing: 'Sharing',
-        comingSoon: 'Coming Soon'
+        comingSoon: 'Coming Soon',
+        yourFavoriteAssets: 'Your Favorite Assets',
+        noFavoriteAssets: 'No favorite assets yet'
     },
       sidebar: {
         menu: {
@@ -110,7 +112,9 @@ export default {
             userManagement: 'User Management',
             roles: 'Roles',
             integrations: 'Integrations',
-            environments: 'Environments'
+            environments: 'Environments',
+            usersAndGroups: 'Users and Groups',
+            permissionSets: 'Permissions'
         }
     },
     profile: {
@@ -902,8 +906,11 @@ export default {
             editGroup: 'Edit Group',
             deleteGroup: 'Delete Group',
             createGroup: 'Create Group',
-            manageGroups: 'Manage Groups'
-        }
+            manageGroups: 'Manage Groups',
+            assignPermissionSet: 'Assign Permission Set'
+        },
+        permissionSets: 'Permission Sets',
+        noPermissionSets: 'No permission sets assigned'
     },
     permissionSets: {
         noAssignments: 'No permission sets',

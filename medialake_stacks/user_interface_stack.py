@@ -226,7 +226,7 @@ class UserInterfaceStack(Stack):
                 parameters={
                     "UserPoolId": props.cognito_user_pool_id,
                     "Username": config.initial_user.email,
-                    "GroupName": "administrators",
+                    "GroupName": "superAdministrators",
                 },
                 physical_resource_id=cr.PhysicalResourceId.of("AddToAdminGroupHandler"),
                 ignore_error_codes_matching="UserNotFoundException|ResourceNotFoundException",
@@ -237,7 +237,7 @@ class UserInterfaceStack(Stack):
                 parameters={
                     "UserPoolId": props.cognito_user_pool_id,
                     "Username": config.initial_user.email,
-                    "GroupName": "administrators",
+                    "GroupName": "superAdministrators",
                 },
                 physical_resource_id=cr.PhysicalResourceId.of("RemoveFromAdminGroupHandler"),
                 ignore_error_codes_matching="UserNotFoundException|ResourceNotFoundException",
