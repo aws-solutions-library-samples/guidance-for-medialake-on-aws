@@ -12,6 +12,7 @@ import re
 import os
 import glob
 from pathlib import Path
+import datetime
 
 from aws_cdk import (
     aws_lambda as lambda_,
@@ -380,7 +381,6 @@ class Lambda(Construct):
             lambda_environment_variables["METRICS_NAMESPACE"] = (
                 env_config.resource_prefix
             )
-            common_lambda_props["environment"] = lambda_environment_variables
         else:
             lambda_environment_variables = {}
             lambda_environment_variables["RESOURCE_PREFIX"] = env_config.resource_prefix
@@ -388,6 +388,13 @@ class Lambda(Construct):
             lambda_environment_variables["METRICS_NAMESPACE"] = (
                 env_config.resource_prefix
             )
+
+        # --- SnapStart: Force new version on each deployment ---
+        if config.snap_start:
+            lambda_environment_variables["DEPLOYMENT_TIMESTAMP"] = datetime.datetime.utcnow().isoformat()
+        # --- End SnapStart versioning ---
+
+        common_lambda_props["environment"] = lambda_environment_variables
 
         # Add VPC if provided
         if config.vpc:
