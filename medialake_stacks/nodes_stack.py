@@ -41,9 +41,6 @@ class NodesStack(cdk.NestedStack):
         self, scope: Construct, construct_id: str, props: NodesStackProps, **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
-        # Store props for use in other methods
-        self._props = props
 
         # Create S3 bucket for node definitions and templates
         self._pipelines_nodes_bucket = S3Bucket(
@@ -403,7 +400,7 @@ class NodesStack(cdk.NestedStack):
                     "kms:GenerateDataKey*",
                     "kms:DescribeKey",
                 ],
-                resources=[self._pipelines_nodes_bucket.kms_key.key_arn,self._props.iac_bucket.encryption_key.key_arn],
+                resources=[f"arn:aws:kms:{self.region}:{self.account}:key/*"],
             )
         )
 
