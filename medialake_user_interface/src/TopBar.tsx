@@ -68,7 +68,10 @@ function TopBar() {
   const isNotificationEnabled = useFeatureFlag('notification-enabled', true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
 
-  // Whenever the URL’s `semantic` param changes (e.g. on browser refresh),
+  // Add state for clipType
+  const [clipType, setClipType] = useState<'clip' | 'full'>('clip');
+
+  // Whenever the URL's `semantic` param changes (e.g. on browser refresh),
   // make sure `isSemanticSearch` reflects that:
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -86,23 +89,23 @@ function TopBar() {
   const debouncedSearch = useCallback(
     debounce((query: string) => {
       if (query.trim()) {
+        const params: any = { query, isSemantic: isSemanticSearch };
+        if (isSemanticSearch) params.clipType = clipType;
         navigate('/search', {
-          state: { query, isSemantic: isSemanticSearch }
+          state: params
         });
       }
     }, 500),
-    [navigate, isSemanticSearch]
+    [navigate, isSemanticSearch, clipType]
   );
 
   const handleApplyFilters = (newFilters: any) => {
     setFilters(newFilters);
-    // Trigger search with the new filters
     const searchQuery = getSearchQuery();
-
-    // Build URLSearchParams
     const queryParams = new URLSearchParams();
     queryParams.append('q', searchQuery);
     queryParams.append('semantic', isSemanticSearch.toString());
+    if (isSemanticSearch) queryParams.append('clipType', clipType);
     if (newFilters.type) queryParams.append('type', newFilters.type);
     if (newFilters.extension) queryParams.append('extension', newFilters.extension);
     if (newFilters.LargerThan)
@@ -116,7 +119,6 @@ function TopBar() {
     if (newFilters.ingested_date_gte)
       queryParams.append('ingested_date_gte', newFilters.ingested_date_gte);
     if (newFilters.filename) queryParams.append('filename', newFilters.filename);
-
     navigate({
       pathname: '/search',
       search: queryParams.toString()
@@ -244,8 +246,10 @@ function TopBar() {
       createTagFromInput(searchInput);
     } else if (searchInput.trim() || searchTags.length > 0) {
       const searchQuery = getSearchQuery();
+      const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
+      if (isSemanticSearch) params.clipType = clipType;
       navigate('/search', {
-        state: { query: searchQuery, isSemantic: isSemanticSearch }
+        state: params
       });
     }
   };
@@ -355,21 +359,75 @@ function TopBar() {
               boxShadow:
                 theme === 'dark'
                   ? '0 2px 5px rgba(0,0,0,0.2)'
-                  : 'none'
+                  : 'none',
+              position: 'relative',
             }}
           >
-            <SearchIcon
-              sx={{
-                color:
-                  theme === 'dark'
-                    ? 'rgba(255,255,255,0.7)'
-                    : 'text.secondary',
-                [isRTL ? 'ml' : 'mr']: 1.5,
-                fontSize: '20px'
-              }}
-            />
+            {/* Clip/Full Toggle - inside the input, far left */}
+            {isSemanticSearch && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                  borderRadius: '20px',
+                  p: '2px',
+                  mr: 1,
+                  minWidth: '100px',
+                  height: '32px',
+                }}
+              >
+                <Box
+                  onClick={() => setClipType('clip')}
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    bgcolor: clipType === 'clip' ? muiTheme.palette.primary.light : 'transparent',
+                    color: clipType === 'clip' ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    transition: 'all 0.2s',
+                    boxShadow: clipType === 'clip' ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.08)}` : 'none',
+                  }}
+                >
+                  Clip
+                </Box>
+                <Box
+                  onClick={() => setClipType('full')}
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    bgcolor: clipType === 'full' ? muiTheme.palette.primary.light : 'transparent',
+                    color: clipType === 'full' ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    transition: 'all 0.2s',
+                    boxShadow: clipType === 'full' ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.08)}` : 'none',
+                  }}
+                >
+                  Full
+                </Box>
+              </Box>
+            )}
+            {/* Search Icon */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: isSemanticSearch ? 1 : 1.5 }}>
+              <SearchIcon
+                sx={{
+                  color:
+                    theme === 'dark'
+                      ? 'rgba(255,255,255,0.7)'
+                      : 'text.secondary',
+                  fontSize: '20px',
+                  transition: 'margin 0.2s',
+                }}
+              />
+            </Box>
             <InputBase
-              placeholder={t('common.search')}
+              placeholder={t('search.assets', 'Search assets...')}
               value={searchInput}
               onChange={handleSearchInputChange}
               onKeyUp={handleSearchKeyPress}
@@ -388,8 +446,10 @@ function TopBar() {
                       theme === 'dark'
                         ? 'rgba(255,255,255,0.7)'
                         : 'inherit',
-                    opacity: 1
-                  }
+                    opacity: 1,
+                  },
+                  paddingLeft: isSemanticSearch ? '0px' : '8px',
+                  transition: 'padding 0.2s',
                 }
               }}
             />
