@@ -405,7 +405,7 @@ class NodesStack(cdk.NestedStack):
                 ],
                 resources=[
                     self._props.iac_bucket.encryption_key.key_arn,
-                    self._pipelines_nodes_bucket.bucket.encryption_key.key_arn,
+                    self._pipelines_nodes_bucket.kms_key.key_arn,
                 ],
             )
         )
