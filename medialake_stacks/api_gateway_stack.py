@@ -126,7 +126,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 ingest_event_bus=props.ingest_event_bus,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
-                open_search_endpoint= props.collection_endpoint
+                open_search_endpoint= props.collection_endpoint,
                 opensearch_index= "media"
             ),
         )
