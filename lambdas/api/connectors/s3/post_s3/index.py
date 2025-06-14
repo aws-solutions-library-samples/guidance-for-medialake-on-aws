@@ -1071,6 +1071,24 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ("role_policy", (role_name, "AWSLambdaBasicExecutionRole"))
             )
 
+            # Attach VPC execution role policy if VPC configuration is present
+            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
+            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
+            
+            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
+                try:
+                    iam_client.attach_role_policy(
+                        RoleName=role_name,
+                        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                    )
+                    created_resources.append(
+                        ("role_policy", (role_name, "AWSLambdaVPCAccessExecutionRole"))
+                    )
+                    logger.info(f"Attached AWSLambdaVPCAccessExecutionRole to {role_name}")
+                except Exception as e:
+                    logger.error(f"Error attaching VPC execution policy to role {role_name}: {str(e)}")
+                    # Don't fail the entire operation for policy attachment issues
+
             # Prepare all policies for parallel attachment
             policies_to_attach = []
             
@@ -1170,17 +1188,42 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "Effect": "Allow",
                         "Action": [
                             "es:ESHttpPost",            # for _delete_by_query
-                            "es:ESHttpGet",             # if you ever need it
-                            "es:ESHttpDeleteByQuery"    # some accounts require the explicit action
+                            "es:ESHttpGet",             # for reading data
+                            "es:ESHttpPut",             # for indexing documents
+                            "es:ESHttpDelete",          # for deleting documents
+                            "es:ESHttpHead"             # for checking existence
                         ],
-                        # Replace <account> and <your-domain> with your actual values,
-                        # or use a wildcard if you prefer:
-                        "Resource": f"arn:aws:es:{bucket_region}:{account_id}:domain/<your-domain>/*"
+                        "Resource": f"arn:aws:es:{bucket_region}:{account_id}:domain/*"
                     }
                 ],
             }
             opensearch_policy_name = truncate_resource_name("iam_policy", f"{role_name}-os-policy")
             policies_to_attach.append((opensearch_policy_name, opensearch_policy))
+
+            # Add VPC access policy if VPC configuration is present
+            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
+            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
+            
+            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
+                vpc_policy = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:CreateNetworkInterface",
+                                "ec2:DescribeNetworkInterfaces",
+                                "ec2:DeleteNetworkInterface",
+                                "ec2:AttachNetworkInterface",
+                                "ec2:DetachNetworkInterface"
+                            ],
+                            "Resource": "*"
+                        }
+                    ],
+                }
+                vpc_policy_name = truncate_resource_name("iam_policy", f"{role_name}-vpc-policy")
+                policies_to_attach.append((vpc_policy_name, vpc_policy))
+                logger.info(f"Added VPC access policy to role {role_name}")
 
             # Attach all policies in parallel using ThreadPoolExecutor
             logger.info(f"Attaching {len(policies_to_attach)} policies to role {role_name} in parallel")
@@ -1234,36 +1277,53 @@ def create_connector(createconnector: S3Connector) -> dict:
             max_lambda_retries = 2
             lambda_arn = None
             
+            # Prepare Lambda function parameters
+            create_function_params = {
+                "FunctionName": target_function_name,
+                "Runtime": "python3.12",
+                "Role": lambda_role_arn,
+                "Handler": "index.handler",
+                "Code": {"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
+                "Publish": True,
+                "Tags": {"medialake": medialake_tag},
+                "Environment": {
+                    "Variables": {
+                        "INGEST_EVENT_BUS": ingest_event_bus,
+                        "MEDIALAKE_ASSET_TABLE": medialake_asset_table,
+                        "POWERTOOLS_SERVICE_NAME": "asset-processor",
+                        "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
+                        "ASSETS_TABLE": medialake_asset_table,
+                        "EVENT_BUS_NAME": ingest_event_bus,
+                        "DO_NOT_INGEST_DUPLICATES": "True",
+                        "OPENSEARCH_ENDPOINT": os.environ["OPENSEARCH_ENDPOINT"],
+                        "INDEX_NAME": os.environ.get("INDEX_NAME", "media"),
+                        "OPENSEARCH_SERVICE": "es",
+                        "REGION": bucket_region,
+                    }
+                },
+                "Layers": layers,  # Updated to include both custom and AWS SDK layers
+                "Timeout": 900,  # Maximum timeout: 15 minutes
+                "MemorySize": 10240,  # Maximum memory: 10GB
+                "EphemeralStorage": {"Size": 10240},  # Maximum ephemeral storage: 10GB
+            }
+
+            # Add VPC configuration for OpenSearch access
+            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
+            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
+            
+            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
+                subnet_ids = opensearch_vpc_subnet_ids.split(',') if opensearch_vpc_subnet_ids else []
+                create_function_params["VpcConfig"] = {
+                    "SubnetIds": subnet_ids,
+                    "SecurityGroupIds": [opensearch_security_group_id]
+                }
+                logger.info(f"Added VPC configuration to Lambda: Subnets={subnet_ids}, SecurityGroup={opensearch_security_group_id}")
+            else:
+                logger.warning("OpenSearch VPC configuration not found - Lambda will not be deployed in VPC")
+
             for lambda_attempt in range(max_lambda_retries):
                 try:
-                    create_function_response = lambda_client.create_function(
-                        FunctionName=target_function_name,
-                        Runtime="python3.12",
-                        Role=lambda_role_arn,
-                        Handler="index.handler",
-                        Code={"S3Bucket": deployment_bucket, "S3Key": deployment_zip},
-                        Publish=True,
-                        Tags={"medialake": medialake_tag},
-                        Environment={
-                            "Variables": {
-                                "INGEST_EVENT_BUS": ingest_event_bus,
-                                "MEDIALAKE_ASSET_TABLE": medialake_asset_table,
-                                "POWERTOOLS_SERVICE_NAME": "asset-processor",
-                                "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
-                                "ASSETS_TABLE": medialake_asset_table,
-                                "EVENT_BUS_NAME": ingest_event_bus,
-                                "DO_NOT_INGEST_DUPLICATES": "True",
-                                "OPENSEARCH_ENDPOINT": os.environ["OPENSEARCH_ENDPOINT"],
-                                "INDEX_NAME":   os.environ.get("INDEX_NAME", "media"),
-                                "OPENSEARCH_SERVICE": "es",
-                                "REGION":  bucket_region,
-                            }
-                        },
-                        Layers=layers,  # Updated to include both custom and AWS SDK layers
-                        Timeout=900,  # Maximum timeout: 15 minutes
-                        MemorySize=10240,  # Maximum memory: 10GB
-                        EphemeralStorage={"Size": 10240},  # Maximum ephemeral storage: 10GB
-                    )
+                    create_function_response = lambda_client.create_function(**create_function_params)
                     logger.info(f"Successfully deployed Lambda function: {target_function_name}")
                     lambda_arn = create_function_response["FunctionArn"]
                     created_resources.append(("lambda_function", target_function_name))
@@ -1424,10 +1484,17 @@ def create_connector(createconnector: S3Connector) -> dict:
                     logger.info(f"Deleted inline policy {policy_name} from role {role_name}")
                 elif resource_type == "role_policy":
                     role_name, policy_name = resource_id
-                    iam_client.detach_role_policy(
-                        RoleName=role_name,
-                        PolicyArn=f"arn:aws:iam::aws:policy/service-role/{policy_name}",
-                    )
+                    if policy_name in ["AWSLambdaBasicExecutionRole", "AWSLambdaVPCAccessExecutionRole"]:
+                        iam_client.detach_role_policy(
+                            RoleName=role_name,
+                            PolicyArn=f"arn:aws:iam::aws:policy/service-role/{policy_name}",
+                        )
+                    else:
+                        # Handle other managed policies if needed
+                        iam_client.detach_role_policy(
+                            RoleName=role_name,
+                            PolicyArn=f"arn:aws:iam::aws:policy/{policy_name}",
+                        )
                     logger.info(f"Detached policy {policy_name} from role {role_name}")
                 elif resource_type == "iam_role":
                     iam_client.delete_role(RoleName=resource_id)
