@@ -74,69 +74,6 @@ s3_config = Config(
     connect_timeout=5
 )
 
-def _signed_request(self,
-                    method: str,
-                    url: str,
-                    payload: dict | None = None,
-                    timeout: int = 60) -> tuple[int, str]:
-    """Build, sign and send an HTTPS request with SigV4 auth."""
-    headers = {"Content-Type": "application/json"}
-    if payload:
-        body = json.dumps(payload)
-    else:
-        body = None
-
-    req = AWSRequest(method=method,
-                     url=url,
-                     data=body,
-                     headers=headers)
-    SigV4Auth(_credentials, OPENSEARCH_SERVICE, AWS_REGION).add_auth(req)
-    prepared = req.prepare()
-
-    parsed = urlparse(prepared.url)
-    path   = parsed.path + (f"?{parsed.query}" if parsed.query else "")
-
-    conn = http.client.HTTPSConnection(parsed.hostname,
-                                       parsed.port or 443,
-                                       timeout=timeout)
-    conn.request(prepared.method,
-                 path,
-                 body=prepared.body,
-                 headers=dict(prepared.headers))
-    resp  = conn.getresponse()
-    resp_body = resp.read().decode("utf-8")
-    conn.close()
-    return resp.status, resp_body
-
-
-def delete_opensearch_docs(self, asset_id: str) -> None:
-    """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
-    if not OPENSEARCH_ENDPOINT:
-        logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
-        return
-
-    host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
-    url  = f"https://{host}/{OPENSEARCH_INDEX}/_delete_by_query?refresh=true&conflicts=proceed"
-    query = {
-        "query": {
-            "term": {
-                "DigitalSourceAsset.ID": asset_id
-            }
-        }
-    }
-
-    status, body = self._signed_request("POST", url, payload=query)
-    if status not in (200, 202):
-        logger.error(f"OpenSearch deletion failed (status={status}): {body}")
-    else:
-        deleted = 0
-        try:
-            deleted = json.loads(body).get("deleted", 0)
-        except Exception:
-            pass
-        logger.info(f"OpenSearch deletion complete – deleted {deleted} docs for {asset_id}")
-        metrics.add_metric(name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted)
-
 
 def initialize_global_clients():
     """Initialize global AWS clients for container reuse"""
@@ -364,6 +301,75 @@ class AssetProcessor:
         # Add current asset tracking
         self.current_asset_id = None
         self.current_inventory_id = None
+
+        _session           = boto3.Session()
+        self._credentials  = _session.get_credentials()
+
+    def _signed_request(self,
+                    method: str,
+                    url: str,
+                    payload: dict | None = None,
+                    timeout: int = 60) -> tuple[int, str]:
+        """Build, sign and send an HTTPS request with SigV4 auth."""
+        headers = {"Content-Type": "application/json"}
+        if payload:
+            body = json.dumps(payload)
+        else:
+            body = None
+
+        req = AWSRequest(method=method,
+                        url=url,
+                        data=body,
+                        headers=headers)
+        
+        SigV4Auth(self._credentials,  OPENSEARCH_SERVICE, AWS_REGION).add_auth(req)
+
+        prepared = req.prepare()
+
+        parsed = urlparse(prepared.url)
+        path   = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+        conn = http.client.HTTPSConnection(parsed.hostname,
+                                        parsed.port or 443,
+                                        timeout=timeout)
+        conn.request(prepared.method,
+                    path,
+                    body=prepared.body,
+                    headers=dict(prepared.headers))
+        resp  = conn.getresponse()
+        resp_body = resp.read().decode("utf-8")
+        conn.close()
+        return resp.status, resp_body
+
+
+    def delete_opensearch_docs(self, asset_id: str) -> None:
+        """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
+        if not OPENSEARCH_ENDPOINT:
+            logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
+            return
+
+        host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
+        url  = f"https://{host}/{OPENSEARCH_INDEX}/_delete_by_query?refresh=true&conflicts=proceed"
+        query = {
+            "query": {
+                "term": {
+                    "DigitalSourceAsset.ID": asset_id
+                }
+            }
+        }
+
+        status, body = self._signed_request("POST", url, payload=query)
+        if status not in (200, 202):
+            logger.error(f"OpenSearch deletion failed (status={status}): {body}")
+        else:
+            deleted = 0
+            try:
+                deleted = json.loads(body).get("deleted", 0)
+            except Exception:
+                pass
+            logger.info(f"OpenSearch deletion complete – deleted {deleted} docs for {asset_id}")
+            metrics.add_metric(name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted)
+
 
     @contextmanager
     def asset_context(self, asset_id=None, inventory_id=None):
