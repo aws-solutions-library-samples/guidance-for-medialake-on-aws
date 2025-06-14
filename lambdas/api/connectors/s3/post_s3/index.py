@@ -1163,6 +1163,25 @@ def create_connector(createconnector: S3Connector) -> dict:
             dynamodb_policy_name = truncate_resource_name("iam_policy", dynamodb_policy_name_base)
             policies_to_attach.append((dynamodb_policy_name, dynamodb_policy))
 
+            opensearch_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "es:ESHttpPost",            # for _delete_by_query
+                            "es:ESHttpGet",             # if you ever need it
+                            "es:ESHttpDeleteByQuery"    # some accounts require the explicit action
+                        ],
+                        # Replace <account> and <your-domain> with your actual values,
+                        # or use a wildcard if you prefer:
+                        "Resource": f"arn:aws:es:{bucket_region}:{account_id}:domain/<your-domain>/*"
+                    }
+                ],
+            }
+            opensearch_policy_name = truncate_resource_name("iam_policy", f"{role_name}-os-policy")
+            policies_to_attach.append((opensearch_policy_name, opensearch_policy))
+
             # Attach all policies in parallel using ThreadPoolExecutor
             logger.info(f"Attaching {len(policies_to_attach)} policies to role {role_name} in parallel")
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -1234,6 +1253,10 @@ def create_connector(createconnector: S3Connector) -> dict:
                                 "ASSETS_TABLE": medialake_asset_table,
                                 "EVENT_BUS_NAME": ingest_event_bus,
                                 "DO_NOT_INGEST_DUPLICATES": "True",
+                                "OPENSEARCH_ENDPOINT": os.environ["OPENSEARCH_ENDPOINT"],
+                                "INDEX_NAME":   os.environ.get("INDEX_NAME", "media"),
+                                "OPENSEARCH_SERVICE": "es",
+                                "AWS_REGION":  bucket_region,
                             }
                         },
                         Layers=layers,  # Updated to include both custom and AWS SDK layers
