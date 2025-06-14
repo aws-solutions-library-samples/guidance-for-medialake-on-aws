@@ -247,98 +247,73 @@ def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
         raise RuntimeError(f"OpenSearch {operation} failed: {error_msg} (status: {status})")
 
 
-# ── Lambda entrypoint ────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
-def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     try:
+        # 1) Get payload
         logger.info("Received event", extra={"event": event})
-
-        payload: Dict[str, Any] = event.get("payload") or {}
+        payload = event.get("payload") or {}
         if not payload:
             return _bad_request("Event missing 'payload'")
 
-        logger.info("Processing payload", extra={
-            "payload_structure": {
-                "has_data": "data" in payload,
-                "has_assets": "assets" in payload,
-                "data_type": type(payload.get("data")).__name__ if payload.get("data") else None,
-                "assets_length": len(payload.get("assets", [])),
-            }
-        })
-
-        # Handle error wrapper in payload.data (400)
-        if isinstance(payload.get("data"), dict):
-            response_data = payload["data"]
-            if response_data.get("statusCode") == 400:
-                error_body = json.loads(response_data.get("body", "{}"))
-                logger.error(f"400 in payload.data: {error_body.get('error', 'Unknown')}")
-                logger.info("Continuing – vector may be elsewhere")
-
+        # 2) Resolve asset_id
         asset_id = extract_asset_id(payload)
         if not asset_id:
             return _bad_request("Unable to determine asset_id – aborting")
 
+        # 3) Resolve embedding_vector
         embedding_vector = extract_embedding_vector(payload)
         if not embedding_vector and payload.get("assets"):
-            logger.info("Attempting to extract embedding vector from assets")
             for asset in payload["assets"]:
-                meta = asset.get("Metadata", {}).get("CustomMetadata", {})
-                if isinstance(meta.get("embedding"), list):
-                    embedding_vector = meta["embedding"]
+                cm = asset.get("Metadata", {}).get("CustomMetadata", {})
+                if isinstance(cm.get("embedding"), list):
+                    embedding_vector = cm["embedding"]
                     break
-
         if not embedding_vector:
             return _bad_request("No embedding vector found in event or assets")
 
-        scope            = extract_scope(payload)
-
-        # Default: if this asset is audio and no scope is supplied,
-        # treat it as an “audio” clip so we still index the segment.
+        # 4) Resolve scope and embedding_option
+        scope = extract_scope(payload)
         if IS_AUDIO_CONTENT and not scope:
             scope = "audio"
-
         embedding_option = extract_embedding_option(payload)
-        logger.info(f"Scope: {scope}, Embedding option: {embedding_option}")
+        logger.info(f"Scope={scope}, embedding_option={embedding_option}")
 
-        # Skip audio option inside video scope
+        # 5) Build base document
+        document: Dict[str, Any] = {
+            "type":              CONTENT_TYPE,
+            "embedding_scope":   scope,
+            "timestamp":         datetime.utcnow().isoformat(),
+            "DigitalSourceAsset": {"ID": asset_id},
+        }
+
+        # 6) Inject vector
         if embedding_option == "audio" and scope == "video":
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "message": "Skipped processing: audio embedding option with video scope",
-                    "asset_id": asset_id,
-                    "embedding_option": embedding_option,
-                    "embedding_scope": scope
-                })
-            }
+            document["audio_embedding"] = embedding_vector
+            logger.info("Merged audio_embedding into video master", extra={
+                "asset_id": asset_id, "vector_length": len(embedding_vector)
+            })
+        elif scope == "audio":
+            document["audio_embedding"] = embedding_vector
+        else:
+            document["embedding"] = embedding_vector
 
-        # ── OpenSearch client ──────────────────────────────────────
+        # 7) Get client or no-op
         client = get_opensearch_client()
         if not client:
             return _ok_no_op(embedding_vector, asset_id)
 
-        # ── Base document ──────────────────────────────────────────
-        document: Dict[str, Any] = {
-            "type":            CONTENT_TYPE,
-            "embedding":       embedding_vector,
-            "embedding_scope": scope,
-            "timestamp":       datetime.utcnow().isoformat(),
-        }
-
-        # ── Clip / audio scopes – create new doc ───────────────────
+        # 8) New doc for clips/audio
         if scope in {"clip", "audio"}:
             start_sec, end_sec = _get_segment_bounds(payload)
-
-            document |= {
-                "DigitalSourceAsset": {"ID": asset_id},
-                "start_timecode":     seconds_to_smpte(start_sec),
-                "end_timecode":       seconds_to_smpte(end_sec),
-            }
-            if IS_AUDIO_CONTENT:                       
-                document["embedding_scope"] = "clip" 
-
+            document.update({
+                "start_timecode": seconds_to_smpte(start_sec),
+                "end_timecode":   seconds_to_smpte(end_sec),
+            })
+            if IS_AUDIO_CONTENT:
+                document["embedding_scope"] = "clip"
             if embedding_option is not None:
                 document["embedding_option"] = embedding_option
 
@@ -346,7 +321,8 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 "index": INDEX_NAME,
                 "doc_preview": {
                     **document,
-                    "embedding": f"<vector length {len(embedding_vector)}>"
+                    ("audio_embedding" if scope == "audio" else "embedding"):
+                        f"<vector length {len(embedding_vector)}>"
                 }
             })
             res = client.index(index=INDEX_NAME, body=document)
@@ -361,178 +337,70 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 }),
             }
 
-        if IS_AUDIO_CONTENT:                             # ← NEW guard
-            logger.info("Skipping master-document update for audio content",
-                        extra={"asset_id": asset_id})
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "message":  "Embedding stored (audio clips only—master unchanged)",
-                    "asset_id": asset_id,
-                }),
-            }
-
-        # ── Non‑clip / non‑audio scopes – update existing document ────────────
-        search_query = {
+        # 9) Update existing master doc
+        search_q = {
             "query": {
                 "bool": {
                     "filter": [
-                        # exact match on the parent document
-                        { "term": { "DigitalSourceAsset.ID": asset_id } },
-                        { "exists": { "field": "InventoryID" } },
-
-                        # look inside the nested array “DerivedRepresentations”
-                        {
-                            "nested": {
-                                "path": "DerivedRepresentations",
-                                "query": {
-                                    "exists": {
-                                        "field": "DerivedRepresentations.ID"
-                                    }
-                                }
-                            }
-                        }
+                        {"term": {"DigitalSourceAsset.ID": asset_id}},
+                        {"exists": {"field": "InventoryID"}}
                     ]
                 }
             }
         }
+        logger.info("Searching for existing document", extra={"query": search_q})
+        start = time.time()
+        resp = client.search(index=INDEX_NAME, body=search_q, size=1)
+        check_opensearch_response(resp, "search")
 
-
-        logger.info("Searching for existing document", extra={
-            "operation": "search",
-            "index": INDEX_NAME,
-            "asset_id": asset_id,
-            "query": search_query
-        })
-
-        start_time      = time.time()
-        search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-        check_opensearch_response(search_response, "search")
-        
-        logger.info("Search response received", extra={
-            "total_hits": search_response["hits"]["total"]["value"],
-            "took_ms": search_response.get("took", 0),
-            "asset_id": asset_id
-        })
-
-        while (
-            search_response["hits"]["total"]["value"] == 0
-            and time.time() - start_time < 120
-        ):
-            logger.info(f"Doc {asset_id} not found – refreshing index & retrying …")
-            refresh_response = client.indices.refresh(index=INDEX_NAME)
-            check_opensearch_response(refresh_response, "refresh")
+        # retry refresh
+        while resp["hits"]["total"]["value"] == 0 and time.time() - start < 120:
+            client.indices.refresh(index=INDEX_NAME)
             time.sleep(5)
-            search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            check_opensearch_response(search_response, "search")
+            resp = client.search(index=INDEX_NAME, body=search_q, size=1)
+            check_opensearch_response(resp, "search")
 
-        if search_response["hits"]["total"]["value"] == 0:
-            error_msg = f"No document found with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
-            logger.error(error_msg, extra={
-                "asset_id": asset_id,
-                "index": INDEX_NAME,
-                "search_query": search_query
-            })
-            raise RuntimeError(error_msg)
+        if resp["hits"]["total"]["value"] == 0:
+            raise RuntimeError(f"No document found with ID={asset_id} in {INDEX_NAME}")
 
-        existing_id       = search_response["hits"]["hits"][0]["_id"]
-        meta             = client.get(index=INDEX_NAME, id=existing_id)
+        existing_id = resp["hits"]["hits"][0]["_id"]
+        meta       = client.get(index=INDEX_NAME, id=existing_id)
         check_opensearch_response(meta, "get")
-        seq_no, p_term    = meta["_seq_no"], meta["_primary_term"]
-        document["DigitalSourceAsset"] = {"ID": asset_id}
+        seq_no, p_term = meta["_seq_no"], meta["_primary_term"]
 
-        logger.info("Starting document update process", extra={
-            "document_id": existing_id,
-            "asset_id": asset_id,
-            "index": INDEX_NAME,
-            "sequence_no": seq_no,
-            "primary_term": p_term
-        })
-
-        for attempt in range(50):
+        # optimistic update
+        for _ in range(50):
             try:
                 update_body = {"doc": document}
-                logger.info("Attempting document update", extra={
-                    "attempt": attempt + 1,
-                    "operation": "update",
-                    "index": INDEX_NAME,
-                    "document_id": existing_id,
-                    "asset_id": asset_id,
-                    "update_structure": {
-                        **update_body,
-                        "doc": {
-                            **document,
-                            "embedding": f"<vector with length {len(embedding_vector)}>"
-                        }
-                    },
-                    "seq_no": seq_no,
-                    "primary_term": p_term
-                })
-
-                res = client.update(
+                ures = client.update(
                     index=INDEX_NAME,
                     id=existing_id,
                     body=update_body,
                     if_seq_no=seq_no,
                     if_primary_term=p_term,
                 )
-                check_opensearch_response(res, "update")
-                
-                logger.info("Update operation successful", extra={
-                    "operation": "update",
-                    "document_id": existing_id,
-                    "asset_id": asset_id,
-                    "attempt": attempt + 1,
-                    "response": {
-                        "result": res.get("result"),
-                        "version": res.get("_version"),
-                        "seq_no": res.get("_seq_no"),
-                        "primary_term": res.get("_primary_term")
-                    }
-                })
+                check_opensearch_response(ures, "update")
+                logger.info("Update successful", extra={"result": ures.get("result")})
                 break
-
             except exceptions.ConflictError:
-                logger.warning("Version conflict during update", extra={
-                    "attempt": attempt + 1,
-                    "document_id": existing_id,
-                    "asset_id": asset_id,
-                    "old_seq_no": seq_no,
-                    "old_primary_term": p_term
-                })
                 meta   = client.get(index=INDEX_NAME, id=existing_id)
                 check_opensearch_response(meta, "get")
-                seq_no = meta["_seq_no"]
-                p_term = meta["_primary_term"]
-                logger.info("Retrieved new sequence numbers after conflict", extra={
-                    "new_seq_no": seq_no,
-                    "new_primary_term": p_term,
-                    "document_id": existing_id,
-                    "asset_id": asset_id
-                })
+                seq_no, p_term = meta["_seq_no"], meta["_primary_term"]
                 time.sleep(1)
         else:
-            error_msg = "Failed to update document after 50 retries"
-            logger.error(error_msg, extra={
-                "document_id": existing_id,
-                "asset_id": asset_id,
-                "final_seq_no": seq_no,
-                "final_primary_term": p_term
-            })
-            return _bad_request(error_msg)
+            raise RuntimeError("Failed to update document after 50 retries")
 
         return {
             "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "message":     "Embedding stored successfully",
-                    "index":       INDEX_NAME,
-                    "document_id": existing_id,
-                    "asset_id":    asset_id,
-                }
-            ),
+            "body": json.dumps({
+                "message":     "Embedding stored successfully",
+                "index":       INDEX_NAME,
+                "document_id": existing_id,
+                "asset_id":    asset_id,
+            }),
         }
 
-    except Exception as exc:
+    except Exception:
         logger.exception("Error storing embedding")
-        raise RuntimeError("Error storing embedding") from exc
+        raise
+
