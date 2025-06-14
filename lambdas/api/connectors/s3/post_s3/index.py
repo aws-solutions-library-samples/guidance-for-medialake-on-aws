@@ -1256,7 +1256,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                                 "OPENSEARCH_ENDPOINT": os.environ["OPENSEARCH_ENDPOINT"],
                                 "INDEX_NAME":   os.environ.get("INDEX_NAME", "media"),
                                 "OPENSEARCH_SERVICE": "es",
-                                "AWS_REGION":  bucket_region,
+                                "REGION":  bucket_region,
                             }
                         },
                         Layers=layers,  # Updated to include both custom and AWS SDK layers
