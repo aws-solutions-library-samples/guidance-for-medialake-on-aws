@@ -50,12 +50,13 @@ class ConnectorsProps:
     asset_table_s3_path_index_arn: str
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
+    open_search_endpoint: str
+    opensearch_index: str
     ingest_event_bus: str | None
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
-    open_search_endpoint: str
-    opensearch_index: str
+
 
 
 
