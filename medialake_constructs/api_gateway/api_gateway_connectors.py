@@ -54,6 +54,8 @@ class ConnectorsProps:
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
+    open_search_endpoint: str
+    opensearch_index: str
 
 
 
