@@ -182,7 +182,7 @@ class LambdaConfig:
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
         snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
-                                      Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
+        Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
     """
 
     name: Optional[str] = None
