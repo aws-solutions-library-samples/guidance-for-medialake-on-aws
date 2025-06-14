@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
 OPENSEARCH_INDEX    = os.environ.get("INDEX_NAME", "media")
 OPENSEARCH_SERVICE  = os.environ.get("OPENSEARCH_SERVICE", "es")
-AWS_REGION          = os.environ.get("REGION", boto3.Session().region_name or "us-east-1")
+AWS_REGION          = os.environ.get("REGION","")
 
 # Re-use boto3’s session credentials
 _session     = boto3.Session()
