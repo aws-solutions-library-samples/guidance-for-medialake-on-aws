@@ -465,6 +465,36 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Add EC2 permissions for VPC Lambda creation
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:AttachNetworkInterface",
+                    "ec2:DetachNetworkInterface",
+                ],
+                resources=[
+                    f"arn:aws:ec2:{scope.region}:{account_id}:network-interface/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:subnet/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:security-group/*",
+                ],
+            )
+        )
+        
+        # Add EC2 describe permissions (these require * resource)
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeVpcs",
+                ],
+                resources=["*"],  # Describe actions require * resource
+            )
+        )
+
         # Update IAM/S3 policy with account-specific ARNs
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(

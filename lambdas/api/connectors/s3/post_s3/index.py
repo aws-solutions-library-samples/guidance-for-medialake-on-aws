@@ -1209,6 +1209,19 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "ec2:AttachNetworkInterface",
                             "ec2:DetachNetworkInterface"
                         ],
+                        "Resource": [
+                            f"arn:aws:ec2:{bucket_region}:{account_id}:network-interface/*",
+                            f"arn:aws:ec2:{bucket_region}:{account_id}:subnet/*",
+                            f"arn:aws:ec2:{bucket_region}:{account_id}:security-group/*"
+                        ]
+                    },
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "ec2:DescribeSecurityGroups",
+                            "ec2:DescribeSubnets",
+                            "ec2:DescribeVpcs"
+                        ],
                         "Resource": "*"
                     }
                 ],
