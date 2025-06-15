@@ -663,7 +663,10 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "lambda:ListEventSourceMappings",
                     "lambda:DeleteEventSourceMapping",
                 ],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:{config.resource_prefix}*",
+                    f"arn:aws:lambda:{self.region}:{self.account_id}:event-source-mapping:*",
+                ],
             )
         )
 
@@ -671,7 +674,9 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["states:DeleteStateMachine"],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:states:{self.region}:{self.account_id}:stateMachine:{config.resource_prefix}*"
+                ],
             )
         )
 
@@ -679,7 +684,9 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["sqs:DeleteQueue", "sqs:GetQueueAttributes"],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:sqs:{self.region}:{self.account_id}:{config.resource_prefix}*"
+                ],
             )
         )
 
@@ -692,7 +699,9 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "events:DescribeRule",
                     "events:ListTargetsByRule",
                 ],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:events:{self.region}:{self.account_id}:rule/*"
+                ],
             )
         )
 
@@ -707,7 +716,9 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "iam:ListRolePolicies",
                     "iam:GetRole",
                 ],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:iam::{self.account_id}:role/*"
+                ],
             )
         )
 
