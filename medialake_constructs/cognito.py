@@ -107,7 +107,7 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/pre_token_generation",
                 timeout_minutes=1,
                 lambda_handler="handler",
-                snap_start=True,
+                snap_start=False,
                 environment_variables={
                     "AUTH_TABLE_NAME": self._auth_table.table_name,
                     "DEBUG_MODE": "true",

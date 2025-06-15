@@ -60,7 +60,7 @@ class SharedAuthorizerConstruct(Construct):
                 entry="lambdas/auth/custom_authorizer",
                 memory_size=256,
                 timeout_minutes=1,
-                snap_start=True,  # Enable SnapStart for faster cold starts
+                snap_start=False,  # Disable SnapStart to avoid versioning
                 environment_variables=common_env_vars,
             ),
         )
