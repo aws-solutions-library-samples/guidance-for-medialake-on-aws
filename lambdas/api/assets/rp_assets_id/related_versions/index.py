@@ -251,20 +251,27 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             })
             raise APIError("Asset not found", 404)
 
-        if "embedding" not in hits[0]["_source"]:
-            logger.warning("No embedding found in asset document", extra={
+        src = hits[0]["_source"]
+
+        # Prefer audio_embedding if present, otherwise fall back to embedding
+        if "audio_embedding" in src:
+            vector_field = "audio_embedding"
+            embedding     = src["audio_embedding"]
+        elif "embedding" in src:
+            vector_field = "embedding"
+            embedding     = src["embedding"]
+        else:
+            logger.warning("No embedding field found in asset document", extra={
                 "asset_id": asset_id,
-                "available_fields": list(hits[0]["_source"].keys()),
+                "available_fields": list(src.keys()),
                 "query_used": json.dumps(initial_query, indent=2)
             })
             raise APIError("No embedding available for asset", 404)
 
-        embedding = hits[0]["_source"]["embedding"]
-        
-        logger.info("Retrieved embedding details", extra={
-            "embedding_exists": embedding is not None,
+        logger.info(f"Retrieved {vector_field} details", extra={
+            "vector_field":   vector_field,
             "embedding_type": type(embedding).__name__,
-            "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list"
+            "embedding_len":  len(embedding) if isinstance(embedding, list) else "not_a_list"
         })
 
         # Build the vector search query
@@ -273,9 +280,9 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "from": params.from_,
             "query": {
                 "knn": {
-                    "embedding": {
-                        "vector": embedding,
-                        "k": params.size
+                    vector_field: {
+                       "vector": embedding,
+                        "k":      params.size
                     }
                 }
             },
