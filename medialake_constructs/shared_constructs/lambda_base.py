@@ -571,21 +571,32 @@ class Lambda(Construct):
                 # Copy common libraries from various possible locations
                 COMMON_LIBS_COPIED=false
                 
-                # Try different possible paths for common_libraries
-                for path in "/asset-input/../common_libraries" "/asset-input/../../common_libraries" "/asset-input/../../../lambdas/common_libraries"; do
+                # Try different possible paths for common_libraries based on Lambda location depth
+                # For lambdas at root level: ../common_libraries
+                # For lambdas in api/: ../../common_libraries  
+                # For lambdas in api/category/: ../../../common_libraries
+                # For lambdas in api/category/function/: ../../../../common_libraries
+                for path in "/asset-input/../common_libraries" "/asset-input/../../common_libraries" "/asset-input/../../../common_libraries" "/asset-input/../../../../common_libraries" "/asset-input/../../../../../common_libraries"; do
                     if [ -d "$path" ]; then
                         echo "Found common libraries at: $path"
                         echo "Copying common libraries to Lambda bundle..."
-                        cp -au "$path"/* /asset-output/ 2>/dev/null || {
-                            echo "Warning: Some files in $path could not be copied, continuing..."
-                            for file in "$path"/*; do
-                                if [ -f "$file" ]; then
-                                    cp -u "$file" /asset-output/ || echo "Warning: Could not copy $file"
-                                fi
-                            done
-                        }
+                        
+                        # List files being copied for debugging
+                        echo "Files in common_libraries:"
+                        ls -la "$path"
+                        
+                        # Copy files individually to avoid issues with globbing
+                        for file in "$path"/*; do
+                            if [ -f "$file" ]; then
+                                filename=$(basename "$file")
+                                echo "Copying: $filename"
+                                cp -u "$file" /asset-output/ || echo "Warning: Could not copy $filename"
+                            fi
+                        done
                         COMMON_LIBS_COPIED=true
                         break
+                    else
+                        echo "Path not found: $path"
                     fi
                 done
                 
@@ -593,7 +604,13 @@ class Lambda(Construct):
                     echo "Warning: No common_libraries directory found. Searched paths:"
                     echo "  - /asset-input/../common_libraries"
                     echo "  - /asset-input/../../common_libraries" 
-                    echo "  - /asset-input/../../../lambdas/common_libraries"
+                    echo "  - /asset-input/../../../common_libraries"
+                    echo "  - /asset-input/../../../../common_libraries"
+                    echo "  - /asset-input/../../../../../common_libraries"
+                    echo "Current working directory during build:"
+                    pwd
+                    echo "Directory structure:"
+                    find /asset-input -name "common_libraries" -type d 2>/dev/null || echo "No common_libraries found in asset-input tree"
                 else
                     echo "Successfully copied common libraries"
                 fi
