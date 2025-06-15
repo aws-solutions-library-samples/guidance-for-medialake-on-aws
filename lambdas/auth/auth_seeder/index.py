@@ -1,8 +1,8 @@
 """
-Authorization Table Seeder Lambda for Media Lake.
+Authorization Table Seeder Lambda for MediaLake.
 
 This Lambda function is triggered by a CloudFormation Custom Resource
-and seeds the default system groups and permission sets (Administrator, Editor, Viewer)
+and seeds the default system groups and permission sets (Super Administrator, Editor, Viewer)
 into the DynamoDB authorization table.
 """
 
@@ -32,17 +32,17 @@ PREFIX_METADATA = "METADATA"
 # Default groups definitions
 DEFAULT_GROUPS = [
     {
-        "id": "administrators",
-        "name": "MediaLake Super Admin",
+        "id": "superAdministrators",
+        "name": "Super Administrator",
         "description": "System administrators with full access to all features and settings",
-        "department": "IT",
-        "assignedPermissionSets": ["administrator"]
+        "department": "Administration",
+        "assignedPermissionSets": ["superAdministrator"]
     },
     {
         "id": "editors",
-        "name": "Editors",
+        "name": "Editor",
         "description": "Content editors who can create, modify, and manage media assets",
-        "department": "Content",
+        "department": "Content Management",
         "assignedPermissionSets": ["editor"]
     },
     {
@@ -63,11 +63,14 @@ DEFAULT_PERMISSION_SETS = [
         "isSystem": True,
         "permissions": {
             "assets": {
+                "upload": True,
+                "download": True,
                 "view": True,
                 "edit": True,
                 "delete": True
             },
             "pipelines": {
+                "create": True,
                 "view": True,
                 "edit": True,
                 "delete": True
@@ -78,13 +81,17 @@ DEFAULT_PERMISSION_SETS = [
                 "cancel": True
             },
             "collections": {
+                "create": True,
                 "view": True,
                 "edit": True,
                 "delete": True
             },
             "settings": {
                 "users": {
-                    "edit": True
+                    "edit": True,
+                    "view": True,
+                    "delete": True,
+                    "create": True
                 },
                 "system": {
                     "edit": True
@@ -97,18 +104,15 @@ DEFAULT_PERMISSION_SETS = [
                 "regions": {
                     "edit": True
                 },
-                "system-settings": {
-                    "edit": True
-                },
                 "connectors": {
                     "edit": True,
                     "delete": True,
-                    "add": True
+                    "create": True
                 },
                 "permissions": {
                     "edit": True,
                     "delete": True,
-                    "add": True
+                    "create": True
                 }
             }
         }
@@ -121,11 +125,14 @@ DEFAULT_PERMISSION_SETS = [
         "effectiveRole": "Editor",
         "permissions": {
             "assets": {
+                "upload": True,
+                "download": True,
                 "view": True,
                 "edit": True,
                 "delete": True
             },
             "pipelines": {
+                "create": True,
                 "view": True,
                 "edit": True,
                 "delete": True
@@ -136,6 +143,7 @@ DEFAULT_PERMISSION_SETS = [
                 "cancel": True
             },
             "collections": {
+                "create": True,
                 "view": True,
                 "edit": True,
                 "delete": True
@@ -150,11 +158,14 @@ DEFAULT_PERMISSION_SETS = [
         "effectiveRole": "Viewer",
         "permissions": {
             "assets": {
+                "upload": False,
+                "download": True,
                 "view": True,
                 "edit": False,
                 "delete": False
             },
             "pipelines": {
+                "create": False,
                 "view": True,
                 "edit": False,
                 "delete": False
@@ -165,6 +176,7 @@ DEFAULT_PERMISSION_SETS = [
                 "cancel": False
             },
             "collections": {
+                "create": False,
                 "view": True,
                 "edit": False,
                 "delete": False

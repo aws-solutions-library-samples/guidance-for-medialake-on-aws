@@ -202,7 +202,7 @@ export const router = createBrowserRouter([
             {
                 path: 'settings/system',
                 element: <RoutePermissionGuard
-                    permission={{ action: 'manage', subject: 'system-settings' }}
+                    permission={{ action: 'manage', subject: 'settings' }}
                     element={<SystemSettingsPage />}
                 />
             },

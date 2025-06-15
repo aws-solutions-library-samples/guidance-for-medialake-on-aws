@@ -122,8 +122,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
           // Map settings resources to CASL subjects
           const settingsMapping: {[key: string]: string} = {
             'users': 'user',
-            'system': 'system-settings',
-            'system-settings': 'system-settings',  // Add explicit mapping for system-settings
+            'system': 'settings',  // Changed from system-settings to generic settings
             'permissions': 'permission-set',
             'connectors': 'connector',
             'integrations': 'integration',
@@ -202,7 +201,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             'groups': 'group',
             'connectors': 'connector',
             'permissions': 'permission-set',
-            'systems': 'system-settings'
+            'systems': 'settings'
           };
           
           const caslResource = resourceMapping[resource] || resource;
@@ -246,7 +245,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     // Additional specific permissions for settings
     
     // System settings
-    can('manage', 'system-settings');
+    can('manage', 'settings');
     
     // Connector settings
     can('create', 'connector');

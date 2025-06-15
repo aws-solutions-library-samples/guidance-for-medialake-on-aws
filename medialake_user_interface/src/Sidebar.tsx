@@ -109,16 +109,6 @@ function Sidebar() {
 
     const { ability } = usePermission();
     
-    // Memoize permission checks with error handling
-    const canViewSettings = useMemo(() => {
-        try {
-            return ability?.can('view', 'settings') ?? false;
-        } catch (error) {
-            console.error('Error checking settings permission:', error);
-            return false;
-        }
-    }, [ability]);
-    
     const canViewPipeline = useMemo(() => {
         try {
             return ability?.can('view', 'pipeline') ?? false;
@@ -137,6 +127,27 @@ function Sidebar() {
             return false;
         }
     }, [ability]);
+
+    // Memoize permission checks with error handling
+    const canViewSettings = useMemo(() => {
+        try {
+            // Check if user has any settings-related permissions
+            return (ability?.can('view', 'settings') ||
+                   ability?.can('view', 'user') ||
+                   ability?.can('view', 'group') ||
+                   ability?.can('view', 'permission-set') ||
+                   ability?.can('view', 'connector') ||
+                   ability?.can('view', 'integration') ||
+                   safePermissionCheck('view', 'settings.users') ||
+                   safePermissionCheck('view', 'settings.connectors') ||
+                   safePermissionCheck('view', 'settings.integrations') ||
+                   safePermissionCheck('view', 'settings.system') ||
+                   safePermissionCheck('view', 'settings.permissions')) ?? false;
+        } catch (error) {
+            console.error('Error checking settings permission:', error);
+            return false;
+        }
+    }, [ability, safePermissionCheck]);
     
     // Build menu items based on permissions
     const mainMenuItems = [
@@ -205,7 +216,8 @@ function Sidebar() {
                     text: t('sidebar.submenu.system'),
                     icon: <SettingsIcon />,
                     path: '/settings/system',
-                    visible: safePermissionCheck('view', 'system-settings')
+                    visible: safePermissionCheck('view', 'settings') || 
+                             safePermissionCheck('view', 'settings.system')
                 },
             ].filter(item => item.visible !== false)
         }
