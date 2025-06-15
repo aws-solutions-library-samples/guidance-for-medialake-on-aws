@@ -656,17 +656,39 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
 
         # Add Lambda function deletion permissions
+        # Lambda function deletion permissions
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:DeleteFunction",
+                ],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:{config.resource_prefix}*",
+                ],
+            )
+        )
+        
+        # Lambda event source mapping permissions - scoped to region/account
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
                     "lambda:ListEventSourceMappings",
                     "lambda:DeleteEventSourceMapping",
                 ],
                 resources=[
-                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:{config.resource_prefix}*",
                     f"arn:aws:lambda:{self.region}:{self.account_id}:event-source-mapping:*",
+                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:*",
                 ],
+            )
+        )
+        
+        # GetEventSourceMapping requires wildcard access due to AWS Lambda service internals
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "lambda:GetEventSourceMapping",
+                ],
+                resources=["*"],
             )
         )
 
