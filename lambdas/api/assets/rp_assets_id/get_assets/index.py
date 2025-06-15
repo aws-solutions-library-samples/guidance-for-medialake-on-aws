@@ -255,7 +255,7 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
                     "must": [
                         {
                             "term": {
-                                "DigitalSourceAsset.ID.keyword": asset_id
+                                "DigitalSourceAsset.ID": asset_id
                             }
                         },
                         {
