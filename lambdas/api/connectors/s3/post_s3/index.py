@@ -1071,23 +1071,19 @@ def create_connector(createconnector: S3Connector) -> dict:
                 ("role_policy", (role_name, "AWSLambdaBasicExecutionRole"))
             )
 
-            # Attach VPC execution role policy if VPC configuration is present
-            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
-            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
-            
-            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
-                try:
-                    iam_client.attach_role_policy(
-                        RoleName=role_name,
-                        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-                    )
-                    created_resources.append(
-                        ("role_policy", (role_name, "AWSLambdaVPCAccessExecutionRole"))
-                    )
-                    logger.info(f"Attached AWSLambdaVPCAccessExecutionRole to {role_name}")
-                except Exception as e:
-                    logger.error(f"Error attaching VPC execution policy to role {role_name}: {str(e)}")
-                    # Don't fail the entire operation for policy attachment issues
+            # Attach VPC execution role policy
+            try:
+                iam_client.attach_role_policy(
+                    RoleName=role_name,
+                    PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                )
+                created_resources.append(
+                    ("role_policy", (role_name, "AWSLambdaVPCAccessExecutionRole"))
+                )
+                logger.info(f"Attached AWSLambdaVPCAccessExecutionRole to {role_name}")
+            except Exception as e:
+                logger.error(f"Error attaching VPC execution policy to role {role_name}: {str(e)}")
+                # Don't fail the entire operation for policy attachment issues
 
             # Prepare all policies for parallel attachment
             policies_to_attach = []
@@ -1200,30 +1196,26 @@ def create_connector(createconnector: S3Connector) -> dict:
             opensearch_policy_name = truncate_resource_name("iam_policy", f"{role_name}-os-policy")
             policies_to_attach.append((opensearch_policy_name, opensearch_policy))
 
-            # Add VPC access policy if VPC configuration is present
-            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
-            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
-            
-            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
-                vpc_policy = {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:CreateNetworkInterface",
-                                "ec2:DescribeNetworkInterfaces",
-                                "ec2:DeleteNetworkInterface",
-                                "ec2:AttachNetworkInterface",
-                                "ec2:DetachNetworkInterface"
-                            ],
-                            "Resource": "*"
-                        }
-                    ],
-                }
-                vpc_policy_name = truncate_resource_name("iam_policy", f"{role_name}-vpc-policy")
-                policies_to_attach.append((vpc_policy_name, vpc_policy))
-                logger.info(f"Added VPC access policy to role {role_name}")
+            # Add VPC access policy
+            vpc_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "ec2:CreateNetworkInterface",
+                            "ec2:DescribeNetworkInterfaces",
+                            "ec2:DeleteNetworkInterface",
+                            "ec2:AttachNetworkInterface",
+                            "ec2:DetachNetworkInterface"
+                        ],
+                        "Resource": "*"
+                    }
+                ],
+            }
+            vpc_policy_name = truncate_resource_name("iam_policy", f"{role_name}-vpc-policy")
+            policies_to_attach.append((vpc_policy_name, vpc_policy))
+            logger.info(f"Added VPC access policy to role {role_name}")
 
             # Attach all policies in parallel using ThreadPoolExecutor
             logger.info(f"Attaching {len(policies_to_attach)} policies to role {role_name} in parallel")
@@ -1308,18 +1300,15 @@ def create_connector(createconnector: S3Connector) -> dict:
             }
 
             # Add VPC configuration for OpenSearch access
-            opensearch_vpc_subnet_ids = os.environ.get("OPENSEARCH_VPC_SUBNET_IDS")
-            opensearch_security_group_id = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
+            opensearch_vpc_subnet_ids = os.environ["OPENSEARCH_VPC_SUBNET_IDS"]
+            opensearch_security_group_id = os.environ["OPENSEARCH_SECURITY_GROUP_ID"]
             
-            if opensearch_vpc_subnet_ids and opensearch_security_group_id:
-                subnet_ids = opensearch_vpc_subnet_ids.split(',') if opensearch_vpc_subnet_ids else []
-                create_function_params["VpcConfig"] = {
-                    "SubnetIds": subnet_ids,
-                    "SecurityGroupIds": [opensearch_security_group_id]
-                }
-                logger.info(f"Added VPC configuration to Lambda: Subnets={subnet_ids}, SecurityGroup={opensearch_security_group_id}")
-            else:
-                logger.warning("OpenSearch VPC configuration not found - Lambda will not be deployed in VPC")
+            subnet_ids = opensearch_vpc_subnet_ids.split(',')
+            create_function_params["VpcConfig"] = {
+                "SubnetIds": subnet_ids,
+                "SecurityGroupIds": [opensearch_security_group_id]
+            }
+            logger.info(f"Added VPC configuration to Lambda: Subnets={subnet_ids}, SecurityGroup={opensearch_security_group_id}")
 
             for lambda_attempt in range(max_lambda_retries):
                 try:

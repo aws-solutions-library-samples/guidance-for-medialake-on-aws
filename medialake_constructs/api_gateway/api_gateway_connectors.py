@@ -53,6 +53,8 @@ class ConnectorsProps:
     open_search_endpoint: str
     opensearch_index: str
     ingest_event_bus: str | None
+    vpc_subnet_ids: str
+    security_group_id: str
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
@@ -382,6 +384,27 @@ class ConnectorsConstruct(Construct):
             "IngestMediaProcessorLayer",
         )
 
+        # Prepare environment variables
+        env_vars = {
+            "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+            "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+            "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+            "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+            "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
+            "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
+            "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+            "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
+            "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+            "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
+            "RESOURCE_PREFIX": config.resource_prefix,
+            "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
+            "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+            "OPENSEARCH_INDEX": props.opensearch_index,
+            "INDEX_NAME": props.opensearch_index,
+            "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
+            "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
+        }
+
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
@@ -389,23 +412,7 @@ class ConnectorsConstruct(Construct):
                 name="connectors_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
                 memory_size=256,
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
-                    "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                    "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                    "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
-                    "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                    "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
-                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
-                    "OPENSEARCH_INDEX": props.opensearch_index,
-                    
-                },
+                environment_variables=env_vars,
             ),
         )
 
