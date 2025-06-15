@@ -142,8 +142,7 @@ class ConnectorsConstruct(Construct):
                         "iam:PassRole",
                     ],
                     resources=[
-                        # f"arn:aws:iam::{account_id}:role/{config.resource_prefix}-*",
-                        f"arn:aws:iam::{account_id}:role/*",
+                        f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*",
                     ],  # Restrict to roles with prefix
                     conditions={
                         "StringLike": {
@@ -311,7 +310,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Separate IAM policy with account-specific ARNs
+        # Separate IAM policy with account-specific ARNs - restricted to resource prefix
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -324,10 +323,11 @@ class ConnectorsConstruct(Construct):
                     "iam:ListInstanceProfilesForRole",
                     "iam:GetRole"
                 ],
-                resources=[f"arn:aws:iam::{account_id}:role/*"],
+                resources=[f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*"],
             )
         )
 
+        # EventBridge rules - restricted to resource prefix
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -335,7 +335,7 @@ class ConnectorsConstruct(Construct):
                     "events:DeleteRule",
                 ],
                 resources=[
-                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/{config.resource_prefix}*",
                 ],
             )
         )
@@ -353,7 +353,7 @@ class ConnectorsConstruct(Construct):
             )
         )
         
-        # Add EventBridge Pipes permissions
+        # Add EventBridge Pipes permissions - restricted to resource prefix
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -365,7 +365,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/{config.resource_prefix}*"],
             )
         )
 
@@ -487,7 +487,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Separate IAM policy with account-specific ARNs
+        # Separate IAM policy with account-specific ARNs - restricted to resource prefix
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -504,7 +504,7 @@ class ConnectorsConstruct(Construct):
                     "iam:DetachRolePolicy",
                     "iam:GetRole",
                 ],
-                resources=[f"arn:aws:iam::{account_id}:role/*"],
+                resources=[f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*"],
             )
         )
 
@@ -542,7 +542,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Policy for EventBridge actions
+        # Policy for EventBridge actions - restricted to resource prefix
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -552,12 +552,12 @@ class ConnectorsConstruct(Construct):
                     "events:RemoveTargets"
                 ],
                 resources=[
-                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/{config.resource_prefix}*",
                 ],
             )
         )
 
-        # Add EventBridge Pipes permissions
+        # Add EventBridge Pipes permissions - restricted to resource prefix
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -572,7 +572,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/{config.resource_prefix}*"],
             )
         )
 

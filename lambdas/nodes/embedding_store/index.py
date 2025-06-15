@@ -36,6 +36,8 @@ INDEX_NAME          = os.getenv("INDEX_NAME", "media")
 CONTENT_TYPE        = os.getenv("CONTENT_TYPE", "video").lower()
 AWS_REGION          = os.getenv("AWS_REGION", "us-east-1")
 
+IS_AUDIO_CONTENT    = CONTENT_TYPE == "audio"
+
 # ── OpenSearch client ────────────────────────────────────────────────────────
 _session     = boto3.Session()
 _credentials = _session.get_credentials()
@@ -64,9 +66,7 @@ def get_opensearch_client():
 
 # ── Helper extraction functions ──────────────────────────────────────────────
 def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Return payload.data.item if present (new Twelve Labs shape).
-    """
+    """Return payload.data.item when present."""
     if isinstance(container.get("data"), dict):
         itm = container["data"].get("item")
         if isinstance(itm, dict):
@@ -74,10 +74,8 @@ def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # 👈 NEW
-    """
-    Return payload.map.item when present (audio segmentation metadata).
-    """
+def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return payload.map.item when present (audio segmentation metadata)."""
     m = container.get("map")
     if isinstance(m, dict) and isinstance(m.get("item"), dict):
         return m["item"]
@@ -86,19 +84,17 @@ def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # 👈 NE
 
 def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
     """
-    Locate the first asset ID, in order of priority:
-
-    1. payload.data.item.asset_id    
-    2. payload.map.item.asset_id     
-    3. payload.assets[ ].DigitalSourceAsset.ID
+    1. payload.data.item.asset_id
+    2. payload.map.item.asset_id
+    3. payload.assets[*].DigitalSourceAsset.ID
     4. payload.DigitalSourceAsset.ID
     """
     itm = _item(container)
     if itm and itm.get("asset_id"):
         return itm["asset_id"]
 
-    m_itm = _map_item(container)                                    
-    if m_itm and m_itm.get("asset_id"):      
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("asset_id"):
         return m_itm["asset_id"]
 
     for asset in container.get("assets", []):
@@ -111,34 +107,27 @@ def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
 
 def extract_scope(container: Dict[str, Any]) -> Optional[str]:
     """
-    Locate the embedding_scope in the following order:
-
     1. payload.data.item.embedding_scope
-    2. payload.data.embedding_scope        <-- NEW
+    2. payload.data.embedding_scope
     3. payload.map.item.embedding_scope
     4. payload.embedding_scope
     5. payload.externalTaskResults[*].embedding_scope
     """
-    # 1️⃣  payload.data.item.embedding_scope  (existing logic)
     itm = _item(container)
     if itm and itm.get("embedding_scope"):
         return itm["embedding_scope"]
 
-    # 2️⃣  payload.data.embedding_scope  (flat data shape)
     data = container.get("data")
     if isinstance(data, dict) and data.get("embedding_scope"):
         return data["embedding_scope"]
 
-    # 3️⃣  payload.map.item.embedding_scope
     m_itm = _map_item(container)
     if m_itm and m_itm.get("embedding_scope"):
         return m_itm["embedding_scope"]
 
-    # 4️⃣  top-level payload.embedding_scope
     if container.get("embedding_scope"):
         return container["embedding_scope"]
 
-    # 5️⃣  externalTaskResults[*].embedding_scope
     for res in container.get("externalTaskResults", []):
         if res.get("embedding_scope"):
             return res["embedding_scope"]
@@ -148,34 +137,27 @@ def extract_scope(container: Dict[str, Any]) -> Optional[str]:
 
 def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
     """
-    Locate the embedding_option in the following order:
-    
     1. payload.data.item.embedding_option
     2. payload.data.embedding_option
     3. payload.map.item.embedding_option
     4. payload.embedding_option
     5. payload.externalTaskResults[*].embedding_option
     """
-    # 1️⃣  payload.data.item.embedding_option
     itm = _item(container)
     if itm and itm.get("embedding_option"):
         return itm["embedding_option"]
 
-    # 2️⃣  payload.data.embedding_option
     data = container.get("data")
     if isinstance(data, dict) and data.get("embedding_option"):
         return data["embedding_option"]
 
-    # 3️⃣  payload.map.item.embedding_option
     m_itm = _map_item(container)
     if m_itm and m_itm.get("embedding_option"):
         return m_itm["embedding_option"]
 
-    # 4️⃣  top-level payload.embedding_option
     if container.get("embedding_option"):
         return container["embedding_option"]
 
-    # 5️⃣  externalTaskResults[*].embedding_option
     for res in container.get("externalTaskResults", []):
         if res.get("embedding_option"):
             return res["embedding_option"]
@@ -185,7 +167,7 @@ def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
 
 def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
     """
-    1. payload.data.item.float             (new shape – PRIMARY)
+    1. payload.data.item.float
     2. payload.data.float
     3. payload.float
     4. payload.externalTaskResults[*].float
@@ -210,6 +192,37 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
 
     return None
 
+
+# ── NEW helper ───────────────────────────────────────────────────────────────
+def _get_segment_bounds(payload: Dict[str, Any]) -> tuple[int, int]:
+    """
+    Return (start_sec, end_sec) or (0, 0) if not found.
+    Searches the three shapes we meet in production and accepts both
+    *_offset_sec and *_time field names.
+    """
+    candidates: list[Dict[str, Any]] = []
+
+    itm = _item(payload)
+    if itm:
+        candidates.append(itm)
+
+    if isinstance(payload.get("data"), dict):
+        candidates.append(payload["data"])
+
+    m_itm = _map_item(payload)
+    if m_itm:
+        candidates.append(m_itm)
+
+    for c in candidates:
+        start = c.get("start_offset_sec") or c.get("start_time")
+        end   = c.get("end_offset_sec")   or c.get("end_time")
+        if start is not None and end is not None:
+            return int(start), int(end)
+
+    logger.warning("Segment bounds not found – defaulting to 0-0")
+    return 0, 0
+
+
 # ── Small helpers for early exits ────────────────────────────────────────────
 def _bad_request(msg: str):
     logger.warning(msg)
@@ -228,6 +241,7 @@ def _ok_no_op(vector: Optional[List], asset_id: Optional[str]):
         ),
     }
 
+<<<<<<< HEAD
 # Using the new error handler module instead of the local function
 def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
     """
@@ -236,6 +250,21 @@ def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
     This is a wrapper around check_response_status for backward compatibility
     """
     check_response_status(response, "OpenSearch", operation, [200, 201])
+=======
+
+def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
+    """Raise if OpenSearch response status is not 200/201."""
+    status = response.get("status", 200)
+    if status not in (200, 201):
+        error_msg = response.get("error", {}).get("reason", "Unknown error")
+        logger.error(f"OpenSearch {operation} failed", extra={
+            "status": status,
+            "error": error_msg,
+            "response": response
+        })
+        raise RuntimeError(f"OpenSearch {operation} failed: {error_msg} (status: {status})")
+>>>>>>> e7926b1d25c1ad23611b0d1074062a03a94cfa9b
+
 
 # ── Lambda entrypoint ────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
@@ -246,12 +275,10 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
         logger.info("Received event", extra={"event": event})
 
-        # Extract and validate payload
         payload: Dict[str, Any] = event.get("payload") or {}
         if not payload:
             return _bad_request("Event missing 'payload'")
 
-        # Log the full payload structure for debugging
         logger.info("Processing payload", extra={
             "payload_structure": {
                 "has_data": "data" in payload,
@@ -261,62 +288,42 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             }
         })
 
-        # Check if we're receiving an error response
+        # Handle error wrapper in payload.data (400)
         if isinstance(payload.get("data"), dict):
             response_data = payload["data"]
-            if isinstance(response_data, dict) and response_data.get("statusCode") == 400:
+            if response_data.get("statusCode") == 400:
                 error_body = json.loads(response_data.get("body", "{}"))
-                error_message = error_body.get("error", "Unknown 400 error")
-                logger.error(f"Received 400 status code in payload.data: {error_message}")
-                # Don't immediately fail - continue processing as the embedding might be elsewhere
-                logger.info("Attempting to process assets data despite error in payload.data")
+                logger.error(f"400 in payload.data: {error_body.get('error', 'Unknown')}")
+                logger.info("Continuing – vector may be elsewhere")
 
-        # Extract asset_id first since we need it for both paths
         asset_id = extract_asset_id(payload)
-        if not asset_id:
-            # Try to extract from assets array if present
-            if payload.get("assets"):
-                for asset in payload["assets"]:
-                    if asset.get("DigitalSourceAsset", {}).get("ID"):
-                        asset_id = asset["DigitalSourceAsset"]["ID"]
-                        logger.info(f"Found asset_id in assets array: {asset_id}")
-                        break
-
         if not asset_id:
             return _bad_request("Unable to determine asset_id – aborting")
 
-        # Try to extract embedding vector from multiple locations
         embedding_vector = extract_embedding_vector(payload)
         if not embedding_vector and payload.get("assets"):
-            # If embedding_vector not found in primary location, try to extract from assets
-            logger.info("Attempting to extract embedding vector from assets data")
+            logger.info("Attempting to extract embedding vector from assets")
             for asset in payload["assets"]:
-                if isinstance(asset, dict):
-                    # Try to extract from asset's metadata or other relevant fields
-                    # This might need adjustment based on where the embedding actually is
-                    if "Metadata" in asset and "CustomMetadata" in asset["Metadata"]:
-                        metadata = asset["Metadata"]["CustomMetadata"]
-                        if "embedding" in metadata:
-                            embedding_vector = metadata["embedding"]
-                            logger.info("Found embedding vector in asset metadata")
-                            break
+                meta = asset.get("Metadata", {}).get("CustomMetadata", {})
+                if isinstance(meta.get("embedding"), list):
+                    embedding_vector = meta["embedding"]
+                    break
 
         if not embedding_vector:
-            error_msg = "No embedding vector found in event or assets data"
-            logger.error(error_msg, extra={"payload_structure": payload})
-            return _bad_request(error_msg)
+            return _bad_request("No embedding vector found in event or assets")
 
-        scope = extract_scope(payload)
+        scope            = extract_scope(payload)
+
+        # Default: if this asset is audio and no scope is supplied,
+        # treat it as an “audio” clip so we still index the segment.
+        if IS_AUDIO_CONTENT and not scope:
+            scope = "audio"
+
         embedding_option = extract_embedding_option(payload)
         logger.info(f"Scope: {scope}, Embedding option: {embedding_option}")
 
-        # Check if we should skip processing for audio embedding_option with video scope
+        # Skip audio option inside video scope
         if embedding_option == "audio" and scope == "video":
-            logger.info("Skipping processing: embedding_option='audio' with embedding_scope='video'", extra={
-                "embedding_option": embedding_option,
-                "embedding_scope": scope,
-                "asset_id": asset_id
-            })
             return {
                 "statusCode": 200,
                 "body": json.dumps({
@@ -327,12 +334,12 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 })
             }
 
-        # 3️⃣ OpenSearch client (skip if unavailable) ---------------------------
+        # ── OpenSearch client ──────────────────────────────────────
         client = get_opensearch_client()
         if not client:
             return _ok_no_op(embedding_vector, asset_id)
 
-        # 4️⃣ Base document definition ------------------------------------------
+        # ── Base document ──────────────────────────────────────────
         document: Dict[str, Any] = {
             "type":            CONTENT_TYPE,
             "embedding":       embedding_vector,
@@ -340,54 +347,49 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             "timestamp":       datetime.utcnow().isoformat(),
         }
 
-        # ── Clip / audio scopes – create a new document ────────────────────────
+        # ── Clip / audio scopes – create new doc ───────────────────
         if scope in {"clip", "audio"}:
-            # --------------------------------------------------------------
-            # Where to grab segment timing?
-            #  • clip  -> payload.data.item
-            #  • audio -> payload.map.item  (preferred) OR payload.data.item
-            # --------------------------------------------------------------
-            itm: Dict[str, Any] = {}
-
-            if scope == "clip":
-                itm = _item(payload) or {}
-                start_sec = itm.get("start_offset_sec", 0)
-                end_sec   = itm.get("end_offset_sec",   0)
-
-            else:  # audio
-                itm = _map_item(payload) or _item(payload) or {}
-                start_sec = itm.get("start_time", 0)
-                end_sec   = itm.get("end_time",   0)
+            start_sec, end_sec = _get_segment_bounds(payload)
 
             document |= {
                 "DigitalSourceAsset": {"ID": asset_id},
                 "start_timecode":     seconds_to_smpte(start_sec),
                 "end_timecode":       seconds_to_smpte(end_sec),
             }
+            if IS_AUDIO_CONTENT:                       
+                document["embedding_scope"] = "clip" 
 
             if embedding_option is not None:
                 document["embedding_option"] = embedding_option
 
-            logger.info("Inserting new document into OpenSearch", extra={
-                "operation": "index",
+            logger.info("Indexing new document", extra={
                 "index": INDEX_NAME,
-                "document_structure": {
+                "doc_preview": {
                     **document,
-                    "embedding": f"<vector with length {len(embedding_vector)}>"  # Don't log full vector
+                    "embedding": f"<vector length {len(embedding_vector)}>"
                 }
             })
             res = client.index(index=INDEX_NAME, body=document)
             check_opensearch_response(res, "index")
             return {
                 "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "message":     "Embedding stored successfully",
-                        "index":       INDEX_NAME,
-                        "document_id": res.get("_id", "unknown"),
-                        "asset_id":    asset_id,
-                    }
-                ),
+                "body": json.dumps({
+                    "message":     "Embedding stored successfully",
+                    "index":       INDEX_NAME,
+                    "document_id": res.get("_id", "unknown"),
+                    "asset_id":    asset_id,
+                }),
+            }
+
+        if IS_AUDIO_CONTENT:                             # ← NEW guard
+            logger.info("Skipping master-document update for audio content",
+                        extra={"asset_id": asset_id})
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "message":  "Embedding stored (audio clips only—master unchanged)",
+                    "asset_id": asset_id,
+                }),
             }
 
         # ── Non‑clip / non‑audio scopes – update existing document ────────────

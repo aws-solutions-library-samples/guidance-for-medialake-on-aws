@@ -258,6 +258,7 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
+<<<<<<< HEAD
         # Using stack name, region, account, and environment to create a unique domain prefix
         unique_id = hashlib.md5(
             f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()
@@ -265,6 +266,11 @@ class CognitoConstruct(Construct):
         domain_prefix = (
             f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         )
+=======
+        # Using stack name, region, account, and environment ensures uniqueness across different deployments
+        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode(), usedforsecurity=False).hexdigest()[:16]
+        domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+>>>>>>> e7926b1d25c1ad23611b0d1074062a03a94cfa9b
         self._domain_prefix = domain_prefix
 
         # Grant the Cognito service permission to invoke the Lambda
