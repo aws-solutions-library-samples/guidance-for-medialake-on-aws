@@ -209,6 +209,11 @@ export default {
         endTime: 'Endzeit',
         duration: 'Dauer',
         actions: 'Aktionen'
+      },
+      actions: {
+        retryFromCurrent: 'Ab aktueller Position wiederholen',
+        retryFromStart: 'Von Anfang an wiederholen',
+        viewDetails: 'Details anzeigen'
       }
     },
     users: {

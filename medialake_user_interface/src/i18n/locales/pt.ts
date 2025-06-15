@@ -387,6 +387,11 @@ export default {
         endTime: 'Hora de Término',
         duration: 'Duração',
         actions: 'Ações'
+      },
+      actions: {
+        retryFromCurrent: 'Tentar novamente a partir da posição atual',
+        retryFromStart: 'Tentar novamente desde o início',
+        viewDetails: 'Ver Detalhes'
       }
     },
     translation: {

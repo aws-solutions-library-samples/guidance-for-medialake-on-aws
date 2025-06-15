@@ -4,6 +4,8 @@ import { apiClient } from '@/api/apiClient';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
+import { useFeatureFlag } from '@/utils/featureFlags';
+import { useAuth } from '@/common/hooks/auth-context';
 
 interface Asset {
     asset: {
@@ -459,6 +461,8 @@ export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) =>
 // Hook to get all bulk download jobs for the current user
 export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
     const { showError } = useErrorModal();
+    const { isAuthenticated } = useAuth();
+    const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
     return useQuery({
         queryKey: ['userBulkDownloadJobs'],
@@ -497,7 +501,7 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
                 throw error;
             }
         },
-        enabled,
+        enabled: enabled && isAuthenticated && multiSelectFeature.value,
         refetchInterval: 15000, // Poll every 15 seconds
         refetchIntervalInBackground: true, // Continue polling when tab is not active
         retry: 1,
