@@ -37,6 +37,15 @@ export interface CreateUserResponse {
   data: {
     username: string;
     userStatus: string;
+    groupsAdded: string[];
+    groupsFailed?: Array<{
+      group_id: string;
+      error_code: string;
+      error_message: string;
+    }>;
+    groupsFailedCount?: number;
+    invalidGroups?: string[];
+    invalidGroupsCount?: number;
   };
 }
 

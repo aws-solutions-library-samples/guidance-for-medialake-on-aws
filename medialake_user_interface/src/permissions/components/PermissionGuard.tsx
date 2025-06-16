@@ -37,7 +37,8 @@ export function PermissionGuard({
     console.log('PermissionGuard: Showing loading state', { 
       authLoading, 
       isInitialized, 
-      permissionLoading: loading 
+      permissionLoading: loading,
+      currentPath: location.pathname
     });
     return (
       <Box 
@@ -65,22 +66,30 @@ export function PermissionGuard({
   }
   
   // Check if the user has permission
-  console.log(`PermissionGuard: Checking permission for ${action} on ${subject}`);
+  console.log('🔒 PermissionGuard: Starting permission check for route:', location.pathname);
+  console.log('🔒 Required permission:', { action, subject, field });
+  console.log('🔒 Auth state:', { isAuthenticated, isInitialized, authLoading });
+  console.log('🔒 Permission loading:', loading);
+  
   const allowed = can(action, subject, field);
-  console.log(`PermissionGuard: Permission check result: ${allowed}`);
+  console.log('🔒 PermissionGuard: Final permission result:', allowed);
   
   // If allowed, render the children
   if (allowed) {
+    console.log('🔒 PermissionGuard: Access GRANTED for', location.pathname);
     return <>{children}</>;
   }
   
   // If fallback is provided, render it
   if (fallback) {
+    console.log('🔒 PermissionGuard: Using fallback component for', location.pathname);
     return <>{fallback}</>;
   }
   
   // Otherwise, redirect to the login page or access denied page
-  console.log('PermissionGuard: Access denied, redirecting to /access-denied');
+  console.log('🔒 PermissionGuard: Access DENIED for', location.pathname);
+  console.log('🔒 Required permission was:', { action, subject, field });
+  console.log('🔒 Redirecting to /access-denied');
   return <Navigate to="/access-denied" state={{ from: location }} replace />;
 }
 
@@ -117,6 +126,10 @@ export function RoutePermissionGuard({
   permission: { action: Actions; subject: Subjects; field?: string }; 
   element: React.ReactNode;
 }) {
+  const location = useLocation();
+  
+  console.log('🛡️  RoutePermissionGuard: Protecting route', location.pathname, 'with permission:', permission);
+  
   return (
     <PermissionGuard 
       action={permission.action} 

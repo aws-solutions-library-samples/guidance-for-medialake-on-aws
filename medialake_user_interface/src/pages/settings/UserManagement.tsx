@@ -57,7 +57,7 @@ const UserManagement: React.FC = () => {
 
         if (isNewUser) {
             console.log('Creating new user with groups:', userData.groups);
-            await handleMutation(
+            const result = await handleMutation(
                 {
                     mutation: createUserMutation,
                     actionMessages: {
@@ -66,7 +66,30 @@ const UserManagement: React.FC = () => {
                         successMessage: t('users.apiMessages.creating.successMessage'),
                         error: t('users.apiMessages.creating.error'),
                     },
-                    onSuccess: () => { /* Optional: Trigger refetch or other actions */ },
+                    onSuccess: (data) => {
+                        // Check for group assignment issues and show additional notifications
+                        if (data?.data) {
+                            const { groupsAdded = [], groupsFailed = [], invalidGroups = [] } = data.data;
+                            
+                            // Log the results for debugging
+                            console.log('User creation completed with group results:', {
+                                groupsAdded,
+                                groupsFailed,
+                                invalidGroups
+                            });
+                            
+                            // Show warnings for failed group assignments
+                            if (groupsFailed.length > 0) {
+                                console.warn(`Failed to assign user to ${groupsFailed.length} groups:`, groupsFailed);
+                                // You could show a toast notification here about partial group assignment
+                            }
+                            
+                            if (invalidGroups.length > 0) {
+                                console.warn(`${invalidGroups.length} groups were invalid:`, invalidGroups);
+                                // You could show a toast notification here about invalid groups
+                            }
+                        }
+                    },
                 },
                 userData
             );

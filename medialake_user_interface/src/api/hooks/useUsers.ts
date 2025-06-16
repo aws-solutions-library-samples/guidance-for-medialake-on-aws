@@ -64,6 +64,7 @@ export const useCreateUser = () => {
 
     return useMutation<CreateUserResponse, Error, CreateUserRequest>({
         mutationFn: async (newUser) => {
+            console.log('Sending user creation request with groups:', newUser.groups);
             const { data } = await apiClient.post<{ statusCode: number; body: string }>(API_ENDPOINTS.USER, newUser);
             console.log('Raw API Response:', data);
 
@@ -71,13 +72,38 @@ export const useCreateUser = () => {
             const parsedBody = JSON.parse(data.body);
             console.log('Parsed body:', parsedBody);
 
+            // Log detailed group assignment results
+            if (parsedBody.data) {
+                console.log('Group assignment results:', {
+                    groupsAdded: parsedBody.data.groupsAdded || [],
+                    groupsFailed: parsedBody.data.groupsFailed || [],
+                    invalidGroups: parsedBody.data.invalidGroups || [],
+                    groupsAddedCount: parsedBody.data.groupsAdded?.length || 0,
+                    groupsFailedCount: parsedBody.data.groupsFailedCount || 0,
+                    invalidGroupsCount: parsedBody.data.invalidGroupsCount || 0,
+                });
+
+                // Log any issues with group assignment
+                if (parsedBody.data.groupsFailed && parsedBody.data.groupsFailed.length > 0) {
+                    console.warn('Some groups failed to be assigned:', parsedBody.data.groupsFailed);
+                }
+                if (parsedBody.data.invalidGroups && parsedBody.data.invalidGroups.length > 0) {
+                    console.warn('Some groups were invalid:', parsedBody.data.invalidGroups);
+                }
+            }
+
             // Return the parsed response with the correct structure
             return {
                 status: parsedBody.status,
                 message: parsedBody.message,
                 data: {
                     username: parsedBody.data.username,
-                    userStatus: parsedBody.data.userStatus
+                    userStatus: parsedBody.data.userStatus,
+                    groupsAdded: parsedBody.data.groupsAdded || [],
+                    groupsFailed: parsedBody.data.groupsFailed,
+                    groupsFailedCount: parsedBody.data.groupsFailedCount,
+                    invalidGroups: parsedBody.data.invalidGroups,
+                    invalidGroupsCount: parsedBody.data.invalidGroupsCount,
                 }
             };
         },
