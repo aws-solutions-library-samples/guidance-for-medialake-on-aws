@@ -221,15 +221,7 @@ def handler(event, context):
                         "engine":     "nmslib"
                     }
                 },
-                "audio_embedding": {
-                    "type":      "knn_vector",
-                    "dimension": VECTOR_DIMENSION,
-                    "method": {
-                        "name":       "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine":     "nmslib"
-                    }
-                },
+               
                 "DerivedRepresentations": {
                     "type": "nested",
                     "properties": {
@@ -345,15 +337,6 @@ def handler(event, context):
                         "end_timecode":    {"type": "keyword"},
                         "embedding_scope": {"type": "keyword"},
                         "embedding": {
-                            "type":      "knn_vector",
-                            "dimension": VECTOR_DIMENSION,
-                            "method": {
-                                "name":       "hnsw",
-                                "space_type": "cosinesimil",
-                                "engine":     "nmslib"
-                            }
-                        },
-                        "audio_embedding": {
                             "type":      "knn_vector",
                             "dimension": VECTOR_DIMENSION,
                             "method": {

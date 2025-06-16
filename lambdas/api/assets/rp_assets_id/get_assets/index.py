@@ -268,7 +268,7 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
             },
             "size": 100,  # Limit to 100 clips per asset
             "_source": {
-                    "excludes": ["embedding","audio_embedding"]
+                    "excludes": ["embedding"]
             },
             "sort": [
                 {"start_timecode": {"order": "asc"}}  # Sort by start time
