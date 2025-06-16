@@ -213,19 +213,26 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 raise SearchException("Invalid embedding format")
 
             logger.info(f"Generated embedding for query: {params.q} (length: {len(embedding)})")
-            k_val = params.pageSize * 20
+
             query = {
-                "size": k_val,
+                "size": params.pageSize * 20,
                 "query": {
                     "bool": {
-                    "should": [
-                        {"knn": {"embedding":       {"vector": embedding, "k": k_val}}},
-                        {"knn": {"audio_embedding": {"vector": embedding, "k": k_val}}}
-                    ],
-                    "minimum_should_match": 1
+                        "must": [
+                            {
+                                "knn": {
+                                    "embedding": {
+                                        "vector": embedding,
+                                        "k": params.pageSize * 20
+                                    }
+                                }
+                            }
+                        ]
                     }
                 },
-                "_source": {"excludes": ["embedding", "audio_embedding"]}
+                "_source": {
+                    "excludes": ["embedding"]
+                }
             }
             # If clip logic is disabled, exclude clip hits in the semantic query
             if not CLIP_LOGIC_ENABLED:
@@ -233,9 +240,8 @@ def build_semantic_query(params: SearchParams) -> Dict:
                     {"term": {"embedding_scope": "clip"}}
                 ]
 
-            
-            logger.info(f"Semantic query size: {query['size']}, k: {k_val}")
-
+            # print(json.dumps(query))
+            logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
             return query
         else:
             raise SearchException("Failed to generate embedding for search term")
