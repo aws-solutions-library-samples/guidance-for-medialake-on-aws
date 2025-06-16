@@ -76,7 +76,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             
             return {
                 nodeId: nodeId,
-                description: config.description || editingIntegration.name || '',
+                description: editingIntegration.description || config.description || '',
                 auth: {
                     type: authType,
                     credentials: {
@@ -244,7 +244,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             setSelectedNodeId(nodeId);
             form.reset({
                 nodeId: nodeId,
-                description: config.description || editingIntegration.name || '',
+                description: editingIntegration.description || config.description || '',
                 auth: {
                     type: authType,
                     credentials: {
